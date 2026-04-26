@@ -1,11 +1,3 @@
-import { useCallback, useRef } from "react";
-import type { Dispatch, MutableRefObject } from "react";
-import type {
-  DebugEntry,
-  ThreadListSortKey,
-  ThreadSummary,
-  WorkspaceInfo,
-} from "@/types";
 import {
   archiveThread as archiveThreadService,
   forkThread as forkThreadService,
@@ -15,13 +7,13 @@ import {
   startThread as startThreadService,
 } from "@services/tauri";
 import {
-  getThreadTimestamp,
-} from "@utils/threadItems";
+  buildResumeHydrationPlan,
+  buildWorkspacePathLookup,
+  buildWorkspaceThreadListState,
+  getThreadListNextCursor,
+  resolveWorkspaceIdForThreadPath,
+} from "@threads/utils/threadActionHelpers";
 import { extractThreadCodexMetadata } from "@threads/utils/threadCodexMetadata";
-import {
-  buildThreadSummaryFromThread,
-  extractThreadFromResponse,
-} from "@threads/utils/threadSummary";
 import { asString } from "@threads/utils/threadNormalize";
 import {
   getParentThreadIdFromThread,
@@ -29,12 +21,13 @@ import {
 } from "@threads/utils/threadRpc";
 import { saveThreadActivity } from "@threads/utils/threadStorage";
 import {
-  buildResumeHydrationPlan,
-  buildWorkspacePathLookup,
-  buildWorkspaceThreadListState,
-  getThreadListNextCursor,
-  resolveWorkspaceIdForThreadPath,
-} from "@threads/utils/threadActionHelpers";
+  buildThreadSummaryFromThread,
+  extractThreadFromResponse,
+} from "@threads/utils/threadSummary";
+import { getThreadTimestamp } from "@utils/threadItems";
+import type { Dispatch, MutableRefObject } from "react";
+import { useCallback, useRef } from "react";
+import type { DebugEntry, ThreadListSortKey, ThreadSummary, WorkspaceInfo } from "@/types";
 import type { ThreadAction, ThreadState } from "./useThreadsReducer";
 
 const THREAD_LIST_TARGET_COUNT = 20;
@@ -117,11 +110,7 @@ export function useThreadActions({
         }
       }
     },
-    [
-      onSubagentThreadDetected,
-      onThreadCodexMetadataDetected,
-      updateThreadParent,
-    ],
+    [onSubagentThreadDetected, onThreadCodexMetadataDetected, updateThreadParent],
   );
 
   const dispatchPreviewMessage = useCallback(
@@ -136,13 +125,10 @@ export function useThreadActions({
     [dispatch],
   );
 
-  const extractThreadId = useCallback(
-    (response: Record<string, unknown> | null | undefined) => {
-      const thread = extractThreadFromResponse(response);
-      return String(thread?.id ?? "");
-    },
-    [],
-  );
+  const extractThreadId = useCallback((response: Record<string, unknown> | null | undefined) => {
+    const thread = extractThreadFromResponse(response);
+    return String(thread?.id ?? "");
+  }, []);
 
   const startThreadForWorkspace = useCallback(
     async (workspaceId: string, options?: { activate?: boolean }) => {
@@ -188,12 +174,7 @@ export function useThreadActions({
   );
 
   const resumeThreadForWorkspace = useCallback(
-    async (
-      workspaceId: string,
-      threadId: string,
-      force = false,
-      replaceLocal = false,
-    ) => {
+    async (workspaceId: string, threadId: string, force = false, replaceLocal = false) => {
       if (!threadId) {
         return null;
       }
@@ -218,17 +199,16 @@ export function useThreadActions({
         label: "thread/resume",
         payload: { workspaceId, threadId },
       });
-      const inFlightCount =
-        (resumeInFlightByThreadRef.current[threadId] ?? 0) + 1;
+      const inFlightCount = (resumeInFlightByThreadRef.current[threadId] ?? 0) + 1;
       resumeInFlightByThreadRef.current[threadId] = inFlightCount;
       if (inFlightCount === 1) {
         dispatch({ type: "setThreadResumeLoading", threadId, isLoading: true });
       }
       try {
-        const response =
-          (await resumeThreadService(workspaceId, threadId)) as
-            | Record<string, unknown>
-            | null;
+        const response = (await resumeThreadService(workspaceId, threadId)) as Record<
+          string,
+          unknown
+        > | null;
         onDebug?.({
           id: `${Date.now()}-server-thread-resume`,
           timestamp: Date.now(),
@@ -244,8 +224,7 @@ export function useThreadActions({
           });
           applyCollabThreadLinksFromThread(workspaceId, threadId, thread);
           const localItems = itemsByThread[threadId] ?? [];
-          const shouldReplace =
-            replaceLocal || replaceOnResumeRef.current[threadId] === true;
+          const shouldReplace = replaceLocal || replaceOnResumeRef.current[threadId] === true;
           if (shouldReplace) {
             replaceOnResumeRef.current[threadId] = false;
           }
@@ -303,10 +282,7 @@ export function useThreadActions({
               name: hydrationPlan.threadName,
             });
           }
-          if (
-            hydrationPlan.lastMessageText &&
-            hydrationPlan.lastMessageTimestamp !== null
-          ) {
+          if (hydrationPlan.lastMessageText && hydrationPlan.lastMessageTimestamp !== null) {
             dispatchPreviewMessage(
               threadId,
               hydrationPlan.lastMessageText,
@@ -326,10 +302,7 @@ export function useThreadActions({
         });
         return null;
       } finally {
-        const nextCount = Math.max(
-          0,
-          (resumeInFlightByThreadRef.current[threadId] ?? 1) - 1,
-        );
+        const nextCount = Math.max(0, (resumeInFlightByThreadRef.current[threadId] ?? 1) - 1);
         if (nextCount === 0) {
           delete resumeInFlightByThreadRef.current[threadId];
           dispatch({ type: "setThreadResumeLoading", threadId, isLoading: false });
@@ -352,11 +325,7 @@ export function useThreadActions({
   );
 
   const forkThreadForWorkspace = useCallback(
-    async (
-      workspaceId: string,
-      threadId: string,
-      options?: { activate?: boolean },
-    ) => {
+    async (workspaceId: string, threadId: string, options?: { activate?: boolean }) => {
       if (!threadId) {
         return null;
       }
@@ -403,13 +372,7 @@ export function useThreadActions({
         return null;
       }
     },
-    [
-      dispatch,
-      extractThreadId,
-      loadedThreadsRef,
-      onDebug,
-      resumeThreadForWorkspace,
-    ],
+    [dispatch, extractThreadId, loadedThreadsRef, onDebug, resumeThreadForWorkspace],
   );
 
   const refreshThread = useCallback(
@@ -503,10 +466,7 @@ export function useThreadActions({
         try {
           const knownWorkspaces = await listWorkspacesService();
           if (knownWorkspaces.length > 0) {
-            workspacePathLookup = buildWorkspacePathLookup([
-              ...targets,
-              ...knownWorkspaces,
-            ]);
+            workspacePathLookup = buildWorkspacePathLookup([...targets, ...knownWorkspaces]);
           }
         } catch {
           workspacePathLookup = buildWorkspacePathLookup(targets);
@@ -523,13 +483,12 @@ export function useThreadActions({
         do {
           const pageCursor = cursor;
           pagesFetched += 1;
-          const response =
-            (await listThreadsService(
-              requester.id,
-              cursor,
-              THREAD_LIST_PAGE_SIZE,
-              requestedSortKey,
-            )) as Record<string, unknown>;
+          const response = (await listThreadsService(
+            requester.id,
+            cursor,
+            THREAD_LIST_PAGE_SIZE,
+            requestedSortKey,
+          )) as Record<string, unknown>;
           onDebug?.({
             id: `${Date.now()}-server-thread-list`,
             timestamp: Date.now(),
@@ -569,8 +528,7 @@ export function useThreadActions({
               uniqueThreadIds.size > THREAD_LIST_TARGET_COUNT &&
               resumeCursorByWorkspace[workspaceId] === null
             ) {
-              resumeCursorByWorkspace[workspaceId] =
-                pageCursor ?? THREAD_LIST_CURSOR_PAGE_START;
+              resumeCursorByWorkspace[workspaceId] = pageCursor ?? THREAD_LIST_CURSOR_PAGE_START;
             }
           });
           cursor = nextCursor;
@@ -591,9 +549,7 @@ export function useThreadActions({
             requestedSortKey,
             buildThreadSummary,
             activeThreadId: activeThreadIdByWorkspace[workspace.id],
-            existingThreadIds: (threadsByWorkspace[workspace.id] ?? []).map(
-              (thread) => thread.id,
-            ),
+            existingThreadIds: (threadsByWorkspace[workspace.id] ?? []).map((thread) => thread.id),
             threadStatusById,
             threadParentById,
             threadListTargetCount: THREAD_LIST_TARGET_COUNT,
@@ -687,8 +643,7 @@ export function useThreadActions({
       if (!cursorValue) {
         return;
       }
-      const nextCursor =
-        cursorValue === THREAD_LIST_CURSOR_PAGE_START ? null : cursorValue;
+      const nextCursor = cursorValue === THREAD_LIST_CURSOR_PAGE_START ? null : cursorValue;
       let workspacePathLookup = buildWorkspacePathLookup([workspace]);
       const allowedWorkspaceIds = new Set([workspace.id]);
       const existing = threadsByWorkspace[workspace.id] ?? [];
@@ -708,10 +663,7 @@ export function useThreadActions({
         try {
           const knownWorkspaces = await listWorkspacesService();
           if (knownWorkspaces.length > 0) {
-            workspacePathLookup = buildWorkspacePathLookup([
-              workspace,
-              ...knownWorkspaces,
-            ]);
+            workspacePathLookup = buildWorkspacePathLookup([workspace, ...knownWorkspaces]);
           }
         } catch {
           workspacePathLookup = buildWorkspacePathLookup([workspace]);
@@ -722,13 +674,12 @@ export function useThreadActions({
         let cursor: string | null = nextCursor;
         do {
           pagesFetched += 1;
-          const response =
-            (await listThreadsService(
-              workspace.id,
-              cursor,
-              THREAD_LIST_PAGE_SIZE,
-              requestedSortKey,
-            )) as Record<string, unknown>;
+          const response = (await listThreadsService(
+            workspace.id,
+            cursor,
+            THREAD_LIST_PAGE_SIZE,
+            requestedSortKey,
+          )) as Record<string, unknown>;
           onDebug?.({
             id: `${Date.now()}-server-thread-list-older`,
             timestamp: Date.now(),
@@ -742,24 +693,22 @@ export function useThreadActions({
             : [];
           const next = getThreadListNextCursor(result);
           matchingThreads.push(
-            ...data.filter(
-              (thread) => {
-                const workspaceId = resolveWorkspaceIdForThreadPath(
-                  String(thread?.cwd ?? ""),
-                  workspacePathLookup,
-                  allowedWorkspaceIds,
-                );
-                if (workspaceId !== workspace.id) {
-                  return false;
-                }
-                const threadId = String(thread?.id ?? "");
-                if (threadId && shouldHideSubagentThreadFromSidebar(thread.source)) {
-                  dispatch({ type: "hideThread", workspaceId, threadId });
-                  return false;
-                }
-                return true;
-              },
-            ),
+            ...data.filter((thread) => {
+              const workspaceId = resolveWorkspaceIdForThreadPath(
+                String(thread?.cwd ?? ""),
+                workspacePathLookup,
+                allowedWorkspaceIds,
+              );
+              if (workspaceId !== workspace.id) {
+                return false;
+              }
+              const threadId = String(thread?.id ?? "");
+              if (threadId && shouldHideSubagentThreadFromSidebar(thread.source)) {
+                dispatch({ type: "hideThread", workspaceId, threadId });
+                return false;
+              }
+              return true;
+            }),
           );
           cursor = next;
           if (matchingThreads.length === 0 && pagesFetched >= maxPagesWithoutMatch) {

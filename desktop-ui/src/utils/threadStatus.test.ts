@@ -5,10 +5,7 @@ import { getThreadStatusClass, getWorkspaceHomeThreadState } from "./threadStatu
 describe("threadStatus", () => {
   it("prioritizes pending user input over processing state", () => {
     expect(
-      getThreadStatusClass(
-        { isProcessing: true, hasUnread: false, isReviewing: false },
-        true,
-      ),
+      getThreadStatusClass({ isProcessing: true, hasUnread: false, isReviewing: false }, true),
     ).toBe("unread");
   });
 

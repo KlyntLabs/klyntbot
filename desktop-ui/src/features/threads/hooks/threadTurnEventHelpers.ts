@@ -1,11 +1,11 @@
-import type { TurnPlan } from "@/types";
+import { asString } from "@threads/utils/threadNormalize";
 import {
   getParentThreadIdFromThread,
   getSubagentMetadataFromThread,
   isSubagentThreadSource,
   shouldHideSubagentThreadFromSidebar,
 } from "@threads/utils/threadRpc";
-import { asString } from "@threads/utils/threadNormalize";
+import type { TurnPlan } from "@/types";
 
 export function normalizeThreadStatusType(status: Record<string, unknown>): string {
   const typeRaw = status.type ?? status.statusType ?? status.status_type;

@@ -1,5 +1,5 @@
-import { useEffect } from "react";
 import { matchesShortcut } from "@utils/shortcuts";
+import { useEffect } from "react";
 
 type UseArchiveShortcutOptions = {
   isEnabled: boolean;
@@ -21,11 +21,7 @@ function isEditableTarget(target: EventTarget | null) {
   );
 }
 
-export function useArchiveShortcut({
-  isEnabled,
-  shortcut,
-  onTrigger,
-}: UseArchiveShortcutOptions) {
+export function useArchiveShortcut({ isEnabled, shortcut, onTrigger }: UseArchiveShortcutOptions) {
   useEffect(() => {
     if (!isEnabled || !shortcut) {
       return;

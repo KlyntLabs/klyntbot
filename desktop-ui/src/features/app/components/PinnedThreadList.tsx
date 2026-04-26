@@ -1,7 +1,6 @@
-import { useMemo, useState, type MouseEvent } from "react";
-
-import type { ThreadSummary } from "@/types";
 import type { ThreadStatusById } from "@utils/threadStatus";
+import { type MouseEvent, useMemo, useState } from "react";
+import type { ThreadSummary } from "@/types";
 import { ThreadRow } from "./ThreadRow";
 import { buildThreadRowVisibility } from "./threadRowVisibility";
 
@@ -46,9 +45,8 @@ export function PinnedThreadList({
   const [collapsedThreadKeys, setCollapsedThreadKeys] = useState<Set<string>>(new Set());
   const visibility = useMemo(
     () =>
-      buildThreadRowVisibility(
-        rows,
-        (row) => collapsedThreadKeys.has(`${row.workspaceId}:${row.thread.id}`),
+      buildThreadRowVisibility(rows, (row) =>
+        collapsedThreadKeys.has(`${row.workspaceId}:${row.thread.id}`),
       ),
     [collapsedThreadKeys, rows],
   );

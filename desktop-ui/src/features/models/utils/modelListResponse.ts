@@ -32,7 +32,9 @@ function extractModelItems(response: unknown): unknown[] {
   return [];
 }
 
-function parseReasoningEfforts(item: Record<string, unknown>): ModelOption["supportedReasoningEfforts"] {
+function parseReasoningEfforts(
+  item: Record<string, unknown>,
+): ModelOption["supportedReasoningEfforts"] {
   const camel = item.supportedReasoningEfforts;
   if (Array.isArray(camel)) {
     return camel
@@ -46,8 +48,8 @@ function parseReasoningEfforts(item: Record<string, unknown>): ModelOption["supp
           description: String(entry.description ?? ""),
         };
       })
-      .filter((effort): effort is { reasoningEffort: string; description: string } =>
-        effort !== null,
+      .filter(
+        (effort): effort is { reasoningEffort: string; description: string } => effort !== null,
       );
   }
 
@@ -64,8 +66,8 @@ function parseReasoningEfforts(item: Record<string, unknown>): ModelOption["supp
           description: String(entry.description ?? ""),
         };
       })
-      .filter((effort): effort is { reasoningEffort: string; description: string } =>
-        effort !== null,
+      .filter(
+        (effort): effort is { reasoningEffort: string; description: string } => effort !== null,
       );
   }
 

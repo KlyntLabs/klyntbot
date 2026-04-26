@@ -20,11 +20,7 @@ export function workspaceMatchesQuery(workspaceName: string, query: string) {
   return includesNormalizedText(workspaceName, query);
 }
 
-export function threadMatchesQuery(
-  thread: ThreadSummary,
-  workspaceName: string,
-  query: string,
-) {
+export function threadMatchesQuery(thread: ThreadSummary, workspaceName: string, query: string) {
   if (!query) {
     return true;
   }
@@ -36,9 +32,7 @@ export function threadMatchesQuery(
   );
 }
 
-export function splitRowsByRoot<Row extends { depth: number }>(
-  rows: Row[],
-): RootRowGroup<Row>[] {
+export function splitRowsByRoot<Row extends { depth: number }>(rows: Row[]): RootRowGroup<Row>[] {
   const groups: RootRowGroup<Row>[] = [];
   let current: Row[] = [];
   let currentRootIndex = 0;

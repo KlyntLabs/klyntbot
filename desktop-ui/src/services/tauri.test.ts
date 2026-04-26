@@ -1,58 +1,58 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import * as notification from "@tauri-apps/plugin-notification";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  exportMarkdownFile,
   addWorkspace,
   compactThread,
+  createAgent,
   createGitHubRepo,
+  deleteAgent,
+  exportMarkdownFile,
   fetchGit,
   forkThread,
-  getAppsList,
+  generateAgentDescription,
   getAgentsSettings,
+  getAppsList,
   getExperimentalFeatureList,
   getGitHubIssues,
   getGitLog,
   getGitStatus,
   getOpenAppIcon,
-  listThreads,
   listMcpServerStatus,
-  readThread,
-  readGlobalAgentsMd,
-  readGlobalCodexConfigToml,
+  listThreads,
   listWorkspaces,
   openWorkspaceIn,
+  pickImageFiles,
+  pickWorkspacePaths,
+  readAgentConfigToml,
   readAgentMd,
-  stageGitAll,
+  readGlobalAgentsMd,
+  readGlobalCodexConfigToml,
+  readImageAsDataUrl,
+  readThread,
   respondToServerRequest,
   respondToUserInputRequest,
-  sendUserMessage,
-  steerTurn,
   sendNotification,
-  setCodexFeatureFlag,
+  sendUserMessage,
   setAgentsCoreSettings,
+  setCodexFeatureFlag,
+  setThreadName,
   setTrayRecentThreads,
   setTraySessionUsage,
+  stageGitAll,
   startReview,
-  setThreadName,
-  tailscaleDaemonStart,
+  steerTurn,
   tailscaleDaemonCommandPreview,
+  tailscaleDaemonStart,
   tailscaleDaemonStatus,
   tailscaleDaemonStop,
   tailscaleStatus,
-  pickImageFiles,
-  pickWorkspacePaths,
-  writeGlobalAgentsMd,
-  writeGlobalCodexConfigToml,
-  createAgent,
   updateAgent,
-  deleteAgent,
-  readAgentConfigToml,
-  readImageAsDataUrl,
-  generateAgentDescription,
   writeAgentConfigToml,
   writeAgentMd,
+  writeGlobalAgentsMd,
+  writeGlobalCodexConfigToml,
 } from "./tauri";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -124,28 +124,14 @@ describe("tauri invoke wrappers", () => {
     const openMock = vi.mocked(open);
     openMock.mockResolvedValueOnce(["/tmp/photo.heic", "/tmp/photo.heif"]);
 
-    await expect(pickImageFiles()).resolves.toEqual([
-      "/tmp/photo.heic",
-      "/tmp/photo.heif",
-    ]);
+    await expect(pickImageFiles()).resolves.toEqual(["/tmp/photo.heic", "/tmp/photo.heif"]);
 
     expect(openMock).toHaveBeenCalledWith({
       multiple: true,
       filters: [
         {
           name: "Images",
-          extensions: [
-            "png",
-            "jpg",
-            "jpeg",
-            "gif",
-            "webp",
-            "bmp",
-            "tiff",
-            "tif",
-            "heic",
-            "heif",
-          ],
+          extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "tif", "heic", "heif"],
         },
       ],
     });
@@ -157,10 +143,7 @@ describe("tauri invoke wrappers", () => {
     saveMock.mockResolvedValueOnce(null);
 
     await expect(exportMarkdownFile("# Plan")).resolves.toBeNull();
-    expect(invokeMock).not.toHaveBeenCalledWith(
-      "write_text_file",
-      expect.anything(),
-    );
+    expect(invokeMock).not.toHaveBeenCalledWith("write_text_file", expect.anything());
   });
 
   it("writes markdown to the selected path", async () => {
@@ -556,7 +539,11 @@ describe("tauri invoke wrappers", () => {
 
   it("reads global config.toml", async () => {
     const invokeMock = vi.mocked(invoke);
-    invokeMock.mockResolvedValueOnce({ exists: true, content: "model = \"gpt-5\"", truncated: false });
+    invokeMock.mockResolvedValueOnce({
+      exists: true,
+      content: 'model = "gpt-5"',
+      truncated: false,
+    });
 
     await readGlobalCodexConfigToml();
 
@@ -571,13 +558,13 @@ describe("tauri invoke wrappers", () => {
     const invokeMock = vi.mocked(invoke);
     invokeMock.mockResolvedValueOnce({});
 
-    await writeGlobalCodexConfigToml("model = \"gpt-5\"");
+    await writeGlobalCodexConfigToml('model = "gpt-5"');
 
     expect(invokeMock).toHaveBeenCalledWith("file_write", {
       scope: "global",
       kind: "config",
       workspaceId: undefined,
-      content: "model = \"gpt-5\"",
+      content: 'model = "gpt-5"',
     });
   });
 
@@ -684,7 +671,7 @@ describe("tauri invoke wrappers", () => {
 
   it("reads an agent config file", async () => {
     const invokeMock = vi.mocked(invoke);
-    invokeMock.mockResolvedValueOnce("model = \"gpt-5-codex\"");
+    invokeMock.mockResolvedValueOnce('model = "gpt-5-codex"');
 
     await readAgentConfigToml("researcher");
 
@@ -697,11 +684,11 @@ describe("tauri invoke wrappers", () => {
     const invokeMock = vi.mocked(invoke);
     invokeMock.mockResolvedValueOnce({});
 
-    await writeAgentConfigToml("researcher", "model = \"gpt-5-codex\"");
+    await writeAgentConfigToml("researcher", 'model = "gpt-5-codex"');
 
     expect(invokeMock).toHaveBeenCalledWith("write_agent_config_toml", {
       agentName: "researcher",
-      content: "model = \"gpt-5-codex\"",
+      content: 'model = "gpt-5-codex"',
     });
   });
 
@@ -1068,10 +1055,9 @@ describe("tauri invoke wrappers", () => {
     expect(isPermissionGrantedMock).toHaveBeenCalledTimes(1);
     expect(requestPermissionMock).toHaveBeenCalledTimes(1);
     expect(sendNotificationMock).not.toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledWith(
-      "Notification permission not granted.",
-      { permission: "denied" },
-    );
+    expect(warnSpy).toHaveBeenCalledWith("Notification permission not granted.", {
+      permission: "denied",
+    });
     expect(invokeMock).toHaveBeenCalledWith("send_notification_fallback", {
       title: "Denied",
       body: "Nope",

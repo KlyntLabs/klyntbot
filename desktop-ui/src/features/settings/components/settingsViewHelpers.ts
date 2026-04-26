@@ -1,8 +1,4 @@
-import type {
-  AppSettings,
-  OpenAppTarget,
-  WorkspaceInfo,
-} from "@/types";
+import type { AppSettings, OpenAppTarget, WorkspaceInfo } from "@/types";
 import type { OpenAppDraft, ShortcutDrafts } from "./settingsTypes";
 import { SETTINGS_MOBILE_BREAKPOINT_PX } from "./settingsViewConstants";
 
@@ -11,9 +7,7 @@ export const normalizeOverrideValue = (value: string): string | null => {
   return trimmed ? trimmed : null;
 };
 
-export const normalizeWorktreeSetupScript = (
-  value: string | null | undefined,
-): string | null => {
+export const normalizeWorktreeSetupScript = (value: string | null | undefined): string | null => {
   const next = value ?? "";
   return next.trim().length > 0 ? next : null;
 };
@@ -72,9 +66,7 @@ export const isOpenAppTargetComplete = (target: OpenAppTarget) => {
   return true;
 };
 
-export const normalizeOpenAppTargets = (
-  drafts: OpenAppDraft[],
-): OpenAppTarget[] =>
+export const normalizeOpenAppTargets = (drafts: OpenAppDraft[]): OpenAppTarget[] =>
   drafts.map(({ argsText, ...target }) => ({
     ...target,
     label: target.label.trim(),

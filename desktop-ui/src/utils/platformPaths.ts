@@ -5,8 +5,9 @@ function platformKind(): PlatformKind {
     return "unknown";
   }
   const platform =
-    (navigator as Navigator & { userAgentData?: { platform?: string } })
-      .userAgentData?.platform ?? navigator.platform ?? "";
+    (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ??
+    navigator.platform ??
+    "";
   const normalized = platform.toLowerCase();
   if (normalized.includes("mac")) {
     return "mac";
@@ -33,8 +34,9 @@ export function isMobilePlatform(): boolean {
     return false;
   }
   const platform =
-    (navigator as Navigator & { userAgentData?: { platform?: string } })
-      .userAgentData?.platform ?? navigator.platform ?? "";
+    (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ??
+    navigator.platform ??
+    "";
   const normalizedPlatform = platform.toLowerCase();
   const userAgent = (navigator.userAgent ?? "").toLowerCase();
   const maxTouchPoints =

@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import type { AccessMode, ServiceTier } from "@/types";
 import { useThreadCodexParams } from "@threads/hooks/useThreadCodexParams";
 import {
-  type PendingNewThreadSeed,
   NO_THREAD_SCOPE_SUFFIX,
+  type PendingNewThreadSeed,
 } from "@threads/utils/threadCodexParamsSeed";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import type { AccessMode, ServiceTier } from "@/types";
 
 type ThreadCodexOrchestration = {
   accessMode: AccessMode;
@@ -52,18 +52,12 @@ export function useThreadCodexOrchestration({
   const [accessMode, setAccessMode] = useState<AccessMode>("current");
   const [preferredModelId, setPreferredModelId] = useState<string | null>(null);
   const [preferredEffort, setPreferredEffort] = useState<string | null>(null);
-  const [preferredServiceTier, setPreferredServiceTier] = useState<
-    ServiceTier | null | undefined
-  >(undefined);
-  const [preferredCollabModeId, setPreferredCollabModeId] = useState<string | null>(
-    null,
+  const [preferredServiceTier, setPreferredServiceTier] = useState<ServiceTier | null | undefined>(
+    undefined,
   );
-  const [preferredCodexArgsOverride, setPreferredCodexArgsOverride] = useState<string | null>(
-    null,
-  );
-  const [threadCodexSelectionKey, setThreadCodexSelectionKey] = useState<string | null>(
-    null,
-  );
+  const [preferredCollabModeId, setPreferredCollabModeId] = useState<string | null>(null);
+  const [preferredCodexArgsOverride, setPreferredCodexArgsOverride] = useState<string | null>(null);
+  const [threadCodexSelectionKey, setThreadCodexSelectionKey] = useState<string | null>(null);
   const activeThreadIdRef = useRef<string | null>(null);
   const pendingNewThreadSeedRef = useRef<PendingNewThreadSeed | null>(null);
 
@@ -82,10 +76,7 @@ export function useThreadCodexOrchestration({
         return;
       }
       patchThreadCodexParams(workspaceId, threadId, patch);
-      if (
-        activeThreadIdRef.current &&
-        Object.prototype.hasOwnProperty.call(patch, "serviceTier")
-      ) {
+      if (activeThreadIdRef.current && Object.hasOwn(patch, "serviceTier")) {
         patchThreadCodexParams(workspaceId, NO_THREAD_SCOPE_SUFFIX, {
           serviceTier: patch.serviceTier,
         });

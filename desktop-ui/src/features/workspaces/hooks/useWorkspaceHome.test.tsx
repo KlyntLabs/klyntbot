@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+
+import { generateRunMetadata } from "@services/tauri";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ModelOption, WorkspaceInfo } from "@/types";
-import { generateRunMetadata } from "@services/tauri";
 import { useWorkspaceHome } from "./useWorkspaceHome";
 
 vi.mock("../../../services/tauri", () => ({
@@ -170,9 +171,7 @@ describe("useWorkspaceHome", () => {
     });
 
     expect(started).toBe(false);
-    expect(result.current.error).toBe(
-      "Select at least one model to run in a worktree.",
-    );
+    expect(result.current.error).toBe("Select at least one model to run in a worktree.");
     expect(result.current.runs).toHaveLength(0);
   });
 
@@ -221,8 +220,7 @@ describe("useWorkspaceHome", () => {
     const connectWorkspace = vi.fn().mockResolvedValue(undefined);
     const startThreadForWorkspace = vi.fn().mockResolvedValue("thread-1");
     const sendUserMessageToThread = vi.fn().mockResolvedValue(undefined);
-    let resolveMetadata: (value: { title: string; worktreeName: string }) => void =
-      () => {};
+    let resolveMetadata: (value: { title: string; worktreeName: string }) => void = () => {};
     vi.mocked(generateRunMetadata).mockReturnValue(
       new Promise((resolve) => {
         resolveMetadata = resolve;
@@ -292,8 +290,6 @@ describe("useWorkspaceHome", () => {
 
     expect(started).toBe(false);
     expect(result.current.runs).toHaveLength(0);
-    expect(result.current.error).toBe(
-      "Select at least one model to run in a worktree.",
-    );
+    expect(result.current.error).toBe("Select at least one model to run in a worktree.");
   });
 });

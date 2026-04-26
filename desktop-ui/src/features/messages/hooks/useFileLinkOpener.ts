@@ -1,23 +1,15 @@
-import { useCallback } from "react";
-import type { MouseEvent } from "react";
-import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
-import { LogicalPosition } from "@tauri-apps/api/dpi";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import * as Sentry from "@sentry/react";
 import { openWorkspaceIn } from "@services/tauri";
 import { pushErrorToast } from "@services/toasts";
+import { LogicalPosition } from "@tauri-apps/api/dpi";
+import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { formatFileLocation, type ParsedFileLocation, toFileUrl } from "@utils/fileLinks";
+import { isAbsolutePath, joinWorkspacePath, revealInFileManagerLabel } from "@utils/platformPaths";
+import type { MouseEvent } from "react";
+import { useCallback } from "react";
 import type { OpenAppTarget } from "@/types";
-import {
-  type ParsedFileLocation,
-  formatFileLocation,
-  toFileUrl,
-} from "@utils/fileLinks";
-import {
-  isAbsolutePath,
-  joinWorkspacePath,
-  revealInFileManagerLabel,
-} from "@utils/platformPaths";
 import { resolveMountedWorkspacePath } from "../utils/mountedWorkspacePaths";
 
 type OpenTarget = {
@@ -51,14 +43,10 @@ const canOpenTarget = (target: OpenTarget) => {
   return Boolean(resolveAppName(target));
 };
 
-function resolveOpenTarget(
-  openTargets: OpenAppTarget[],
-  selectedOpenAppId: string,
-): OpenTarget {
+function resolveOpenTarget(openTargets: OpenAppTarget[], selectedOpenAppId: string): OpenTarget {
   return {
     ...DEFAULT_OPEN_TARGET,
-    ...(openTargets.find((entry) => entry.id === selectedOpenAppId) ??
-      openTargets[0]),
+    ...(openTargets.find((entry) => entry.id === selectedOpenAppId) ?? openTargets[0]),
   };
 }
 
@@ -77,17 +65,10 @@ function resolveFilePath(path: string, workspacePath?: string | null) {
   return joinWorkspacePath(workspacePath, trimmed);
 }
 
-function resolveFileLinkContext(
-  fileLocation: ParsedFileLocation,
-  workspacePath?: string | null,
-) {
+function resolveFileLinkContext(fileLocation: ParsedFileLocation, workspacePath?: string | null) {
   return {
     fileLocation,
-    rawPathLabel: formatFileLocation(
-      fileLocation.path,
-      fileLocation.line,
-      fileLocation.column,
-    ),
+    rawPathLabel: formatFileLocation(fileLocation.path, fileLocation.line, fileLocation.column),
     resolvedPath: resolveFilePath(fileLocation.path, workspacePath),
   };
 }
@@ -97,26 +78,20 @@ export function useFileLinkOpener(
   openTargets: OpenAppTarget[],
   selectedOpenAppId: string,
 ) {
-  const reportOpenError = useCallback(
-    (error: unknown, context: Record<string, string | null>) => {
-      const message = error instanceof Error ? error.message : String(error);
-      Sentry.captureException(
-        error instanceof Error ? error : new Error(message),
-        {
-          tags: {
-            feature: "file-link-open",
-          },
-          extra: context,
-        },
-      );
-      pushErrorToast({
-        title: "Couldn’t open file",
-        message,
-      });
-      console.warn("Failed to open file link", { message, ...context });
-    },
-    [],
-  );
+  const reportOpenError = useCallback((error: unknown, context: Record<string, string | null>) => {
+    const message = error instanceof Error ? error.message : String(error);
+    Sentry.captureException(error instanceof Error ? error : new Error(message), {
+      tags: {
+        feature: "file-link-open",
+      },
+      extra: context,
+    });
+    pushErrorToast({
+      title: "Couldn’t open file",
+      message,
+    });
+    console.warn("Failed to open file link", { message, ...context });
+  }, []);
 
   const openFileLink = useCallback(
     async (targetLocation: ParsedFileLocation) => {

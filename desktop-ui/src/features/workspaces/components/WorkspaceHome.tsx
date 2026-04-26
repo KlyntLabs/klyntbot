@@ -1,12 +1,13 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type RefObject,
-} from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { computeDictationInsertion } from "@utils/dictation";
+import { isComposingEvent } from "@utils/keys";
+import type { ThreadStatusById } from "@utils/threadStatus";
+import { type KeyboardEvent, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { ComposerInput } from "@/features/composer/components/ComposerInput";
+import { useComposerAutocompleteState } from "@/features/composer/hooks/useComposerAutocompleteState";
+import { useComposerImages } from "@/features/composer/hooks/useComposerImages";
+import { usePromptHistory } from "@/features/composer/hooks/usePromptHistory";
+import { FileEditorCard } from "@/features/shared/components/FileEditorCard";
 import type {
   AppOption,
   CustomPromptOption,
@@ -16,24 +17,16 @@ import type {
   SkillOption,
   WorkspaceInfo,
 } from "@/types";
-import { ComposerInput } from "@/features/composer/components/ComposerInput";
-import { useComposerImages } from "@/features/composer/hooks/useComposerImages";
-import { useComposerAutocompleteState } from "@/features/composer/hooks/useComposerAutocompleteState";
-import { usePromptHistory } from "@/features/composer/hooks/usePromptHistory";
 import type {
   WorkspaceHomeRun,
   WorkspaceHomeRunInstance,
   WorkspaceRunMode,
 } from "../hooks/useWorkspaceHome";
-import { computeDictationInsertion } from "@utils/dictation";
-import { isComposingEvent } from "@utils/keys";
-import { FileEditorCard } from "@/features/shared/components/FileEditorCard";
-import { WorkspaceHomeRunControls } from "./WorkspaceHomeRunControls";
-import { WorkspaceHomeHistory } from "./WorkspaceHomeHistory";
-import { WorkspaceHomeGitInitBanner } from "./WorkspaceHomeGitInitBanner";
-import { buildIconPath } from "./workspaceHomeHelpers";
 import { useWorkspaceHomeSuggestionsStyle } from "../hooks/useWorkspaceHomeSuggestionsStyle";
-import type { ThreadStatusById } from "@utils/threadStatus";
+import { WorkspaceHomeGitInitBanner } from "./WorkspaceHomeGitInitBanner";
+import { WorkspaceHomeHistory } from "./WorkspaceHomeHistory";
+import { WorkspaceHomeRunControls } from "./WorkspaceHomeRunControls";
+import { buildIconPath } from "./workspaceHomeHelpers";
 
 type WorkspaceHomeProps = {
   workspace: WorkspaceInfo;
@@ -166,16 +159,11 @@ export function WorkspaceHome({
   const iconSrc = useMemo(() => convertFileSrc(iconPath), [iconPath]);
   const fallbackTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const textareaRef = textareaRefProp ?? fallbackTextareaRef;
-  const {
-    activeImages,
-    attachImages,
-    pickImages,
-    removeImage,
-    clearActiveImages,
-  } = useComposerImages({
-    activeThreadId: null,
-    activeWorkspaceId: workspace.id,
-  });
+  const { activeImages, attachImages, pickImages, removeImage, clearActiveImages } =
+    useComposerImages({
+      activeThreadId: null,
+      activeWorkspaceId: workspace.id,
+    });
 
   const {
     isAutocompleteOpen,
@@ -214,21 +202,17 @@ export function WorkspaceHome({
     onFileAutocompleteActiveChange?.(fileTriggerActive);
   }, [fileTriggerActive, onFileAutocompleteActiveChange]);
 
-  const {
-    handleHistoryKeyDown,
-    handleHistoryTextChange,
-    recordHistory,
-    resetHistoryNavigation,
-  } = usePromptHistory({
-    historyKey: workspace.id,
-    text: prompt,
-    hasAttachments: activeImages.length > 0,
-    disabled: isSubmitting,
-    isAutocompleteOpen,
-    textareaRef,
-    setText: onPromptChange,
-    setSelectionStart,
-  });
+  const { handleHistoryKeyDown, handleHistoryTextChange, recordHistory, resetHistoryNavigation } =
+    usePromptHistory({
+      historyKey: workspace.id,
+      text: prompt,
+      hasAttachments: activeImages.length > 0,
+      disabled: isSubmitting,
+      isAutocompleteOpen,
+      textareaRef,
+      setText: onPromptChange,
+      setSelectionStart,
+    });
 
   const handleTextChangeWithHistory = (next: string, cursor: number | null) => {
     handleHistoryTextChange(next);
@@ -254,12 +238,7 @@ export function WorkspaceHome({
     const textarea = textareaRef.current;
     const start = textarea?.selectionStart ?? selectionStart ?? prompt.length;
     const end = textarea?.selectionEnd ?? start;
-    const { nextText, nextCursor } = computeDictationInsertion(
-      prompt,
-      textToInsert,
-      start,
-      end,
-    );
+    const { nextText, nextCursor } = computeDictationInsertion(prompt, textToInsert, start, end);
 
     onPromptChange(nextText);
     resetHistoryNavigation();
@@ -365,10 +344,7 @@ export function WorkspaceHome({
       </div>
 
       {showGitInitBanner && (
-        <WorkspaceHomeGitInitBanner
-          isLoading={initGitRepoLoading}
-          onInitGitRepo={onInitGitRepo}
-        />
+        <WorkspaceHomeGitInitBanner isLoading={initGitRepoLoading} onInitGitRepo={onInitGitRepo} />
       )}
 
       <div className="workspace-home-composer">

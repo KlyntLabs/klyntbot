@@ -1,13 +1,13 @@
-import { useCallback, useRef } from "react";
-import { useUpdater } from "@/features/update/hooks/useUpdater";
-import { useAgentSoundNotifications } from "@/features/notifications/hooks/useAgentSoundNotifications";
-import { useAgentSystemNotifications } from "@/features/notifications/hooks/useAgentSystemNotifications";
-import { useWindowFocusState } from "@/features/layout/hooks/useWindowFocusState";
-import { useTauriEvent } from "./useTauriEvent";
-import { playNotificationSound } from "@utils/notificationSounds";
 import { subscribeUpdaterCheck } from "@services/events";
 import { sendNotification } from "@services/tauri";
+import { playNotificationSound } from "@utils/notificationSounds";
+import { useCallback, useRef } from "react";
+import { useWindowFocusState } from "@/features/layout/hooks/useWindowFocusState";
+import { useAgentSoundNotifications } from "@/features/notifications/hooks/useAgentSoundNotifications";
+import { useAgentSystemNotifications } from "@/features/notifications/hooks/useAgentSystemNotifications";
+import { useUpdater } from "@/features/update/hooks/useUpdater";
 import type { DebugEntry } from "@/types";
+import { useTauriEvent } from "./useTauriEvent";
 
 type Params = {
   enabled?: boolean;
@@ -103,18 +103,17 @@ export function useUpdaterController({
     if (!systemNotificationsEnabled) {
       return;
     }
-    void sendNotification(
-      "Test Notification",
-      "This is a test notification from Klynt.",
-    ).catch((error) => {
-      onDebug({
-        id: `${Date.now()}-client-notification-test-error`,
-        timestamp: Date.now(),
-        source: "error",
-        label: "notification/test-error",
-        payload: error instanceof Error ? error.message : String(error),
-      });
-    });
+    void sendNotification("Test Notification", "This is a test notification from Klynt.").catch(
+      (error) => {
+        onDebug({
+          id: `${Date.now()}-client-notification-test-error`,
+          timestamp: Date.now(),
+          source: "error",
+          label: "notification/test-error",
+          payload: error instanceof Error ? error.message : String(error),
+        });
+      },
+    );
   }, [onDebug, systemNotificationsEnabled]);
 
   return {

@@ -1,25 +1,19 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-} from "react";
-import type { CustomPromptOption } from "@/types";
-import { expandCustomPromptText, getPromptArgumentHint } from "@utils/customPrompts";
-import type { PanelTabId } from "@/features/layout/components/PanelTabs";
-import { PanelShell } from "@/features/layout/components/PanelShell";
-import {
-  PanelMeta,
-  PanelSearchField,
-} from "@/features/design-system/components/panel/PanelPrimitives";
-import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
+import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { expandCustomPromptText, getPromptArgumentHint } from "@utils/customPrompts";
 import MoreHorizontal from "lucide-react/dist/esm/icons/more-horizontal";
 import Plus from "lucide-react/dist/esm/icons/plus";
 import ScrollText from "lucide-react/dist/esm/icons/scroll-text";
 import Search from "lucide-react/dist/esm/icons/search";
+import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  PanelMeta,
+  PanelSearchField,
+} from "@/features/design-system/components/panel/PanelPrimitives";
+import { PanelShell } from "@/features/layout/components/PanelShell";
+import type { PanelTabId } from "@/features/layout/components/PanelTabs";
+import type { CustomPromptOption } from "@/types";
 
 type PromptPanelProps = {
   prompts: CustomPromptOption[];
@@ -267,9 +261,7 @@ export function PromptPanel({
     }
     try {
       await onDeletePrompt(prompt.path);
-      setPendingDeletePath((current) =>
-        current === prompt.path ? null : current,
-      );
+      setPendingDeletePath((current) => (current === prompt.path ? null : current));
     } catch (error) {
       showError(error);
     }
@@ -327,9 +319,7 @@ export function PromptPanel({
       <div className={`prompt-row${isHighlighted ? " is-highlight" : ""}`} key={key}>
         <div className="prompt-row-header">
           <div className="prompt-name">{prompt.name}</div>
-          {prompt.description && (
-            <div className="prompt-description">{prompt.description}</div>
-          )}
+          {prompt.description && <div className="prompt-description">{prompt.description}</div>}
         </div>
         {hint && <div className="prompt-hint">{hint}</div>}
         <div className="prompt-actions">
@@ -544,9 +534,7 @@ export function PromptPanel({
                       workspace prompts folder
                     </button>
                   ) : (
-                    <span className="prompt-empty-link is-disabled">
-                      workspace prompts folder
-                    </span>
+                    <span className="prompt-empty-link is-disabled">workspace prompts folder</span>
                   )}
                   .
                 </div>
@@ -587,9 +575,7 @@ export function PromptPanel({
                       CODEX_HOME/prompts
                     </button>
                   ) : (
-                    <span className="prompt-empty-link is-disabled">
-                      CODEX_HOME/prompts
-                    </span>
+                    <span className="prompt-empty-link is-disabled">CODEX_HOME/prompts</span>
                   )}
                   .
                 </div>

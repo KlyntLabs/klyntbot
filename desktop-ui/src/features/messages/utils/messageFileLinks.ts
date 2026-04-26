@@ -1,8 +1,8 @@
 import {
   FILE_LINK_SUFFIX_SOURCE,
-  type ParsedFileLocation,
   formatFileLocation,
   normalizeFileLinkPath,
+  type ParsedFileLocation,
   parseFileLocation,
   parseFileUrlLocation,
 } from "@utils/fileLinks";
@@ -33,8 +33,7 @@ const POSIX_OR_RELATIVE_FILE_PATH_PATTERN =
   "(?:\\/[^\\s\\`\"'<>]+|~\\/[^\\s\\`\"'<>]+|\\.{1,2}\\/[^\\s\\`\"'<>]+|[A-Za-z0-9._-]+(?:\\/[A-Za-z0-9._-]+)+)";
 const WINDOWS_ABSOLUTE_FILE_PATH_PATTERN =
   "(?:[A-Za-z]:[\\\\/][^\\s\\`\"'<>]+(?:[\\\\/][^\\s\\`\"'<>]+)*)";
-const WINDOWS_UNC_FILE_PATH_PATTERN =
-  "(?:\\\\\\\\[^\\s\\`\"'<>]+(?:\\\\[^\\s\\`\"'<>]+)+)";
+const WINDOWS_UNC_FILE_PATH_PATTERN = "(?:\\\\\\\\[^\\s\\`\"'<>]+(?:\\\\[^\\s\\`\"'<>]+)+)";
 
 const FILE_PATH_PATTERN = new RegExp(
   `(${POSIX_OR_RELATIVE_FILE_PATH_PATTERN}|${WINDOWS_ABSOLUTE_FILE_PATH_PATTERN}|${WINDOWS_UNC_FILE_PATH_PATTERN})${FILE_LINK_SUFFIX_SOURCE}`,
@@ -96,8 +95,7 @@ function splitAbsolutePath(path: string) {
   if (!root) {
     return null;
   }
-  const withoutRoot =
-    root === "/" ? path.slice(1) : path.slice(2).replace(/^\/+/, "");
+  const withoutRoot = root === "/" ? path.slice(1) : path.slice(2).replace(/^\/+/, "");
   return {
     root,
     segments: withoutRoot.split("/").filter(Boolean),
@@ -181,9 +179,7 @@ function hasLikelyFileName(path: string) {
 
 function hasLikelyLocalAbsolutePrefix(path: string) {
   const normalizedPath = path.replace(/\\/g, "/");
-  return LIKELY_LOCAL_ABSOLUTE_PATH_PREFIXES.some((prefix) =>
-    normalizedPath.startsWith(prefix),
-  );
+  return LIKELY_LOCAL_ABSOLUTE_PATH_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix));
 }
 
 function hasLikelyWorkspaceNameSegment(segment: string) {
@@ -194,11 +190,7 @@ function pathSegmentCount(path: string) {
   return path.split("/").filter(Boolean).length;
 }
 
-function isPathCandidate(
-  value: string,
-  leadingText: string,
-  previousChar: string,
-) {
+function isPathCandidate(value: string, leadingText: string, previousChar: string) {
   if (
     URL_SCHEME_PREFIX_PATTERN.test(leadingText) ||
     EMBEDDED_URL_SCHEME_PATTERN.test(leadingText)
@@ -215,11 +207,7 @@ function isPathCandidate(
     return false;
   }
   if (value.startsWith("/") || value.startsWith("./") || value.startsWith("../")) {
-    if (
-      value.startsWith("/") &&
-      previousChar &&
-      LETTER_OR_NUMBER_PATTERN.test(previousChar)
-    ) {
+    if (value.startsWith("/") && previousChar && LETTER_OR_NUMBER_PATTERN.test(previousChar)) {
       return false;
     }
     return true;
@@ -258,10 +246,7 @@ function isSkippableParent(parentType?: string) {
   return parentType === "link" || parentType === "inlineCode" || parentType === "code";
 }
 
-function isLikelyMountedWorkspaceFilePath(
-  path: string,
-  workspacePath?: string | null,
-) {
+function isLikelyMountedWorkspaceFilePath(path: string, workspacePath?: string | null) {
   if (isKnownLocalWorkspaceRoutePath(path)) {
     return false;
   }
@@ -277,10 +262,7 @@ function isLikelyMountedWorkspaceFilePath(
   );
 }
 
-function usesAbsolutePathDepthFallback(
-  path: string,
-  workspacePath?: string | null,
-) {
+function usesAbsolutePathDepthFallback(path: string, workspacePath?: string | null) {
   const normalizedPath = path.replace(/\\/g, "/");
   if (
     WORKSPACE_ROUTE_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix)) &&
@@ -291,10 +273,7 @@ function usesAbsolutePathDepthFallback(
   return hasLikelyLocalAbsolutePrefix(normalizedPath) && pathSegmentCount(normalizedPath) >= 3;
 }
 
-function isLikelyFileHref(
-  url: string,
-  workspacePath?: string | null,
-) {
+function isLikelyFileHref(url: string, workspacePath?: string | null) {
   const trimmed = url.trim();
   if (!trimmed) {
     return false;
@@ -327,9 +306,7 @@ function isLikelyFileHref(
   if (pathOnly.startsWith("/")) {
     if (parsedLocation.line !== null) {
       const normalizedPath = pathOnly.replace(/\\/g, "/");
-      if (
-        WORKSPACE_ROUTE_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix))
-      ) {
+      if (WORKSPACE_ROUTE_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix))) {
         return isLikelyMountedWorkspaceFilePath(normalizedPath, workspacePath);
       }
       return true;
@@ -508,10 +485,8 @@ export function describeFileTarget(
   const normalizedPath = trimTrailingPathSeparators(displayPath) || displayPath;
   const lastSlashIndex = normalizedPath.lastIndexOf("/");
   const fallbackFile = normalizedPath || fullPath;
-  const fileName =
-    lastSlashIndex >= 0 ? normalizedPath.slice(lastSlashIndex + 1) : fallbackFile;
-  const rawParentPath =
-    lastSlashIndex >= 0 ? normalizedPath.slice(0, lastSlashIndex) : "";
+  const fileName = lastSlashIndex >= 0 ? normalizedPath.slice(lastSlashIndex + 1) : fallbackFile;
+  const rawParentPath = lastSlashIndex >= 0 ? normalizedPath.slice(0, lastSlashIndex) : "";
   return {
     fullPath,
     fileName,

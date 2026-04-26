@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildThreadCodexSeedPatch,
   createPendingThreadSeed,
+  resolveThreadCodexState,
   resolveWorkspaceRuntimeCodexArgsBadgeLabel,
   resolveWorkspaceRuntimeCodexArgsOverride,
-  resolveThreadCodexState,
 } from "./threadCodexParamsSeed";
 import type { ThreadCodexParams } from "./threadStorage";
 
@@ -194,9 +194,7 @@ describe("threadCodexParamsSeed", () => {
       pendingSeed: null,
     });
 
-    expect(inheritedFromNoThreadResolved.preferredCodexArgsOverride).toBe(
-      "--profile inherited",
-    );
+    expect(inheritedFromNoThreadResolved.preferredCodexArgsOverride).toBe("--profile inherited");
   });
 
   it("resolves no-thread state from stored no-thread params before defaults", () => {
@@ -262,9 +260,7 @@ describe("threadCodexParamsSeed", () => {
   });
 
   it("falls back to no-thread runtime args until thread-scoped params are seeded", () => {
-    const entry = (
-      codexArgsOverride: string | null | undefined,
-    ): ThreadCodexParams => ({
+    const entry = (codexArgsOverride: string | null | undefined): ThreadCodexParams => ({
       modelId: null,
       effort: null,
       serviceTier: null,
@@ -335,9 +331,7 @@ describe("threadCodexParamsSeed", () => {
   });
 
   it("returns null for no-thread ignored-only overrides and sanitized args otherwise", () => {
-    const entry = (
-      codexArgsOverride: string | null | undefined,
-    ): ThreadCodexParams => ({
+    const entry = (codexArgsOverride: string | null | undefined): ThreadCodexParams => ({
       modelId: null,
       effort: null,
       serviceTier: null,
@@ -373,9 +367,7 @@ describe("threadCodexParamsSeed", () => {
   });
 
   it("builds badges from effective runtime codex args, including no-thread fallback", () => {
-    const entry = (
-      codexArgsOverride: string | null | undefined,
-    ): ThreadCodexParams => ({
+    const entry = (codexArgsOverride: string | null | undefined): ThreadCodexParams => ({
       modelId: null,
       effort: null,
       serviceTier: null,

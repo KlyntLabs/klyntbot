@@ -1,16 +1,35 @@
 /* Distraction overlay — same surface family as launcher + tray. */
 
 @keyframes dx-glass-appear {
-	from { opacity: 0; transform: scale(0.96); }
-	to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 @keyframes dx-pulse {
-	0%, 100% { opacity: 1; }
-	50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 @keyframes dx-bounce {
-	0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
-	40% { transform: translateY(-3px); opacity: 1; }
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
 }
 
 /* Global button reset (neutralizing styles/buttons.css padding/weight/lift)
@@ -18,153 +37,159 @@
    rules — shared by all three aux windows. */
 
 .dx-root {
-	width: 100%;
-	height: 100%;
-	display: flex;
-	color: var(--text-primary);
-	font-family: var(--ui-font-family, system-ui);
-	font-size: 13px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  color: var(--text-primary);
+  font-family: var(--ui-font-family, system-ui);
+  font-size: 13px;
 
-	/* Same semantic alias scheme as tray.css — pulls in real project tokens
+  /* Same semantic alias scheme as tray.css — pulls in real project tokens
 	   so theme switches reach the distraction overlay automatically. */
-	--dx-destructive: var(--status-error, rgba(255, 110, 110, 0.95));
-	--dx-destructive-bg: rgba(255, 110, 110, 0.14);
-	--dx-destructive-border: rgba(255, 110, 110, 0.28);
-	--dx-success: var(--status-success, rgba(120, 235, 190, 0.95));
+  --dx-destructive: var(--status-error, rgba(255, 110, 110, 0.95));
+  --dx-destructive-bg: rgba(255, 110, 110, 0.14);
+  --dx-destructive-border: rgba(255, 110, 110, 0.28);
+  --dx-success: var(--status-success, rgba(120, 235, 190, 0.95));
 }
 
 .dx-shell {
-	width: 100%;
-	flex: 1 1 auto;
-	display: flex;
-	flex-direction: column;
-	overflow: hidden;
-	background: var(--surface-sidebar, rgba(22, 24, 28, 0.55));
-	border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-	/* Match Tauri's HUD effect radius (`hud_effects().radius(16)` in
+  width: 100%;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-sidebar, rgba(22, 24, 28, 0.55));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  /* Match Tauri's HUD effect radius (`hud_effects().radius(16)` in
 	   lazy_window.rs) so the card and the window's HUD bezel share the
 	   same curve — no visible vibrancy halo at the corners. */
-	border-radius: 16px;
-	backdrop-filter: blur(40px) saturate(1.4);
-	-webkit-backdrop-filter: blur(40px) saturate(1.4);
-	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
-	animation: dx-glass-appear 0.25s ease-out;
+  border-radius: 16px;
+  backdrop-filter: blur(40px) saturate(1.4);
+  -webkit-backdrop-filter: blur(40px) saturate(1.4);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  animation: dx-glass-appear 0.25s ease-out;
 }
 
 /* Body sizes to content (NOT shell). The shared useWindowAutoResize hook
    observes this element's scrollHeight and resizes the OS window. */
 .dx-body {
-	overflow: visible;
-	padding: 14px 16px;
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
+  overflow: visible;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .dx-header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .dx-status {
-	display: flex;
-	align-items: center;
-	gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .dx-status-dot {
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	background: var(--dx-destructive);
-	animation: dx-pulse 1.6s ease-in-out infinite;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dx-destructive);
+  animation: dx-pulse 1.6s ease-in-out infinite;
 }
 
 .dx-status-label {
-	font-size: 11px;
-	font-weight: 500;
-	text-transform: uppercase;
-	letter-spacing: 0.08em;
-	color: var(--dx-destructive);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--dx-destructive);
 }
 
 .dx-verdict {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	font-size: 10px;
-	color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
 }
-.dx-verdict .is-positive { color: var(--dx-success); }
-.dx-verdict .is-negative { color: var(--dx-destructive); }
+.dx-verdict .is-positive {
+  color: var(--dx-success);
+}
+.dx-verdict .is-negative {
+  color: var(--dx-destructive);
+}
 
 .dx-dots {
-	display: flex;
-	gap: 3px;
+  display: flex;
+  gap: 3px;
 }
 .dx-dots span {
-	width: 4px;
-	height: 4px;
-	border-radius: 50%;
-	background: var(--text-muted);
-	opacity: 0.6;
-	animation: dx-bounce 0.9s ease-in-out infinite both;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.6;
+  animation: dx-bounce 0.9s ease-in-out infinite both;
 }
 
 .dx-divider {
-	height: 1px;
-	background: var(--border-subtle, rgba(255, 255, 255, 0.06));
+  height: 1px;
+  background: var(--border-subtle, rgba(255, 255, 255, 0.06));
 }
 
 .dx-info {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .dx-app-name {
-	font-size: 13px;
-	font-weight: 500;
-	color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 .dx-window-title {
-	font-size: 11px;
-	font-weight: 300;
-	color: var(--text-muted);
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: 300;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dx-actions {
-	display: flex;
-	gap: 8px;
-	padding-top: 2px;
+  display: flex;
+  gap: 8px;
+  padding-top: 2px;
 }
 
 .dx-btn {
-	flex: 1;
-	padding: 8px 12px;
-	border-radius: 8px;
-	font-size: 11px;
-	font-weight: 500;
-	background: var(--surface-control, rgba(255, 255, 255, 0.08));
-	border: 1px solid transparent;
-	color: var(--text-muted);
-	cursor: pointer;
-	transition: background-color 120ms ease, color 120ms ease;
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--surface-control, rgba(255, 255, 255, 0.08));
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 .dx-btn:hover {
-	background: var(--surface-control-hover, rgba(255, 255, 255, 0.14));
-	color: var(--text-primary);
+  background: var(--surface-control-hover, rgba(255, 255, 255, 0.14));
+  color: var(--text-primary);
 }
 .dx-btn.is-primary {
-	background: var(--dx-destructive-bg);
-	border-color: var(--dx-destructive-border);
-	color: var(--dx-destructive);
+  background: var(--dx-destructive-bg);
+  border-color: var(--dx-destructive-border);
+  color: var(--dx-destructive);
 }
 .dx-btn.is-primary:hover {
-	background: rgba(255, 110, 110, 0.22);
+  background: rgba(255, 110, 110, 0.22);
 }

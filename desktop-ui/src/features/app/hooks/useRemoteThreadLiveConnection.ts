@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { subscribeAppServerEvents } from "@services/events";
 import { threadLiveSubscribe, threadLiveUnsubscribe } from "@services/tauri";
-import {
-  getAppServerParams,
-  getAppServerRawMethod,
-} from "@utils/appServerEvents";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getAppServerParams, getAppServerRawMethod } from "@utils/appServerEvents";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkspaceInfo } from "@/types";
 
 export type RemoteThreadConnectionState = "live" | "polling" | "disconnected";
@@ -85,16 +82,15 @@ export function useRemoteThreadLiveConnection({
 }: UseRemoteThreadLiveConnectionOptions) {
   const activeWorkspaceId = activeWorkspace?.id ?? null;
   const activeWorkspaceConnected = activeWorkspace?.connected ?? false;
-  const [connectionState, setConnectionState] =
-    useState<RemoteThreadConnectionState>(() => {
-      if (backendMode !== "remote") {
-        return activeWorkspace?.connected ? "live" : "disconnected";
-      }
-      if (!activeWorkspace?.connected) {
-        return "disconnected";
-      }
-      return "polling";
-    });
+  const [connectionState, setConnectionState] = useState<RemoteThreadConnectionState>(() => {
+    if (backendMode !== "remote") {
+      return activeWorkspace?.connected ? "live" : "disconnected";
+    }
+    if (!activeWorkspace?.connected) {
+      return "disconnected";
+    }
+    return "polling";
+  });
 
   const backendModeRef = useRef(backendMode);
   const activeWorkspaceRef = useRef(activeWorkspace);
@@ -144,18 +140,15 @@ export function useRemoteThreadLiveConnection({
     setConnectionState(next);
   }, []);
 
-  const unsubscribeByKey = useCallback(
-    async (key: string) => {
-      const parsed = splitKey(key);
-      if (!parsed) {
-        return;
-      }
-      await threadLiveUnsubscribe(parsed.workspaceId, parsed.threadId).catch(() => {
-        // Ignore cleanup errors; foreground reattach handles recovery.
-      });
-    },
-    [],
-  );
+  const unsubscribeByKey = useCallback(async (key: string) => {
+    const parsed = splitKey(key);
+    if (!parsed) {
+      return;
+    }
+    await threadLiveUnsubscribe(parsed.workspaceId, parsed.threadId).catch(() => {
+      // Ignore cleanup errors; foreground reattach handles recovery.
+    });
+  }, []);
 
   const reconcileDisconnectedState = useCallback(() => {
     const workspace = activeWorkspaceRef.current;
@@ -171,11 +164,7 @@ export function useRemoteThreadLiveConnection({
   }, [setState]);
 
   const reconnectLive = useCallback(
-    async (
-      workspaceId: string,
-      threadId: string,
-      options?: ReconnectOptions,
-    ): Promise<boolean> => {
+    async (workspaceId: string, threadId: string, options?: ReconnectOptions): Promise<boolean> => {
       if (
         backendModeRef.current !== "remote" ||
         !workspaceId ||
@@ -369,8 +358,7 @@ export function useRemoteThreadLiveConnection({
         const threadId = extractThreadId(method, params);
         if (threadId === selectedThreadId) {
           const threadKey = keyForThread(activeWorkspaceId, threadId);
-          const ignoreDetachedUntil =
-            ignoreDetachedEventsUntilRef.current.get(threadKey) ?? 0;
+          const ignoreDetachedUntil = ignoreDetachedEventsUntilRef.current.get(threadKey) ?? 0;
           if (ignoreDetachedUntil > 0 && ignoreDetachedUntil >= Date.now()) {
             ignoreDetachedEventsUntilRef.current.delete(threadKey);
             return;

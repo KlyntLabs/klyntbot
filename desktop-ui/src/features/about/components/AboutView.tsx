@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useEffect, useState } from "react";
 
 const GITHUB_URL = "https://github.com/Dimillian/Klynt";
 const TWITTER_URL = "https://x.com/dimillian";
@@ -41,34 +41,18 @@ export function AboutView() {
     <div className="about">
       <div className="about-card">
         <div className="about-header">
-          <img
-            className="about-icon"
-            src="/app-icon.png"
-            alt="Klynt icon"
-          />
+          <img className="about-icon" src="/app-icon.png" alt="Klynt icon" />
           <div className="about-title">Klynt</div>
         </div>
-        <div className="about-version">
-          {version ? `Version ${version}` : "Version —"}
-        </div>
-        <div className="about-tagline">
-          Monitor the situation of your agents
-        </div>
+        <div className="about-version">{version ? `Version ${version}` : "Version —"}</div>
+        <div className="about-tagline">Monitor the situation of your agents</div>
         <div className="about-divider" />
         <div className="about-links">
-          <button
-            type="button"
-            className="about-link"
-            onClick={handleOpenGitHub}
-          >
+          <button type="button" className="about-link" onClick={handleOpenGitHub}>
             GitHub
           </button>
           <span className="about-link-sep">|</span>
-          <button
-            type="button"
-            className="about-link"
-            onClick={handleOpenTwitter}
-          >
+          <button type="button" className="about-link" onClick={handleOpenTwitter}>
             Twitter
           </button>
         </div>

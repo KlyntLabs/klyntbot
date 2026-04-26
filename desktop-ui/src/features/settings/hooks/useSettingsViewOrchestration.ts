@@ -1,3 +1,9 @@
+import {
+  COMPOSER_PRESET_CONFIGS,
+  COMPOSER_PRESET_LABELS,
+  DICTATION_MODELS,
+} from "@settings/components/settingsViewConstants";
+import { isMacPlatform, isWindowsPlatform } from "@utils/platformPaths";
 import { useMemo } from "react";
 import type {
   AppSettings,
@@ -7,23 +13,17 @@ import type {
   WorkspaceGroup,
   WorkspaceSettings,
 } from "@/types";
-import { isMacPlatform, isWindowsPlatform } from "@utils/platformPaths";
-import { useSettingsOpenAppDrafts } from "./useSettingsOpenAppDrafts";
-import { useSettingsShortcutDrafts } from "./useSettingsShortcutDrafts";
+import type { GroupedWorkspaces } from "./settingsSectionTypes";
+import { useSettingsAgentsSection } from "./useSettingsAgentsSection";
 import { useSettingsCodexSection } from "./useSettingsCodexSection";
 import { useSettingsDisplaySection } from "./useSettingsDisplaySection";
 import { useSettingsEnvironmentsSection } from "./useSettingsEnvironmentsSection";
 import { useSettingsFeaturesSection } from "./useSettingsFeaturesSection";
 import { useSettingsGitSection } from "./useSettingsGitSection";
-import { useSettingsAgentsSection } from "./useSettingsAgentsSection";
+import { useSettingsOpenAppDrafts } from "./useSettingsOpenAppDrafts";
 import { useSettingsProjectsSection } from "./useSettingsProjectsSection";
 import { useSettingsServerSection } from "./useSettingsServerSection";
-import type { GroupedWorkspaces } from "./settingsSectionTypes";
-import {
-  COMPOSER_PRESET_CONFIGS,
-  COMPOSER_PRESET_LABELS,
-  DICTATION_MODELS,
-} from "@settings/components/settingsViewConstants";
+import { useSettingsShortcutDrafts } from "./useSettingsShortcutDrafts";
 
 type UseSettingsViewOrchestrationArgs = {
   workspaceGroups: WorkspaceGroup[];
@@ -35,18 +35,12 @@ type UseSettingsViewOrchestrationArgs = {
   openAppIconById: Record<string, string>;
   onUpdateAppSettings: (next: AppSettings) => Promise<void>;
   onToggleAutomaticAppUpdateChecks?: () => void;
-  onRunDoctor: (
-    codexBin: string | null,
-    codexArgs: string | null,
-  ) => Promise<CodexDoctorResult>;
+  onRunDoctor: (codexBin: string | null, codexArgs: string | null) => Promise<CodexDoctorResult>;
   onRunCodexUpdate?: (
     codexBin: string | null,
     codexArgs: string | null,
   ) => Promise<CodexUpdateResult>;
-  onUpdateWorkspaceSettings: (
-    id: string,
-    settings: Partial<WorkspaceSettings>,
-  ) => Promise<void>;
+  onUpdateWorkspaceSettings: (id: string, settings: Partial<WorkspaceSettings>) => Promise<void>;
   scaleShortcutTitle: string;
   scaleShortcutText: string;
   onTestNotificationSound: () => void;
@@ -58,10 +52,7 @@ type UseSettingsViewOrchestrationArgs = {
   onRenameWorkspaceGroup: (id: string, name: string) => Promise<boolean | null>;
   onMoveWorkspaceGroup: (id: string, direction: "up" | "down") => Promise<boolean | null>;
   onDeleteWorkspaceGroup: (id: string) => Promise<boolean | null>;
-  onAssignWorkspaceGroup: (
-    workspaceId: string,
-    groupId: string | null,
-  ) => Promise<boolean | null>;
+  onAssignWorkspaceGroup: (workspaceId: string, groupId: string | null) => Promise<boolean | null>;
   dictationModelStatus?: DictationModelStatus | null;
   onDownloadDictationModel?: () => void;
   onCancelDictationDownload?: () => void;
@@ -112,20 +103,13 @@ export function useSettingsViewOrchestration({
   );
 
   const optionKeyLabel = isMacPlatform() ? "Option" : "Alt";
-  const metaKeyLabel = isMacPlatform()
-    ? "Command"
-    : isWindowsPlatform()
-      ? "Windows"
-      : "Meta";
-  const followUpShortcutLabel = isMacPlatform()
-    ? "Shift+Cmd+Enter"
-    : "Shift+Ctrl+Enter";
+  const metaKeyLabel = isMacPlatform() ? "Command" : isWindowsPlatform() ? "Windows" : "Meta";
+  const followUpShortcutLabel = isMacPlatform() ? "Shift+Cmd+Enter" : "Shift+Ctrl+Enter";
 
   const selectedDictationModel = useMemo(() => {
     return (
-      DICTATION_MODELS.find(
-        (model) => model.id === appSettings.dictationModelId,
-      ) ?? DICTATION_MODELS[1]
+      DICTATION_MODELS.find((model) => model.id === appSettings.dictationModelId) ??
+      DICTATION_MODELS[1]
     );
   }, [appSettings.dictationModelId]);
 
@@ -146,11 +130,10 @@ export function useSettingsViewOrchestration({
     onUpdateAppSettings,
   });
 
-  const { shortcutDrafts, handleShortcutKeyDown, clearShortcut } =
-    useSettingsShortcutDrafts({
-      appSettings,
-      onUpdateAppSettings,
-    });
+  const { shortcutDrafts, handleShortcutKeyDown, clearShortcut } = useSettingsShortcutDrafts({
+    appSettings,
+    onUpdateAppSettings,
+  });
 
   const projectsSectionProps = useSettingsProjectsSection({
     appSettings,
@@ -227,9 +210,7 @@ export function useSettingsViewOrchestration({
       optionKeyLabel,
       followUpShortcutLabel,
       composerPresetLabels: COMPOSER_PRESET_LABELS,
-      onComposerPresetChange: (
-        preset: AppSettings["composerEditorPreset"],
-      ) => {
+      onComposerPresetChange: (preset: AppSettings["composerEditorPreset"]) => {
         const config = COMPOSER_PRESET_CONFIGS[preset];
         void onUpdateAppSettings({
           ...appSettings,

@@ -1,32 +1,5 @@
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ClipboardEvent,
-} from "react";
-import type {
-  AppMention,
-  AppOption,
-  ComposerSendIntent,
-  ComposerEditorSettings,
-  CustomPromptOption,
-  DictationTranscript,
-  FollowUpMessageBehavior,
-  QueuedMessage,
-  ServiceTier,
-  ThreadTokenUsage,
-} from "@/types";
-import type {
-  ReviewPromptState,
-  ReviewPromptStep,
-} from "@threads/hooks/useReviewPrompt";
-import {
-  connectorMentionSlug,
-  resolveBoundAppMentions,
-  type AppMentionBinding,
-} from "@/features/apps/utils/appMentions";
+import type { ReviewPromptState, ReviewPromptStep } from "@threads/hooks/useReviewPrompt";
+import type { CodexArgsOption } from "@threads/utils/codexArgsProfiles";
 import {
   getFenceTriggerLine,
   getLineIndent,
@@ -34,6 +7,25 @@ import {
   isCursorInsideFence,
   normalizePastedText,
 } from "@utils/composerText";
+import { isMacPlatform } from "@utils/platformPaths";
+import { type ClipboardEvent, memo, useCallback, useEffect, useRef, useState } from "react";
+import {
+  type AppMentionBinding,
+  connectorMentionSlug,
+  resolveBoundAppMentions,
+} from "@/features/apps/utils/appMentions";
+import type {
+  AppMention,
+  AppOption,
+  ComposerEditorSettings,
+  ComposerSendIntent,
+  CustomPromptOption,
+  DictationTranscript,
+  FollowUpMessageBehavior,
+  QueuedMessage,
+  ServiceTier,
+  ThreadTokenUsage,
+} from "@/types";
 import { useComposerAutocompleteState } from "../hooks/useComposerAutocompleteState";
 import { useComposerDraftEffects } from "../hooks/useComposerDraftEffects";
 import { useComposerKeyDown } from "../hooks/useComposerKeyDown";
@@ -42,8 +34,6 @@ import { usePromptHistory } from "../hooks/usePromptHistory";
 import { ComposerInput } from "./ComposerInput";
 import { ComposerMetaBar } from "./ComposerMetaBar";
 import { ComposerQueue } from "./ComposerQueue";
-import { isMacPlatform } from "@utils/platformPaths";
-import type { CodexArgsOption } from "@threads/utils/codexArgsProfiles";
 
 type ComposerProps = {
   onSend: (
@@ -258,8 +248,7 @@ export const Composer = memo(function Composer({
     followUpMessageBehavior === "steer" && steerAvailable ? "steer" : "queue";
   const oppositeFollowUpIntent: ComposerSendIntent =
     effectiveFollowUpBehavior === "queue" ? "steer" : "queue";
-  const oppositeFallsBackToQueue =
-    oppositeFollowUpIntent === "steer" && !steerAvailable;
+  const oppositeFallsBackToQueue = oppositeFollowUpIntent === "steer" && !steerAvailable;
   const defaultSubmitIntent: ComposerSendIntent = isProcessing
     ? effectiveFollowUpBehavior
     : "default";
@@ -343,8 +332,7 @@ export const Composer = memo(function Composer({
         const filtered = prev.filter(
           (binding) =>
             !(
-              binding.slug === nextBinding.slug &&
-              binding.mention.path === nextBinding.mention.path
+              binding.slug === nextBinding.slug && binding.mention.path === nextBinding.mention.path
             ),
         );
         return [...filtered, nextBinding];
@@ -365,21 +353,17 @@ export const Composer = memo(function Composer({
     textareaRef,
   });
 
-  const {
-    handleHistoryKeyDown,
-    handleHistoryTextChange,
-    recordHistory,
-    resetHistoryNavigation,
-  } = usePromptHistory({
-    historyKey,
-    text,
-    hasAttachments: attachedImages.length > 0,
-    disabled,
-    isAutocompleteOpen: suggestionsOpen,
-    textareaRef,
-    setText: setComposerText,
-    setSelectionStart,
-  });
+  const { handleHistoryKeyDown, handleHistoryTextChange, recordHistory, resetHistoryNavigation } =
+    usePromptHistory({
+      historyKey,
+      text,
+      hasAttachments: attachedImages.length > 0,
+      disabled,
+      isAutocompleteOpen: suggestionsOpen,
+      textareaRef,
+      setText: setComposerText,
+      setSelectionStart,
+    });
 
   const handleTextChangeWithHistory = useCallback(
     (next: string, cursor: number | null) => {
@@ -389,36 +373,39 @@ export const Composer = memo(function Composer({
     [handleHistoryTextChange, handleTextChange],
   );
 
-  const handleSend = useCallback((submitIntent: ComposerSendIntent = "default") => {
-    if (disabled) {
-      return;
-    }
-    const trimmed = text.trim();
-    if (!trimmed && attachedImages.length === 0) {
-      return;
-    }
-    if (trimmed) {
-      recordHistory(trimmed);
-    }
-    const resolvedMentions = resolveBoundAppMentions(trimmed, appMentionBindings);
-    if (resolvedMentions.length > 0) {
-      onSend(trimmed, attachedImages, resolvedMentions, submitIntent);
-    } else {
-      onSend(trimmed, attachedImages, undefined, submitIntent);
-    }
-    resetHistoryNavigation();
-    setComposerText("");
-    setAppMentionBindings([]);
-  }, [
-    appMentionBindings,
-    attachedImages,
-    disabled,
-    onSend,
-    recordHistory,
-    resetHistoryNavigation,
-    setComposerText,
-    text,
-  ]);
+  const handleSend = useCallback(
+    (submitIntent: ComposerSendIntent = "default") => {
+      if (disabled) {
+        return;
+      }
+      const trimmed = text.trim();
+      if (!trimmed && attachedImages.length === 0) {
+        return;
+      }
+      if (trimmed) {
+        recordHistory(trimmed);
+      }
+      const resolvedMentions = resolveBoundAppMentions(trimmed, appMentionBindings);
+      if (resolvedMentions.length > 0) {
+        onSend(trimmed, attachedImages, resolvedMentions, submitIntent);
+      } else {
+        onSend(trimmed, attachedImages, undefined, submitIntent);
+      }
+      resetHistoryNavigation();
+      setComposerText("");
+      setAppMentionBindings([]);
+    },
+    [
+      appMentionBindings,
+      attachedImages,
+      disabled,
+      onSend,
+      recordHistory,
+      resetHistoryNavigation,
+      setComposerText,
+      text,
+    ],
+  );
 
   useComposerDraftEffects({
     draftText,
@@ -485,10 +472,7 @@ export const Composer = memo(function Composer({
       if (isMultiline && !autoWrapPasteMultiline) {
         return;
       }
-      if (
-        !isMultiline &&
-        !(autoWrapPasteCodeLike && isCodeLikeSingleLine(normalized))
-      ) {
+      if (!isMultiline && !(autoWrapPasteCodeLike && isCodeLikeSingleLine(normalized))) {
         return;
       }
       event.preventDefault();
@@ -545,8 +529,7 @@ export const Composer = memo(function Composer({
       }
       const block = `${openFence}\n${fence.indent}\n${closeFence}`;
       const nextText = `${before}${block}${after}`;
-      const nextCursor =
-        before.length + openFence.length + 1 + fence.indent.length;
+      const nextCursor = before.length + openFence.length + 1 + fence.indent.length;
       applyTextInsertion(nextText, nextCursor);
       return true;
     },
@@ -573,7 +556,6 @@ export const Composer = memo(function Composer({
     tryExpandFence,
   });
 
-
   return (
     <footer className={`composer${disabled ? " is-disabled" : ""}`}>
       <ComposerQueue
@@ -594,8 +576,8 @@ export const Composer = memo(function Composer({
             ) : (
               <>
                 Default: {effectiveFollowUpBehavior === "steer" ? "Steer" : "Queue"}. Press{" "}
-                {followUpShortcutLabel} to{" "}
-                {oppositeFollowUpIntent === "steer" ? "steer" : "queue"} this message.
+                {followUpShortcutLabel} to {oppositeFollowUpIntent === "steer" ? "steer" : "queue"}{" "}
+                this message.
               </>
             )}
           </div>

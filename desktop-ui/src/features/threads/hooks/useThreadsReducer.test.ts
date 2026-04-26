@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationItem, ThreadSummary } from "@/types";
-import { initialState, threadReducer } from "./useThreadsReducer";
 import type { ThreadState } from "./useThreadsReducer";
+import { initialState, threadReducer } from "./useThreadsReducer";
 
 describe("threadReducer", () => {
   it("ensures thread with default name and active selection", () => {
@@ -18,9 +18,7 @@ describe("threadReducer", () => {
   });
 
   it("renames auto-generated thread on first user message", () => {
-    const threads: ThreadSummary[] = [
-      { id: "thread-1", name: "New Agent", updatedAt: 1 },
-    ];
+    const threads: ThreadSummary[] = [{ id: "thread-1", name: "New Agent", updatedAt: 1 }];
     const next = threadReducer(
       {
         ...initialState,
@@ -49,9 +47,7 @@ describe("threadReducer", () => {
   });
 
   it("renames auto-generated thread from assistant output when no user message", () => {
-    const threads: ThreadSummary[] = [
-      { id: "thread-1", name: "New Agent", updatedAt: 1 },
-    ];
+    const threads: ThreadSummary[] = [{ id: "thread-1", name: "New Agent", updatedAt: 1 }];
     const next = threadReducer(
       {
         ...initialState,
@@ -71,9 +67,7 @@ describe("threadReducer", () => {
   });
 
   it("updates thread timestamp when newer activity arrives", () => {
-    const threads: ThreadSummary[] = [
-      { id: "thread-1", name: "Agent 1", updatedAt: 1000 },
-    ];
+    const threads: ThreadSummary[] = [{ id: "thread-1", name: "Agent 1", updatedAt: 1000 }];
     const next = threadReducer(
       {
         ...initialState,
@@ -537,9 +531,7 @@ describe("threadReducer", () => {
       diff: "diff --git a/file.ts b/file.ts",
     });
 
-    expect(next.turnDiffByThread["thread-1"]).toBe(
-      "diff --git a/file.ts b/file.ts",
-    );
+    expect(next.turnDiffByThread["thread-1"]).toBe("diff --git a/file.ts b/file.ts");
   });
 
   it("clears turn diff state when a thread is removed", () => {
@@ -641,12 +633,10 @@ describe("threadReducer", () => {
       "thread-parent",
     ]);
     expect(
-      next.threadsByWorkspace["ws-1"]?.find((thread) => thread.id === "thread-child")
-        ?.name,
+      next.threadsByWorkspace["ws-1"]?.find((thread) => thread.id === "thread-child")?.name,
     ).toBe("Child (fresh)");
     expect(
-      next.threadsByWorkspace["ws-1"]?.find((thread) => thread.id === "thread-parent")
-        ?.updatedAt,
+      next.threadsByWorkspace["ws-1"]?.find((thread) => thread.id === "thread-parent")?.updatedAt,
     ).toBe(300);
   });
 
@@ -691,9 +681,7 @@ describe("threadReducer", () => {
       threads: [{ id: "thread-child", name: "Child", updatedAt: 210 }],
     });
 
-    expect(next.threadsByWorkspace["ws-1"]?.map((thread) => thread.id)).toEqual([
-      "thread-child",
-    ]);
+    expect(next.threadsByWorkspace["ws-1"]?.map((thread) => thread.id)).toEqual(["thread-child"]);
   });
 
   it("drops stale active anchors on complete setThreads payloads", () => {
@@ -715,9 +703,7 @@ describe("threadReducer", () => {
       threads: [{ id: "thread-fresh", name: "Fresh", updatedAt: 210 }],
     });
 
-    expect(next.threadsByWorkspace["ws-1"]?.map((thread) => thread.id)).toEqual([
-      "thread-fresh",
-    ]);
+    expect(next.threadsByWorkspace["ws-1"]?.map((thread) => thread.id)).toEqual(["thread-fresh"]);
     expect(next.activeThreadIdByWorkspace["ws-1"]).toBe("thread-fresh");
   });
 
@@ -743,5 +729,4 @@ describe("threadReducer", () => {
     expect(trimmed.itemsByThread["thread-1"]).toHaveLength(3);
     expect(trimmed.itemsByThread["thread-1"]?.[0]?.id).toBe("msg-2");
   });
-
 });

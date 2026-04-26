@@ -4,9 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useRemoteThreadRefreshOnFocus } from "./useRemoteThreadRefreshOnFocus";
 
 const windowListeners = new Map<string, Set<() => void>>();
-const listenMock = vi.fn<
-  (eventName: string, handler: () => void) => Promise<() => void>
->();
+const listenMock = vi.fn<(eventName: string, handler: () => void) => Promise<() => void>>();
 
 function registerWindowListener(eventName: string, handler: () => void) {
   const handlers = windowListeners.get(eventName) ?? new Set<() => void>();
@@ -127,9 +125,7 @@ describe("useRemoteThreadRefreshOnFocus", () => {
     });
 
     expect(reconnectWorkspace).toHaveBeenCalledTimes(1);
-    expect(reconnectWorkspace).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "ws-1" }),
-    );
+    expect(reconnectWorkspace).toHaveBeenCalledWith(expect.objectContaining({ id: "ws-1" }));
     expect(refreshThread).toHaveBeenCalledTimes(1);
     expect(reconnectWorkspace.mock.invocationCallOrder[0]).toBeLessThan(
       refreshThread.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,

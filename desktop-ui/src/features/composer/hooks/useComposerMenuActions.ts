@@ -1,5 +1,3 @@
-import { useMemo } from "react";
-import type { AccessMode } from "@/types";
 import { useTauriEvent } from "@app/hooks/useTauriEvent";
 import {
   subscribeMenuCycleAccessMode,
@@ -7,6 +5,8 @@ import {
   subscribeMenuCycleModel,
   subscribeMenuCycleReasoning,
 } from "@services/events";
+import { useMemo } from "react";
+import type { AccessMode } from "@/types";
 
 type ModelOption = { id: string; displayName: string; model: string };
 
@@ -59,8 +59,7 @@ export function useComposerMenuActions({
       },
       cycleAccessMode() {
         const currentIndex = ACCESS_ORDER.indexOf(accessMode);
-        const nextIndex =
-          currentIndex >= 0 ? (currentIndex + 1) % ACCESS_ORDER.length : 0;
+        const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % ACCESS_ORDER.length : 0;
         const nextAccess = ACCESS_ORDER[nextIndex];
         if (nextAccess) {
           onFocusComposer?.();
@@ -74,10 +73,7 @@ export function useComposerMenuActions({
         const currentIndex = collaborationModes.findIndex(
           (mode) => mode.id === selectedCollaborationModeId,
         );
-        const nextIndex =
-          currentIndex >= 0
-            ? (currentIndex + 1) % collaborationModes.length
-            : 0;
+        const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % collaborationModes.length : 0;
         const nextMode = collaborationModes[nextIndex];
         if (nextMode) {
           onFocusComposer?.();
@@ -89,8 +85,7 @@ export function useComposerMenuActions({
           return;
         }
         const currentIndex = reasoningOptions.indexOf(selectedEffort ?? "");
-        const nextIndex =
-          currentIndex >= 0 ? (currentIndex + 1) % reasoningOptions.length : 0;
+        const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % reasoningOptions.length : 0;
         const nextEffort = reasoningOptions[nextIndex];
         if (nextEffort) {
           onFocusComposer?.();

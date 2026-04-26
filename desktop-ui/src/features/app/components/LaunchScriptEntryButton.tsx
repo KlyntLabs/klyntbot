@@ -1,8 +1,8 @@
-import type { LaunchScriptEntry, LaunchScriptIconId } from "@/types";
 import { PopoverSurface } from "@/features/design-system/components/popover/PopoverPrimitives";
+import type { LaunchScriptEntry, LaunchScriptIconId } from "@/types";
 import { useMenuController } from "../hooks/useMenuController";
-import { LaunchScriptIconPicker } from "./LaunchScriptIconPicker";
 import { getLaunchScriptIcon, getLaunchScriptIconLabel } from "../utils/launchScriptIcons";
+import { LaunchScriptIconPicker } from "./LaunchScriptIconPicker";
 
 type LaunchScriptEntryButtonProps = {
   entry: LaunchScriptEntry;
@@ -69,9 +69,7 @@ export function LaunchScriptEntryButton({
       </div>
       {editorOpen && (
         <PopoverSurface className="launch-script-popover" role="dialog">
-          <div className="launch-script-title">
-            {entry.label?.trim() || "Launch script"}
-          </div>
+          <div className="launch-script-title">{entry.label?.trim() || "Launch script"}</div>
           <LaunchScriptIconPicker value={draftIcon} onChange={onDraftIconChange} />
           <input
             className="launch-script-input"

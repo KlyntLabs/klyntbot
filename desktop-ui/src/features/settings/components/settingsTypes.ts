@@ -24,9 +24,7 @@ export const SETTINGS_ROUTE_SECTION_IDS = [
 
 type SettingsSection = (typeof SETTINGS_SECTION_IDS)[number];
 
-export type CodexSection =
-  | SettingsSection
-  | (typeof SETTINGS_EXTRA_SECTION_IDS)[number];
+export type CodexSection = SettingsSection | (typeof SETTINGS_EXTRA_SECTION_IDS)[number];
 
 export type ShortcutSettingKey =
   | "composerModelShortcut"

@@ -1,22 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  tailscaleDaemonCommandPreview as fetchTailscaleDaemonCommandPreview,
+  tailscaleStatus as fetchTailscaleStatus,
+  listWorkspaces,
+  tailscaleDaemonStart,
+  tailscaleDaemonStatus,
+  tailscaleDaemonStop,
+} from "@services/tauri";
+import { DEFAULT_REMOTE_HOST } from "@settings/components/settingsViewConstants";
+import { isMobilePlatform } from "@utils/platformPaths";
 import type { Dispatch, SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
 import type {
   AppSettings,
   TailscaleDaemonCommandPreview,
   TailscaleStatus,
   TcpDaemonStatus,
 } from "@/types";
-import {
-  listWorkspaces,
-  tailscaleDaemonCommandPreview as fetchTailscaleDaemonCommandPreview,
-  tailscaleDaemonStart,
-  tailscaleDaemonStatus,
-  tailscaleDaemonStop,
-  tailscaleStatus as fetchTailscaleStatus,
-} from "@services/tauri";
-import { isMobilePlatform } from "@utils/platformPaths";
-import { DEFAULT_REMOTE_HOST } from "@settings/components/settingsViewConstants";
-import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
 
 type UseSettingsServerSectionArgs = {
   appSettings: AppSettings;
@@ -166,12 +166,11 @@ export const useSettingsServerSection = ({
     fallback: null,
   });
 
-  const tailscaleCommandPreviewQuery =
-    useTauriQuery<TailscaleDaemonCommandPreview | null>({
-      queryKey: qk.settings.tailscaleCommandPreview(),
-      queryFn: () => fetchTailscaleDaemonCommandPreview(),
-      fallback: null,
-    });
+  const tailscaleCommandPreviewQuery = useTauriQuery<TailscaleDaemonCommandPreview | null>({
+    queryKey: qk.settings.tailscaleCommandPreview(),
+    queryFn: () => fetchTailscaleDaemonCommandPreview(),
+    fallback: null,
+  });
 
   const tcpDaemonStatusQuery = useTauriQuery<TcpDaemonStatus | null>({
     queryKey: qk.settings.tcpDaemonStatus(),
@@ -271,7 +270,8 @@ export const useSettingsServerSection = ({
         nextSettings.backendMode === latestSettings.backendMode &&
         nextSettings.remoteBackendProvider === latestSettings.remoteBackendProvider &&
         nextSettings.activeRemoteBackendId === latestSettings.activeRemoteBackendId &&
-        JSON.stringify(nextSettings.remoteBackends) === JSON.stringify(latestSettings.remoteBackends);
+        JSON.stringify(nextSettings.remoteBackends) ===
+          JSON.stringify(latestSettings.remoteBackends);
       if (unchanged) {
         return;
       }
@@ -325,7 +325,8 @@ export const useSettingsServerSection = ({
       return;
     }
     const duplicate = getConfiguredRemoteBackends(latestSettings).some(
-      (entry) => entry.id !== active.id && entry.name.trim().toLowerCase() === nextName.toLowerCase(),
+      (entry) =>
+        entry.id !== active.id && entry.name.trim().toLowerCase() === nextName.toLowerCase(),
     );
     if (duplicate) {
       const message = `A remote named "${nextName}" already exists.`;
@@ -492,7 +493,7 @@ export const useSettingsServerSection = ({
     const remaining = existingBackends.filter((entry) => entry.id !== id);
     const nextActiveId =
       latestSettings.activeRemoteBackendId === id
-        ? remaining[Math.min(index, remaining.length - 1)]?.id ?? remaining[0]?.id ?? null
+        ? (remaining[Math.min(index, remaining.length - 1)]?.id ?? remaining[0]?.id ?? null)
         : latestSettings.activeRemoteBackendId;
     await persistRemoteBackends(remaining, nextActiveId);
     setRemoteStatus(`Deleted "${removed.name}".`);
@@ -601,8 +602,6 @@ export const useSettingsServerSection = ({
     await runTcpDaemonAction("status", () => tcpDaemonStatusQuery.refetch());
   };
 
-
-
   return {
     appSettings,
     onUpdateAppSettings,
@@ -625,7 +624,10 @@ export const useSettingsServerSection = ({
     tailscaleCommandPreview: tailscaleCommandPreviewQuery.data,
     tailscaleCommandBusy: tailscaleCommandPreviewQuery.isLoading,
     tailscaleCommandError: tailscaleCommandPreviewQuery.error
-      ? formatErrorMessage(tailscaleCommandPreviewQuery.error, "Unable to build Tailscale daemon command.")
+      ? formatErrorMessage(
+          tailscaleCommandPreviewQuery.error,
+          "Unable to build Tailscale daemon command.",
+        )
       : null,
     tcpDaemonStatus: tcpDaemonStatusQuery.data,
     tcpDaemonBusyAction,

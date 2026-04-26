@@ -44,9 +44,7 @@ export const METHODS_HANDLED_OUTSIDE_USE_APP_SERVER_EVENTS = [
 
 const SUPPORTED_METHOD_SET = new Set<string>(SUPPORTED_APP_SERVER_METHODS);
 
-function getAppServerMessageObject(
-  event: AppServerEvent,
-): Record<string, unknown> | null {
+function getAppServerMessageObject(event: AppServerEvent): Record<string, unknown> | null {
   if (!event || typeof event !== "object") {
     return null;
   }
@@ -70,9 +68,7 @@ export function getAppServerRawMethod(event: AppServerEvent): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-export function isSupportedAppServerMethod(
-  method: string,
-): method is SupportedAppServerMethod {
+export function isSupportedAppServerMethod(method: string): method is SupportedAppServerMethod {
   return SUPPORTED_METHOD_SET.has(method);
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { DebugEntry, WorkspaceInfo } from "@/types";
 import { useWorkspaceFiles } from "@/features/workspaces/hooks/useWorkspaceFiles";
+import type { DebugEntry, WorkspaceInfo } from "@/types";
 
 type FilePanelMode = "git" | "files" | "prompts";
 type TabKey = "home" | "projects" | "codex" | "git" | "log";
@@ -41,8 +41,7 @@ export function useWorkspaceFileListing({
 
   const compactTab = isTablet ? tabletTab : activeTab;
   const filePanelVisible =
-    filePanelMode === "files" &&
-    (isCompact ? compactTab === "git" : !rightPanelCollapsed);
+    filePanelMode === "files" && (isCompact ? compactTab === "git" : !rightPanelCollapsed);
   const shouldFetchFiles =
     Boolean(activeWorkspace) && (filePanelMode === "files" || fileAutocompleteActive);
 

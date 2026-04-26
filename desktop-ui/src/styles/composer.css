@@ -416,11 +416,7 @@
 }
 
 .composer-waveform.is-processing {
-  background: linear-gradient(
-    90deg,
-    rgba(100, 200, 255, 0.15),
-    rgba(120, 235, 190, 0.15)
-  );
+  background: linear-gradient(90deg, rgba(100, 200, 255, 0.15), rgba(120, 235, 190, 0.15));
 }
 
 .composer-waveform-bar {
@@ -512,7 +508,6 @@
   border-top-color: rgba(255, 120, 120, 0.9);
   animation: composer-action-spin var(--ds-spinner-dur) linear infinite;
 }
-
 
 .composer.is-disabled {
   opacity: 0.7;
@@ -706,8 +701,7 @@
     radial-gradient(circle, var(--surface-context-core) 54%, transparent 56%),
     conic-gradient(
       from 180deg,
-      hsl(calc(120deg * var(--context-free) / 100), 80%, 55%)
-        calc(var(--context-free) * 1%),
+      hsl(calc(120deg * var(--context-free) / 100), 80%, 55%) calc(var(--context-free) * 1%),
       var(--border-strong) 0
     );
   transition: background 0.2s ease;
@@ -727,7 +721,9 @@
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
   border: 1px solid var(--border-subtle);
 }
 
@@ -741,7 +737,6 @@
   font-size: 6px;
   color: var(--text-quiet);
 }
-
 
 .composer-select-wrap {
   position: relative;

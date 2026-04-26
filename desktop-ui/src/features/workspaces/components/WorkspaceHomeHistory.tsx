@@ -1,12 +1,6 @@
+import { getWorkspaceHomeThreadState, type ThreadStatusById } from "@utils/threadStatus";
 import { formatRelativeTime } from "@utils/time";
-import {
-  getWorkspaceHomeThreadState,
-  type ThreadStatusById,
-} from "@utils/threadStatus";
-import type {
-  WorkspaceHomeRun,
-  WorkspaceHomeRunInstance,
-} from "../hooks/useWorkspaceHome";
+import type { WorkspaceHomeRun, WorkspaceHomeRunInstance } from "../hooks/useWorkspaceHome";
 import { buildLabelCounts } from "./workspaceHomeHelpers";
 
 type WorkspaceHomeHistoryProps = {
@@ -41,13 +35,10 @@ function WorkspaceHomeInstanceList({
       {instances.map((instance) => {
         const status = getWorkspaceHomeThreadState(threadStatusById[instance.threadId]);
         const isActive =
-          instance.threadId === activeThreadId &&
-          instance.workspaceId === activeWorkspaceId;
+          instance.threadId === activeThreadId && instance.workspaceId === activeWorkspaceId;
         const totalForLabel = labelCounts.get(instance.modelLabel) ?? 1;
         const label =
-          totalForLabel > 1
-            ? `${instance.modelLabel} ${instance.sequence}`
-            : instance.modelLabel;
+          totalForLabel > 1 ? `${instance.modelLabel} ${instance.sequence}` : instance.modelLabel;
 
         return (
           <button
@@ -58,9 +49,7 @@ function WorkspaceHomeInstanceList({
           >
             <span className="workspace-home-instance-title">{label}</span>
             <span
-              className={`workspace-home-instance-status${
-                status.isRunning ? " is-running" : ""
-              }`}
+              className={`workspace-home-instance-status${status.isRunning ? " is-running" : ""}`}
             >
               {status.statusLabel}
             </span>
@@ -87,9 +76,7 @@ export function WorkspaceHomeHistory({
           <div className="workspace-home-section-title">Recent runs</div>
         </div>
         {runs.length === 0 ? (
-          <div className="workspace-home-empty">
-            Start a run to see its instances tracked here.
-          </div>
+          <div className="workspace-home-empty">Start a run to see its instances tracked here.</div>
         ) : (
           <div className="workspace-home-run-grid">
             {runs.map((run) => {
@@ -101,7 +88,8 @@ export function WorkspaceHomeHistory({
                     <div>
                       <div className="workspace-home-run-title">{run.title}</div>
                       <div className="workspace-home-run-meta">
-                        {run.mode === "local" ? "Local" : "Worktree"} · {run.instances.length} instance
+                        {run.mode === "local" ? "Local" : "Worktree"} · {run.instances.length}{" "}
+                        instance
                         {run.instances.length === 1 ? "" : "s"}
                         {run.status === "failed" && " · Failed"}
                         {run.status === "partial" && " · Partial"}
@@ -135,9 +123,7 @@ export function WorkspaceHomeHistory({
                       onSelectInstance={onSelectInstance}
                     />
                   ) : run.status === "failed" ? (
-                    <div className="workspace-home-empty">
-                      No instances were started.
-                    </div>
+                    <div className="workspace-home-empty">No instances were started.</div>
                   ) : (
                     <div className="workspace-home-empty workspace-home-pending">
                       <span className="working-spinner" aria-hidden />
@@ -158,9 +144,7 @@ export function WorkspaceHomeHistory({
           <div className="workspace-home-section-title">Recent threads</div>
         </div>
         {recentThreadInstances.length === 0 ? (
-          <div className="workspace-home-empty">
-            Threads from the sidebar will appear here.
-          </div>
+          <div className="workspace-home-empty">Threads from the sidebar will appear here.</div>
         ) : (
           <div className="workspace-home-run-grid">
             <div className="workspace-home-run-card">

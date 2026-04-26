@@ -1,8 +1,8 @@
-import { useCallback, useMemo } from "react";
-import type { ModelOption, WorkspaceInfo } from "@/types";
 import { connectWorkspace, getConfigModel, getModelList } from "@services/tauri";
+import { useCallback, useMemo } from "react";
 import { parseModelListResponse } from "@/features/models/utils/modelListResponse";
-import { useTauriQuery } from "@/lib/query";
+import { qk, useTauriQuery } from "@/lib/query";
+import type { ModelOption, WorkspaceInfo } from "@/types";
 
 type SettingsDefaultModelsState = {
   models: ModelOption[];
@@ -62,12 +62,16 @@ function compareModelsByLatest(a: ModelOption, b: ModelOption): number {
 
 export function useSettingsDefaultModels(projects: WorkspaceInfo[]) {
   const workspaceIds = useMemo(
-    () => projects.map((p) => p.id).sort().join(","),
+    () =>
+      projects
+        .map((p) => p.id)
+        .sort()
+        .join(","),
     [projects],
   );
 
   const query = useTauriQuery<SettingsDefaultModelsState>({
-    queryKey: ["settings", "defaultModels", workspaceIds],
+    queryKey: qk.settings.defaultModels(workspaceIds),
     queryFn: async () => {
       let connectedWorkspaceCount = 0;
       let lastError: string | null = null;
@@ -82,9 +86,7 @@ export function useSettingsDefaultModels(projects: WorkspaceInfo[]) {
           continue;
         }
         try {
-          const list = parseModelListResponse(
-            await getModelList(project.id),
-          );
+          const list = parseModelListResponse(await getModelList(project.id));
           const configModel = await getConfigModel(project.id);
           if (configModel) {
             all.push({

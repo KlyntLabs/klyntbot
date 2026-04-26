@@ -104,9 +104,7 @@ export function formatPlanType(value: string | null | undefined) {
     .join(" ");
 }
 
-export function formatAccountTypeLabel(
-  value: AccountSnapshot["type"] | null | undefined,
-) {
+export function formatAccountTypeLabel(value: AccountSnapshot["type"] | null | undefined) {
   if (value === "chatgpt") {
     return "ChatGPT account";
   }

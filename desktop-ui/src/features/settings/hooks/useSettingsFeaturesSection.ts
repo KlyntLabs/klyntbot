@@ -1,12 +1,12 @@
-import { useCallback, useMemo, useState } from "react";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import type { AppSettings, CodexFeature } from "@/types";
 import {
   getCodexConfigPath,
   getExperimentalFeatureList,
   setCodexFeatureFlag,
 } from "@services/tauri";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { useCallback, useMemo, useState } from "react";
 import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
+import type { AppSettings, CodexFeature } from "@/types";
 
 type UseSettingsFeaturesSectionArgs = {
   appSettings: AppSettings;
@@ -14,11 +14,7 @@ type UseSettingsFeaturesSectionArgs = {
   onUpdateAppSettings: (next: AppSettings) => Promise<void>;
 };
 
-const HIDDEN_DYNAMIC_FEATURE_KEYS = new Set<string>([
-  "personality",
-  "collab",
-  "steer",
-]);
+const HIDDEN_DYNAMIC_FEATURE_KEYS = new Set<string>(["personality", "collab", "steer"]);
 
 export type SettingsFeaturesSectionProps = {
   appSettings: AppSettings;
@@ -62,9 +58,7 @@ export const useSettingsFeaturesSection = ({
 }: UseSettingsFeaturesSectionArgs): SettingsFeaturesSectionProps => {
   const [openConfigError, setOpenConfigError] = useState<string | null>(null);
   const [featureError, setFeatureError] = useState<string | null>(null);
-  const [featureUpdatingKey, setFeatureUpdatingKey] = useState<string | null>(
-    null,
-  );
+  const [featureUpdatingKey, setFeatureUpdatingKey] = useState<string | null>(null);
 
   const featuresQuery = useTauriQuery<CodexFeature[]>({
     queryKey: qk.settings.features(featureWorkspaceId),
@@ -73,11 +67,7 @@ export const useSettingsFeaturesSection = ({
       const collected: CodexFeature[] = [];
       let cursor: string | null = null;
       for (let page = 0; page < 20; page += 1) {
-        const result = await getExperimentalFeatureList(
-          featureWorkspaceId,
-          cursor,
-          100,
-        );
+        const result = await getExperimentalFeatureList(featureWorkspaceId, cursor, 100);
         collected.push(...result.features);
         if (!result.nextCursor) break;
         cursor = result.nextCursor;
@@ -94,10 +84,7 @@ export const useSettingsFeaturesSection = ({
     fallback: null,
   });
 
-  const toggleFeature = useTauriMutation<
-    void,
-    { name: string; enabled: boolean }
-  >({
+  const toggleFeature = useTauriMutation<void, { name: string; enabled: boolean }>({
     mutationFn: (input) => setCodexFeatureFlag(input.name, input.enabled),
     invalidates: [qk.settings.features(featureWorkspaceId)],
   });
@@ -109,18 +96,14 @@ export const useSettingsFeaturesSection = ({
       if (!configPath) return;
       await revealItemInDir(configPath);
     } catch (error) {
-      setOpenConfigError(
-        error instanceof Error ? error.message : "Unable to open config.",
-      );
+      setOpenConfigError(error instanceof Error ? error.message : "Unable to open config.");
     }
   }, [configPathQuery.data]);
 
   const stableFeatures = useMemo(
     () =>
       featuresQuery.data.filter(
-        (feature) =>
-          feature.stage === "stable" &&
-          !HIDDEN_DYNAMIC_FEATURE_KEYS.has(feature.name),
+        (feature) => feature.stage === "stable" && !HIDDEN_DYNAMIC_FEATURE_KEYS.has(feature.name),
       ),
     [featuresQuery.data],
   );
@@ -133,8 +116,7 @@ export const useSettingsFeaturesSection = ({
       ),
     [featuresQuery.data],
   );
-  const hasDynamicFeatureRows =
-    stableFeatures.length > 0 || experimentalFeatures.length > 0;
+  const hasDynamicFeatureRows = stableFeatures.length > 0 || experimentalFeatures.length > 0;
 
   const onToggleCodexFeature = useCallback(
     (feature: CodexFeature) => {
@@ -143,11 +125,7 @@ export const useSettingsFeaturesSection = ({
         setFeatureUpdatingKey(feature.name);
         setFeatureError(null);
         try {
-          const nextSettings = mapFeatureToAppSettings(
-            appSettings,
-            feature.name,
-            nextEnabled,
-          );
+          const nextSettings = mapFeatureToAppSettings(appSettings, feature.name, nextEnabled);
           if (nextSettings) {
             await onUpdateAppSettings(nextSettings);
           } else {
@@ -158,14 +136,10 @@ export const useSettingsFeaturesSection = ({
           }
         } catch (error) {
           setFeatureError(
-            error instanceof Error
-              ? error.message
-              : `Unable to update feature "${feature.name}".`,
+            error instanceof Error ? error.message : `Unable to update feature "${feature.name}".`,
           );
         } finally {
-          setFeatureUpdatingKey((current) =>
-            current === feature.name ? null : current,
-          );
+          setFeatureUpdatingKey((current) => (current === feature.name ? null : current));
         }
       })();
     },

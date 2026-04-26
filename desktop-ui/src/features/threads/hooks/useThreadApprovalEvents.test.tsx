@@ -1,12 +1,10 @@
 // @vitest-environment jsdom
+
+import { respondToServerRequest } from "@services/tauri";
 import { act, renderHook } from "@testing-library/react";
+import { getApprovalCommandInfo, matchesCommandPrefix } from "@utils/approvalRules";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApprovalRequest } from "@/types";
-import { respondToServerRequest } from "@services/tauri";
-import {
-  getApprovalCommandInfo,
-  matchesCommandPrefix,
-} from "@utils/approvalRules";
 import { useThreadApprovalEvents } from "./useThreadApprovalEvents";
 
 vi.mock("@services/tauri", () => ({

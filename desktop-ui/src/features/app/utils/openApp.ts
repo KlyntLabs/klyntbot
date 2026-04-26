@@ -26,5 +26,5 @@ export function getSelectedOpenAppId(settings: AppSettings): string {
       : window.localStorage.getItem("open-workspace-app") || DEFAULT_OPEN_APP_ID);
   return targets.some((target) => target.id === selected)
     ? selected
-    : targets[0]?.id ?? DEFAULT_OPEN_APP_ID;
+    : (targets[0]?.id ?? DEFAULT_OPEN_APP_ID);
 }

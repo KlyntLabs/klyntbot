@@ -1,5 +1,5 @@
-import { useCallback } from "react";
 import { pickWorkspacePath } from "@services/tauri";
+import { useCallback } from "react";
 import type { WorkspaceInfo } from "@/types";
 
 type UseGitRootSelectionOptions = {
@@ -35,12 +35,7 @@ export function useGitRootSelection({
       clearGitRootCandidates();
       refreshGitStatus();
     },
-    [
-      activeWorkspace,
-      clearGitRootCandidates,
-      refreshGitStatus,
-      updateWorkspaceSettings,
-    ],
+    [activeWorkspace, clearGitRootCandidates, refreshGitStatus, updateWorkspaceSettings],
   );
 
   const handlePickGitRoot = useCallback(async () => {

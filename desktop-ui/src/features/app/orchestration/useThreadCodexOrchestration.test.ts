@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
 import { useRef } from "react";
-import {
-  useThreadCodexOrchestration,
-} from "./useThreadCodexOrchestration";
+import { beforeEach, describe, expect, it } from "vitest";
+import { useThreadCodexOrchestration } from "./useThreadCodexOrchestration";
 
 describe("useThreadCodexOrchestration", () => {
   beforeEach(() => {
@@ -25,9 +23,9 @@ describe("useThreadCodexOrchestration", () => {
     expect(result.current.getThreadCodexParams("ws-1", "thread-1")).toEqual(
       expect.objectContaining({ serviceTier: "fast" }),
     );
-    expect(
-      result.current.getThreadCodexParams("ws-1", "__no_thread__"),
-    ).toEqual(expect.objectContaining({ serviceTier: "fast" }));
+    expect(result.current.getThreadCodexParams("ws-1", "__no_thread__")).toEqual(
+      expect.objectContaining({ serviceTier: "fast" }),
+    );
   });
 
   it("keeps workspace-home fast mode changes scoped to the no-thread selection", () => {

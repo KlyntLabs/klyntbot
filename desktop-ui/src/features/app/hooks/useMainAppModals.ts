@@ -1,5 +1,15 @@
-import { useMemo } from "react";
+import type { AppModalsProps } from "@app/components/AppModals";
+import type { SettingsSection } from "@app/hooks/useSettingsModalState";
+import { useSettingsModalState } from "@app/hooks/useSettingsModalState";
+import type { SettingsViewProps } from "@settings/components/SettingsView";
+import { useRenameThreadPrompt } from "@threads/hooks/useRenameThreadPrompt";
 import type { ComponentType } from "react";
+import { useMemo } from "react";
+import { useBranchSwitcher } from "@/features/git/hooks/useBranchSwitcher";
+import type { InitGitRepoOutcome } from "@/features/git/hooks/useGitActions";
+import { useInitGitRepoPrompt } from "@/features/git/hooks/useInitGitRepoPrompt";
+import { useClonePrompt } from "@/features/workspaces/hooks/useClonePrompt";
+import { useWorktreePrompt } from "@/features/workspaces/hooks/useWorktreePrompt";
 import type {
   AppSettings,
   BranchInfo,
@@ -10,16 +20,6 @@ import type {
   WorkspaceInfo,
   WorkspaceSettings,
 } from "@/types";
-import { useSettingsModalState } from "@app/hooks/useSettingsModalState";
-import type { SettingsSection } from "@app/hooks/useSettingsModalState";
-import type { AppModalsProps } from "@app/components/AppModals";
-import type { SettingsViewProps } from "@settings/components/SettingsView";
-import { useRenameThreadPrompt } from "@threads/hooks/useRenameThreadPrompt";
-import { useBranchSwitcher } from "@/features/git/hooks/useBranchSwitcher";
-import { useInitGitRepoPrompt } from "@/features/git/hooks/useInitGitRepoPrompt";
-import type { InitGitRepoOutcome } from "@/features/git/hooks/useGitActions";
-import { useWorktreePrompt } from "@/features/workspaces/hooks/useWorktreePrompt";
-import { useClonePrompt } from "@/features/workspaces/hooks/useClonePrompt";
 
 type GroupedWorkspaceInfo = SettingsViewProps["groupedWorkspaces"];
 
@@ -67,9 +67,10 @@ type UseMainAppModalsArgs = {
     ) => Promise<WorkspaceInfo>;
     selectWorkspace: (workspaceId: string) => void;
     handleWorktreeCreated: (worktree: WorkspaceInfo, parent: WorkspaceInfo) => Promise<void>;
-    resolveCloneProjectContext: (
-      workspace: WorkspaceInfo,
-    ) => { groupId: string | null; copiesFolder: string | null };
+    resolveCloneProjectContext: (workspace: WorkspaceInfo) => {
+      groupId: string | null;
+      copiesFolder: string | null;
+    };
     persistProjectCopiesFolder: (groupId: string, copiesFolder: string) => Promise<void>;
     onCompactActivate?: () => void;
     onWorkspacePromptError: (message: string, kind: "worktree" | "clone") => void;
@@ -98,24 +99,15 @@ type UseMainAppModalsArgs = {
     renameWorkspaceGroup: (id: string, name: string) => Promise<boolean | null>;
     moveWorkspaceGroup: (id: string, direction: "up" | "down") => Promise<boolean | null>;
     deleteWorkspaceGroup: (id: string) => Promise<boolean | null>;
-    assignWorkspaceGroup: (
-      workspaceId: string,
-      groupId: string | null,
-    ) => Promise<boolean | null>;
+    assignWorkspaceGroup: (workspaceId: string, groupId: string | null) => Promise<boolean | null>;
     reduceTransparency: boolean;
     setReduceTransparency: (value: boolean) => void;
     appSettings: AppSettings;
     openAppIconById: Record<string, string>;
     queueSaveSettings: (next: AppSettings) => Promise<unknown>;
     handleToggleAutomaticAppUpdateChecks: () => void;
-    doctor: (
-      codexBin: string | null,
-      codexArgs: string | null,
-    ) => Promise<CodexDoctorResult>;
-    codexUpdate?: (
-      codexBin: string | null,
-      codexArgs: string | null,
-    ) => Promise<CodexUpdateResult>;
+    doctor: (codexBin: string | null, codexArgs: string | null) => Promise<CodexDoctorResult>;
+    codexUpdate?: (codexBin: string | null, codexArgs: string | null) => Promise<CodexUpdateResult>;
     updateWorkspaceSettings: (
       id: string,
       settings: Partial<WorkspaceSettings>,
@@ -182,8 +174,7 @@ function buildSettingsViewProps({
     onUpdateAppSettings: async (next) => {
       await Promise.resolve(settings.queueSaveSettings(next));
     },
-    onToggleAutomaticAppUpdateChecks:
-      settings.handleToggleAutomaticAppUpdateChecks,
+    onToggleAutomaticAppUpdateChecks: settings.handleToggleAutomaticAppUpdateChecks,
     onRunDoctor: settings.doctor,
     onRunCodexUpdate: settings.codexUpdate,
     onUpdateWorkspaceSettings: async (id, nextSettings) => {
@@ -369,12 +360,7 @@ export function useMainAppModals({
   workspacePrompts,
   settings,
 }: UseMainAppModalsArgs): UseMainAppModalsResult {
-  const {
-    settingsOpen,
-    settingsSection,
-    openSettings,
-    closeSettings,
-  } = useSettingsModalState();
+  const { settingsOpen, settingsSection, openSettings, closeSettings } = useSettingsModalState();
 
   const {
     renamePrompt,
@@ -387,16 +373,12 @@ export function useMainAppModals({
     renameThread: threadRename.renameThread,
   });
 
-  const {
-    branchSwitcher,
-    openBranchSwitcher,
-    closeBranchSwitcher,
-    handleBranchSelect,
-  } = useBranchSwitcher({
-    activeWorkspace,
-    checkoutBranch: git.checkoutBranch,
-    setActiveWorkspaceId,
-  });
+  const { branchSwitcher, openBranchSwitcher, closeBranchSwitcher, handleBranchSelect } =
+    useBranchSwitcher({
+      activeWorkspace,
+      checkoutBranch: git.checkoutBranch,
+      setActiveWorkspaceId,
+    });
 
   const {
     initGitRepoPrompt,
@@ -474,8 +456,7 @@ export function useMainAppModals({
         initGitRepoPrompt,
         initGitRepoPromptBusy: git.initGitRepoLoading || git.createGitHubRepoLoading,
         onInitGitRepoPromptBranchChange: handleInitGitRepoPromptBranchChange,
-        onInitGitRepoPromptCreateRemoteChange:
-          handleInitGitRepoPromptCreateRemoteChange,
+        onInitGitRepoPromptCreateRemoteChange: handleInitGitRepoPromptCreateRemoteChange,
         onInitGitRepoPromptRepoNameChange: handleInitGitRepoPromptRepoNameChange,
         onInitGitRepoPromptPrivateChange: handleInitGitRepoPromptPrivateChange,
         onInitGitRepoPromptCancel: handleInitGitRepoPromptCancel,
@@ -495,8 +476,7 @@ export function useMainAppModals({
         onClonePromptCancel: cancelClonePrompt,
         onClonePromptConfirm: confirmClonePrompt,
         workspaceFromUrl: workspacePrompts.workspaceFromUrl,
-        mobileRemoteWorkspacePathPrompt:
-          workspacePrompts.mobileRemoteWorkspacePathPrompt,
+        mobileRemoteWorkspacePathPrompt: workspacePrompts.mobileRemoteWorkspacePathPrompt,
         onMobileRemoteWorkspacePathPromptChange:
           workspacePrompts.updateMobileRemoteWorkspacePathInput,
         onMobileRemoteWorkspacePathPromptRecentPathSelect:

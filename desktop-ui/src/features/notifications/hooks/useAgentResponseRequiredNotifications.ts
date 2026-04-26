@@ -1,12 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  ApprovalRequest,
-  DebugEntry,
-  RequestUserInputRequest,
-} from "@/types";
+import { useAppServerEvents } from "@app/hooks/useAppServerEvents";
 import { sendNotification } from "@services/tauri";
 import { getApprovalCommandInfo } from "@utils/approvalRules";
-import { useAppServerEvents } from "@app/hooks/useAppServerEvents";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ApprovalRequest, DebugEntry, RequestUserInputRequest } from "@/types";
 
 const MAX_BODY_LENGTH = 200;
 const MIN_NOTIFICATION_SPACING_MS = 1500;
@@ -109,11 +105,7 @@ export function useAgentResponseRequiredNotifications({
   }, [enabled, isWindowFocused]);
 
   const notify = useCallback(
-    async (
-      title: string,
-      body: string,
-      extra?: Record<string, unknown>,
-    ) => {
+    async (title: string, body: string, extra?: Record<string, unknown>) => {
       try {
         await sendNotification(title, body, {
           autoCancel: true,
@@ -162,9 +154,7 @@ export function useAgentResponseRequiredNotifications({
 
   useEffect(() => {
     const activeKeys = new Set(
-      approvals.map((approval) =>
-        buildApprovalKey(approval.workspace_id, approval.request_id),
-      ),
+      approvals.map((approval) => buildApprovalKey(approval.workspace_id, approval.request_id)),
     );
     for (const key of notifiedApprovalsRef.current) {
       if (!activeKeys.has(key)) {
@@ -196,9 +186,7 @@ export function useAgentResponseRequiredNotifications({
       if (notifiedApprovalsRef.current.has(key)) {
         continue;
       }
-      const threadId = String(
-        approval.params?.threadId ?? approval.params?.thread_id ?? "",
-      ).trim();
+      const threadId = String(approval.params?.threadId ?? approval.params?.thread_id ?? "").trim();
       if (shouldMuteSubagentThread(approval.workspace_id, threadId)) {
         continue;
       }
@@ -223,9 +211,7 @@ export function useAgentResponseRequiredNotifications({
     notifiedApprovalsRef.current.add(approvalKey);
 
     const workspaceName = getWorkspaceName?.(latestUnnotifiedApproval.workspace_id);
-    const title = workspaceName
-      ? `Approval needed — ${workspaceName}`
-      : "Approval needed";
+    const title = workspaceName ? `Approval needed — ${workspaceName}` : "Approval needed";
     const commandInfo = getApprovalCommandInfo(latestUnnotifiedApproval.params ?? {});
     const body = commandInfo?.preview
       ? truncateText(commandInfo.preview, MAX_BODY_LENGTH)
@@ -257,9 +243,7 @@ export function useAgentResponseRequiredNotifications({
       if (notifiedUserInputsRef.current.has(key)) {
         continue;
       }
-      if (
-        shouldMuteSubagentThread(request.workspace_id, request.params.thread_id)
-      ) {
+      if (shouldMuteSubagentThread(request.workspace_id, request.params.thread_id)) {
         continue;
       }
       return request;
@@ -348,10 +332,7 @@ export function useAgentResponseRequiredNotifications({
         return;
       }
       const key = buildPlanKey(workspaceId, threadId, itemId);
-      if (
-        notifiedPlanItemsRef.current.has(key) ||
-        pendingPlanNotificationsRef.current.has(key)
-      ) {
+      if (notifiedPlanItemsRef.current.has(key) || pendingPlanNotificationsRef.current.has(key)) {
         return;
       }
       const workspaceName = getWorkspaceName?.(workspaceId);

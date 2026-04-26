@@ -8,12 +8,7 @@ type SettingsSectionProps = {
   children: ReactNode;
 };
 
-export function SettingsSection({
-  title,
-  subtitle,
-  className,
-  children,
-}: SettingsSectionProps) {
+export function SettingsSection({ title, subtitle, className, children }: SettingsSectionProps) {
   return (
     <section className={joinClassNames("settings-section", className)}>
       <div className="settings-section-title">{title}</div>
@@ -70,11 +65,7 @@ type SettingsToggleSwitchProps = Omit<
   className?: string;
 };
 
-export function SettingsToggleSwitch({
-  pressed,
-  className,
-  ...props
-}: SettingsToggleSwitchProps) {
+export function SettingsToggleSwitch({ pressed, className, ...props }: SettingsToggleSwitchProps) {
   return (
     <button
       type="button"

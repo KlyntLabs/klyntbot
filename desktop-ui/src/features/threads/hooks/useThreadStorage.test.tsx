@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  STORAGE_KEY_CUSTOM_NAMES,
-  STORAGE_KEY_PINNED_THREADS,
   loadCustomNames,
   loadPinnedThreads,
   loadThreadActivity,
+  STORAGE_KEY_CUSTOM_NAMES,
+  STORAGE_KEY_PINNED_THREADS,
   savePinnedThreads,
   saveThreadActivity,
 } from "@threads/utils/threadStorage";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useThreadStorage } from "./useThreadStorage";
 
 vi.mock("@threads/utils/threadStorage", () => ({
@@ -19,10 +19,8 @@ vi.mock("@threads/utils/threadStorage", () => ({
   loadCustomNames: vi.fn(),
   loadPinnedThreads: vi.fn(),
   loadThreadActivity: vi.fn(),
-  makeCustomNameKey: (workspaceId: string, threadId: string) =>
-    `${workspaceId}:${threadId}`,
-  makePinKey: (workspaceId: string, threadId: string) =>
-    `${workspaceId}:${threadId}`,
+  makeCustomNameKey: (workspaceId: string, threadId: string) => `${workspaceId}:${threadId}`,
+  makePinKey: (workspaceId: string, threadId: string) => `${workspaceId}:${threadId}`,
   savePinnedThreads: vi.fn(),
   saveThreadActivity: vi.fn(),
 }));
@@ -37,8 +35,7 @@ describe("useThreadStorage", () => {
       "ws-1": { "thread-1": 101 },
     });
     vi.mocked(loadPinnedThreads).mockReturnValue({ "ws-1:thread-1": 202 });
-    vi
-      .mocked(loadCustomNames)
+    vi.mocked(loadCustomNames)
       .mockReturnValueOnce({ "ws-1:thread-1": "Custom" })
       .mockReturnValueOnce({ "ws-1:thread-1": "Updated" });
 
@@ -56,9 +53,7 @@ describe("useThreadStorage", () => {
     });
 
     act(() => {
-      window.dispatchEvent(
-        new StorageEvent("storage", { key: STORAGE_KEY_CUSTOM_NAMES }),
-      );
+      window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY_CUSTOM_NAMES }));
     });
 
     await waitFor(() => {
@@ -133,9 +128,7 @@ describe("useThreadStorage", () => {
 
     vi.mocked(loadPinnedThreads).mockReturnValue({ "ws-1:thread-2": 456 });
     act(() => {
-      window.dispatchEvent(
-        new StorageEvent("storage", { key: STORAGE_KEY_PINNED_THREADS }),
-      );
+      window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY_PINNED_THREADS }));
     });
 
     await waitFor(() => {

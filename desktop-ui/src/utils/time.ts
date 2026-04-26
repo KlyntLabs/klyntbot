@@ -22,9 +22,7 @@ export function formatRelativeTime(timestamp: number) {
     { unit: "minute", seconds: 60 },
     { unit: "second", seconds: 1 },
   ];
-  const range =
-    ranges.find((entry) => absSeconds >= entry.seconds) ||
-    ranges[ranges.length - 1];
+  const range = ranges.find((entry) => absSeconds >= entry.seconds) || ranges[ranges.length - 1];
   if (!range) {
     return "now";
   }

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import type { ConversationItem, ThreadSummary } from "@/types";
+
 import { generateRunMetadata } from "@services/tauri";
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ConversationItem, ThreadSummary } from "@/types";
 import { useThreadTitleAutogeneration } from "./useThreadTitleAutogeneration";
 
 vi.mock("@services/tauri", () => ({
@@ -36,9 +37,7 @@ describe("useThreadTitleAutogeneration", () => {
     };
     const threadsByWorkspaceRef = {
       current: {
-        "ws-1": [
-          { id: "thread-1", name: threadName, updatedAt: 0 } as ThreadSummary,
-        ],
+        "ws-1": [{ id: "thread-1", name: threadName, updatedAt: 0 } as ThreadSummary],
       },
     };
 

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, within } from "@testing-library/react";
+
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UpdateState } from "../hooks/useUpdater";
 import { UpdateToast } from "./UpdateToast";
@@ -21,9 +22,7 @@ describe("UpdateToast", () => {
     const onDismiss = vi.fn();
     const state: UpdateState = { stage: "available", version: "1.2.3" };
 
-    render(
-      <UpdateToast state={state} onUpdate={onUpdate} onDismiss={onDismiss} />,
-    );
+    render(<UpdateToast state={state} onUpdate={onUpdate} onDismiss={onDismiss} />);
 
     const region = screen.getByRole("region");
     expect(region.getAttribute("aria-live")).toBe("polite");
@@ -67,9 +66,7 @@ describe("UpdateToast", () => {
       error: "Network error",
     };
 
-    render(
-      <UpdateToast state={state} onUpdate={onUpdate} onDismiss={onDismiss} />,
-    );
+    render(<UpdateToast state={state} onUpdate={onUpdate} onDismiss={onDismiss} />);
 
     expect(screen.getByText("Update failed.")).toBeTruthy();
     expect(screen.getByText("Network error")).toBeTruthy();
@@ -122,8 +119,7 @@ describe("UpdateToast", () => {
 
   it("renders post-update release notes and opens GitHub link", () => {
     const onDismissPostUpdateNotice = vi.fn();
-    const htmlUrl =
-      "https://github.com/Dimillian/Klynt/releases/tag/v1.2.3";
+    const htmlUrl = "https://github.com/Dimillian/Klynt/releases/tag/v1.2.3";
     const state: UpdateState = { stage: "idle" };
 
     const { container } = render(
@@ -153,8 +149,7 @@ describe("UpdateToast", () => {
   });
 
   it("renders post-update fallback notice", () => {
-    const htmlUrl =
-      "https://github.com/Dimillian/Klynt/releases/tag/v1.2.3";
+    const htmlUrl = "https://github.com/Dimillian/Klynt/releases/tag/v1.2.3";
     const state: UpdateState = { stage: "available", version: "9.9.9" };
 
     const { container } = render(
@@ -171,9 +166,7 @@ describe("UpdateToast", () => {
     );
     const scoped = within(container);
 
-    expect(
-      scoped.getByText("Updated to v1.2.3. Release notes could not be loaded."),
-    ).toBeTruthy();
+    expect(scoped.getByText("Updated to v1.2.3. Release notes could not be loaded.")).toBeTruthy();
     fireEvent.click(scoped.getByRole("button", { name: "View on GitHub" }));
     expect(openUrlMock).toHaveBeenCalledWith(htmlUrl);
     expect(scoped.queryByText("A new version is available.")).toBeNull();

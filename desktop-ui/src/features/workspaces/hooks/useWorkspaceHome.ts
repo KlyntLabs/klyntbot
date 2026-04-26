@@ -1,11 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type {
-  ModelOption,
-  SendMessageResult,
-  ServiceTier,
-  WorkspaceInfo,
-} from "@/types";
 import { generateRunMetadata } from "@services/tauri";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ModelOption, SendMessageResult, ServiceTier, WorkspaceInfo } from "@/types";
 
 export type WorkspaceRunMode = "local" | "worktree";
 
@@ -85,8 +80,7 @@ const DEFAULT_MODE: WorkspaceRunMode = "local";
 const EMPTY_SELECTIONS: Record<string, number> = {};
 const MAX_TITLE_LENGTH = 56;
 
-const createRunId = () =>
-  `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const createRunId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const buildRunTitle = (prompt: string) => {
   const firstLine = prompt.trim().split("\n")[0] ?? "";
@@ -124,16 +118,7 @@ const PREFIX_RULES: Array<{ prefix: string; keywords: string[] }> = [
   { prefix: "style", keywords: ["style", "format", "lint"] },
   {
     prefix: "fix",
-    keywords: [
-      "fix",
-      "bug",
-      "error",
-      "issue",
-      "broken",
-      "regression",
-      "crash",
-      "failure",
-    ],
+    keywords: ["fix", "bug", "error", "issue", "broken", "regression", "crash", "failure"],
   },
 ];
 
@@ -208,10 +193,10 @@ export function useWorkspaceHome({
   });
 
   const activeWorkspaceId = activeWorkspace?.id ?? null;
-  const runs = activeWorkspaceId ? state.runsByWorkspace[activeWorkspaceId] ?? [] : [];
-  const draft = activeWorkspaceId ? state.draftsByWorkspace[activeWorkspaceId] ?? "" : "";
+  const runs = activeWorkspaceId ? (state.runsByWorkspace[activeWorkspaceId] ?? []) : [];
+  const draft = activeWorkspaceId ? (state.draftsByWorkspace[activeWorkspaceId] ?? "") : "";
   const runMode = activeWorkspaceId
-    ? state.modeByWorkspace[activeWorkspaceId] ?? DEFAULT_MODE
+    ? (state.modeByWorkspace[activeWorkspaceId] ?? DEFAULT_MODE)
     : DEFAULT_MODE;
   const modelSelections = useMemo(() => {
     if (!activeWorkspaceId) {
@@ -219,9 +204,9 @@ export function useWorkspaceHome({
     }
     return state.modelSelectionsByWorkspace[activeWorkspaceId] ?? EMPTY_SELECTIONS;
   }, [activeWorkspaceId, state.modelSelectionsByWorkspace]);
-  const error = activeWorkspaceId ? state.errorByWorkspace[activeWorkspaceId] ?? null : null;
+  const error = activeWorkspaceId ? (state.errorByWorkspace[activeWorkspaceId] ?? null) : null;
   const isSubmitting = activeWorkspaceId
-    ? state.submittingByWorkspace[activeWorkspaceId] ?? false
+    ? (state.submittingByWorkspace[activeWorkspaceId] ?? false)
     : false;
 
   useEffect(() => {
@@ -349,11 +334,7 @@ export function useWorkspaceHome({
   );
 
   const updateRunState = useCallback(
-    (
-      workspaceId: string,
-      runId: string,
-      updates: Partial<WorkspaceHomeRun>,
-    ) => {
+    (workspaceId: string, runId: string, updates: Partial<WorkspaceHomeRun>) => {
       setState((prev) => {
         const runsForWorkspace = prev.runsByWorkspace[workspaceId] ?? [];
         return {
@@ -370,276 +351,262 @@ export function useWorkspaceHome({
     [],
   );
 
-  const updateRunTitle = useCallback(
-    (workspaceId: string, runId: string, title: string) => {
-      setState((prev) => {
-        const runsForWorkspace = prev.runsByWorkspace[workspaceId] ?? [];
-        return {
-          ...prev,
-          runsByWorkspace: {
-            ...prev.runsByWorkspace,
-            [workspaceId]: runsForWorkspace.map((run) =>
-              run.id === runId ? { ...run, title } : run,
-            ),
-          },
-        };
-      });
-    },
-    [],
-  );
+  const updateRunTitle = useCallback((workspaceId: string, runId: string, title: string) => {
+    setState((prev) => {
+      const runsForWorkspace = prev.runsByWorkspace[workspaceId] ?? [];
+      return {
+        ...prev,
+        runsByWorkspace: {
+          ...prev.runsByWorkspace,
+          [workspaceId]: runsForWorkspace.map((run) =>
+            run.id === runId ? { ...run, title } : run,
+          ),
+        },
+      };
+    });
+  }, []);
 
-  const startRun = useCallback(async (images: string[] = []) => {
-    if (!activeWorkspaceId || !activeWorkspace) {
-      return false;
-    }
-    const prompt = draft.trim();
-    const hasImages = images.length > 0;
-    if ((!prompt && !hasImages) || isSubmitting) {
-      return false;
-    }
+  const startRun = useCallback(
+    async (images: string[] = []) => {
+      if (!activeWorkspaceId || !activeWorkspace) {
+        return false;
+      }
+      const prompt = draft.trim();
+      const hasImages = images.length > 0;
+      if ((!prompt && !hasImages) || isSubmitting) {
+        return false;
+      }
 
-    const selectedModels = Object.entries(modelSelections)
-      .filter(([modelId, count]) => count > 0 && modelLookup.has(modelId))
-      .map(([modelId, count]) => ({
-        modelId,
-        count,
-        model: modelLookup.get(modelId) ?? null,
+      const selectedModels = Object.entries(modelSelections)
+        .filter(([modelId, count]) => count > 0 && modelLookup.has(modelId))
+        .map(([modelId, count]) => ({
+          modelId,
+          count,
+          model: modelLookup.get(modelId) ?? null,
+        }));
+
+      if (runMode === "worktree" && selectedModels.length === 0) {
+        setWorkspaceError("Select at least one model to run in a worktree.");
+        return false;
+      }
+
+      setSubmitting(true);
+      setWorkspaceError(null);
+
+      const runId = createRunId();
+      const runIdParts = runId.split("-");
+      const runSuffix = runIdParts.length ? runIdParts[runIdParts.length - 1] : runId.slice(-6);
+      const fallbackTitle = buildRunTitle(prompt);
+      const run: WorkspaceHomeRun = {
+        id: runId,
+        workspaceId: activeWorkspaceId,
+        title: fallbackTitle,
+        prompt,
+        createdAt: Date.now(),
+        mode: runMode,
+        instances: [],
+        status: "pending",
+        error: null,
+        instanceErrors: [],
+      };
+
+      setState((prev) => ({
+        ...prev,
+        runsByWorkspace: {
+          ...prev.runsByWorkspace,
+          [activeWorkspaceId]: [run, ...(prev.runsByWorkspace[activeWorkspaceId] ?? [])],
+        },
+        draftsByWorkspace: { ...prev.draftsByWorkspace, [activeWorkspaceId]: "" },
       }));
 
-    if (runMode === "worktree" && selectedModels.length === 0) {
-      setWorkspaceError("Select at least one model to run in a worktree.");
-      return false;
-    }
-
-    setSubmitting(true);
-    setWorkspaceError(null);
-
-    const runId = createRunId();
-    const runIdParts = runId.split("-");
-    const runSuffix = runIdParts.length
-      ? runIdParts[runIdParts.length - 1]
-      : runId.slice(-6);
-    const fallbackTitle = buildRunTitle(prompt);
-    const run: WorkspaceHomeRun = {
-      id: runId,
-      workspaceId: activeWorkspaceId,
-      title: fallbackTitle,
-      prompt,
-      createdAt: Date.now(),
-      mode: runMode,
-      instances: [],
-      status: "pending",
-      error: null,
-      instanceErrors: [],
-    };
-
-    setState((prev) => ({
-      ...prev,
-      runsByWorkspace: {
-        ...prev.runsByWorkspace,
-        [activeWorkspaceId]: [run, ...(prev.runsByWorkspace[activeWorkspaceId] ?? [])],
-      },
-      draftsByWorkspace: { ...prev.draftsByWorkspace, [activeWorkspaceId]: "" },
-    }));
-
-    let worktreeBaseName: string | null = null;
-    if (runMode === "local") {
-      void generateRunMetadata(activeWorkspace.id, prompt)
-        .then((metadata) => {
-          if (!metadata?.title) {
-            return;
-          }
-          const nextTitle = metadata.title.trim();
-          if (nextTitle && nextTitle !== fallbackTitle) {
-            updateRunTitle(activeWorkspaceId, runId, nextTitle);
-          }
-        })
-        .catch(() => {
-          // Metadata is best-effort for local runs.
-        });
-    } else {
-      try {
-        const metadata = await generateRunMetadata(activeWorkspace.id, prompt);
-        if (metadata?.title && metadata.title.trim() !== fallbackTitle) {
-          updateRunTitle(activeWorkspaceId, runId, metadata.title.trim());
-        }
-        worktreeBaseName = normalizeWorktreeName(metadata?.worktreeName) ?? null;
-      } catch {
-        // Best-effort fallback to local naming.
-      }
-      if (!worktreeBaseName) {
-        worktreeBaseName = buildWorktreeBranch(prompt);
-      }
-    }
-    const worktreeSlugBase = worktreeBaseName
-      ? `${worktreeBaseName}-${runSuffix}`
-      : null;
-
-    const instances: WorkspaceHomeRunInstance[] = [];
-    let runError: string | null = null;
-    const instanceErrors: Array<{ message: string }> = [];
-    try {
+      let worktreeBaseName: string | null = null;
       if (runMode === "local") {
-        try {
-          if (!activeWorkspace.connected) {
-            await connectWorkspace(activeWorkspace);
-          }
-          const threadId = await startThreadForWorkspace(activeWorkspace.id, {
-            activate: false,
+        void generateRunMetadata(activeWorkspace.id, prompt)
+          .then((metadata) => {
+            if (!metadata?.title) {
+              return;
+            }
+            const nextTitle = metadata.title.trim();
+            if (nextTitle && nextTitle !== fallbackTitle) {
+              updateRunTitle(activeWorkspaceId, runId, nextTitle);
+            }
+          })
+          .catch(() => {
+            // Metadata is best-effort for local runs.
           });
-          if (!threadId) {
-            throw new Error("Failed to start a local thread.");
-          }
-          seedThreadCodexParams?.(activeWorkspace.id, threadId, {
-            modelId: selectedModelId,
-            effort,
-            serviceTier,
-          });
-          const localModel = selectedModelId
-            ? modelLookup.get(selectedModelId)?.model ?? null
-            : null;
-          await sendUserMessageToThread(activeWorkspace, threadId, prompt, images, {
-            model: localModel,
-            effort,
-            serviceTier,
-            collaborationMode,
-          });
-          const model =
-            selectedModelId ? modelLookup.get(selectedModelId) ?? null : null;
-          instances.push({
-            id: `${runId}-local-1`,
-            workspaceId: activeWorkspace.id,
-            threadId,
-            modelId: selectedModelId ?? null,
-            modelLabel: resolveModelLabel(model, "Default model"),
-            sequence: 1,
-          });
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          runError = message;
-          instanceErrors.push({ message });
-        }
       } else {
-        let instanceCounter = 0;
-        let failureCount = 0;
-        const totalInstanceCount = selectedModels.reduce(
-          (sum, selection) => sum + selection.count,
-          0,
-        );
-        const branchBaseFallback = worktreeSlugBase ?? buildWorktreeBranch(prompt);
-        for (const selection of selectedModels) {
-          const label = resolveModelLabel(selection.model, selection.modelId);
-          for (let index = 0; index < selection.count; index += 1) {
-            instanceCounter += 1;
-            const instanceSuffix =
-              totalInstanceCount > 1 ? `-${instanceCounter}` : "";
-            const branch = `${branchBaseFallback}${instanceSuffix}`;
-            try {
-              const worktreeWorkspace = await addWorktreeAgent(
-                activeWorkspace,
-                branch,
-                { activate: false },
-              );
-              if (!worktreeWorkspace) {
-                throw new Error("Failed to create worktree.");
-              }
-              if (!worktreeWorkspace.connected) {
-                await connectWorkspace(worktreeWorkspace);
-              }
+        try {
+          const metadata = await generateRunMetadata(activeWorkspace.id, prompt);
+          if (metadata?.title && metadata.title.trim() !== fallbackTitle) {
+            updateRunTitle(activeWorkspaceId, runId, metadata.title.trim());
+          }
+          worktreeBaseName = normalizeWorktreeName(metadata?.worktreeName) ?? null;
+        } catch {
+          // Best-effort fallback to local naming.
+        }
+        if (!worktreeBaseName) {
+          worktreeBaseName = buildWorktreeBranch(prompt);
+        }
+      }
+      const worktreeSlugBase = worktreeBaseName ? `${worktreeBaseName}-${runSuffix}` : null;
+
+      const instances: WorkspaceHomeRunInstance[] = [];
+      let runError: string | null = null;
+      const instanceErrors: Array<{ message: string }> = [];
+      try {
+        if (runMode === "local") {
+          try {
+            if (!activeWorkspace.connected) {
+              await connectWorkspace(activeWorkspace);
+            }
+            const threadId = await startThreadForWorkspace(activeWorkspace.id, {
+              activate: false,
+            });
+            if (!threadId) {
+              throw new Error("Failed to start a local thread.");
+            }
+            seedThreadCodexParams?.(activeWorkspace.id, threadId, {
+              modelId: selectedModelId,
+              effort,
+              serviceTier,
+            });
+            const localModel = selectedModelId
+              ? (modelLookup.get(selectedModelId)?.model ?? null)
+              : null;
+            await sendUserMessageToThread(activeWorkspace, threadId, prompt, images, {
+              model: localModel,
+              effort,
+              serviceTier,
+              collaborationMode,
+            });
+            const model = selectedModelId ? (modelLookup.get(selectedModelId) ?? null) : null;
+            instances.push({
+              id: `${runId}-local-1`,
+              workspaceId: activeWorkspace.id,
+              threadId,
+              modelId: selectedModelId ?? null,
+              modelLabel: resolveModelLabel(model, "Default model"),
+              sequence: 1,
+            });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            runError = message;
+            instanceErrors.push({ message });
+          }
+        } else {
+          let instanceCounter = 0;
+          let failureCount = 0;
+          const totalInstanceCount = selectedModels.reduce(
+            (sum, selection) => sum + selection.count,
+            0,
+          );
+          const branchBaseFallback = worktreeSlugBase ?? buildWorktreeBranch(prompt);
+          for (const selection of selectedModels) {
+            const label = resolveModelLabel(selection.model, selection.modelId);
+            for (let index = 0; index < selection.count; index += 1) {
+              instanceCounter += 1;
+              const instanceSuffix = totalInstanceCount > 1 ? `-${instanceCounter}` : "";
+              const branch = `${branchBaseFallback}${instanceSuffix}`;
               try {
-                await onWorktreeCreated?.(worktreeWorkspace, activeWorkspace);
-              } catch {
-                // Setup script errors are handled by the caller; runs should still proceed.
-              }
-              const threadId = await startThreadForWorkspace(worktreeWorkspace.id, {
-                activate: false,
-              });
-              if (!threadId) {
-                throw new Error("Failed to start a worktree thread.");
-              }
-              seedThreadCodexParams?.(worktreeWorkspace.id, threadId, {
-                modelId: selection.modelId,
-                effort,
-                serviceTier,
-              });
-              await sendUserMessageToThread(
-                worktreeWorkspace,
-                threadId,
-                prompt,
-                images,
-                {
+                const worktreeWorkspace = await addWorktreeAgent(activeWorkspace, branch, {
+                  activate: false,
+                });
+                if (!worktreeWorkspace) {
+                  throw new Error("Failed to create worktree.");
+                }
+                if (!worktreeWorkspace.connected) {
+                  await connectWorkspace(worktreeWorkspace);
+                }
+                try {
+                  await onWorktreeCreated?.(worktreeWorkspace, activeWorkspace);
+                } catch {
+                  // Setup script errors are handled by the caller; runs should still proceed.
+                }
+                const threadId = await startThreadForWorkspace(worktreeWorkspace.id, {
+                  activate: false,
+                });
+                if (!threadId) {
+                  throw new Error("Failed to start a worktree thread.");
+                }
+                seedThreadCodexParams?.(worktreeWorkspace.id, threadId, {
+                  modelId: selection.modelId,
+                  effort,
+                  serviceTier,
+                });
+                await sendUserMessageToThread(worktreeWorkspace, threadId, prompt, images, {
                   model: selection.model?.model ?? selection.modelId,
                   effort,
                   serviceTier,
                   collaborationMode,
-                },
-              );
-              instances.push({
-                id: `${runId}-${selection.modelId}-${index + 1}`,
-                workspaceId: worktreeWorkspace.id,
-                threadId,
-                modelId: selection.modelId,
-                modelLabel: label,
-                sequence: index + 1,
-              });
-            } catch (error) {
-              failureCount += 1;
-              const message = error instanceof Error ? error.message : String(error);
-              runError ??= message;
-              instanceErrors.push({ message });
+                });
+                instances.push({
+                  id: `${runId}-${selection.modelId}-${index + 1}`,
+                  workspaceId: worktreeWorkspace.id,
+                  threadId,
+                  modelId: selection.modelId,
+                  modelLabel: label,
+                  sequence: index + 1,
+                });
+              } catch (error) {
+                failureCount += 1;
+                const message = error instanceof Error ? error.message : String(error);
+                runError ??= message;
+                instanceErrors.push({ message });
+              }
             }
           }
+          if (failureCount > 0) {
+            runError = `Started ${instances.length}/${totalInstanceCount} runs. ${failureCount} failed.`;
+          }
         }
-        if (failureCount > 0) {
-          runError = `Started ${instances.length}/${totalInstanceCount} runs. ${failureCount} failed.`;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        runError ??= message;
+      } finally {
+        let status: WorkspaceHomeRun["status"] = "ready";
+        if (instances.length === 0) {
+          runError ??= "Failed to start any instances.";
+          status = "failed";
+        } else if (runError) {
+          status = "partial";
         }
+        updateRunState(activeWorkspaceId, runId, {
+          instances,
+          status,
+          error: runError,
+          instanceErrors,
+        });
+        if (runError && status === "failed") {
+          setWorkspaceError(runError);
+        }
+        setSubmitting(false);
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      runError ??= message;
-    } finally {
-      let status: WorkspaceHomeRun["status"] = "ready";
-      if (instances.length === 0) {
-        runError ??= "Failed to start any instances.";
-        status = "failed";
-      } else if (runError) {
-        status = "partial";
-      }
-      updateRunState(activeWorkspaceId, runId, {
-        instances,
-        status,
-        error: runError,
-        instanceErrors,
-      });
-      if (runError && status === "failed") {
-        setWorkspaceError(runError);
-      }
-      setSubmitting(false);
-    }
-    return true;
-  }, [
-    activeWorkspace,
-    activeWorkspaceId,
-    addWorktreeAgent,
-    collaborationMode,
-    connectWorkspace,
-    onWorktreeCreated,
-    draft,
-    effort,
-    isSubmitting,
-    modelLookup,
-    modelSelections,
-    updateRunState,
-    runMode,
-    seedThreadCodexParams,
-    selectedModelId,
-    serviceTier,
-    sendUserMessageToThread,
-    setSubmitting,
-    setWorkspaceError,
-    startThreadForWorkspace,
-    updateRunTitle,
-  ]);
+      return true;
+    },
+    [
+      activeWorkspace,
+      activeWorkspaceId,
+      addWorktreeAgent,
+      collaborationMode,
+      connectWorkspace,
+      onWorktreeCreated,
+      draft,
+      effort,
+      isSubmitting,
+      modelLookup,
+      modelSelections,
+      updateRunState,
+      runMode,
+      seedThreadCodexParams,
+      selectedModelId,
+      serviceTier,
+      sendUserMessageToThread,
+      setSubmitting,
+      setWorkspaceError,
+      startThreadForWorkspace,
+      updateRunTitle,
+    ],
+  );
 
   return {
     runs,

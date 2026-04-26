@@ -67,14 +67,8 @@ export function upsertItem(list: ConversationItem[], item: ConversationItem) {
     next[index] = {
       ...existing,
       ...item,
-      summary:
-        incomingSummary.length >= existingSummary.length
-          ? incomingSummary
-          : existingSummary,
-      content:
-        incomingContent.length >= existingContent.length
-          ? incomingContent
-          : existingContent,
+      summary: incomingSummary.length >= existingSummary.length ? incomingSummary : existingSummary,
+      content: incomingContent.length >= existingContent.length ? incomingContent : existingContent,
     };
     return next;
   }
@@ -92,8 +86,7 @@ export function upsertItem(list: ConversationItem[], item: ConversationItem) {
       status: item.status?.trim() ? item.status : existing.status,
       output: hasIncomingOutput ? incomingOutput : existingOutput,
       changes: hasIncomingChanges ? item.changes : existing.changes,
-      durationMs:
-        typeof item.durationMs === "number" ? item.durationMs : existing.durationMs,
+      durationMs: typeof item.durationMs === "number" ? item.durationMs : existing.durationMs,
     };
     return next;
   }
@@ -127,14 +120,12 @@ export function upsertItem(list: ConversationItem[], item: ConversationItem) {
 }
 
 export function getThreadTimestamp(thread: Record<string, unknown>) {
-  const raw =
-    (thread.updatedAt ?? thread.updated_at ?? thread.createdAt ?? thread.created_at) ??
-    0;
+  const raw = thread.updatedAt ?? thread.updated_at ?? thread.createdAt ?? thread.created_at ?? 0;
   return normalizeThreadTimestamp(raw);
 }
 
 export function getThreadCreatedTimestamp(thread: Record<string, unknown>) {
-  const raw = (thread.createdAt ?? thread.created_at) ?? 0;
+  const raw = thread.createdAt ?? thread.created_at ?? 0;
   return normalizeThreadTimestamp(raw);
 }
 
@@ -155,13 +146,11 @@ function chooseRicherItem(remote: ConversationItem, local: ConversationItem) {
   }
   if (remote.kind === "userInput" && local.kind === "userInput") {
     const remoteScore = remote.questions.reduce(
-      (total, question) =>
-        total + question.question.length + question.answers.join("\n").length,
+      (total, question) => total + question.question.length + question.answers.join("\n").length,
       0,
     );
     const localScore = local.questions.reduce(
-      (total, question) =>
-        total + question.question.length + question.answers.join("\n").length,
+      (total, question) => total + question.question.length + question.answers.join("\n").length,
       0,
     );
     return localScore > remoteScore ? local : remote;
@@ -184,13 +173,9 @@ function chooseRicherItem(remote: ConversationItem, local: ConversationItem) {
       collabSender: remote.collabSender ?? local.collabSender,
       collabReceiver: remote.collabReceiver ?? local.collabReceiver,
       collabReceivers:
-        (remote.collabReceivers?.length ?? 0) > 0
-          ? remote.collabReceivers
-          : local.collabReceivers,
+        (remote.collabReceivers?.length ?? 0) > 0 ? remote.collabReceivers : local.collabReceivers,
       collabStatuses:
-        (remote.collabStatuses?.length ?? 0) > 0
-          ? remote.collabStatuses
-          : local.collabStatuses,
+        (remote.collabStatuses?.length ?? 0) > 0 ? remote.collabStatuses : local.collabStatuses,
     };
   }
   if (remote.kind === "diff" && local.kind === "diff") {
@@ -205,10 +190,7 @@ function chooseRicherItem(remote: ConversationItem, local: ConversationItem) {
   return remote;
 }
 
-export function mergeThreadItems(
-  remoteItems: ConversationItem[],
-  localItems: ConversationItem[],
-) {
+export function mergeThreadItems(remoteItems: ConversationItem[], localItems: ConversationItem[]) {
   if (!localItems.length) {
     return remoteItems;
   }

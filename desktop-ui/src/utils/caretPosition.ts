@@ -60,9 +60,7 @@ export const getCaretPosition = (
   const markerRect = marker.getBoundingClientRect();
   document.body.removeChild(mirror);
   const lineHeight =
-    Number.parseFloat(style.lineHeight) ||
-    Number.parseFloat(style.fontSize) * 1.2 ||
-    16;
+    Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.2 || 16;
   return {
     top: markerRect.top - mirrorRect.top,
     left: markerRect.left - mirrorRect.left,

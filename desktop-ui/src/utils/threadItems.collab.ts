@@ -1,9 +1,4 @@
-import type {
-  CollabAgentRef,
-  CollabAgentStatus,
-  ConversationItem,
-  ThreadSummary,
-} from "../types";
+import type { CollabAgentRef, CollabAgentStatus, ConversationItem, ThreadSummary } from "../types";
 import { asString, normalizeStringList } from "./threadItems.shared";
 
 function buildCollabAgentRef(
@@ -28,11 +23,7 @@ function parseCollabAgentRef(value: unknown): CollabAgentRef | null {
   return buildCollabAgentRef(
     record.threadId ?? record.thread_id ?? record.id,
     record.agentNickname ?? record.agent_nickname ?? record.nickname,
-    record.agentRole ??
-      record.agent_role ??
-      record.agentType ??
-      record.agent_type ??
-      record.role,
+    record.agentRole ?? record.agent_role ?? record.agentType ?? record.agent_type ?? record.role,
   );
 }
 
@@ -116,9 +107,7 @@ function parseCollabAgentStatusesFromMap(value: unknown) {
   return Object.entries(value as Record<string, unknown>)
     .map(([threadId, state]) => {
       const stateRecord =
-        state && typeof state === "object"
-          ? (state as Record<string, unknown>)
-          : null;
+        state && typeof state === "object" ? (state as Record<string, unknown>) : null;
       const status = asString(stateRecord?.status ?? state ?? "").trim();
       if (!status || !threadId) {
         return null;
@@ -126,9 +115,7 @@ function parseCollabAgentStatusesFromMap(value: unknown) {
       return buildCollabAgentStatus(
         threadId,
         status,
-        stateRecord?.agentNickname ??
-          stateRecord?.agent_nickname ??
-          stateRecord?.nickname,
+        stateRecord?.agentNickname ?? stateRecord?.agent_nickname ?? stateRecord?.nickname,
         stateRecord?.agentRole ??
           stateRecord?.agent_role ??
           stateRecord?.agentType ??
@@ -159,10 +146,7 @@ function mergeCollabAgentStatuses(...lists: CollabAgentStatus[][]) {
   return Array.from(byThreadId.values());
 }
 
-function withCollabAgentMetadata(
-  statuses: CollabAgentStatus[],
-  agents: CollabAgentRef[],
-) {
+function withCollabAgentMetadata(statuses: CollabAgentStatus[], agents: CollabAgentRef[]) {
   if (statuses.length === 0 || agents.length === 0) {
     return statuses;
   }
@@ -199,17 +183,12 @@ function formatCollabAgentStatuses(value: CollabAgentStatus[]) {
   if (value.length === 0) {
     return "";
   }
-  return value
-    .map((entry) => `${formatCollabAgentLabel(entry)}: ${entry.status}`)
-    .join("\n");
+  return value.map((entry) => `${formatCollabAgentLabel(entry)}: ${entry.status}`).join("\n");
 }
 
 function enrichCollabAgentRef(
   agent: CollabAgentRef | undefined,
-  metadataByThreadId: ReadonlyMap<
-    string,
-    { nickname?: string | null; role?: string | null }
-  >,
+  metadataByThreadId: ReadonlyMap<string, { nickname?: string | null; role?: string | null }>,
 ): CollabAgentRef | undefined {
   if (!agent) {
     return agent;
@@ -232,10 +211,7 @@ function enrichCollabAgentRef(
 
 function enrichCollabAgentStatuses(
   statuses: CollabAgentStatus[] | undefined,
-  metadataByThreadId: ReadonlyMap<
-    string,
-    { nickname?: string | null; role?: string | null }
-  >,
+  metadataByThreadId: ReadonlyMap<string, { nickname?: string | null; role?: string | null }>,
 ): CollabAgentStatus[] | undefined {
   if (!statuses || statuses.length === 0) {
     return statuses;
@@ -276,10 +252,7 @@ function extractCollabPrompt(
   return text.slice(0, text.length - statusText.length).replace(/\n\n$/, "");
 }
 
-function buildCollabDetail(
-  sender: CollabAgentRef | undefined,
-  receivers: CollabAgentRef[],
-) {
+function buildCollabDetail(sender: CollabAgentRef | undefined, receivers: CollabAgentRef[]) {
   const detailParts = [sender ? `From ${formatCollabAgentLabel(sender)}` : ""]
     .concat(
       receivers.length > 0
@@ -345,9 +318,7 @@ export function parseCollabToolCallItem(
     mergeCollabAgentStatuses(
       parseCollabAgentStatuses(item.agentStatuses ?? item.agent_statuses),
       parseCollabAgentStatusesFromMap(item.statuses),
-      parseCollabAgentStatusesFromMap(
-        item.agentStatus ?? item.agentsStates ?? item.agents_states,
-      ),
+      parseCollabAgentStatusesFromMap(item.agentStatus ?? item.agentsStates ?? item.agents_states),
     ),
     receiverAgents,
   );
@@ -376,10 +347,7 @@ export function enrichConversationItemsWithThreads(
     return items;
   }
 
-  const metadataByThreadId = new Map<
-    string,
-    { nickname?: string | null; role?: string | null }
-  >();
+  const metadataByThreadId = new Map<string, { nickname?: string | null; role?: string | null }>();
   threads.forEach((thread) => {
     if (!thread.id || (!thread.subagentNickname && !thread.subagentRole)) {
       return;
@@ -402,21 +370,16 @@ export function enrichConversationItemsWithThreads(
 
     const nextSender = enrichCollabAgentRef(item.collabSender, metadataByThreadId);
     const nextReceivers =
-      item.collabReceivers?.map((entry) =>
-        enrichCollabAgentRef(entry, metadataByThreadId) ?? entry,
+      item.collabReceivers?.map(
+        (entry) => enrichCollabAgentRef(entry, metadataByThreadId) ?? entry,
       ) ?? [];
-    const nextStatuses =
-      enrichCollabAgentStatuses(item.collabStatuses, metadataByThreadId) ?? [];
+    const nextStatuses = enrichCollabAgentStatuses(item.collabStatuses, metadataByThreadId) ?? [];
     const nextPrimaryReceiver =
       enrichCollabAgentRef(item.collabReceiver, metadataByThreadId) ??
       nextReceivers[0] ??
       item.collabReceiver;
     const detailReceivers =
-      nextReceivers.length > 0
-        ? nextReceivers
-        : nextPrimaryReceiver
-          ? [nextPrimaryReceiver]
-          : [];
+      nextReceivers.length > 0 ? nextReceivers : nextPrimaryReceiver ? [nextPrimaryReceiver] : [];
 
     const prompt = extractCollabPrompt(item.output, item.collabStatuses);
     const nextDetail = buildCollabDetail(nextSender, detailReceivers);

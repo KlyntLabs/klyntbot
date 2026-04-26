@@ -42,15 +42,11 @@ vi.mock("@pierre/diffs/react", () => ({
     renderHoverUtility,
   }: {
     renderHoverUtility?: (
-      getHoveredLine: () =>
-        | { lineNumber: number; side?: "additions" | "deletions" }
-        | undefined,
+      getHoveredLine: () => { lineNumber: number; side?: "additions" | "deletions" } | undefined,
     ) => ReactNode;
   }) => (
     <div>
-      {renderHoverUtility
-        ? renderHoverUtility(() => ({ lineNumber: 2, side: "additions" }))
-        : null}
+      {renderHoverUtility ? renderHoverUtility(() => ({ lineNumber: 2, side: "additions" })) : null}
     </div>
   ),
   WorkerPoolContextProvider: ({ children }: { children: ReactNode }) => children,
@@ -94,9 +90,7 @@ describe("GitDiffViewer", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Ask for changes on hovered line" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Ask for changes on hovered line" }));
 
     expect(onInsertComposerText).toHaveBeenCalledTimes(1);
     expect(onInsertComposerText).toHaveBeenCalledWith(

@@ -1,5 +1,19 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useAppServerEvents } from "@app/hooks/useAppServerEvents";
 import * as Sentry from "@sentry/react";
+import {
+  archiveThread as archiveThreadService,
+  readThread as readThreadService,
+  setThreadName as setThreadNameService,
+} from "@services/tauri";
+import { getSubagentDescendantThreadIds } from "@threads/utils/subagentTree";
+import { getParentThreadIdFromThread } from "@threads/utils/threadRpc";
+import { makeCustomNameKey, saveCustomName } from "@threads/utils/threadStorage";
+import {
+  buildThreadSummaryFromThread,
+  extractThreadFromResponse,
+} from "@threads/utils/threadSummary";
+import { CHAT_SCROLLBACK_DEFAULT } from "@utils/chatScrollback";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type {
   CollabAgentRef,
   CustomPromptOption,
@@ -8,46 +22,26 @@ import type {
   ThreadListSortKey,
   WorkspaceInfo,
 } from "@/types";
-import { CHAT_SCROLLBACK_DEFAULT } from "@utils/chatScrollback";
-import { useAppServerEvents } from "@app/hooks/useAppServerEvents";
-import { initialState, threadReducer } from "./useThreadsReducer";
-import { useThreadStorage } from "./useThreadStorage";
-import { useThreadLinking } from "./useThreadLinking";
-import { useThreadEventHandlers } from "./useThreadEventHandlers";
-import { useThreadActions } from "./useThreadActions";
-import { useThreadMessaging } from "./useThreadMessaging";
-import { useThreadApprovals } from "./useThreadApprovals";
+import { useDetachedReviewTracking } from "./useDetachedReviewTracking";
 import { useThreadAccountInfo } from "./useThreadAccountInfo";
+import { useThreadActions } from "./useThreadActions";
+import { useThreadApprovals } from "./useThreadApprovals";
+import { useThreadEventHandlers } from "./useThreadEventHandlers";
+import { useThreadLinking } from "./useThreadLinking";
+import { useThreadMessaging } from "./useThreadMessaging";
 import { useThreadRateLimits } from "./useThreadRateLimits";
 import { useThreadSelectors } from "./useThreadSelectors";
 import { useThreadStatus } from "./useThreadStatus";
-import { useThreadUserInput } from "./useThreadUserInput";
+import { useThreadStorage } from "./useThreadStorage";
+import { initialState, threadReducer } from "./useThreadsReducer";
 import { useThreadTitleAutogeneration } from "./useThreadTitleAutogeneration";
-import { useDetachedReviewTracking } from "./useDetachedReviewTracking";
-import {
-  archiveThread as archiveThreadService,
-  readThread as readThreadService,
-  setThreadName as setThreadNameService,
-} from "@services/tauri";
-import {
-  makeCustomNameKey,
-  saveCustomName,
-} from "@threads/utils/threadStorage";
-import { getParentThreadIdFromThread } from "@threads/utils/threadRpc";
-import {
-  buildThreadSummaryFromThread,
-  extractThreadFromResponse,
-} from "@threads/utils/threadSummary";
-import { getSubagentDescendantThreadIds } from "@threads/utils/subagentTree";
+import { useThreadUserInput } from "./useThreadUserInput";
 
 type UseThreadsOptions = {
   activeWorkspace: WorkspaceInfo | null;
   onWorkspaceConnected: (id: string) => void;
   onDebug?: (entry: DebugEntry) => void;
-  ensureWorkspaceRuntimeCodexArgs?: (
-    workspaceId: string,
-    threadId: string | null,
-  ) => Promise<void>;
+  ensureWorkspaceRuntimeCodexArgs?: (workspaceId: string, threadId: string | null) => Promise<void>;
   model?: string | null;
   effort?: string | null;
   serviceTier?: ServiceTier | null | undefined;
@@ -95,9 +89,7 @@ export function useThreads({
   onThreadCodexMetadataDetected,
 }: UseThreadsOptions) {
   const maxItemsPerThread =
-    chatHistoryScrollbackItems === undefined
-      ? CHAT_SCROLLBACK_DEFAULT
-      : chatHistoryScrollbackItems;
+    chatHistoryScrollbackItems === undefined ? CHAT_SCROLLBACK_DEFAULT : chatHistoryScrollbackItems;
 
   const [state, dispatch] = useReducer(
     threadReducer,
@@ -206,9 +198,7 @@ export function useThreads({
       const key = makeCustomNameKey(workspaceId, threadId);
       customNamesRef.current[key] = newName;
       dispatch({ type: "setThreadName", workspaceId, threadId, name: newName });
-      void Promise.resolve(
-        setThreadNameService(workspaceId, threadId, newName),
-      ).catch((error) => {
+      void Promise.resolve(setThreadNameService(workspaceId, threadId, newName)).catch((error) => {
         onDebug?.({
           id: `${Date.now()}-client-thread-rename-error`,
           timestamp: Date.now(),
@@ -221,24 +211,18 @@ export function useThreads({
     [customNamesRef, dispatch, onDebug],
   );
 
-  const onSubagentThreadDetected = useCallback(
-    (workspaceId: string, threadId: string) => {
-      if (!workspaceId || !threadId) {
-        return;
-      }
-      subagentThreadByWorkspaceThreadRef.current[
-        buildWorkspaceThreadKey(workspaceId, threadId)
-      ] = true;
-    },
-    [],
-  );
+  const onSubagentThreadDetected = useCallback((workspaceId: string, threadId: string) => {
+    if (!workspaceId || !threadId) {
+      return;
+    }
+    subagentThreadByWorkspaceThreadRef.current[buildWorkspaceThreadKey(workspaceId, threadId)] =
+      true;
+  }, []);
 
   const isSubagentThread = useCallback(
     (workspaceId: string, threadId: string) =>
       Boolean(
-        subagentThreadByWorkspaceThreadRef.current[
-          buildWorkspaceThreadKey(workspaceId, threadId)
-        ],
+        subagentThreadByWorkspaceThreadRef.current[buildWorkspaceThreadKey(workspaceId, threadId)],
       ),
     [],
   );
@@ -278,16 +262,15 @@ export function useThreads({
     [],
   );
 
-  const { registerDetachedReviewChild, handleReviewExited } =
-    useDetachedReviewTracking({
-      activeThreadId,
-      dispatch,
-      recordThreadActivity,
-      safeMessageActivity,
-      threadsByWorkspace: state.threadsByWorkspace,
-      threadParentById: state.threadParentById,
-      updateThreadParent,
-    });
+  const { registerDetachedReviewChild, handleReviewExited } = useDetachedReviewTracking({
+    activeThreadId,
+    dispatch,
+    recordThreadActivity,
+    safeMessageActivity,
+    threadsByWorkspace: state.threadsByWorkspace,
+    threadParentById: state.threadParentById,
+    updateThreadParent,
+  });
 
   const hydrateSubagentThreads = useCallback(
     async (workspaceId: string, receivers: CollabAgentRef[]) => {
@@ -325,8 +308,7 @@ export function useThreads({
             if (!thread) {
               return;
             }
-            const fallbackIndex =
-              threadsByWorkspaceRef.current[workspaceId]?.length ?? 0;
+            const fallbackIndex = threadsByWorkspaceRef.current[workspaceId]?.length ?? 0;
             const summary = buildThreadSummaryFromThread({
               workspaceId,
               thread,
@@ -354,9 +336,7 @@ export function useThreads({
               threadId: summary.id,
               patch: {
                 ...(summary.isSubagent ? { isSubagent: true } : {}),
-                ...(summary.subagentNickname
-                  ? { subagentNickname: summary.subagentNickname }
-                  : {}),
+                ...(summary.subagentNickname ? { subagentNickname: summary.subagentNickname } : {}),
                 ...(summary.subagentRole ? { subagentRole: summary.subagentRole } : {}),
                 ...(summary.createdAt !== undefined ? { createdAt: summary.createdAt } : {}),
               },
@@ -480,8 +460,7 @@ export function useThreads({
       const descendants = getSubagentDescendantThreadIds({
         rootThreadId: threadId,
         threadParentById: threadParentByIdRef.current,
-        isSubagentThread: (candidateId) =>
-          isSubagentThread(workspaceId, candidateId),
+        isSubagentThread: (candidateId) => isSubagentThread(workspaceId, candidateId),
       });
       if (descendants.length === 0) {
         return;
@@ -614,11 +593,8 @@ export function useThreads({
       const visibleThreadIds = (state.threadsByWorkspace[workspaceId] ?? [])
         .map((thread) => String(thread.id ?? "").trim())
         .filter((threadId) => threadId.length > 0);
-      const hiddenThreadIds = Object.keys(
-        state.hiddenThreadIdsByWorkspace[workspaceId] ?? {},
-      );
-      const activeThreadIdForWorkspace =
-        state.activeThreadIdByWorkspace[workspaceId] ?? null;
+      const hiddenThreadIds = Object.keys(state.hiddenThreadIdsByWorkspace[workspaceId] ?? {});
+      const activeThreadIdForWorkspace = state.activeThreadIdByWorkspace[workspaceId] ?? null;
       const threadIds = new Set([...visibleThreadIds, ...hiddenThreadIds]);
       if (activeThreadIdForWorkspace) {
         threadIds.add(activeThreadIdForWorkspace);
@@ -628,11 +604,7 @@ export function useThreads({
       }
       return Array.from(threadIds);
     },
-    [
-      state.activeThreadIdByWorkspace,
-      state.hiddenThreadIdsByWorkspace,
-      state.threadsByWorkspace,
-    ],
+    [state.activeThreadIdByWorkspace, state.hiddenThreadIdsByWorkspace, state.threadsByWorkspace],
   );
 
   const hasProcessingThreadInWorkspace = useCallback(
@@ -677,11 +649,7 @@ export function useThreads({
         return null;
       }
     } else if (!loadedThreadsRef.current[threadId]) {
-      await ensureWorkspaceRuntimeCodexArgsBestEffort(
-        activeWorkspace.id,
-        threadId,
-        "resume",
-      );
+      await ensureWorkspaceRuntimeCodexArgsBestEffort(activeWorkspace.id, threadId, "resume");
       await resumeThreadForWorkspace(activeWorkspace.id, threadId);
     }
     return threadId;

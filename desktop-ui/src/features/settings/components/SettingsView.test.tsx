@@ -1,27 +1,20 @@
 // @vitest-environment jsdom
+
 import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+  connectWorkspace,
+  getAgentsSettings,
+  getAppBuildType,
+  getConfigModel,
+  getExperimentalFeatureList,
+  getModelList,
+  isMobileRuntime,
+  listWorkspaces,
+} from "@services/tauri";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { DEFAULT_COMMIT_MESSAGE_PROMPT } from "@utils/commitMessagePrompt";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { AppSettings, WorkspaceInfo } from "@/types";
-import {
-  connectWorkspace,
-  getAppBuildType,
-  getAgentsSettings,
-  getConfigModel,
-  getExperimentalFeatureList,
-  isMobileRuntime,
-  getModelList,
-  listWorkspaces,
-} from "@services/tauri";
-import { DEFAULT_COMMIT_MESSAGE_PROMPT } from "@utils/commitMessagePrompt";
 import { SettingsView } from "./SettingsView";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
@@ -30,9 +23,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 vi.mock("@services/tauri", async () => {
-  const actual = await vi.importActual<typeof import("@services/tauri")>(
-    "@services/tauri",
-  );
+  const actual = await vi.importActual<typeof import("@services/tauri")>("@services/tauri");
   return {
     ...actual,
     connectWorkspace: vi.fn(),
@@ -195,8 +186,7 @@ const renderDisplaySection = (
   } = {},
 ) => {
   cleanup();
-  const onUpdateAppSettings =
-    options.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
+  const onUpdateAppSettings = options.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
   const onToggleTransparency = options.onToggleTransparency ?? vi.fn();
   const props: ComponentProps<typeof SettingsView> = {
     reduceTransparency: options.reduceTransparency ?? false,
@@ -240,8 +230,7 @@ const renderComposerSection = (
   } = {},
 ) => {
   cleanup();
-  const onUpdateAppSettings =
-    options.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
+  const onUpdateAppSettings = options.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
   const props: ComponentProps<typeof SettingsView> = {
     reduceTransparency: false,
     onToggleTransparency: vi.fn(),
@@ -286,10 +275,8 @@ const renderAboutSection = (
   } = {},
 ) => {
   cleanup();
-  const onUpdateAppSettings =
-    options.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
-  const onToggleAutomaticAppUpdateChecks =
-    options.onToggleAutomaticAppUpdateChecks ?? vi.fn();
+  const onUpdateAppSettings = options.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
+  const onToggleAutomaticAppUpdateChecks = options.onToggleAutomaticAppUpdateChecks ?? vi.fn();
   const props: ComponentProps<typeof SettingsView> = {
     reduceTransparency: false,
     onToggleTransparency: vi.fn(),
@@ -334,8 +321,7 @@ const renderFeaturesSection = (
   } = {},
 ) => {
   cleanup();
-  const onUpdateAppSettings =
-    options.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
+  const onUpdateAppSettings = options.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
   getExperimentalFeatureListMock.mockResolvedValue(
     (options.experimentalFeaturesResponse as Record<string, unknown>) ?? {
       data: [
@@ -345,8 +331,7 @@ const renderFeaturesSection = (
           enabled: true,
           defaultEnabled: true,
           displayName: "Steer mode",
-          description:
-            "Send messages immediately. Use Tab to queue while a run is active.",
+          description: "Send messages immediately. Use Tab to queue while a run is active.",
           announcement: null,
         },
         {
@@ -436,28 +421,25 @@ const renderEnvironmentsSection = (
   } = {},
 ) => {
   cleanup();
-  const onUpdateAppSettings =
-    options.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
+  const onUpdateAppSettings = options.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
   const onUpdateWorkspaceSettings =
     options.onUpdateWorkspaceSettings ?? vi.fn().mockResolvedValue(undefined);
-  const defaultGroupedWorkspaces =
-    options.groupedWorkspaces ??
-    [
-      {
-        id: null,
-        name: "Ungrouped",
-        workspaces: [
-          workspace({
-            id: "w1",
-            name: "Project One",
-            settings: {
-              sidebarCollapsed: false,
-              worktreeSetupScript: "echo one",
-            },
-          }),
-        ],
-      },
-    ];
+  const defaultGroupedWorkspaces = options.groupedWorkspaces ?? [
+    {
+      id: null,
+      name: "Ungrouped",
+      workspaces: [
+        workspace({
+          id: "w1",
+          name: "Project One",
+          settings: {
+            sidebarCollapsed: false,
+            worktreeSetupScript: "echo one",
+          },
+        }),
+      ],
+    },
+  ];
 
   const buildProps = (
     nextOptions: {
@@ -516,9 +498,7 @@ describe("SettingsView Display", () => {
     fireEvent.change(select, { target: { value: "dark" } });
 
     await waitFor(() => {
-      expect(onUpdateAppSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ theme: "dark" }),
-      );
+      expect(onUpdateAppSettings).toHaveBeenCalledWith(expect.objectContaining({ theme: "dark" }));
     });
   });
 
@@ -532,9 +512,7 @@ describe("SettingsView Display", () => {
     if (!row) {
       throw new Error("Expected remaining limits row");
     }
-    const toggle = row.querySelector(
-      "button.settings-toggle",
-    ) as HTMLButtonElement | null;
+    const toggle = row.querySelector("button.settings-toggle") as HTMLButtonElement | null;
     if (!toggle) {
       throw new Error("Expected remaining limits toggle");
     }
@@ -557,9 +535,7 @@ describe("SettingsView Display", () => {
     if (!row) {
       throw new Error("Expected file path visibility row");
     }
-    const toggle = row.querySelector(
-      "button.settings-toggle",
-    ) as HTMLButtonElement | null;
+    const toggle = row.querySelector("button.settings-toggle") as HTMLButtonElement | null;
     if (!toggle) {
       throw new Error("Expected file path visibility toggle");
     }
@@ -605,9 +581,7 @@ describe("SettingsView Display", () => {
     if (!row) {
       throw new Error("Expected reduce transparency row");
     }
-    const toggle = row.querySelector(
-      "button.settings-toggle",
-    ) as HTMLButtonElement | null;
+    const toggle = row.querySelector("button.settings-toggle") as HTMLButtonElement | null;
     if (!toggle) {
       throw new Error("Expected reduce transparency toggle");
     }
@@ -628,18 +602,14 @@ describe("SettingsView Display", () => {
     fireEvent.blur(scaleInput);
 
     await waitFor(() => {
-      expect(onUpdateAppSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ uiScale: 3 }),
-      );
+      expect(onUpdateAppSettings).toHaveBeenCalledWith(expect.objectContaining({ uiScale: 3 }));
     });
 
     fireEvent.change(scaleInput, { target: { value: "3%" } });
     fireEvent.keyDown(scaleInput, { key: "Enter" });
 
     await waitFor(() => {
-      expect(onUpdateAppSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ uiScale: 0.1 }),
-      );
+      expect(onUpdateAppSettings).toHaveBeenCalledWith(expect.objectContaining({ uiScale: 0.1 }));
     });
   });
 
@@ -849,9 +819,7 @@ describe("SettingsView Environments", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(
-      await screen.findByText("Failed to save workspace settings"),
-    ).toBeTruthy();
+    expect(await screen.findByText("Failed to save workspace settings")).toBeTruthy();
     expect(onUpdateAppSettings).toHaveBeenCalledTimes(1);
     expect(onUpdateWorkspaceSettings).toHaveBeenCalledTimes(1);
 
@@ -965,9 +933,7 @@ describe("SettingsView Environments", () => {
     fireEvent.change(input, { target: { value: "I:/cm-worktrees" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(
-      await screen.findByText("Failed to save global worktrees root"),
-    ).toBeTruthy();
+    expect(await screen.findByText("Failed to save global worktrees root")).toBeTruthy();
   });
 
   it("keeps the new global worktrees root as saved when workspace settings fail afterward", async () => {
@@ -987,9 +953,7 @@ describe("SettingsView Environments", () => {
     fireEvent.change(textarea, { target: { value: "echo updated" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(
-      await screen.findByText("Failed to save workspace settings"),
-    ).toBeTruthy();
+    expect(await screen.findByText("Failed to save workspace settings")).toBeTruthy();
 
     await waitFor(() => {
       expect(onUpdateAppSettings).toHaveBeenCalledWith(
@@ -1018,9 +982,7 @@ describe("SettingsView Environments", () => {
     const onUpdateWorkspaceSettings = vi.fn().mockResolvedValue(undefined);
     renderEnvironmentsSection({ onUpdateWorkspaceSettings });
 
-    expect(
-      screen.getByText("Environments", { selector: ".settings-section-title" }),
-    ).toBeTruthy();
+    expect(screen.getByText("Environments", { selector: ".settings-section-title" })).toBeTruthy();
     const textarea = screen.getByPlaceholderText("pnpm install");
     expect((textarea as HTMLTextAreaElement).value).toBe("echo one");
 
@@ -1264,11 +1226,7 @@ describe("SettingsView Codex section", () => {
         Reflect.deleteProperty(window.navigator, "userAgent");
       }
       if (originalTouchPointsDescriptor) {
-        Object.defineProperty(
-          window.navigator,
-          "maxTouchPoints",
-          originalTouchPointsDescriptor,
-        );
+        Object.defineProperty(window.navigator, "maxTouchPoints", originalTouchPointsDescriptor);
       } else {
         Reflect.deleteProperty(window.navigator, "maxTouchPoints");
       }
@@ -1469,17 +1427,12 @@ describe("SettingsView Codex section", () => {
         Reflect.deleteProperty(window.navigator, "userAgent");
       }
       if (originalTouchPointsDescriptor) {
-        Object.defineProperty(
-          window.navigator,
-          "maxTouchPoints",
-          originalTouchPointsDescriptor,
-        );
+        Object.defineProperty(window.navigator, "maxTouchPoints", originalTouchPointsDescriptor);
       } else {
         Reflect.deleteProperty(window.navigator, "maxTouchPoints");
       }
     }
   });
-
 });
 
 describe("SettingsView Codex defaults", () => {
@@ -1561,9 +1514,7 @@ describe("SettingsView Codex defaults", () => {
     );
 
     const modelSelect = screen.getByLabelText("Model") as HTMLSelectElement;
-    const effortSelect = screen.getByLabelText(
-      "Reasoning effort",
-    ) as HTMLSelectElement;
+    const effortSelect = screen.getByLabelText("Reasoning effort") as HTMLSelectElement;
 
     await waitFor(() => {
       expect(getModelListMock).toHaveBeenCalledWith("w1");
@@ -1658,9 +1609,7 @@ describe("SettingsView Codex defaults", () => {
     );
 
     const modelSelect = screen.getByLabelText("Model") as HTMLSelectElement;
-    const effortSelect = screen.getByLabelText(
-      "Reasoning effort",
-    ) as HTMLSelectElement;
+    const effortSelect = screen.getByLabelText("Reasoning effort") as HTMLSelectElement;
 
     await waitFor(() => {
       expect(modelSelect.disabled).toBe(false);
@@ -1743,9 +1692,7 @@ describe("SettingsView Features", () => {
       },
     });
 
-    await screen.findByText(
-      "Use Responses API WebSocket transport for OpenAI by default.",
-    );
+    await screen.findByText("Use Responses API WebSocket transport for OpenAI by default.");
     expect(screen.queryByText("Steer mode")).toBeNull();
   });
 
@@ -1788,9 +1735,7 @@ describe("SettingsView Features", () => {
       },
     });
 
-    await screen.findByText(
-      "Use Responses API WebSocket transport for OpenAI by default.",
-    );
+    await screen.findByText("Use Responses API WebSocket transport for OpenAI by default.");
   });
 });
 
@@ -1848,9 +1793,7 @@ describe("SettingsView Composer", () => {
     const steerOption = screen.getByRole("radio", { name: "Steer" });
     expect(steerOption.hasAttribute("disabled")).toBe(true);
     expect(
-      screen.getByText(
-        "Steer is unavailable in the current Codex config. Follow-ups will queue.",
-      ),
+      screen.getByText("Steer is unavailable in the current Codex config. Follow-ups will queue."),
     ).not.toBeNull();
 
     fireEvent.click(steerOption);
@@ -1937,12 +1880,9 @@ describe("SettingsView mobile layout", () => {
         />,
       );
 
+      expect(within(rendered.container).queryByText("Sections")).toBeNull();
       expect(
-        within(rendered.container).queryByText("Sections"),
-      ).toBeNull();
-      expect(
-        rendered.container.querySelectorAll(".ds-panel-nav-item-disclosure")
-          .length,
+        rendered.container.querySelectorAll(".ds-panel-nav-item-disclosure").length,
       ).toBeGreaterThan(0);
 
       fireEvent.click(
@@ -1994,11 +1934,7 @@ describe("SettingsView mobile layout", () => {
         Reflect.deleteProperty(window.navigator, "userAgent");
       }
       if (originalTouchPointsDescriptor) {
-        Object.defineProperty(
-          window.navigator,
-          "maxTouchPoints",
-          originalTouchPointsDescriptor,
-        );
+        Object.defineProperty(window.navigator, "maxTouchPoints", originalTouchPointsDescriptor);
       } else {
         Reflect.deleteProperty(window.navigator, "maxTouchPoints");
       }

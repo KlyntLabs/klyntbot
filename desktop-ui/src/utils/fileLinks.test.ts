@@ -26,9 +26,7 @@ function withThrowingUrlConstructor(run: () => void) {
 
 function expectFileUrlLocation(url: string, expected: string | null) {
   const parsed = parseFileUrlLocation(url);
-  const formatted = parsed
-    ? formatFileLocation(parsed.path, parsed.line, parsed.column)
-    : null;
+  const formatted = parsed ? formatFileLocation(parsed.path, parsed.line, parsed.column) : null;
   expect(formatted).toBe(expected);
 }
 
@@ -40,9 +38,7 @@ describe("parseFileUrlLocation", () => {
 
   it("uses only the real URL fragment as a line anchor", () => {
     expectFileUrlLocation("file:///tmp/report%23L12.md#L34", "/tmp/report#L12.md:34");
-    expectFileUrlLocation("file:///tmp/report%23L12C3.md#L34C2", 
-      "/tmp/report#L12C3.md:34:2",
-    );
+    expectFileUrlLocation("file:///tmp/report%23L12C3.md#L34C2", "/tmp/report#L12C3.md:34:2");
   });
 
   it("keeps Windows drive paths when decoding a file URL with an unescaped percent", () => {
@@ -56,17 +52,13 @@ describe("parseFileUrlLocation", () => {
   it("preserves Windows drive info when the URL constructor fallback is used", () => {
     withThrowingUrlConstructor(() => {
       expectFileUrlLocation("file:///C:/repo/100%.tsx#L12", "C:/repo/100%.tsx:12");
-      expectFileUrlLocation("file://localhost/C:/repo/100%.tsx#L12", 
-        "C:/repo/100%.tsx:12",
-      );
+      expectFileUrlLocation("file://localhost/C:/repo/100%.tsx#L12", "C:/repo/100%.tsx:12");
     });
   });
 
   it("preserves UNC host info when the URL constructor fallback is used", () => {
     withThrowingUrlConstructor(() => {
-      expectFileUrlLocation("file://server/share/100%.tsx#L12", 
-        "//server/share/100%.tsx:12",
-      );
+      expectFileUrlLocation("file://server/share/100%.tsx#L12", "//server/share/100%.tsx:12");
     });
   });
 
@@ -85,9 +77,7 @@ describe("parseFileUrlLocation", () => {
 
   it("round-trips Windows namespace UNC paths through file URLs", () => {
     const fileUrl = toFileUrl("\\\\?\\UNC\\server\\share\\repo\\App.tsx", 12, null);
-    expect(fileUrl).toBe(
-      "file:///%5C%5C%3F%5CUNC%5Cserver%5Cshare%5Crepo%5CApp.tsx#L12",
-    );
+    expect(fileUrl).toBe("file:///%5C%5C%3F%5CUNC%5Cserver%5Cshare%5Crepo%5CApp.tsx#L12");
     expectFileUrlLocation(fileUrl, "\\\\?\\UNC\\server\\share\\repo\\App.tsx:12");
   });
 });

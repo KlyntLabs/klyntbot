@@ -1,5 +1,5 @@
-import { useCallback } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { useCallback } from "react";
 import type { SendMessageResult, WorkspaceInfo } from "@/types";
 
 type PromptPayload = {

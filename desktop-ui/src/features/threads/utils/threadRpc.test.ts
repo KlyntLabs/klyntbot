@@ -20,9 +20,9 @@ describe("threadRpc", () => {
       activeTurnStartedAtMs: null,
       confidentNoActiveTurn: false,
     });
-    expect(
-      getResumedActiveTurnId({ id: "thread-1", activeTurnId: "turn-explicit" }),
-    ).toBe("turn-explicit");
+    expect(getResumedActiveTurnId({ id: "thread-1", activeTurnId: "turn-explicit" })).toBe(
+      "turn-explicit",
+    );
   });
 
   it("treats explicit empty active-turn fields as confidently idle", () => {
@@ -130,18 +130,12 @@ describe("threadRpc", () => {
   });
 
   it("hides only memory consolidation subagents from sidebar", () => {
-    expect(
-      shouldHideSubagentThreadFromSidebar({ subagent: "memory_consolidation" }),
-    ).toBe(true);
-    expect(
-      shouldHideSubagentThreadFromSidebar({ subAgent: { memory_consolidation: true } }),
-    ).toBe(true);
-    expect(shouldHideSubagentThreadFromSidebar("subagent_memory_consolidation")).toBe(
+    expect(shouldHideSubagentThreadFromSidebar({ subagent: "memory_consolidation" })).toBe(true);
+    expect(shouldHideSubagentThreadFromSidebar({ subAgent: { memory_consolidation: true } })).toBe(
       true,
     );
-    expect(shouldHideSubagentThreadFromSidebar({ subAgent: { review: true } })).toBe(
-      false,
-    );
+    expect(shouldHideSubagentThreadFromSidebar("subagent_memory_consolidation")).toBe(true);
+    expect(shouldHideSubagentThreadFromSidebar({ subAgent: { review: true } })).toBe(false);
     expect(shouldHideSubagentThreadFromSidebar("subagent_review")).toBe(false);
   });
 });

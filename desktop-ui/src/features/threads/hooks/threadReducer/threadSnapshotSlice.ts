@@ -1,14 +1,9 @@
 import type { ThreadAction, ThreadState } from "../useThreadsReducer";
 
-export function reduceThreadSnapshots(
-  state: ThreadState,
-  action: ThreadAction,
-): ThreadState {
+export function reduceThreadSnapshots(state: ThreadState, action: ThreadAction): ThreadState {
   switch (action.type) {
     case "setLastAgentMessage":
-      if (
-        state.lastAgentMessageByThread[action.threadId]?.timestamp >= action.timestamp
-      ) {
+      if (state.lastAgentMessageByThread[action.threadId]?.timestamp >= action.timestamp) {
         return state;
       }
       return {

@@ -1,22 +1,19 @@
 // @vitest-environment jsdom
+
+import { getAppSettings, runCodexDoctor, updateAppSettings } from "@services/tauri";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { UI_SCALE_DEFAULT, UI_SCALE_MAX } from "@utils/uiScale";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppSettings, CodexDoctorResult } from "@/types";
 import { useAppSettings } from "./useAppSettings";
-import {
-  getAppSettings,
-  runCodexDoctor,
-  updateAppSettings,
-} from "@services/tauri";
-import { UI_SCALE_DEFAULT, UI_SCALE_MAX } from "@utils/uiScale";
 
 function withQuery({ children }: { children: React.ReactNode }) {
-	const client = new QueryClient({
-		defaultOptions: { queries: { retry: 0 } },
-	});
-	return createElement(QueryClientProvider, { client }, children);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: 0 } },
+  });
+  return createElement(QueryClientProvider, { client }, children);
 }
 
 vi.mock("@services/tauri", () => ({
@@ -39,18 +36,16 @@ describe("useAppSettings", () => {
   });
 
   it("loads settings and normalizes theme + uiScale", async () => {
-    getAppSettingsMock.mockResolvedValue(
-      ({
-        uiScale: UI_SCALE_MAX + 1,
-        theme: "nope" as unknown as AppSettings["theme"],
-        backendMode: "remote",
-        remoteBackendHost: "example:1234",
-        personality: "unknown",
-        uiFontFamily: "",
-        codeFontFamily: "  ",
-        codeFontSize: 25,
-      } as unknown) as AppSettings,
-    );
+    getAppSettingsMock.mockResolvedValue({
+      uiScale: UI_SCALE_MAX + 1,
+      theme: "nope" as unknown as AppSettings["theme"],
+      backendMode: "remote",
+      remoteBackendHost: "example:1234",
+      personality: "unknown",
+      uiFontFamily: "",
+      codeFontFamily: "  ",
+      codeFontSize: 25,
+    } as unknown as AppSettings);
 
     const { result } = renderHook(() => useAppSettings(), { wrapper: withQuery });
 
@@ -141,10 +136,7 @@ describe("useAppSettings", () => {
     await expect(result.current.doctor("/bin/codex", "--profile test")).rejects.toThrow(
       "doctor fail",
     );
-    expect(runCodexDoctorMock).toHaveBeenCalledWith(
-      "/bin/codex",
-      "--profile test",
-    );
+    expect(runCodexDoctorMock).toHaveBeenCalledWith("/bin/codex", "--profile test");
   });
 
   it("returns doctor results", async () => {
@@ -165,8 +157,6 @@ describe("useAppSettings", () => {
 
     await waitFor(() => expect(result.current.settings.backendMode).toBe("local"));
 
-    await expect(result.current.doctor("/bin/codex", null)).resolves.toEqual(
-      response,
-    );
+    await expect(result.current.doctor("/bin/codex", null)).resolves.toEqual(response);
   });
 });

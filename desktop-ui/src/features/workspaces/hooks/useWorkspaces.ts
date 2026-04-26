@@ -7,17 +7,14 @@ import type {
   WorkspaceSettings,
 } from "@/types";
 import {
-  RESERVED_GROUP_NAME,
   buildGroupedWorkspaces,
   buildWorkspaceById,
   buildWorkspaceGroupById,
   getWorkspaceGroupNameById,
+  RESERVED_GROUP_NAME,
   sortWorkspaceGroups,
 } from "../domain/workspaceGroups";
-import {
-  useWorkspaceCrud,
-  type AddWorkspacesFromPathsResult,
-} from "./useWorkspaceCrud";
+import { type AddWorkspacesFromPathsResult, useWorkspaceCrud } from "./useWorkspaceCrud";
 import { useWorkspaceGroupOps } from "./useWorkspaceGroupOps";
 import { useWorktreeOps } from "./useWorktreeOps";
 
@@ -36,7 +33,10 @@ export type UseWorkspacesResult = {
   activeWorkspace: WorkspaceInfo | null;
   activeWorkspaceId: string | null;
   setActiveWorkspaceId: (workspaceId: string | null) => void;
-  addWorkspaceFromPath: (path: string, options?: { activate?: boolean }) => Promise<WorkspaceInfo | null>;
+  addWorkspaceFromPath: (
+    path: string,
+    options?: { activate?: boolean },
+  ) => Promise<WorkspaceInfo | null>;
   addWorkspaceFromGitUrl: (
     url: string,
     destinationPath: string,
@@ -45,7 +45,11 @@ export type UseWorkspacesResult = {
   ) => Promise<WorkspaceInfo | null>;
   addWorkspacesFromPaths: (paths: string[]) => Promise<AddWorkspacesFromPathsResult>;
   filterWorkspacePaths: (paths: string[]) => Promise<string[]>;
-  addCloneAgent: (source: WorkspaceInfo, copyName: string, copiesFolder: string) => Promise<WorkspaceInfo | null>;
+  addCloneAgent: (
+    source: WorkspaceInfo,
+    copyName: string,
+    copiesFolder: string,
+  ) => Promise<WorkspaceInfo | null>;
   addWorktreeAgent: (
     parent: WorkspaceInfo,
     branch: string,
@@ -57,7 +61,10 @@ export type UseWorkspacesResult = {
   ) => Promise<WorkspaceInfo | null>;
   connectWorkspace: (entry: WorkspaceInfo) => Promise<void>;
   markWorkspaceConnected: (id: string) => void;
-  updateWorkspaceSettings: (workspaceId: string, patch: Partial<WorkspaceSettings>) => Promise<WorkspaceInfo>;
+  updateWorkspaceSettings: (
+    workspaceId: string,
+    patch: Partial<WorkspaceSettings>,
+  ) => Promise<WorkspaceInfo>;
   createWorkspaceGroup: (name: string) => Promise<WorkspaceGroup | null>;
   renameWorkspaceGroup: (groupId: string, name: string) => Promise<true | null>;
   moveWorkspaceGroup: (groupId: string, direction: "up" | "down") => Promise<true | null>;
@@ -66,7 +73,11 @@ export type UseWorkspacesResult = {
   removeWorkspace: (workspaceId: string) => Promise<void>;
   removeWorktree: (workspaceId: string) => Promise<void>;
   renameWorktree: (workspaceId: string, branch: string) => Promise<WorkspaceInfo>;
-  renameWorktreeUpstream: (workspaceId: string, oldBranch: string, newBranch: string) => Promise<void>;
+  renameWorktreeUpstream: (
+    workspaceId: string,
+    oldBranch: string,
+    newBranch: string,
+  ) => Promise<void>;
   deletingWorktreeIds: Set<string>;
   hasLoaded: boolean;
   refreshWorkspaces: () => Promise<WorkspaceInfo[] | undefined>;

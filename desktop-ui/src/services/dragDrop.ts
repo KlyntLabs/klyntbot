@@ -24,16 +24,15 @@ function start(options?: SubscriptionOptions) {
   if (unlisten || listenPromise) {
     return;
   }
-  listenPromise = getCurrentWindow()
-    .onDragDropEvent((event) => {
-      for (const listener of listeners) {
-        try {
-          listener(event as DragDropEvent);
-        } catch (error) {
-          console.error("[drag-drop] listener failed", error);
-        }
+  listenPromise = getCurrentWindow().onDragDropEvent((event) => {
+    for (const listener of listeners) {
+      try {
+        listener(event as DragDropEvent);
+      } catch (error) {
+        console.error("[drag-drop] listener failed", error);
       }
-    }) as Promise<() => void>;
+    }
+  }) as Promise<() => void>;
   listenPromise
     .then((handler) => {
       listenPromise = null;
@@ -61,10 +60,7 @@ function stop() {
   unlisten = null;
 }
 
-export function subscribeWindowDragDrop(
-  onEvent: Listener,
-  options?: SubscriptionOptions,
-) {
+export function subscribeWindowDragDrop(onEvent: Listener, options?: SubscriptionOptions) {
   listeners.add(onEvent);
   start(options);
   return () => {

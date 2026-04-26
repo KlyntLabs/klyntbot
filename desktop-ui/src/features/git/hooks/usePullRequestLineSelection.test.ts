@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
 import type { ParsedDiffLine } from "@utils/diff";
+import { describe, expect, it } from "vitest";
 import { usePullRequestLineSelection } from "./usePullRequestLineSelection";
 
 const parsedLines: ParsedDiffLine[] = [
@@ -35,11 +35,7 @@ describe("usePullRequestLineSelection", () => {
       result.current.selectLine("src/App.tsx", 1, true);
     });
 
-    const selection = result.current.buildSelectionRange(
-      "src/App.tsx",
-      "M",
-      parsedLines,
-    );
+    const selection = result.current.buildSelectionRange("src/App.tsx", "M", parsedLines);
     expect(selection?.lines).toHaveLength(2);
     expect(selection?.path).toBe("src/App.tsx");
   });

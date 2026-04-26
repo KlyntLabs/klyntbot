@@ -1,9 +1,9 @@
-import type { AppSettings, ModelOption } from "@/types";
 import {
   SettingsSection,
   SettingsToggleRow,
   SettingsToggleSwitch,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
+import type { AppSettings, ModelOption } from "@/types";
 
 type SettingsGitSectionProps = {
   appSettings: AppSettings;
@@ -29,14 +29,8 @@ export function SettingsGitSection({
   onResetCommitMessagePrompt,
 }: SettingsGitSectionProps) {
   return (
-    <SettingsSection
-      title="Git"
-      subtitle="Manage how diffs are loaded in the Git sidebar."
-    >
-      <SettingsToggleRow
-        title="Preload git diffs"
-        subtitle="Make viewing git diff faster."
-      >
+    <SettingsSection title="Git" subtitle="Manage how diffs are loaded in the Git sidebar.">
+      <SettingsToggleRow title="Preload git diffs" subtitle="Make viewing git diff faster.">
         <SettingsToggleSwitch
           pressed={appSettings.preloadGitDiffs}
           onClick={() =>
@@ -64,8 +58,8 @@ export function SettingsGitSection({
       <div className="settings-field">
         <div className="settings-field-label">Commit message prompt</div>
         <div className="settings-help">
-          Used when generating commit messages. Include <code>{"{diff}"}</code> to insert the
-          git diff.
+          Used when generating commit messages. Include <code>{"{diff}"}</code> to insert the git
+          diff.
         </div>
         <textarea
           className="settings-agents-textarea"
@@ -103,8 +97,8 @@ export function SettingsGitSection({
             Commit message model
           </label>
           <div className="settings-help">
-            The model used when generating commit messages. Leave on default to use the
-            workspace model.
+            The model used when generating commit messages. Leave on default to use the workspace
+            model.
           </div>
           <select
             id="commit-message-model-select"

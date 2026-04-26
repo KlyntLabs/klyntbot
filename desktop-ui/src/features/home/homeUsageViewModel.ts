@@ -1,10 +1,10 @@
+import { formatRelativeTime } from "@utils/time";
 import type {
   AccountSnapshot,
   LocalUsageDay,
   LocalUsageSnapshot,
   RateLimitSnapshot,
 } from "@/types";
-import { formatRelativeTime } from "@utils/time";
 import { getUsageLabels } from "../app/utils/usageLabels";
 import {
   buildWindowCaption,
@@ -49,49 +49,33 @@ export function buildHomeUsageViewModel({
   const last7Days = usageDays.slice(-7);
   const last7Tokens = last7Days.reduce((total, day) => total + day.totalTokens, 0);
   const last7Input = last7Days.reduce((total, day) => total + day.inputTokens, 0);
-  const last7Cached = last7Days.reduce(
-    (total, day) => total + day.cachedInputTokens,
-    0,
-  );
-  const last7AgentMs = last7Days.reduce(
-    (total, day) => total + (day.agentTimeMs ?? 0),
-    0,
-  );
-  const last30AgentMs = usageDays.reduce(
-    (total, day) => total + (day.agentTimeMs ?? 0),
-    0,
-  );
+  const last7Cached = last7Days.reduce((total, day) => total + day.cachedInputTokens, 0);
+  const last7AgentMs = last7Days.reduce((total, day) => total + (day.agentTimeMs ?? 0), 0);
+  const last30AgentMs = usageDays.reduce((total, day) => total + (day.agentTimeMs ?? 0), 0);
   const averageDailyAgentMs =
     last7Days.length > 0 ? Math.round(last7AgentMs / last7Days.length) : 0;
-  const last7AgentRuns = last7Days.reduce(
-    (total, day) => total + (day.agentRuns ?? 0),
-    0,
-  );
-  const last30AgentRuns = usageDays.reduce(
-    (total, day) => total + (day.agentRuns ?? 0),
-    0,
-  );
-  const averageTokensPerRun =
-    last7AgentRuns > 0 ? Math.round(last7Tokens / last7AgentRuns) : null;
+  const last7AgentRuns = last7Days.reduce((total, day) => total + (day.agentRuns ?? 0), 0);
+  const last30AgentRuns = usageDays.reduce((total, day) => total + (day.agentRuns ?? 0), 0);
+  const averageTokensPerRun = last7AgentRuns > 0 ? Math.round(last7Tokens / last7AgentRuns) : null;
   const averageRunDurationMs =
     last7AgentRuns > 0 ? Math.round(last7AgentMs / last7AgentRuns) : null;
   const last7ActiveDays = last7Days.filter(isUsageDayActive).length;
   const last30ActiveDays = usageDays.filter(isUsageDayActive).length;
   const averageActiveDayAgentMs =
     last7ActiveDays > 0 ? Math.round(last7AgentMs / last7ActiveDays) : null;
-  const peakAgentDay = usageDays.reduce<
-    | { day: string; agentTimeMs: number }
-    | null
-  >((best, day) => {
-    const value = day.agentTimeMs ?? 0;
-    if (value <= 0) {
+  const peakAgentDay = usageDays.reduce<{ day: string; agentTimeMs: number } | null>(
+    (best, day) => {
+      const value = day.agentTimeMs ?? 0;
+      if (value <= 0) {
+        return best;
+      }
+      if (!best || value > best.agentTimeMs) {
+        return { day: day.day, agentTimeMs: value };
+      }
       return best;
-    }
-    if (!best || value > best.agentTimeMs) {
-      return { day: day.day, agentTimeMs: value };
-    }
-    return best;
-  }, null);
+    },
+    null,
+  );
 
   let longestStreak = 0;
   let runningStreak = 0;
@@ -131,9 +115,7 @@ export function buildHomeUsageViewModel({
           },
           {
             label: "Cache hit rate",
-            value: usageTotals
-              ? `${usageTotals.cacheHitRatePercent.toFixed(1)}%`
-              : "--",
+            value: usageTotals ? `${usageTotals.cacheHitRatePercent.toFixed(1)}%` : "--",
             caption: "Last 7 days",
           },
           {
@@ -147,10 +129,7 @@ export function buildHomeUsageViewModel({
           },
           {
             label: "Avg / run",
-            value:
-              averageTokensPerRun === null
-                ? "--"
-                : formatCompactNumber(averageTokensPerRun),
+            value: averageTokensPerRun === null ? "--" : formatCompactNumber(averageTokensPerRun),
             suffix: "tokens",
             caption:
               last7AgentRuns > 0
@@ -186,9 +165,7 @@ export function buildHomeUsageViewModel({
             label: "Avg / run",
             value: formatDurationCompact(averageRunDurationMs),
             caption:
-              last7AgentRuns > 0
-                ? `Across ${formatCount(last7AgentRuns)} runs`
-                : "No runs yet",
+              last7AgentRuns > 0 ? `Across ${formatCount(last7AgentRuns)} runs` : "No runs yet",
           },
           {
             label: "Avg / active day",
@@ -209,10 +186,7 @@ export function buildHomeUsageViewModel({
     {
       label: "Longest streak",
       value: longestStreak > 0 ? formatDayCount(longestStreak) : "--",
-      caption:
-        longestStreak > 0
-          ? "Across current usage range"
-          : "No active streak yet",
+      caption: longestStreak > 0 ? "Across current usage range" : "No active streak yet",
       compact: true,
     },
     {

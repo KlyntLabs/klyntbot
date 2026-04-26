@@ -1,18 +1,11 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import type { ConversationItem } from "@/types";
 import { isPlanReadyTaggedMessage } from "@utils/internalPlanReadyMessages";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { ConversationItem } from "@/types";
 import {
-  SCROLL_THRESHOLD_PX,
   buildToolGroups,
   computePlanFollowupState,
   parseReasoning,
+  SCROLL_THRESHOLD_PX,
   scrollKeyForItems,
 } from "../utils/messageRenderUtils";
 
@@ -56,12 +49,11 @@ export function useMessagesViewState({
   const manuallyToggledExpandedRef = useRef<Set<string>>(new Set());
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [collapsedToolGroups, setCollapsedToolGroups] = useState<Set<string>>(
-    new Set(),
-  );
+  const [collapsedToolGroups, setCollapsedToolGroups] = useState<Set<string>>(new Set());
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-  const [dismissedPlanFollowupByThread, setDismissedPlanFollowupByThread] =
-    useState<Record<string, string>>({});
+  const [dismissedPlanFollowupByThread, setDismissedPlanFollowupByThread] = useState<
+    Record<string, string>
+  >({});
 
   const scrollKey = `${scrollKeyForItems(items)}-${activeUserInputRequestId ?? "no-input"}`;
 
@@ -80,8 +72,7 @@ export function useMessagesViewState({
 
   const requestAutoScroll = useCallback(() => {
     const container = containerRef.current;
-    const shouldScroll =
-      autoScrollRef.current || (container ? isNearBottom(container) : true);
+    const shouldScroll = autoScrollRef.current || (container ? isNearBottom(container) : true);
     if (!shouldScroll) {
       return;
     }
@@ -98,8 +89,7 @@ export function useMessagesViewState({
 
   useLayoutEffect(() => {
     const container = containerRef.current;
-    const shouldScroll =
-      autoScrollRef.current || (container ? isNearBottom(container) : true);
+    const shouldScroll = autoScrollRef.current || (container ? isNearBottom(container) : true);
     if (!shouldScroll) {
       return;
     }

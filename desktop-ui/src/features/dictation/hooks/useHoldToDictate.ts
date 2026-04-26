@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import { matchesHoldKey } from "@utils/keys";
+import { useEffect, useRef } from "react";
 import type { DictationSessionState } from "@/types";
 
 type UseHoldToDictateArgs = {

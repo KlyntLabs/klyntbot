@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect, useRef } from "react";
 import type { WorkspaceInfo } from "@/types";
 
 export const REMOTE_THREAD_POLL_INTERVAL_MS = 12000;
@@ -54,9 +54,7 @@ export function useRemoteThreadRefreshOnFocus({
     let unlistenWindowBlur: (() => void) | null = null;
 
     const canRefresh = () =>
-      backendMode === "remote" &&
-      Boolean(workspaceId) &&
-      Boolean(activeThreadId);
+      backendMode === "remote" && Boolean(workspaceId) && Boolean(activeThreadId);
 
     const ensureWorkspaceConnected = () => {
       if (
@@ -68,9 +66,7 @@ export function useRemoteThreadRefreshOnFocus({
         return null;
       }
       reconnectInFlight = true;
-      return Promise.resolve(
-        reconnectWorkspaceRef.current(activeWorkspaceRef.current),
-      )
+      return Promise.resolve(reconnectWorkspaceRef.current(activeWorkspaceRef.current))
         .catch(() => {
           // Ignore reconnect failures so lifecycle hooks do not surface toast noise.
         })
@@ -89,9 +85,7 @@ export function useRemoteThreadRefreshOnFocus({
         if (reconnectPromise) {
           await reconnectPromise;
         }
-        await Promise.resolve(
-          refreshThreadRef.current(workspaceId, activeThreadId),
-        );
+        await Promise.resolve(refreshThreadRef.current(workspaceId, activeThreadId));
       })()
         .catch(() => {
           // Ignore refresh failures so lifecycle hooks do not surface toast noise.
@@ -204,11 +198,5 @@ export function useRemoteThreadRefreshOnFocus({
         clearInterval(pollTimer);
       }
     };
-  }, [
-    activeThreadId,
-    activeThreadIsProcessing,
-    backendMode,
-    suspendPolling,
-    workspaceId,
-  ]);
+  }, [activeThreadId, activeThreadIsProcessing, backendMode, suspendPolling, workspaceId]);
 }

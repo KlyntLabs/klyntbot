@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { cancelCodexLogin, runCodexLogin } from "@services/tauri";
 import { subscribeAppServerEvents } from "@services/events";
-import type { AccountSnapshot } from "@/types";
-import { getAppServerParams, getAppServerRawMethod } from "@utils/appServerEvents";
+import { cancelCodexLogin, runCodexLogin } from "@services/tauri";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { getAppServerParams, getAppServerRawMethod } from "@utils/appServerEvents";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AccountSnapshot } from "@/types";
 
 type UseAccountSwitchingArgs = {
   activeWorkspaceId: string | null;
@@ -45,8 +45,7 @@ export function useAccountSwitching({
   }, [activeWorkspaceId, accountByWorkspace]);
 
   const isCodexLoginCanceled = useCallback((error: unknown) => {
-    const message =
-      typeof error === "string" ? error : error instanceof Error ? error.message : "";
+    const message = typeof error === "string" ? error : error instanceof Error ? error.message : "";
     const normalized = message.toLowerCase();
     return (
       normalized.includes("codex login canceled") ||
@@ -193,12 +192,7 @@ export function useAccountSwitching({
     } finally {
       // Completion is now driven by app-server events.
     }
-  }, [
-    activeWorkspaceId,
-    accountSwitching,
-    alertError,
-    isCodexLoginCanceled,
-  ]);
+  }, [activeWorkspaceId, accountSwitching, alertError, isCodexLoginCanceled]);
 
   const handleCancelSwitchAccount = useCallback(async () => {
     const targetWorkspaceId = loginWorkspaceIdRef.current ?? activeWorkspaceId;

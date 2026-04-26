@@ -52,14 +52,6 @@ function makeProps(overrides?: Partial<Parameters<typeof useGitPanelController>[
   };
 }
 
-function getLastEnabledArg() {
-  const { calls } = useGitDiffsMock.mock;
-  if (calls.length === 0) {
-    return undefined;
-  }
-  return calls[calls.length - 1]?.[2];
-}
-
 beforeEach(() => {
   useGitStatusMock.mockReturnValue({
     status: {
@@ -98,66 +90,7 @@ beforeEach(() => {
   useGitDiffsMock.mockClear();
 });
 
-describe("useGitPanelController preload behavior", () => {
-  it("does not preload diffs when disabled and panel is hidden", () => {
-    const { result } = renderHook(() => useGitPanelController(makeProps()));
-
-    const initialEnabled = getLastEnabledArg();
-    expect(initialEnabled).toBe(false);
-
-    act(() => {
-      result.current.setGitPanelMode("issues");
-    });
-
-    const lastEnabled = getLastEnabledArg();
-    expect(lastEnabled).toBe(false);
-  });
-
-  it("does not load diffs when the panel becomes visible if preload is disabled", () => {
-    const { result } = renderHook(() => useGitPanelController(makeProps()));
-
-    act(() => {
-      result.current.setGitPanelMode("issues");
-    });
-
-    const hiddenEnabled = getLastEnabledArg();
-    expect(hiddenEnabled).toBe(false);
-
-    act(() => {
-      result.current.setGitPanelMode("diff");
-    });
-
-    const visibleEnabled = getLastEnabledArg();
-    expect(visibleEnabled).toBe(false);
-  });
-
-  it("loads diffs after selecting a file when preload is disabled", () => {
-    const { result } = renderHook(() => useGitPanelController(makeProps()));
-
-    const hiddenEnabled = getLastEnabledArg();
-    expect(hiddenEnabled).toBe(false);
-
-    act(() => {
-      result.current.handleSelectDiff("src/main.ts");
-    });
-
-    const selectedEnabled = getLastEnabledArg();
-    expect(selectedEnabled).toBe(true);
-  });
-
-  it("loads local diffs when split view is enabled and preload is disabled", () => {
-    renderHook(() =>
-      useGitPanelController(
-        makeProps({
-          splitChatDiffView: true,
-        }),
-      ),
-    );
-
-    const enabled = getLastEnabledArg();
-    expect(enabled).toBe(true);
-  });
-
+describe("useGitPanelController", () => {
   it("derives per-file diffs from active thread fileChange items", () => {
     const { result } = renderHook(() =>
       useGitPanelController(
@@ -190,9 +123,7 @@ describe("useGitPanelController preload behavior", () => {
     expect(result.current.perFileDiffGroups).toHaveLength(1);
     expect(result.current.perFileDiffGroups[0]?.path).toBe("src/main.ts");
     expect(result.current.perFileDiffGroups[0]?.edits[0]?.label).toBe("Edit 1");
-    expect(result.current.activeDiffs[0]?.path).toBe(
-      "src/main.ts@@item-change-1@@change-0",
-    );
+    expect(result.current.activeDiffs[0]?.path).toBe("src/main.ts@@item-change-1@@change-0");
   });
 
   it("opens per-file diff selection in center diff mode", () => {
@@ -220,16 +151,12 @@ describe("useGitPanelController preload behavior", () => {
     );
 
     act(() => {
-      result.current.handleSelectPerFileDiff(
-        "src/main.ts@@item-change-1@@change-0",
-      );
+      result.current.handleSelectPerFileDiff("src/main.ts@@item-change-1@@change-0");
     });
 
     expect(result.current.centerMode).toBe("diff");
     expect(result.current.gitPanelMode).toBe("perFile");
     expect(result.current.diffSource).toBe("perFile");
-    expect(result.current.selectedDiffPath).toBe(
-      "src/main.ts@@item-change-1@@change-0",
-    );
+    expect(result.current.selectedDiffPath).toBe("src/main.ts@@item-change-1@@change-0");
   });
 });

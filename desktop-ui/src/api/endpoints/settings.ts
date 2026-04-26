@@ -2,9 +2,9 @@ import type {
   AppSettings,
   CodexDoctorResult,
   CodexUpdateResult,
-  TcpDaemonStatus,
   TailscaleDaemonCommandPreview,
   TailscaleStatus,
+  TcpDaemonStatus,
 } from "@/types";
 import { invoke } from "../client";
 
@@ -37,9 +37,7 @@ export type MenuAcceleratorUpdate = {
   accelerator: string | null;
 };
 
-export async function setMenuAccelerators(
-  updates: MenuAcceleratorUpdate[],
-): Promise<void> {
+export async function setMenuAccelerators(updates: MenuAcceleratorUpdate[]): Promise<void> {
   return invoke("menu_set_accelerators", { updates });
 }
 
@@ -83,10 +81,7 @@ export async function tailscaleDaemonStatus(): Promise<TcpDaemonStatus> {
   return invoke<TcpDaemonStatus>("tailscale_daemon_status");
 }
 
-export async function setCodexFeatureFlag(
-  featureKey: string,
-  enabled: boolean,
-): Promise<void> {
+export async function setCodexFeatureFlag(featureKey: string, enabled: boolean): Promise<void> {
   return invoke("set_codex_feature_flag", { featureKey, enabled });
 }
 

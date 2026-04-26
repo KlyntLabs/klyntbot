@@ -1,6 +1,6 @@
-import { useMemo, type CSSProperties } from "react";
-import type { AppSettings } from "@/types";
 import { isWindowsPlatform } from "@utils/platformPaths";
+import { type CSSProperties, useMemo } from "react";
+import type { AppSettings } from "@/types";
 
 type UseAppShellOrchestrationOptions = {
   sidebarCollapsed: boolean;
@@ -48,39 +48,40 @@ export function useAppShellOrchestration({
   }${isWindows ? " is-windows" : ""}`;
 
   const appStyle = useMemo<CSSProperties>(
-    () => ({
-      "--sidebar-width": `${sidebarCollapsed ? 0 : sidebarWidth}px`,
-      "--right-panel-width": `${rightPanelCollapsed ? 0 : rightPanelWidth}px`,
-      "--chat-diff-split-position-percent": `${chatDiffSplitPositionPercent}%`,
-      "--plan-panel-height": `${planPanelHeight}px`,
-      "--terminal-panel-height": `${terminalPanelHeight}px`,
-      "--debug-panel-height": `${debugPanelHeight}px`,
-      "--ui-font-family": appSettings.uiFontFamily,
-      "--code-font-family": appSettings.codeFontFamily,
-      "--code-font-size": `${appSettings.codeFontSize}px`,
-      "--sidebar-top-padding": isWindows ? "10px" : "36px",
-      "--right-panel-top-padding": isWindows
-        ? "calc(var(--main-topbar-height, 44px) + 6px)"
-        : "12px",
-      "--home-scroll-offset": isWindows ? "var(--main-topbar-height, 44px)" : "0px",
-      "--window-caption-width": isWindows ? "138px" : "0px",
-      "--window-caption-gap": isWindows ? "10px" : "0px",
-      ...(isWindows
-        ? {
-            "--titlebar-height": "8px",
-            "--titlebar-drag-strip-z-index": "5",
-            "--side-panel-drag-strip-height": "56px",
-            "--window-drag-hit-height": "44px",
-            "--window-drag-strip-pointer-events": "none",
-            "--titlebar-inset-left": "0px",
-            "--titlebar-collapsed-left-extra": "0px",
-            "--titlebar-toggle-size": "32px",
-            "--titlebar-toggle-side-gap": "14px",
-            "--titlebar-toggle-title-offset": "0px",
-            "--titlebar-toggle-offset": "0px",
-          }
-        : {}),
-    } as CSSProperties),
+    () =>
+      ({
+        "--sidebar-width": `${sidebarCollapsed ? 0 : sidebarWidth}px`,
+        "--right-panel-width": `${rightPanelCollapsed ? 0 : rightPanelWidth}px`,
+        "--chat-diff-split-position-percent": `${chatDiffSplitPositionPercent}%`,
+        "--plan-panel-height": `${planPanelHeight}px`,
+        "--terminal-panel-height": `${terminalPanelHeight}px`,
+        "--debug-panel-height": `${debugPanelHeight}px`,
+        "--ui-font-family": appSettings.uiFontFamily,
+        "--code-font-family": appSettings.codeFontFamily,
+        "--code-font-size": `${appSettings.codeFontSize}px`,
+        "--sidebar-top-padding": isWindows ? "10px" : "36px",
+        "--right-panel-top-padding": isWindows
+          ? "calc(var(--main-topbar-height, 44px) + 6px)"
+          : "12px",
+        "--home-scroll-offset": isWindows ? "var(--main-topbar-height, 44px)" : "0px",
+        "--window-caption-width": isWindows ? "138px" : "0px",
+        "--window-caption-gap": isWindows ? "10px" : "0px",
+        ...(isWindows
+          ? {
+              "--titlebar-height": "8px",
+              "--titlebar-drag-strip-z-index": "5",
+              "--side-panel-drag-strip-height": "56px",
+              "--window-drag-hit-height": "44px",
+              "--window-drag-strip-pointer-events": "none",
+              "--titlebar-inset-left": "0px",
+              "--titlebar-collapsed-left-extra": "0px",
+              "--titlebar-toggle-size": "32px",
+              "--titlebar-toggle-side-gap": "14px",
+              "--titlebar-toggle-title-offset": "0px",
+              "--titlebar-toggle-offset": "0px",
+            }
+          : {}),
+      }) as CSSProperties,
     [
       appSettings.codeFontFamily,
       appSettings.codeFontSize,

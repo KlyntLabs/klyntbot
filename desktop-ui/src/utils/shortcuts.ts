@@ -129,8 +129,7 @@ export function formatShortcut(value: string | null | undefined): string {
     ? modifiers
     : modifiers.filter((modifier, index) => modifiers.indexOf(modifier) === index);
   const keyLabel =
-    KEY_LABELS[parsed.key] ??
-    (parsed.key.length === 1 ? parsed.key.toUpperCase() : parsed.key);
+    KEY_LABELS[parsed.key] ?? (parsed.key.length === 1 ? parsed.key.toUpperCase() : parsed.key);
   return useSymbols
     ? [...uniqueModifiers, keyLabel].join("")
     : [...uniqueModifiers, keyLabel].join("+");
@@ -187,11 +186,7 @@ export function matchesShortcut(event: KeyboardEvent, value: string | null | und
     : normalized.meta && !isMac
       ? true
       : !event.ctrlKey;
-  return (
-    ctrlMatches &&
-    normalized.alt === event.altKey &&
-    normalized.shift === event.shiftKey
-  );
+  return ctrlMatches && normalized.alt === event.altKey && normalized.shift === event.shiftKey;
 }
 
 export function isMacPlatform(): boolean {

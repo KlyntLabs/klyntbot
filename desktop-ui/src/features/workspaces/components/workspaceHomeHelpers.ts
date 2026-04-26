@@ -25,10 +25,7 @@ export const buildModelSummary = (
   models: ModelOption[],
   modelSelections: Record<string, number>,
 ) => {
-  const totalInstances = Object.values(modelSelections).reduce(
-    (sum, count) => sum + count,
-    0,
-  );
+  const totalInstances = Object.values(modelSelections).reduce((sum, count) => sum + count, 0);
   const selectedModels = models.filter((model) => modelSelections[model.id]);
   if (selectedModels.length === 0) {
     return "Select models";

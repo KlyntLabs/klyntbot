@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
-import type { DictationModelStatus } from "@/types";
+import { subscribeDictationDownload } from "@services/events";
 import {
   cancelDictationDownload,
   downloadDictationModel,
   getDictationModelStatus,
   removeDictationModel,
 } from "@services/tauri";
-import { subscribeDictationDownload } from "@services/events";
+import { useCallback, useEffect, useState } from "react";
+import type { DictationModelStatus } from "@/types";
 
 type UseDictationModelResult = {
   status: DictationModelStatus | null;

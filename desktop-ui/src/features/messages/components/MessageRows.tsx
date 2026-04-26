@@ -1,6 +1,6 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MouseEvent } from "react";
-import { createPortal } from "react-dom";
+import { exportMarkdownFile } from "@services/tauri";
+import { pushErrorToast } from "@services/toasts";
+import type { ParsedFileLocation } from "@utils/fileLinks";
 import Brain from "lucide-react/dist/esm/icons/brain";
 import Check from "lucide-react/dist/esm/icons/check";
 import Copy from "lucide-react/dist/esm/icons/copy";
@@ -14,28 +14,27 @@ import Terminal from "lucide-react/dist/esm/icons/terminal";
 import Users from "lucide-react/dist/esm/icons/users";
 import Wrench from "lucide-react/dist/esm/icons/wrench";
 import X from "lucide-react/dist/esm/icons/x";
-import { exportMarkdownFile } from "@services/tauri";
-import { pushErrorToast } from "@services/toasts";
-import type { ConversationItem } from "@/types";
-import type { ParsedFileLocation } from "@utils/fileLinks";
+import type { MouseEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { PierreDiffBlock } from "@/features/git/components/PierreDiffBlock";
+import type { ConversationItem } from "@/types";
 import {
-  MAX_COMMAND_OUTPUT_LINES,
   basename,
   buildToolSummary,
   exploreKindLabel,
   formatDurationMs,
   formatToolStatusLabel,
-  normalizeMessageImageSrc,
-  toolNameFromTitle,
-  toolStatusTone,
+  MAX_COMMAND_OUTPUT_LINES,
   type MessageImage,
+  normalizeMessageImageSrc,
   type ParsedReasoning,
   type StatusTone,
   type ToolSummary,
+  toolNameFromTitle,
+  toolStatusTone,
 } from "../utils/messageRenderUtils";
-import { Markdown } from "./Markdown";
-import { isStandaloneMarkdownTable } from "./Markdown";
+import { isStandaloneMarkdownTable, Markdown } from "./Markdown";
 
 type MarkdownFileLinkProps = {
   showMessageFilePath?: boolean;
@@ -164,16 +163,8 @@ const ImageLightbox = memo(function ImageLightbox({
   }
 
   return createPortal(
-    <div
-      className="message-image-lightbox"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="message-image-lightbox-content"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <div className="message-image-lightbox" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="message-image-lightbox-content" onClick={(event) => event.stopPropagation()}>
         <button
           type="button"
           className="message-image-lightbox-close"
@@ -230,16 +221,9 @@ const CommandOutput = memo(function CommandOutput({ output }: CommandOutputProps
 
   return (
     <div className="tool-inline-terminal" role="log" aria-live="polite">
-      <div
-        className="tool-inline-terminal-lines"
-        ref={containerRef}
-        onScroll={handleScroll}
-      >
+      <div className="tool-inline-terminal-lines" ref={containerRef} onScroll={handleScroll}>
         {lineWindow.lines.map((line, index) => (
-          <div
-            key={`${lineWindow.offset + index}-${line}`}
-            className="tool-inline-terminal-line"
-          >
+          <div key={`${lineWindow.offset + index}-${line}`} className="tool-inline-terminal-line">
             {line || " "}
           </div>
         ))}
@@ -331,9 +315,7 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     const intervalSeconds = Math.max(1, Math.ceil(pollingIntervalMs / 1000));
     setPollCountdownSeconds(intervalSeconds);
     const timer = window.setInterval(() => {
-      setPollCountdownSeconds((previous) =>
-        previous <= 1 ? intervalSeconds : previous - 1,
-      );
+      setPollCountdownSeconds((previous) => (previous <= 1 ? intervalSeconds : previous - 1));
     }, 1000);
     return () => {
       window.clearInterval(timer);
@@ -425,7 +407,10 @@ export const MessageRow = memo(function MessageRow({
       return Boolean(element?.closest(".message-quote-button, .message-copy-button"));
     };
 
-    if (isWithinMessageControls(selection.anchorNode) || isWithinMessageControls(selection.focusNode)) {
+    if (
+      isWithinMessageControls(selection.anchorNode) ||
+      isWithinMessageControls(selection.focusNode)
+    ) {
       return null;
     }
     return selectedText;
@@ -447,11 +432,7 @@ export const MessageRow = memo(function MessageRow({
         className={`bubble message-bubble${isTableOnlyAssistantMessage ? " message-bubble-table-only" : ""}`}
       >
         {imageItems.length > 0 && (
-          <MessageImageGrid
-            images={imageItems}
-            onOpen={setLightboxIndex}
-            hasText={hasText}
-          />
+          <MessageImageGrid images={imageItems} onOpen={setLightboxIndex} hasText={hasText} />
         )}
         {hasText && (
           <Markdown
@@ -536,19 +517,13 @@ export const ReasoningRow = memo(function ReasoningRow({
           onClick={() => onToggle(item.id)}
           aria-expanded={isExpanded}
         >
-          <Brain
-            className={`tool-inline-icon ${reasoningTone}`}
-            size={14}
-            aria-hidden
-          />
+          <Brain className={`tool-inline-icon ${reasoningTone}`} size={14} aria-hidden />
           <span className="tool-inline-value">{summaryTitle}</span>
         </button>
         {hasBody && (
           <Markdown
             value={bodyText}
-            className={`reasoning-inline-detail markdown ${
-              isExpanded ? "" : "tool-inline-clamp"
-            }`}
+            className={`reasoning-inline-detail markdown ${isExpanded ? "" : "tool-inline-clamp"}`}
             showFilePath={showMessageFilePath}
             workspacePath={workspacePath}
             onOpenFileLink={onOpenFileLink}
@@ -574,9 +549,7 @@ export const ReviewRow = memo(function ReviewRow({
     <div className="item-card review">
       <div className="review-header">
         <span className="review-title">{title}</span>
-        <span
-          className={`review-badge ${item.state === "started" ? "active" : "done"}`}
-        >
+        <span className={`review-badge ${item.state === "started" ? "active" : "done"}`}>
           Review
         </span>
       </div>
@@ -615,13 +588,10 @@ export const UserInputRow = memo(function UserInputRow({
   onToggle,
 }: UserInputRowProps) {
   const first = item.questions[0];
-  const previewQuestion =
-    first?.question?.trim() || first?.header?.trim() || "Input requested";
+  const previewQuestion = first?.question?.trim() || first?.header?.trim() || "Input requested";
   const firstAnswer = first?.answers[0]?.trim() || "No answer provided";
   const previewAnswer =
-    first && first.answers.length > 1
-      ? `${firstAnswer} +${first.answers.length - 1}`
-      : firstAnswer;
+    first && first.answers.length > 1 ? `${firstAnswer} +${first.answers.length - 1}` : firstAnswer;
   const extraQuestions = Math.max(0, item.questions.length - 1);
 
   return (
@@ -652,10 +622,7 @@ export const UserInputRow = memo(function UserInputRow({
             {item.questions.map((question, index) => {
               const title = question.question || question.header || `Question ${index + 1}`;
               return (
-                <div
-                  key={`${question.id}-${index}`}
-                  className="user-input-inline-entry"
-                >
+                <div key={`${question.id}-${index}`} className="user-input-inline-entry">
                   <div className="user-input-inline-question">{title}</div>
                   {question.answers.length > 0 ? (
                     <div className="user-input-inline-answers">
@@ -669,9 +636,7 @@ export const UserInputRow = memo(function UserInputRow({
                       ))}
                     </div>
                   ) : (
-                    <div className="user-input-inline-empty-answer">
-                      No answer provided.
-                    </div>
+                    <div className="user-input-inline-empty-answer">No answer provided.</div>
                   )}
                 </div>
               );
@@ -697,13 +662,9 @@ export const ToolRow = memo(function ToolRow({
   const isFileChange = item.toolType === "fileChange";
   const isCommand = item.toolType === "commandExecution";
   const isPlan = item.toolType === "plan";
-  const commandText = isCommand
-    ? item.title.replace(/^Command:\s*/i, "").trim()
-    : "";
+  const commandText = isCommand ? item.title.replace(/^Command:\s*/i, "").trim() : "";
   const summary = buildToolSummary(item, commandText);
-  const changeNames = (item.changes ?? [])
-    .map((change) => basename(change.path))
-    .filter(Boolean);
+  const changeNames = (item.changes ?? []).map((change) => basename(change.path)).filter(Boolean);
   const hasChanges = changeNames.length > 0;
   const tone = toolStatusTone(item, hasChanges);
   const ToolIcon = toolIconForSummary(item, summary);
@@ -720,13 +681,11 @@ export const ToolRow = memo(function ToolRow({
       ? `${changeNames[0]} +${changeNames.length - 1}`
       : changeNames[0] || "changes"
     : summary.value;
-  const shouldFadeCommand =
-    isCommand && !isExpanded && (summaryValue?.length ?? 0) > 80;
+  const shouldFadeCommand = isCommand && !isExpanded && (summaryValue?.length ?? 0) > 80;
   const showToolOutput = isExpanded && (!isFileChange || !hasChanges);
   const normalizedStatus = (item.status ?? "").toLowerCase();
   const isCommandRunning = isCommand && /in[_\s-]*progress|running|started/.test(normalizedStatus);
-  const commandDurationMs =
-    typeof item.durationMs === "number" ? item.durationMs : null;
+  const commandDurationMs = typeof item.durationMs === "number" ? item.durationMs : null;
   const isLongRunning = commandDurationMs !== null && commandDurationMs >= 1200;
   const [showLiveOutput, setShowLiveOutput] = useState(false);
   const [isExportingPlan, setIsExportingPlan] = useState(false);
@@ -796,9 +755,7 @@ export const ToolRow = memo(function ToolRow({
           aria-expanded={isExpanded}
         >
           <ToolIcon className={`tool-inline-icon ${tone}`} size={14} aria-hidden />
-          {summaryLabel && (
-            <span className="tool-inline-label">{summaryLabel}:</span>
-          )}
+          {summaryLabel && <span className="tool-inline-label">{summaryLabel}:</span>}
           {summaryValue && (
             <span
               className={`tool-inline-value ${isCommand ? "tool-inline-command" : ""} ${
@@ -818,34 +775,23 @@ export const ToolRow = memo(function ToolRow({
               )}
             </span>
           )}
-          {inlineStatus && (
-            <span className="tool-inline-status">{inlineStatus}</span>
-          )}
+          {inlineStatus && <span className="tool-inline-status">{inlineStatus}</span>}
         </button>
         {isExpanded && summary.detail && !isFileChange && (
           <div className="tool-inline-detail">{summary.detail}</div>
         )}
         {isExpanded && isCommand && item.detail && (
-          <div className="tool-inline-detail tool-inline-muted">
-            cwd: {item.detail}
-          </div>
+          <div className="tool-inline-detail tool-inline-muted">cwd: {item.detail}</div>
         )}
         {isExpanded && isFileChange && hasChanges && (
           <div className="tool-inline-change-list">
             {item.changes?.map((change, index) => (
-              <div
-                key={`${change.path}-${index}`}
-                className="tool-inline-change"
-              >
+              <div key={`${change.path}-${index}`} className="tool-inline-change">
                 <div className="tool-inline-change-header">
                   {change.kind && (
-                    <span className="tool-inline-change-kind">
-                      {change.kind.toUpperCase()}
-                    </span>
+                    <span className="tool-inline-change-kind">{change.kind.toUpperCase()}</span>
                   )}
-                  <span className="tool-inline-change-path">
-                    {basename(change.path)}
-                  </span>
+                  <span className="tool-inline-change-path">{basename(change.path)}</span>
                 </div>
                 {change.diff && (
                   <div className="diff-viewer-output">

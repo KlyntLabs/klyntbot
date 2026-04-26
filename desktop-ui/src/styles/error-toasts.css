@@ -12,11 +12,7 @@
   min-width: 320px;
   max-width: min(560px, calc(100vw - 32px));
   background: color-mix(in srgb, var(--ds-toast-bg) 90%, var(--status-error, #ff4d4f) 10%);
-  border-color: color-mix(
-    in srgb,
-    var(--status-error, #ff4d4f) 42%,
-    var(--ds-toast-border)
-  );
+  border-color: color-mix(in srgb, var(--status-error, #ff4d4f) 42%, var(--ds-toast-border));
   --ds-toast-enter-duration: 0.18s;
 }
 

@@ -1,8 +1,5 @@
+import type { ReviewPromptState, ReviewPromptStep } from "@threads/hooks/useReviewPrompt";
 import { memo, useMemo } from "react";
-import type {
-  ReviewPromptState,
-  ReviewPromptStep,
-} from "@threads/hooks/useReviewPrompt";
 
 type ReviewInlinePromptProps = {
   reviewPrompt: NonNullable<ReviewPromptState>;

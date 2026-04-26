@@ -18,8 +18,7 @@ export function reduceThreadQueue(state: ThreadState, action: ThreadAction): Thr
         ...state,
         approvals: state.approvals.filter(
           (item) =>
-            item.request_id !== action.requestId ||
-            item.workspace_id !== action.workspaceId,
+            item.request_id !== action.requestId || item.workspace_id !== action.workspaceId,
         ),
       };
     case "addUserInputRequest": {
@@ -41,8 +40,7 @@ export function reduceThreadQueue(state: ThreadState, action: ThreadAction): Thr
         ...state,
         userInputRequests: state.userInputRequests.filter(
           (item) =>
-            item.request_id !== action.requestId ||
-            item.workspace_id !== action.workspaceId,
+            item.request_id !== action.requestId || item.workspace_id !== action.workspaceId,
         ),
       };
     default:

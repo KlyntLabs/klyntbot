@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
-import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
+import { check } from "@tauri-apps/plugin-updater";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DebugEntry } from "@/types";
 import {
   buildReleaseTagUrl,
@@ -67,9 +67,7 @@ export function useUpdater({
   onDebug,
 }: UseUpdaterOptions) {
   const [state, setState] = useState<UpdateState>({ stage: "idle" });
-  const [postUpdateNotice, setPostUpdateNotice] = useState<PostUpdateNoticeState>(
-    null,
-  );
+  const [postUpdateNotice, setPostUpdateNotice] = useState<PostUpdateNoticeState>(null);
   const updateRef = useRef<Update | null>(null);
   const hasAttemptedAutoCheckRef = useRef(false);
   const postUpdateFetchGenerationRef = useRef(0);
@@ -91,50 +89,52 @@ export function useUpdater({
     await update?.close();
   }, [clearLatestTimeout]);
 
-  const checkForUpdates = useCallback(async (options?: { announceNoUpdate?: boolean }) => {
-    if (!enabled) {
-      return;
-    }
-    let update: Awaited<ReturnType<typeof check>> | null = null;
-    try {
-      clearLatestTimeout();
-      setState({ stage: "checking" });
-      update = await check();
-      if (!update) {
-        if (options?.announceNoUpdate) {
-          setState({ stage: "latest" });
-          latestTimeoutRef.current = window.setTimeout(() => {
-            latestTimeoutRef.current = null;
-            setState({ stage: "idle" });
-          }, latestToastDurationMs);
-        } else {
-          setState({ stage: "idle" });
-        }
+  const checkForUpdates = useCallback(
+    async (options?: { announceNoUpdate?: boolean }) => {
+      if (!enabled) {
         return;
       }
+      let update: Awaited<ReturnType<typeof check>> | null = null;
+      try {
+        clearLatestTimeout();
+        setState({ stage: "checking" });
+        update = await check();
+        if (!update) {
+          if (options?.announceNoUpdate) {
+            setState({ stage: "latest" });
+            latestTimeoutRef.current = window.setTimeout(() => {
+              latestTimeoutRef.current = null;
+              setState({ stage: "idle" });
+            }, latestToastDurationMs);
+          } else {
+            setState({ stage: "idle" });
+          }
+          return;
+        }
 
-      updateRef.current = update;
-      setState({
-        stage: "available",
-        version: update.version,
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : JSON.stringify(error);
-      onDebug?.({
-        id: `${Date.now()}-client-updater-error`,
-        timestamp: Date.now(),
-        source: "error",
-        label: "updater/error",
-        payload: message,
-      });
-      setState({ stage: "error", error: message });
-    } finally {
-      if (!updateRef.current) {
-        await update?.close();
+        updateRef.current = update;
+        setState({
+          stage: "available",
+          version: update.version,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : JSON.stringify(error);
+        onDebug?.({
+          id: `${Date.now()}-client-updater-error`,
+          timestamp: Date.now(),
+          source: "error",
+          label: "updater/error",
+          payload: message,
+        });
+        setState({ stage: "error", error: message });
+      } finally {
+        if (!updateRef.current) {
+          await update?.close();
+        }
       }
-    }
-  }, [clearLatestTimeout, enabled, onDebug]);
+    },
+    [clearLatestTimeout, enabled, onDebug],
+  );
 
   const startUpdate = useCallback(async () => {
     if (!enabled) {
@@ -171,8 +171,7 @@ export function useUpdater({
             ...prev,
             progress: {
               totalBytes: prev.progress?.totalBytes,
-              downloadedBytes:
-                (prev.progress?.downloadedBytes ?? 0) + event.data.chunkLength,
+              downloadedBytes: (prev.progress?.downloadedBytes ?? 0) + event.data.chunkLength,
             },
           }));
           return;
@@ -193,8 +192,7 @@ export function useUpdater({
       savePendingPostUpdateVersion(update.version);
       await relaunch();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : JSON.stringify(error);
+      const message = error instanceof Error ? error.message : JSON.stringify(error);
       onDebug?.({
         id: `${Date.now()}-client-updater-error`,
         timestamp: Date.now(),
@@ -232,10 +230,7 @@ export function useUpdater({
 
     const normalizedPendingVersion = normalizeReleaseVersion(pendingVersion);
     const normalizedCurrentVersion = normalizeReleaseVersion(__APP_VERSION__);
-    if (
-      !normalizedPendingVersion ||
-      normalizedPendingVersion !== normalizedCurrentVersion
-    ) {
+    if (!normalizedPendingVersion || normalizedPendingVersion !== normalizedCurrentVersion) {
       clearPendingPostUpdateVersion();
       return;
     }
@@ -252,10 +247,7 @@ export function useUpdater({
 
     void fetchReleaseNotesForVersion(normalizedPendingVersion)
       .then((releaseInfo) => {
-        if (
-          cancelled ||
-          postUpdateFetchGenerationRef.current !== generation
-        ) {
+        if (cancelled || postUpdateFetchGenerationRef.current !== generation) {
           return;
         }
         if (releaseInfo.body) {
@@ -274,14 +266,10 @@ export function useUpdater({
         });
       })
       .catch((error) => {
-        if (
-          cancelled ||
-          postUpdateFetchGenerationRef.current !== generation
-        ) {
+        if (cancelled || postUpdateFetchGenerationRef.current !== generation) {
           return;
         }
-        const message =
-          error instanceof Error ? error.message : JSON.stringify(error);
+        const message = error instanceof Error ? error.message : JSON.stringify(error);
         onDebug?.({
           id: `${Date.now()}-client-updater-release-notes-error`,
           timestamp: Date.now(),

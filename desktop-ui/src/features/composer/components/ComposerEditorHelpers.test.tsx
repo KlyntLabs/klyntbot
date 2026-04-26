@@ -112,9 +112,7 @@ describe("Composer editor helpers", () => {
     textarea.setSelectionRange(5, 5);
 
     await act(async () => {
-      textarea.dispatchEvent(
-        new KeyboardEvent("keydown", { key: " ", bubbles: true }),
-      );
+      textarea.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
     });
 
     expect(getTextarea(harness.container).value).toBe("```ts\n\n```");
@@ -155,8 +153,7 @@ describe("Composer editor helpers", () => {
     const event = new Event("paste", { bubbles: true, cancelable: true });
     Object.defineProperty(event, "clipboardData", {
       value: {
-        getData: (type: string) =>
-          type === "text/plain" ? "line one\nline two" : "",
+        getData: (type: string) => (type === "text/plain" ? "line one\nline two" : ""),
         items: [],
       },
     });
@@ -165,9 +162,7 @@ describe("Composer editor helpers", () => {
       textarea.dispatchEvent(event);
     });
 
-    expect(getTextarea(harness.container).value).toBe(
-      "```\nline one\nline two\n```",
-    );
+    expect(getTextarea(harness.container).value).toBe("```\nline one\nline two\n```");
 
     harness.unmount();
   });

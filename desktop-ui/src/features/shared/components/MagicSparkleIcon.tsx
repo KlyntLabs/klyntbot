@@ -3,10 +3,7 @@ type MagicSparkleIconProps = {
   size?: number;
 };
 
-export function MagicSparkleIcon({
-  className,
-  size = 14,
-}: MagicSparkleIconProps) {
+export function MagicSparkleIcon({ className, size = 14 }: MagicSparkleIconProps) {
   return (
     <svg
       className={className}
@@ -31,10 +28,7 @@ export function MagicSparkleIcon({
   );
 }
 
-export function MagicSparkleLoaderIcon({
-  className,
-  size = 14,
-}: MagicSparkleIconProps) {
+export function MagicSparkleLoaderIcon({ className, size = 14 }: MagicSparkleIconProps) {
   return (
     <svg
       className={className}

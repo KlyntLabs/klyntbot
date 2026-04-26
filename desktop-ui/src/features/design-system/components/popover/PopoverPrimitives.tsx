@@ -1,9 +1,4 @@
-import {
-  forwardRef,
-  type ComponentPropsWithoutRef,
-  type ReactNode,
-  type RefObject,
-} from "react";
+import { type ComponentPropsWithoutRef, forwardRef, type ReactNode, type RefObject } from "react";
 import { joinClassNames } from "../classNames";
 
 type PopoverSurfaceProps = ComponentPropsWithoutRef<"div"> & {

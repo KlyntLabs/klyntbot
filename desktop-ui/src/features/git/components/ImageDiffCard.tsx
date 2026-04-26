@@ -1,6 +1,6 @@
-import { memo, useMemo } from "react";
 import ImageOff from "lucide-react/dist/esm/icons/image-off";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
+import { memo, useMemo } from "react";
 import { splitPath } from "./GitDiffPanel.utils";
 
 type ImageDiffCardProps = {
@@ -46,23 +46,17 @@ export const ImageDiffCard = memo(function ImageDiffCard({
 }: ImageDiffCardProps) {
   const { name: fileName, dir } = useMemo(() => splitPath(path), [path]);
   const displayDir = dir ? `${dir}/` : "";
-  const oldDataUri = useMemo(
-    () => {
-      if (!oldImageData) return null;
-      const mimeType = oldImageMime ?? getImageMimeType(path);
-      return `data:${mimeType};base64,${oldImageData}`;
-    },
-    [oldImageData, oldImageMime, path],
-  );
+  const oldDataUri = useMemo(() => {
+    if (!oldImageData) return null;
+    const mimeType = oldImageMime ?? getImageMimeType(path);
+    return `data:${mimeType};base64,${oldImageData}`;
+  }, [oldImageData, oldImageMime, path]);
 
-  const newDataUri = useMemo(
-    () => {
-      if (!newImageData) return null;
-      const mimeType = newImageMime ?? getImageMimeType(path);
-      return `data:${mimeType};base64,${newImageData}`;
-    },
-    [newImageData, newImageMime, path],
-  );
+  const newDataUri = useMemo(() => {
+    if (!newImageData) return null;
+    const mimeType = newImageMime ?? getImageMimeType(path);
+    return `data:${mimeType};base64,${newImageData}`;
+  }, [newImageData, newImageMime, path]);
 
   const oldSize = useMemo(() => {
     if (!oldImageData) return null;
@@ -121,11 +115,7 @@ export const ImageDiffCard = memo(function ImageDiffCard({
           <div className="image-diff-side-by-side">
             <div className="image-diff-pane image-diff-pane-old">
               {oldDataUri ? (
-                <img
-                  src={oldDataUri}
-                  alt="Previous version"
-                  className="image-diff-preview"
-                />
+                <img src={oldDataUri} alt="Previous version" className="image-diff-preview" />
               ) : (
                 renderPlaceholder()
               )}
@@ -133,11 +123,7 @@ export const ImageDiffCard = memo(function ImageDiffCard({
             </div>
             <div className="image-diff-pane image-diff-pane-new">
               {newDataUri ? (
-                <img
-                  src={newDataUri}
-                  alt="Current version"
-                  className="image-diff-preview"
-                />
+                <img src={newDataUri} alt="Current version" className="image-diff-preview" />
               ) : (
                 renderPlaceholder()
               )}
@@ -149,11 +135,7 @@ export const ImageDiffCard = memo(function ImageDiffCard({
           <div className="image-diff-single">
             <div className="image-diff-pane image-diff-pane-new">
               {newDataUri ? (
-                <img
-                  src={newDataUri}
-                  alt="New image"
-                  className="image-diff-preview"
-                />
+                <img src={newDataUri} alt="New image" className="image-diff-preview" />
               ) : (
                 renderPlaceholder()
               )}
@@ -165,11 +147,7 @@ export const ImageDiffCard = memo(function ImageDiffCard({
           <div className="image-diff-single">
             <div className="image-diff-pane image-diff-pane-old">
               {oldDataUri ? (
-                <img
-                  src={oldDataUri}
-                  alt="Deleted image"
-                  className="image-diff-preview"
-                />
+                <img src={oldDataUri} alt="Deleted image" className="image-diff-preview" />
               ) : (
                 renderPlaceholder()
               )}

@@ -42,9 +42,7 @@ export function TerminalDock({
           {terminals.map((tab) => (
             <button
               key={tab.id}
-              className={`terminal-tab${
-                tab.id === activeTerminalId ? " active" : ""
-              }`}
+              className={`terminal-tab${tab.id === activeTerminalId ? " active" : ""}`}
               type="button"
               role="tab"
               aria-selected={tab.id === activeTerminalId}

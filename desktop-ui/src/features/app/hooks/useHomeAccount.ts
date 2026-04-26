@@ -1,10 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type {
-  AccountSnapshot,
-  RateLimitSnapshot,
-  ThreadSummary,
-  WorkspaceInfo,
-} from "@/types";
+import type { AccountSnapshot, RateLimitSnapshot, ThreadSummary, WorkspaceInfo } from "@/types";
 
 type UseHomeAccountArgs = {
   showHome: boolean;
@@ -32,9 +27,7 @@ type AggregateHomeAccountSelectionState = {
   isCommitted: boolean;
 };
 
-function hasUsableAccountSnapshot(
-  account: AccountSnapshot | null | undefined,
-): boolean {
+function hasUsableAccountSnapshot(account: AccountSnapshot | null | undefined): boolean {
   if (!account) {
     return false;
   }
@@ -46,9 +39,7 @@ function hasUsableAccountSnapshot(
   );
 }
 
-function hasUsableRateLimitSnapshot(
-  rateLimits: RateLimitSnapshot | null | undefined,
-): boolean {
+function hasUsableRateLimitSnapshot(rateLimits: RateLimitSnapshot | null | undefined): boolean {
   if (!rateLimits) {
     return false;
   }
@@ -60,9 +51,7 @@ function hasUsableRateLimitSnapshot(
     Boolean(rateLimits.planType?.trim()) ||
     Boolean(
       rateLimits.credits &&
-        (rateLimits.credits.hasCredits ||
-          rateLimits.credits.unlimited ||
-          balance.length > 0),
+        (rateLimits.credits.hasCredits || rateLimits.credits.unlimited || balance.length > 0),
     )
   );
 }
@@ -120,11 +109,7 @@ function canRetainAggregateHomeAccountWorkspaceId(
   if (
     aggregateThreadListsSettled &&
     !workspace.connected &&
-    hasConnectedWorkspaceWithAccountData(
-      workspaces,
-      rateLimitsByWorkspace,
-      accountByWorkspace,
-    )
+    hasConnectedWorkspaceWithAccountData(workspaces, rateLimitsByWorkspace, accountByWorkspace)
   ) {
     return false;
   }
@@ -141,9 +126,10 @@ function haveAggregateThreadListsSettled(
     return true;
   }
 
-  return connectedWorkspaces.every((workspace) =>
-    Object.prototype.hasOwnProperty.call(threadListLoadingByWorkspace, workspace.id) &&
-    threadListLoadingByWorkspace[workspace.id] === false,
+  return connectedWorkspaces.every(
+    (workspace) =>
+      Object.hasOwn(threadListLoadingByWorkspace, workspace.id) &&
+      threadListLoadingByWorkspace[workspace.id] === false,
   );
 }
 
@@ -156,9 +142,7 @@ export function resolveHomeAccountWorkspaceId({
 }: ResolveHomeAccountWorkspaceIdArgs): string | null {
   const workspaceHasCurrentAccountData = (workspace: WorkspaceInfo) =>
     workspaceHasAccountData(workspace, rateLimitsByWorkspace, accountByWorkspace);
-  const workspaceIndexById = new Map(
-    workspaces.map((workspace, index) => [workspace.id, index]),
-  );
+  const workspaceIndexById = new Map(workspaces.map((workspace, index) => [workspace.id, index]));
   const workspaceLatestThreadUpdatedAtById = new Map(
     workspaces.map((workspace) => [
       workspace.id,
@@ -221,13 +205,7 @@ export function useHomeAccount({
         rateLimitsByWorkspace,
         accountByWorkspace,
       }),
-    [
-      usageWorkspaceId,
-      workspaces,
-      threadsByWorkspace,
-      rateLimitsByWorkspace,
-      accountByWorkspace,
-    ],
+    [usageWorkspaceId, workspaces, threadsByWorkspace, rateLimitsByWorkspace, accountByWorkspace],
   );
 
   useEffect(() => {
@@ -315,16 +293,15 @@ export function useHomeAccount({
   ]);
 
   const homeAccountWorkspace = useMemo(
-    () =>
-      workspaces.find((workspace) => workspace.id === stableHomeAccountWorkspaceId) ?? null,
+    () => workspaces.find((workspace) => workspace.id === stableHomeAccountWorkspaceId) ?? null,
     [stableHomeAccountWorkspaceId, workspaces],
   );
 
   const stableHomeAccount = stableHomeAccountWorkspaceId
-    ? accountByWorkspace[stableHomeAccountWorkspaceId] ?? null
+    ? (accountByWorkspace[stableHomeAccountWorkspaceId] ?? null)
     : null;
   const stableHomeRateLimits = stableHomeAccountWorkspaceId
-    ? rateLimitsByWorkspace[stableHomeAccountWorkspaceId] ?? null
+    ? (rateLimitsByWorkspace[stableHomeAccountWorkspaceId] ?? null)
     : null;
 
   useEffect(() => {
@@ -333,11 +310,7 @@ export function useHomeAccount({
     }
     void refreshAccountInfoRef.current(stableHomeAccountWorkspaceId);
     void refreshAccountRateLimitsRef.current(stableHomeAccountWorkspaceId);
-  }, [
-    homeAccountWorkspace?.connected,
-    showHome,
-    stableHomeAccountWorkspaceId,
-  ]);
+  }, [homeAccountWorkspace?.connected, showHome, stableHomeAccountWorkspaceId]);
 
   return {
     homeAccountWorkspace,

@@ -1,8 +1,5 @@
 import type { LaunchScriptIconId } from "../utils/launchScriptIcons";
-import {
-  LAUNCH_SCRIPT_ICON_OPTIONS,
-  getLaunchScriptIcon,
-} from "../utils/launchScriptIcons";
+import { getLaunchScriptIcon, LAUNCH_SCRIPT_ICON_OPTIONS } from "../utils/launchScriptIcons";
 
 type LaunchScriptIconPickerProps = {
   value: LaunchScriptIconId;

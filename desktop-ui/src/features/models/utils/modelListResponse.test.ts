@@ -5,9 +5,7 @@ describe("parseModelListResponse", () => {
   it("uses displayName when present", () => {
     const response = {
       result: {
-        data: [
-          { id: "m1", model: "gpt-5.3-codex-spark", displayName: "GPT-5.3-Codex-Spark" },
-        ],
+        data: [{ id: "m1", model: "gpt-5.3-codex-spark", displayName: "GPT-5.3-Codex-Spark" }],
       },
     };
     const [model] = parseModelListResponse(response);

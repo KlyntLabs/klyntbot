@@ -65,15 +65,11 @@ export function normalizeItem(item: ConversationItem): ConversationItem {
       ...item,
       title: truncateText(item.title, 200),
       detail: truncateText(item.detail, 2000),
-      output: item.output
-        ? truncateToolText(item.toolType, item.output)
-        : item.output,
+      output: item.output ? truncateToolText(item.toolType, item.output) : item.output,
       changes: item.changes
         ? item.changes.map((change) => ({
             ...change,
-            diff: change.diff
-              ? truncateToolText(item.toolType, change.diff)
-              : change.diff,
+            diff: change.diff ? truncateToolText(item.toolType, change.diff) : change.diff,
           }))
         : item.changes,
     };
@@ -90,9 +86,7 @@ function cleanCommandText(commandText: string) {
     /^(?:\/\S+\/)?(?:bash|zsh|sh|fish)(?:\.exe)?\s+-lc\s+(?:(['"])([\s\S]+)\1|([\s\S]+))$/,
   );
   const inner = shellMatch ? (shellMatch[2] ?? shellMatch[3] ?? "") : trimmed;
-  const cdMatch = inner.match(
-    /^\s*cd\s+[^&;]+(?:\s*&&\s*|\s*;\s*)([\s\S]+)$/i,
-  );
+  const cdMatch = inner.match(/^\s*cd\s+[^&;]+(?:\s*&&\s*|\s*;\s*)([\s\S]+)$/i);
   const stripped = cdMatch ? cdMatch[1] : inner;
   return stripped.trim();
 }
@@ -189,9 +183,7 @@ function findPathTokens(tokens: string[]) {
 
 function normalizeCommandStatus(status?: string) {
   const normalized = (status ?? "").toLowerCase();
-  return /(pending|running|processing|started|in[_ -]?progress|inprogress)/.test(
-    normalized,
-  )
+  return /(pending|running|processing|started|in[_ -]?progress|inprogress)/.test(normalized)
     ? "exploring"
     : "explored";
 }
@@ -215,8 +207,7 @@ function parseSearch(tokens: string[]): ExploreEntry | null {
   }
   const query = positional[0];
   const rawPath = positional.length > 1 ? positional[1] : "";
-  const path =
-    commandName === "rg" ? rawPath : rawPath && isPathLike(rawPath) ? rawPath : "";
+  const path = commandName === "rg" ? rawPath : rawPath && isPathLike(rawPath) ? rawPath : "";
   const label = path ? `${query} in ${path}` : query;
   return { kind: "search", label };
 }
@@ -376,10 +367,7 @@ function summarizeExploration(items: ConversationItem[]) {
   return result;
 }
 
-export function prepareThreadItems(
-  items: ConversationItem[],
-  options?: PrepareThreadItemsOptions,
-) {
+export function prepareThreadItems(items: ConversationItem[], options?: PrepareThreadItemsOptions) {
   const filtered: ConversationItem[] = [];
   for (const item of items) {
     const last = filtered[filtered.length - 1];

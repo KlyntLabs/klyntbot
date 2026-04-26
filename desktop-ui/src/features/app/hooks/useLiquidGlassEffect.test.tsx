@@ -1,9 +1,10 @@
 /** @vitest-environment jsdom */
-import { renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { useLiquidGlassEffect } from "./useLiquidGlassEffect";
-import { isGlassSupported, setLiquidGlassEffect } from "tauri-plugin-liquid-glass-api";
+
 import { Effect, EffectState, getCurrentWindow } from "@tauri-apps/api/window";
+import { renderHook, waitFor } from "@testing-library/react";
+import { isGlassSupported, setLiquidGlassEffect } from "tauri-plugin-liquid-glass-api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useLiquidGlassEffect } from "./useLiquidGlassEffect";
 
 vi.mock("tauri-plugin-liquid-glass-api", () => ({
   isGlassSupported: vi.fn(),
@@ -68,9 +69,7 @@ describe("useLiquidGlassEffect", () => {
 
     await waitFor(() => {
       expect(mockSetEffects).toHaveBeenCalledWith({ effects: [] });
-      expect(setLiquidGlassEffect).toHaveBeenCalledWith(
-        expect.objectContaining({ enabled: true })
-      );
+      expect(setLiquidGlassEffect).toHaveBeenCalledWith(expect.objectContaining({ enabled: true }));
     });
   });
 
@@ -99,7 +98,7 @@ describe("useLiquidGlassEffect", () => {
       expect(mockSetEffects).toHaveBeenCalledWith(
         expect.objectContaining({
           effects: [Effect.HudWindow],
-        })
+        }),
       );
     });
   });
@@ -114,7 +113,7 @@ describe("useLiquidGlassEffect", () => {
       expect(mockSetEffects).toHaveBeenCalledWith(
         expect.objectContaining({
           effects: [Effect.HudWindow],
-        })
+        }),
       );
     });
   });

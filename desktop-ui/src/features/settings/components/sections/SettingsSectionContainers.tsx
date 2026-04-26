@@ -1,3 +1,7 @@
+import type { CodexSection } from "@settings/components/settingsTypes";
+import type { SettingsViewOrchestration } from "@settings/hooks/useSettingsViewOrchestration";
+import { SettingsAboutSection } from "./SettingsAboutSection";
+import { SettingsAgentsSection } from "./SettingsAgentsSection";
 import { SettingsCodexSection } from "./SettingsCodexSection";
 import { SettingsComposerSection } from "./SettingsComposerSection";
 import { SettingsDictationSection } from "./SettingsDictationSection";
@@ -9,10 +13,6 @@ import { SettingsOpenAppsSection } from "./SettingsOpenAppsSection";
 import { SettingsProjectsSection } from "./SettingsProjectsSection";
 import { SettingsServerSection } from "./SettingsServerSection";
 import { SettingsShortcutsSection } from "./SettingsShortcutsSection";
-import { SettingsAgentsSection } from "./SettingsAgentsSection";
-import { SettingsAboutSection } from "./SettingsAboutSection";
-import type { CodexSection } from "@settings/components/settingsTypes";
-import type { SettingsViewOrchestration } from "@settings/hooks/useSettingsViewOrchestration";
 
 type SettingsSectionContainersProps = {
   activeSection: CodexSection;

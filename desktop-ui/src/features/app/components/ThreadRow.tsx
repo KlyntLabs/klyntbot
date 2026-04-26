@@ -1,7 +1,6 @@
-import type { CSSProperties, MouseEvent } from "react";
-
-import type { ThreadSummary } from "@/types";
 import { getThreadStatusClass, type ThreadStatusById } from "@utils/threadStatus";
+import type { CSSProperties, MouseEvent } from "react";
+import type { ThreadSummary } from "@/types";
 
 function hashString(value: string) {
   let hash = 0;
@@ -95,25 +94,14 @@ export function ThreadRow({
         : thread.modelId
       : null;
   const indentStyle =
-    depth > 0
-      ? ({ "--thread-indent": `${depth * indentUnit}px` } as CSSProperties)
-      : undefined;
-  const hasPendingUserInput = Boolean(
-    pendingUserInputKeys?.has(`${workspaceId}:${thread.id}`),
-  );
-  const statusClass = getThreadStatusClass(
-    threadStatusById[thread.id],
-    hasPendingUserInput,
-  );
+    depth > 0 ? ({ "--thread-indent": `${depth * indentUnit}px` } as CSSProperties) : undefined;
+  const hasPendingUserInput = Boolean(pendingUserInputKeys?.has(`${workspaceId}:${thread.id}`));
+  const statusClass = getThreadStatusClass(threadStatusById[thread.id], hasPendingUserInput);
   const statusLabel =
-    statusClass === "reviewing"
-      ? "Reviewing"
-      : hasPendingUserInput
-        ? "Waiting"
-        : null;
+    statusClass === "reviewing" ? "Reviewing" : hasPendingUserInput ? "Waiting" : null;
   const subagentLabel =
     thread.isSubagent && (thread.subagentNickname || thread.subagentRole)
-      ? thread.subagentNickname ?? thread.subagentRole ?? null
+      ? (thread.subagentNickname ?? thread.subagentRole ?? null)
       : null;
   const subagentTitle =
     thread.subagentNickname && thread.subagentRole
@@ -124,12 +112,7 @@ export function ThreadRow({
       ? formatSubagentRoleLabel(thread.subagentRole)
       : null;
   const subagentPillStyle = subagentLabel
-    ? getSubagentPillToneStyle(
-        workspaceId,
-        thread.subagentNickname,
-        thread.subagentRole,
-        thread.id,
-      )
+    ? getSubagentPillToneStyle(workspaceId, thread.subagentNickname, thread.subagentRole, thread.id)
     : undefined;
   const effectiveWorkspaceLabel = depth > 0 ? null : workspaceLabel;
   const contextLabel = badge ?? modelBadge;
@@ -143,9 +126,7 @@ export function ThreadRow({
   return (
     <div
       className={`thread-row ${
-        workspaceId === activeWorkspaceId && thread.id === activeThreadId
-          ? "active"
-          : ""
+        workspaceId === activeWorkspaceId && thread.id === activeThreadId ? "active" : ""
       }${hasDetails ? " has-details" : ""}${
         hasDetails ? " has-secondary-line" : ""
       }${canToggleSubagents ? " has-subagent-children" : ""}${

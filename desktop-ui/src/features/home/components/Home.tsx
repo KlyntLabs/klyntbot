@@ -1,16 +1,8 @@
-import type {
-  AccountSnapshot,
-  LocalUsageSnapshot,
-  RateLimitSnapshot,
-} from "@/types";
+import type { AccountSnapshot, LocalUsageSnapshot, RateLimitSnapshot } from "@/types";
+import type { LatestAgentRun, UsageMetric, UsageWorkspaceOption } from "../homeTypes";
 import { HomeActions } from "./HomeActions";
 import { HomeLatestAgentsSection } from "./HomeLatestAgentsSection";
 import { HomeUsageSection } from "./HomeUsageSection";
-import type {
-  LatestAgentRun,
-  UsageMetric,
-  UsageWorkspaceOption,
-} from "../homeTypes";
 
 type HomeProps = {
   onAddWorkspace: () => void;
@@ -55,19 +47,14 @@ export function Home({
     <div className="home">
       <div className="home-hero">
         <div className="home-title">Klynt</div>
-        <div className="home-subtitle">
-          Orchestrate agents across your local projects.
-        </div>
+        <div className="home-subtitle">Orchestrate agents across your local projects.</div>
       </div>
       <HomeLatestAgentsSection
         latestAgentRuns={latestAgentRuns}
         isLoadingLatestAgents={isLoadingLatestAgents}
         onSelectThread={onSelectThread}
       />
-      <HomeActions
-        onAddWorkspace={onAddWorkspace}
-        onAddWorkspaceFromUrl={onAddWorkspaceFromUrl}
-      />
+      <HomeActions onAddWorkspace={onAddWorkspace} onAddWorkspaceFromUrl={onAddWorkspaceFromUrl} />
       <HomeUsageSection
         accountInfo={accountInfo}
         accountRateLimits={accountRateLimits}

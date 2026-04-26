@@ -14,11 +14,7 @@ export function PlanReadyFollowupMessage({
 
   return (
     <div className="message request-user-input-message">
-      <div
-        className="bubble request-user-input-card"
-        role="group"
-        aria-label="Plan ready"
-      >
+      <div className="bubble request-user-input-card" role="group" aria-label="Plan ready">
         <div className="request-user-input-header">
           <div className="request-user-input-title">Plan ready</div>
         </div>

@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ask, message } from "@tauri-apps/plugin-dialog";
-import type { WorkspaceInfo } from "@/types";
-import { isMobilePlatform } from "@utils/platformPaths";
 import { pickWorkspacePaths } from "@services/tauri";
+import { ask, message } from "@tauri-apps/plugin-dialog";
+import { isMobilePlatform } from "@utils/platformPaths";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AddWorkspacesFromPathsResult } from "@/features/workspaces/hooks/useWorkspaceCrud";
+import type { WorkspaceInfo } from "@/types";
 
 const RECENT_REMOTE_WORKSPACE_PATHS_STORAGE_KEY = "mobile-remote-workspace-recent-paths";
 const RECENT_REMOTE_WORKSPACE_PATHS_LIMIT = 5;
@@ -67,10 +67,7 @@ function persistRecentRemoteWorkspacePaths(paths: string[]) {
   if (typeof window === "undefined") {
     return;
   }
-  window.localStorage.setItem(
-    RECENT_REMOTE_WORKSPACE_PATHS_STORAGE_KEY,
-    JSON.stringify(paths),
-  );
+  window.localStorage.setItem(RECENT_REMOTE_WORKSPACE_PATHS_STORAGE_KEY, JSON.stringify(paths));
 }
 
 function mergeRecentRemoteWorkspacePaths(current: string[], nextPaths: string[]): string[] {
@@ -101,9 +98,7 @@ export function useWorkspaceDialogs() {
   >(() => loadRecentRemoteWorkspacePaths());
   const [mobileRemoteWorkspacePathPrompt, setMobileRemoteWorkspacePathPrompt] =
     useState<MobileRemoteWorkspacePathPromptState>(null);
-  const mobileRemoteWorkspacePathResolveRef = useRef<((paths: string[]) => void) | null>(
-    null,
-  );
+  const mobileRemoteWorkspacePathResolveRef = useRef<((paths: string[]) => void) | null>(null);
 
   const resolveMobileRemoteWorkspacePathRequest = useCallback((paths: string[]) => {
     const resolve = mobileRemoteWorkspacePathResolveRef.current;
@@ -200,77 +195,71 @@ export function useWorkspaceDialogs() {
     };
   }, [resolveMobileRemoteWorkspacePathRequest]);
 
-  const requestWorkspacePaths = useCallback(async (backendMode?: string) => {
-    if (isMobilePlatform() && backendMode === "remote") {
-      return requestMobileRemoteWorkspacePaths();
-    }
-    return pickWorkspacePaths();
-  }, [requestMobileRemoteWorkspacePaths]);
-
-  const showAddWorkspacesResult = useCallback(
-    async (result: AddWorkspacesFromPathsResult) => {
-      const hasIssues =
-        result.skippedExisting.length > 0 ||
-        result.skippedInvalid.length > 0 ||
-        result.failures.length > 0;
-      if (!hasIssues) {
-        return;
+  const requestWorkspacePaths = useCallback(
+    async (backendMode?: string) => {
+      if (isMobilePlatform() && backendMode === "remote") {
+        return requestMobileRemoteWorkspacePaths();
       }
-
-      const lines: string[] = [];
-      lines.push(
-        `Added ${result.added.length} workspace${result.added.length === 1 ? "" : "s"}.`,
-      );
-      if (result.skippedExisting.length > 0) {
-        lines.push(
-          `Skipped ${result.skippedExisting.length} already added workspace${
-            result.skippedExisting.length === 1 ? "" : "s"
-          }.`,
-        );
-      }
-      if (result.skippedInvalid.length > 0) {
-        lines.push(
-          `Skipped ${result.skippedInvalid.length} invalid path${
-            result.skippedInvalid.length === 1 ? "" : "s"
-          } (not a folder).`,
-        );
-      }
-      if (result.failures.length > 0) {
-        lines.push(
-          `Failed to add ${result.failures.length} workspace${
-            result.failures.length === 1 ? "" : "s"
-          }.`,
-        );
-        const details = result.failures
-          .slice(0, 3)
-          .map(({ path, message: failureMessage }) => `- ${path}: ${failureMessage}`);
-        if (result.failures.length > 3) {
-          details.push(`- …and ${result.failures.length - 3} more`);
-        }
-        lines.push("");
-        lines.push("Failures:");
-        lines.push(...details);
-      }
-
-      const title =
-        result.failures.length > 0
-          ? "Some workspaces failed to add"
-          : "Some workspaces were skipped";
-      await message(lines.join("\n"), {
-        title,
-        kind: result.failures.length > 0 ? "error" : "warning",
-      });
+      return pickWorkspacePaths();
     },
-    [],
+    [requestMobileRemoteWorkspacePaths],
   );
+
+  const showAddWorkspacesResult = useCallback(async (result: AddWorkspacesFromPathsResult) => {
+    const hasIssues =
+      result.skippedExisting.length > 0 ||
+      result.skippedInvalid.length > 0 ||
+      result.failures.length > 0;
+    if (!hasIssues) {
+      return;
+    }
+
+    const lines: string[] = [];
+    lines.push(`Added ${result.added.length} workspace${result.added.length === 1 ? "" : "s"}.`);
+    if (result.skippedExisting.length > 0) {
+      lines.push(
+        `Skipped ${result.skippedExisting.length} already added workspace${
+          result.skippedExisting.length === 1 ? "" : "s"
+        }.`,
+      );
+    }
+    if (result.skippedInvalid.length > 0) {
+      lines.push(
+        `Skipped ${result.skippedInvalid.length} invalid path${
+          result.skippedInvalid.length === 1 ? "" : "s"
+        } (not a folder).`,
+      );
+    }
+    if (result.failures.length > 0) {
+      lines.push(
+        `Failed to add ${result.failures.length} workspace${
+          result.failures.length === 1 ? "" : "s"
+        }.`,
+      );
+      const details = result.failures
+        .slice(0, 3)
+        .map(({ path, message: failureMessage }) => `- ${path}: ${failureMessage}`);
+      if (result.failures.length > 3) {
+        details.push(`- …and ${result.failures.length - 3} more`);
+      }
+      lines.push("");
+      lines.push("Failures:");
+      lines.push(...details);
+    }
+
+    const title =
+      result.failures.length > 0 ? "Some workspaces failed to add" : "Some workspaces were skipped";
+    await message(lines.join("\n"), {
+      title,
+      kind: result.failures.length > 0 ? "error" : "warning",
+    });
+  }, []);
 
   const confirmWorkspaceRemoval = useCallback(
     async (workspaces: WorkspaceInfo[], workspaceId: string) => {
       const workspace = workspaces.find((entry) => entry.id === workspaceId);
       const workspaceName = workspace?.name || "this workspace";
-      const worktreeCount = workspaces.filter(
-        (entry) => entry.parentId === workspaceId,
-      ).length;
+      const worktreeCount = workspaces.filter((entry) => entry.parentId === workspaceId).length;
       const detail =
         worktreeCount > 0
           ? `\n\nThis will also delete ${worktreeCount} worktree${

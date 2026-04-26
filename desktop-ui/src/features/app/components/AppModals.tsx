@@ -1,13 +1,13 @@
-import { lazy, memo, Suspense } from "react";
-import type { ComponentType } from "react";
-import type { BranchInfo, WorkspaceInfo } from "@/types";
 import type { SettingsViewProps } from "@settings/components/SettingsView";
-import { useRenameThreadPrompt } from "@threads/hooks/useRenameThreadPrompt";
-import { useClonePrompt } from "@/features/workspaces/hooks/useClonePrompt";
-import { useWorktreePrompt } from "@/features/workspaces/hooks/useWorktreePrompt";
-import { useWorkspaceFromUrlPrompt } from "@/features/workspaces/hooks/useWorkspaceFromUrlPrompt";
+import type { useRenameThreadPrompt } from "@threads/hooks/useRenameThreadPrompt";
+import type { ComponentType } from "react";
+import { lazy, memo, Suspense } from "react";
 import type { BranchSwitcherState } from "@/features/git/hooks/useBranchSwitcher";
 import { useGitBranches } from "@/features/git/hooks/useGitBranches";
+import type { useClonePrompt } from "@/features/workspaces/hooks/useClonePrompt";
+import type { useWorkspaceFromUrlPrompt } from "@/features/workspaces/hooks/useWorkspaceFromUrlPrompt";
+import type { useWorktreePrompt } from "@/features/workspaces/hooks/useWorktreePrompt";
+import type { BranchInfo, WorkspaceInfo } from "@/types";
 
 const RenameThreadPrompt = lazy(() =>
   import("../../threads/components/RenameThreadPrompt").then((module) => ({
@@ -173,9 +173,7 @@ export const AppModals = memo(function AppModals({
   SettingsViewComponent,
   settingsProps,
 }: AppModalsProps) {
-  const { branches: worktreeBranches } = useGitBranches(
-    worktreePrompt?.workspace ?? null,
-  );
+  const { branches: worktreeBranches } = useGitBranches(worktreePrompt?.workspace ?? null);
 
   return (
     <>

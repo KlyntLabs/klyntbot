@@ -1,7 +1,7 @@
+import { pushErrorToast } from "@services/toasts";
 import type { Dispatch, SetStateAction } from "react";
 import { SettingsSection } from "@/features/design-system/components/settings/SettingsPrimitives";
 import type { WorkspaceInfo } from "@/types";
-import { pushErrorToast } from "@services/toasts";
 
 type SettingsEnvironmentsSectionProps = {
   mainWorkspaces: WorkspaceInfo[];
@@ -44,8 +44,7 @@ export function SettingsEnvironmentsSection({
   onSetWorktreesFolderDraft,
   onSaveEnvironmentSetup,
 }: SettingsEnvironmentsSectionProps) {
-  const hasAnyChanges =
-    environmentDirty || globalWorktreesFolderDirty || worktreesFolderDirty;
+  const hasAnyChanges = environmentDirty || globalWorktreesFolderDirty || worktreesFolderDirty;
   const hasProjects = mainWorkspaces.length > 0;
 
   return (
@@ -58,8 +57,8 @@ export function SettingsEnvironmentsSection({
           Global worktrees root
         </label>
         <div className="settings-help">
-          Default location for new worktrees when a project does not override it. Each
-          project gets its own subfolder under this root.
+          Default location for new worktrees when a project does not override it. Each project gets
+          its own subfolder under this root.
         </div>
         <div className="settings-field-row">
           <input

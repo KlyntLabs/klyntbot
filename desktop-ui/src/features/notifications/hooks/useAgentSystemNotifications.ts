@@ -1,7 +1,7 @@
+import { useAppServerEvents } from "@app/hooks/useAppServerEvents";
+import { sendNotification } from "@services/tauri";
 import { useCallback, useMemo, useRef } from "react";
 import type { DebugEntry } from "@/types";
-import { sendNotification } from "@services/tauri";
-import { useAppServerEvents } from "@app/hooks/useAppServerEvents";
 
 const DEFAULT_MIN_DURATION_MS = 60_000; // 1 minute
 const MAX_BODY_LENGTH = 200;
@@ -79,58 +79,44 @@ export function useAgentSystemNotifications({
     [onDebug],
   );
 
-  const consumeDuration = useCallback(
-    (workspaceId: string, threadId: string, turnId: string) => {
-      const threadKey = buildThreadKey(workspaceId, threadId);
-      let startedAt: number | undefined;
+  const consumeDuration = useCallback((workspaceId: string, threadId: string, turnId: string) => {
+    const threadKey = buildThreadKey(workspaceId, threadId);
+    let startedAt: number | undefined;
 
-      if (turnId) {
-        const turnKey = buildTurnKey(workspaceId, turnId);
-        startedAt = turnStartById.current.get(turnKey);
-        turnStartById.current.delete(turnKey);
-      }
+    if (turnId) {
+      const turnKey = buildTurnKey(workspaceId, turnId);
+      startedAt = turnStartById.current.get(turnKey);
+      turnStartById.current.delete(turnKey);
+    }
 
-      if (startedAt === undefined) {
-        startedAt = turnStartByThread.current.get(threadKey);
-      }
+    if (startedAt === undefined) {
+      startedAt = turnStartByThread.current.get(threadKey);
+    }
 
-      if (startedAt !== undefined) {
-        turnStartByThread.current.delete(threadKey);
-        return Date.now() - startedAt;
-      }
+    if (startedAt !== undefined) {
+      turnStartByThread.current.delete(threadKey);
+      return Date.now() - startedAt;
+    }
 
-      return null;
-    },
-    [],
-  );
+    return null;
+  }, []);
 
-  const recordStartIfMissing = useCallback(
-    (workspaceId: string, threadId: string) => {
-      const threadKey = buildThreadKey(workspaceId, threadId);
-      if (!turnStartByThread.current.has(threadKey)) {
-        turnStartByThread.current.set(threadKey, Date.now());
-      }
-    },
-    [],
-  );
+  const recordStartIfMissing = useCallback((workspaceId: string, threadId: string) => {
+    const threadKey = buildThreadKey(workspaceId, threadId);
+    if (!turnStartByThread.current.has(threadKey)) {
+      turnStartByThread.current.set(threadKey, Date.now());
+    }
+  }, []);
 
   const shouldNotify = useCallback(
-    (
-      workspaceId: string,
-      threadId: string,
-      durationMs: number | null,
-      threadKey: string,
-    ) => {
+    (workspaceId: string, threadId: string, durationMs: number | null, threadKey: string) => {
       if (durationMs === null) {
         return false;
       }
       if (!enabled) {
         return false;
       }
-      if (
-        !subagentNotificationsEnabled &&
-        isSubagentThread?.(workspaceId, threadId)
-      ) {
+      if (!subagentNotificationsEnabled && isSubagentThread?.(workspaceId, threadId)) {
         return false;
       }
       if (durationMs < minDurationMs) {
@@ -146,13 +132,7 @@ export function useAgentSystemNotifications({
       lastNotifiedAtByThread.current.set(threadKey, Date.now());
       return true;
     },
-    [
-      enabled,
-      isSubagentThread,
-      isWindowFocused,
-      minDurationMs,
-      subagentNotificationsEnabled,
-    ],
+    [enabled, isSubagentThread, isWindowFocused, minDurationMs, subagentNotificationsEnabled],
   );
 
   const getNotificationContent = useCallback(
@@ -160,26 +140,21 @@ export function useAgentSystemNotifications({
       const title = getWorkspaceName?.(workspaceId) ?? "Agent Complete";
       const threadKey = buildThreadKey(workspaceId, threadId);
       const lastMessage = lastMessageByThread.current.get(threadKey);
-      const body = lastMessage
-        ? truncateText(lastMessage, MAX_BODY_LENGTH)
-        : fallbackBody;
+      const body = lastMessage ? truncateText(lastMessage, MAX_BODY_LENGTH) : fallbackBody;
       return { title, body };
     },
     [getWorkspaceName],
   );
 
-  const handleTurnStarted = useCallback(
-    (workspaceId: string, threadId: string, turnId: string) => {
-      const startedAt = Date.now();
-      const threadKey = buildThreadKey(workspaceId, threadId);
-      turnStartByThread.current.set(threadKey, startedAt);
-      lastMessageByThread.current.delete(threadKey);
-      if (turnId) {
-        turnStartById.current.set(buildTurnKey(workspaceId, turnId), startedAt);
-      }
-    },
-    [],
-  );
+  const handleTurnStarted = useCallback((workspaceId: string, threadId: string, turnId: string) => {
+    const startedAt = Date.now();
+    const threadKey = buildThreadKey(workspaceId, threadId);
+    turnStartByThread.current.set(threadKey, startedAt);
+    lastMessageByThread.current.delete(threadKey);
+    if (turnId) {
+      turnStartById.current.set(buildTurnKey(workspaceId, turnId), startedAt);
+    }
+  }, []);
 
   const handleTurnCompleted = useCallback(
     (workspaceId: string, threadId: string, turnId: string) => {
@@ -254,14 +229,7 @@ export function useAgentSystemNotifications({
         lastMessageByThread.current.set(threadKey, event.text);
       }
       const durationMs = consumeDuration(event.workspaceId, event.threadId, "");
-      if (
-        !shouldNotify(
-          event.workspaceId,
-          event.threadId,
-          durationMs,
-          threadKey,
-        )
-      ) {
+      if (!shouldNotify(event.workspaceId, event.threadId, durationMs, threadKey)) {
         return;
       }
       const { title, body } = getNotificationContent(

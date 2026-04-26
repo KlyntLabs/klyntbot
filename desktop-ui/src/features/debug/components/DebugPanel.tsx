@@ -1,5 +1,5 @@
-import { useMemo, useRef } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import { useMemo, useRef } from "react";
 import type { DebugEntry } from "@/types";
 
 type DebugPanelProps = {
@@ -73,8 +73,7 @@ export function DebugPanel({
     const nextFormatted = entries.map((entry) => ({
       ...entry,
       timeLabel: new Date(entry.timestamp).toLocaleTimeString(),
-      payloadText:
-        entry.payload !== undefined ? formatPayload(entry.payload) : undefined,
+      payloadText: entry.payload !== undefined ? formatPayload(entry.payload) : undefined,
     }));
 
     previousEntriesRef.current = entries;
@@ -88,9 +87,7 @@ export function DebugPanel({
   }
 
   return (
-    <section
-      className={`debug-panel ${variant === "full" ? "full" : isOpen ? "open" : ""}`}
-    >
+    <section className={`debug-panel ${variant === "full" ? "full" : isOpen ? "open" : ""}`}>
       {variant !== "full" && isOpen && onResizeStart ? (
         <div
           className="debug-panel-resizer"
@@ -119,9 +116,7 @@ export function DebugPanel({
           {formattedEntries.map((entry) => (
             <div key={entry.id} className="debug-row">
               <div className="debug-meta">
-                <span className={`debug-source ${entry.source}`}>
-                  {entry.source}
-                </span>
+                <span className={`debug-source ${entry.source}`}>{entry.source}</span>
                 <span className="debug-time">{entry.timeLabel}</span>
                 <span className="debug-label">{entry.label}</span>
               </div>

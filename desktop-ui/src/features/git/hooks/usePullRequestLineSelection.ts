@@ -1,6 +1,6 @@
+import type { ParsedDiffLine } from "@utils/diff";
 import { useCallback, useRef, useState } from "react";
 import type { PullRequestSelectionLine, PullRequestSelectionRange } from "@/types";
-import type { ParsedDiffLine } from "@utils/diff";
 
 type SelectionState = {
   path: string;
@@ -36,22 +36,19 @@ export function usePullRequestLineSelection() {
     suppressNextClickRef.current = false;
   }, []);
 
-  const selectLine = useCallback(
-    (path: string, index: number, shiftKey: boolean) => {
-      if (suppressNextClickRef.current) {
-        suppressNextClickRef.current = false;
-        return;
-      }
-      if (!shiftKey || !anchorRef.current || anchorRef.current.path !== path) {
-        setSelection({ path, start: index, end: index });
-        anchorRef.current = { path, index };
-        return;
-      }
-      const range = normalizeRange(anchorRef.current.index, index);
-      setSelection({ path, ...range });
-    },
-    [],
-  );
+  const selectLine = useCallback((path: string, index: number, shiftKey: boolean) => {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      return;
+    }
+    if (!shiftKey || !anchorRef.current || anchorRef.current.path !== path) {
+      setSelection({ path, start: index, end: index });
+      anchorRef.current = { path, index };
+      return;
+    }
+    const range = normalizeRange(anchorRef.current.index, index);
+    setSelection({ path, ...range });
+  }, []);
 
   const startDragSelection = useCallback(
     (path: string, index: number, shiftKey: boolean) => {

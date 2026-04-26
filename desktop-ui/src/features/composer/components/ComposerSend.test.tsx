@@ -1,15 +1,10 @@
 /** @vitest-environment jsdom */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { isMobilePlatform } from "@utils/platformPaths";
 import { useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isMobilePlatform } from "@utils/platformPaths";
+import type { AppMention, AppOption, ComposerSendIntent, FollowUpMessageBehavior } from "@/types";
 import { Composer } from "./Composer";
-import type {
-  AppOption,
-  AppMention,
-  ComposerSendIntent,
-  FollowUpMessageBehavior,
-} from "@/types";
 
 vi.mock("../../../services/dragDrop", () => ({
   subscribeWindowDragDrop: vi.fn(() => () => {}),
@@ -138,12 +133,7 @@ describe("Composer send triggers", () => {
     fireEvent.keyDown(textarea, { key: "Enter" });
 
     expect(onSend).toHaveBeenCalledTimes(1);
-    expect(onSend).toHaveBeenCalledWith(
-      "dismiss keyboard",
-      [],
-      undefined,
-      "default",
-    );
+    expect(onSend).toHaveBeenCalledWith("dismiss keyboard", [], undefined, "default");
     expect(blurSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -255,12 +245,7 @@ describe("Composer send triggers", () => {
     fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true, ctrlKey: true });
 
     expect(onSend).toHaveBeenCalledTimes(1);
-    expect(onSend).toHaveBeenCalledWith(
-      "normal shortcut send",
-      [],
-      undefined,
-      "default",
-    );
+    expect(onSend).toHaveBeenCalledWith("normal shortcut send", [], undefined, "default");
   });
 
   it("does not queue on Tab while processing", () => {

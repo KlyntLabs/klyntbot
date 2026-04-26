@@ -1,17 +1,17 @@
-import { useCallback } from "react";
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import * as Sentry from "@sentry/react";
-import type { DebugEntry, WorkspaceInfo, WorkspaceSettings } from "@/types";
-import { normalizeRootPath } from "@threads/utils/threadNormalize";
 import {
-  addWorkspace as addWorkspaceService,
   addWorkspaceFromGitUrl as addWorkspaceFromGitUrlService,
+  addWorkspace as addWorkspaceService,
   connectWorkspace as connectWorkspaceService,
   isWorkspacePathDir as isWorkspacePathDirService,
   listWorkspaces,
   removeWorkspace as removeWorkspaceService,
   updateWorkspaceSettings as updateWorkspaceSettingsService,
 } from "@services/tauri";
+import { normalizeRootPath } from "@threads/utils/threadNormalize";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import { useCallback } from "react";
+import type { DebugEntry, WorkspaceInfo, WorkspaceSettings } from "@/types";
 
 type UseWorkspaceCrudOptions = {
   onDebug?: (entry: DebugEntry) => void;
@@ -249,10 +249,7 @@ export function useWorkspaceCrud({
           if (!isDir) {
             continue;
           }
-          const candidateKeys = buildWorkspacePathKeyCandidates(
-            candidate,
-            homePrefixes,
-          );
+          const candidateKeys = buildWorkspacePathKeyCandidates(candidate, homePrefixes);
           if (candidateKeys.some((key) => existingPaths.has(key))) {
             hadExistingCandidate = true;
             continue;
@@ -332,9 +329,7 @@ export function useWorkspaceCrud({
         await connectWorkspaceService(entry.id);
         setWorkspaces((prev) =>
           prev.map((workspace) =>
-            workspace.id === entry.id
-              ? { ...workspace, connected: true }
-              : workspace,
+            workspace.id === entry.id ? { ...workspace, connected: true } : workspace,
           ),
         );
       } catch (error) {
@@ -389,17 +384,13 @@ export function useWorkspaceCrud({
       try {
         const updated = await updateWorkspaceSettingsService(workspaceId, nextSettings);
         workspaceSettingsRef.current.set(workspaceId, updated.settings);
-        setWorkspaces((prev) =>
-          prev.map((entry) => (entry.id === workspaceId ? updated : entry)),
-        );
+        setWorkspaces((prev) => prev.map((entry) => (entry.id === workspaceId ? updated : entry)));
         return updated;
       } catch (error) {
         workspaceSettingsRef.current.set(workspaceId, previousSettings);
         setWorkspaces((prev) =>
           prev.map((entry) =>
-            entry.id === workspaceId
-              ? { ...entry, settings: previousSettings }
-              : entry,
+            entry.id === workspaceId ? { ...entry, settings: previousSettings } : entry,
           ),
         );
         onDebug?.({
@@ -418,9 +409,7 @@ export function useWorkspaceCrud({
   const removeWorkspace = useCallback(
     async (workspaceId: string) => {
       const childIds = new Set(
-        workspaces
-          .filter((entry) => entry.parentId === workspaceId)
-          .map((entry) => entry.id),
+        workspaces.filter((entry) => entry.parentId === workspaceId).map((entry) => entry.id),
       );
 
       onDebug?.({
@@ -433,10 +422,7 @@ export function useWorkspaceCrud({
       try {
         await removeWorkspaceService(workspaceId);
         setWorkspaces((prev) =>
-          prev.filter(
-            (entry) =>
-              entry.id !== workspaceId && entry.parentId !== workspaceId,
-          ),
+          prev.filter((entry) => entry.id !== workspaceId && entry.parentId !== workspaceId),
         );
         setActiveWorkspaceId((prev) =>
           prev && (prev === workspaceId || childIds.has(prev)) ? null : prev,

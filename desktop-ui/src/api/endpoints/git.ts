@@ -1,9 +1,4 @@
-import type {
-  GitFileDiff,
-  GitFileStatus,
-  GitCommitDiff,
-  GitLogResponse,
-} from "@/types";
+import type { GitCommitDiff, GitFileDiff, GitFileStatus, GitLogResponse } from "@/types";
 import { invoke } from "../client";
 
 export async function getGitStatus(workspace_id: string): Promise<{
@@ -54,23 +49,15 @@ export async function createGitHubRepo(
   });
 }
 
-export async function listGitRoots(
-  workspace_id: string,
-  depth: number,
-): Promise<string[]> {
+export async function listGitRoots(workspace_id: string, depth: number): Promise<string[]> {
   return invoke("list_git_roots", { workspaceId: workspace_id, depth });
 }
 
-export async function getGitDiffs(
-  workspace_id: string,
-): Promise<GitFileDiff[]> {
+export async function getGitDiffs(workspace_id: string): Promise<GitFileDiff[]> {
   return invoke("get_git_diffs", { workspaceId: workspace_id });
 }
 
-export async function getGitLog(
-  workspace_id: string,
-  limit = 40,
-): Promise<GitLogResponse> {
+export async function getGitLog(workspace_id: string, limit = 40): Promise<GitLogResponse> {
   return invoke("get_git_log", { workspaceId: workspace_id, limit });
 }
 
@@ -105,10 +92,7 @@ export async function revertGitAll(workspaceId: string) {
   return invoke("revert_git_all", { workspaceId });
 }
 
-export async function commitGit(
-  workspaceId: string,
-  message: string,
-): Promise<void> {
+export async function commitGit(workspaceId: string, message: string): Promise<void> {
   return invoke("commit_git", { workspaceId, message });
 }
 

@@ -24,9 +24,7 @@ type AppLayoutProps = {
   debugPanelNode: ReactNode;
   terminalDockNode: ReactNode;
   onSidebarResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
-  onChatDiffSplitPositionResizeStart: (
-    event: MouseEvent<HTMLDivElement>,
-  ) => void;
+  onChatDiffSplitPositionResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
   onRightPanelResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
   onPlanPanelResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
 };

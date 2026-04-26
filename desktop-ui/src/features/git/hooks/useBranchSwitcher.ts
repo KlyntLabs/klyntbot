@@ -19,11 +19,7 @@ export function useBranchSwitcher({
   const [branchSwitcher, setBranchSwitcher] = useState<BranchSwitcherState>(null);
 
   const openBranchSwitcher = useCallback(() => {
-    if (
-      !activeWorkspace ||
-      !activeWorkspace.connected ||
-      activeWorkspace.kind === "worktree"
-    ) {
+    if (!activeWorkspace || !activeWorkspace.connected || activeWorkspace.kind === "worktree") {
       return;
     }
     setBranchSwitcher({ isOpen: true });

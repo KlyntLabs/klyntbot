@@ -1,26 +1,18 @@
-import { useEffect, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
+import { buildEditorContentMeta } from "@settings/components/settingsViewHelpers";
 import { open } from "@tauri-apps/plugin-dialog";
-import type {
-  AppSettings,
-  CodexDoctorResult,
-  CodexUpdateResult,
-  WorkspaceInfo,
-} from "@/types";
+import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useState } from "react";
+import type { AppSettings, CodexDoctorResult, CodexUpdateResult, WorkspaceInfo } from "@/types";
+import { normalizeCodexArgsInput } from "@/utils/codexArgsInput";
 import { useGlobalAgentsMd } from "./useGlobalAgentsMd";
 import { useGlobalCodexConfigToml } from "./useGlobalCodexConfigToml";
 import { useSettingsDefaultModels } from "./useSettingsDefaultModels";
-import { buildEditorContentMeta } from "@settings/components/settingsViewHelpers";
-import { normalizeCodexArgsInput } from "@/utils/codexArgsInput";
 
 type UseSettingsCodexSectionArgs = {
   appSettings: AppSettings;
   projects: WorkspaceInfo[];
   onUpdateAppSettings: (next: AppSettings) => Promise<void>;
-  onRunDoctor: (
-    codexBin: string | null,
-    codexArgs: string | null,
-  ) => Promise<CodexDoctorResult>;
+  onRunDoctor: (codexBin: string | null, codexArgs: string | null) => Promise<CodexDoctorResult>;
   onRunCodexUpdate?: (
     codexBin: string | null,
     codexArgs: string | null,

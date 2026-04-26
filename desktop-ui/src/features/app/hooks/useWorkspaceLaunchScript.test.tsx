@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
+
+import { writeTerminalSession } from "@services/tauri";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TerminalSessionState } from "@/features/terminal/hooks/useTerminalSession";
 import type { WorkspaceInfo } from "@/types";
-import { writeTerminalSession } from "@services/tauri";
 import { useWorkspaceLaunchScript } from "./useWorkspaceLaunchScript";
 
 vi.mock("../../../services/tauri", () => ({
@@ -102,11 +103,7 @@ describe("useWorkspaceLaunchScript", () => {
     });
 
     await waitFor(() => {
-      expect(writeTerminalSession).toHaveBeenCalledWith(
-        "workspace-1",
-        "launch",
-        "npm run dev\n",
-      );
+      expect(writeTerminalSession).toHaveBeenCalledWith("workspace-1", "launch", "npm run dev\n");
     });
   });
 });

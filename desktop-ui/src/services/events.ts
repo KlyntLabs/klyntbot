@@ -69,10 +69,7 @@ function createEventHub<T>(eventName: string) {
     }
   };
 
-  const subscribe = (
-    onEvent: Listener<T>,
-    options?: SubscriptionOptions,
-  ): Unsubscribe => {
+  const subscribe = (onEvent: Listener<T>, options?: SubscriptionOptions): Unsubscribe => {
     listeners.add(onEvent);
     start(options);
     return () => {
@@ -114,9 +111,7 @@ const menuCycleCollaborationHub = createEventHub<void>("menu-composer-cycle-coll
 const menuComposerCycleModelHub = createEventHub<void>("menu-composer-cycle-model");
 const menuComposerCycleAccessHub = createEventHub<void>("menu-composer-cycle-access");
 const menuComposerCycleReasoningHub = createEventHub<void>("menu-composer-cycle-reasoning");
-const menuComposerCycleCollaborationHub = createEventHub<void>(
-  "menu-composer-cycle-collaboration",
-);
+const menuComposerCycleCollaborationHub = createEventHub<void>("menu-composer-cycle-collaboration");
 
 export function subscribeAppServerEvents(
   onEvent: (event: AppServerEvent) => void,

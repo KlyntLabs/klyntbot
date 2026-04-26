@@ -8,12 +8,12 @@ import ListTree from "lucide-react/dist/esm/icons/list-tree";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import Search from "lucide-react/dist/esm/icons/search";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ThreadListOrganizeMode, ThreadListSortKey } from "@/types";
 import {
   MenuTrigger,
   PopoverMenuItem,
   PopoverSurface,
 } from "@/features/design-system/components/popover/PopoverPrimitives";
+import type { ThreadListOrganizeMode, ThreadListSortKey } from "@/types";
 import { useMenuController } from "../hooks/useMenuController";
 
 type SidebarHeaderProps = {
@@ -57,9 +57,7 @@ export function SidebarHeader({
       return;
     }
     const popoverRect = popover.getBoundingClientRect();
-    const sidebarRect = sortMenuRef.current
-      ?.closest(".sidebar")
-      ?.getBoundingClientRect();
+    const sidebarRect = sortMenuRef.current?.closest(".sidebar")?.getBoundingClientRect();
     const minLeft = sidebarRect ? sidebarRect.left + 8 : 8;
     const maxRight = sidebarRect
       ? Math.min(window.innerWidth - 8, sidebarRect.right - 8)
@@ -84,9 +82,7 @@ export function SidebarHeader({
     }
 
     setSortMenuShift((current) =>
-      current.x === shiftX && current.y === shiftY
-        ? current
-        : { x: shiftX, y: shiftY },
+      current.x === shiftX && current.y === shiftY ? current : { x: shiftX, y: shiftY },
     );
   }, [sortMenuRef]);
 

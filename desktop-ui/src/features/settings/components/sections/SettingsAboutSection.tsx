@@ -1,16 +1,12 @@
+import { type AppBuildType, getAppBuildType, isMobileRuntime } from "@services/tauri";
 import { useEffect, useState } from "react";
-import type { AppSettings } from "@/types";
-import {
-  getAppBuildType,
-  isMobileRuntime,
-  type AppBuildType,
-} from "@services/tauri";
-import { useUpdater } from "@/features/update/hooks/useUpdater";
 import {
   SettingsSection,
   SettingsToggleRow,
   SettingsToggleSwitch,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
+import { useUpdater } from "@/features/update/hooks/useUpdater";
+import type { AppSettings } from "@/types";
 
 type SettingsAboutSectionProps = {
   appSettings: AppSettings;
@@ -37,7 +33,11 @@ export function SettingsAboutSection({
 }: SettingsAboutSectionProps) {
   const [appBuildType, setAppBuildType] = useState<AppBuildType | "unknown">("unknown");
   const [updaterEnabled, setUpdaterEnabled] = useState(false);
-  const { state: updaterState, checkForUpdates, startUpdate } = useUpdater({
+  const {
+    state: updaterState,
+    checkForUpdates,
+    startUpdate,
+  } = useUpdater({
     enabled: updaterEnabled,
     autoCheckOnMount: false,
   });
@@ -125,15 +125,11 @@ export function SettingsAboutSection({
           Currently running version <code>{__APP_VERSION__}</code>
         </div>
         {!updaterEnabled && (
-          <div className="settings-help">
-            Updates are unavailable in this runtime.
-          </div>
+          <div className="settings-help">Updates are unavailable in this runtime.</div>
         )}
 
         {updaterState.stage === "error" && (
-          <div className="settings-help ds-text-danger">
-            Update failed: {updaterState.error}
-          </div>
+          <div className="settings-help ds-text-danger">Update failed: {updaterState.error}</div>
         )}
 
         {updaterState.stage === "downloading" ||

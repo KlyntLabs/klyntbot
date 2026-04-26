@@ -1,15 +1,15 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
-import {
-  SettingsSection,
-  SettingsSubsection,
-} from "@/features/design-system/components/settings/SettingsPrimitives";
-import { formatShortcut, getDefaultInterruptShortcut } from "@utils/shortcuts";
-import { isMacPlatform } from "@utils/platformPaths";
 import type {
   ShortcutDraftKey,
   ShortcutDrafts,
   ShortcutSettingKey,
 } from "@settings/components/settingsTypes";
+import { isMacPlatform } from "@utils/platformPaths";
+import { formatShortcut, getDefaultInterruptShortcut } from "@utils/shortcuts";
+import { type KeyboardEvent, useMemo, useState } from "react";
+import {
+  SettingsSection,
+  SettingsSubsection,
+} from "@/features/design-system/components/settings/SettingsPrimitives";
 
 type ShortcutItem = {
   label: string;
@@ -26,10 +26,7 @@ type ShortcutGroup = {
 
 type SettingsShortcutsSectionProps = {
   shortcutDrafts: ShortcutDrafts;
-  onShortcutKeyDown: (
-    event: KeyboardEvent<HTMLInputElement>,
-    key: ShortcutSettingKey,
-  ) => void;
+  onShortcutKeyDown: (event: KeyboardEvent<HTMLInputElement>, key: ShortcutSettingKey) => void;
   onClearShortcut: (key: ShortcutSettingKey) => void;
 };
 
@@ -41,10 +38,7 @@ function ShortcutField({
 }: {
   item: ShortcutItem;
   shortcutDrafts: ShortcutDrafts;
-  onShortcutKeyDown: (
-    event: KeyboardEvent<HTMLInputElement>,
-    key: ShortcutSettingKey,
-  ) => void;
+  onShortcutKeyDown: (event: KeyboardEvent<HTMLInputElement>, key: ShortcutSettingKey) => void;
   onClearShortcut: (key: ShortcutSettingKey) => void;
 }) {
   return (
@@ -226,7 +220,8 @@ export function SettingsShortcutsSection({
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => {
-          const searchValue = `${group.title} ${group.subtitle} ${item.label} ${item.help}`.toLowerCase();
+          const searchValue =
+            `${group.title} ${group.subtitle} ${item.label} ${item.help}`.toLowerCase();
           return searchValue.includes(normalizedSearchQuery);
         }),
       }))

@@ -87,7 +87,6 @@
   color: var(--text-stronger);
 }
 
-
 .working-text {
   position: relative;
   color: transparent;
@@ -211,7 +210,9 @@
   border: 1px solid var(--border-strong);
   opacity: 0;
   transform: translateY(4px);
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
 }
 
 .message-quote-button {
@@ -227,7 +228,9 @@
   border: 1px solid var(--border-strong);
   opacity: 0;
   transform: translateY(4px);
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
 }
 
 .message:hover .message-copy-button,
@@ -248,7 +251,10 @@
 .message-copy-icon svg {
   position: absolute;
   inset: 0;
-  transition: opacity 160ms ease, transform 160ms ease, filter 160ms ease;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    filter 160ms ease;
 }
 
 .message-copy-icon-copy {
@@ -337,7 +343,6 @@
   outline: 1px solid var(--border-accent);
   outline-offset: 0;
 }
-
 
 .message-image-lightbox {
   position: fixed;
@@ -887,7 +892,6 @@
   word-break: break-word;
 }
 
-
 .tool-group {
   display: flex;
   flex-direction: column;
@@ -1193,7 +1197,6 @@
   text-overflow: ellipsis;
   max-width: 32ch;
 }
-
 
 .message .markdown-codeblock {
   border: 1px solid var(--border-stronger);

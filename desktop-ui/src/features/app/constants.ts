@@ -1,9 +1,5 @@
+import { fileManagerName, isMacPlatform, isWindowsPlatform } from "@utils/platformPaths";
 import type { OpenAppTarget } from "@/types";
-import {
-  fileManagerName,
-  isMacPlatform,
-  isWindowsPlatform,
-} from "@utils/platformPaths";
 
 export const OPEN_APP_STORAGE_KEY = "open-workspace-app";
 export const DEFAULT_OPEN_APP_ID = isWindowsPlatform() ? "finder" : "vscode";

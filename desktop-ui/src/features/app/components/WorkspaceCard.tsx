@@ -14,12 +14,14 @@ type WorkspaceCardProps = {
   onShowWorkspaceMenu: (event: MouseEvent, workspaceId: string) => void;
   onToggleWorkspaceCollapse: (workspaceId: string, collapsed: boolean) => void;
   onConnectWorkspace: (workspace: WorkspaceInfo) => void;
-  onToggleAddMenu: (anchor: {
-    workspaceId: string;
-    top: number;
-    left: number;
-    width: number;
-  } | null) => void;
+  onToggleAddMenu: (
+    anchor: {
+      workspaceId: string;
+      top: number;
+      left: number;
+      width: number;
+    } | null,
+  ) => void;
   children?: React.ReactNode;
 };
 
@@ -81,10 +83,7 @@ export function WorkspaceCard({
             onClick={(event) => {
               event.stopPropagation();
               const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-              const left = Math.min(
-                Math.max(rect.left, 12),
-                window.innerWidth - addMenuWidth - 12,
-              );
+              const left = Math.min(Math.max(rect.left, 12), window.innerWidth - addMenuWidth - 12);
               const top = rect.bottom + 8;
               onToggleAddMenu(
                 addMenuOpen

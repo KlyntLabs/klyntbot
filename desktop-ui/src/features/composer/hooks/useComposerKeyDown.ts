@@ -1,8 +1,8 @@
-import { useCallback, type KeyboardEvent, type RefObject } from "react";
-import type { ComposerSendIntent } from "@/types";
 import { getListContinuation } from "@utils/composerText";
 import { isComposingEvent } from "@utils/keys";
 import { isMobilePlatform } from "@utils/platformPaths";
+import { type KeyboardEvent, type RefObject, useCallback } from "react";
+import type { ComposerSendIntent } from "@/types";
 
 type ReviewPromptKeyEvent = {
   key: string;
@@ -61,9 +61,7 @@ export function useComposerKeyDown({
         return;
       }
       const isOppositeFollowUpShortcut =
-        event.key === "Enter" &&
-        event.shiftKey &&
-        (isMac ? event.metaKey : event.ctrlKey);
+        event.key === "Enter" && event.shiftKey && (isMac ? event.metaKey : event.ctrlKey);
       if (isOppositeFollowUpShortcut && !suggestionsOpen) {
         if (isDictationBusy) {
           event.preventDefault();

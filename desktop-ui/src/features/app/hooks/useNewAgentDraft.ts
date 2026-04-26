@@ -17,9 +17,7 @@ export function useNewAgentDraft({
 }: UseNewAgentDraftOptions) {
   const clearStartingTimeoutRef = useRef<number | null>(null);
   const draftStartChainByWorkspaceRef = useRef<Record<string, Promise<void>>>({});
-  const [newAgentDraftWorkspaceId, setNewAgentDraftWorkspaceId] = useState<string | null>(
-    null,
-  );
+  const [newAgentDraftWorkspaceId, setNewAgentDraftWorkspaceId] = useState<string | null>(null);
   const [startingDraftThreadWorkspaceId, setStartingDraftThreadWorkspaceId] = useState<
     string | null
   >(null);
@@ -65,18 +63,19 @@ export function useNewAgentDraft({
   const isDraftModeForActiveWorkspace = useMemo(
     () =>
       Boolean(
-        activeWorkspaceId &&
-          !activeThreadId &&
-          newAgentDraftWorkspaceId === activeWorkspaceId,
+        activeWorkspaceId && !activeThreadId && newAgentDraftWorkspaceId === activeWorkspaceId,
       ),
     [activeThreadId, activeWorkspaceId, newAgentDraftWorkspaceId],
   );
 
-  const startNewAgentDraft = useCallback((workspaceId: string) => {
-    clearStartingTimeout();
-    setNewAgentDraftWorkspaceId(workspaceId);
-    setStartingDraftThreadWorkspaceId(null);
-  }, [clearStartingTimeout]);
+  const startNewAgentDraft = useCallback(
+    (workspaceId: string) => {
+      clearStartingTimeout();
+      setNewAgentDraftWorkspaceId(workspaceId);
+      setStartingDraftThreadWorkspaceId(null);
+    },
+    [clearStartingTimeout],
+  );
 
   const clearDraftStateIfDifferentWorkspace = useCallback(
     (workspaceId: string) => {
@@ -92,7 +91,8 @@ export function useNewAgentDraft({
       const shouldMarkStarting = Boolean(activeWorkspace && !activeThreadId);
       const draftWorkspaceId = activeWorkspace?.id ?? null;
       if (shouldMarkStarting && draftWorkspaceId) {
-        const previous = draftStartChainByWorkspaceRef.current[draftWorkspaceId] ?? Promise.resolve();
+        const previous =
+          draftStartChainByWorkspaceRef.current[draftWorkspaceId] ?? Promise.resolve();
         const current = previous
           .catch(() => {
             // Keep the chain alive even if a previous send fails.

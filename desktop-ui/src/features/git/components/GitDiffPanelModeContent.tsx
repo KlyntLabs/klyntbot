@@ -1,8 +1,3 @@
-export {
-  GitBranchRow,
-  GitPanelModeStatus,
-  GitRootCurrentPath,
-} from "./GitDiffPanelOverview";
 export { GitDiffModeContent } from "./GitDiffPanelDiffMode";
 export {
   GitIssuesModeContent,
@@ -10,3 +5,8 @@ export {
   GitPerFileModeContent,
   GitPullRequestsModeContent,
 } from "./GitDiffPanelListModes";
+export {
+  GitBranchRow,
+  GitPanelModeStatus,
+  GitRootCurrentPath,
+} from "./GitDiffPanelOverview";

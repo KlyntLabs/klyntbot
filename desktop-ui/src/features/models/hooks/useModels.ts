@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DebugEntry, ModelOption, WorkspaceInfo } from "@/types";
 import { getConfigModel, getModelList } from "@services/tauri";
-import {
-  normalizeEffortValue,
-  parseModelListResponse,
-} from "../utils/modelListResponse";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { qk, useTauriQuery } from "@/lib/query";
+import type { DebugEntry, ModelOption, WorkspaceInfo } from "@/types";
+import { normalizeEffortValue, parseModelListResponse } from "../utils/modelListResponse";
 
 type UseModelsOptions = {
   activeWorkspace: WorkspaceInfo | null;
@@ -189,13 +186,11 @@ export function useModels({
     if (selectedModelId && !existingSelection) {
       hasUserSelectedModel.current = false;
     }
-    const shouldKeepUserSelection =
-      hasUserSelectedModel.current && existingSelection !== null;
+    const shouldKeepUserSelection = hasUserSelectedModel.current && existingSelection !== null;
     if (shouldKeepUserSelection) {
       return;
     }
-    const nextSelection =
-      preferredSelection ?? defaultModel ?? existingSelection ?? null;
+    const nextSelection = preferredSelection ?? defaultModel ?? existingSelection ?? null;
     if (!nextSelection) {
       return;
     }
@@ -206,14 +201,7 @@ export function useModels({
     if (nextEffort !== selectedEffort) {
       setSelectedEffortState(nextEffort);
     }
-  }, [
-    configModel,
-    models,
-    preferredModelId,
-    selectedEffort,
-    selectedModelId,
-    resolveEffort,
-  ]);
+  }, [configModel, models, preferredModelId, selectedEffort, selectedModelId, resolveEffort]);
 
   return {
     models,

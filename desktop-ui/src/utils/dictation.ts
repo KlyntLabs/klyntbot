@@ -21,11 +21,7 @@ export function computeDictationInsertion(
     isWordChar(beforeChar) &&
     isWordChar(firstChar);
   const needsSuffixSpace =
-    afterChar &&
-    !/\s/.test(afterChar) &&
-    lastChar &&
-    isWordChar(lastChar) &&
-    isWordChar(afterChar);
+    afterChar && !/\s/.test(afterChar) && lastChar && isWordChar(lastChar) && isWordChar(afterChar);
   const insertText = `${needsPrefixSpace ? " " : ""}${transcriptText}${
     needsSuffixSpace ? " " : ""
   }`;

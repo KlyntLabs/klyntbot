@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
-import { createRef } from "react";
+
 import { renderHook } from "@testing-library/react";
+import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { useComposerAutocompleteState } from "./useComposerAutocompleteState";
 
@@ -32,9 +33,7 @@ describe("useComposerAutocompleteState file mentions", () => {
     );
 
     expect(result.current.isAutocompleteOpen).toBe(true);
-    expect(result.current.autocompleteMatches.map((item) => item.label)).toContain(
-      "src/App.tsx",
-    );
+    expect(result.current.autocompleteMatches.map((item) => item.label)).toContain("src/App.tsx");
   });
 
   it("marks root-level file suggestions as Files group", () => {
@@ -63,9 +62,7 @@ describe("useComposerAutocompleteState file mentions", () => {
       }),
     );
 
-    const rootItem = result.current.autocompleteMatches.find(
-      (item) => item.label === "AGENTS.md",
-    );
+    const rootItem = result.current.autocompleteMatches.find((item) => item.label === "AGENTS.md");
     expect(rootItem?.group).toBe("Files");
   });
 });
@@ -150,16 +147,7 @@ describe("useComposerAutocompleteState slash commands", () => {
 
     const labels = result.current.autocompleteMatches.map((item) => item.label);
     expect(labels).not.toContain("apps");
-    expect(labels).toEqual([
-      "compact",
-      "fast",
-      "fork",
-      "mcp",
-      "new",
-      "resume",
-      "review",
-      "status",
-    ]);
+    expect(labels).toEqual(["compact", "fast", "fork", "mcp", "new", "resume", "review", "status"]);
   });
 });
 

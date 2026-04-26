@@ -51,10 +51,7 @@ const EXTENSION_TO_LANGUAGE: Record<string, string> = {
 };
 
 function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export function languageFromPath(path?: string | null) {
@@ -74,9 +71,5 @@ export function highlightLine(text: string, language?: string | null) {
   if (!language || !(Prism.languages as Record<string, unknown>)[language]) {
     return escapeHtml(text);
   }
-  return Prism.highlight(
-    text,
-    Prism.languages[language] as Grammar,
-    language,
-  );
+  return Prism.highlight(text, Prism.languages[language] as Grammar, language);
 }

@@ -1,8 +1,5 @@
 import type { AccessMode, ServiceTier } from "@/types";
-import {
-  buildEffectiveCodexArgsBadgeLabel,
-  sanitizeRuntimeCodexArgs,
-} from "./codexArgsProfiles";
+import { buildEffectiveCodexArgsBadgeLabel, sanitizeRuntimeCodexArgs } from "./codexArgsProfiles";
 import type { ThreadCodexParams } from "./threadStorage";
 import { makeThreadCodexParamsKey } from "./threadStorage";
 
@@ -146,20 +143,16 @@ export function resolveThreadCodexState(
     preferredModelId: stored?.modelId ?? lastComposerModelId ?? null,
     preferredEffort: stored?.effort ?? lastComposerReasoningEffort ?? null,
     preferredServiceTier:
-      stored?.serviceTier !== undefined
-        ? stored.serviceTier
-        : noThreadStored?.serviceTier,
+      stored?.serviceTier !== undefined ? stored.serviceTier : noThreadStored?.serviceTier,
     preferredCollabModeId:
       stored?.collaborationModeId ??
-      (pendingForWorkspace
-        ? pendingForWorkspace.collaborationModeId
-        : null),
+      (pendingForWorkspace ? pendingForWorkspace.collaborationModeId : null),
     preferredCodexArgsOverride:
       stored && stored.codexArgsOverride !== undefined
         ? stored.codexArgsOverride
         : pendingForWorkspace
           ? pendingForWorkspace.codexArgsOverride
-          : noThreadStored?.codexArgsOverride ?? null,
+          : (noThreadStored?.codexArgsOverride ?? null),
   };
 }
 

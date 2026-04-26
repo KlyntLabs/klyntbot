@@ -128,10 +128,12 @@ body {
   -webkit-app-region: no-drag;
   pointer-events: auto;
   transform: translateY(-50%);
-  transition: left 180ms ease, right 180ms ease, opacity 160ms ease;
+  transition:
+    left 180ms ease,
+    right 180ms ease,
+    opacity 160ms ease;
   will-change: left, right;
 }
-
 
 .titlebar-toggle-left {
   left: calc(2px + var(--titlebar-inset-left, 0px));
@@ -173,7 +175,10 @@ body {
 
 button.window-caption-control,
 .titlebar-toggle .main-header-action {
-  transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
 }
 
 .titlebar-toggle .main-header-action {
@@ -245,7 +250,6 @@ button.window-caption-control:focus-visible,
 .sidebar-resizer:hover::after {
   opacity: 1;
 }
-
 
 @media (max-width: 768px) {
   .app.layout-desktop {

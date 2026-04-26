@@ -1,11 +1,8 @@
-import { useCallback } from "react";
-import type { Dispatch } from "react";
 import { buildConversationItem } from "@utils/threadItems";
+import type { Dispatch } from "react";
+import { useCallback } from "react";
 import type { CollabAgentRef } from "@/types";
-import {
-  buildItemForDisplay,
-  handleConvertedItemEffects,
-} from "./threadItemEventHelpers";
+import { buildItemForDisplay, handleConvertedItemEffects } from "./threadItemEventHelpers";
 import type { ThreadAction } from "./useThreadsReducer";
 
 type UseThreadItemEventsOptions = {
@@ -15,11 +12,7 @@ type UseThreadItemEventsOptions = {
   markProcessing: (threadId: string, isProcessing: boolean) => void;
   markReviewing: (threadId: string, isReviewing: boolean) => void;
   safeMessageActivity: () => void;
-  recordThreadActivity: (
-    workspaceId: string,
-    threadId: string,
-    timestamp?: number,
-  ) => void;
+  recordThreadActivity: (workspaceId: string, threadId: string, timestamp?: number) => void;
   applyCollabThreadLinks: (
     workspaceId: string,
     threadId: string,
@@ -194,13 +187,7 @@ export function useThreadItemEvents({
         dispatch({ type: "markUnread", threadId, hasUnread: true });
       }
     },
-    [
-      activeThreadId,
-      dispatch,
-      getCustomName,
-      recordThreadActivity,
-      safeMessageActivity,
-    ],
+    [activeThreadId, dispatch, getCustomName, recordThreadActivity, safeMessageActivity],
   );
 
   const onItemStarted = useCallback(

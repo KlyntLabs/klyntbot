@@ -17,9 +17,7 @@ export function useRenameThreadPrompt({
   threadsByWorkspace,
   renameThread,
 }: UseRenameThreadPromptOptions) {
-  const [renamePrompt, setRenamePrompt] = useState<RenamePromptState | null>(
-    null,
-  );
+  const [renamePrompt, setRenamePrompt] = useState<RenamePromptState | null>(null);
 
   const openRenamePrompt = useCallback(
     (workspaceId: string, threadId: string) => {

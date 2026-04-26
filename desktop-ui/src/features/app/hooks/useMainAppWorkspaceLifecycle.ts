@@ -1,13 +1,11 @@
+import { useRemoteThreadRefreshOnFocus } from "@app/hooks/useRemoteThreadRefreshOnFocus";
+import { useTabActivationGuard } from "@app/hooks/useTabActivationGuard";
 import { useWindowDrag } from "@/features/layout/hooks/useWindowDrag";
 import {
   REMOTE_WORKSPACE_REFRESH_INTERVAL_MS,
   useWorkspaceRefreshOnFocus,
 } from "@/features/workspaces/hooks/useWorkspaceRefreshOnFocus";
 import { useWorkspaceRestore } from "@/features/workspaces/hooks/useWorkspaceRestore";
-import { useTabActivationGuard } from "@app/hooks/useTabActivationGuard";
-import {
-  useRemoteThreadRefreshOnFocus,
-} from "@app/hooks/useRemoteThreadRefreshOnFocus";
 import type { WorkspaceInfo } from "@/types";
 
 type UseMainAppWorkspaceLifecycleArgs = {
@@ -73,8 +71,7 @@ export function useMainAppWorkspaceLifecycle({
     activeThreadIsProcessing: Boolean(
       activeThreadId && threadStatusById[activeThreadId]?.isProcessing,
     ),
-    suspendPolling:
-      backendMode === "remote" && remoteThreadConnectionState === "live",
+    suspendPolling: backendMode === "remote" && remoteThreadConnectionState === "live",
     reconnectWorkspace: connectWorkspace,
     refreshThread,
   });

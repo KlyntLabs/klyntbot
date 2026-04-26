@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import type { GitCommitDiff, GitHubPullRequestDiff } from "@/types";
 import type { GitDiffSource } from "@/features/git/types";
 import type { PerFileDiffGroup } from "@/features/git/utils/perFileThreadDiffs";
+import type { GitCommitDiff, GitHubPullRequestDiff } from "@/types";
 
 type Params = {
   diffSource: GitDiffSource;
@@ -29,20 +29,11 @@ export function useSyncSelectedDiffPath({
     if (!gitPullRequestDiffs.length) {
       return;
     }
-    if (
-      selectedDiffPath &&
-      gitPullRequestDiffs.some((entry) => entry.path === selectedDiffPath)
-    ) {
+    if (selectedDiffPath && gitPullRequestDiffs.some((entry) => entry.path === selectedDiffPath)) {
       return;
     }
     setSelectedDiffPath(gitPullRequestDiffs[0].path);
-  }, [
-    centerMode,
-    diffSource,
-    gitPullRequestDiffs,
-    selectedDiffPath,
-    setSelectedDiffPath,
-  ]);
+  }, [centerMode, diffSource, gitPullRequestDiffs, selectedDiffPath, setSelectedDiffPath]);
 
   useEffect(() => {
     if (diffSource !== "perFile" || centerMode !== "diff") {
@@ -56,13 +47,7 @@ export function useSyncSelectedDiffPath({
       return;
     }
     setSelectedDiffPath(perFileDiffs[0].id);
-  }, [
-    centerMode,
-    diffSource,
-    perFileDiffGroups,
-    selectedDiffPath,
-    setSelectedDiffPath,
-  ]);
+  }, [centerMode, diffSource, perFileDiffGroups, selectedDiffPath, setSelectedDiffPath]);
 
   useEffect(() => {
     if (diffSource !== "commit" || centerMode !== "diff") {
@@ -71,18 +56,9 @@ export function useSyncSelectedDiffPath({
     if (!gitCommitDiffs.length) {
       return;
     }
-    if (
-      selectedDiffPath &&
-      gitCommitDiffs.some((entry) => entry.path === selectedDiffPath)
-    ) {
+    if (selectedDiffPath && gitCommitDiffs.some((entry) => entry.path === selectedDiffPath)) {
       return;
     }
     setSelectedDiffPath(gitCommitDiffs[0].path);
-  }, [
-    centerMode,
-    diffSource,
-    gitCommitDiffs,
-    selectedDiffPath,
-    setSelectedDiffPath,
-  ]);
+  }, [centerMode, diffSource, gitCommitDiffs, selectedDiffPath, setSelectedDiffPath]);
 }

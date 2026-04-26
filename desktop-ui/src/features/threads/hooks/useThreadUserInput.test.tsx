@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
+
+import { respondToUserInputRequest } from "@services/tauri";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { respondToUserInputRequest } from "@services/tauri";
 import { useThreadUserInput } from "./useThreadUserInput";
 
 vi.mock("@services/tauri", () => ({
@@ -42,11 +43,7 @@ describe("useThreadUserInput", () => {
       await result.current.handleUserInputSubmit(request, response);
     });
 
-    expect(respondToUserInputRequest).toHaveBeenCalledWith(
-      "ws-1",
-      "req-7",
-      response.answers,
-    );
+    expect(respondToUserInputRequest).toHaveBeenCalledWith("ws-1", "req-7", response.answers);
     expect(dispatch).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({

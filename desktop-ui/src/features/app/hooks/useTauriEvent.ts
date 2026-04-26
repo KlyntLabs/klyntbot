@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import type { Unsubscribe } from "@services/events";
+import { useEffect, useRef } from "react";
 
 type Subscribe<T> = (handler: (payload: T) => void) => Unsubscribe;
 type SubscribeVoid = (handler: () => void) => Unsubscribe;

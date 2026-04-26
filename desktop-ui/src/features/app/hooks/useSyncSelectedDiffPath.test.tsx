@@ -35,9 +35,7 @@ describe("useSyncSelectedDiffPath", () => {
       }),
     );
 
-    expect(setSelectedDiffPath).toHaveBeenCalledWith(
-      "src/main.ts@@item-change-1@@change-0",
-    );
+    expect(setSelectedDiffPath).toHaveBeenCalledWith("src/main.ts@@item-change-1@@change-0");
   });
 
   it("re-selects the first per-file edit when current selection is stale", () => {
@@ -71,9 +69,7 @@ describe("useSyncSelectedDiffPath", () => {
       }),
     );
 
-    expect(setSelectedDiffPath).toHaveBeenCalledWith(
-      "src/main.ts@@item-change-2@@change-0",
-    );
+    expect(setSelectedDiffPath).toHaveBeenCalledWith("src/main.ts@@item-change-2@@change-0");
   });
 
   it("keeps current per-file selection when it is still valid", () => {

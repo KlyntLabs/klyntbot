@@ -5,9 +5,7 @@ import { useTerminalTabs } from "./useTerminalTabs";
 
 describe("useTerminalTabs.ensureTerminalWithTitle", () => {
   it("creates and activates a named terminal tab", () => {
-    const { result } = renderHook(() =>
-      useTerminalTabs({ activeWorkspaceId: "workspace-1" }),
-    );
+    const { result } = renderHook(() => useTerminalTabs({ activeWorkspaceId: "workspace-1" }));
 
     act(() => {
       result.current.ensureTerminalWithTitle("workspace-1", "launch", "Launch");
@@ -18,9 +16,7 @@ describe("useTerminalTabs.ensureTerminalWithTitle", () => {
   });
 
   it("updates the title when the tab already exists", () => {
-    const { result } = renderHook(() =>
-      useTerminalTabs({ activeWorkspaceId: "workspace-1" }),
-    );
+    const { result } = renderHook(() => useTerminalTabs({ activeWorkspaceId: "workspace-1" }));
 
     act(() => {
       result.current.ensureTerminalWithTitle("workspace-1", "launch", "Launch");
@@ -30,17 +26,13 @@ describe("useTerminalTabs.ensureTerminalWithTitle", () => {
       result.current.ensureTerminalWithTitle("workspace-1", "launch", "Launch (dev)");
     });
 
-    expect(result.current.terminals).toEqual([
-      { id: "launch", title: "Launch (dev)" },
-    ]);
+    expect(result.current.terminals).toEqual([{ id: "launch", title: "Launch (dev)" }]);
   });
 });
 
 describe("useTerminalTabs auto-named tabs", () => {
   it("renumbers remaining auto-named tabs after closing one", () => {
-    const { result } = renderHook(() =>
-      useTerminalTabs({ activeWorkspaceId: "workspace-1" }),
-    );
+    const { result } = renderHook(() => useTerminalTabs({ activeWorkspaceId: "workspace-1" }));
 
     let firstId = "";
     let secondId = "";
@@ -53,15 +45,11 @@ describe("useTerminalTabs auto-named tabs", () => {
       result.current.closeTerminal("workspace-1", firstId);
     });
 
-    expect(result.current.terminals).toEqual([
-      { id: secondId, title: "Terminal 1" },
-    ]);
+    expect(result.current.terminals).toEqual([{ id: secondId, title: "Terminal 1" }]);
   });
 
   it("does not create duplicate auto-named labels after close and create", () => {
-    const { result } = renderHook(() =>
-      useTerminalTabs({ activeWorkspaceId: "workspace-1" }),
-    );
+    const { result } = renderHook(() => useTerminalTabs({ activeWorkspaceId: "workspace-1" }));
 
     let firstId = "";
     let secondId = "";
@@ -86,9 +74,7 @@ describe("useTerminalTabs auto-named tabs", () => {
   });
 
   it("keeps custom titles while numbering auto-named tabs independently", () => {
-    const { result } = renderHook(() =>
-      useTerminalTabs({ activeWorkspaceId: "workspace-1" }),
-    );
+    const { result } = renderHook(() => useTerminalTabs({ activeWorkspaceId: "workspace-1" }));
 
     let firstAutoId = "";
     let secondAutoId = "";
@@ -106,9 +92,7 @@ describe("useTerminalTabs auto-named tabs", () => {
   });
 
   it("converts an auto-named tab to custom and renumbers remaining auto tabs", () => {
-    const { result } = renderHook(() =>
-      useTerminalTabs({ activeWorkspaceId: "workspace-1" }),
-    );
+    const { result } = renderHook(() => useTerminalTabs({ activeWorkspaceId: "workspace-1" }));
 
     let firstAutoId = "";
     let secondAutoId = "";

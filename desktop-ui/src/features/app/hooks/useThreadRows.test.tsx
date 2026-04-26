@@ -20,41 +20,17 @@ describe("useThreadRows", () => {
     });
     const { result } = renderHook(() => useThreadRows({}));
 
-    const first = result.current.getThreadRows(
-      threads,
-      true,
-      "ws-1",
-      getPinTimestamp,
-      7,
-    );
-    const second = result.current.getThreadRows(
-      threads,
-      true,
-      "ws-1",
-      getPinTimestamp,
-      7,
-    );
+    const first = result.current.getThreadRows(threads, true, "ws-1", getPinTimestamp, 7);
+    const second = result.current.getThreadRows(threads, true, "ws-1", getPinTimestamp, 7);
 
     expect(second).toBe(first);
     expect(getPinTimestamp).toHaveBeenCalledTimes(3);
 
-    const third = result.current.getThreadRows(
-      threads,
-      true,
-      "ws-1",
-      getPinTimestamp,
-      8,
-    );
+    const third = result.current.getThreadRows(threads, true, "ws-1", getPinTimestamp, 8);
     expect(third).not.toBe(first);
     expect(getPinTimestamp).toHaveBeenCalledTimes(6);
 
-    const thirdRepeat = result.current.getThreadRows(
-      threads,
-      true,
-      "ws-1",
-      getPinTimestamp,
-      8,
-    );
+    const thirdRepeat = result.current.getThreadRows(threads, true, "ws-1", getPinTimestamp, 8);
     expect(thirdRepeat).toBe(third);
     expect(getPinTimestamp).toHaveBeenCalledTimes(6);
   });
@@ -101,23 +77,11 @@ describe("useThreadRows", () => {
       },
     );
 
-    const beforeParenting = result.current.getThreadRows(
-      threads,
-      true,
-      "ws-1",
-      getPinTimestamp,
-      0,
-    );
+    const beforeParenting = result.current.getThreadRows(threads, true, "ws-1", getPinTimestamp, 0);
     rerender({
       threadParentById: { "thread-child": "thread-root" },
     });
-    const afterParenting = result.current.getThreadRows(
-      threads,
-      true,
-      "ws-1",
-      getPinTimestamp,
-      0,
-    );
+    const afterParenting = result.current.getThreadRows(threads, true, "ws-1", getPinTimestamp, 0);
 
     expect(afterParenting).not.toBe(beforeParenting);
     expect(afterParenting.unpinnedRows.map((row) => [row.thread.id, row.depth])).toEqual([
@@ -133,17 +97,9 @@ describe("useThreadRows", () => {
       { id: "thread-subagent-child", name: "Child", updatedAt: 3, isSubagent: true },
     ];
     const getPinTimestamp = vi.fn(() => null);
-    const { result } = renderHook(() =>
-      useThreadRows({ "thread-subagent-child": "thread-root" }),
-    );
+    const { result } = renderHook(() => useThreadRows({ "thread-subagent-child": "thread-root" }));
 
-    const rows = result.current.getThreadRows(
-      threads,
-      true,
-      "ws-1",
-      getPinTimestamp,
-      0,
-    );
+    const rows = result.current.getThreadRows(threads, true, "ws-1", getPinTimestamp, 0);
 
     expect(rows.unpinnedRows.map((row) => [row.thread.id, row.depth])).toEqual([
       ["thread-root", 0],

@@ -40,12 +40,7 @@ export function useCollaborationModeSelection({
       mode: modeValue,
       settings,
     };
-  }, [
-    resolvedModel,
-    selectedCollaborationMode,
-    selectedCollaborationModeId,
-    selectedEffort,
-  ]);
+  }, [resolvedModel, selectedCollaborationMode, selectedCollaborationModeId, selectedEffort]);
 
   return { collaborationModePayload };
 }

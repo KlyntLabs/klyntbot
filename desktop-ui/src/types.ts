@@ -154,10 +154,7 @@ export type ThreadSummary = {
 };
 
 export type ThreadListSortKey = "created_at" | "updated_at";
-export type ThreadListOrganizeMode =
-  | "by_project"
-  | "by_project_activity"
-  | "threads_only";
+export type ThreadListOrganizeMode = "by_project" | "by_project_activity" | "threads_only";
 
 export type ReviewTarget =
   | { type: "uncommittedChanges" }
@@ -165,12 +162,7 @@ export type ReviewTarget =
   | { type: "commit"; sha: string; title?: string }
   | { type: "custom"; instructions: string };
 
-export type PullRequestReviewIntent =
-  | "full"
-  | "risks"
-  | "tests"
-  | "summary"
-  | "question";
+export type PullRequestReviewIntent = "full" | "risks" | "tests" | "summary" | "question";
 
 export type PullRequestReviewAction = {
   id: string;
@@ -312,12 +304,7 @@ export type AppSettings = {
   selectedOpenAppId: string;
 };
 
-export type CodexFeatureStage =
-  | "under_development"
-  | "beta"
-  | "stable"
-  | "deprecated"
-  | "removed";
+export type CodexFeatureStage = "under_development" | "beta" | "stable" | "deprecated" | "removed";
 
 export type CodexFeature = {
   name: string;

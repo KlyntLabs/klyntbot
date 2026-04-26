@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRef } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "./Sidebar";
 
 afterEach(() => {
@@ -820,9 +820,7 @@ describe("Sidebar", () => {
         ]}
         threadsByWorkspace={{
           "ws-a": [{ id: "thread-a", name: "Alpha root", updatedAt: 100 }],
-          "ws-a-clone": [
-            { id: "thread-a-clone", name: "Alpha clone thread", updatedAt: 300 },
-          ],
+          "ws-a-clone": [{ id: "thread-a-clone", name: "Alpha clone thread", updatedAt: 300 }],
           "ws-b": [{ id: "thread-b", name: "Beta root", updatedAt: 200 }],
         }}
       />,

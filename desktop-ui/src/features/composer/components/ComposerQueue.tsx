@@ -1,11 +1,11 @@
-import { useCallback } from "react";
+import { useMenuController } from "@app/hooks/useMenuController";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import type { QueuedMessage } from "@/types";
+import { useCallback } from "react";
 import {
   PopoverMenuItem,
   PopoverSurface,
 } from "@/features/design-system/components/popover/PopoverPrimitives";
-import { useMenuController } from "@app/hooks/useMenuController";
+import type { QueuedMessage } from "@/types";
 
 type ComposerQueueProps = {
   queuedMessages: QueuedMessage[];
@@ -27,19 +27,13 @@ export function ComposerQueue({
   return (
     <div className="composer-queue">
       <div className="composer-queue-title">Queued</div>
-      {pausedReason ? (
-        <div className="composer-queue-hint">{pausedReason}</div>
-      ) : null}
+      {pausedReason ? <div className="composer-queue-hint">{pausedReason}</div> : null}
       <div className="composer-queue-list">
         {queuedMessages.map((item) => (
           <div key={item.id} className="composer-queue-item">
             <span className="composer-queue-text">
               {item.text ||
-                (item.images?.length
-                  ? item.images.length === 1
-                    ? "Image"
-                    : "Images"
-                  : "")}
+                (item.images?.length ? (item.images.length === 1 ? "Image" : "Images") : "")}
               {item.images?.length
                 ? ` · ${item.images.length} image${item.images.length === 1 ? "" : "s"}`
                 : ""}

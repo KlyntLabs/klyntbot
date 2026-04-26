@@ -55,19 +55,13 @@ describe("useRenameWorktreePrompt", () => {
       await result.current.confirmUpstream();
     });
 
-    expect(renameWorktreeUpstream).toHaveBeenCalledWith(
-      worktree.id,
-      "feature/old",
-      "feature/new",
-    );
+    expect(renameWorktreeUpstream).toHaveBeenCalledWith(worktree.id, "feature/old", "feature/new");
     expect(result.current.upstreamPrompt).toBeNull();
     expect(result.current.notice).toBe("Upstream branch updated.");
   });
 
   it("surfaces rename errors", async () => {
-    const renameWorktree = vi
-      .fn()
-      .mockRejectedValue(new Error("rename failed"));
+    const renameWorktree = vi.fn().mockRejectedValue(new Error("rename failed"));
     const renameWorktreeUpstream = vi.fn().mockResolvedValue(undefined);
 
     const { result } = renderHook(() =>

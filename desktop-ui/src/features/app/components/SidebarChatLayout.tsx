@@ -1,12 +1,5 @@
+import { Clock, FolderPlus, LayoutGrid, Search, Settings, SquarePen } from "lucide-react";
 import { memo } from "react";
-import {
-  Clock,
-  FolderPlus,
-  LayoutGrid,
-  Search,
-  Settings,
-  SquarePen,
-} from "lucide-react";
 import type { ChatThread } from "@/features/chat/types";
 
 type SidebarChatLayoutProps = {
@@ -88,11 +81,7 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
       <div className="sidebar-chat__spacer" />
 
       <div className="sidebar-chat__footer">
-        <button
-          type="button"
-          className="sidebar-chat__settings"
-          onClick={onOpenSettings}
-        >
+        <button type="button" className="sidebar-chat__settings" onClick={onOpenSettings}>
           <Settings aria-hidden />
           <span>Settings</span>
         </button>

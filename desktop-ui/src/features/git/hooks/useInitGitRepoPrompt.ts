@@ -26,15 +26,11 @@ export function useInitGitRepoPrompt({
     repo: string,
     visibility: "private" | "public",
     branch: string,
-  ) => Promise<
-    | { ok: true }
-    | { ok: false; error: string }
-  >;
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
   refreshGitRemote: () => void;
   isBusy: boolean;
 }) {
-  const [initGitRepoPrompt, setInitGitRepoPrompt] =
-    useState<InitGitRepoPromptState | null>(null);
+  const [initGitRepoPrompt, setInitGitRepoPrompt] = useState<InitGitRepoPromptState | null>(null);
 
   useEffect(() => {
     if (!initGitRepoPrompt) {
@@ -132,13 +128,9 @@ export function useInitGitRepoPrompt({
 
     const trimmedBranch = prompt.branch.trim();
     const validationError =
-      trimmedBranch.length === 0
-        ? "Branch name is required."
-        : validateBranchName(prompt.branch);
+      trimmedBranch.length === 0 ? "Branch name is required." : validateBranchName(prompt.branch);
     if (validationError) {
-      setInitGitRepoPrompt((prev) =>
-        prev ? { ...prev, error: validationError } : prev,
-      );
+      setInitGitRepoPrompt((prev) => (prev ? { ...prev, error: validationError } : prev));
       return;
     }
 
@@ -182,23 +174,14 @@ export function useInitGitRepoPrompt({
       const visibility = prompt.isPrivate ? "private" : "public";
       const remoteResult = await createGitHubRepo(trimmedRepo, visibility, trimmedBranch);
       if (!remoteResult.ok) {
-        setInitGitRepoPrompt((prev) =>
-          prev ? { ...prev, error: remoteResult.error } : prev,
-        );
+        setInitGitRepoPrompt((prev) => (prev ? { ...prev, error: remoteResult.error } : prev));
         return;
       }
       refreshGitRemote();
     }
 
     setInitGitRepoPrompt(null);
-  }, [
-    activeWorkspace,
-    createGitHubRepo,
-    initGitRepo,
-    initGitRepoPrompt,
-    isBusy,
-    refreshGitRemote,
-  ]);
+  }, [activeWorkspace, createGitHubRepo, initGitRepo, initGitRepoPrompt, isBusy, refreshGitRemote]);
 
   return {
     initGitRepoPrompt,

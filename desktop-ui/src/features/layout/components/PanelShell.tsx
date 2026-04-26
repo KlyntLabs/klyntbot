@@ -1,10 +1,7 @@
 import type { ReactNode } from "react";
 
-import {
-  PanelFrame,
-  PanelHeader,
-} from "@/features/design-system/components/panel/PanelPrimitives";
-import { PanelTabs, type PanelTabId } from "./PanelTabs";
+import { PanelFrame, PanelHeader } from "@/features/design-system/components/panel/PanelPrimitives";
+import { type PanelTabId, PanelTabs } from "./PanelTabs";
 
 type PanelShellProps = {
   filePanelMode: PanelTabId;

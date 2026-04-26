@@ -6,8 +6,7 @@ if (!("IS_REACT_ACT_ENVIRONMENT" in globalThis)) {
     writable: true,
   });
 } else {
-  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-    true;
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 }
 
 if (!("matchMedia" in globalThis)) {
@@ -50,8 +49,7 @@ if (!("IntersectionObserver" in globalThis)) {
 
 if (!("requestAnimationFrame" in globalThis)) {
   Object.defineProperty(globalThis, "requestAnimationFrame", {
-    value: (callback: FrameRequestCallback) =>
-      setTimeout(() => callback(Date.now()), 0),
+    value: (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0),
   });
   Object.defineProperty(globalThis, "cancelAnimationFrame", {
     value: (id: number) => clearTimeout(id),
@@ -66,7 +64,7 @@ const existingLocalStorage = hasLocalStorage
 if (!existingLocalStorage || typeof existingLocalStorage.clear !== "function") {
   const store = new Map<string, string>();
   const localStorage = {
-    getItem: (key: string) => (store.has(key) ? store.get(key) ?? null : null),
+    getItem: (key: string) => (store.has(key) ? (store.get(key) ?? null) : null),
     setItem: (key: string, value: string) => {
       store.set(key, value);
     },

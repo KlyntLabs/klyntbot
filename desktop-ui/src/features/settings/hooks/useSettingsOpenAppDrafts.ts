@@ -1,5 +1,3 @@
-import { useCallback, useEffect, useState } from "react";
-import type { AppSettings, OpenAppTarget } from "@/types";
 import { DEFAULT_OPEN_APP_ID, OPEN_APP_STORAGE_KEY } from "@app/constants";
 import type { OpenAppDraft } from "@settings/components/settingsTypes";
 import {
@@ -9,6 +7,8 @@ import {
   isOpenAppTargetComplete,
   normalizeOpenAppTargets,
 } from "@settings/components/settingsViewHelpers";
+import { useCallback, useEffect, useState } from "react";
+import type { AppSettings, OpenAppTarget } from "@/types";
 
 type UseSettingsOpenAppDraftsParams = {
   appSettings: AppSettings;
@@ -22,9 +22,7 @@ export const useSettingsOpenAppDrafts = ({
   const [openAppDrafts, setOpenAppDrafts] = useState<OpenAppDraft[]>(() =>
     buildOpenAppDrafts(appSettings.openAppTargets),
   );
-  const [openAppSelectedId, setOpenAppSelectedId] = useState(
-    appSettings.selectedOpenAppId,
-  );
+  const [openAppSelectedId, setOpenAppSelectedId] = useState(appSettings.selectedOpenAppId);
 
   useEffect(() => {
     setOpenAppDrafts(buildOpenAppDrafts(appSettings.openAppTargets));
@@ -39,10 +37,7 @@ export const useSettingsOpenAppDrafts = ({
       )?.id;
       const firstCompleteId = nextTargets.find(isOpenAppTargetComplete)?.id;
       const nextSelectedId =
-        resolvedSelectedId ??
-        firstCompleteId ??
-        nextTargets[0]?.id ??
-        DEFAULT_OPEN_APP_ID;
+        resolvedSelectedId ?? firstCompleteId ?? nextTargets[0]?.id ?? DEFAULT_OPEN_APP_ID;
       setOpenAppDrafts(buildOpenAppDrafts(nextTargets));
       setOpenAppSelectedId(nextSelectedId);
       await onUpdateAppSettings({
@@ -54,10 +49,7 @@ export const useSettingsOpenAppDrafts = ({
     [appSettings, onUpdateAppSettings, openAppSelectedId],
   );
 
-  const handleOpenAppDraftChange = (
-    index: number,
-    updates: Partial<OpenAppDraft>,
-  ) => {
+  const handleOpenAppDraftChange = (index: number, updates: Partial<OpenAppDraft>) => {
     setOpenAppDrafts((prev) => {
       const next = [...prev];
       const current = next[index];
@@ -79,8 +71,8 @@ export const useSettingsOpenAppDrafts = ({
       next[index] = {
         ...current,
         kind,
-        appName: kind === "app" ? current.appName ?? "" : null,
-        command: kind === "command" ? current.command ?? "" : null,
+        appName: kind === "app" ? (current.appName ?? "") : null,
+        command: kind === "command" ? (current.command ?? "") : null,
         argsText: kind === "finder" ? "" : current.argsText,
       };
       void commitOpenApps(next);
@@ -107,9 +99,7 @@ export const useSettingsOpenAppDrafts = ({
     const removed = openAppDrafts[index];
     const next = openAppDrafts.filter((_, draftIndex) => draftIndex !== index);
     const nextSelected =
-      removed?.id === openAppSelectedId
-        ? next[0]?.id ?? DEFAULT_OPEN_APP_ID
-        : openAppSelectedId;
+      removed?.id === openAppSelectedId ? (next[0]?.id ?? DEFAULT_OPEN_APP_ID) : openAppSelectedId;
     setOpenAppDrafts(next);
     void commitOpenApps(next, nextSelected);
   };

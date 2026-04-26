@@ -1,23 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { revealInFileManagerLabel } from "@utils/platformPaths";
 import Check from "lucide-react/dist/esm/icons/check";
 import Copy from "lucide-react/dist/esm/icons/copy";
 import Terminal from "lucide-react/dist/esm/icons/terminal";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import type { BranchInfo, OpenAppTarget, WorkspaceInfo } from "@/types";
 import type { ReactNode } from "react";
-import { revealInFileManagerLabel } from "@utils/platformPaths";
-import { BranchList } from "@/features/git/components/BranchList";
-import { filterBranches, findExactBranch } from "@/features/git/utils/branchSearch";
-import { validateBranchName } from "@/features/git/utils/branchValidation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MenuTrigger,
   PopoverSurface,
 } from "@/features/design-system/components/popover/PopoverPrimitives";
-import { OpenAppMenu } from "./OpenAppMenu";
+import { BranchList } from "@/features/git/components/BranchList";
+import { filterBranches, findExactBranch } from "@/features/git/utils/branchSearch";
+import { validateBranchName } from "@/features/git/utils/branchValidation";
+import type { BranchInfo, OpenAppTarget, WorkspaceInfo } from "@/types";
+import { useMenuController } from "../hooks/useMenuController";
+import type { WorkspaceLaunchScriptsState } from "../hooks/useWorkspaceLaunchScripts";
 import { LaunchScriptButton } from "./LaunchScriptButton";
 import { LaunchScriptEntryButton } from "./LaunchScriptEntryButton";
-import type { WorkspaceLaunchScriptsState } from "../hooks/useWorkspaceLaunchScripts";
-import { useMenuController } from "../hooks/useMenuController";
+import { OpenAppMenu } from "./OpenAppMenu";
 
 type MainHeaderProps = {
   workspace: WorkspaceInfo;
@@ -134,10 +134,7 @@ export function MainHeader({
     [branches, trimmedQuery],
   );
   const canCreate = trimmedQuery.length > 0 && !exactMatch;
-  const branchValidationMessage = useMemo(
-    () => validateBranchName(trimmedQuery),
-    [trimmedQuery],
-  );
+  const branchValidationMessage = useMemo(() => validateBranchName(trimmedQuery), [trimmedQuery]);
   const resolvedWorktreePath = worktreePath ?? workspace.path;
   const relativeWorktreePath = useMemo(() => {
     if (!parentPath) {
@@ -147,10 +144,7 @@ export function MainHeader({
       ? resolvedWorktreePath.slice(parentPath.length + 1)
       : resolvedWorktreePath;
   }, [parentPath, resolvedWorktreePath]);
-  const cdCommand = useMemo(
-    () => `cd "${relativeWorktreePath}"`,
-    [relativeWorktreePath],
-  );
+  const cdCommand = useMemo(() => `cd "${relativeWorktreePath}"`, [relativeWorktreePath]);
 
   useEffect(() => {
     if (!infoOpen && renameOnCancel) {
@@ -188,9 +182,7 @@ export function MainHeader({
     <header className="main-header" data-tauri-drag-region>
       <div className="workspace-header">
         <div className="workspace-title-line">
-          <span className="workspace-title">
-            {parentName ? parentName : workspace.name}
-          </span>
+          <span className="workspace-title">{parentName ? parentName : workspace.name}</span>
           <span className="workspace-separator" aria-hidden>
             ›
           </span>
@@ -254,9 +246,7 @@ export function MainHeader({
                           className="icon-button worktree-info-confirm"
                           ref={renameConfirmRef}
                           onClick={() => worktreeRename.onCommit()}
-                          disabled={
-                            worktreeRename.isSubmitting || !worktreeRename.isDirty
-                          }
+                          disabled={worktreeRename.isSubmitting || !worktreeRename.isDirty}
                           aria-label="Confirm rename"
                           title="Confirm rename"
                         >
@@ -267,9 +257,7 @@ export function MainHeader({
                         <div className="worktree-info-error">{worktreeRename.error}</div>
                       )}
                       {worktreeRename.notice && (
-                        <span className="worktree-info-subtle">
-                          {worktreeRename.notice}
-                        </span>
+                        <span className="worktree-info-subtle">{worktreeRename.notice}</span>
                       )}
                       {worktreeRename.upstream && (
                         <div className="worktree-info-upstream">
@@ -300,9 +288,7 @@ export function MainHeader({
                       Terminal{parentPath ? " (repo root)" : ""}
                     </span>
                     <div className="worktree-info-command">
-                      <code className="worktree-info-code">
-                        {cdCommand}
-                      </code>
+                      <code className="worktree-info-code">{cdCommand}</code>
                       <button
                         type="button"
                         className="worktree-info-copy"
@@ -379,9 +365,7 @@ export function MainHeader({
                               setBranchQuery("");
                               setError(null);
                             } catch (err) {
-                              setError(
-                                err instanceof Error ? err.message : String(err),
-                              );
+                              setError(err instanceof Error ? err.message : String(err));
                             }
                             return;
                           }
@@ -392,9 +376,7 @@ export function MainHeader({
                               setBranchQuery("");
                               setError(null);
                             } catch (err) {
-                              setError(
-                                err instanceof Error ? err.message : String(err),
-                              );
+                              setError(err instanceof Error ? err.message : String(err));
                             }
                           }
                         }}
@@ -425,9 +407,7 @@ export function MainHeader({
                             setBranchQuery("");
                             setError(null);
                           } catch (err) {
-                            setError(
-                              err instanceof Error ? err.message : String(err),
-                            );
+                            setError(err instanceof Error ? err.message : String(err));
                           }
                         }}
                         data-tauri-drag-region="false"
@@ -439,9 +419,7 @@ export function MainHeader({
                       <div className="branch-error">{branchValidationMessage}</div>
                     )}
                     {canCreate && !branchValidationMessage && (
-                      <div className="branch-create-hint">
-                        Create branch “{trimmedQuery}”
-                      </div>
+                      <div className="branch-create-hint">Create branch “{trimmedQuery}”</div>
                     )}
                   </div>
                   <BranchList

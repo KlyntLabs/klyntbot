@@ -1,5 +1,5 @@
-import { useEffect } from "react";
 import { matchesShortcut } from "@utils/shortcuts";
+import { useEffect } from "react";
 
 type UsePanelShortcutsOptions = {
   toggleDebugPanelShortcut: string | null;

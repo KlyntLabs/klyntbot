@@ -41,9 +41,7 @@ describe("remarkFileLinks", () => {
   });
 
   it("keeps workspace route anchors out of linkification", () => {
-    const tree = runRemarkFileLinks(
-      textParagraph("See /workspace/settings#L12 for app settings."),
-    );
+    const tree = runRemarkFileLinks(textParagraph("See /workspace/settings#L12 for app settings."));
     expect(tree.children?.[0]?.children?.map((child) => child.type)).toEqual(["text"]);
   });
 

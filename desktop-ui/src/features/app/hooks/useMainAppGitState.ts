@@ -1,20 +1,15 @@
-import { useCallback, useEffect } from "react";
-import type {
-  ConversationItem,
-  DebugEntry,
-  SendMessageResult,
-  WorkspaceInfo,
-} from "@/types";
-import { useGitPanelController } from "@app/hooks/useGitPanelController";
-import { useGitHubPanelController } from "@app/hooks/useGitHubPanelController";
 import { useGitCommitController } from "@app/hooks/useGitCommitController";
+import { useGitHubPanelController } from "@app/hooks/useGitHubPanelController";
+import { useGitPanelController } from "@app/hooks/useGitPanelController";
 import { useGitRootSelection } from "@app/hooks/useGitRootSelection";
+import { useSyncSelectedDiffPath } from "@app/hooks/useSyncSelectedDiffPath";
+import { useCallback, useEffect } from "react";
+import { useGitActions } from "@/features/git/hooks/useGitActions";
+import { useGitBranches } from "@/features/git/hooks/useGitBranches";
 import { useGitRemote } from "@/features/git/hooks/useGitRemote";
 import { useGitRepoScan } from "@/features/git/hooks/useGitRepoScan";
 import { usePullRequestReviewActions } from "@/features/git/hooks/usePullRequestReviewActions";
-import { useGitActions } from "@/features/git/hooks/useGitActions";
-import { useGitBranches } from "@/features/git/hooks/useGitBranches";
-import { useSyncSelectedDiffPath } from "@app/hooks/useSyncSelectedDiffPath";
+import type { ConversationItem, DebugEntry, SendMessageResult, WorkspaceInfo } from "@/types";
 
 type UseMainAppGitStateOptions = {
   activeWorkspace: WorkspaceInfo | null;
@@ -77,9 +72,7 @@ function resolveShouldLoadGitHubPanelData({
   diffSource: "commit" | "local" | "perFile" | "pr";
 }) {
   return (
-    gitPanelMode === "issues" ||
-    gitPanelMode === "prs" ||
-    (shouldLoadDiffs && diffSource === "pr")
+    gitPanelMode === "issues" || gitPanelMode === "prs" || (shouldLoadDiffs && diffSource === "pr")
   );
 }
 
@@ -94,7 +87,8 @@ function useMainAppGitBranchActions({
   refreshGitLog: () => void;
   currentBranch: string | null;
 }) {
-  const { branches, checkoutBranch, checkoutPullRequest, createBranch } = useGitBranches(activeWorkspace);
+  const { branches, checkoutBranch, checkoutPullRequest, createBranch } =
+    useGitBranches(activeWorkspace);
 
   const alertError = useCallback((error: unknown) => {
     alert(error instanceof Error ? error.message : String(error));
@@ -132,7 +126,8 @@ function useMainAppGitBranchActions({
   return {
     branches,
     currentBranch,
-    isBranchSwitcherEnabled: Boolean(activeWorkspace?.connected) && activeWorkspace?.kind !== "worktree",
+    isBranchSwitcherEnabled:
+      Boolean(activeWorkspace?.connected) && activeWorkspace?.kind !== "worktree",
     handleCheckoutBranch,
     handleCheckoutPullRequest,
     handleCreateBranch,

@@ -1,12 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type {
-  BranchInfo,
-  DebugEntry,
-  GitLogEntry,
-  ReviewTarget,
-  WorkspaceInfo,
-} from "@/types";
 import { getGitLog, listGitBranches } from "@services/tauri";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { BranchInfo, DebugEntry, GitLogEntry, ReviewTarget, WorkspaceInfo } from "@/types";
 
 export type ReviewPromptStep = "preset" | "baseBranch" | "commit" | "custom";
 
@@ -240,12 +234,8 @@ export function useReviewPrompt({
         const nextSelectedCommitSha = prev.selectedCommitSha || commits[0]?.sha || "";
         const nextSelectedCommitTitle =
           prev.selectedCommitTitle || commits[0]?.summary || commits[0]?.sha || "";
-        const nextBranchIndex = branches.findIndex(
-          (branch) => branch.name === nextSelectedBranch,
-        );
-        const nextCommitIndex = commits.findIndex(
-          (commit) => commit.sha === nextSelectedCommitSha,
-        );
+        const nextBranchIndex = branches.findIndex((branch) => branch.name === nextSelectedBranch);
+        const nextCommitIndex = commits.findIndex((commit) => commit.sha === nextSelectedCommitSha);
         setHighlightedBranchIndex(nextBranchIndex >= 0 ? nextBranchIndex : 0);
         setHighlightedCommitIndex(nextCommitIndex >= 0 ? nextCommitIndex : 0);
         return {
@@ -290,9 +280,7 @@ export function useReviewPrompt({
           setReviewPrompt(null);
         } else {
           setReviewPrompt((prev) =>
-            prev && prev.workspace.id === workspaceId
-              ? { ...prev, isSubmitting: false }
-              : prev,
+            prev && prev.workspace.id === workspaceId ? { ...prev, isSubmitting: false } : prev,
           );
         }
       }
@@ -318,14 +306,12 @@ export function useReviewPrompt({
               step: preset,
               error: null,
               selectedBranch:
-                preset === "baseBranch" ? prev.branches[0]?.name ?? "" : prev.selectedBranch,
+                preset === "baseBranch" ? (prev.branches[0]?.name ?? "") : prev.selectedBranch,
               selectedCommitSha:
-                preset === "commit"
-                  ? prev.commits[0]?.sha ?? ""
-                  : prev.selectedCommitSha,
+                preset === "commit" ? (prev.commits[0]?.sha ?? "") : prev.selectedCommitSha,
               selectedCommitTitle:
                 preset === "commit"
-                  ? prev.commits[0]?.summary ?? prev.commits[0]?.sha ?? ""
+                  ? (prev.commits[0]?.summary ?? prev.commits[0]?.sha ?? "")
                   : prev.selectedCommitTitle,
             }
           : prev,
@@ -368,9 +354,7 @@ export function useReviewPrompt({
     }
     const branch = reviewPrompt.selectedBranch.trim();
     if (!branch) {
-      setReviewPrompt((prev) =>
-        prev ? { ...prev, error: "Choose a base branch." } : prev,
-      );
+      setReviewPrompt((prev) => (prev ? { ...prev, error: "Choose a base branch." } : prev));
       return;
     }
     await runReviewTarget({ type: "baseBranch", branch });
@@ -421,9 +405,7 @@ export function useReviewPrompt({
     }
     const sha = reviewPrompt.selectedCommitSha.trim();
     if (!sha) {
-      setReviewPrompt((prev) =>
-        prev ? { ...prev, error: "Choose a commit to review." } : prev,
-      );
+      setReviewPrompt((prev) => (prev ? { ...prev, error: "Choose a commit to review." } : prev));
       return;
     }
     const title = reviewPrompt.selectedCommitTitle.trim();
@@ -435,9 +417,7 @@ export function useReviewPrompt({
   }, [reviewPrompt, runReviewTarget]);
 
   const updateCustomInstructions = useCallback((value: string) => {
-    setReviewPrompt((prev) =>
-      prev ? { ...prev, customInstructions: value, error: null } : prev,
-    );
+    setReviewPrompt((prev) => (prev ? { ...prev, customInstructions: value, error: null } : prev));
   }, []);
 
   const confirmCustom = useCallback(async () => {

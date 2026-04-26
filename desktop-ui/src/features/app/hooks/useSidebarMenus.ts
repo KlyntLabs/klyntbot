@@ -1,11 +1,10 @@
-import { useCallback, type MouseEvent } from "react";
-import { Menu, MenuItem } from "@tauri-apps/api/menu";
-import { LogicalPosition } from "@tauri-apps/api/dpi";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-
-import type { WorkspaceInfo } from "@/types";
 import { pushErrorToast } from "@services/toasts";
+import { LogicalPosition } from "@tauri-apps/api/dpi";
+import { Menu, MenuItem } from "@tauri-apps/api/menu";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { fileManagerName } from "@utils/platformPaths";
+import { type MouseEvent, useCallback } from "react";
+import type { WorkspaceInfo } from "@/types";
 
 type SidebarMenuHandlers = {
   onDeleteThread: (workspaceId: string, threadId: string) => void;
@@ -31,12 +30,7 @@ export function useSidebarMenus({
   onDeleteWorktree,
 }: SidebarMenuHandlers) {
   const showThreadMenu = useCallback(
-    async (
-      event: MouseEvent,
-      workspaceId: string,
-      threadId: string,
-      canPin: boolean,
-    ) => {
+    async (event: MouseEvent, workspaceId: string, threadId: string, canPin: boolean) => {
       event.preventDefault();
       event.stopPropagation();
       const renameItem = await MenuItem.new({
@@ -83,14 +77,7 @@ export function useSidebarMenus({
       const position = new LogicalPosition(event.clientX, event.clientY);
       await menu.popup(position, window);
     },
-    [
-      isThreadPinned,
-      onDeleteThread,
-      onPinThread,
-      onRenameThread,
-      onSyncThread,
-      onUnpinThread,
-    ],
+    [isThreadPinned, onDeleteThread, onPinThread, onRenameThread, onSyncThread, onUnpinThread],
   );
 
   const showWorkspaceMenu = useCallback(
@@ -129,9 +116,7 @@ export function useSidebarMenus({
             return;
           }
           try {
-            const { revealItemInDir } = await import(
-              "@tauri-apps/plugin-opener"
-            );
+            const { revealItemInDir } = await import("@tauri-apps/plugin-opener");
             await revealItemInDir(worktree.path);
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -175,9 +160,7 @@ export function useSidebarMenus({
             return;
           }
           try {
-            const { revealItemInDir } = await import(
-              "@tauri-apps/plugin-opener"
-            );
+            const { revealItemInDir } = await import("@tauri-apps/plugin-opener");
             await revealItemInDir(clone.path);
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);

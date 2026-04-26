@@ -34,10 +34,7 @@ export function filterBranches(
   return branches.filter((branch) => matcher(trimmed, branch.name));
 }
 
-export function findExactBranch(
-  branches: BranchInfo[],
-  query: string,
-): BranchInfo | null {
+export function findExactBranch(branches: BranchInfo[], query: string): BranchInfo | null {
   const trimmed = query.trim();
   if (!trimmed) {
     return null;

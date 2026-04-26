@@ -1,7 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkspaceInfo } from "@/types";
+
 import {
   addWorkspace,
   addWorkspaceFromGitUrl,
@@ -12,6 +10,9 @@ import {
   renameWorktreeUpstream,
   updateWorkspaceSettings,
 } from "@services/tauri";
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { WorkspaceInfo } from "@/types";
 import { useWorkspaces } from "./useWorkspaces";
 
 vi.mock("../../../services/tauri", () => ({
@@ -165,18 +166,10 @@ describe("useWorkspaces.renameWorktree", () => {
     });
 
     await act(async () => {
-      await result.current.renameWorktreeUpstream(
-        "wt-1",
-        "feature/old",
-        "feature/new",
-      );
+      await result.current.renameWorktreeUpstream("wt-1", "feature/old", "feature/new");
     });
 
-    expect(renameWorktreeUpstreamMock).toHaveBeenCalledWith(
-      "wt-1",
-      "feature/old",
-      "feature/new",
-    );
+    expect(renameWorktreeUpstreamMock).toHaveBeenCalledWith("wt-1", "feature/old", "feature/new");
   });
 });
 
@@ -214,12 +207,12 @@ describe("useWorkspaces.updateWorkspaceSettings", () => {
 
     expect(updateWorkspaceSettingsMock).toHaveBeenCalledTimes(2);
     expect(
-      result.current.workspaces.find((entry) => entry.id === workspaceOne.id)
-        ?.settings.sidebarCollapsed,
+      result.current.workspaces.find((entry) => entry.id === workspaceOne.id)?.settings
+        .sidebarCollapsed,
     ).toBe(true);
     expect(
-      result.current.workspaces.find((entry) => entry.id === workspaceTwo.id)
-        ?.settings.sidebarCollapsed,
+      result.current.workspaces.find((entry) => entry.id === workspaceTwo.id)?.settings
+        .sidebarCollapsed,
     ).toBe(true);
   });
 });
@@ -282,10 +275,9 @@ describe("useWorkspaces.connectWorkspace", () => {
     });
 
     expect(connectWorkspaceMock).toHaveBeenCalledWith(workspaceOne.id);
-    expect(
-      result.current.workspaces.find((entry) => entry.id === workspaceOne.id)
-        ?.connected,
-    ).toBe(true);
+    expect(result.current.workspaces.find((entry) => entry.id === workspaceOne.id)?.connected).toBe(
+      true,
+    );
   });
 });
 
@@ -379,14 +371,10 @@ describe("useWorkspaces.addWorkspacesFromPaths", () => {
 
     let addResult: Awaited<ReturnType<typeof result.current.addWorkspacesFromPaths>>;
     await act(async () => {
-      addResult = await result.current.addWorkspacesFromPaths([
-        "\\\\?\\I:\\gpt-projects\\Klynt",
-      ]);
+      addResult = await result.current.addWorkspacesFromPaths(["\\\\?\\I:\\gpt-projects\\Klynt"]);
     });
 
-    expect(isWorkspacePathDirMock).toHaveBeenCalledWith(
-      "\\\\?\\I:\\gpt-projects\\Klynt",
-    );
+    expect(isWorkspacePathDirMock).toHaveBeenCalledWith("\\\\?\\I:\\gpt-projects\\Klynt");
     expect(addWorkspaceMock).not.toHaveBeenCalled();
     expect(addResult!.added).toHaveLength(0);
     expect(addResult!.skippedExisting).toEqual(["\\\\?\\I:\\gpt-projects\\Klynt"]);
@@ -416,19 +404,13 @@ describe("useWorkspaces.addWorkspacesFromPaths", () => {
 
     let addResult: Awaited<ReturnType<typeof result.current.addWorkspacesFromPaths>>;
     await act(async () => {
-      addResult = await result.current.addWorkspacesFromPaths([
-        "\\\\?\\UNC\\SERVER\\Share\\Klynt",
-      ]);
+      addResult = await result.current.addWorkspacesFromPaths(["\\\\?\\UNC\\SERVER\\Share\\Klynt"]);
     });
 
-    expect(isWorkspacePathDirMock).toHaveBeenCalledWith(
-      "\\\\?\\UNC\\SERVER\\Share\\Klynt",
-    );
+    expect(isWorkspacePathDirMock).toHaveBeenCalledWith("\\\\?\\UNC\\SERVER\\Share\\Klynt");
     expect(addWorkspaceMock).not.toHaveBeenCalled();
     expect(addResult!.added).toHaveLength(0);
-    expect(addResult!.skippedExisting).toEqual([
-      "\\\\?\\UNC\\SERVER\\Share\\Klynt",
-    ]);
+    expect(addResult!.skippedExisting).toEqual(["\\\\?\\UNC\\SERVER\\Share\\Klynt"]);
     expect(addResult!.skippedInvalid).toHaveLength(0);
     expect(addResult!.failures).toHaveLength(0);
   });
@@ -518,7 +500,9 @@ describe("useWorkspaces.addWorkspacesFromPaths", () => {
         path: "/Users/vlad/dev/existing",
       },
     ]);
-    isWorkspacePathDirMock.mockImplementation(async (path: string) => path === "/Users/vlad/dev/personal");
+    isWorkspacePathDirMock.mockImplementation(
+      async (path: string) => path === "/Users/vlad/dev/personal",
+    );
     addWorkspaceMock.mockResolvedValue({
       ...workspaceTwo,
       id: "added-home",
@@ -597,7 +581,6 @@ describe("useWorkspaces.addWorkspacesFromPaths", () => {
     expect(addResult!.failures).toHaveLength(0);
   });
 });
-
 
 describe("useWorkspaces.addWorkspaceFromGitUrl", () => {
   it("invokes service and activates workspace", async () => {

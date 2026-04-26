@@ -24,11 +24,7 @@ export function RenameThreadPrompt({
   }, []);
 
   return (
-    <ModalShell
-      className="worktree-modal"
-      onBackdropClick={onCancel}
-      ariaLabel="Rename thread"
-    >
+    <ModalShell className="worktree-modal" onBackdropClick={onCancel} ariaLabel="Rename thread">
       <div className="ds-modal-title worktree-modal-title">Rename thread</div>
       <div className="ds-modal-subtitle worktree-modal-subtitle">Current name: "{currentName}"</div>
       <label className="ds-modal-label worktree-modal-label" htmlFor="thread-rename">

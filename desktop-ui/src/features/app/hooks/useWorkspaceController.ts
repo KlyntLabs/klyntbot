@@ -1,9 +1,8 @@
+import { isMobilePlatform } from "@utils/platformPaths";
 import { useCallback } from "react";
 import { useWorkspaces } from "@/features/workspaces/hooks/useWorkspaces";
-import type { AppSettings, WorkspaceInfo } from "@/types";
-import type { DebugEntry } from "@/types";
+import type { AppSettings, DebugEntry, WorkspaceInfo } from "@/types";
 import { useWorkspaceDialogs } from "./useWorkspaceDialogs";
-import { isMobilePlatform } from "@utils/platformPaths";
 
 type WorkspaceControllerOptions = {
   appSettings: AppSettings;
@@ -45,10 +44,7 @@ export function useWorkspaceController({
   } = useWorkspaceDialogs();
 
   const runAddWorkspacesFromPaths = useCallback(
-    async (
-      paths: string[],
-      options?: { rememberMobileRemoteRecents?: boolean },
-    ) => {
+    async (paths: string[], options?: { rememberMobileRemoteRecents?: boolean }) => {
       const result = await addWorkspacesFromPathsCore(paths);
       await showAddWorkspacesResult(result);
       if (options?.rememberMobileRemoteRecents && result.added.length > 0) {
@@ -56,11 +52,7 @@ export function useWorkspaceController({
       }
       return result;
     },
-    [
-      addWorkspacesFromPathsCore,
-      rememberRecentMobileRemoteWorkspacePaths,
-      showAddWorkspacesResult,
-    ],
+    [addWorkspacesFromPathsCore, rememberRecentMobileRemoteWorkspacePaths, showAddWorkspacesResult],
   );
 
   const addWorkspacesFromPaths = useCallback(

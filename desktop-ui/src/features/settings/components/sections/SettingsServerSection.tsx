@@ -1,18 +1,18 @@
-import { useMemo, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
 import X from "lucide-react/dist/esm/icons/x";
-import type {
-  AppSettings,
-  TailscaleDaemonCommandPreview,
-  TailscaleStatus,
-  TcpDaemonStatus,
-} from "@/types";
+import type { Dispatch, SetStateAction } from "react";
+import { useMemo, useState } from "react";
 import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
 import {
   SettingsSection,
   SettingsToggleRow,
   SettingsToggleSwitch,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
+import type {
+  AppSettings,
+  TailscaleDaemonCommandPreview,
+  TailscaleStatus,
+  TcpDaemonStatus,
+} from "@/types";
 
 type AddRemoteBackendDraft = {
   name: string;
@@ -107,9 +107,7 @@ export function SettingsServerSection({
   onTcpDaemonStatus,
   onMobileConnectTest,
 }: SettingsServerSectionProps) {
-  const [pendingDeleteRemoteId, setPendingDeleteRemoteId] = useState<string | null>(
-    null,
-  );
+  const [pendingDeleteRemoteId, setPendingDeleteRemoteId] = useState<string | null>(null);
   const [addRemoteOpen, setAddRemoteOpen] = useState(false);
   const [addRemoteBusy, setAddRemoteBusy] = useState(false);
   const [addRemoteError, setAddRemoteError] = useState<string | null>(null);
@@ -121,7 +119,7 @@ export function SettingsServerSection({
     () =>
       pendingDeleteRemoteId == null
         ? null
-        : remoteBackends.find((entry) => entry.id === pendingDeleteRemoteId) ?? null,
+        : (remoteBackends.find((entry) => entry.id === pendingDeleteRemoteId) ?? null),
     [pendingDeleteRemoteId, remoteBackends],
   );
   const tcpRunnerStatusText = (() => {
@@ -186,7 +184,6 @@ export function SettingsServerSection({
           : "Configure how Klynt exposes TCP backend access for mobile and remote clients. Desktop usage remains local unless you explicitly connect through remote mode."
       }
     >
-
       {!isMobileSimplified && (
         <div className="settings-field">
           <label className="settings-field-label" htmlFor="backend-mode">
@@ -328,7 +325,9 @@ export function SettingsServerSection({
                   }
                 }}
               />
-              {remoteNameError && <div className="settings-help settings-help-error">{remoteNameError}</div>}
+              {remoteNameError && (
+                <div className="settings-help settings-help-error">{remoteNameError}</div>
+              )}
             </div>
           </>
         )}
@@ -387,7 +386,9 @@ export function SettingsServerSection({
               aria-label="Remote backend token"
             />
           </div>
-          {remoteHostError && <div className="settings-help settings-help-error">{remoteHostError}</div>}
+          {remoteHostError && (
+            <div className="settings-help settings-help-error">{remoteHostError}</div>
+          )}
           <div className="settings-help">
             {isMobileSimplified
               ? "Use the Tailscale host from your desktop Klynt app (Server section), for example `macbook.your-tailnet.ts.net:4732`."
@@ -409,7 +410,9 @@ export function SettingsServerSection({
               </button>
             </div>
             {mobileConnectStatusText && (
-              <div className={`settings-help${mobileConnectStatusError ? " settings-help-error" : ""}`}>
+              <div
+                className={`settings-help${mobileConnectStatusError ? " settings-help-error" : ""}`}
+              >
                 {mobileConnectStatusText}
               </div>
             )}
@@ -613,9 +616,16 @@ export function SettingsServerSection({
               disabled={addRemoteBusy}
             />
           </div>
-          {addRemoteError && <div className="settings-help settings-help-error">{addRemoteError}</div>}
+          {addRemoteError && (
+            <div className="settings-help settings-help-error">{addRemoteError}</div>
+          )}
           <div className="settings-add-remote-actions">
-            <button type="button" className="ghost" onClick={closeAddRemoteModal} disabled={addRemoteBusy}>
+            <button
+              type="button"
+              className="ghost"
+              onClick={closeAddRemoteModal}
+              disabled={addRemoteBusy}
+            >
               Cancel
             </button>
             <button
@@ -638,15 +648,11 @@ export function SettingsServerSection({
         >
           <div className="settings-delete-remote-title">Delete remote?</div>
           <div className="settings-delete-remote-message">
-            Remove <strong>{pendingDeleteRemote.name}</strong> from saved remotes? This only
-            removes the profile from this device.
+            Remove <strong>{pendingDeleteRemote.name}</strong> from saved remotes? This only removes
+            the profile from this device.
           </div>
           <div className="settings-delete-remote-actions">
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => setPendingDeleteRemoteId(null)}
-            >
+            <button type="button" className="ghost" onClick={() => setPendingDeleteRemoteId(null)}>
               Cancel
             </button>
             <button

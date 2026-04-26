@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AccessMode, ServiceTier } from "@/types";
 import {
-  STORAGE_KEY_THREAD_CODEX_PARAMS,
-  type ThreadCodexParams,
-  type ThreadCodexParamsMap,
   loadThreadCodexParams,
   makeThreadCodexParamsKey,
+  STORAGE_KEY_THREAD_CODEX_PARAMS,
   saveThreadCodexParams,
+  type ThreadCodexParams,
+  type ThreadCodexParamsMap,
 } from "@threads/utils/threadStorage";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AccessMode, ServiceTier } from "@/types";
 
 type ThreadCodexParamsPatch = Partial<
   Pick<
@@ -61,10 +61,7 @@ function sanitizeEntry(value: unknown): ThreadCodexParams | null {
     return null;
   }
   const entry = value as Record<string, unknown>;
-  const hasCodexArgsOverrideField = Object.prototype.hasOwnProperty.call(
-    entry,
-    "codexArgsOverride",
-  );
+  const hasCodexArgsOverrideField = Object.hasOwn(entry, "codexArgsOverride");
   const codexArgsOverride = hasCodexArgsOverrideField
     ? entry.codexArgsOverride === undefined
       ? undefined
@@ -72,7 +69,7 @@ function sanitizeEntry(value: unknown): ThreadCodexParams | null {
         ? entry.codexArgsOverride
         : null
     : undefined;
-  const hasServiceTierField = Object.prototype.hasOwnProperty.call(entry, "serviceTier");
+  const hasServiceTierField = Object.hasOwn(entry, "serviceTier");
   const serviceTier = hasServiceTierField
     ? entry.serviceTier === undefined
       ? undefined
@@ -86,9 +83,7 @@ function sanitizeEntry(value: unknown): ThreadCodexParams | null {
     serviceTier,
     accessMode: coerceAccessMode(entry.accessMode),
     collaborationModeId:
-      typeof entry.collaborationModeId === "string"
-        ? entry.collaborationModeId
-        : null,
+      typeof entry.collaborationModeId === "string" ? entry.collaborationModeId : null,
     codexArgsOverride,
     updatedAt: typeof entry.updatedAt === "number" ? entry.updatedAt : 0,
   };

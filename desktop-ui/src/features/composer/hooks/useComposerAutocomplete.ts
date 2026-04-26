@@ -80,10 +80,8 @@ function fileParts(label: string) {
   const normalized = label.replace(/\\/g, "/").toLowerCase();
   const base = basename(normalized);
   const dotIndex = base.lastIndexOf(".");
-  const name =
-    dotIndex > 0 && dotIndex < base.length - 1 ? base.slice(0, dotIndex) : base;
-  const ext =
-    dotIndex > 0 && dotIndex < base.length - 1 ? base.slice(dotIndex + 1) : "";
+  const name = dotIndex > 0 && dotIndex < base.length - 1 ? base.slice(0, dotIndex) : base;
+  const ext = dotIndex > 0 && dotIndex < base.length - 1 ? base.slice(dotIndex + 1) : "";
   return { normalized, base, name, ext };
 }
 
@@ -108,8 +106,7 @@ function scoreMatch(query: string, label: string) {
   const queryParts = normalizedQuery.split(".");
   const queryName = queryParts[0] ?? "";
   const queryExt = queryParts.length > 1 ? queryParts.slice(1).join(".") : "";
-  const matchExt =
-    !queryExt || ext.startsWith(queryExt) || ext.includes(queryExt);
+  const matchExt = !queryExt || ext.startsWith(queryExt) || ext.includes(queryExt);
   if (!matchExt) {
     return 0;
   }

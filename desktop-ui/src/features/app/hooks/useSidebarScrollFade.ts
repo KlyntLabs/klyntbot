@@ -23,9 +23,7 @@ export function useSidebarScrollFade(deps: ReadonlyArray<unknown>) {
       top: canScroll && scrollTop > 0,
       bottom: canScroll && scrollTop + clientHeight < scrollHeight - 1,
     };
-    setScrollFade((prev) =>
-      prev.top === next.top && prev.bottom === next.bottom ? prev : next,
-    );
+    setScrollFade((prev) => (prev.top === next.top && prev.bottom === next.bottom ? prev : next));
   }, []);
 
   useEffect(() => {

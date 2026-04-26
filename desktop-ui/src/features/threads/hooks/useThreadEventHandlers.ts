@@ -1,5 +1,6 @@
-import { useCallback, useMemo } from "react";
+import { getAppServerRawMethod } from "@utils/appServerEvents";
 import type { Dispatch, MutableRefObject } from "react";
+import { useCallback, useMemo } from "react";
 import type {
   AppServerEvent,
   CollabAgentRef,
@@ -8,13 +9,12 @@ import type {
   RateLimitSnapshot,
   TurnPlan,
 } from "@/types";
-import { getAppServerRawMethod } from "@utils/appServerEvents";
 import { useThreadApprovalEvents } from "./useThreadApprovalEvents";
 import { useThreadHookEvents } from "./useThreadHookEvents";
 import { useThreadItemEvents } from "./useThreadItemEvents";
+import type { ThreadAction } from "./useThreadsReducer";
 import { useThreadTurnEvents } from "./useThreadTurnEvents";
 import { useThreadUserInputEvents } from "./useThreadUserInputEvents";
-import type { ThreadAction } from "./useThreadsReducer";
 
 type ThreadEventHandlersOptions = {
   activeThreadId: string | null;
@@ -30,11 +30,7 @@ type ThreadEventHandlersOptions = {
   setActiveTurnId: (threadId: string, turnId: string | null) => void;
   getActiveTurnId: (threadId: string) => string | null;
   safeMessageActivity: () => void;
-  recordThreadActivity: (
-    workspaceId: string,
-    threadId: string,
-    timestamp?: number,
-  ) => void;
+  recordThreadActivity: (workspaceId: string, threadId: string, timestamp?: number) => void;
   onUserMessageCreated?: (
     workspaceId: string,
     threadId: string,
@@ -87,14 +83,12 @@ export function useThreadEventHandlers({
     approvalAllowlistRef,
   });
   const onRequestUserInput = useThreadUserInputEvents({ dispatch });
-  const {
-    onHookStarted: handleHookStarted,
-    onHookCompleted: handleHookCompleted,
-  } = useThreadHookEvents({
-    dispatch,
-    getItemsForThread,
-    safeMessageActivity,
-  });
+  const { onHookStarted: handleHookStarted, onHookCompleted: handleHookCompleted } =
+    useThreadHookEvents({
+      dispatch,
+      getItemsForThread,
+      safeMessageActivity,
+    });
   const onHookStarted = useCallback(
     ({
       workspaceId,

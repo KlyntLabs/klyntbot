@@ -1,5 +1,5 @@
-import type { ConversationItem, ThreadSummary } from "@/types";
 import { enrichConversationItemsWithThreads } from "@utils/threadItems";
+import type { ConversationItem, ThreadSummary } from "@/types";
 
 export function getActiveThreadIdForWorkspace(
   activeWorkspaceId: string | null,

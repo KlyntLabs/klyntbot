@@ -1,5 +1,5 @@
+import type { MainAppShell } from "@app/components/MainAppShell";
 import type { ComponentProps } from "react";
-import { MainAppShell } from "@app/components/MainAppShell";
 
 type UseMainAppShellPropsArgs = {
   shell: Pick<
@@ -15,10 +15,15 @@ type UseMainAppShellPropsArgs = {
     | "mobileSetupWizardProps"
   >;
   gitHubPanelDataProps: ComponentProps<typeof MainAppShell>["gitHubPanelDataProps"];
-  appLayout: Omit<ComponentProps<typeof MainAppShell>["appLayoutProps"], "desktopTopbarLeftNode" | "topbarActionsNode">;
+  appLayout: Omit<
+    ComponentProps<typeof MainAppShell>["appLayoutProps"],
+    "desktopTopbarLeftNode" | "topbarActionsNode"
+  >;
   topbar: {
     isCompact: boolean;
-    desktopTopbarLeftNode: ComponentProps<typeof MainAppShell>["appLayoutProps"]["desktopTopbarLeftNode"];
+    desktopTopbarLeftNode: ComponentProps<
+      typeof MainAppShell
+    >["appLayoutProps"]["desktopTopbarLeftNode"];
     hasActiveWorkspace: boolean;
     backendMode: "local" | "remote";
     remoteThreadConnectionState: "live" | "polling" | "disconnected";

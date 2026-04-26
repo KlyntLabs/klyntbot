@@ -1,36 +1,22 @@
-import type { GitHubIssue, GitHubPullRequest, GitLogEntry } from "@/types";
-import type { MouseEvent as ReactMouseEvent } from "react";
-import { Menu, MenuItem } from "@tauri-apps/api/menu";
+import { pushErrorToast } from "@services/toasts";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
+import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { fileManagerName, isAbsolutePath as isAbsolutePathForPlatform } from "@utils/platformPaths";
 import FileText from "lucide-react/dist/esm/icons/file-text";
 import GitBranch from "lucide-react/dist/esm/icons/git-branch";
 import ScrollText from "lucide-react/dist/esm/icons/scroll-text";
 import Search from "lucide-react/dist/esm/icons/search";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PanelTabId } from "@/features/layout/components/PanelTabs";
 import { PanelShell } from "@/features/layout/components/PanelShell";
-import { pushErrorToast } from "@services/toasts";
-import {
-  fileManagerName,
-  isAbsolutePath as isAbsolutePathForPlatform,
-} from "@utils/platformPaths";
-import {
-  GitBranchRow,
-  GitDiffModeContent,
-  GitIssuesModeContent,
-  GitLogModeContent,
-  GitPerFileModeContent,
-  GitPanelModeStatus,
-  GitPullRequestsModeContent,
-  GitRootCurrentPath,
-} from "./GitDiffPanelModeContent";
-import {
-  SidebarError,
-  type SidebarErrorAction,
-} from "./GitDiffPanelShared";
+import type { PanelTabId } from "@/features/layout/components/PanelTabs";
+import type { GitHubIssue, GitHubPullRequest, GitLogEntry } from "@/types";
+import { useDiffFileSelection } from "../hooks/useDiffFileSelection";
+import type { GitPanelMode } from "../types";
+import type { PerFileDiffGroup } from "../utils/perFileThreadDiffs";
 import {
   getFileName,
   getGitHubBaseUrl,
@@ -41,9 +27,17 @@ import {
   normalizeRootPath,
   resolveRootPath,
 } from "./GitDiffPanel.utils";
-import { useDiffFileSelection } from "../hooks/useDiffFileSelection";
-import type { GitPanelMode } from "../types";
-import type { PerFileDiffGroup } from "../utils/perFileThreadDiffs";
+import {
+  GitBranchRow,
+  GitDiffModeContent,
+  GitIssuesModeContent,
+  GitLogModeContent,
+  GitPanelModeStatus,
+  GitPerFileModeContent,
+  GitPullRequestsModeContent,
+  GitRootCurrentPath,
+} from "./GitDiffPanelModeContent";
+import { SidebarError, type SidebarErrorAction } from "./GitDiffPanelShared";
 
 type GitDiffPanelProps = {
   workspaceId?: string | null;
@@ -233,19 +227,13 @@ export function GitDiffPanel({
   syncError = null,
   commitsAhead = 0,
 }: GitDiffPanelProps) {
-  const [dismissedErrorSignatures, setDismissedErrorSignatures] = useState<Set<string>>(
-    new Set(),
-  );
-  const {
-    selectedFiles,
-    handleFileClick,
-    handleDiffListClick,
-    selectOnlyFile,
-  } = useDiffFileSelection({
-    stagedFiles,
-    unstagedFiles,
-    onSelectFile,
-  });
+  const [dismissedErrorSignatures, setDismissedErrorSignatures] = useState<Set<string>>(new Set());
+  const { selectedFiles, handleFileClick, handleDiffListClick, selectOnlyFile } =
+    useDiffFileSelection({
+      stagedFiles,
+      unstagedFiles,
+      onSelectFile,
+    });
 
   const ModeIcon = useMemo(() => {
     switch (mode) {
@@ -385,7 +373,8 @@ export function GitDiffPanel({
       event.stopPropagation();
 
       const isInSelection = selectedFiles.has(path);
-      const targetPaths = isInSelection && selectedFiles.size > 1 ? Array.from(selectedFiles) : [path];
+      const targetPaths =
+        isInSelection && selectedFiles.size > 1 ? Array.from(selectedFiles) : [path];
 
       if (!isInSelection) {
         selectOnlyFile(path);
@@ -560,7 +549,8 @@ export function GitDiffPanel({
   const hasAnyChanges = stagedFiles.length > 0 || unstagedFiles.length > 0;
   const showApplyWorktree = mode === "diff" && Boolean(onApplyWorktreeChanges) && hasAnyChanges;
   const canGenerateCommitMessage = hasAnyChanges;
-  const showGenerateCommitMessage = mode === "diff" && Boolean(onGenerateCommitMessage) && hasAnyChanges;
+  const showGenerateCommitMessage =
+    mode === "diff" && Boolean(onGenerateCommitMessage) && hasAnyChanges;
   const commitsBehind = logBehind;
 
   const sidebarErrorCandidates = useMemo(() => {
@@ -743,9 +733,7 @@ export function GitDiffPanel({
           onDiscardFile={onRevertFile ? discardFile : undefined}
           onDiscardFiles={onRevertFile ? discardFiles : undefined}
           onReviewUncommittedChanges={
-            onReviewUncommittedChanges
-              ? () => onReviewUncommittedChanges(workspaceId)
-              : undefined
+            onReviewUncommittedChanges ? () => onReviewUncommittedChanges(workspaceId) : undefined
           }
           selectedFiles={selectedFiles}
           selectedPath={selectedPath}

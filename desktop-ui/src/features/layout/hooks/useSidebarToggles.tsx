@@ -23,17 +23,11 @@ export function useSidebarToggles({ isCompact }: UseSidebarTogglesOptions) {
   );
 
   useEffect(() => {
-    window.localStorage.setItem(
-      SIDEBAR_COLLAPSED_KEY,
-      String(sidebarCollapsed),
-    );
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      RIGHT_PANEL_COLLAPSED_KEY,
-      String(rightPanelCollapsed),
-    );
+    window.localStorage.setItem(RIGHT_PANEL_COLLAPSED_KEY, String(rightPanelCollapsed));
   }, [rightPanelCollapsed]);
 
   const collapseSidebar = () => {

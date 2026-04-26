@@ -61,21 +61,14 @@ describe("PinnedThreadList", () => {
       throw new Error("Missing pinned row");
     }
     expect(row.classList.contains("active")).toBe(true);
-    expect(row.querySelector(".thread-status")?.className).toContain(
-      "reviewing",
-    );
+    expect(row.querySelector(".thread-status")?.className).toContain("reviewing");
     expect(screen.queryByText("Pinned")).toBeNull();
 
     fireEvent.click(row);
     expect(onSelectThread).toHaveBeenCalledWith("ws-1", "thread-1");
 
     fireEvent.contextMenu(row);
-    expect(onShowThreadMenu).toHaveBeenCalledWith(
-      expect.anything(),
-      "ws-1",
-      "thread-1",
-      true,
-    );
+    expect(onShowThreadMenu).toHaveBeenCalledWith(expect.anything(), "ws-1", "thread-1", true);
   });
 
   it("routes callbacks for rows across workspaces", () => {
@@ -104,12 +97,7 @@ describe("PinnedThreadList", () => {
     expect(onSelectThread).toHaveBeenCalledWith("ws-2", "thread-2");
 
     fireEvent.contextMenu(secondRow);
-    expect(onShowThreadMenu).toHaveBeenCalledWith(
-      expect.anything(),
-      "ws-2",
-      "thread-2",
-      true,
-    );
+    expect(onShowThreadMenu).toHaveBeenCalledWith(expect.anything(), "ws-2", "thread-2", true);
   });
 
   it("shows blue unread-style status when a pinned thread is waiting for user input", () => {

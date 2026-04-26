@@ -2,10 +2,7 @@ import { FileTreePanel } from "@/features/files/components/FileTreePanel";
 import { GitDiffPanel } from "@/features/git/components/GitDiffPanel";
 import { GitDiffViewer } from "@/features/git/components/GitDiffViewer";
 import { PromptPanel } from "@/features/prompts/components/PromptPanel";
-import type {
-  LayoutGitSurface,
-  LayoutNodesResult,
-} from "./types";
+import type { LayoutGitSurface, LayoutNodesResult } from "./types";
 
 export type GitLayoutNodesOptions = LayoutGitSurface;
 
@@ -26,9 +23,7 @@ function resolveGitDiffStyle({
 
 function buildGitDiffPanelNode(options: GitLayoutNodesOptions) {
   const selectedDiffPath =
-    options.diffViewProps.centerMode === "diff"
-      ? options.gitDiffViewerProps.selectedPath
-      : null;
+    options.diffViewProps.centerMode === "diff" ? options.gitDiffViewerProps.selectedPath : null;
 
   if (options.filePanelMode === "files" && options.fileTreeProps) {
     return <FileTreePanel {...options.fileTreeProps} />;
@@ -36,12 +31,7 @@ function buildGitDiffPanelNode(options: GitLayoutNodesOptions) {
   if (options.filePanelMode === "prompts") {
     return <PromptPanel {...options.promptPanelProps} />;
   }
-  return (
-    <GitDiffPanel
-      {...options.gitDiffPanelProps}
-      selectedPath={selectedDiffPath}
-    />
-  );
+  return <GitDiffPanel {...options.gitDiffPanelProps} selectedPath={selectedDiffPath} />;
 }
 
 function buildGitDiffViewerNode(options: GitLayoutNodesOptions) {

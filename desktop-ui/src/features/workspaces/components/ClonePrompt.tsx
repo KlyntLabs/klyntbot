@@ -38,8 +38,7 @@ export function ClonePrompt({
   }, []);
 
   const canCreate = copyName.trim().length > 0 && copiesFolder.trim().length > 0;
-  const showSuggested =
-    Boolean(suggestedCopiesFolder) && copiesFolder.trim().length === 0;
+  const showSuggested = Boolean(suggestedCopiesFolder) && copiesFolder.trim().length === 0;
 
   return (
     <ModalShell

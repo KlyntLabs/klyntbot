@@ -1,7 +1,7 @@
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
 import Folder from "lucide-react/dist/esm/icons/folder";
 import GitBranch from "lucide-react/dist/esm/icons/git-branch";
 import ScrollText from "lucide-react/dist/esm/icons/scroll-text";
+import { type KeyboardEvent, type ReactNode, useRef } from "react";
 
 export type PanelTabId = "git" | "files" | "prompts";
 

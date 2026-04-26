@@ -1,8 +1,7 @@
 import type { AppMention, ReviewTarget, TrayRecentThreadEntry, TraySessionUsage } from "@/types";
-import { invoke } from "../client";
+import { invoke, isMissingTauriInvokeError } from "../client";
 import { convertImagesToDataUrls } from "./files";
 import { getAppSettings, isMobileRuntime } from "./settings";
-import { isMissingTauriInvokeError } from "../client";
 
 async function normalizeImagesForRpc(images?: string[]): Promise<string[] | null> {
   if (images == null) {
@@ -13,9 +12,7 @@ async function normalizeImagesForRpc(images?: string[]): Promise<string[] | null
   }
   const hasPathImages = images.some(
     (image) =>
-      !image.startsWith("data:") &&
-      !image.startsWith("http://") &&
-      !image.startsWith("https://"),
+      !image.startsWith("data:") && !image.startsWith("http://") && !image.startsWith("https://"),
   );
   if (!hasPathImages) {
     return images;
@@ -84,11 +81,7 @@ export async function sendUserMessage(
   return invoke("send_user_message", payload);
 }
 
-export async function interruptTurn(
-  workspaceId: string,
-  threadId: string,
-  turnId: string,
-) {
+export async function interruptTurn(workspaceId: string, threadId: string, turnId: string) {
   return invoke("turn_interrupt", { workspaceId, threadId, turnId });
 }
 
@@ -151,10 +144,7 @@ export async function respondToUserInputRequest(
   });
 }
 
-export async function rememberApprovalRule(
-  workspaceId: string,
-  command: string[],
-) {
+export async function rememberApprovalRule(workspaceId: string, command: string[]) {
   return invoke("remember_approval_rule", { workspaceId, command });
 }
 
@@ -195,11 +185,7 @@ export async function archiveThread(workspaceId: string, threadId: string) {
   return invoke<any>("archive_thread", { workspaceId, threadId });
 }
 
-export async function setThreadName(
-  workspaceId: string,
-  threadId: string,
-  name: string,
-) {
+export async function setThreadName(workspaceId: string, threadId: string, name: string) {
   return invoke<any>("set_thread_name", { workspaceId, threadId, name });
 }
 
@@ -233,8 +219,7 @@ export async function runCodexLogin(workspaceId: string) {
 }
 
 export async function cancelCodexLogin(workspaceId: string) {
-  return invoke<{ canceled: boolean; status?: string; raw?: unknown }>(
-    "codex_login_cancel",
-    { workspaceId },
-  );
+  return invoke<{ canceled: boolean; status?: string; raw?: unknown }>("codex_login_cancel", {
+    workspaceId,
+  });
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import type { WorkspaceInfo } from "@/types";
 import type { WorktreeRenameState } from "@/features/layout/hooks/layoutNodes/types";
+import type { WorkspaceInfo } from "@/types";
 
 type RenameWorktreePromptState = {
   workspaceId: string;
@@ -45,10 +45,10 @@ export function useMainAppWorktreeState({
 }: UseMainAppWorktreeStateArgs) {
   const isWorktreeWorkspace = activeWorkspace?.kind === "worktree";
   const activeParentWorkspace = isWorktreeWorkspace
-    ? workspacesById.get(activeWorkspace?.parentId ?? "") ?? null
+    ? (workspacesById.get(activeWorkspace?.parentId ?? "") ?? null)
     : null;
   const worktreeLabel = isWorktreeWorkspace
-    ? (activeWorkspace?.name?.trim() || activeWorkspace?.worktree?.branch) ?? null
+    ? ((activeWorkspace?.name?.trim() || activeWorkspace?.worktree?.branch) ?? null)
     : null;
   const activeRenamePrompt =
     renameWorktreePrompt?.workspaceId === activeWorkspace?.id ? renameWorktreePrompt : null;

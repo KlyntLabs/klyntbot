@@ -36,11 +36,8 @@ export function useRenameWorktreePrompt({
   renameWorktreeUpstream,
   onRenameSuccess,
 }: UseRenameWorktreePromptOptions) {
-  const [renamePrompt, setRenamePrompt] = useState<RenamePromptState | null>(
-    null,
-  );
-  const [upstreamPrompt, setUpstreamPrompt] =
-    useState<UpstreamPromptState | null>(null);
+  const [renamePrompt, setRenamePrompt] = useState<RenamePromptState | null>(null);
+  const [upstreamPrompt, setUpstreamPrompt] = useState<UpstreamPromptState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimerRef = useRef<number | null>(null);
 
@@ -81,10 +78,7 @@ export function useRenameWorktreePrompt({
     if (!upstreamPrompt) {
       return;
     }
-    if (
-      activeWorkspaceId &&
-      upstreamPrompt.workspaceId !== activeWorkspaceId
-    ) {
+    if (activeWorkspaceId && upstreamPrompt.workspaceId !== activeWorkspaceId) {
       setUpstreamPrompt(null);
     }
   }, [activeWorkspaceId, upstreamPrompt]);
@@ -184,9 +178,7 @@ export function useRenameWorktreePrompt({
     if (!upstreamPrompt || upstreamPrompt.isSubmitting) {
       return;
     }
-    setUpstreamPrompt((prev) =>
-      prev ? { ...prev, isSubmitting: true, error: null } : prev,
-    );
+    setUpstreamPrompt((prev) => (prev ? { ...prev, isSubmitting: true, error: null } : prev));
     try {
       await renameWorktreeUpstream(
         upstreamPrompt.workspaceId,

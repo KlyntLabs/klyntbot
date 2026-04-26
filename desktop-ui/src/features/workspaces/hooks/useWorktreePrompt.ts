@@ -187,9 +187,7 @@ export function useWorktreePrompt({
       parentWorkspace = await persistSetupScript(snapshot);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setWorktreePrompt((prev) =>
-        prev ? { ...prev, isSubmitting: false, error: message } : prev,
-      );
+      setWorktreePrompt((prev) => (prev ? { ...prev, isSubmitting: false, error: message } : prev));
       onError?.(message);
       return;
     }
@@ -218,9 +216,7 @@ export function useWorktreePrompt({
       setWorktreePrompt(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setWorktreePrompt((prev) =>
-        prev ? { ...prev, isSubmitting: false, error: message } : prev,
-      );
+      setWorktreePrompt((prev) => (prev ? { ...prev, isSubmitting: false, error: message } : prev));
       onError?.(message);
     }
   }, [

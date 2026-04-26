@@ -36,9 +36,7 @@ export function PlanPanel({ plan, isProcessing }: PlanPanelProps) {
         <span>Plan</span>
         {progress && <span className="plan-progress">{progress}</span>}
       </div>
-      {plan?.explanation && (
-        <div className="plan-explanation">{plan.explanation}</div>
-      )}
+      {plan?.explanation && <div className="plan-explanation">{plan.explanation}</div>}
       {showEmpty ? (
         <div className="plan-empty">{emptyLabel}</div>
       ) : (

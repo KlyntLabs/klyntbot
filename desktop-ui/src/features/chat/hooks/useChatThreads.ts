@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useCallback, useEffect, useState } from "react";
 import type { ChatThread } from "../types";
 
 export interface UseChatThreadsResult {

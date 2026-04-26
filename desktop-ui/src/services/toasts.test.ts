@@ -26,4 +26,3 @@ describe("error toasts", () => {
     unsubscribe();
   });
 });
-

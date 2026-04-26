@@ -1,7 +1,6 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import type { PostUpdateNoticeState, UpdateState } from "../hooks/useUpdater";
 import {
   ToastActions,
   ToastBody,
@@ -11,6 +10,7 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/features/design-system/components/toast/ToastPrimitives";
+import type { PostUpdateNoticeState, UpdateState } from "../hooks/useUpdater";
 
 type UpdateToastProps = {
   state: UpdateState;
@@ -90,8 +90,7 @@ export function UpdateToast({
           ) : null}
           {postUpdateNotice.stage === "fallback" ? (
             <ToastBody className="update-toast-body">
-              Updated to v{postUpdateNotice.version}. Release notes could not be
-              loaded.
+              Updated to v{postUpdateNotice.version}. Release notes could not be loaded.
             </ToastBody>
           ) : null}
           <ToastActions className="update-toast-actions">
@@ -105,10 +104,7 @@ export function UpdateToast({
                 View on GitHub
               </button>
             ) : null}
-            <button
-              className="secondary"
-              onClick={onDismissPostUpdateNotice ?? onDismiss}
-            >
+            <button className="secondary" onClick={onDismissPostUpdateNotice ?? onDismiss}>
               Dismiss
             </button>
           </ToastActions>
@@ -124,27 +120,21 @@ export function UpdateToast({
   const totalBytes = state.progress?.totalBytes;
   const downloadedBytes = state.progress?.downloadedBytes ?? 0;
   const percent =
-    totalBytes && totalBytes > 0
-      ? Math.min(100, (downloadedBytes / totalBytes) * 100)
-      : null;
+    totalBytes && totalBytes > 0 ? Math.min(100, (downloadedBytes / totalBytes) * 100) : null;
 
   return (
     <ToastViewport className="update-toasts" role="region" ariaLive="polite">
       <ToastCard className="update-toast" role="status">
         <ToastHeader className="update-toast-header">
           <ToastTitle className="update-toast-title">Update</ToastTitle>
-          {state.version ? (
-            <div className="update-toast-version">v{state.version}</div>
-          ) : null}
+          {state.version ? <div className="update-toast-version">v{state.version}</div> : null}
         </ToastHeader>
         {state.stage === "checking" && (
           <ToastBody className="update-toast-body">Checking for updates...</ToastBody>
         )}
         {state.stage === "available" && (
           <>
-            <ToastBody className="update-toast-body">
-              A new version is available.
-            </ToastBody>
+            <ToastBody className="update-toast-body">A new version is available.</ToastBody>
             <ToastActions className="update-toast-actions">
               <button className="secondary" onClick={onDismiss}>
                 Later
@@ -167,9 +157,7 @@ export function UpdateToast({
         )}
         {state.stage === "downloading" && (
           <>
-            <ToastBody className="update-toast-body">
-              Downloading update…
-            </ToastBody>
+            <ToastBody className="update-toast-body">Downloading update…</ToastBody>
             <div className="update-toast-progress">
               <div className="update-toast-progress-bar">
                 <span

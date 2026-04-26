@@ -47,12 +47,20 @@
   cursor: pointer;
   min-height: 34px;
   appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
     linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
-  background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
-  background-size: 5px 5px, 5px 5px;
+  background-position:
+    calc(100% - 16px) 50%,
+    calc(100% - 11px) 50%;
+  background-size:
+    5px 5px,
+    5px 5px;
   background-repeat: no-repeat;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .git-panel-select-input option {
@@ -146,7 +154,10 @@
   flex-shrink: 0;
   box-shadow: none;
   transform: none;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .diff-branch-refresh:hover:not(:disabled) {
@@ -225,7 +236,10 @@
   color: var(--text-emphasis);
   box-shadow: none;
   transform: none;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .git-root-button:hover:not(:disabled),
@@ -335,7 +349,6 @@
   font-size: var(--fs-2xs);
   color: var(--text-faint);
 }
-
 
 .diff-list {
   display: flex;
@@ -646,7 +659,9 @@
   cursor: pointer;
   border: 0;
   background: transparent;
-  transition: background 160ms ease, box-shadow 160ms ease;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .diff-row-meta {
@@ -685,7 +700,10 @@
   opacity: 0;
   pointer-events: none;
   transform: translateX(6px);
-  transition: max-width 180ms ease, opacity 140ms ease, transform 140ms ease,
+  transition:
+    max-width 180ms ease,
+    opacity 140ms ease,
+    transform 140ms ease,
     margin-left 180ms ease;
 }
 
@@ -711,7 +729,10 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
   position: relative;
 }
 
@@ -809,7 +830,6 @@
   border-color: rgba(255, 107, 107, 0.45);
   background: rgba(255, 107, 107, 0.12);
 }
-
 
 .diff-icon-renamed,
 .diff-icon-typechange,
@@ -988,7 +1008,9 @@
   box-shadow: none;
   outline: none;
   transform: none;
-  transition: background 160ms ease, box-shadow 160ms ease;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
   min-width: 0;
 }
 
@@ -1165,7 +1187,10 @@
   resize: vertical;
   min-height: 56px;
   max-height: 132px;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .commit-message-input::placeholder {
@@ -1198,7 +1223,10 @@
   background: var(--cm-surface-panel-soft);
   color: var(--text-muted);
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .commit-message-generate-button:hover:not(:disabled) {
@@ -1251,7 +1279,10 @@
   cursor: pointer;
   box-shadow: none;
   transform: none;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .commit-button:hover:not(:disabled) {
@@ -1317,7 +1348,10 @@
   cursor: pointer;
   box-shadow: none;
   transform: none;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .push-button:hover:not(:disabled) {
@@ -1348,7 +1382,9 @@
   cursor: pointer;
   box-shadow: none;
   transform: none;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
 }
 
 .push-button-secondary:hover:not(:disabled) {

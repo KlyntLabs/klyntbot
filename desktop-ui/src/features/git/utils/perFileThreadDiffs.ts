@@ -82,12 +82,12 @@ function countDiffStats(diff: string): { additions: number; deletions: number } 
       continue;
     }
     if (
-      line.startsWith("+++")
-      || line.startsWith("---")
-      || line.startsWith("diff --git")
-      || line.startsWith("@@")
-      || line.startsWith("index ")
-      || line.startsWith("\\ No newline")
+      line.startsWith("+++") ||
+      line.startsWith("---") ||
+      line.startsWith("diff --git") ||
+      line.startsWith("@@") ||
+      line.startsWith("index ") ||
+      line.startsWith("\\ No newline")
     ) {
       continue;
     }

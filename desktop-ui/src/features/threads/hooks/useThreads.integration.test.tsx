@@ -1,7 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkspaceInfo } from "@/types";
+
 import type { useAppServerEvents } from "@app/hooks/useAppServerEvents";
 import { useThreadRows } from "@app/hooks/useThreadRows";
 import {
@@ -12,11 +10,14 @@ import {
   resumeThread,
   sendUserMessage as sendUserMessageService,
   setThreadName,
-  startThread,
   startReview,
+  startThread,
   steerTurn,
 } from "@services/tauri";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { STORAGE_KEY_DETACHED_REVIEW_LINKS } from "@threads/utils/threadStorage";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { WorkspaceInfo } from "@/types";
 import { useQueuedSend } from "./useQueuedSend";
 import { useThreads } from "./useThreads";
 
@@ -126,10 +127,7 @@ describe("useThreads UX integration", () => {
 
     const activeItems = result.current.activeItems;
     const assistantMerged = activeItems.find(
-      (item) =>
-        item.kind === "message" &&
-        item.role === "assistant" &&
-        item.id === "assistant-1",
+      (item) => item.kind === "message" && item.role === "assistant" && item.id === "assistant-1",
     );
     expect(assistantMerged?.kind).toBe("message");
     if (assistantMerged?.kind === "message") {
@@ -379,11 +377,7 @@ describe("useThreads UX integration", () => {
     ensureWorkspaceRuntimeCodexArgs.mockClear();
 
     await act(async () => {
-      await result.current.sendUserMessageToThread(
-        workspace,
-        "thread-target",
-        "hello target",
-      );
+      await result.current.sendUserMessageToThread(workspace, "thread-target", "hello target");
     });
 
     expect(ensureWorkspaceRuntimeCodexArgs).not.toHaveBeenCalled();
@@ -472,10 +466,7 @@ describe("useThreads UX integration", () => {
     });
 
     await waitFor(() => {
-      expect(vi.mocked(resumeThread)).toHaveBeenCalledWith(
-        "ws-1",
-        "thread-scrollback",
-      );
+      expect(vi.mocked(resumeThread)).toHaveBeenCalledWith("ws-1", "thread-scrollback");
     });
 
     await waitFor(() => {
@@ -530,16 +521,10 @@ describe("useThreads UX integration", () => {
     );
 
     act(() => {
-      handlers?.onTurnDiffUpdated?.(
-        "ws-1",
-        "thread-1",
-        "diff --git a/src/a.ts b/src/a.ts",
-      );
+      handlers?.onTurnDiffUpdated?.("ws-1", "thread-1", "diff --git a/src/a.ts b/src/a.ts");
     });
 
-    expect(result.current.turnDiffByThread["thread-1"]).toBe(
-      "diff --git a/src/a.ts b/src/a.ts",
-    );
+    expect(result.current.turnDiffByThread["thread-1"]).toBe("diff --git a/src/a.ts b/src/a.ts");
   });
 
   it("does not resume selected threads that already have local items", async () => {
@@ -602,9 +587,7 @@ describe("useThreads UX integration", () => {
     const activeItems = result.current.activeItems;
     const hasLocal = activeItems.some(
       (item) =>
-        item.kind === "message" &&
-        item.role === "assistant" &&
-        item.id === "local-assistant-1",
+        item.kind === "message" && item.role === "assistant" && item.id === "local-assistant-1",
     );
     const hasRemote = activeItems.some(
       (item) => item.kind === "message" && item.id === "server-user-1",
@@ -827,7 +810,7 @@ describe("useThreads UX integration", () => {
       const status = threadId ? threads.threadStatusById[threadId] : undefined;
       const queued = useQueuedSend({
         activeThreadId: threadId,
-        activeTurnId: threadId ? threads.activeTurnIdByThread[threadId] ?? null : null,
+        activeTurnId: threadId ? (threads.activeTurnIdByThread[threadId] ?? null) : null,
         isProcessing: status?.isProcessing ?? false,
         isReviewing: status?.isReviewing ?? false,
         steerEnabled: false,
@@ -1157,9 +1140,7 @@ describe("useThreads UX integration", () => {
     expect(result.current.threadParentById["thread-child-live-flat-parent"]).toBe(
       "thread-parent-live-flat",
     );
-    expect(result.current.isSubagentThread("ws-1", "thread-child-live-flat-parent")).toBe(
-      true,
-    );
+    expect(result.current.isSubagentThread("ws-1", "thread-child-live-flat-parent")).toBe(true);
   });
 
   it("classifies live spawned threads from collab tool events", () => {
@@ -1179,9 +1160,7 @@ describe("useThreads UX integration", () => {
       });
     });
 
-    expect(result.current.threadParentById["thread-child-live-collab"]).toBe(
-      "thread-parent-live",
-    );
+    expect(result.current.threadParentById["thread-child-live-collab"]).toBe("thread-parent-live");
     expect(result.current.isSubagentThread("ws-1", "thread-child-live-collab")).toBe(true);
   });
 
@@ -1206,9 +1185,7 @@ describe("useThreads UX integration", () => {
     expect(result.current.threadParentById["thread-child-live-spawn-hint"]).toBe(
       "thread-parent-live",
     );
-    expect(result.current.isSubagentThread("ws-1", "thread-child-live-spawn-hint")).toBe(
-      true,
-    );
+    expect(result.current.isSubagentThread("ws-1", "thread-child-live-spawn-hint")).toBe(true);
   });
 
   it("classifies collab receivers from receiver_agents metadata", () => {
@@ -1237,9 +1214,7 @@ describe("useThreads UX integration", () => {
     expect(result.current.threadParentById["thread-child-live-agent-ref"]).toBe(
       "thread-parent-live",
     );
-    expect(result.current.isSubagentThread("ws-1", "thread-child-live-agent-ref")).toBe(
-      true,
-    );
+    expect(result.current.isSubagentThread("ws-1", "thread-child-live-agent-ref")).toBe(true);
   });
 
   it("enriches live collab spawn rows as soon as thread started metadata arrives", () => {
@@ -1463,10 +1438,7 @@ describe("useThreads UX integration", () => {
 
     await waitFor(() => {
       expect(vi.mocked(archiveThread)).toHaveBeenCalledWith("ws-1", "thread-child");
-      expect(vi.mocked(archiveThread)).toHaveBeenCalledWith(
-        "ws-1",
-        "thread-grandchild",
-      );
+      expect(vi.mocked(archiveThread)).toHaveBeenCalledWith("ws-1", "thread-grandchild");
     });
     expect(vi.mocked(archiveThread)).not.toHaveBeenCalledWith("ws-1", "thread-parent");
     expect(vi.mocked(archiveThread)).toHaveBeenCalledTimes(2);
@@ -1577,10 +1549,7 @@ describe("useThreads UX integration", () => {
     });
 
     await waitFor(() => {
-      expect(vi.mocked(archiveThread)).toHaveBeenCalledWith(
-        "ws-1",
-        "thread-review-subagent",
-      );
+      expect(vi.mocked(archiveThread)).toHaveBeenCalledWith("ws-1", "thread-review-subagent");
     });
     expect(vi.mocked(archiveThread)).not.toHaveBeenCalledWith("ws-1", "thread-review-1");
   });
@@ -1808,9 +1777,7 @@ describe("useThreads UX integration", () => {
     });
 
     expect(first.result.current.threadParentById["thread-review-1"]).toBe("thread-parent");
-    expect(localStorage.getItem(STORAGE_KEY_DETACHED_REVIEW_LINKS)).toContain(
-      "thread-review-1",
-    );
+    expect(localStorage.getItem(STORAGE_KEY_DETACHED_REVIEW_LINKS)).toContain("thread-review-1");
 
     first.unmount();
 
@@ -1826,9 +1793,7 @@ describe("useThreads UX integration", () => {
     });
 
     await waitFor(() => {
-      expect(second.result.current.threadParentById["thread-review-1"]).toBe(
-        "thread-parent",
-      );
+      expect(second.result.current.threadParentById["thread-review-1"]).toBe("thread-parent");
     });
   });
 
@@ -1916,11 +1881,7 @@ describe("useThreads UX integration", () => {
     act(() => {
       result.current.renameThread("ws-1", "thread-b", "Custom Beta");
     });
-    expect(vi.mocked(setThreadName)).toHaveBeenCalledWith(
-      "ws-1",
-      "thread-b",
-      "Custom Beta",
-    );
+    expect(vi.mocked(setThreadName)).toHaveBeenCalledWith("ws-1", "thread-b", "Custom Beta");
 
     await act(async () => {
       await result.current.listThreadsForWorkspace(workspace);
@@ -1947,10 +1908,7 @@ describe("useThreads UX integration", () => {
       result.current.getPinTimestamp,
     );
 
-    expect(pinnedRows.map((row) => row.thread.id)).toEqual([
-      "thread-c",
-      "thread-a",
-    ]);
+    expect(pinnedRows.map((row) => row.thread.id)).toEqual(["thread-c", "thread-a"]);
     expect(unpinnedRows.map((row) => row.thread.id)).toEqual(["thread-b"]);
   });
 
@@ -2017,9 +1975,7 @@ describe("useThreads UX integration", () => {
     });
 
     await waitFor(() => {
-      expect(result.current.threadParentById["thread-child-anchor"]).toBe(
-        "thread-parent-anchor",
-      );
+      expect(result.current.threadParentById["thread-child-anchor"]).toBe("thread-parent-anchor");
     });
 
     await act(async () => {
@@ -2027,9 +1983,10 @@ describe("useThreads UX integration", () => {
     });
 
     expect(vi.mocked(listThreads)).toHaveBeenCalledTimes(2);
-    expect(result.current.threadsByWorkspace["ws-1"]?.map((thread) => thread.id)).toEqual(
-      ["thread-child-anchor", "thread-parent-anchor"],
-    );
+    expect(result.current.threadsByWorkspace["ws-1"]?.map((thread) => thread.id)).toEqual([
+      "thread-child-anchor",
+      "thread-parent-anchor",
+    ]);
 
     const { result: threadRowsResult } = renderHook(() =>
       useThreadRows(result.current.threadParentById),

@@ -1,9 +1,9 @@
-import type { AppSettings } from "@/types";
 import {
   SettingsSection,
   SettingsToggleRow,
   SettingsToggleSwitch,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
+import type { AppSettings } from "@/types";
 
 type ComposerPreset = AppSettings["composerEditorPreset"];
 
@@ -32,7 +32,10 @@ export function SettingsComposerSection({
     >
       <div className="settings-field">
         <div className="settings-field-label">Follow-up behavior</div>
-        <div className={`settings-segmented${appSettings.followUpMessageBehavior === "steer" ? " is-second-active" : ""}`} aria-label="Follow-up behavior">
+        <div
+          className={`settings-segmented${appSettings.followUpMessageBehavior === "steer" ? " is-second-active" : ""}`}
+          aria-label="Follow-up behavior"
+        >
           <label
             className={`settings-segmented-option${
               appSettings.followUpMessageBehavior === "queue" ? " is-active" : ""
@@ -116,9 +119,7 @@ export function SettingsComposerSection({
           id="composer-preset"
           className="settings-select"
           value={appSettings.composerEditorPreset}
-          onChange={(event) =>
-            onComposerPresetChange(event.target.value as ComposerPreset)
-          }
+          onChange={(event) => onComposerPresetChange(event.target.value as ComposerPreset)}
         >
           {Object.entries(composerPresetLabels).map(([preset, label]) => (
             <option key={preset} value={preset}>
@@ -191,9 +192,7 @@ export function SettingsComposerSection({
       <SettingsToggleRow
         title="Copy blocks without fences"
         subtitle={
-          <>
-            When enabled, Copy is plain text. Hold {optionKeyLabel} to include ``` fences.
-          </>
+          <>When enabled, Copy is plain text. Hold {optionKeyLabel} to include ``` fences.</>
         }
       >
         <SettingsToggleSwitch
@@ -201,8 +200,7 @@ export function SettingsComposerSection({
           onClick={() =>
             void onUpdateAppSettings({
               ...appSettings,
-              composerCodeBlockCopyUseModifier:
-                !appSettings.composerCodeBlockCopyUseModifier,
+              composerCodeBlockCopyUseModifier: !appSettings.composerCodeBlockCopyUseModifier,
             })
           }
         />
@@ -218,8 +216,7 @@ export function SettingsComposerSection({
           onClick={() =>
             void onUpdateAppSettings({
               ...appSettings,
-              composerFenceAutoWrapPasteMultiline:
-                !appSettings.composerFenceAutoWrapPasteMultiline,
+              composerFenceAutoWrapPasteMultiline: !appSettings.composerFenceAutoWrapPasteMultiline,
             })
           }
         />
@@ -233,8 +230,7 @@ export function SettingsComposerSection({
           onClick={() =>
             void onUpdateAppSettings({
               ...appSettings,
-              composerFenceAutoWrapPasteCodeLike:
-                !appSettings.composerFenceAutoWrapPasteCodeLike,
+              composerFenceAutoWrapPasteCodeLike: !appSettings.composerFenceAutoWrapPasteCodeLike,
             })
           }
         />

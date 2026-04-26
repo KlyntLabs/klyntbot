@@ -17,9 +17,8 @@ describe("playNotificationSound", () => {
 
   afterEach(() => {
     window.AudioContext = originalAudioContext;
-    (
-      window as typeof window & { webkitAudioContext?: typeof AudioContext }
-    ).webkitAudioContext = originalWebkitAudioContext;
+    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext =
+      originalWebkitAudioContext;
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });

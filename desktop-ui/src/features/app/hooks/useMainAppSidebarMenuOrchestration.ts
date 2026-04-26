@@ -20,12 +20,8 @@ type UseMainAppSidebarMenuOrchestrationArgs = {
     onAddWorkspace: () => void;
     onAddWorkspaceFromUrl: () => void;
     onAddAgent: NonNullable<Parameters<typeof useAppMenuEvents>[0]["onAddAgent"]>;
-    onAddWorktreeAgent: NonNullable<
-      Parameters<typeof useAppMenuEvents>[0]["onAddWorktreeAgent"]
-    >;
-    onAddCloneAgent: NonNullable<
-      Parameters<typeof useAppMenuEvents>[0]["onAddCloneAgent"]
-    >;
+    onAddWorktreeAgent: NonNullable<Parameters<typeof useAppMenuEvents>[0]["onAddWorktreeAgent"]>;
+    onAddCloneAgent: NonNullable<Parameters<typeof useAppMenuEvents>[0]["onAddCloneAgent"]>;
   };
   appSettings: Parameters<typeof useMenuAcceleratorController>[0]["appSettings"];
   onDebug: Parameters<typeof useMenuAcceleratorController>[0]["onDebug"];

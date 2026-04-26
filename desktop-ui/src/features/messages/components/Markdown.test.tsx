@@ -10,12 +10,7 @@ describe("Markdown file-like href behavior", () => {
   });
 
   it("prevents file-like href navigation when no file opener is provided", () => {
-    render(
-      <Markdown
-        value="See [setup](./docs/setup.md)"
-        className="markdown"
-      />,
-    );
+    render(<Markdown value="See [setup](./docs/setup.md)" className="markdown" />);
 
     const link = screen.getByText("setup").closest("a");
     expect(link?.getAttribute("href")).toBe("./docs/setup.md");
@@ -357,14 +352,11 @@ describe("Markdown file-like href behavior", () => {
     );
 
     fireEvent.contextMenu(link as Element);
-    expect(onOpenFileLinkMenu).toHaveBeenCalledWith(
-      expect.anything(),
-      {
-        path: "I:\\gpt-projects\\Klynt\\src\\features\\settings\\components\\sections\\SettingsDisplaySection.tsx",
-        line: 422,
-        column: null,
-      },
-    );
+    expect(onOpenFileLinkMenu).toHaveBeenCalledWith(expect.anything(), {
+      path: "I:\\gpt-projects\\Klynt\\src\\features\\settings\\components\\sections\\SettingsDisplaySection.tsx",
+      line: 422,
+      column: null,
+    });
   });
 
   it("prevents unsupported route fragments without treating them as file links", () => {
@@ -556,5 +548,4 @@ describe("Markdown file-like href behavior", () => {
     expect(screen.getByRole("columnheader", { name: "Name" })).toBeTruthy();
     expect(screen.getByText("Ready")).toBeTruthy();
   });
-
 });

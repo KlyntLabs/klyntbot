@@ -1,9 +1,5 @@
-import type { ThreadSummary } from "@/types";
-import {
-  getThreadCreatedTimestamp,
-  getThreadTimestamp,
-} from "@utils/threadItems";
 import { extractThreadCodexMetadata } from "@threads/utils/threadCodexMetadata";
+import { clampThreadName } from "@threads/utils/threadNaming";
 import { asString } from "@threads/utils/threadNormalize";
 import {
   getParentThreadIdFromThread,
@@ -11,7 +7,8 @@ import {
   isSubagentThreadSource,
   shouldHideSubagentThreadFromSidebar,
 } from "@threads/utils/threadRpc";
-import { clampThreadName } from "@threads/utils/threadNaming";
+import { getThreadCreatedTimestamp, getThreadTimestamp } from "@utils/threadItems";
+import type { ThreadSummary } from "@/types";
 
 type BuildThreadSummaryFromThreadOptions = {
   workspaceId: string;
@@ -49,9 +46,7 @@ export function buildThreadSummaryFromThread({
   const preview = asString(thread.preview ?? "").trim();
   const customName = getCustomName?.(workspaceId, id);
   const fallbackName = `Agent ${fallbackIndex + 1}`;
-  const name = customName
-    ? customName
-    : clampThreadName(preview) ?? fallbackName;
+  const name = customName ? customName : (clampThreadName(preview) ?? fallbackName);
   const metadata = extractThreadCodexMetadata(thread);
   if (shouldHideSubagentThreadFromSidebar(thread.source)) {
     return null;
@@ -72,8 +67,6 @@ export function buildThreadSummaryFromThread({
     ...(isSubagent && subagentMetadata.nickname
       ? { subagentNickname: subagentMetadata.nickname }
       : {}),
-    ...(isSubagent && subagentMetadata.role
-      ? { subagentRole: subagentMetadata.role }
-      : {}),
+    ...(isSubagent && subagentMetadata.role ? { subagentRole: subagentMetadata.role } : {}),
   };
 }

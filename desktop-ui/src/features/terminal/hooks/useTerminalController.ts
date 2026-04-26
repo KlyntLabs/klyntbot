@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { DebugEntry, WorkspaceInfo } from "@/types";
 import { closeTerminalSession } from "@services/tauri";
 import { buildErrorDebugEntry } from "@utils/debugEntries";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { DebugEntry, WorkspaceInfo } from "@/types";
 import { useTerminalSession } from "./useTerminalSession";
 import { useTerminalTabs } from "./useTerminalTabs";
 
@@ -112,8 +112,7 @@ export function useTerminalController({
       if (!activeWorkspaceId) {
         return;
       }
-      const shouldClosePanel =
-        terminalTabs.length === 1 && terminalTabs[0]?.id === terminalId;
+      const shouldClosePanel = terminalTabs.length === 1 && terminalTabs[0]?.id === terminalId;
       closeTerminal(activeWorkspaceId, terminalId);
       if (shouldClosePanel) {
         onCloseTerminalPanel?.();

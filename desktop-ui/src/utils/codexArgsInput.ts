@@ -6,7 +6,7 @@ const NBSP_PATTERN = /[\u00A0\u2007\u202F]/g;
 
 function stripWrappingQuotes(value: string): string {
   if (
-    (value.startsWith("\"") && value.endsWith("\"")) ||
+    (value.startsWith('"') && value.endsWith('"')) ||
     (value.startsWith("'") && value.endsWith("'"))
   ) {
     return value.slice(1, -1);
@@ -22,7 +22,7 @@ export function normalizeCodexArgsInput(value: string | null | undefined): strin
 
   let normalized = raw
     .replace(NBSP_PATTERN, " ")
-    .replace(SMART_DOUBLE_QUOTES_PATTERN, "\"")
+    .replace(SMART_DOUBLE_QUOTES_PATTERN, '"')
     .replace(SMART_SINGLE_QUOTES_PATTERN, "'")
     .trim();
 

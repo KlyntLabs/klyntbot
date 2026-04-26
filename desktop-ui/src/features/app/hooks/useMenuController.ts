@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { useDismissibleMenu } from "./useDismissibleMenu";
 

@@ -8,9 +8,7 @@ describe("ErrorToasts", () => {
     const onDismiss = vi.fn();
     render(
       <ErrorToasts
-        toasts={[
-          { id: "toast-1", title: "Error title", message: "Something failed" },
-        ]}
+        toasts={[{ id: "toast-1", title: "Error title", message: "Something failed" }]}
         onDismiss={onDismiss}
       />,
     );

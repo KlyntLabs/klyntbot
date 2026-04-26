@@ -295,7 +295,9 @@
   visibility: hidden;
   pointer-events: none;
   transform: translateX(-4px);
-  transition: opacity 120ms ease, transform 120ms ease;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
   z-index: 6;
 }
 

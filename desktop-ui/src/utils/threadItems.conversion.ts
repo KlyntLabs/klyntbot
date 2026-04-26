@@ -41,9 +41,7 @@ function parseUserInputs(inputs: Array<Record<string, unknown>>) {
   return { text: textParts.join(" ").trim(), images };
 }
 
-export function buildConversationItem(
-  item: Record<string, unknown>,
-): ConversationItem | null {
+export function buildConversationItem(item: Record<string, unknown>): ConversationItem | null {
   const type = asString(item.type);
   const id = asString(item.id);
   if (!id || !type) {
@@ -117,13 +115,7 @@ export function buildConversationItem(
     const formattedChanges = normalizedChanges
       .map((change) => {
         const prefix =
-          change.kind === "add"
-            ? "A"
-            : change.kind === "delete"
-              ? "D"
-              : change.kind
-                ? "M"
-                : "";
+          change.kind === "add" ? "A" : change.kind === "delete" ? "D" : change.kind ? "M" : "";
         return [prefix, change.path].filter(Boolean).join(" ");
       })
       .filter(Boolean);

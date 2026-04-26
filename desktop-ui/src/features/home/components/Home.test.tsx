@@ -67,9 +67,7 @@ describe("Home", () => {
     render(<Home {...baseProps} />);
 
     expect(screen.getByText("No agent activity yet")).toBeTruthy();
-    expect(
-      screen.getByText("Start a thread to see the latest responses here."),
-    ).toBeTruthy();
+    expect(screen.getByText("Start a thread to see the latest responses here.")).toBeTruthy();
   });
 
   it("renders usage cards in time mode", () => {
@@ -300,35 +298,26 @@ describe("Home", () => {
     }
     expect(within(todayCard).getByText("36")).toBeTruthy();
 
+    expect(screen.getByLabelText("Usage week 2026-01-14 to 2026-01-20")).toBeTruthy();
     expect(
-      screen.getByLabelText("Usage week 2026-01-14 to 2026-01-20"),
-    ).toBeTruthy();
-    expect(
-      (screen.getByRole("button", { name: "Show next week" }) as HTMLButtonElement)
-        .disabled,
+      (screen.getByRole("button", { name: "Show next week" }) as HTMLButtonElement).disabled,
     ).toBe(true);
-    expect(
-      screen.getByText("Jan 20").closest(".home-usage-bar")?.getAttribute("data-value"),
-    ).toBe("Jan 20 · 36 tokens");
+    expect(screen.getByText("Jan 20").closest(".home-usage-bar")?.getAttribute("data-value")).toBe(
+      "Jan 20 · 36 tokens",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Show previous week" }));
 
+    expect(screen.getByLabelText("Usage week 2026-01-07 to 2026-01-13")).toBeTruthy();
     expect(
-      screen.getByLabelText("Usage week 2026-01-07 to 2026-01-13"),
-    ).toBeTruthy();
-    expect(
-      (screen.getByRole("button", { name: "Show next week" }) as HTMLButtonElement)
-        .disabled,
+      (screen.getByRole("button", { name: "Show next week" }) as HTMLButtonElement).disabled,
     ).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: "Show next week" }));
 
+    expect(screen.getByLabelText("Usage week 2026-01-14 to 2026-01-20")).toBeTruthy();
     expect(
-      screen.getByLabelText("Usage week 2026-01-14 to 2026-01-20"),
-    ).toBeTruthy();
-    expect(
-      (screen.getByRole("button", { name: "Show next week" }) as HTMLButtonElement)
-        .disabled,
+      (screen.getByRole("button", { name: "Show next week" }) as HTMLButtonElement).disabled,
     ).toBe(true);
   });
 

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode, type MouseEvent } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import type { ParsedFileLocation } from "@utils/fileLinks";
+import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   describeFileTarget,
   formatParsedFileLocation,
@@ -12,7 +13,6 @@ import {
   resolveMessageFileHref,
   toFileLink,
 } from "../utils/messageFileLinks";
-import type { ParsedFileLocation } from "@utils/fileLinks";
 
 type MarkdownProps = {
   value: string;
@@ -64,11 +64,8 @@ function extractLanguageTag(className?: string) {
 function extractCodeFromPre(node?: PreProps["node"]) {
   const codeNode = node?.children?.find((child) => child.tagName === "code");
   const className = codeNode?.properties?.className;
-  const normalizedClassName = Array.isArray(className)
-    ? className.join(" ")
-    : className;
-  const value =
-    codeNode?.children?.map((child) => child.value ?? "").join("") ?? "";
+  const normalizedClassName = Array.isArray(className) ? className.join(" ") : className;
+  const value = codeNode?.children?.map((child) => child.value ?? "").join("") ?? "";
   return {
     className: normalizedClassName,
     value: value.replace(/\n$/, ""),
@@ -96,11 +93,7 @@ type StructuredReviewFinding = {
 };
 
 function escapeTableCell(value: string) {
-  return value
-    .replace(/\\/g, "\\\\")
-    .replace(/\|/g, "\\|")
-    .replace(/\r?\n/g, "<br />")
-    .trim();
+  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br />").trim();
 }
 
 function parseStructuredReviewFinding(line: string): StructuredReviewFinding | null {
@@ -227,8 +220,7 @@ function normalizeListIndentation(value: string) {
   let orderedBaseIndent = 4;
   let orderedIndentOffset: number | null = null;
 
-  const countLeadingSpaces = (line: string) =>
-    line.match(/^\s*/)?.[0].length ?? 0;
+  const countLeadingSpaces = (line: string) => line.match(/^\s*/)?.[0].length ?? 0;
   const spaces = (count: number) => " ".repeat(Math.max(0, count));
   const normalized = lines.map((line) => {
     const fenceMatch = line.match(/^\s*(```|~~~)/);
@@ -248,8 +240,7 @@ function normalizeListIndentation(value: string) {
     const orderedMatch = line.match(/^(\s*)\d+\.\s+/);
     if (orderedMatch) {
       const rawIndent = orderedMatch[1].length;
-      const normalizedIndent =
-        rawIndent > 0 && rawIndent < 4 ? 4 : rawIndent;
+      const normalizedIndent = rawIndent > 0 && rawIndent < 4 ? 4 : rawIndent;
       activeOrderedItem = true;
       orderedBaseIndent = normalizedIndent + 4;
       orderedIndentOffset = null;
@@ -419,13 +410,7 @@ function PreBlock({ node, children, copyUseModifier }: PreProps) {
       </pre>
     );
   }
-  return (
-    <CodeBlock
-      className={className}
-      value={value}
-      copyUseModifier={copyUseModifier}
-    />
-  );
+  return <CodeBlock className={className} value={value} copyUseModifier={copyUseModifier} />;
 }
 
 export function Markdown({
@@ -443,9 +428,7 @@ export function Markdown({
   const normalizedValue = codeBlock
     ? value
     : normalizeStructuredReviewTables(normalizeListIndentation(value));
-  const content = codeBlock
-    ? `\`\`\`\n${normalizedValue}\n\`\`\``
-    : normalizedValue;
+  const content = codeBlock ? `\`\`\`\n${normalizedValue}\n\`\`\`` : normalizedValue;
   const handleFileLinkClick = (event: React.MouseEvent, path: ParsedFileLocation) => {
     event.preventDefault();
     event.stopPropagation();
@@ -455,10 +438,7 @@ export function Markdown({
     event.preventDefault();
     event.stopPropagation();
   };
-  const handleFileLinkContextMenu = (
-    event: React.MouseEvent,
-    path: ParsedFileLocation,
-  ) => {
+  const handleFileLinkContextMenu = (event: React.MouseEvent, path: ParsedFileLocation) => {
     event.preventDefault();
     event.stopPropagation();
     onOpenFileLinkMenu?.(event, path);
@@ -532,8 +512,7 @@ export function Markdown({
       const hrefFilePath = resolveHrefFilePath(url);
       if (hrefFilePath) {
         const formattedHrefFilePath = formatParsedFileLocation(hrefFilePath);
-        const clickHandler = (event: React.MouseEvent) =>
-          handleFileLinkClick(event, hrefFilePath);
+        const clickHandler = (event: React.MouseEvent) => handleFileLinkClick(event, hrefFilePath);
         const contextMenuHandler = onOpenFileLinkMenu
           ? (event: React.MouseEvent) => handleFileLinkContextMenu(event, hrefFilePath)
           : undefined;
@@ -549,9 +528,7 @@ export function Markdown({
         );
       }
       const isExternal =
-        url.startsWith("http://") ||
-        url.startsWith("https://") ||
-        url.startsWith("mailto:");
+        url.startsWith("http://") || url.startsWith("https://") || url.startsWith("mailto:");
 
       if (!isExternal) {
         if (url.startsWith("#")) {

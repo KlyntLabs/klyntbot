@@ -77,8 +77,7 @@ export function useWorkspaceRefreshOnFocus({
         clearInterval(pollTimer);
         pollTimer = null;
       }
-      const { backendMode: currentBackendMode, pollIntervalMs: intervalMs } =
-        optionsRef.current;
+      const { backendMode: currentBackendMode, pollIntervalMs: intervalMs } = optionsRef.current;
       if (currentBackendMode !== "remote" || document.visibilityState !== "visible") {
         return;
       }

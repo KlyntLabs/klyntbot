@@ -1,5 +1,5 @@
-import type { RateLimitSnapshot } from "@/types";
 import { formatRelativeTime } from "@utils/time";
+import type { RateLimitSnapshot } from "@/types";
 
 type UsageLabels = {
   sessionPercent: number | null;
@@ -10,8 +10,7 @@ type UsageLabels = {
   showWeekly: boolean;
 };
 
-const clampPercent = (value: number) =>
-  Math.min(Math.max(Math.round(value), 0), 100);
+const clampPercent = (value: number) => Math.min(Math.max(Math.round(value), 0), 100);
 
 function formatResetLabel(resetsAt?: number | null) {
   if (typeof resetsAt !== "number" || !Number.isFinite(resetsAt)) {

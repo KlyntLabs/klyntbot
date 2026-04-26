@@ -60,10 +60,7 @@ export function saveThreadCodexParams(next: ThreadCodexParamsMap): void {
     return;
   }
   try {
-    window.localStorage.setItem(
-      STORAGE_KEY_THREAD_CODEX_PARAMS,
-      JSON.stringify(next),
-    );
+    window.localStorage.setItem(STORAGE_KEY_THREAD_CODEX_PARAMS, JSON.stringify(next));
   } catch {
     // Best-effort persistence.
   }
@@ -93,10 +90,7 @@ export function saveThreadActivity(activity: ThreadActivityMap) {
     return;
   }
   try {
-    window.localStorage.setItem(
-      STORAGE_KEY_THREAD_ACTIVITY,
-      JSON.stringify(activity),
-    );
+    window.localStorage.setItem(STORAGE_KEY_THREAD_ACTIVITY, JSON.stringify(activity));
   } catch {
     // Best-effort persistence; ignore write failures.
   }
@@ -133,10 +127,7 @@ export function saveCustomName(workspaceId: string, threadId: string, name: stri
     const current = loadCustomNames();
     const key = makeCustomNameKey(workspaceId, threadId);
     current[key] = name;
-    window.localStorage.setItem(
-      STORAGE_KEY_CUSTOM_NAMES,
-      JSON.stringify(current),
-    );
+    window.localStorage.setItem(STORAGE_KEY_CUSTOM_NAMES, JSON.stringify(current));
   } catch {
     // Best-effort persistence.
   }
@@ -170,10 +161,7 @@ export function savePinnedThreads(pinned: PinnedThreadsMap) {
     return;
   }
   try {
-    window.localStorage.setItem(
-      STORAGE_KEY_PINNED_THREADS,
-      JSON.stringify(pinned),
-    );
+    window.localStorage.setItem(STORAGE_KEY_PINNED_THREADS, JSON.stringify(pinned));
   } catch {
     // Best-effort persistence; ignore write failures.
   }
@@ -203,10 +191,7 @@ export function saveDetachedReviewLinks(links: DetachedReviewLinksMap) {
     return;
   }
   try {
-    window.localStorage.setItem(
-      STORAGE_KEY_DETACHED_REVIEW_LINKS,
-      JSON.stringify(links),
-    );
+    window.localStorage.setItem(STORAGE_KEY_DETACHED_REVIEW_LINKS, JSON.stringify(links));
   } catch {
     // Best-effort persistence; ignore write failures.
   }

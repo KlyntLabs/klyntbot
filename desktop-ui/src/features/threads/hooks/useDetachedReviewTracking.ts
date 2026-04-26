@@ -1,19 +1,12 @@
-import { useCallback, useEffect, useRef } from "react";
+import { loadDetachedReviewLinks, saveDetachedReviewLinks } from "@threads/utils/threadStorage";
 import type { Dispatch } from "react";
-import {
-  loadDetachedReviewLinks,
-  saveDetachedReviewLinks,
-} from "@threads/utils/threadStorage";
+import { useCallback, useEffect, useRef } from "react";
 import type { ThreadAction, ThreadState } from "./useThreadsReducer";
 
 type UseDetachedReviewTrackingArgs = {
   activeThreadId: string | null;
   dispatch: Dispatch<ThreadAction>;
-  recordThreadActivity: (
-    workspaceId: string,
-    threadId: string,
-    timestamp?: number,
-  ) => void;
+  recordThreadActivity: (workspaceId: string, threadId: string, timestamp?: number) => void;
   safeMessageActivity: () => void;
   threadsByWorkspace: ThreadState["threadsByWorkspace"];
   threadParentById: ThreadState["threadParentById"];
@@ -40,8 +33,7 @@ export function useDetachedReviewTracking({
         return;
       }
       detachedReviewParentByChildRef.current[childId] = parentId;
-      const existingWorkspaceLinks =
-        detachedReviewLinksByWorkspaceRef.current[workspaceId] ?? {};
+      const existingWorkspaceLinks = detachedReviewLinksByWorkspaceRef.current[workspaceId] ?? {};
       if (existingWorkspaceLinks[childId] !== parentId) {
         const nextLinksByWorkspace = {
           ...detachedReviewLinksByWorkspaceRef.current,

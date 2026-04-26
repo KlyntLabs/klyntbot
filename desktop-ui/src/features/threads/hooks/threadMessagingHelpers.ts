@@ -1,3 +1,5 @@
+import { clampThreadName } from "@threads/utils/threadNaming";
+import { formatRelativeTime } from "@utils/time";
 import type {
   AccessMode,
   AppMention,
@@ -6,8 +8,6 @@ import type {
   ReviewTarget,
   ServiceTier,
 } from "@/types";
-import { clampThreadName } from "@threads/utils/threadNaming";
-import { formatRelativeTime } from "@utils/time";
 
 export type SendMessageOptions = {
   skipPromptExpansion?: boolean;
@@ -91,7 +91,10 @@ export function isStaleSteerTurnError(message: string): boolean {
 }
 
 export function parseFastCommand(text: string): FastCommandAction {
-  const arg = text.replace(/^\/fast\b/i, "").trim().toLowerCase();
+  const arg = text
+    .replace(/^\/fast\b/i, "")
+    .trim()
+    .toLowerCase();
   if (!arg) {
     return "toggle";
   }
@@ -111,10 +114,8 @@ export function resolveSendMessageOptions({
   options,
   defaults,
 }: ResolveSendMessageOptionsArgs): ResolvedSendMessageOptions {
-  const resolvedModel =
-    options?.model !== undefined ? options.model : defaults.model;
-  const resolvedEffort =
-    options?.effort !== undefined ? options.effort : defaults.effort;
+  const resolvedModel = options?.model !== undefined ? options.model : defaults.model;
+  const resolvedEffort = options?.effort !== undefined ? options.effort : defaults.effort;
   const resolvedServiceTier =
     options?.serviceTier !== undefined ? options.serviceTier : defaults.serviceTier;
   const resolvedCollaborationMode =
@@ -198,9 +199,7 @@ function resetLabel(value?: number | null): string | null {
   return resetAt ? formatRelativeTime(resetAt) : null;
 }
 
-function getCollaborationModeId(
-  collaborationMode?: Record<string, unknown> | null,
-): string {
+function getCollaborationModeId(collaborationMode?: Record<string, unknown> | null): string {
   if (
     !collaborationMode ||
     typeof collaborationMode !== "object" ||
@@ -243,19 +242,11 @@ export function buildStatusLines({
 
   if (typeof primaryUsed === "number") {
     const reset = resetLabel(rateLimits?.primary?.resetsAt);
-    lines.push(
-      `- Session usage: ${Math.round(primaryUsed)}%${
-        reset ? ` (resets ${reset})` : ""
-      }`,
-    );
+    lines.push(`- Session usage: ${Math.round(primaryUsed)}%${reset ? ` (resets ${reset})` : ""}`);
   }
   if (typeof secondaryUsed === "number") {
     const reset = resetLabel(rateLimits?.secondary?.resetsAt);
-    lines.push(
-      `- Weekly usage: ${Math.round(secondaryUsed)}%${
-        reset ? ` (resets ${reset})` : ""
-      }`,
-    );
+    lines.push(`- Weekly usage: ${Math.round(secondaryUsed)}%${reset ? ` (resets ${reset})` : ""}`);
   }
 
   const credits = rateLimits?.credits ?? null;
@@ -270,9 +261,7 @@ export function buildStatusLines({
   return lines;
 }
 
-export function buildMcpStatusLines(
-  data: Array<Record<string, unknown>>,
-): string[] {
+export function buildMcpStatusLines(data: Array<Record<string, unknown>>): string[] {
   const lines: string[] = ["MCP tools:"];
   if (data.length === 0) {
     lines.push("- No MCP servers configured.");
@@ -299,15 +288,9 @@ export function buildMcpStatusLines(
         : {};
     const prefix = `mcp__${name}__`;
     const toolNames = Object.keys(toolsRecord)
-      .map((toolName) =>
-        toolName.startsWith(prefix) ? toolName.slice(prefix.length) : toolName,
-      )
+      .map((toolName) => (toolName.startsWith(prefix) ? toolName.slice(prefix.length) : toolName))
       .sort((a, b) => a.localeCompare(b));
-    lines.push(
-      toolNames.length > 0
-        ? `  tools: ${toolNames.join(", ")}`
-        : "  tools: none",
-    );
+    lines.push(toolNames.length > 0 ? `  tools: ${toolNames.join(", ")}` : "  tools: none");
 
     const resources = Array.isArray(server.resources) ? server.resources.length : 0;
     const templates = Array.isArray(server.resourceTemplates)
@@ -330,9 +313,7 @@ export function buildAppsLines(data: Array<Record<string, unknown>>): string[] {
     return lines;
   }
 
-  const apps = [...data].sort((a, b) =>
-    String(a.name ?? "").localeCompare(String(b.name ?? "")),
-  );
+  const apps = [...data].sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
   for (const app of apps) {
     const name = String(app.name ?? app.id ?? "unknown");
     const appId = String(app.id ?? "");

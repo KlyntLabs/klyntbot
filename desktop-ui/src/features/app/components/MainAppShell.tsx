@@ -1,10 +1,8 @@
-import { lazy, Suspense, type CSSProperties, type ComponentProps, type RefObject } from "react";
 import { AppLayout } from "@app/components/AppLayout";
-import { AppModals } from "@app/components/AppModals";
 import type { AppModalsProps } from "@app/components/AppModals";
-import {
-  TitlebarExpandControls,
-} from "@/features/layout/components/SidebarToggleControls";
+import { AppModals } from "@app/components/AppModals";
+import { type ComponentProps, type CSSProperties, lazy, type RefObject, Suspense } from "react";
+import { TitlebarExpandControls } from "@/features/layout/components/SidebarToggleControls";
 import { WindowCaptionControls } from "@/features/layout/components/WindowCaptionControls";
 import { MobileServerSetupWizard } from "@/features/mobile/components/MobileServerSetupWizard";
 
@@ -48,7 +46,11 @@ export function MainAppShell({
   mobileSetupWizardProps,
 }: MainAppShellProps) {
   return (
-    <div className={`${appClassName}${isResizing ? " is-resizing" : ""}`} style={appStyle} ref={appRef}>
+    <div
+      className={`${appClassName}${isResizing ? " is-resizing" : ""}`}
+      style={appStyle}
+      ref={appRef}
+    >
       <div className="drag-strip" id="titlebar" />
       <TitlebarExpandControls {...sidebarToggleProps} />
       <WindowCaptionControls />

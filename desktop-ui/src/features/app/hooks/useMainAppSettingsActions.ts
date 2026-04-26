@@ -1,6 +1,6 @@
-import { useCallback, type Dispatch, type SetStateAction } from "react";
-import type { AppSettings } from "@/types";
 import { OPEN_APP_STORAGE_KEY } from "@app/constants";
+import { type Dispatch, type SetStateAction, useCallback } from "react";
+import type { AppSettings } from "@/types";
 
 type UseMainAppSettingsActionsArgs = {
   appSettings: AppSettings;

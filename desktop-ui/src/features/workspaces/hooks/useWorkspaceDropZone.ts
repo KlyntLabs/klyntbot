@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { subscribeWindowDragDrop } from "@/services/dragDrop";
 
 function isDragFileTransfer(types: readonly string[] | undefined) {
@@ -44,10 +44,7 @@ type UseWorkspaceDropZoneArgs = {
   onDropPaths: DropPathsHandler;
 };
 
-export function useWorkspaceDropZone({
-  disabled = false,
-  onDropPaths,
-}: UseWorkspaceDropZoneArgs) {
+export function useWorkspaceDropZone({ disabled = false, onDropPaths }: UseWorkspaceDropZoneArgs) {
   const [isDragOver, setIsDragOver] = useState(false);
   const dropTargetRef = useRef<HTMLElement | null>(null);
   const dragDepthRef = useRef(0);
@@ -100,10 +97,7 @@ export function useWorkspaceDropZone({
         return;
       }
       if (payload.type === "over" || payload.type === "enter") {
-        const position = normalizeDragPosition(
-          payload.position,
-          lastClientPositionRef.current,
-        );
+        const position = normalizeDragPosition(payload.position, lastClientPositionRef.current);
         const rect = dropTargetRef.current.getBoundingClientRect();
         const isInside =
           position.x >= rect.left &&
@@ -115,10 +109,7 @@ export function useWorkspaceDropZone({
       }
       if (payload.type === "drop") {
         setIsDragOver(false);
-        const position = normalizeDragPosition(
-          payload.position,
-          lastClientPositionRef.current,
-        );
+        const position = normalizeDragPosition(payload.position, lastClientPositionRef.current);
         const rect = dropTargetRef.current.getBoundingClientRect();
         const isInside =
           position.x >= rect.left &&
@@ -128,9 +119,7 @@ export function useWorkspaceDropZone({
         if (!isInside) {
           return;
         }
-        const paths = (payload.paths ?? [])
-          .map((path) => path.trim())
-          .filter(Boolean);
+        const paths = (payload.paths ?? []).map((path) => path.trim()).filter(Boolean);
         emitPaths(paths);
       }
     });

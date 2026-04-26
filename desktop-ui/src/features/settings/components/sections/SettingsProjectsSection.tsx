@@ -62,10 +62,7 @@ export function SettingsProjectsSection({
       title="Projects"
       subtitle="Group related workspaces and reorder projects within each group."
     >
-      <SettingsSubsection
-        title="Groups"
-        subtitle="Create group labels for related repositories."
-      />
+      <SettingsSubsection title="Groups" subtitle="Create group labels for related repositories." />
       <div className="settings-groups">
         <div className="settings-group-create">
           <input
@@ -200,7 +197,7 @@ export function SettingsProjectsSection({
               const groupValue = workspaceGroups.some(
                 (entry) => entry.id === workspace.settings.groupId,
               )
-                ? workspace.settings.groupId ?? ""
+                ? (workspace.settings.groupId ?? "")
                 : "";
               return (
                 <div key={workspace.id} className="settings-project-row">

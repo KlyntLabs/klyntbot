@@ -1,8 +1,9 @@
 import type { PullRequestReviewIntent } from "@/types";
 
-export type PullRequestReviewCommand =
-  | { intent: PullRequestReviewIntent; question?: string }
-  | null;
+export type PullRequestReviewCommand = {
+  intent: PullRequestReviewIntent;
+  question?: string;
+} | null;
 
 export function parsePullRequestReviewCommand(input: string): PullRequestReviewCommand {
   const trimmed = input.trim();

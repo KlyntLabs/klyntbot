@@ -1,21 +1,17 @@
-import { useMemo } from "react";
-import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import * as Sentry from "@sentry/react";
 import { openWorkspaceIn } from "@services/tauri";
 import { pushErrorToast } from "@services/toasts";
-import type { OpenAppTarget } from "@/types";
-import {
-  DEFAULT_OPEN_APP_ID,
-  DEFAULT_OPEN_APP_TARGETS,
-  OPEN_APP_STORAGE_KEY,
-} from "../constants";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
+import { useMemo } from "react";
 import {
   PopoverMenuItem,
   SplitActionMenu,
 } from "@/features/design-system/components/popover/PopoverPrimitives";
-import { GENERIC_APP_ICON, getKnownOpenAppIcon } from "../utils/openAppIcons";
+import type { OpenAppTarget } from "@/types";
+import { DEFAULT_OPEN_APP_ID, DEFAULT_OPEN_APP_TARGETS, OPEN_APP_STORAGE_KEY } from "../constants";
 import { useMenuController } from "../hooks/useMenuController";
+import { GENERIC_APP_ICON, getKnownOpenAppIcon } from "../utils/openAppIcons";
 
 type OpenTarget = {
   id: string;
@@ -41,25 +37,19 @@ export function OpenAppMenu({
 }: OpenAppMenuProps) {
   const openMenu = useMenuController();
   const { isOpen: openMenuOpen, containerRef: openMenuRef } = openMenu;
-  const availableTargets =
-    openTargets.length > 0 ? openTargets : DEFAULT_OPEN_APP_TARGETS;
+  const availableTargets = openTargets.length > 0 ? openTargets : DEFAULT_OPEN_APP_TARGETS;
   const openAppId = useMemo(
-    () =>
-      availableTargets.find((target) => target.id === selectedOpenAppId)?.id,
+    () => availableTargets.find((target) => target.id === selectedOpenAppId)?.id,
     [availableTargets, selectedOpenAppId],
   );
-  const resolvedOpenAppId =
-    openAppId ?? availableTargets[0]?.id ?? DEFAULT_OPEN_APP_ID;
+  const resolvedOpenAppId = openAppId ?? availableTargets[0]?.id ?? DEFAULT_OPEN_APP_ID;
 
   const resolvedOpenTargets = useMemo<OpenTarget[]>(
     () =>
       availableTargets.map((target) => ({
         id: target.id,
         label: target.label,
-        icon:
-          getKnownOpenAppIcon(target.id) ??
-          iconById[target.id] ??
-          GENERIC_APP_ICON,
+        icon: getKnownOpenAppIcon(target.id) ?? iconById[target.id] ?? GENERIC_APP_ICON,
         target,
       })),
     [availableTargets, iconById],
@@ -68,13 +58,11 @@ export function OpenAppMenu({
   const fallbackTarget: OpenTarget = {
     id: DEFAULT_OPEN_APP_ID,
     label:
-      DEFAULT_OPEN_APP_TARGETS.find((target) => target.id === DEFAULT_OPEN_APP_ID)
-        ?.label ??
+      DEFAULT_OPEN_APP_TARGETS.find((target) => target.id === DEFAULT_OPEN_APP_ID)?.label ??
       DEFAULT_OPEN_APP_TARGETS[0]?.label ??
       "Open",
     icon: getKnownOpenAppIcon(DEFAULT_OPEN_APP_ID) ?? GENERIC_APP_ICON,
-    target:
-      DEFAULT_OPEN_APP_TARGETS.find((target) => target.id === DEFAULT_OPEN_APP_ID) ??
+    target: DEFAULT_OPEN_APP_TARGETS.find((target) => target.id === DEFAULT_OPEN_APP_ID) ??
       DEFAULT_OPEN_APP_TARGETS[0] ?? {
         id: DEFAULT_OPEN_APP_ID,
         label: "VS Code",
@@ -114,10 +102,8 @@ export function OpenAppMenu({
     });
   };
 
-  const resolveAppName = (target: OpenTarget) =>
-    (target.target.appName ?? "").trim();
-  const resolveCommand = (target: OpenTarget) =>
-    (target.target.command ?? "").trim();
+  const resolveAppName = (target: OpenTarget) => (target.target.appName ?? "").trim();
+  const resolveCommand = (target: OpenTarget) => (target.target.command ?? "").trim();
   const canOpenTarget = (target: OpenTarget) => {
     if (target.target.kind === "finder") {
       return true;
@@ -200,12 +186,7 @@ export function OpenAppMenu({
           data-tooltip-placement="bottom"
         >
           <span className="open-app-label">
-            <img
-              className="open-app-icon"
-              src={selectedOpenTarget.icon}
-              alt=""
-              aria-hidden
-            />
+            <img className="open-app-icon" src={selectedOpenTarget.icon} alt="" aria-hidden />
             {selectedOpenTarget.label}
           </span>
         </button>

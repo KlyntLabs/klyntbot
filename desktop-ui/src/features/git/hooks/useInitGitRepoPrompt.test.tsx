@@ -67,9 +67,6 @@ describe("useInitGitRepoPrompt", () => {
       await result.current.handleInitGitRepoPromptConfirm();
     });
 
-    expect(result.current.initGitRepoPrompt?.error).toBe(
-      "Failed to initialize Git repository.",
-    );
+    expect(result.current.initGitRepoPrompt?.error).toBe("Failed to initialize Git repository.");
   });
 });
-

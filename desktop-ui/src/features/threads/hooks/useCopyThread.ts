@@ -1,5 +1,5 @@
-import { useCallback } from "react";
 import { buildThreadTranscript } from "@utils/threadText";
+import { useCallback } from "react";
 import type { ConversationItem, DebugEntry } from "@/types";
 
 type CopyThreadOptions = {

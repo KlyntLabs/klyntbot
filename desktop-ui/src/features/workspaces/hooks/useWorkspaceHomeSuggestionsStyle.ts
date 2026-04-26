@@ -1,10 +1,5 @@
-import {
-  useLayoutEffect,
-  useState,
-  type CSSProperties,
-  type RefObject,
-} from "react";
 import { getCaretPosition } from "@utils/caretPosition";
+import { type CSSProperties, type RefObject, useLayoutEffect, useState } from "react";
 import { CARET_ANCHOR_GAP } from "../components/workspaceHomeHelpers";
 
 type UseWorkspaceHomeSuggestionsStyleParams = {
@@ -22,9 +17,7 @@ export function useWorkspaceHomeSuggestionsStyle({
   prompt,
   textareaRef,
 }: UseWorkspaceHomeSuggestionsStyleParams) {
-  const [suggestionsStyle, setSuggestionsStyle] = useState<
-    CSSProperties | undefined
-  >(undefined);
+  const [suggestionsStyle, setSuggestionsStyle] = useState<CSSProperties | undefined>(undefined);
 
   useLayoutEffect(() => {
     if (!isAutocompleteOpen) {
@@ -36,10 +29,7 @@ export function useWorkspaceHomeSuggestionsStyle({
       return;
     }
     const cursor =
-      autocompleteAnchorIndex ??
-      textarea.selectionStart ??
-      selectionStart ??
-      prompt.length;
+      autocompleteAnchorIndex ?? textarea.selectionStart ?? selectionStart ?? prompt.length;
     const caret = getCaretPosition(textarea, cursor);
     if (!caret) {
       return;
@@ -58,13 +48,7 @@ export function useWorkspaceHomeSuggestionsStyle({
       bottom: "auto",
       right: "auto",
     });
-  }, [
-    autocompleteAnchorIndex,
-    isAutocompleteOpen,
-    prompt,
-    selectionStart,
-    textareaRef,
-  ]);
+  }, [autocompleteAnchorIndex, isAutocompleteOpen, prompt, selectionStart, textareaRef]);
 
   return suggestionsStyle;
 }

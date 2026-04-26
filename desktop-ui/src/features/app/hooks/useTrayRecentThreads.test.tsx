@@ -2,10 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ThreadSummary, WorkspaceInfo } from "@/types";
-import {
-  buildTrayRecentThreadEntries,
-  useTrayRecentThreads,
-} from "./useTrayRecentThreads";
+import { buildTrayRecentThreadEntries, useTrayRecentThreads } from "./useTrayRecentThreads";
 
 const isTauriMock = vi.hoisted(() => vi.fn(() => true));
 const setTrayRecentThreadsMock = vi.fn();
@@ -157,11 +154,7 @@ describe("useTrayRecentThreads", () => {
     };
 
     const { rerender } = renderHook(
-      ({
-        threadsByWorkspace,
-      }: {
-        threadsByWorkspace: Record<string, ThreadSummary[]>;
-      }) =>
+      ({ threadsByWorkspace }: { threadsByWorkspace: Record<string, ThreadSummary[]> }) =>
         useTrayRecentThreads({
           workspaces,
           threadsByWorkspace,
@@ -250,11 +243,7 @@ describe("useTrayRecentThreads", () => {
     );
 
     const { rerender } = renderHook(
-      ({
-        threadsByWorkspace,
-      }: {
-        threadsByWorkspace: Record<string, ThreadSummary[]>;
-      }) =>
+      ({ threadsByWorkspace }: { threadsByWorkspace: Record<string, ThreadSummary[]> }) =>
         useTrayRecentThreads({
           workspaces: [makeWorkspace()],
           threadsByWorkspace,

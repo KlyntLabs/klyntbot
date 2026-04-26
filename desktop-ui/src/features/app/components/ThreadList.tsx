@@ -1,7 +1,6 @@
-import { useMemo, useState, type MouseEvent } from "react";
-
-import type { ThreadSummary } from "@/types";
 import type { ThreadStatusById } from "@utils/threadStatus";
+import { type MouseEvent, useMemo, useState } from "react";
+import type { ThreadSummary } from "@/types";
 import { ThreadRow } from "./ThreadRow";
 import { buildThreadRowVisibility } from "./threadRowVisibility";
 
@@ -80,17 +79,15 @@ export function ThreadList({
 
   const pinnedVisibility = useMemo(
     () =>
-      buildThreadRowVisibility(
-        pinnedRows,
-        (row) => collapsedThreadKeys.has(`${workspaceId}:${row.thread.id}`),
+      buildThreadRowVisibility(pinnedRows, (row) =>
+        collapsedThreadKeys.has(`${workspaceId}:${row.thread.id}`),
       ),
     [collapsedThreadKeys, pinnedRows, workspaceId],
   );
   const unpinnedVisibility = useMemo(
     () =>
-      buildThreadRowVisibility(
-        unpinnedRows,
-        (row) => collapsedThreadKeys.has(`${workspaceId}:${row.thread.id}`),
+      buildThreadRowVisibility(unpinnedRows, (row) =>
+        collapsedThreadKeys.has(`${workspaceId}:${row.thread.id}`),
       ),
     [collapsedThreadKeys, unpinnedRows, workspaceId],
   );
@@ -162,11 +159,7 @@ export function ThreadList({
           }}
           disabled={isPaging}
         >
-          {isPaging
-            ? "Loading..."
-            : totalThreadRoots === 0
-              ? "Search older..."
-              : "Load older..."}
+          {isPaging ? "Loading..." : totalThreadRoots === 0 ? "Search older..." : "Load older..."}
         </button>
       )}
     </div>

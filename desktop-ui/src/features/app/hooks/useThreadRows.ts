@@ -20,19 +20,11 @@ type ThreadRowCacheEntry = {
 };
 
 export function useThreadRows(threadParentById: Record<string, string>) {
-  const cacheRef = useRef(
-    new WeakMap<
-      ThreadSummary[],
-      Map<string, ThreadRowCacheEntry>
-    >(),
-  );
+  const cacheRef = useRef(new WeakMap<ThreadSummary[], Map<string, ThreadRowCacheEntry>>());
   const cacheParentRef = useRef(threadParentById);
   if (cacheParentRef.current !== threadParentById) {
     cacheParentRef.current = threadParentById;
-    cacheRef.current = new WeakMap<
-      ThreadSummary[],
-      Map<string, ThreadRowCacheEntry>
-    >();
+    cacheRef.current = new WeakMap<ThreadSummary[], Map<string, ThreadRowCacheEntry>>();
   }
 
   const getThreadRows = useCallback(
@@ -106,11 +98,7 @@ export function useThreadRows(threadParentById: Record<string, string>) {
       const visibleRootCount = isExpanded ? unpinnedRoots.length : 3;
       const visibleRoots = unpinnedRoots.slice(0, visibleRootCount);
 
-      const appendThread = (
-        thread: ThreadSummary,
-        depth: number,
-        rows: ThreadRow[],
-      ) => {
+      const appendThread = (thread: ThreadSummary, depth: number, rows: ThreadRow[]) => {
         rows.push({ thread, depth });
         const children = childrenByParent.get(thread.id) ?? [];
         children.forEach((child) => appendThread(child, depth + 1, rows));

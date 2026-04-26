@@ -1,6 +1,6 @@
+import { localUsageSnapshot } from "@services/tauri";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LocalUsageSnapshot } from "@/types";
-import { localUsageSnapshot } from "@services/tauri";
 
 type LocalUsageState = {
   snapshot: LocalUsageSnapshot | null;

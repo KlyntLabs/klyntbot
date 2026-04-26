@@ -1,5 +1,5 @@
-import { useCallback } from "react";
 import type { Dispatch } from "react";
+import { useCallback } from "react";
 import type { ConversationItem } from "@/types";
 import type { ThreadAction } from "./useThreadsReducer";
 
@@ -26,8 +26,12 @@ function basename(path: string) {
 
 function formatHookDetail(run: HookRun) {
   const parts = [
-    asString(run.handlerType ?? run.handler_type).trim().toLowerCase(),
-    asString(run.executionMode ?? run.execution_mode).trim().toLowerCase(),
+    asString(run.handlerType ?? run.handler_type)
+      .trim()
+      .toLowerCase(),
+    asString(run.executionMode ?? run.execution_mode)
+      .trim()
+      .toLowerCase(),
     asString(run.scope).trim().toLowerCase(),
     basename(asString(run.sourcePath ?? run.source_path).trim()),
   ].filter(Boolean);
@@ -75,9 +79,7 @@ function buildHookConversationItem(run: HookRun, status: string): ConversationIt
     status,
     output: formatHookOutput(run),
     durationMs:
-      typeof parsedDuration === "number" && Number.isFinite(parsedDuration)
-        ? parsedDuration
-        : null,
+      typeof parsedDuration === "number" && Number.isFinite(parsedDuration) ? parsedDuration : null,
   };
 }
 
@@ -114,12 +116,7 @@ export function useThreadHookEvents({
   );
 
   const onHookStarted = useCallback(
-    (
-      workspaceId: string,
-      threadId: string,
-      _turnId: string | null,
-      run: HookRun,
-    ) => {
+    (workspaceId: string, threadId: string, _turnId: string | null, run: HookRun) => {
       if (!hasStatusMessage(run)) {
         return;
       }
@@ -129,12 +126,7 @@ export function useThreadHookEvents({
   );
 
   const onHookCompleted = useCallback(
-    (
-      workspaceId: string,
-      threadId: string,
-      _turnId: string | null,
-      run: HookRun,
-    ) => {
+    (workspaceId: string, threadId: string, _turnId: string | null, run: HookRun) => {
       const itemId = `hook-${asString(run.id).trim()}`;
       const hasExistingRow = getItemsForThread(threadId).some((item) => item.id === itemId);
       if (!hasExistingRow && !shouldCreateVisibleCompletion(run)) {

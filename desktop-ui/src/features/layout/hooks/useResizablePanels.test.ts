@@ -101,9 +101,7 @@ describe("useResizablePanels", () => {
     });
 
     act(() => {
-      window.dispatchEvent(
-        new MouseEvent("mousemove", { clientX: 4000, clientY: 0 }),
-      );
+      window.dispatchEvent(new MouseEvent("mousemove", { clientX: 4000, clientY: 0 }));
     });
 
     act(() => {
@@ -111,9 +109,7 @@ describe("useResizablePanels", () => {
     });
 
     expect(hook.result.sidebarWidth).toBe(420);
-    expect(window.localStorage.getItem("klynt.sidebarWidth")).toBe(
-      "420",
-    );
+    expect(window.localStorage.getItem("klynt.sidebarWidth")).toBe("420");
 
     hook.unmount();
     appEl.remove();
@@ -136,9 +132,7 @@ describe("useResizablePanels", () => {
     });
 
     act(() => {
-      window.dispatchEvent(
-        new MouseEvent("mousemove", { clientX: 750, clientY: 0 }),
-      );
+      window.dispatchEvent(new MouseEvent("mousemove", { clientX: 750, clientY: 0 }));
     });
 
     act(() => {
@@ -169,9 +163,7 @@ describe("useResizablePanels", () => {
     });
 
     act(() => {
-      window.dispatchEvent(
-        new MouseEvent("mousemove", { clientX: 250, clientY: 0 }),
-      );
+      window.dispatchEvent(new MouseEvent("mousemove", { clientX: 250, clientY: 0 }));
     });
 
     act(() => {

@@ -1,9 +1,3 @@
-import type {
-  ConversationItem,
-  ThreadListSortKey,
-  ThreadSummary,
-  WorkspaceInfo,
-} from "@/types";
 import {
   buildItemsFromThread,
   getThreadCreatedTimestamp,
@@ -12,6 +6,7 @@ import {
   mergeThreadItems,
   previewThreadName,
 } from "@utils/threadItems";
+import type { ConversationItem, ThreadListSortKey, ThreadSummary, WorkspaceInfo } from "@/types";
 import { asString, normalizeRootPath } from "./threadNormalize";
 import { getResumedTurnState } from "./threadRpc";
 
@@ -62,9 +57,7 @@ export type WorkspaceThreadListState = {
   uniqueThreads: ThreadRecord[];
 };
 
-export function buildWorkspacePathLookup(
-  workspaces: WorkspaceInfo[],
-): WorkspacePathLookup {
+export function buildWorkspacePathLookup(workspaces: WorkspaceInfo[]): WorkspacePathLookup {
   const workspaceIdsByPath: Record<string, string[]> = {};
   const workspacePathsSorted: string[] = [];
   workspaces.forEach((workspace) => {
@@ -101,10 +94,7 @@ export function resolveWorkspaceIdForThreadPath(
   if (!allowedWorkspaceIds) {
     return workspaceIds[0] ?? null;
   }
-  return (
-    workspaceIds.find((workspaceId) => allowedWorkspaceIds.has(workspaceId)) ??
-    null
-  );
+  return workspaceIds.find((workspaceId) => allowedWorkspaceIds.has(workspaceId)) ?? null;
 }
 
 export function getThreadListNextCursor(result: Record<string, unknown>) {
@@ -176,17 +166,14 @@ export function buildResumeHydrationPlan({
       : localItems;
   const preview = asString(thread.preview ?? "");
   const customName = getCustomName(workspaceId, threadId);
-  const threadName =
-    !customName && preview ? previewThreadName(preview, "New Agent") : null;
+  const threadName = !customName && preview ? previewThreadName(preview, "New Agent") : null;
   const lastAgentMessage = [...mergedItems]
     .reverse()
-    .find(
-      (item) => item.kind === "message" && item.role === "assistant",
-    ) as ConversationItem | undefined;
+    .find((item) => item.kind === "message" && item.role === "assistant") as
+    | ConversationItem
+    | undefined;
   const lastMessageText =
-    lastAgentMessage && lastAgentMessage.kind === "message"
-      ? lastAgentMessage.text
-      : preview;
+    lastAgentMessage && lastAgentMessage.kind === "message" ? lastAgentMessage.text : preview;
 
   return {
     keepLocalProcessing,

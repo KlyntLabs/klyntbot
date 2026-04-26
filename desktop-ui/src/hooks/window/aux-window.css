@@ -9,14 +9,14 @@
 html[data-launcher],
 html[data-launcher] body,
 html[data-launcher] #root {
-	background: transparent !important;
-	background-color: transparent !important;
-	border-radius: 14px;
-	overflow: hidden;
+  background: transparent !important;
+  background-color: transparent !important;
+  border-radius: 14px;
+  overflow: hidden;
 }
 
 html[data-launcher] #root {
-	display: flex;
+  display: flex;
 }
 
 /* Neutralize the project-wide `button { padding:8px 14px; font-weight:600 }`
@@ -30,12 +30,12 @@ html[data-launcher] #root {
    side-imported by useTransparentBackground (and thus loaded after
    buttons.css), source order resolves the tie in our favor. */
 :where(html[data-launcher]) button {
-	padding: 0;
-	font-weight: 300;
-	font-size: inherit;
+  padding: 0;
+  font-weight: 300;
+  font-size: inherit;
 }
 :where(html[data-launcher]) button:hover:not(:disabled),
 :where(html[data-launcher]) button:active:not(:disabled) {
-	transform: none;
-	box-shadow: none;
+  transform: none;
+  box-shadow: none;
 }

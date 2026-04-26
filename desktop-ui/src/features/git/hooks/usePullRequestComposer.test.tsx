@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
+import { buildPullRequestDraft } from "@utils/pullRequestPrompt";
 import { describe, expect, it, vi } from "vitest";
 import type {
-  GitLogEntry,
   GitHubPullRequest,
+  GitLogEntry,
   PullRequestReviewAction,
   WorkspaceInfo,
 } from "@/types";
-import { buildPullRequestDraft } from "@utils/pullRequestPrompt";
 import { usePullRequestComposer } from "./usePullRequestComposer";
 
 vi.mock("../../../utils/pullRequestPrompt", () => ({
@@ -160,12 +160,7 @@ describe("usePullRequestComposer", () => {
       await result.current.handleComposerSend("/apps", []);
     });
 
-    expect(options.handleSend).toHaveBeenCalledWith(
-      "/apps",
-      [],
-      undefined,
-      undefined,
-    );
+    expect(options.handleSend).toHaveBeenCalledWith("/apps", [], undefined, undefined);
     expect(options.runPullRequestReview).not.toHaveBeenCalled();
   });
 

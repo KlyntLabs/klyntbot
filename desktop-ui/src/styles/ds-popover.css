@@ -20,8 +20,9 @@
   font-size: var(--fs-sm);
   text-align: left;
   cursor: pointer;
-  transition: background-color var(--ds-dur-fast) var(--ds-ease-out-soft),
-              color var(--ds-dur-fast) var(--ds-ease-out-soft);
+  transition:
+    background-color var(--ds-dur-fast) var(--ds-ease-out-soft),
+    color var(--ds-dur-fast) var(--ds-ease-out-soft);
 }
 
 .ds-popover-item:disabled {

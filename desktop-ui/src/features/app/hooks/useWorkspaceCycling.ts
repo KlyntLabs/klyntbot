@@ -45,10 +45,7 @@ export function useWorkspaceCycling({
   const orderedWorkspaceIds = useMemo(() => {
     const worktreesByParent = new Map<string, WorkspaceInfo[]>();
     workspaces
-      .filter(
-        (entry) =>
-          (entry.kind ?? "main") === "worktree" && Boolean(entry.parentId),
-      )
+      .filter((entry) => (entry.kind ?? "main") === "worktree" && Boolean(entry.parentId))
       .forEach((entry) => {
         const parentId = entry.parentId as string;
         const list = worktreesByParent.get(parentId) ?? [];
@@ -109,9 +106,7 @@ export function useWorkspaceCycling({
         return;
       }
       const currentThreadId = activeThreadIdRef.current;
-      let index = currentThreadId
-        ? orderedThreadIds.indexOf(currentThreadId)
-        : -1;
+      let index = currentThreadId ? orderedThreadIds.indexOf(currentThreadId) : -1;
       if (index === -1) {
         index = direction === "next" ? -1 : 0;
       }
@@ -142,9 +137,7 @@ export function useWorkspaceCycling({
         return;
       }
       const currentWorkspaceId = activeWorkspaceIdRef.current;
-      let index = currentWorkspaceId
-        ? orderedWorkspaceIds.indexOf(currentWorkspaceId)
-        : -1;
+      let index = currentWorkspaceId ? orderedWorkspaceIds.indexOf(currentWorkspaceId) : -1;
       if (index === -1) {
         index = direction === "next" ? -1 : 0;
       }

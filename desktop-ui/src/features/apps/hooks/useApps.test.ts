@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { useApps } from "./useApps";
-import { getAppsList } from "@services/tauri";
+
 import { subscribeAppServerEvents } from "@services/events";
+import { getAppsList } from "@services/tauri";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppServerEvent, WorkspaceInfo } from "@/types";
+import { useApps } from "./useApps";
 
 vi.mock("../../../services/tauri", () => ({
   getAppsList: vi.fn(),
@@ -66,13 +67,7 @@ describe("useApps", () => {
 
     await waitFor(() => {
       expect(getAppsListMock).toHaveBeenCalledTimes(1);
-      expect(getAppsListMock).toHaveBeenNthCalledWith(
-        1,
-        "workspace-1",
-        null,
-        100,
-        null,
-      );
+      expect(getAppsListMock).toHaveBeenNthCalledWith(1, "workspace-1", null, 100, null);
     });
 
     const workspaceTwo: WorkspaceInfo = {
@@ -91,13 +86,7 @@ describe("useApps", () => {
 
     await waitFor(() => {
       expect(getAppsListMock).toHaveBeenCalledTimes(2);
-      expect(getAppsListMock).toHaveBeenNthCalledWith(
-        2,
-        "workspace-2",
-        null,
-        100,
-        null,
-      );
+      expect(getAppsListMock).toHaveBeenNthCalledWith(2, "workspace-2", null, 100, null);
       expect(result.current.apps).toEqual([]);
     });
 
@@ -117,11 +106,9 @@ describe("useApps", () => {
 
   it("retries automatically after a transient fetch error", async () => {
     vi.useFakeTimers();
-    getAppsListMock
-      .mockRejectedValueOnce(new Error("boom"))
-      .mockResolvedValueOnce({
-        data: [{ id: "ok", name: "Recovered App", isAccessible: true }],
-      });
+    getAppsListMock.mockRejectedValueOnce(new Error("boom")).mockResolvedValueOnce({
+      data: [{ id: "ok", name: "Recovered App", isAccessible: true }],
+    });
 
     const { result } = renderHook(() =>
       useApps({
@@ -165,12 +152,7 @@ describe("useApps", () => {
     );
 
     await waitFor(() => {
-      expect(getAppsListMock).toHaveBeenCalledWith(
-        "workspace-1",
-        null,
-        100,
-        "thread-1",
-      );
+      expect(getAppsListMock).toHaveBeenCalledWith("workspace-1", null, 100, "thread-1");
       expect(result.current.apps).toEqual([
         expect.objectContaining({ id: "app-a", name: "App A" }),
       ]);
@@ -179,12 +161,7 @@ describe("useApps", () => {
     rerender({ activeThreadId: "thread-2" });
 
     await waitFor(() => {
-      expect(getAppsListMock).toHaveBeenCalledWith(
-        "workspace-1",
-        null,
-        100,
-        "thread-2",
-      );
+      expect(getAppsListMock).toHaveBeenCalledWith("workspace-1", null, 100, "thread-2");
       expect(result.current.apps).toEqual([
         expect.objectContaining({ id: "app-b", name: "App B" }),
       ]);

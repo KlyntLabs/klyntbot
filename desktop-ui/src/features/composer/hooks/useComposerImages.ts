@@ -1,15 +1,12 @@
-import { useCallback, useMemo, useState } from "react";
 import { pickImageFiles } from "@services/tauri";
+import { useCallback, useMemo, useState } from "react";
 
 type UseComposerImagesArgs = {
   activeThreadId: string | null;
   activeWorkspaceId: string | null;
 };
 
-export function useComposerImages({
-  activeThreadId,
-  activeWorkspaceId,
-}: UseComposerImagesArgs) {
+export function useComposerImages({ activeThreadId, activeWorkspaceId }: UseComposerImagesArgs) {
   const [imagesByThread, setImagesByThread] = useState<Record<string, string[]>>({});
 
   const draftKey = useMemo(

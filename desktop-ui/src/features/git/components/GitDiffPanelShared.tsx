@@ -1,13 +1,13 @@
-import type { GitLogEntry } from "@/types";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import { formatRelativeTime } from "@utils/time";
 import Check from "lucide-react/dist/esm/icons/check";
 import Minus from "lucide-react/dist/esm/icons/minus";
 import Plus from "lucide-react/dist/esm/icons/plus";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
 import Upload from "lucide-react/dist/esm/icons/upload";
 import X from "lucide-react/dist/esm/icons/x";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { MagicSparkleIcon } from "@/features/shared/components/MagicSparkleIcon";
-import { formatRelativeTime } from "@utils/time";
+import type { GitLogEntry } from "@/types";
 import {
   getStatusClass,
   getStatusSymbol,
@@ -101,12 +101,7 @@ type SidebarErrorProps = {
   onDismiss: () => void;
 };
 
-export function SidebarError({
-  variant = "diff",
-  message,
-  action,
-  onDismiss,
-}: SidebarErrorProps) {
+export function SidebarError({ variant = "diff", message, action, onDismiss }: SidebarErrorProps) {
   return (
     <div className={`sidebar-error sidebar-error-${variant}`}>
       <div className="sidebar-error-body">
@@ -314,9 +309,7 @@ export function DiffSection({
   const canUnstageAll = section === "staged" && Boolean(onUnstageFile) && filePaths.length > 0;
   const canDiscardAll = section === "unstaged" && Boolean(onDiscardFiles) && filePaths.length > 0;
   const canReviewUncommitted =
-    section === "unstaged" &&
-    Boolean(onReviewUncommittedChanges) &&
-    filePaths.length > 0;
+    section === "unstaged" && Boolean(onReviewUncommittedChanges) && filePaths.length > 0;
   const canApplyWorktree =
     showWorktreeApplyAction && Boolean(onApplyWorktreeChanges) && filePaths.length > 0;
   const showSectionActions =

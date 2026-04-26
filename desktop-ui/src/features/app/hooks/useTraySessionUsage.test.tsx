@@ -2,10 +2,7 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RateLimitSnapshot } from "@/types";
-import {
-  buildTraySessionUsage,
-  useTraySessionUsage,
-} from "./useTraySessionUsage";
+import { buildTraySessionUsage, useTraySessionUsage } from "./useTraySessionUsage";
 
 const isTauriMock = vi.hoisted(() => vi.fn(() => true));
 const setTraySessionUsageMock = vi.fn();
@@ -18,9 +15,7 @@ vi.mock("@services/tauri", () => ({
   setTraySessionUsage: (...args: unknown[]) => setTraySessionUsageMock(...args),
 }));
 
-function makeRateLimits(
-  overrides: Partial<RateLimitSnapshot> = {},
-): RateLimitSnapshot {
+function makeRateLimits(overrides: Partial<RateLimitSnapshot> = {}): RateLimitSnapshot {
   return {
     primary: {
       usedPercent: 12,

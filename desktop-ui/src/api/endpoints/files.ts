@@ -23,18 +23,7 @@ export async function pickImageFiles(): Promise<string[]> {
     filters: [
       {
         name: "Images",
-        extensions: [
-          "png",
-          "jpg",
-          "jpeg",
-          "gif",
-          "webp",
-          "bmp",
-          "tiff",
-          "tif",
-          "heic",
-          "heif",
-        ],
+        extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "tif", "heic", "heif"],
       },
     ],
   });
@@ -146,11 +135,7 @@ export async function getCodexConfigPath(): Promise<string> {
 }
 
 function isInlineImageUrl(image: string) {
-  return (
-    image.startsWith("data:") ||
-    image.startsWith("http://") ||
-    image.startsWith("https://")
-  );
+  return image.startsWith("data:") || image.startsWith("http://") || image.startsWith("https://");
 }
 
 export async function convertImagesToDataUrls(images: string[]): Promise<string[]> {

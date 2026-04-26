@@ -1,4 +1,6 @@
+import { useQueuedSend } from "@threads/hooks/useQueuedSend";
 import { useCallback, useMemo, useState } from "react";
+import { useComposerImages } from "@/features/composer/hooks/useComposerImages";
 import type {
   AppMention,
   ComposerSendIntent,
@@ -7,8 +9,6 @@ import type {
   SendMessageResult,
   WorkspaceInfo,
 } from "@/types";
-import { useComposerImages } from "@/features/composer/hooks/useComposerImages";
-import { useQueuedSend } from "@threads/hooks/useQueuedSend";
 
 export function useComposerController({
   activeThreadId,
@@ -70,13 +70,9 @@ export function useComposerController({
   startFast: (text: string) => Promise<void>;
   startStatus: (text: string) => Promise<void>;
 }) {
-  const [composerDraftsByThread, setComposerDraftsByThread] = useState<
-    Record<string, string>
-  >({});
+  const [composerDraftsByThread, setComposerDraftsByThread] = useState<Record<string, string>>({});
   const [prefillDraft, setPrefillDraft] = useState<QueuedMessage | null>(null);
-  const [composerInsert, setComposerInsert] = useState<QueuedMessage | null>(
-    null,
-  );
+  const [composerInsert, setComposerInsert] = useState<QueuedMessage | null>(null);
 
   const {
     activeImages,
@@ -88,12 +84,7 @@ export function useComposerController({
     removeImagesForThread,
   } = useComposerImages({ activeThreadId, activeWorkspaceId });
 
-  const {
-    activeQueue,
-    handleSend,
-    queueMessage,
-    removeQueuedMessage,
-  } = useQueuedSend({
+  const { activeQueue, handleSend, queueMessage, removeQueuedMessage } = useQueuedSend({
     activeThreadId,
     activeTurnId,
     isProcessing,
@@ -119,8 +110,7 @@ export function useComposerController({
   });
 
   const activeDraft = useMemo(
-    () =>
-      activeThreadId ? composerDraftsByThread[activeThreadId] ?? "" : "",
+    () => (activeThreadId ? (composerDraftsByThread[activeThreadId] ?? "") : ""),
     [activeThreadId, composerDraftsByThread],
   );
 

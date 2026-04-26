@@ -114,13 +114,7 @@ export function useSidebarLayoutActions({
       selectWorkspace(workspaceId);
       setActiveThreadId(threadId, workspaceId);
     },
-    [
-      clearDraftState,
-      exitDiffView,
-      resetPullRequestSelection,
-      selectWorkspace,
-      setActiveThreadId,
-    ],
+    [clearDraftState, exitDiffView, resetPullRequestSelection, selectWorkspace, setActiveThreadId],
   );
 
   const onDeleteThread = useCallback(

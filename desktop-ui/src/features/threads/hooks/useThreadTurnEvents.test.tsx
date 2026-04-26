@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { RateLimitSnapshot, TurnPlan } from "@/types";
+
 import { interruptTurn } from "@services/tauri";
+import { act, renderHook } from "@testing-library/react";
 import {
   normalizePlanUpdate,
   normalizeRateLimits,
   normalizeTokenUsage,
 } from "@threads/utils/threadNormalize";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { RateLimitSnapshot, TurnPlan } from "@/types";
 import { useThreadTurnEvents } from "./useThreadTurnEvents";
 
 vi.mock("@services/tauri", () => ({
@@ -15,8 +16,7 @@ vi.mock("@services/tauri", () => ({
 }));
 
 vi.mock("@threads/utils/threadNormalize", () => ({
-  asString: (value: unknown) =>
-    typeof value === "string" ? value : value ? String(value) : "",
+  asString: (value: unknown) => (typeof value === "string" ? value : value ? String(value) : ""),
   normalizePlanUpdate: vi.fn(),
   normalizeRateLimits: vi.fn(),
   normalizeTokenUsage: vi.fn(),
@@ -97,8 +97,7 @@ describe("useThreadTurnEvents", () => {
   });
 
   it("upserts thread summaries when a thread starts", () => {
-    const { result, dispatch, recordThreadActivity, safeMessageActivity } =
-      makeOptions();
+    const { result, dispatch, recordThreadActivity, safeMessageActivity } = makeOptions();
 
     act(() => {
       result.current.onThreadStarted("ws-1", {
@@ -125,11 +124,7 @@ describe("useThreadTurnEvents", () => {
       threadId: "thread-1",
       name: "A brand new thread",
     });
-    expect(recordThreadActivity).toHaveBeenCalledWith(
-      "ws-1",
-      "thread-1",
-      1_700_000_000_000,
-    );
+    expect(recordThreadActivity).toHaveBeenCalledWith("ws-1", "thread-1", 1_700_000_000_000);
     expect(safeMessageActivity).toHaveBeenCalled();
   });
 
@@ -178,8 +173,7 @@ describe("useThreadTurnEvents", () => {
   });
 
   it("hides memory consolidation thread started events", () => {
-    const { result, dispatch, recordThreadActivity, safeMessageActivity } =
-      makeOptions();
+    const { result, dispatch, recordThreadActivity, safeMessageActivity } = makeOptions();
 
     act(() => {
       result.current.onThreadStarted("ws-1", {
@@ -379,8 +373,7 @@ describe("useThreadTurnEvents", () => {
   });
 
   it("re-adds thread summary on thread unarchived", () => {
-    const { result, dispatch, recordThreadActivity, safeMessageActivity } =
-      makeOptions();
+    const { result, dispatch, recordThreadActivity, safeMessageActivity } = makeOptions();
 
     act(() => {
       result.current.onThreadUnarchived("ws-1", "thread-8");
@@ -398,11 +391,7 @@ describe("useThreadTurnEvents", () => {
         threadId: "thread-8",
       }),
     );
-    expect(recordThreadActivity).toHaveBeenCalledWith(
-      "ws-1",
-      "thread-8",
-      expect.any(Number),
-    );
+    expect(recordThreadActivity).toHaveBeenCalledWith("ws-1", "thread-8", expect.any(Number));
     expect(safeMessageActivity).toHaveBeenCalled();
   });
 
@@ -424,8 +413,9 @@ describe("useThreadTurnEvents", () => {
   });
 
   it("interrupts immediately when a pending interrupt is queued", () => {
-    const { result, markProcessing, setActiveTurnId, pendingInterruptsRef } =
-      makeOptions({ pendingInterrupts: ["thread-1"] });
+    const { result, markProcessing, setActiveTurnId, pendingInterruptsRef } = makeOptions({
+      pendingInterrupts: ["thread-1"],
+    });
     vi.mocked(interruptTurn).mockResolvedValue({});
 
     act(() => {
@@ -439,8 +429,9 @@ describe("useThreadTurnEvents", () => {
   });
 
   it("clears pending interrupt and active turn on turn completed", () => {
-    const { result, markProcessing, setActiveTurnId, pendingInterruptsRef } =
-      makeOptions({ pendingInterrupts: ["thread-1"] });
+    const { result, markProcessing, setActiveTurnId, pendingInterruptsRef } = makeOptions({
+      pendingInterrupts: ["thread-1"],
+    });
 
     act(() => {
       result.current.onTurnCompleted("ws-1", "thread-1", "turn-1");
@@ -519,13 +510,7 @@ describe("useThreadTurnEvents", () => {
   });
 
   it("clears processing, active turn, and pending interrupt for non-active thread status", () => {
-    const {
-      result,
-      markProcessing,
-      setActiveTurnId,
-      setThreadLoaded,
-      pendingInterruptsRef,
-    } =
+    const { result, markProcessing, setActiveTurnId, setThreadLoaded, pendingInterruptsRef } =
       makeOptions({ pendingInterrupts: ["thread-1"] });
 
     act(() => {
@@ -778,10 +763,7 @@ describe("useThreadTurnEvents", () => {
     });
 
     expect(getCurrentRateLimits).toHaveBeenCalledWith("ws-1");
-    expect(normalizeRateLimits).toHaveBeenCalledWith(
-      { primary: {} },
-      previousRateLimits,
-    );
+    expect(normalizeRateLimits).toHaveBeenCalledWith({ primary: {} }, previousRateLimits);
     expect(dispatch).toHaveBeenCalledWith({
       type: "setRateLimits",
       workspaceId: "ws-1",
@@ -815,10 +797,7 @@ describe("useThreadTurnEvents", () => {
     expect(markProcessing).toHaveBeenCalledWith("thread-1", false);
     expect(markReviewing).toHaveBeenCalledWith("thread-1", false);
     expect(setActiveTurnId).toHaveBeenCalledWith("thread-1", null);
-    expect(pushThreadErrorMessage).toHaveBeenCalledWith(
-      "thread-1",
-      "Turn failed: boom",
-    );
+    expect(pushThreadErrorMessage).toHaveBeenCalledWith("thread-1", "Turn failed: boom");
     expect(safeMessageActivity).toHaveBeenCalled();
   });
 
@@ -887,15 +866,10 @@ describe("useThreadTurnEvents", () => {
     const activeTurnByThread: Record<string, string | null> = {
       "thread-1": "turn-old",
     };
-    const {
-      result,
-      markProcessing,
-      markReviewing,
-      setActiveTurnId,
-      pushThreadErrorMessage,
-    } = makeOptions({
-      activeTurnByThread,
-    });
+    const { result, markProcessing, markReviewing, setActiveTurnId, pushThreadErrorMessage } =
+      makeOptions({
+        activeTurnByThread,
+      });
 
     act(() => {
       result.current.onTurnStarted("ws-1", "thread-1", "turn-local");
@@ -930,5 +904,4 @@ describe("useThreadTurnEvents", () => {
     expect(dispatch).not.toHaveBeenCalled();
     expect(markProcessing).not.toHaveBeenCalled();
   });
-
 });

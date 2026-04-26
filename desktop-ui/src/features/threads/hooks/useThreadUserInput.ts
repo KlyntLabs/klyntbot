@@ -1,11 +1,7 @@
-import { useCallback } from "react";
-import type { Dispatch } from "react";
-import type {
-  ConversationItem,
-  RequestUserInputRequest,
-  RequestUserInputResponse,
-} from "@/types";
 import { respondToUserInputRequest } from "@services/tauri";
+import type { Dispatch } from "react";
+import { useCallback } from "react";
+import type { ConversationItem, RequestUserInputRequest, RequestUserInputResponse } from "@/types";
 import type { ThreadAction } from "./useThreadsReducer";
 
 type UseThreadUserInputOptions = {
@@ -64,13 +60,9 @@ function buildUserInputConversationItem(
   }
   return {
     id: itemId
-      ? [
-          "user-input",
-          request.workspace_id,
-          threadId || "thread",
-          turnId || "turn",
-          itemId,
-        ].join("-")
+      ? ["user-input", request.workspace_id, threadId || "thread", turnId || "turn", itemId].join(
+          "-",
+        )
       : [
           "user-input",
           request.workspace_id,
@@ -87,11 +79,7 @@ function buildUserInputConversationItem(
 export function useThreadUserInput({ dispatch }: UseThreadUserInputOptions) {
   const handleUserInputSubmit = useCallback(
     async (request: RequestUserInputRequest, response: RequestUserInputResponse) => {
-      await respondToUserInputRequest(
-        request.workspace_id,
-        request.request_id,
-        response.answers,
-      );
+      await respondToUserInputRequest(request.workspace_id, request.request_id, response.answers);
       const item = buildUserInputConversationItem(request, response);
       dispatch({
         type: "upsertItem",

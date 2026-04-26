@@ -1,7 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ConversationItem, WorkspaceInfo } from "@/types";
+
 import {
   archiveThread,
   forkThread,
@@ -10,6 +8,8 @@ import {
   resumeThread,
   startThread,
 } from "@services/tauri";
+import { act, renderHook } from "@testing-library/react";
+import { saveThreadActivity } from "@threads/utils/threadStorage";
 import {
   buildItemsFromThread,
   getThreadCreatedTimestamp,
@@ -18,7 +18,8 @@ import {
   mergeThreadItems,
   previewThreadName,
 } from "@utils/threadItems";
-import { saveThreadActivity } from "@threads/utils/threadStorage";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ConversationItem, WorkspaceInfo } from "@/types";
 import { useThreadActions } from "./useThreadActions";
 
 vi.mock("@services/tauri", () => ({
@@ -65,9 +66,7 @@ describe("useThreadActions", () => {
     vi.mocked(getThreadCreatedTimestamp).mockReturnValue(0);
   });
 
-  function renderActions(
-    overrides?: Partial<Parameters<typeof useThreadActions>[0]>,
-  ) {
+  function renderActions(overrides?: Partial<Parameters<typeof useThreadActions>[0]>) {
     const dispatch = vi.fn();
     const loadedThreadsRef = { current: {} as Record<string, boolean> };
     const replaceOnResumeRef = { current: {} as Record<string, boolean> };
@@ -513,12 +512,7 @@ describe("useThreadActions", () => {
 
     let resumePromise: Promise<string | null> | null = null;
     await act(async () => {
-      resumePromise = result.current.resumeThreadForWorkspace(
-        "ws-1",
-        "thread-1",
-        true,
-        true,
-      );
+      resumePromise = result.current.resumeThreadForWorkspace("ws-1", "thread-1", true, true);
     });
 
     args.threadStatusById = {
@@ -722,12 +716,7 @@ describe("useThreadActions", () => {
       await result.current.listThreadsForWorkspace(workspace);
     });
 
-    expect(listThreads).toHaveBeenCalledWith(
-      "ws-1",
-      null,
-      100,
-      "updated_at",
-    );
+    expect(listThreads).toHaveBeenCalledWith("ws-1", null, 100, "updated_at");
     expect(dispatch).toHaveBeenCalledWith({
       type: "setThreadListLoading",
       workspaceId: "ws-1",
@@ -791,9 +780,7 @@ describe("useThreadActions", () => {
 
     const setThreadsAction = dispatch.mock.calls
       .map(([action]) => action)
-      .find(
-        (action) => action.type === "setThreads" && action.workspaceId === "ws-1",
-      );
+      .find((action) => action.type === "setThreads" && action.workspaceId === "ws-1");
     expect(setThreadsAction).toBeTruthy();
     if (!setThreadsAction || setThreadsAction.type !== "setThreads") {
       return;
@@ -959,13 +946,7 @@ describe("useThreadActions", () => {
 
     expect(listThreads).toHaveBeenCalledTimes(2);
     expect(listThreads).toHaveBeenNthCalledWith(1, "ws-1", null, 100, "updated_at");
-    expect(listThreads).toHaveBeenNthCalledWith(
-      2,
-      "ws-1",
-      "cursor-1",
-      100,
-      "updated_at",
-    );
+    expect(listThreads).toHaveBeenNthCalledWith(2, "ws-1", "cursor-1", 100, "updated_at");
   });
 
   it("supports snake_case next_cursor in shared thread list responses", async () => {
@@ -1008,13 +989,7 @@ describe("useThreadActions", () => {
     });
 
     expect(listThreads).toHaveBeenCalledTimes(2);
-    expect(listThreads).toHaveBeenNthCalledWith(
-      2,
-      "ws-1",
-      "cursor-legacy-1",
-      100,
-      "updated_at",
-    );
+    expect(listThreads).toHaveBeenNthCalledWith(2, "ws-1", "cursor-legacy-1", 100, "updated_at");
   });
 
   it("stores a per-workspace cursor boundary for older pagination", async () => {
@@ -1131,13 +1106,8 @@ describe("useThreadActions", () => {
       await result.current.listThreadsForWorkspace(workspace);
     });
 
-    expect(updateThreadParent).toHaveBeenCalledWith("parent-thread-flat", [
-      "child-thread-flat",
-    ]);
-    expect(onSubagentThreadDetected).toHaveBeenCalledWith(
-      "ws-1",
-      "child-thread-flat",
-    );
+    expect(updateThreadParent).toHaveBeenCalledWith("parent-thread-flat", ["child-thread-flat"]);
+    expect(onSubagentThreadDetected).toHaveBeenCalledWith("ws-1", "child-thread-flat");
   });
 
   it("marks thread summaries as subagent when source indicates subagent", async () => {
@@ -1257,12 +1227,7 @@ describe("useThreadActions", () => {
       await result.current.listThreadsForWorkspace(windowsWorkspace);
     });
 
-    expect(listThreads).toHaveBeenCalledWith(
-      "ws-1",
-      null,
-      100,
-      "updated_at",
-    );
+    expect(listThreads).toHaveBeenCalledWith("ws-1", null, 100, "updated_at");
     expect(dispatch).toHaveBeenCalledWith({
       type: "setThreads",
       workspaceId: "ws-1",
@@ -1395,11 +1360,7 @@ describe("useThreadActions", () => {
     expect(listWorkspaces).toHaveBeenCalled();
     const parentSetThreadsAction = dispatch.mock.calls
       .map(([action]) => action)
-      .find(
-        (action) =>
-          action?.type === "setThreads" &&
-          action?.workspaceId === "ws-parent",
-      ) as
+      .find((action) => action?.type === "setThreads" && action?.workspaceId === "ws-parent") as
       | { type: "setThreads"; threads: Array<{ id: string }>; workspaceId: string }
       | undefined;
 
@@ -1443,12 +1404,7 @@ describe("useThreadActions", () => {
       await result.current.listThreadsForWorkspace(workspace);
     });
 
-    expect(listThreads).toHaveBeenCalledWith(
-      "ws-1",
-      null,
-      100,
-      "created_at",
-    );
+    expect(listThreads).toHaveBeenCalledWith("ws-1", null, 100, "created_at");
   });
 
   it("loads older threads when a cursor is available", async () => {
@@ -1560,12 +1516,7 @@ describe("useThreadActions", () => {
       await result.current.loadOlderThreadsForWorkspace(workspace);
     });
 
-    expect(listThreads).toHaveBeenCalledWith(
-      "ws-1",
-      null,
-      100,
-      "updated_at",
-    );
+    expect(listThreads).toHaveBeenCalledWith("ws-1", null, 100, "updated_at");
   });
 
   it("matches windows workspace threads when loading older threads", async () => {
@@ -1602,12 +1553,7 @@ describe("useThreadActions", () => {
       await result.current.loadOlderThreadsForWorkspace(windowsWorkspace);
     });
 
-    expect(listThreads).toHaveBeenCalledWith(
-      "ws-1",
-      "cursor-1",
-      100,
-      "updated_at",
-    );
+    expect(listThreads).toHaveBeenCalledWith("ws-1", "cursor-1", 100, "updated_at");
     expect(dispatch).toHaveBeenCalledWith({
       type: "setThreads",
       workspaceId: "ws-1",
@@ -1752,11 +1698,10 @@ describe("useThreadActions", () => {
       await result.current.listThreadsForWorkspace(workspace);
     });
 
-    expect(onThreadCodexMetadataDetected).toHaveBeenCalledWith(
-      "ws-1",
-      "thread-model-1",
-      { modelId: "gpt-5-codex", effort: "high" },
-    );
+    expect(onThreadCodexMetadataDetected).toHaveBeenCalledWith("ws-1", "thread-model-1", {
+      modelId: "gpt-5-codex",
+      effort: "high",
+    });
   });
 
   it("detects model metadata when resuming a thread", async () => {
@@ -1795,11 +1740,10 @@ describe("useThreadActions", () => {
       await result.current.resumeThreadForWorkspace("ws-1", "thread-resume-model");
     });
 
-    expect(onThreadCodexMetadataDetected).toHaveBeenCalledWith(
-      "ws-1",
-      "thread-resume-model",
-      { modelId: "gpt-5.3-codex", effort: "medium" },
-    );
+    expect(onThreadCodexMetadataDetected).toHaveBeenCalledWith("ws-1", "thread-resume-model", {
+      modelId: "gpt-5.3-codex",
+      effort: "medium",
+    });
   });
 
   it("archives threads and reports errors", async () => {

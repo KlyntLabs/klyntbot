@@ -73,23 +73,12 @@ describe("ThreadList", () => {
     expect(onSelectThread).toHaveBeenCalledWith("ws-1", "thread-1");
 
     fireEvent.contextMenu(row);
-    expect(onShowThreadMenu).toHaveBeenCalledWith(
-      expect.anything(),
-      "ws-1",
-      "thread-1",
-      true,
-    );
+    expect(onShowThreadMenu).toHaveBeenCalledWith(expect.anything(), "ws-1", "thread-1", true);
   });
 
   it("shows the more button and toggles expanded", () => {
     const onToggleExpanded = vi.fn();
-    render(
-      <ThreadList
-        {...baseProps}
-        totalThreadRoots={4}
-        onToggleExpanded={onToggleExpanded}
-      />,
-    );
+    render(<ThreadList {...baseProps} totalThreadRoots={4} onToggleExpanded={onToggleExpanded} />);
 
     const moreButton = screen.getByRole("button", { name: "More..." });
     fireEvent.click(moreButton);
@@ -99,11 +88,7 @@ describe("ThreadList", () => {
   it("loads older threads when a cursor is available", () => {
     const onLoadOlderThreads = vi.fn();
     render(
-      <ThreadList
-        {...baseProps}
-        nextCursor="cursor"
-        onLoadOlderThreads={onLoadOlderThreads}
-      />,
+      <ThreadList {...baseProps} nextCursor="cursor" onLoadOlderThreads={onLoadOlderThreads} />,
     );
 
     const loadButton = screen.getByRole("button", { name: "Load older..." });
@@ -133,12 +118,7 @@ describe("ThreadList", () => {
     expect(nestedRow.getAttribute("style")).toContain("--thread-indent");
 
     fireEvent.contextMenu(nestedRow);
-    expect(onShowThreadMenu).toHaveBeenCalledWith(
-      expect.anything(),
-      "ws-1",
-      "thread-2",
-      false,
-    );
+    expect(onShowThreadMenu).toHaveBeenCalledWith(expect.anything(), "ws-1", "thread-2", false);
   });
 
   it("shows the subagent nickname pill with role styling", () => {

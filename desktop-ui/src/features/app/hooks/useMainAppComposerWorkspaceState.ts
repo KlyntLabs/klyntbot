@@ -1,4 +1,10 @@
-import { useMemo, type RefObject } from "react";
+import { useComposerController } from "@app/hooks/useComposerController";
+import { useComposerInsert } from "@app/hooks/useComposerInsert";
+import { useWorkspaceFileListing } from "@app/hooks/useWorkspaceFileListing";
+import { type RefObject, useMemo } from "react";
+import { computePlanFollowupState } from "@/features/messages/utils/messageRenderUtils";
+import { useWorkspaceAgentMd } from "@/features/workspaces/hooks/useWorkspaceAgentMd";
+import { useWorkspaceHome } from "@/features/workspaces/hooks/useWorkspaceHome";
 import type {
   AppSettings,
   ConversationItem,
@@ -9,12 +15,6 @@ import type {
   ThreadSummary,
   WorkspaceInfo,
 } from "@/types";
-import { computePlanFollowupState } from "@/features/messages/utils/messageRenderUtils";
-import { useComposerController } from "@app/hooks/useComposerController";
-import { useComposerInsert } from "@app/hooks/useComposerInsert";
-import { useWorkspaceFileListing } from "@app/hooks/useWorkspaceFileListing";
-import { useWorkspaceAgentMd } from "@/features/workspaces/hooks/useWorkspaceAgentMd";
-import { useWorkspaceHome } from "@/features/workspaces/hooks/useWorkspaceHome";
 
 const RECENT_THREAD_LIMIT = 8;
 
@@ -70,10 +70,14 @@ type UseMainAppComposerWorkspaceStateArgs = {
     addWorktreeAgent: Parameters<typeof useWorkspaceHome>[0]["addWorktreeAgent"];
     connectWorkspace: Parameters<typeof useComposerController>[0]["connectWorkspace"] &
       Parameters<typeof useWorkspaceHome>[0]["connectWorkspace"];
-    startThreadForWorkspace: Parameters<typeof useComposerController>[0]["startThreadForWorkspace"] &
+    startThreadForWorkspace: Parameters<
+      typeof useComposerController
+    >[0]["startThreadForWorkspace"] &
       Parameters<typeof useWorkspaceHome>[0]["startThreadForWorkspace"];
     sendUserMessage: Parameters<typeof useComposerController>[0]["sendUserMessage"];
-    sendUserMessageToThread: Parameters<typeof useComposerController>[0]["sendUserMessageToThread"] &
+    sendUserMessageToThread: Parameters<
+      typeof useComposerController
+    >[0]["sendUserMessageToThread"] &
       Parameters<typeof useWorkspaceHome>[0]["sendUserMessageToThread"];
     seedThreadCodexParams: NonNullable<
       Parameters<typeof useWorkspaceHome>[0]["seedThreadCodexParams"]
@@ -116,13 +120,8 @@ export function useMainAppComposerWorkspaceState({
     startingDraftThreadWorkspaceId,
     threadsByWorkspace,
   } = workspace;
-  const {
-    activeThreadId,
-    activeItems,
-    activeTurnIdByThread,
-    threadStatusById,
-    userInputRequests,
-  } = thread;
+  const { activeThreadId, activeItems, activeTurnIdByThread, threadStatusById, userInputRequests } =
+    thread;
   const {
     models: modelOptions,
     selectedModelId,
@@ -149,40 +148,41 @@ export function useMainAppComposerWorkspaceState({
     handleWorktreeCreated,
     addDebugEntry,
   } = actions;
-  const showWorkspaceHome = Boolean(
-    activeWorkspace && !activeThreadId && !isNewAgentDraftMode,
-  );
+  const showWorkspaceHome = Boolean(activeWorkspace && !activeThreadId && !isNewAgentDraftMode);
   const showComposer =
     (!isCompact
       ? centerMode === "chat" || centerMode === "diff"
       : (isTablet ? tabletTab : activeTab) === "codex") && !showWorkspaceHome;
 
-  const { files, isLoading: isFilesLoading, setFileAutocompleteActive } =
-    useWorkspaceFileListing({
-      activeWorkspace,
-      activeWorkspaceId,
-      filePanelMode,
-      isCompact,
-      isTablet,
-      activeTab,
-      tabletTab,
-      rightPanelCollapsed,
-      hasComposerSurface: showComposer || showWorkspaceHome,
-      onDebug: addDebugEntry,
-    });
+  const {
+    files,
+    isLoading: isFilesLoading,
+    setFileAutocompleteActive,
+  } = useWorkspaceFileListing({
+    activeWorkspace,
+    activeWorkspaceId,
+    filePanelMode,
+    isCompact,
+    isTablet,
+    activeTab,
+    tabletTab,
+    rightPanelCollapsed,
+    hasComposerSurface: showComposer || showWorkspaceHome,
+    onDebug: addDebugEntry,
+  });
 
   const canInterrupt = activeThreadId
-    ? threadStatusById[activeThreadId]?.isProcessing ?? false
+    ? (threadStatusById[activeThreadId]?.isProcessing ?? false)
     : false;
   const isStartingDraftThread =
     Boolean(activeWorkspaceId) && startingDraftThreadWorkspaceId === activeWorkspaceId;
   const isProcessing =
-    (activeThreadId ? threadStatusById[activeThreadId]?.isProcessing ?? false : false) ||
+    (activeThreadId ? (threadStatusById[activeThreadId]?.isProcessing ?? false) : false) ||
     isStartingDraftThread;
   const isReviewing = activeThreadId
-    ? threadStatusById[activeThreadId]?.isReviewing ?? false
+    ? (threadStatusById[activeThreadId]?.isReviewing ?? false)
     : false;
-  const activeTurnId = activeThreadId ? activeTurnIdByThread[activeThreadId] ?? null : null;
+  const activeTurnId = activeThreadId ? (activeTurnIdByThread[activeThreadId] ?? null) : null;
   const steerAvailable = settings.steerEnabled && Boolean(activeTurnId);
   const hasUserInputRequestForActiveThread = Boolean(
     activeThreadId &&
@@ -201,12 +201,7 @@ export function useMainAppComposerWorkspaceState({
         isThinking: isProcessing,
         hasVisibleUserInputRequest: hasUserInputRequestForActiveThread,
       }).shouldShow,
-    [
-      activeItems,
-      activeThreadId,
-      hasUserInputRequestForActiveThread,
-      isProcessing,
-    ],
+    [activeItems, activeThreadId, hasUserInputRequestForActiveThread, isProcessing],
   );
 
   const queueFlushPaused = Boolean(

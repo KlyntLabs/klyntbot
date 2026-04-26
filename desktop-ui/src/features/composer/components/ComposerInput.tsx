@@ -1,27 +1,21 @@
-import { useCallback, useRef } from "react";
-import type {
-  ChangeEvent,
-  ClipboardEvent,
-  KeyboardEvent,
-  RefObject,
-  SyntheticEvent,
-} from "react";
-import type { AutocompleteItem } from "../hooks/useComposerAutocomplete";
-import ImagePlus from "lucide-react/dist/esm/icons/image-plus";
+import type { ReviewPromptState, ReviewPromptStep } from "@threads/hooks/useReviewPrompt";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
+import ImagePlus from "lucide-react/dist/esm/icons/image-plus";
 import Mic from "lucide-react/dist/esm/icons/mic";
 import Square from "lucide-react/dist/esm/icons/square";
 import X from "lucide-react/dist/esm/icons/x";
-import { useComposerImageDrop } from "../hooks/useComposerImageDrop";
-import { ComposerMobileActionsMenu } from "./ComposerMobileActionsMenu";
-import { ComposerSuggestionsPopover } from "./ComposerSuggestionsPopover";
-import { ComposerAttachments } from "./ComposerAttachments";
+import type { ChangeEvent, ClipboardEvent, KeyboardEvent, RefObject, SyntheticEvent } from "react";
+import { useCallback, useRef } from "react";
 import { DictationWaveform } from "@/features/dictation/components/DictationWaveform";
+import type { AutocompleteItem } from "../hooks/useComposerAutocomplete";
 import { useComposerDictationControls } from "../hooks/useComposerDictationControls";
+import { useComposerImageDrop } from "../hooks/useComposerImageDrop";
 import { useComposerInputLayout } from "../hooks/useComposerInputLayout";
 import { useComposerMobileActions } from "../hooks/useComposerMobileActions";
-import type { ReviewPromptState, ReviewPromptStep } from "@threads/hooks/useReviewPrompt";
+import { ComposerAttachments } from "./ComposerAttachments";
+import { ComposerMobileActionsMenu } from "./ComposerMobileActionsMenu";
+import { ComposerSuggestionsPopover } from "./ComposerSuggestionsPopover";
 
 type ComposerInputProps = {
   text: string;
@@ -143,8 +137,9 @@ export function ComposerInput({
     text,
     textareaRef,
   });
-  const { mobileActionsOpen, mobileActionsRef, setMobileActionsOpen } =
-    useComposerMobileActions({ disabled });
+  const { mobileActionsOpen, mobileActionsRef, setMobileActionsOpen } = useComposerMobileActions({
+    disabled,
+  });
   const {
     dropTargetRef,
     isDragOver,
@@ -334,9 +329,7 @@ export function ComposerInput({
               {canStop ? (
                 <>
                   <span className="composer-action-stop-square" aria-hidden />
-                  {isProcessing && (
-                    <span className="composer-action-spinner" aria-hidden />
-                  )}
+                  {isProcessing && <span className="composer-action-spinner" aria-hidden />}
                 </>
               ) : (
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden>

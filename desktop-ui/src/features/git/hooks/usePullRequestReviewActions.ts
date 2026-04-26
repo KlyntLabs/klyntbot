@@ -1,3 +1,5 @@
+import { pushErrorToast } from "@services/toasts";
+import { buildPullRequestReviewPrompt } from "@utils/pullRequestReviewPrompt";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type {
   GitHubPullRequest,
@@ -9,8 +11,6 @@ import type {
   SendMessageResult,
   WorkspaceInfo,
 } from "@/types";
-import { pushErrorToast } from "@services/toasts";
-import { buildPullRequestReviewPrompt } from "@utils/pullRequestReviewPrompt";
 
 const REVIEW_ACTIONS: PullRequestReviewAction[] = [
   { id: "pr-review-full", label: "Review PR", intent: "full" },
@@ -84,13 +84,12 @@ export function usePullRequestReviewActions({
           await connectWorkspace(activeWorkspace);
         }
 
-        const reuseActiveThread =
-          reviewDeliveryMode === "inline" && Boolean(activeThreadId);
+        const reuseActiveThread = reviewDeliveryMode === "inline" && Boolean(activeThreadId);
         const reviewThreadId = reuseActiveThread
           ? activeThreadId
           : await startThreadForWorkspace(activeWorkspace.id, {
-            activate: activateThread,
-          });
+              activate: activateThread,
+            });
         if (!reviewThreadId) {
           throw new Error("Failed to start a review thread.");
         }

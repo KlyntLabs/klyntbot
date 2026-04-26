@@ -1,28 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ask } from "@tauri-apps/plugin-dialog";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import type { SelectedLineRange } from "@pierre/diffs";
 import { WorkerPoolContextProvider } from "@pierre/diffs/react";
-import GitCommitHorizontal from "lucide-react/dist/esm/icons/git-commit-horizontal";
-import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { ask } from "@tauri-apps/plugin-dialog";
 import type { ParsedDiffLine } from "@utils/diff";
 import { workerFactory } from "@utils/diffsWorker";
-import type {
-  PullRequestReviewIntent,
-  PullRequestSelectionRange,
-} from "@/types";
-import {
-  DIFF_VIEWER_HIGHLIGHTER_OPTIONS,
-} from "@/features/design-system/diff/diffViewerTheme";
-import { ImageDiffCard } from "./ImageDiffCard";
+import GitCommitHorizontal from "lucide-react/dist/esm/icons/git-commit-horizontal";
+import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DIFF_VIEWER_HIGHLIGHTER_OPTIONS } from "@/features/design-system/diff/diffViewerTheme";
+import type { PullRequestReviewIntent, PullRequestSelectionRange } from "@/types";
 import { splitPath } from "./GitDiffPanel.utils";
+import type { GitDiffViewerItem, GitDiffViewerProps } from "./GitDiffViewer.types";
+import { calculateDiffStats } from "./GitDiffViewer.utils";
 import { DiffCard } from "./GitDiffViewerDiffCard";
 import { PullRequestSummary } from "./GitDiffViewerPullRequestSummary";
-import type {
-  GitDiffViewerItem,
-  GitDiffViewerProps,
-} from "./GitDiffViewer.types";
-import { calculateDiffStats } from "./GitDiffViewer.utils";
+import { ImageDiffCard } from "./ImageDiffCard";
 
 function isSelectableLine(
   line: ParsedDiffLine,
@@ -36,9 +28,7 @@ function findSelectionLineIndex(
   side: "additions" | "deletions",
   fromEnd = false,
 ) {
-  const indices = fromEnd
-    ? [...parsedLines.keys()].reverse()
-    : [...parsedLines.keys()];
+  const indices = fromEnd ? [...parsedLines.keys()].reverse() : [...parsedLines.keys()];
 
   for (const index of indices) {
     const line = parsedLines[index];
@@ -83,18 +73,8 @@ function buildSelectionRangeFromLineSelection({
 
   const startSide = selectedLines.side ?? "additions";
   const endSide = selectedLines.endSide ?? startSide;
-  const startIndex = findSelectionLineIndex(
-    parsedLines,
-    selectedLines.start,
-    startSide,
-    false,
-  );
-  const endIndex = findSelectionLineIndex(
-    parsedLines,
-    selectedLines.end,
-    endSide,
-    true,
-  );
+  const startIndex = findSelectionLineIndex(parsedLines, selectedLines.start, startSide, false);
+  const endIndex = findSelectionLineIndex(parsedLines, selectedLines.end, endSide, true);
   if (startIndex === null || endIndex === null) {
     return null;
   }
@@ -181,26 +161,20 @@ export function GitDiffViewer({
     [lineSelection],
   );
 
-  const setSelectedLinesForPath = useCallback(
-    (path: string, range: SelectedLineRange | null) => {
-      setLineSelection((previous) => {
-        if (!range) {
-          if (previous?.path !== path) {
-            return previous;
-          }
-          return null;
+  const setSelectedLinesForPath = useCallback((path: string, range: SelectedLineRange | null) => {
+    setLineSelection((previous) => {
+      if (!range) {
+        if (previous?.path !== path) {
+          return previous;
         }
-        return { path, range };
-      });
-    },
-    [],
-  );
+        return null;
+      }
+      return { path, range };
+    });
+  }, []);
 
   const poolOptions = useMemo(() => ({ workerFactory }), []);
-  const highlighterOptions = useMemo(
-    () => DIFF_VIEWER_HIGHLIGHTER_OPTIONS,
-    [],
-  );
+  const highlighterOptions = useMemo(() => DIFF_VIEWER_HIGHLIGHTER_OPTIONS, []);
 
   const indexByPath = useMemo(() => {
     const map = new Map<string, number>();
@@ -278,8 +252,7 @@ export function GitDiffViewer({
       }
       const displayPath = entry.displayPath ?? entry.path;
       const lineNumber = line.newLine ?? line.oldLine;
-      const lineLabel =
-        typeof lineNumber === "number" ? `L${lineNumber}` : `line-${index + 1}`;
+      const lineLabel = typeof lineNumber === "number" ? `L${lineNumber}` : `line-${index + 1}`;
       const prefix = line.type === "add" ? "+" : line.type === "del" ? "-" : " ";
       const reference = `${displayPath}:${lineLabel}\n\`\`\`diff\n${prefix}${line.text}\n\`\`\`\n\n`;
       onInsertComposerText(reference);
@@ -319,10 +292,10 @@ export function GitDiffViewer({
       if (!onRevertFile) {
         return;
       }
-      const confirmed = await ask(
-        `Discard changes in:\n\n${path}\n\nThis cannot be undone.`,
-        { title: "Discard changes", kind: "warning" },
-      );
+      const confirmed = await ask(`Discard changes in:\n\n${path}\n\nThis cannot be undone.`, {
+        title: "Discard changes",
+        kind: "warning",
+      });
       if (!confirmed) {
         return;
       }
@@ -394,8 +367,7 @@ export function GitDiffViewer({
       const scrollTop = container.scrollTop;
       const canScroll = container.scrollHeight > container.clientHeight;
       const isAtBottom =
-        canScroll &&
-        scrollTop + container.clientHeight >= container.scrollHeight - 4;
+        canScroll && scrollTop + container.clientHeight >= container.scrollHeight - 4;
       let nextPath: string | undefined;
       if (isAtBottom) {
         nextPath = diffs[diffs.length - 1]?.path;
@@ -465,10 +437,7 @@ export function GitDiffViewer({
       };
 
   return (
-    <WorkerPoolContextProvider
-      poolOptions={poolOptions}
-      highlighterOptions={highlighterOptions}
-    >
+    <WorkerPoolContextProvider poolOptions={poolOptions} highlighterOptions={highlighterOptions}>
       <div
         className={`diff-viewer ds-diff-viewer ${
           diffStyle === "unified" ? "is-unified" : "is-split"
@@ -490,10 +459,7 @@ export function GitDiffViewer({
         {!error && stickyEntry && (
           <div className="diff-viewer-sticky">
             <div className="diff-viewer-header diff-viewer-header-sticky">
-              <span
-                className="diff-viewer-status"
-                data-status={stickyEntry.status}
-              >
+              <span className="diff-viewer-status" data-status={stickyEntry.status}>
                 {stickyEntry.status}
               </span>
               <span
@@ -516,9 +482,7 @@ export function GitDiffViewer({
                   onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
-                    void handleRequestRevert(
-                      stickyEntry.displayPath ?? stickyEntry.path,
-                    );
+                    void handleRequestRevert(stickyEntry.displayPath ?? stickyEntry.path);
                   }}
                 >
                   <RotateCcw size={14} aria-hidden />
@@ -529,9 +493,7 @@ export function GitDiffViewer({
         )}
         {error && <div className="diff-viewer-empty">{error}</div>}
         {!error && isLoading && diffs.length > 0 && (
-          <div className="diff-viewer-loading diff-viewer-loading-overlay">
-            Refreshing diff...
-          </div>
+          <div className="diff-viewer-loading diff-viewer-loading-overlay">Refreshing diff...</div>
         )}
         {!error && !isLoading && !diffs.length && (
           <div className="diff-viewer-empty-state" role="status" aria-live="polite">
@@ -599,12 +561,7 @@ export function GitDiffViewer({
                       }
                       reviewActions={pullRequestReviewActions}
                       onRunReviewAction={(intent, parsedLines, selectedLines) => {
-                        void handleRunSelectionReview(
-                          intent,
-                          entry,
-                          parsedLines,
-                          selectedLines,
-                        );
+                        void handleRunSelectionReview(intent, entry, parsedLines, selectedLines);
                       }}
                       onClearSelection={clearSelection}
                       pullRequestReviewLaunching={pullRequestReviewLaunching}

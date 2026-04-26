@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+
+import { usePlanReadyActions } from "@app/hooks/usePlanReadyActions";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { CollaborationModeOption, WorkspaceInfo } from "@/types";
-import { usePlanReadyActions } from "@app/hooks/usePlanReadyActions";
 
 function makeMode(id: string): CollaborationModeOption {
   return {
@@ -184,10 +185,9 @@ describe("usePlanReadyActions", () => {
   });
 
   it("connects workspace before sending plan accept message", async () => {
-    const { result, connectWorkspace, sendUserMessageToThread } =
-      renderPlanReadyActions({
-        activeWorkspace: disconnectedWorkspace,
-      });
+    const { result, connectWorkspace, sendUserMessageToThread } = renderPlanReadyActions({
+      activeWorkspace: disconnectedWorkspace,
+    });
 
     await act(async () => {
       await result.current.handlePlanAccept();

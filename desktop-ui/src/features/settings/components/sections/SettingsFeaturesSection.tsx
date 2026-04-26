@@ -1,12 +1,12 @@
-import type { CodexFeature } from "@/types";
+import type { SettingsFeaturesSectionProps } from "@settings/hooks/useSettingsFeaturesSection";
+import { fileManagerName, openInFileManagerLabel } from "@utils/platformPaths";
 import {
   SettingsSection,
   SettingsSubsection,
   SettingsToggleRow,
   SettingsToggleSwitch,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
-import type { SettingsFeaturesSectionProps } from "@settings/hooks/useSettingsFeaturesSection";
-import { fileManagerName, openInFileManagerLabel } from "@utils/platformPaths";
+import type { CodexFeature } from "@/types";
 
 const FEATURE_DESCRIPTION_FALLBACKS: Record<string, string> = {
   undo: "Create a ghost commit at each turn.",
@@ -25,25 +25,20 @@ const FEATURE_DESCRIPTION_FALLBACKS: Record<string, string> = {
   apply_patch_freeform: "Include the freeform apply_patch tool.",
   use_linux_sandbox_bwrap: "Use the bubblewrap-based Linux sandbox pipeline.",
   request_rule: "Allow approval requests and exec rule proposals.",
-  experimental_windows_sandbox:
-    "Removed Windows sandbox flag kept for backward compatibility.",
+  experimental_windows_sandbox: "Removed Windows sandbox flag kept for backward compatibility.",
   elevated_windows_sandbox:
     "Removed elevated Windows sandbox flag kept for backward compatibility.",
   remote_models: "Refresh remote models before AppReady.",
   powershell_utf8: "Enforce UTF-8 output in PowerShell.",
-  enable_request_compression:
-    "Compress streaming request bodies sent to codex-backend.",
+  enable_request_compression: "Compress streaming request bodies sent to codex-backend.",
   apps: "Enable ChatGPT Apps integration.",
   apps_mcp_gateway: "Route Apps MCP calls through the configured gateway.",
-  skill_mcp_dependency_install:
-    "Allow prompting and installing missing MCP dependencies.",
-  skill_env_var_dependency_prompt:
-    "Prompt for missing skill environment variable dependencies.",
+  skill_mcp_dependency_install: "Allow prompting and installing missing MCP dependencies.",
+  skill_env_var_dependency_prompt: "Prompt for missing skill environment variable dependencies.",
   steer: "Enable turn steering capability when supported by Codex.",
   collaboration_modes: "Enable collaboration mode presets.",
   personality: "Enable personality selection.",
-  responses_websockets:
-    "Use Responses API WebSocket transport for OpenAI by default.",
+  responses_websockets: "Use Responses API WebSocket transport for OpenAI by default.",
   responses_websockets_v2: "Enable Responses API WebSocket v2 mode.",
 };
 
@@ -94,10 +89,7 @@ export function SettingsFeaturesSection({
   onUpdateAppSettings,
 }: SettingsFeaturesSectionProps) {
   return (
-    <SettingsSection
-      title="Features"
-      subtitle="Manage stable and experimental Codex features."
-    >
+    <SettingsSection title="Features" subtitle="Manage stable and experimental Codex features.">
       <SettingsToggleRow
         title="Config file"
         subtitle={`Open the Codex config in ${fileManagerName()}.`}
@@ -164,10 +156,7 @@ export function SettingsFeaturesSection({
           />
         </SettingsToggleRow>
       ))}
-      {hasFeatureWorkspace &&
-        !featuresLoading &&
-        !featureError &&
-        stableFeatures.length === 0 && (
+      {hasFeatureWorkspace && !featuresLoading && !featureError && stableFeatures.length === 0 && (
         <div className="settings-help">No stable feature flags returned by Codex.</div>
       )}
       <SettingsSubsection
@@ -196,13 +185,9 @@ export function SettingsFeaturesSection({
             No preview or under-development feature flags returned by Codex.
           </div>
         )}
-      {featuresLoading && (
-        <div className="settings-help">Loading Codex feature flags...</div>
-      )}
+      {featuresLoading && <div className="settings-help">Loading Codex feature flags...</div>}
       {!hasFeatureWorkspace && !featuresLoading && (
-        <div className="settings-help">
-          Connect a workspace to load Codex feature flags.
-        </div>
+        <div className="settings-help">Connect a workspace to load Codex feature flags.</div>
       )}
       {featureError && <div className="settings-help">{featureError}</div>}
     </SettingsSection>

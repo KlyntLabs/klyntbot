@@ -1,4 +1,3 @@
-import type { Dispatch, RefObject, SetStateAction } from "react";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import ImagePlus from "lucide-react/dist/esm/icons/image-plus";
@@ -6,6 +5,7 @@ import Mic from "lucide-react/dist/esm/icons/mic";
 import Plus from "lucide-react/dist/esm/icons/plus";
 import Square from "lucide-react/dist/esm/icons/square";
 import X from "lucide-react/dist/esm/icons/x";
+import type { Dispatch, RefObject, SetStateAction } from "react";
 import {
   PopoverMenuItem,
   PopoverSurface,
@@ -76,9 +76,7 @@ export function ComposerMobileActionsMenu({
             <PopoverMenuItem
               onClick={handleMobileExpandClick}
               disabled={disabled}
-              icon={
-                isExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />
-              }
+              icon={isExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
             >
               {isExpanded ? "Collapse input" : "Expand input"}
             </PopoverMenuItem>

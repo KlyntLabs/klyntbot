@@ -1,11 +1,11 @@
 import { useCallback } from "react";
 import type { AppSettings, WorkspaceGroup, WorkspaceInfo, WorkspaceSettings } from "@/types";
 import {
-  RESERVED_GROUP_NAME,
   createGroupId,
   isDuplicateGroupName,
   isReservedGroupName,
   normalizeGroupName,
+  RESERVED_GROUP_NAME,
 } from "../domain/workspaceGroups";
 
 type UseWorkspaceGroupOpsOptions = {
@@ -120,9 +120,7 @@ export function useWorkspaceGroupOps({
       const temp = nextOrdered[index];
       nextOrdered[index] = nextOrdered[nextIndex];
       nextOrdered[nextIndex] = temp;
-      const nextOrderById = new Map(
-        nextOrdered.map((group, idx) => [group.id, idx]),
-      );
+      const nextOrderById = new Map(nextOrdered.map((group, idx) => [group.id, idx]));
       const currentGroups = appSettings.workspaceGroups ?? [];
       const nextGroups = currentGroups.map((group) => {
         const nextOrder = nextOrderById.get(group.id);
@@ -157,13 +155,7 @@ export function useWorkspaceGroupOps({
       ]);
       return true;
     },
-    [
-      appSettings,
-      onUpdateAppSettings,
-      updateWorkspaceGroups,
-      updateWorkspaceSettings,
-      workspaces,
-    ],
+    [appSettings, onUpdateAppSettings, updateWorkspaceGroups, updateWorkspaceSettings, workspaces],
   );
 
   const assignWorkspaceGroup = useCallback(

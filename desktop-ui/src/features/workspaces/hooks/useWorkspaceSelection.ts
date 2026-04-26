@@ -1,5 +1,5 @@
-import { useCallback } from "react";
 import * as Sentry from "@sentry/react";
+import { useCallback } from "react";
 import type { WorkspaceInfo, WorkspaceSettings } from "@/types";
 
 type UseWorkspaceSelectionOptions = {

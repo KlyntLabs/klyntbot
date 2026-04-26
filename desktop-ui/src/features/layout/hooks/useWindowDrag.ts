@@ -1,6 +1,6 @@
-import { useEffect } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect } from "react";
 
 const NEVER_DRAG_TARGET_SELECTOR = [
   "button",
@@ -52,10 +52,7 @@ function isNeverDragTarget(event: MouseEvent) {
 
 function isInsideRect(clientX: number, clientY: number, rect: DOMRect) {
   return (
-    clientX >= rect.left &&
-    clientX <= rect.right &&
-    clientY >= rect.top &&
-    clientY <= rect.bottom
+    clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
   );
 }
 

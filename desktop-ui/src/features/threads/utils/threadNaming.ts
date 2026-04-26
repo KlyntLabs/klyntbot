@@ -18,7 +18,5 @@ export function clampThreadName(name: string, maxLength = 38): string | null {
   if (!trimmed) {
     return null;
   }
-  return trimmed.length > maxLength
-    ? `${trimmed.slice(0, maxLength)}…`
-    : trimmed;
+  return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength)}…` : trimmed;
 }

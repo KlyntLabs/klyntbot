@@ -43,14 +43,7 @@ describe("ClonePrompt", () => {
   it("handles Escape and Enter keyboard actions", () => {
     const onCancel = vi.fn();
     const onConfirm = vi.fn();
-    render(
-      <ClonePrompt
-        {...baseProps}
-        onCancel={onCancel}
-        onConfirm={onConfirm}
-        isBusy={false}
-      />,
-    );
+    render(<ClonePrompt {...baseProps} onCancel={onCancel} onConfirm={onConfirm} isBusy={false} />);
 
     const copyNameInput = screen.getByLabelText("Copy name");
     fireEvent.keyDown(copyNameInput, {

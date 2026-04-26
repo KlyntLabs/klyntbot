@@ -1,22 +1,22 @@
-import type { MutableRefObject } from "react";
-import { useTauriEvent } from "./useTauriEvent";
 import {
   subscribeMenuAddWorkspace,
   subscribeMenuAddWorkspaceFromUrl,
   subscribeMenuNewAgent,
   subscribeMenuNewCloneAgent,
   subscribeMenuNewWorktreeAgent,
+  subscribeMenuNextAgent,
+  subscribeMenuNextWorkspace,
   subscribeMenuOpenSettings,
   subscribeMenuPrevAgent,
-  subscribeMenuNextAgent,
   subscribeMenuPrevWorkspace,
-  subscribeMenuNextWorkspace,
   subscribeMenuToggleDebugPanel,
   subscribeMenuToggleGitSidebar,
   subscribeMenuToggleProjectsSidebar,
   subscribeMenuToggleTerminal,
 } from "@services/events";
+import type { MutableRefObject } from "react";
 import type { WorkspaceInfo } from "@/types";
+import { useTauriEvent } from "./useTauriEvent";
 
 type Params = {
   activeWorkspaceRef: MutableRefObject<WorkspaceInfo | null>;

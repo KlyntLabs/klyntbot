@@ -27,9 +27,7 @@ export type WorktreeSetupStatus = {
   script: string | null;
 };
 
-export async function getWorktreeSetupStatus(
-  workspaceId: string,
-): Promise<WorktreeSetupStatus> {
+export async function getWorktreeSetupStatus(workspaceId: string): Promise<WorktreeSetupStatus> {
   return invoke<WorktreeSetupStatus>("worktree_setup_status", { workspaceId });
 }
 
@@ -41,10 +39,7 @@ export async function removeWorktree(id: string): Promise<void> {
   return invoke("remove_worktree", { id });
 }
 
-export async function renameWorktree(
-  id: string,
-  branch: string,
-): Promise<WorkspaceInfo> {
+export async function renameWorktree(id: string, branch: string): Promise<WorkspaceInfo> {
   return invoke<WorkspaceInfo>("rename_worktree", { id, branch });
 }
 

@@ -5,9 +5,10 @@
 // subscriber that listens for `qk.threads.list()` updates and calls
 // setTrayRecentThreads from the cache. Until then it stays as a prop-driven
 // effect.
+
+import { setTrayRecentThreads } from "@services/tauri";
 import { isTauri } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef } from "react";
-import { setTrayRecentThreads } from "@services/tauri";
 import type { ThreadSummary, TrayRecentThreadEntry, WorkspaceInfo } from "@/types";
 
 const SYNC_DEBOUNCE_MS = 150;

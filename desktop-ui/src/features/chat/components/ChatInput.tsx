@@ -1,5 +1,5 @@
-import { useEffect, useRef, type KeyboardEvent } from "react";
 import { Send } from "lucide-react";
+import { type KeyboardEvent, useEffect, useRef } from "react";
 
 type ChatInputProps = {
   value: string;

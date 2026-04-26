@@ -1,7 +1,7 @@
-import type { CSSProperties } from "react";
-import { BrainCog, SlidersHorizontal, Zap } from "lucide-react";
-import type { AccessMode, ServiceTier, ThreadTokenUsage } from "@/types";
 import type { CodexArgsOption } from "@threads/utils/codexArgsProfiles";
+import { BrainCog, SlidersHorizontal, Zap } from "lucide-react";
+import type { CSSProperties } from "react";
+import type { AccessMode, ServiceTier, ThreadTokenUsage } from "@/types";
 
 type ComposerMetaBarProps = {
   disabled: boolean;
@@ -44,10 +44,8 @@ export function ComposerMetaBar({
   onSelectCodexArgsOverride,
   contextUsage = null,
 }: ComposerMetaBarProps) {
-  const selectedModel =
-    models.find((model) => model.id === selectedModelId) ?? null;
-  const selectedModelLabel =
-    selectedModel?.displayName || selectedModel?.model || "No models";
+  const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
+  const selectedModelLabel = selectedModel?.displayName || selectedModel?.model || "No models";
   const modelSelectStyle = {
     "--composer-model-select-width": `${Math.max(selectedModelLabel.length + 2, 8)}ch`,
   } as CSSProperties;
@@ -57,28 +55,20 @@ export function ComposerMetaBar({
   const usedTokens = lastTokens > 0 ? lastTokens : totalTokens;
   const contextFreePercent =
     contextWindow && contextWindow > 0 && usedTokens > 0
-      ? Math.max(
-          0,
-          100 -
-            Math.min(Math.max((usedTokens / contextWindow) * 100, 0), 100),
-        )
+      ? Math.max(0, 100 - Math.min(Math.max((usedTokens / contextWindow) * 100, 0), 100))
       : null;
-  const planMode =
-    collaborationModes.find((mode) => mode.id === "plan") ?? null;
-  const defaultMode =
-    collaborationModes.find((mode) => mode.id === "default") ?? null;
+  const planMode = collaborationModes.find((mode) => mode.id === "plan") ?? null;
+  const defaultMode = collaborationModes.find((mode) => mode.id === "default") ?? null;
   const canUsePlanToggle =
     Boolean(planMode) &&
-    collaborationModes.every(
-      (mode) => mode.id === "default" || mode.id === "plan",
-    );
+    collaborationModes.every((mode) => mode.id === "default" || mode.id === "plan");
   const planSelected = selectedCollaborationModeId === (planMode?.id ?? "");
 
   return (
     <div className="composer-bar">
       <div className="composer-meta">
-        {collaborationModes.length > 0 && (
-          canUsePlanToggle ? (
+        {collaborationModes.length > 0 &&
+          (canUsePlanToggle ? (
             <div className="composer-select-wrap composer-plan-toggle-wrap">
               <label className="composer-plan-toggle" aria-label="Plan mode">
                 <input
@@ -88,9 +78,7 @@ export function ComposerMetaBar({
                   disabled={disabled}
                   onChange={(event) =>
                     onSelectCollaborationMode(
-                      event.target.checked
-                        ? planMode?.id ?? "plan"
-                        : (defaultMode?.id ?? null),
+                      event.target.checked ? (planMode?.id ?? "plan") : (defaultMode?.id ?? null),
                     )
                   }
                 />
@@ -105,31 +93,27 @@ export function ComposerMetaBar({
                     />
                   </svg>
                 </span>
-                <span className="composer-plan-toggle-label">
-                  {planMode?.label || "Plan"}
-                </span>
+                <span className="composer-plan-toggle-label">{planMode?.label || "Plan"}</span>
               </label>
             </div>
           ) : (
             <div className="composer-select-wrap">
-            <span className="composer-icon" aria-hidden>
-              <svg viewBox="0 0 24 24" fill="none">
-                <path
-                  d="m6.5 7.5 1 1 2-2M6.5 12.5l1 1 2-2M6.5 17.5l1 1 2-2M11 7.5h7M11 12.5h7M11 17.5h7"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
+              <span className="composer-icon" aria-hidden>
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="m6.5 7.5 1 1 2-2M6.5 12.5l1 1 2-2M6.5 17.5l1 1 2-2M11 7.5h7M11 12.5h7M11 17.5h7"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
               <select
                 className="composer-select composer-select--model composer-select--collab"
                 aria-label="Collaboration mode"
                 value={selectedCollaborationModeId ?? ""}
-                onChange={(event) =>
-                  onSelectCollaborationMode(event.target.value || null)
-                }
+                onChange={(event) => onSelectCollaborationMode(event.target.value || null)}
                 disabled={disabled}
               >
                 {collaborationModes.map((mode) => (
@@ -139,17 +123,11 @@ export function ComposerMetaBar({
                 ))}
               </select>
             </div>
-          )
-        )}
+          ))}
         <div className="composer-select-wrap composer-select-wrap--model">
           <span className="composer-icon composer-icon--model" aria-hidden>
             <svg viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 4v2"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
+              <path d="M12 4v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
               <path
                 d="M8 7.5h8a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-2.5 2.5H8A2.5 2.5 0 0 1 5.5 15v-5A2.5 2.5 0 0 1 8 7.5Z"
                 stroke="currentColor"
@@ -158,12 +136,7 @@ export function ComposerMetaBar({
               />
               <circle cx="9.5" cy="12.5" r="1" fill="currentColor" />
               <circle cx="14.5" cy="12.5" r="1" fill="currentColor" />
-              <path
-                d="M9.5 15.5h5"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
+              <path d="M9.5 15.5h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
               <path
                 d="M5.5 11H4M20 11h-1.5"
                 stroke="currentColor"
@@ -227,9 +200,7 @@ export function ComposerMetaBar({
               aria-label="Codex args profile"
               disabled={disabled}
               value={selectedCodexArgsOverride ?? ""}
-              onChange={(event) =>
-                onSelectCodexArgsOverride(event.target.value || null)
-              }
+              onChange={(event) => onSelectCodexArgsOverride(event.target.value || null)}
             >
               {codexArgsOptions.map((option) => (
                 <option key={option.value || "default"} value={option.value}>
@@ -262,9 +233,7 @@ export function ComposerMetaBar({
             aria-label="Agent access"
             disabled={disabled}
             value={accessMode}
-            onChange={(event) =>
-              onSelectAccessMode(event.target.value as AccessMode)
-            }
+            onChange={(event) => onSelectAccessMode(event.target.value as AccessMode)}
           >
             <option value="read-only">Read only</option>
             <option value="current">On-Request</option>

@@ -10,11 +10,11 @@ import "./aux-window.css";
 // data-attribute selector with the rules in the side-imported CSS file
 // produces the visibly-rounded card.
 export function useTransparentBackground() {
-	useEffect(() => {
-		const html = document.documentElement;
-		html.dataset.launcher = "true";
-		return () => {
-			delete html.dataset.launcher;
-		};
-	}, []);
+  useEffect(() => {
+    const html = document.documentElement;
+    html.dataset.launcher = "true";
+    return () => {
+      delete html.dataset.launcher;
+    };
+  }, []);
 }

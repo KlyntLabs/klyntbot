@@ -50,11 +50,7 @@ export function ComposerAttachments({
         const titleAttr = path.startsWith("data:") ? "Pasted image" : path;
         const previewSrc = attachmentPreviewSrc(path);
         return (
-          <div
-            key={path}
-            className="composer-attachment"
-            title={titleAttr}
-          >
+          <div key={path} className="composer-attachment" title={titleAttr}>
             {previewSrc && (
               <span className="composer-attachment-preview" aria-hidden>
                 <img src={previewSrc} alt="" />

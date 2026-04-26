@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ActiveInteraction,
   ChatMessage,
@@ -107,7 +107,15 @@ export function useChatSession(
   // Clear streaming segments only when a NEW assistant message arrives from refetch.
   // Tracks assistant count to avoid clearing before the refetch completes — the old
   // approach fired on isStreaming→false before the new message existed, causing a flash.
-  const { isStreaming, clearSegments, clearTransparency, clearPersonaMessages, segments, startStreaming, failStreaming } = stream;
+  const {
+    isStreaming,
+    clearSegments,
+    clearTransparency,
+    clearPersonaMessages,
+    segments,
+    startStreaming,
+    failStreaming,
+  } = stream;
   const hasSegmentsRef = useRef(false);
   hasSegmentsRef.current = segments.length > 0;
   const assistantCountRef = useRef(0);

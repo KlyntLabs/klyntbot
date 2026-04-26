@@ -25,9 +25,7 @@ export function useWorkspaceRestore({
     if (!hasLoaded) {
       return;
     }
-    const pending = workspaces.filter(
-      (workspace) => !restoredWorkspaces.current.has(workspace.id),
-    );
+    const pending = workspaces.filter((workspace) => !restoredWorkspaces.current.has(workspace.id));
     if (pending.length === 0) {
       return;
     }

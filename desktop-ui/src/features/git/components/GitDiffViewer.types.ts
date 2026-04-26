@@ -46,9 +46,7 @@ export type GitDiffViewerProps = {
   }) => Promise<string | null>;
   pullRequestReviewLaunching?: boolean;
   pullRequestReviewThreadId?: string | null;
-  onCheckoutPullRequest?: (
-    pullRequest: GitHubPullRequest,
-  ) => Promise<void> | void;
+  onCheckoutPullRequest?: (pullRequest: GitHubPullRequest) => Promise<void> | void;
   canRevert?: boolean;
   onRevertFile?: (path: string) => Promise<void> | void;
   onActivePathChange?: (path: string) => void;

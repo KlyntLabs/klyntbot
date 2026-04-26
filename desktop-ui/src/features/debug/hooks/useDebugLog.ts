@@ -85,18 +85,15 @@ export function useDebugLog() {
     setHasDebugAlerts(false);
   }, []);
 
-  const setDebugOpen = useCallback(
-    (next: boolean | ((prev: boolean) => boolean)) => {
-      setDebugOpenState((prev) => {
-        const resolved = typeof next === "function" ? next(prev) : next;
-        if (resolved) {
-          setDebugPinned(true);
-        }
-        return resolved;
-      });
-    },
-    [],
-  );
+  const setDebugOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
+    setDebugOpenState((prev) => {
+      const resolved = typeof next === "function" ? next(prev) : next;
+      if (resolved) {
+        setDebugPinned(true);
+      }
+      return resolved;
+    });
+  }, []);
 
   const showDebugButton = hasDebugAlerts || debugOpen || debugPinned;
 

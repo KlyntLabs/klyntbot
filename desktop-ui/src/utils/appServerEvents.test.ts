@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 import { METHODS_ROUTED_IN_USE_APP_SERVER_EVENTS } from "../features/app/hooks/useAppServerEvents";
 import type { AppServerEvent } from "../types";
 import {
-  METHODS_HANDLED_OUTSIDE_USE_APP_SERVER_EVENTS,
-  SUPPORTED_APP_SERVER_METHODS,
   getAppServerParams,
   getAppServerRawMethod,
   getAppServerRequestId,
-  isApprovalRequestMethod,
   isAppListUpdatedEvent,
+  isApprovalRequestMethod,
   isSkillsUpdateAvailableEvent,
   isSupportedAppServerMethod,
+  METHODS_HANDLED_OUTSIDE_USE_APP_SERVER_EVENTS,
+  SUPPORTED_APP_SERVER_METHODS,
 } from "./appServerEvents";
 
 function makeEvent(message: Record<string, unknown>): AppServerEvent {

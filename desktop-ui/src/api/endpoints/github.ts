@@ -6,9 +6,7 @@ import type {
 } from "@/types";
 import { invoke } from "../client";
 
-export async function getGitHubIssues(
-  workspace_id: string,
-): Promise<GitHubIssuesResponse> {
+export async function getGitHubIssues(workspace_id: string): Promise<GitHubIssuesResponse> {
   return invoke("get_github_issues", { workspaceId: workspace_id });
 }
 

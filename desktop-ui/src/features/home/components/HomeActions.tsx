@@ -3,10 +3,7 @@ type HomeActionsProps = {
   onAddWorkspaceFromUrl: () => void;
 };
 
-export function HomeActions({
-  onAddWorkspace,
-  onAddWorkspaceFromUrl,
-}: HomeActionsProps) {
+export function HomeActions({ onAddWorkspace, onAddWorkspaceFromUrl }: HomeActionsProps) {
   return (
     <div className="home-actions">
       <button

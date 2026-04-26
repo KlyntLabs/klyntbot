@@ -1,13 +1,13 @@
-import type { GitHubIssue, GitHubPullRequest, GitLogEntry } from "@/types";
-import type { MouseEvent as ReactMouseEvent } from "react";
-import { useCallback, useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { formatRelativeTime } from "@utils/time";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
-import { formatRelativeTime } from "@utils/time";
+import type { MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { GitHubIssue, GitHubPullRequest, GitLogEntry } from "@/types";
 import type { PerFileDiffGroup } from "../utils/perFileThreadDiffs";
-import { GitLogEntryRow } from "./GitDiffPanelShared";
 import { splitPath } from "./GitDiffPanel.utils";
+import { GitLogEntryRow } from "./GitDiffPanelShared";
 
 type GitPerFileModeContentProps = {
   groups: PerFileDiffGroup[];
@@ -155,9 +155,7 @@ export function GitLogModeContent({
 }: GitLogModeContentProps) {
   return (
     <div className="git-log-list">
-      {!logError && logLoading && (
-        <div className="diff-viewer-loading">Loading commits...</div>
-      )}
+      {!logError && logLoading && <div className="diff-viewer-loading">Loading commits...</div>}
       {!logError &&
         !logLoading &&
         !logEntries.length &&
@@ -320,9 +318,7 @@ export function GitPullRequestsModeContent({
             </div>
             <div className="git-pr-meta">
               <span className="git-pr-author-inline">@{author}</span>
-              {pullRequest.isDraft && (
-                <span className="git-pr-pill git-pr-draft">Draft</span>
-              )}
+              {pullRequest.isDraft && <span className="git-pr-pill git-pr-draft">Draft</span>}
             </div>
           </div>
         );

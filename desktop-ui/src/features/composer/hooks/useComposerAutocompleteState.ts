@@ -1,8 +1,3 @@
-import { useCallback, useMemo } from "react";
-import type { AutocompleteItem } from "./useComposerAutocomplete";
-import { useComposerAutocomplete } from "./useComposerAutocomplete";
-import type { AppOption, CustomPromptOption } from "@/types";
-import { connectorMentionSlug } from "@/features/apps/utils/appMentions";
 import {
   buildPromptInsertText,
   findNextPromptArgCursor,
@@ -10,6 +5,11 @@ import {
   getPromptArgumentHint,
 } from "@utils/customPrompts";
 import { isComposingEvent } from "@utils/keys";
+import { useCallback, useMemo } from "react";
+import { connectorMentionSlug } from "@/features/apps/utils/appMentions";
+import type { AppOption, CustomPromptOption } from "@/types";
+import type { AutocompleteItem } from "./useComposerAutocomplete";
+import { useComposerAutocomplete } from "./useComposerAutocomplete";
 
 type Skill = { name: string; description?: string };
 type UseComposerAutocompleteStateArgs = {
@@ -31,7 +31,7 @@ type UseComposerAutocompleteStateArgs = {
 };
 
 const MAX_FILE_SUGGESTIONS = 500;
-const FILE_TRIGGER_PREFIX = new RegExp("^(?:\\s|[\"'`]|\\(|\\[|\\{)$");
+const FILE_TRIGGER_PREFIX = /^(?:\s|["'`]|\(|\[|\{)$/;
 
 function isFileTriggerActive(text: string, cursor: number | null) {
   if (!text || cursor === null) {
@@ -257,22 +257,13 @@ export function useComposerAutocompleteState({
       const triggerIndex = Math.max(0, autocompleteRange.start - 1);
       const triggerChar = text[triggerIndex] ?? "";
       const cursor = selectionStart ?? autocompleteRange.end;
-      const promptRange =
-        triggerChar === "@" ? findPromptArgRangeAtCursor(text, cursor) : null;
+      const promptRange = triggerChar === "@" ? findPromptArgRangeAtCursor(text, cursor) : null;
       const before =
-        triggerChar === "@"
-          ? text.slice(0, triggerIndex)
-          : text.slice(0, autocompleteRange.start);
+        triggerChar === "@" ? text.slice(0, triggerIndex) : text.slice(0, autocompleteRange.start);
       const after = text.slice(autocompleteRange.end);
       const insert = item.insertText ?? item.label;
-      const actualInsert = triggerChar === "@"
-        ? insert.replace(/^@+/, "")
-        : insert;
-      const needsSpace = promptRange
-        ? false
-        : after.length === 0
-          ? true
-          : !/^\s/.test(after);
+      const actualInsert = triggerChar === "@" ? insert.replace(/^@+/, "") : insert;
+      const needsSpace = promptRange ? false : after.length === 0 ? true : !/^\s/.test(after);
       const nextText = `${before}${actualInsert}${needsSpace ? " " : ""}${after}`;
       setText(nextText);
       onItemApplied?.(item, { triggerChar, insertedText: actualInsert });
@@ -343,8 +334,7 @@ export function useComposerAutocompleteState({
         }
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
-          const selected =
-            autocompleteMatches[highlightIndex] ?? autocompleteMatches[0];
+          const selected = autocompleteMatches[highlightIndex] ?? autocompleteMatches[0];
           if (selected) {
             applyAutocomplete(selected);
           }
@@ -352,8 +342,7 @@ export function useComposerAutocompleteState({
         }
         if (event.key === "Tab") {
           event.preventDefault();
-          const selected =
-            autocompleteMatches[highlightIndex] ?? autocompleteMatches[0];
+          const selected = autocompleteMatches[highlightIndex] ?? autocompleteMatches[0];
           if (selected) {
             applyAutocomplete(selected);
           }

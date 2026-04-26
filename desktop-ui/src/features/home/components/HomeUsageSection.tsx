@@ -2,17 +2,8 @@ import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import { useEffect, useState } from "react";
-import type {
-  AccountSnapshot,
-  LocalUsageSnapshot,
-  RateLimitSnapshot,
-} from "@/types";
-import {
-  formatCount,
-  formatDayLabel,
-  formatDuration,
-  formatWeekRange,
-} from "../homeFormatters";
+import type { AccountSnapshot, LocalUsageSnapshot, RateLimitSnapshot } from "@/types";
+import { formatCount, formatDayLabel, formatDuration, formatWeekRange } from "../homeFormatters";
 import type { HomeStatCard, UsageMetric, UsageWorkspaceOption } from "../homeTypes";
 import { buildHomeUsageViewModel } from "../homeUsageViewModel";
 
@@ -59,20 +50,14 @@ export function HomeUsageSection({
   usageWorkspaceOptions,
 }: HomeUsageSectionProps) {
   const [chartWeekOffset, setChartWeekOffset] = useState(0);
-  const {
-    accountCards,
-    accountMeta,
-    updatedLabel,
-    usageCards,
-    usageDays,
-    usageInsights,
-  } = buildHomeUsageViewModel({
-    accountInfo,
-    accountRateLimits,
-    localUsageSnapshot,
-    usageMetric,
-    usageShowRemaining,
-  });
+  const { accountCards, accountMeta, updatedLabel, usageCards, usageDays, usageInsights } =
+    buildHomeUsageViewModel({
+      accountInfo,
+      accountRateLimits,
+      localUsageSnapshot,
+      usageMetric,
+      usageShowRemaining,
+    });
 
   const maxHistoricalWeekOffset = Math.max(0, Math.ceil(usageDays.length / 7) - 1);
   useEffect(() => {
@@ -85,7 +70,7 @@ export function HomeUsageSection({
   const maxUsageValue = Math.max(
     1,
     ...chartDays.map((day) =>
-      usageMetric === "tokens" ? day.totalTokens : day.agentTimeMs ?? 0,
+      usageMetric === "tokens" ? day.totalTokens : (day.agentTimeMs ?? 0),
     ),
   );
   const canShowOlderWeek = chartWeekOffset < maxHistoricalWeekOffset;
@@ -106,11 +91,7 @@ export function HomeUsageSection({
           {updatedLabel && <div className="home-section-meta">{updatedLabel}</div>}
           <button
             type="button"
-            className={
-              isLoadingLocalUsage
-                ? "home-usage-refresh is-loading"
-                : "home-usage-refresh"
-            }
+            className={isLoadingLocalUsage ? "home-usage-refresh is-loading" : "home-usage-refresh"}
             onClick={onRefreshLocalUsage}
             disabled={isLoadingLocalUsage}
             aria-label="Refresh usage"
@@ -118,9 +99,7 @@ export function HomeUsageSection({
           >
             <RefreshCw
               className={
-                isLoadingLocalUsage
-                  ? "home-usage-refresh-icon spinning"
-                  : "home-usage-refresh-icon"
+                isLoadingLocalUsage ? "home-usage-refresh-icon spinning" : "home-usage-refresh-icon"
               }
               aria-hidden
             />
@@ -196,9 +175,7 @@ export function HomeUsageSection({
           <div className="home-usage-empty-subtitle">
             Run a session to start tracking local usage.
           </div>
-          {localUsageError && (
-            <div className="home-usage-error">{localUsageError}</div>
-          )}
+          {localUsageError && <div className="home-usage-error">{localUsageError}</div>}
         </div>
       ) : (
         <>
@@ -242,8 +219,7 @@ export function HomeUsageSection({
             </div>
             <div className="home-usage-chart">
               {chartDays.map((day) => {
-                const value =
-                  usageMetric === "tokens" ? day.totalTokens : day.agentTimeMs ?? 0;
+                const value = usageMetric === "tokens" ? day.totalTokens : (day.agentTimeMs ?? 0);
                 const height = Math.max(6, Math.round((value / maxUsageValue) * 100));
                 const tooltip =
                   usageMetric === "tokens"
@@ -251,10 +227,7 @@ export function HomeUsageSection({
                     : `${formatDayLabel(day.day)} · ${formatDuration(day.agentTimeMs ?? 0)} agent time`;
                 return (
                   <div className="home-usage-bar" key={day.day} data-value={tooltip}>
-                    <span
-                      className="home-usage-bar-fill"
-                      style={{ height: `${height}%` }}
-                    />
+                    <span className="home-usage-bar-fill" style={{ height: `${height}%` }} />
                     <span className="home-usage-bar-label">{formatDayLabel(day.day)}</span>
                   </div>
                 );
@@ -269,9 +242,7 @@ export function HomeUsageSection({
           <div className="home-usage-models">
             <div className="home-usage-models-label">
               Top models
-              {usageMetric === "time" && (
-                <span className="home-usage-models-hint">Tokens</span>
-              )}
+              {usageMetric === "time" && <span className="home-usage-models-hint">Tokens</span>}
             </div>
             <div className="home-usage-models-list">
               {localUsageSnapshot?.topModels?.length ? (
@@ -282,9 +253,7 @@ export function HomeUsageSection({
                     title={`${model.model}: ${formatCount(model.tokens)} tokens`}
                   >
                     {model.model}
-                    <span className="home-usage-model-share">
-                      {model.sharePercent.toFixed(1)}%
-                    </span>
+                    <span className="home-usage-model-share">{model.sharePercent.toFixed(1)}%</span>
                   </span>
                 ))
               ) : (

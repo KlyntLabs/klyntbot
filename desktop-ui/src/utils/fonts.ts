@@ -8,10 +8,7 @@ export const CODE_FONT_SIZE_DEFAULT = 11;
 export const CODE_FONT_SIZE_MIN = 9;
 export const CODE_FONT_SIZE_MAX = 16;
 
-export function normalizeFontFamily(
-  value: string | null | undefined,
-  fallback: string,
-) {
+export function normalizeFontFamily(value: string | null | undefined, fallback: string) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : fallback;
 }

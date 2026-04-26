@@ -1,8 +1,8 @@
-import { useMemo } from "react";
-import type { CSSProperties, MouseEvent } from "react";
-import X from "lucide-react/dist/esm/icons/x";
-import { highlightLine, languageFromPath } from "@utils/syntax";
 import { OpenAppMenu } from "@app/components/OpenAppMenu";
+import { highlightLine, languageFromPath } from "@utils/syntax";
+import X from "lucide-react/dist/esm/icons/x";
+import type { CSSProperties, MouseEvent } from "react";
+import { useMemo } from "react";
 import { PopoverSurface } from "@/features/design-system/components/popover/PopoverPrimitives";
 import type { OpenAppTarget } from "@/types";
 
@@ -84,9 +84,7 @@ export function FilePreviewPopover({
       <div className="file-preview-header">
         <div className="file-preview-title">
           <span className="file-preview-path">{path}</span>
-          {truncated && (
-            <span className="file-preview-warning">Truncated</span>
-          )}
+          {truncated && <span className="file-preview-warning">Truncated</span>}
         </div>
         <button
           type="button"
@@ -121,9 +119,7 @@ export function FilePreviewPopover({
               <img src={imageSrc} alt={path} />
             </div>
           ) : (
-            <div className="file-preview-status file-preview-error">
-              Image preview unavailable.
-            </div>
+            <div className="file-preview-status file-preview-error">Image preview unavailable.</div>
           )}
         </div>
       ) : (
@@ -170,10 +166,7 @@ export function FilePreviewPopover({
           <div className="file-preview-lines" role="list">
             {lines.map((_, index) => {
               const html = highlightedLines[index] ?? "&nbsp;";
-              const isSelected =
-                selection &&
-                index >= selection.start &&
-                index <= selection.end;
+              const isSelected = selection && index >= selection.start && index <= selection.end;
               const isStart = isSelected && selection?.start === index;
               const isEnd = isSelected && selection?.end === index;
               return (

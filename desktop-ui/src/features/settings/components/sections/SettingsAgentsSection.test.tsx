@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
+
+import type { SettingsAgentsSectionProps } from "@settings/hooks/useSettingsAgentsSection";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SettingsAgentsSectionProps } from "@settings/hooks/useSettingsAgentsSection";
 import { SettingsAgentsSection } from "./SettingsAgentsSection";
 
 const baseProps = (): SettingsAgentsSectionProps => ({
@@ -39,7 +40,7 @@ const baseProps = (): SettingsAgentsSectionProps => ({
   onCreateAgent: vi.fn(async () => true),
   onUpdateAgent: vi.fn(async () => true),
   onDeleteAgent: vi.fn(async () => true),
-  onReadAgentConfig: vi.fn(async () => "model = \"gpt-5-codex\""),
+  onReadAgentConfig: vi.fn(async () => 'model = "gpt-5-codex"'),
   onWriteAgentConfig: vi.fn(async () => true),
   onGenerateCreateDescription: vi.fn(async () => null),
   onGenerateEditDescription: vi.fn(async () => null),
@@ -97,9 +98,7 @@ describe("SettingsAgentsSection", () => {
     ) as HTMLTextAreaElement;
     fireEvent.change(createName, { target: { value: "researcher" } });
     fireEvent.change(createDescription, { target: { value: "flaky tests" } });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Generate fields for new agent" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Generate fields for new agent" }));
 
     await waitFor(() => {
       expect(onGenerateCreateDescription).toHaveBeenCalledWith({

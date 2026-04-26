@@ -43,10 +43,7 @@ export function collectMentionNames(text: string): Set<string> {
   return names;
 }
 
-export function resolveBoundAppMentions(
-  text: string,
-  bindings: AppMentionBinding[],
-): AppMention[] {
+export function resolveBoundAppMentions(text: string, bindings: AppMentionBinding[]): AppMention[] {
   if (!text || bindings.length === 0) {
     return [];
   }

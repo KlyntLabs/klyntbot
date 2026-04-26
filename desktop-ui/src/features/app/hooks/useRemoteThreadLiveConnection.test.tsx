@@ -531,13 +531,7 @@ describe("useRemoteThreadLiveConnection", () => {
     };
 
     const { rerender } = renderHook(
-      ({
-        threadId,
-        hasLocalSnapshot,
-      }: {
-        threadId: string | null;
-        hasLocalSnapshot: boolean;
-      }) =>
+      ({ threadId, hasLocalSnapshot }: { threadId: string | null; hasLocalSnapshot: boolean }) =>
         useRemoteThreadLiveConnection({
           backendMode: "remote",
           activeWorkspace: workspace,

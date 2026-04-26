@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
+
+import * as Sentry from "@sentry/react";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as Sentry from "@sentry/react";
 import type { WorkspaceInfo } from "@/types";
 import { useWorkspaceActions } from "./useWorkspaceActions";
 

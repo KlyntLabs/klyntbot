@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
 import { ask, open } from "@tauri-apps/plugin-dialog";
+import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AppSettings, WorkspaceGroup, WorkspaceInfo } from "@/types";
 import type { GroupedWorkspaces } from "./settingsSectionTypes";
 
@@ -17,10 +17,7 @@ type UseSettingsProjectsSectionArgs = {
   onRenameWorkspaceGroup: (id: string, name: string) => Promise<boolean | null>;
   onMoveWorkspaceGroup: (id: string, direction: "up" | "down") => Promise<boolean | null>;
   onDeleteWorkspaceGroup: (id: string) => Promise<boolean | null>;
-  onAssignWorkspaceGroup: (
-    workspaceId: string,
-    groupId: string | null,
-  ) => Promise<boolean | null>;
+  onAssignWorkspaceGroup: (workspaceId: string, groupId: string | null) => Promise<boolean | null>;
 };
 
 export type SettingsProjectsSectionProps = {
@@ -40,10 +37,7 @@ export type SettingsProjectsSectionProps = {
   onDeleteGroup: (group: WorkspaceGroup) => Promise<void>;
   onChooseGroupCopiesFolder: (group: WorkspaceGroup) => Promise<void>;
   onClearGroupCopiesFolder: (group: WorkspaceGroup) => Promise<void>;
-  onAssignWorkspaceGroup: (
-    workspaceId: string,
-    groupId: string | null,
-  ) => Promise<boolean | null>;
+  onAssignWorkspaceGroup: (workspaceId: string, groupId: string | null) => Promise<boolean | null>;
   onMoveWorkspace: (id: string, direction: "up" | "down") => void;
   onDeleteWorkspace: (id: string) => void;
 };
@@ -114,10 +108,7 @@ export const useSettingsProjectsSection = ({
     }
   };
 
-  const updateGroupCopiesFolder = async (
-    groupId: string,
-    copiesFolder: string | null,
-  ) => {
+  const updateGroupCopiesFolder = async (groupId: string, copiesFolder: string | null) => {
     setGroupError(null);
     try {
       await onUpdateAppSettings({

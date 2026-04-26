@@ -6,7 +6,9 @@
 .ds-tooltip-trigger[data-tooltip]::after {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 150ms ease, transform 150ms ease;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
   z-index: 20;
 }
 

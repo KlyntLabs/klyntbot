@@ -1,5 +1,5 @@
-import type { ComponentProps } from "react";
 import { MainHeaderActions } from "@app/components/MainHeaderActions";
+import type { ComponentProps } from "react";
 import { WorkspaceHome } from "@/features/workspaces/components/WorkspaceHome";
 
 type UseMainAppDisplayNodesArgs = {

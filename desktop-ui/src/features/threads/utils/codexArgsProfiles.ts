@@ -151,7 +151,7 @@ function normalizeCodexArgs(value: string | null | undefined): string | null {
 
 function stripWrappingQuotes(value: string): string {
   if (
-    (value.startsWith("\"") && value.endsWith("\"")) ||
+    (value.startsWith('"') && value.endsWith('"')) ||
     (value.startsWith("'") && value.endsWith("'"))
   ) {
     return value.slice(1, -1);
@@ -228,7 +228,7 @@ function quoteTokenIfNeeded(token: string): string {
     return token;
   }
 
-  const escaped = token.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+  const escaped = token.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `"${escaped}"`;
 }
 
@@ -237,7 +237,10 @@ function joinTokens(tokens: string[]): string | null {
     return null;
   }
 
-  const joined = tokens.map((token) => quoteTokenIfNeeded(token)).join(" ").trim();
+  const joined = tokens
+    .map((token) => quoteTokenIfNeeded(token))
+    .join(" ")
+    .trim();
   return joined.length > 0 ? joined : null;
 }
 
@@ -488,9 +491,7 @@ export function labelForCodexArgs(args: string): string {
   return buildCodexArgsBadgeLabel(args);
 }
 
-export function buildEffectiveCodexArgsBadgeLabel(
-  args: string | null | undefined,
-): string | null {
+export function buildEffectiveCodexArgsBadgeLabel(args: string | null | undefined): string | null {
   const sanitizedArgs = sanitizeRuntimeCodexArgs(args);
   if (!sanitizedArgs) {
     return null;
@@ -504,9 +505,7 @@ export function buildCodexArgsOptions(input: {
   additionalCodexArgs?: Array<string | null | undefined>;
 }): CodexArgsOption[] {
   const seen = new Set<string>();
-  const options: CodexArgsOption[] = [
-    { value: "", codexArgs: null, label: "Default" },
-  ];
+  const options: CodexArgsOption[] = [{ value: "", codexArgs: null, label: "Default" }];
 
   const candidates = [
     normalizeCodexArgs(input.appCodexArgs),

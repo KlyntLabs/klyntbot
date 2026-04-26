@@ -42,13 +42,8 @@ function renumberAutoNamedTabs(tabs: TerminalTabRecord[]): TerminalTabRecord[] {
   return changed ? nextTabs : tabs;
 }
 
-export function useTerminalTabs({
-  activeWorkspaceId,
-  onCloseTerminal,
-}: UseTerminalTabsOptions) {
-  const [tabsByWorkspace, setTabsByWorkspace] = useState<
-    Record<string, TerminalTabRecord[]>
-  >({});
+export function useTerminalTabs({ activeWorkspaceId, onCloseTerminal }: UseTerminalTabsOptions) {
+  const [tabsByWorkspace, setTabsByWorkspace] = useState<Record<string, TerminalTabRecord[]>>({});
   const [activeTerminalIdByWorkspace, setActiveTerminalIdByWorkspace] = useState<
     Record<string, string | null>
   >({});
@@ -57,10 +52,7 @@ export function useTerminalTabs({
     const id = createTerminalId();
     setTabsByWorkspace((prev) => {
       const existing = prev[workspaceId] ?? [];
-      const nextTabs = renumberAutoNamedTabs([
-        ...existing,
-        { id, title: "", autoNamed: true },
-      ]);
+      const nextTabs = renumberAutoNamedTabs([...existing, { id, title: "", autoNamed: true }]);
       return {
         ...prev,
         [workspaceId]: nextTabs,
@@ -109,9 +101,7 @@ export function useTerminalTabs({
     (workspaceId: string, terminalId: string) => {
       setTabsByWorkspace((prev) => {
         const existing = prev[workspaceId] ?? [];
-        const nextTabs = renumberAutoNamedTabs(
-          existing.filter((tab) => tab.id !== terminalId),
-        );
+        const nextTabs = renumberAutoNamedTabs(existing.filter((tab) => tab.id !== terminalId));
         setActiveTerminalIdByWorkspace((prevActive) => {
           const active = prevActive[workspaceId];
           if (active !== terminalId) {

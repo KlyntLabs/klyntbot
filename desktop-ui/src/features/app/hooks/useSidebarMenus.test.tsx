@@ -1,15 +1,13 @@
 /** @vitest-environment jsdom */
-import type { MouseEvent as ReactMouseEvent } from "react";
-import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
 
+import { renderHook } from "@testing-library/react";
+import { fileManagerName } from "@utils/platformPaths";
+import type { MouseEvent as ReactMouseEvent } from "react";
+import { describe, expect, it, vi } from "vitest";
 import type { WorkspaceInfo } from "@/types";
 import { useSidebarMenus } from "./useSidebarMenus";
-import { fileManagerName } from "@utils/platformPaths";
 
-const menuNew = vi.hoisted(() =>
-  vi.fn(async ({ items }) => ({ popup: vi.fn(), items })),
-);
+const menuNew = vi.hoisted(() => vi.fn(async ({ items }) => ({ popup: vi.fn(), items })));
 const menuItemNew = vi.hoisted(() => vi.fn(async (options) => options));
 
 vi.mock("@tauri-apps/api/menu", () => ({

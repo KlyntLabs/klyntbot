@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { WorkspaceInfo } from "@/types";
 import { useLocalUsage } from "@/features/home/hooks/useLocalUsage";
+import type { WorkspaceInfo } from "@/types";
 
 type ThreadSummary = {
   id: string;
@@ -90,7 +90,8 @@ export function useWorkspaceInsightsOrchestration({
 
   const isLoadingLatestAgents = useMemo(
     () =>
-      !hasLoaded || workspaces.some((workspace) => threadListLoadingByWorkspace[workspace.id] ?? false),
+      !hasLoaded ||
+      workspaces.some((workspace) => threadListLoadingByWorkspace[workspace.id] ?? false),
     [hasLoaded, threadListLoadingByWorkspace, workspaces],
   );
 

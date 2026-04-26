@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
+
+import { relaunch } from "@tauri-apps/plugin-process";
+import { check } from "@tauri-apps/plugin-updater";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { check } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
 import type { DebugEntry } from "@/types";
-import { useUpdater } from "./useUpdater";
 import { STORAGE_KEY_PENDING_POST_UPDATE_VERSION } from "../utils/postUpdateRelease";
+import { useUpdater } from "./useUpdater";
 
 vi.mock("@tauri-apps/api/core", () => ({
   isTauri: vi.fn(() => true),
@@ -119,9 +120,7 @@ describe("useUpdater", () => {
     expect(result.current.state.progress?.downloadedBytes).toBe(100);
     expect(downloadAndInstall).toHaveBeenCalledTimes(1);
     expect(relaunchMock).toHaveBeenCalledTimes(1);
-    expect(
-      window.localStorage.getItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION),
-    ).toBe("1.2.3");
+    expect(window.localStorage.getItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION)).toBe("1.2.3");
   });
 
   it("resets to idle and closes update on dismiss", async () => {
@@ -202,9 +201,7 @@ describe("useUpdater", () => {
   it("skips automatic startup checks when auto-check is disabled but still allows manual checks", async () => {
     checkMock.mockResolvedValue(null);
 
-    const { result } = renderHook(() =>
-      useUpdater({ autoCheckOnMount: false }),
-    );
+    const { result } = renderHook(() => useUpdater({ autoCheckOnMount: false }));
 
     expect(checkMock).not.toHaveBeenCalled();
 
@@ -217,10 +214,7 @@ describe("useUpdater", () => {
   });
 
   it("loads post-update release notes after restart when marker matches current version", async () => {
-    window.localStorage.setItem(
-      STORAGE_KEY_PENDING_POST_UPDATE_VERSION,
-      __APP_VERSION__,
-    );
+    window.localStorage.setItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION, __APP_VERSION__);
     fetchMock.mockResolvedValue({
       ok: true,
       status: 200,
@@ -233,9 +227,7 @@ describe("useUpdater", () => {
 
     const { result } = renderHook(() => useUpdater({}));
 
-    await waitFor(() =>
-      expect(result.current.postUpdateNotice?.stage).toBe("ready"),
-    );
+    await waitFor(() => expect(result.current.postUpdateNotice?.stage).toBe("ready"));
 
     expect(result.current.postUpdateNotice).toMatchObject({
       stage: "ready",
@@ -248,23 +240,16 @@ describe("useUpdater", () => {
       result.current.dismissPostUpdateNotice();
     });
     expect(result.current.postUpdateNotice).toBeNull();
-    expect(
-      window.localStorage.getItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION),
-    ).toBeNull();
+    expect(window.localStorage.getItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION)).toBeNull();
   });
 
   it("shows post-update fallback when release notes fetch fails", async () => {
-    window.localStorage.setItem(
-      STORAGE_KEY_PENDING_POST_UPDATE_VERSION,
-      __APP_VERSION__,
-    );
+    window.localStorage.setItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION, __APP_VERSION__);
     fetchMock.mockRejectedValue(new Error("offline"));
     const onDebug = vi.fn();
     const { result } = renderHook(() => useUpdater({ onDebug }));
 
-    await waitFor(() =>
-      expect(result.current.postUpdateNotice?.stage).toBe("fallback"),
-    );
+    await waitFor(() => expect(result.current.postUpdateNotice?.stage).toBe("fallback"));
 
     expect(result.current.postUpdateNotice).toMatchObject({
       stage: "fallback",
@@ -280,10 +265,7 @@ describe("useUpdater", () => {
   });
 
   it("does not reopen post-update toast after dismissing during loading", async () => {
-    window.localStorage.setItem(
-      STORAGE_KEY_PENDING_POST_UPDATE_VERSION,
-      __APP_VERSION__,
-    );
+    window.localStorage.setItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION, __APP_VERSION__);
 
     let resolveFetch: ((value: Response) => void) | null = null;
     fetchMock.mockImplementation(
@@ -295,18 +277,14 @@ describe("useUpdater", () => {
 
     const { result } = renderHook(() => useUpdater({}));
 
-    await waitFor(() =>
-      expect(result.current.postUpdateNotice?.stage).toBe("loading"),
-    );
+    await waitFor(() => expect(result.current.postUpdateNotice?.stage).toBe("loading"));
 
     await act(async () => {
       result.current.dismissPostUpdateNotice();
     });
 
     expect(result.current.postUpdateNotice).toBeNull();
-    expect(
-      window.localStorage.getItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION),
-    ).toBeNull();
+    expect(window.localStorage.getItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION)).toBeNull();
 
     await act(async () => {
       resolveFetch?.({
@@ -325,17 +303,12 @@ describe("useUpdater", () => {
   });
 
   it("clears stale post-update marker when version does not match current app", async () => {
-    window.localStorage.setItem(
-      STORAGE_KEY_PENDING_POST_UPDATE_VERSION,
-      "0.0.1",
-    );
+    window.localStorage.setItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION, "0.0.1");
 
     const { result } = renderHook(() => useUpdater({}));
 
     await waitFor(() =>
-      expect(
-        window.localStorage.getItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION),
-      ).toBeNull(),
+      expect(window.localStorage.getItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION)).toBeNull(),
     );
     expect(result.current.postUpdateNotice).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();

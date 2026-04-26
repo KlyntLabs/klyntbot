@@ -1,12 +1,11 @@
+import type { ThreadStatusById } from "@utils/threadStatus";
 import Layers from "lucide-react/dist/esm/icons/layers";
 import type { MouseEvent, ReactNode } from "react";
-
 import type { ThreadSummary, WorkspaceInfo } from "@/types";
-import type { ThreadStatusById } from "@utils/threadStatus";
 import { ThreadList } from "./ThreadList";
 import { ThreadLoading } from "./ThreadLoading";
-import { WorktreeCard } from "./WorktreeCard";
 import { getVisibleThreadListState } from "./threadSearchUtils";
+import { WorktreeCard } from "./WorktreeCard";
 
 type ThreadRowsResult = {
   pinnedRows: Array<{ thread: ThreadSummary; depth: number }>;
@@ -109,20 +108,13 @@ export function WorktreeSection({
       <div className="worktree-list">
         {worktrees.map((worktree) => {
           const worktreeThreads = threadsByWorkspace[worktree.id] ?? [];
-          const isLoadingWorktreeThreads =
-            threadListLoadingByWorkspace[worktree.id] ?? false;
-          const showWorktreeLoader =
-            isLoadingWorktreeThreads && worktreeThreads.length === 0;
-          const worktreeNextCursor =
-            threadListCursorByWorkspace[worktree.id] ?? null;
-          const isWorktreePaging =
-            threadListPagingByWorkspace[worktree.id] ?? false;
+          const isLoadingWorktreeThreads = threadListLoadingByWorkspace[worktree.id] ?? false;
+          const showWorktreeLoader = isLoadingWorktreeThreads && worktreeThreads.length === 0;
+          const worktreeNextCursor = threadListCursorByWorkspace[worktree.id] ?? null;
+          const isWorktreePaging = threadListPagingByWorkspace[worktree.id] ?? false;
           const isWorktreeExpanded = expandedWorkspaces.has(worktree.id);
           const searchExpanded = isWorktreeExpanded || isSearchActive;
-          const {
-            unpinnedRows,
-            totalRoots: totalWorktreeRoots,
-          } = getThreadRows(
+          const { unpinnedRows, totalRoots: totalWorktreeRoots } = getThreadRows(
             worktreeThreads,
             searchExpanded,
             worktree.id,

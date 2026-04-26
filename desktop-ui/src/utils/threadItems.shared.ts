@@ -5,8 +5,7 @@ export type PrepareThreadItemsOptions = {
   maxItemsPerThread?: number | null;
 };
 
-export type ExploreEntry =
-  Extract<ConversationItem, { kind: "explore" }>["entries"][number];
+export type ExploreEntry = Extract<ConversationItem, { kind: "explore" }>["entries"][number];
 export type ExploreItem = Extract<ConversationItem, { kind: "explore" }>;
 
 const MAX_ITEM_TEXT = 20000;
@@ -40,9 +39,7 @@ export function truncateText(text: string, maxLength = MAX_ITEM_TEXT) {
 }
 
 export function truncateToolText(toolType: string, text: string) {
-  const maxLength = LARGE_TOOL_TYPES.has(toolType)
-    ? MAX_LARGE_TOOL_TEXT
-    : MAX_ITEM_TEXT;
+  const maxLength = LARGE_TOOL_TYPES.has(toolType) ? MAX_LARGE_TOOL_TEXT : MAX_ITEM_TEXT;
   return truncateText(text, maxLength);
 }
 

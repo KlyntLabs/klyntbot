@@ -1,7 +1,7 @@
 import type {
   CreditsSnapshot,
-  RateLimitWindow,
   RateLimitSnapshot,
+  RateLimitWindow,
   ReviewTarget,
   ThreadTokenUsage,
   TurnPlan,
@@ -44,13 +44,10 @@ function clampPercent(value: number): number {
 }
 
 function hasOwn(source: Record<string, unknown>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(source, key);
+  return Object.hasOwn(source, key);
 }
 
-function readOptionalNumber(
-  candidate: unknown,
-  fallback: number | null,
-): number | null {
+function readOptionalNumber(candidate: unknown, fallback: number | null): number | null {
   const parsed = asFiniteNumber(candidate);
   return parsed !== null ? parsed : fallback;
 }
@@ -98,9 +95,7 @@ function normalizeCreditsSnapshot(
   const unlimitedRaw = source.unlimited;
   const balanceRaw = source.balance;
   const normalizedUnlimited =
-    typeof unlimitedRaw === "boolean"
-      ? unlimitedRaw
-      : previousCredits?.unlimited ?? false;
+    typeof unlimitedRaw === "boolean" ? unlimitedRaw : (previousCredits?.unlimited ?? false);
   const balanceHasExplicitValue = hasOwn(source, "balance");
   const normalizedBalance =
     typeof balanceRaw === "string"
@@ -109,7 +104,7 @@ function normalizeCreditsSnapshot(
         ? String(balanceRaw)
         : balanceRaw === null
           ? null
-          : previousCredits?.balance ?? null;
+          : (previousCredits?.balance ?? null);
   const explicitBalanceHasCredits =
     balanceRaw === null
       ? false
@@ -121,18 +116,17 @@ function normalizeCreditsSnapshot(
         : typeof balanceRaw === "number" && Number.isFinite(balanceRaw)
           ? balanceRaw > 0
           : null;
-  const inferredHasCredits =
-    normalizedUnlimited
-      ? true
-      : balanceHasExplicitValue
-        ? explicitBalanceHasCredits
-        : null;
+  const inferredHasCredits = normalizedUnlimited
+    ? true
+    : balanceHasExplicitValue
+      ? explicitBalanceHasCredits
+      : null;
 
   return {
     hasCredits:
       typeof hasCreditsRaw === "boolean"
         ? hasCreditsRaw
-        : inferredHasCredits ?? previousCredits?.hasCredits ?? false,
+        : (inferredHasCredits ?? previousCredits?.hasCredits ?? false),
     unlimited: normalizedUnlimited,
     balance: normalizedBalance,
   };
@@ -219,22 +213,16 @@ export function normalizeTokenUsage(
     total: {
       totalTokens: asNumber(total.totalTokens ?? total.total_tokens),
       inputTokens: asNumber(total.inputTokens ?? total.input_tokens),
-      cachedInputTokens: asNumber(
-        total.cachedInputTokens ?? total.cached_input_tokens,
-      ),
+      cachedInputTokens: asNumber(total.cachedInputTokens ?? total.cached_input_tokens),
       outputTokens: asNumber(total.outputTokens ?? total.output_tokens),
-      reasoningOutputTokens: asNumber(
-        total.reasoningOutputTokens ?? total.reasoning_output_tokens,
-      ),
+      reasoningOutputTokens: asNumber(total.reasoningOutputTokens ?? total.reasoning_output_tokens),
     },
     last: {
       totalTokens: asNumber(last.totalTokens ?? last.total_tokens),
       inputTokens: asNumber(last.inputTokens ?? last.input_tokens),
       cachedInputTokens: asNumber(last.cachedInputTokens ?? last.cached_input_tokens),
       outputTokens: asNumber(last.outputTokens ?? last.output_tokens),
-      reasoningOutputTokens: asNumber(
-        last.reasoningOutputTokens ?? last.reasoning_output_tokens,
-      ),
+      reasoningOutputTokens: asNumber(last.reasoningOutputTokens ?? last.reasoning_output_tokens),
     },
     modelContextWindow: (() => {
       const value = source.modelContextWindow ?? source.model_context_window;
@@ -258,47 +246,29 @@ export function normalizeRateLimits(
   const previousSecondary = previous?.secondary ?? null;
   const previousCredits = previous?.credits ?? null;
 
-  const primary =
-    hasOwn(raw, "primary")
-      ? raw.primary === null
-        ? null
-        : raw.primary &&
-            typeof raw.primary === "object" &&
-            !Array.isArray(raw.primary)
-          ? normalizeRateLimitWindow(
-              raw.primary as Record<string, unknown>,
-              previousPrimary,
-            )
-          : previousPrimary
-      : previousPrimary;
+  const primary = hasOwn(raw, "primary")
+    ? raw.primary === null
+      ? null
+      : raw.primary && typeof raw.primary === "object" && !Array.isArray(raw.primary)
+        ? normalizeRateLimitWindow(raw.primary as Record<string, unknown>, previousPrimary)
+        : previousPrimary
+    : previousPrimary;
 
-  const secondary =
-    hasOwn(raw, "secondary")
-      ? raw.secondary === null
-        ? null
-        : raw.secondary &&
-            typeof raw.secondary === "object" &&
-            !Array.isArray(raw.secondary)
-          ? normalizeRateLimitWindow(
-              raw.secondary as Record<string, unknown>,
-              previousSecondary,
-            )
-          : previousSecondary
-      : previousSecondary;
+  const secondary = hasOwn(raw, "secondary")
+    ? raw.secondary === null
+      ? null
+      : raw.secondary && typeof raw.secondary === "object" && !Array.isArray(raw.secondary)
+        ? normalizeRateLimitWindow(raw.secondary as Record<string, unknown>, previousSecondary)
+        : previousSecondary
+    : previousSecondary;
 
-  const credits =
-    hasOwn(raw, "credits")
-      ? raw.credits === null
-        ? null
-        : raw.credits &&
-            typeof raw.credits === "object" &&
-            !Array.isArray(raw.credits)
-          ? normalizeCreditsSnapshot(
-              raw.credits as Record<string, unknown>,
-              previousCredits,
-            )
-          : previousCredits
-      : previousCredits;
+  const credits = hasOwn(raw, "credits")
+    ? raw.credits === null
+      ? null
+      : raw.credits && typeof raw.credits === "object" && !Array.isArray(raw.credits)
+        ? normalizeCreditsSnapshot(raw.credits as Record<string, unknown>, previousCredits)
+        : previousCredits
+    : previousCredits;
 
   const hasPlanTypeKey = hasOwn(raw, "planType") || hasOwn(raw, "plan_type");
   const planTypeValue =
@@ -312,7 +282,7 @@ export function normalizeRateLimits(
     primary,
     secondary,
     credits,
-    planType: planTypeValue ?? (hasPlanTypeKey ? null : previous?.planType ?? null),
+    planType: planTypeValue ?? (hasPlanTypeKey ? null : (previous?.planType ?? null)),
   };
 }
 
@@ -343,11 +313,7 @@ export function normalizePlanUpdate(
     }
     if (planRecord) {
       const candidate =
-        planRecord.steps ??
-        planRecord.plan ??
-        planRecord.items ??
-        planRecord.entries ??
-        null;
+        planRecord.steps ?? planRecord.plan ?? planRecord.items ?? planRecord.entries ?? null;
       return Array.isArray(candidate) ? candidate : [];
     }
     return [];

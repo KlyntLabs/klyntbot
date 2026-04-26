@@ -1,6 +1,6 @@
-import { useEffect } from "react";
 import { setMenuAccelerators } from "@services/tauri";
 import { toMenuAccelerator } from "@utils/shortcuts";
+import { useEffect } from "react";
 
 type MenuAccelerator = {
   id: string;
@@ -12,10 +12,7 @@ type UseMenuAcceleratorsOptions = {
   onError?: (error: unknown) => void;
 };
 
-export function useMenuAccelerators({
-  accelerators,
-  onError,
-}: UseMenuAcceleratorsOptions) {
+export function useMenuAccelerators({ accelerators, onError }: UseMenuAcceleratorsOptions) {
   useEffect(() => {
     let active = true;
     const updateMenuAccelerators = async () => {

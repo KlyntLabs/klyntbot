@@ -1,6 +1,6 @@
-import type { GitPanelMode } from "../types";
 import ArrowLeftRight from "lucide-react/dist/esm/icons/arrow-left-right";
 import RotateCw from "lucide-react/dist/esm/icons/rotate-cw";
+import type { GitPanelMode } from "../types";
 
 type GitMode = GitPanelMode;
 

@@ -14,16 +14,13 @@ function trimTrailingSeparators(path: string) {
 }
 
 function pathBaseName(path: string) {
-  return trimTrailingSeparators(normalizePathSeparators(path.trim()))
-    .split("/")
-    .filter(Boolean)
-    .pop() ?? "";
+  return (
+    trimTrailingSeparators(normalizePathSeparators(path.trim())).split("/").filter(Boolean).pop() ??
+    ""
+  );
 }
 
-export function resolveMountedWorkspacePath(
-  path: string,
-  workspacePath?: string | null,
-) {
+export function resolveMountedWorkspacePath(path: string, workspacePath?: string | null) {
   const trimmed = path.trim();
   if (isKnownLocalWorkspaceRoutePath(trimmed)) {
     return null;
@@ -60,8 +57,5 @@ export function resolveMountedWorkspacePath(
   if (!routeMatch) {
     return null;
   }
-  return resolveFromSegments(
-    routeMatch.segments,
-    routeMatch.prefix === WORKSPACE_MOUNT_PREFIX,
-  );
+  return resolveFromSegments(routeMatch.segments, routeMatch.prefix === WORKSPACE_MOUNT_PREFIX);
 }

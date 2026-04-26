@@ -1,17 +1,12 @@
-import { useEffect, useMemo, useRef } from "react";
 import Stethoscope from "lucide-react/dist/esm/icons/stethoscope";
 import type { Dispatch, SetStateAction } from "react";
-import type {
-  AppSettings,
-  CodexDoctorResult,
-  CodexUpdateResult,
-  ModelOption,
-} from "@/types";
+import { useEffect, useMemo, useRef } from "react";
 import {
   SettingsSection,
   SettingsToggleRow,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
 import { FileEditorCard } from "@/features/shared/components/FileEditorCard";
+import type { AppSettings, CodexDoctorResult, CodexUpdateResult, ModelOption } from "@/types";
 
 type SettingsCodexSectionProps = {
   appSettings: AppSettings;
@@ -156,14 +151,8 @@ export function SettingsCodexSection({
     () => defaultModels.find((model) => model.model === selectedModelSlug) ?? null,
     [defaultModels, selectedModelSlug],
   );
-  const reasoningSupported = useMemo(
-    () => getReasoningSupport(selectedModel),
-    [selectedModel],
-  );
-  const reasoningOptions = useMemo(
-    () => getReasoningOptions(selectedModel),
-    [selectedModel],
-  );
+  const reasoningSupported = useMemo(() => getReasoningSupport(selectedModel), [selectedModel]);
+  const reasoningOptions = useMemo(() => getReasoningOptions(selectedModel), [selectedModel]);
   const savedEffort = useMemo(
     () => normalizeEffortValue(appSettings.lastComposerReasoningEffort),
     [appSettings.lastComposerReasoningEffort],
@@ -208,7 +197,9 @@ export function SettingsCodexSection({
 
     const next: AppSettings = {
       ...appSettings,
-      lastComposerModelId: shouldNormalizeModel ? selectedModelSlug : appSettings.lastComposerModelId,
+      lastComposerModelId: shouldNormalizeModel
+        ? selectedModelSlug
+        : appSettings.lastComposerModelId,
       lastComposerReasoningEffort: shouldNormalizeEffort
         ? selectedEffort
         : appSettings.lastComposerReasoningEffort,
@@ -253,11 +244,7 @@ export function SettingsCodexSection({
           >
             Browse
           </button>
-          <button
-            type="button"
-            className="ghost"
-            onClick={() => onSetCodexPathDraft("")}
-          >
+          <button type="button" className="ghost" onClick={() => onSetCodexPathDraft("")}>
             Use PATH
           </button>
         </div>
@@ -273,11 +260,7 @@ export function SettingsCodexSection({
             placeholder="--profile personal"
             onChange={(event) => onSetCodexArgsDraft(event.target.value)}
           />
-          <button
-            type="button"
-            className="ghost"
-            onClick={() => onSetCodexArgsDraft("")}
-          >
+          <button type="button" className="ghost" onClick={() => onSetCodexArgsDraft("")}>
             Clear
           </button>
         </div>
@@ -289,8 +272,8 @@ export function SettingsCodexSection({
         </div>
         <div className="settings-help">
           Per-thread override processing ignores unsupported flags: <code>-m</code>/
-          <code>--model</code>, <code>-a</code>/<code>--ask-for-approval</code>,{" "}
-          <code>-s</code>/<code>--sandbox</code>, <code>--full-auto</code>,{" "}
+          <code>--model</code>, <code>-a</code>/<code>--ask-for-approval</code>, <code>-s</code>/
+          <code>--sandbox</code>, <code>--full-auto</code>,{" "}
           <code>--dangerously-bypass-approvals-and-sandbox</code>, <code>--oss</code>,{" "}
           <code>--local-provider</code>, and <code>--no-alt-screen</code>.
         </div>
@@ -356,9 +339,7 @@ export function SettingsCodexSection({
         )}
 
         {codexUpdateState.result && (
-          <div
-            className={`settings-doctor ${codexUpdateState.result.ok ? "ok" : "error"}`}
-          >
+          <div className={`settings-doctor ${codexUpdateState.result.ok ? "ok" : "error"}`}>
             <div className="settings-doctor-title">
               {codexUpdateState.result.ok
                 ? codexUpdateState.result.upgraded
@@ -390,16 +371,10 @@ export function SettingsCodexSection({
       </div>
 
       <div className="settings-divider" />
-      <div className="settings-field-label settings-field-label--section">
-        Default parameters
-      </div>
+      <div className="settings-field-label settings-field-label--section">Default parameters</div>
 
       <SettingsToggleRow
-        title={
-          <label htmlFor="default-model">
-            Model
-          </label>
-        }
+        title={<label htmlFor="default-model">Model</label>}
         subtitle={
           defaultModelsConnectedWorkspaceCount === 0
             ? "Add a workspace to load available models."
@@ -442,11 +417,7 @@ export function SettingsCodexSection({
       </SettingsToggleRow>
 
       <SettingsToggleRow
-        title={
-          <label htmlFor="default-effort">
-            Reasoning effort
-          </label>
-        }
+        title={<label htmlFor="default-effort">Reasoning effort</label>}
         subtitle={
           reasoningSupported
             ? "Available options depend on the selected model."
@@ -476,11 +447,7 @@ export function SettingsCodexSection({
       </SettingsToggleRow>
 
       <SettingsToggleRow
-        title={
-          <label htmlFor="default-access">
-            Access mode
-          </label>
-        }
+        title={<label htmlFor="default-access">Access mode</label>}
         subtitle="Used when there is no thread-specific override."
       >
         <select

@@ -44,9 +44,7 @@ export function MobileRemoteWorkspacePrompt({
     >
       <div className="mobile-remote-workspace-modal-content">
         <div className="ds-modal-title">Add project directories</div>
-        <div className="ds-modal-subtitle">
-          Enter directories on the connected server.
-        </div>
+        <div className="ds-modal-subtitle">Enter directories on the connected server.</div>
         <label className="ds-modal-label" htmlFor="mobile-remote-workspace-paths">
           Paths
         </label>

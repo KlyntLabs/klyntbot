@@ -1,3 +1,4 @@
+import { CHAT_SCROLLBACK_DEFAULT } from "@utils/chatScrollback";
 import type {
   AccountSnapshot,
   ApprovalRequest,
@@ -9,10 +10,9 @@ import type {
   ThreadTokenUsage,
   TurnPlan,
 } from "@/types";
-import { CHAT_SCROLLBACK_DEFAULT } from "@utils/chatScrollback";
+import { reduceThreadConfig } from "./threadReducer/threadConfigSlice";
 import { reduceThreadItems } from "./threadReducer/threadItemsSlice";
 import { reduceThreadLifecycle } from "./threadReducer/threadLifecycleSlice";
-import { reduceThreadConfig } from "./threadReducer/threadConfigSlice";
 import { reduceThreadQueue } from "./threadReducer/threadQueueSlice";
 import { reduceThreadSnapshots } from "./threadReducer/threadSnapshotSlice";
 
@@ -70,10 +70,7 @@ export type ThreadAction =
       workspaceId: string;
       threadId: string;
       patch: Partial<
-        Pick<
-          ThreadSummary,
-          "isSubagent" | "subagentNickname" | "subagentRole" | "createdAt"
-        >
+        Pick<ThreadSummary, "isSubagent" | "subagentNickname" | "subagentRole" | "createdAt">
       >;
     }
   | {

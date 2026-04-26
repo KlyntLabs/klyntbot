@@ -87,14 +87,8 @@ describe("usePromptHistory", () => {
 
   it("does not clobber stored history when switching keys", () => {
     globalThis.localStorage.clear();
-    globalThis.localStorage.setItem(
-      getStorageKey("ws-a"),
-      JSON.stringify(["alpha prompt"]),
-    );
-    globalThis.localStorage.setItem(
-      getStorageKey("ws-b"),
-      JSON.stringify(["beta prompt"]),
-    );
+    globalThis.localStorage.setItem(getStorageKey("ws-a"), JSON.stringify(["alpha prompt"]));
+    globalThis.localStorage.setItem(getStorageKey("ws-b"), JSON.stringify(["beta prompt"]));
 
     const textarea = document.createElement("textarea");
     document.body.appendChild(textarea);

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
+
+import { writeTerminalSession } from "@services/tauri";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TerminalSessionState } from "@/features/terminal/hooks/useTerminalSession";
 import type { LaunchScriptEntry, LaunchScriptIconId, WorkspaceInfo } from "@/types";
-import { writeTerminalSession } from "@services/tauri";
 import { useWorkspaceLaunchScripts } from "./useWorkspaceLaunchScripts";
 
 vi.mock("../../../services/tauri", () => ({
@@ -43,9 +44,7 @@ function getUpdatedLaunchScripts(updateWorkspaceSettings: ReturnType<typeof vi.f
 
 describe("useWorkspaceLaunchScripts", () => {
   it("opens the editor when script is empty", () => {
-    const scripts: LaunchScriptEntry[] = [
-      { id: "one", script: "", icon: "play", label: null },
-    ];
+    const scripts: LaunchScriptEntry[] = [{ id: "one", script: "", icon: "play", label: null }];
     const workspace = makeWorkspace(scripts);
 
     const { result } = renderHook(() =>
@@ -111,11 +110,7 @@ describe("useWorkspaceLaunchScripts", () => {
     });
 
     expect(openTerminal).toHaveBeenCalled();
-    expect(ensureLaunchTerminal).toHaveBeenCalledWith(
-      "workspace-1",
-      scripts[0],
-      "Launch: Play",
-    );
+    expect(ensureLaunchTerminal).toHaveBeenCalledWith("workspace-1", scripts[0], "Launch: Play");
     expect(restartLaunchSession).toHaveBeenCalledWith("workspace-1", "launch-one");
 
     rerender({

@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import type { ModelOption } from "@/types";
-import {
-  MagicSparkleIcon,
-  MagicSparkleLoaderIcon,
-} from "@/features/shared/components/MagicSparkleIcon";
 import type { SettingsAgentsSectionProps } from "@settings/hooks/useSettingsAgentsSection";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { fileManagerName, openInFileManagerLabel } from "@utils/platformPaths";
+import { useEffect, useMemo, useState } from "react";
 import {
   SettingsSection,
   SettingsSubsection,
   SettingsToggleRow,
   SettingsToggleSwitch,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
+import {
+  MagicSparkleIcon,
+  MagicSparkleLoaderIcon,
+} from "@/features/shared/components/MagicSparkleIcon";
+import type { ModelOption } from "@/types";
 
 const FALLBACK_AGENT_MODELS: ModelOption[] = [
   {
@@ -134,10 +134,7 @@ export function SettingsAgentsSection({
     if (!effectiveModelOptions.length) {
       return;
     }
-    if (
-      !createModel ||
-      !effectiveModelOptions.some((option) => option.model === createModel)
-    ) {
+    if (!createModel || !effectiveModelOptions.some((option) => option.model === createModel)) {
       setCreateModel(effectiveModelOptions[0].model);
     }
   }, [createModel, effectiveModelOptions]);
@@ -161,9 +158,7 @@ export function SettingsAgentsSection({
     try {
       await revealItemInDir(path);
     } catch (openError) {
-      setOpenPathError(
-        openError instanceof Error ? openError.message : "Unable to open path.",
-      );
+      setOpenPathError(openError instanceof Error ? openError.message : "Unable to open path.");
     }
   };
 
@@ -234,10 +229,7 @@ export function SettingsAgentsSection({
     if (!settings || isUpdatingCore) {
       return;
     }
-    const nextValue = Math.min(
-      MAX_MAX_DEPTH,
-      Math.max(MIN_MAX_DEPTH, currentMaxDepth + delta),
-    );
+    const nextValue = Math.min(MAX_MAX_DEPTH, Math.max(MIN_MAX_DEPTH, currentMaxDepth + delta));
     if (nextValue === currentMaxDepth) {
       return;
     }
@@ -267,7 +259,9 @@ export function SettingsAgentsSection({
     }
   };
 
-  const startEditing = (agent: NonNullable<SettingsAgentsSectionProps["settings"]>["agents"][number]) => {
+  const startEditing = (
+    agent: NonNullable<SettingsAgentsSectionProps["settings"]>["agents"][number],
+  ) => {
     setEditingName(agent.name);
     setEditNameDraft(agent.name);
     setEditDescriptionDraft(agent.description ?? "");
@@ -286,8 +280,7 @@ export function SettingsAgentsSection({
       return;
     }
     const editingAgent = settings?.agents.find((agent) => agent.name === editingName) ?? null;
-    const previousDeveloperInstructions =
-      editingAgent?.developerInstructions?.trim() ?? "";
+    const previousDeveloperInstructions = editingAgent?.developerInstructions?.trim() ?? "";
     const nextDeveloperInstructions = editDeveloperInstructionsDraft.trim();
     const developerInstructionsChanged =
       nextDeveloperInstructions !== previousDeveloperInstructions;
@@ -731,9 +724,7 @@ export function SettingsAgentsSection({
                         }
                       })();
                     }}
-                    disabled={
-                      isUpdating || editDescriptionGenerating || !canGenerateEditFromName
-                    }
+                    disabled={isUpdating || editDescriptionGenerating || !canGenerateEditFromName}
                     title="Generate description and developer instructions with AI"
                     aria-label={`Generate fields for ${agent.name}`}
                   >
@@ -776,9 +767,7 @@ export function SettingsAgentsSection({
                   id={`settings-agent-edit-developer-instructions-${agent.name}`}
                   className="settings-agents-textarea"
                   value={editDeveloperInstructionsDraft}
-                  onChange={(event) =>
-                    setEditDeveloperInstructionsDraft(event.target.value)
-                  }
+                  onChange={(event) => setEditDeveloperInstructionsDraft(event.target.value)}
                   placeholder="Multiline per-agent developer instructions."
                   disabled={isUpdating}
                 />

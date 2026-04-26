@@ -27,8 +27,8 @@ function getStoredThreadListOrganizeMode(): ThreadListOrganizeMode {
 }
 
 export function useThreadListSortKey() {
-  const [threadListSortKey, setThreadListSortKeyState] = useState<ThreadListSortKey>(
-    () => getStoredThreadListSortKey(),
+  const [threadListSortKey, setThreadListSortKeyState] = useState<ThreadListSortKey>(() =>
+    getStoredThreadListSortKey(),
   );
   const [threadListOrganizeMode, setThreadListOrganizeModeState] = useState<ThreadListOrganizeMode>(
     () => getStoredThreadListOrganizeMode(),
@@ -41,18 +41,12 @@ export function useThreadListSortKey() {
     }
   }, []);
 
-  const setThreadListOrganizeMode = useCallback(
-    (nextOrganizeMode: ThreadListOrganizeMode) => {
-      setThreadListOrganizeModeState(nextOrganizeMode);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          THREAD_LIST_ORGANIZE_MODE_STORAGE_KEY,
-          nextOrganizeMode,
-        );
-      }
-    },
-    [],
-  );
+  const setThreadListOrganizeMode = useCallback((nextOrganizeMode: ThreadListOrganizeMode) => {
+    setThreadListOrganizeModeState(nextOrganizeMode);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(THREAD_LIST_ORGANIZE_MODE_STORAGE_KEY, nextOrganizeMode);
+    }
+  }, []);
 
   return {
     threadListSortKey,

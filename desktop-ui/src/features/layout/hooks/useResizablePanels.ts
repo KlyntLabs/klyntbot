@@ -3,8 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const STORAGE_KEY_SIDEBAR = "klynt.sidebarWidth";
 const STORAGE_KEY_RIGHT_PANEL = "klynt.rightPanelWidth";
-const STORAGE_KEY_CHAT_DIFF_SPLIT_POSITION_PERCENT =
-  "klynt.chatDiffSplitPositionPercent";
+const STORAGE_KEY_CHAT_DIFF_SPLIT_POSITION_PERCENT = "klynt.chatDiffSplitPositionPercent";
 const STORAGE_KEY_PLAN_PANEL = "klynt.planPanelHeight";
 const STORAGE_KEY_TERMINAL_PANEL = "klynt.terminalPanelHeight";
 const STORAGE_KEY_DEBUG_PANEL = "klynt.debugPanelHeight";
@@ -43,10 +42,7 @@ type ResizeState = {
   startContainerLeft?: number;
 };
 
-const CSS_VAR_MAP: Record<
-  ResizeState["type"],
-  { prop: string; unit: string }
-> = {
+const CSS_VAR_MAP: Record<ResizeState["type"], { prop: string; unit: string }> = {
   sidebar: { prop: "--sidebar-width", unit: "px" },
   "right-panel": { prop: "--right-panel-width", unit: "px" },
   "chat-diff-split": {
@@ -92,15 +88,14 @@ export function useResizablePanels() {
       MAX_SIDEBAR_WIDTH,
     ),
   );
-  const [chatDiffSplitPositionPercent, setChatDiffSplitPositionPercent] =
-    useState(() =>
-      readStoredWidth(
-        STORAGE_KEY_CHAT_DIFF_SPLIT_POSITION_PERCENT,
-        DEFAULT_CHAT_DIFF_SPLIT_POSITION_PERCENT,
-        MIN_CHAT_DIFF_SPLIT_POSITION_PERCENT,
-        MAX_CHAT_DIFF_SPLIT_POSITION_PERCENT,
-      ),
-    );
+  const [chatDiffSplitPositionPercent, setChatDiffSplitPositionPercent] = useState(() =>
+    readStoredWidth(
+      STORAGE_KEY_CHAT_DIFF_SPLIT_POSITION_PERCENT,
+      DEFAULT_CHAT_DIFF_SPLIT_POSITION_PERCENT,
+      MIN_CHAT_DIFF_SPLIT_POSITION_PERCENT,
+      MAX_CHAT_DIFF_SPLIT_POSITION_PERCENT,
+    ),
+  );
   const [rightPanelWidth, setRightPanelWidth] = useState(() =>
     readStoredWidth(
       STORAGE_KEY_RIGHT_PANEL,
@@ -150,31 +145,19 @@ export function useResizablePanels() {
   }, [chatDiffSplitPositionPercent]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      STORAGE_KEY_RIGHT_PANEL,
-      String(rightPanelWidth),
-    );
+    window.localStorage.setItem(STORAGE_KEY_RIGHT_PANEL, String(rightPanelWidth));
   }, [rightPanelWidth]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      STORAGE_KEY_PLAN_PANEL,
-      String(planPanelHeight),
-    );
+    window.localStorage.setItem(STORAGE_KEY_PLAN_PANEL, String(planPanelHeight));
   }, [planPanelHeight]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      STORAGE_KEY_TERMINAL_PANEL,
-      String(terminalPanelHeight),
-    );
+    window.localStorage.setItem(STORAGE_KEY_TERMINAL_PANEL, String(terminalPanelHeight));
   }, [terminalPanelHeight]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      STORAGE_KEY_DEBUG_PANEL,
-      String(debugPanelHeight),
-    );
+    window.localStorage.setItem(STORAGE_KEY_DEBUG_PANEL, String(debugPanelHeight));
   }, [debugPanelHeight]);
 
   useEffect(() => {
@@ -189,11 +172,7 @@ export function useResizablePanels() {
       let next: number;
       if (resize.type === "sidebar") {
         const delta = event.clientX - resize.startX;
-        next = clamp(
-          resize.startWidth + delta,
-          MIN_SIDEBAR_WIDTH,
-          MAX_SIDEBAR_WIDTH,
-        );
+        next = clamp(resize.startWidth + delta, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
       } else if (resize.type === "chat-diff-split") {
         const pointerPercent = getContainerPointerPercent(event, resize);
         next = clamp(
@@ -203,18 +182,10 @@ export function useResizablePanels() {
         );
       } else if (resize.type === "right-panel") {
         const delta = event.clientX - resize.startX;
-        next = clamp(
-          resize.startWidth - delta,
-          MIN_RIGHT_PANEL_WIDTH,
-          MAX_RIGHT_PANEL_WIDTH,
-        );
+        next = clamp(resize.startWidth - delta, MIN_RIGHT_PANEL_WIDTH, MAX_RIGHT_PANEL_WIDTH);
       } else if (resize.type === "plan-panel") {
         const delta = event.clientY - resize.startY;
-        next = clamp(
-          resize.startHeight - delta,
-          MIN_PLAN_PANEL_HEIGHT,
-          MAX_PLAN_PANEL_HEIGHT,
-        );
+        next = clamp(resize.startHeight - delta, MIN_PLAN_PANEL_HEIGHT, MAX_PLAN_PANEL_HEIGHT);
       } else if (resize.type === "terminal-panel") {
         const delta = event.clientY - resize.startY;
         next = clamp(
@@ -224,11 +195,7 @@ export function useResizablePanels() {
         );
       } else {
         const delta = event.clientY - resize.startY;
-        next = clamp(
-          resize.startHeight - delta,
-          MIN_DEBUG_PANEL_HEIGHT,
-          MAX_DEBUG_PANEL_HEIGHT,
-        );
+        next = clamp(resize.startHeight - delta, MIN_DEBUG_PANEL_HEIGHT, MAX_DEBUG_PANEL_HEIGHT);
       }
 
       liveValueRef.current = next;
@@ -300,9 +267,7 @@ export function useResizablePanels() {
     (event: ReactMouseEvent) => {
       event.preventDefault();
 
-      const content = event.currentTarget.closest(".content-split") as
-        | HTMLDivElement
-        | null;
+      const content = event.currentTarget.closest(".content-split") as HTMLDivElement | null;
       resizeRef.current = {
         type: "chat-diff-split",
         startX: event.clientX,

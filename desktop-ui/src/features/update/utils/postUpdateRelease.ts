@@ -1,9 +1,6 @@
-export const STORAGE_KEY_PENDING_POST_UPDATE_VERSION =
-  "klynt.pendingPostUpdateVersion";
-const GITHUB_RELEASES_API_BASE =
-  "https://api.github.com/repos/Dimillian/Klynt/releases";
-const GITHUB_RELEASES_WEB_BASE =
-  "https://github.com/Dimillian/Klynt/releases";
+export const STORAGE_KEY_PENDING_POST_UPDATE_VERSION = "klynt.pendingPostUpdateVersion";
+const GITHUB_RELEASES_API_BASE = "https://api.github.com/repos/Dimillian/Klynt/releases";
+const GITHUB_RELEASES_WEB_BASE = "https://github.com/Dimillian/Klynt/releases";
 
 type GitHubReleaseResponse = {
   tag_name?: string;
@@ -44,10 +41,7 @@ export function savePendingPostUpdateVersion(version: string): void {
     return;
   }
   try {
-    window.localStorage.setItem(
-      STORAGE_KEY_PENDING_POST_UPDATE_VERSION,
-      normalized,
-    );
+    window.localStorage.setItem(STORAGE_KEY_PENDING_POST_UPDATE_VERSION, normalized);
   } catch {
     // Best-effort persistence.
   }
@@ -80,9 +74,7 @@ export function clearPendingPostUpdateVersion(): void {
   }
 }
 
-export async function fetchReleaseNotesForVersion(
-  version: string,
-): Promise<PostUpdateReleaseInfo> {
+export async function fetchReleaseNotesForVersion(version: string): Promise<PostUpdateReleaseInfo> {
   const normalized = normalizeStoredVersion(version);
   if (!normalized) {
     throw new Error("Invalid release version.");
@@ -115,9 +107,7 @@ export async function fetchReleaseNotesForVersion(
         ? payload.html_url
         : buildReleaseTagUrl(normalized);
     const resultTag =
-      payload.tag_name && payload.tag_name.trim().length > 0
-        ? payload.tag_name
-        : null;
+      payload.tag_name && payload.tag_name.trim().length > 0 ? payload.tag_name : null;
     return {
       body,
       htmlUrl,

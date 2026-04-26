@@ -1,15 +1,12 @@
-import { useEffect } from "react";
 import { isMacPlatform } from "@utils/shortcuts";
+import { useEffect } from "react";
 
 type UseNewAgentShortcutOptions = {
   isEnabled: boolean;
   onTrigger: () => void;
 };
 
-export function useNewAgentShortcut({
-  isEnabled,
-  onTrigger,
-}: UseNewAgentShortcutOptions) {
+export function useNewAgentShortcut({ isEnabled, onTrigger }: UseNewAgentShortcutOptions) {
   useEffect(() => {
     if (!isEnabled) {
       return;

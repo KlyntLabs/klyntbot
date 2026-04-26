@@ -1,11 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  DictationEvent,
-  DictationSessionState,
-  DictationTranscript,
-} from "@/types";
-import { cancelDictation, startDictation, stopDictation } from "@services/tauri";
 import { subscribeDictationEvents } from "@services/events";
+import { cancelDictation, startDictation, stopDictation } from "@services/tauri";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { DictationEvent, DictationSessionState, DictationTranscript } from "@/types";
 
 type UseDictationResult = {
   state: DictationSessionState;
@@ -94,12 +90,9 @@ export function useDictation(): UseDictationResult {
     await cancelDictation();
   }, []);
 
-  const clearTranscript = useCallback(
-    (id: string) => {
-      setTranscript((prev) => (prev?.id === id ? null : prev));
-    },
-    [],
-  );
+  const clearTranscript = useCallback((id: string) => {
+    setTranscript((prev) => (prev?.id === id ? null : prev));
+  }, []);
 
   const clearError = useCallback(() => {
     setError(null);

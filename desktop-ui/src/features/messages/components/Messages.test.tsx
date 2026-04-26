@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { useCallback, useState } from "react";
+
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useCallback, useState } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConversationItem } from "@/types";
 import { expectOpenedFileTarget } from "../test/fileLinkAssertions";
@@ -27,9 +28,7 @@ vi.mock("../hooks/useFileLinkOpener", () => ({
 }));
 
 vi.mock("@services/tauri", async () => {
-  const actual = await vi.importActual<typeof import("@services/tauri")>(
-    "@services/tauri",
-  );
+  const actual = await vi.importActual<typeof import("@services/tauri")>("@services/tauri");
   return {
     ...actual,
     exportMarkdownFile: exportMarkdownFileMock,
@@ -941,15 +940,11 @@ describe("Messages", () => {
         />,
       );
 
-      expect(
-        screen.getByText("New message will be fetched in 12 seconds"),
-      ).toBeTruthy();
+      expect(screen.getByText("New message will be fetched in 12 seconds")).toBeTruthy();
       act(() => {
         vi.advanceTimersByTime(1_000);
       });
-      expect(
-        screen.getByText("New message will be fetched in 11 seconds"),
-      ).toBeTruthy();
+      expect(screen.getByText("New message will be fetched in 11 seconds")).toBeTruthy();
     } finally {
       vi.useRealTimers();
     }
@@ -1008,14 +1003,10 @@ describe("Messages", () => {
       />,
     );
 
-    expect(
-      screen.getByText(/Proceed with deployment\?: Yes \+1/),
-    ).toBeTruthy();
+    expect(screen.getByText(/Proceed with deployment\?: Yes \+1/)).toBeTruthy();
     expect(screen.queryByText("user_note: after running tests")).toBeNull();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Toggle answered input details" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Toggle answered input details" }));
 
     expect(screen.getByText("user_note: after running tests")).toBeTruthy();
   });
@@ -1365,9 +1356,7 @@ describe("Messages", () => {
     );
 
     expect(screen.getByText("Plan ready")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Implement this plan" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Implement this plan" })).toBeTruthy();
   });
 
   it("exports plan tool-call output from the conversation view", async () => {
@@ -1401,10 +1390,7 @@ describe("Messages", () => {
     fireEvent.click(exportButton);
 
     await waitFor(() =>
-      expect(exportMarkdownFileMock).toHaveBeenCalledWith(
-        "## Steps\n- Step 1",
-        "plan-7.md",
-      ),
+      expect(exportMarkdownFileMock).toHaveBeenCalledWith("## Steps\n- Step 1", "plan-7.md"),
     );
   });
 
@@ -1538,9 +1524,7 @@ describe("Messages", () => {
     const sendChangesButton = screen.getByRole("button", { name: "Send changes" });
     expect((sendChangesButton as HTMLButtonElement).disabled).toBe(true);
 
-    const textarea = screen.getByPlaceholderText(
-      "Describe what you want to change in the plan...",
-    );
+    const textarea = screen.getByPlaceholderText("Describe what you want to change in the plan...");
     fireEvent.change(textarea, { target: { value: "Add error handling" } });
 
     expect((sendChangesButton as HTMLButtonElement).disabled).toBe(false);
@@ -1577,9 +1561,7 @@ describe("Messages", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Implement this plan" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Implement this plan" }));
     expect(onPlanAccept).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Plan ready")).toBeNull();
   });
@@ -1697,9 +1679,7 @@ describe("Messages", () => {
     expect(screen.getByText("failed • 0:03")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Toggle tool details" }));
-    expect(
-      screen.getByText("command • sync • thread • session-start.sh • Preparing"),
-    ).toBeTruthy();
+    expect(screen.getByText("command • sync • thread • session-start.sh • Preparing")).toBeTruthy();
     expect(screen.getByText("[error] Missing config")).toBeTruthy();
   });
 });

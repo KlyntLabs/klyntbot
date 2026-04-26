@@ -1,11 +1,8 @@
-import { buildConversationItem } from "@utils/threadItems";
-import type { CollabAgentRef } from "@/types";
 import { asString } from "@threads/utils/threadNormalize";
+import type { buildConversationItem } from "@utils/threadItems";
+import type { CollabAgentRef } from "@/types";
 
-export function buildItemForDisplay(
-  item: Record<string, unknown>,
-  shouldMarkProcessing: boolean,
-) {
+export function buildItemForDisplay(item: Record<string, unknown>, shouldMarkProcessing: boolean) {
   const itemType = asString(item?.type ?? "");
   if (itemType !== "contextCompaction" && itemType !== "webSearch") {
     return item;

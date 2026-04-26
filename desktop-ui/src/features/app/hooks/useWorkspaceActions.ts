@@ -1,6 +1,6 @@
+import * as Sentry from "@sentry/react";
 import type { RefObject } from "react";
 import { useCallback } from "react";
-import * as Sentry from "@sentry/react";
 import type { DebugEntry, WorkspaceInfo } from "@/types";
 
 type Params = {
@@ -112,7 +112,6 @@ export function useWorkspaceActions({
     },
     [addWorkspaceFromPath, handleWorkspaceAdded, onDebug],
   );
-
 
   const handleAddWorkspaceFromGitUrl = useCallback(
     async (url: string, destinationPath: string, targetFolderName?: string | null) => {

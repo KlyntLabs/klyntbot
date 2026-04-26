@@ -25,10 +25,7 @@ export function useCollapsedGroups(storageKey: string) {
       if (typeof window === "undefined") {
         return;
       }
-      window.localStorage.setItem(
-        storageKey,
-        JSON.stringify(Array.from(next)),
-      );
+      window.localStorage.setItem(storageKey, JSON.stringify(Array.from(next)));
     },
     [storageKey],
   );

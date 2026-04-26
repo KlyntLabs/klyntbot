@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { chatStreamStore } from "../store/chatStreamStore";
 import type {
   ActiveInteraction,
@@ -7,7 +8,6 @@ import type {
   PersonaSegment,
   TransparencyData,
 } from "../types";
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
 export type { PersonaSegment };
 

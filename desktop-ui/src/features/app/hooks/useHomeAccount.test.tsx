@@ -1,22 +1,12 @@
 // @vitest-environment jsdom
-import { useState } from "react";
-import { renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import type {
-  AccountSnapshot,
-  RateLimitSnapshot,
-  ThreadSummary,
-  WorkspaceInfo,
-} from "@/types";
-import {
-  resolveHomeAccountWorkspaceId,
-  useHomeAccount,
-} from "./useHomeAccount";
 
-function makeWorkspace(
-  id: string,
-  overrides: Partial<WorkspaceInfo> = {},
-): WorkspaceInfo {
+import { renderHook, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { describe, expect, it, vi } from "vitest";
+import type { AccountSnapshot, RateLimitSnapshot, ThreadSummary, WorkspaceInfo } from "@/types";
+import { resolveHomeAccountWorkspaceId, useHomeAccount } from "./useHomeAccount";
+
+function makeWorkspace(id: string, overrides: Partial<WorkspaceInfo> = {}): WorkspaceInfo {
   return {
     id,
     name: id,
@@ -29,9 +19,7 @@ function makeWorkspace(
   };
 }
 
-function makeAccount(
-  overrides: Partial<AccountSnapshot> = {},
-): AccountSnapshot {
+function makeAccount(overrides: Partial<AccountSnapshot> = {}): AccountSnapshot {
   return {
     type: "chatgpt",
     email: "user@example.com",
@@ -41,9 +29,7 @@ function makeAccount(
   };
 }
 
-function makeRateLimits(
-  overrides: Partial<RateLimitSnapshot> = {},
-): RateLimitSnapshot {
+function makeRateLimits(overrides: Partial<RateLimitSnapshot> = {}): RateLimitSnapshot {
   return {
     primary: {
       usedPercent: 42,
@@ -74,9 +60,7 @@ function makeThreadListLoadingState(
   workspaces: WorkspaceInfo[],
   isLoading = false,
 ): Record<string, boolean> {
-  return Object.fromEntries(
-    workspaces.map((workspace) => [workspace.id, isLoading]),
-  );
+  return Object.fromEntries(workspaces.map((workspace) => [workspace.id, isLoading]));
 }
 
 describe("resolveHomeAccountWorkspaceId", () => {
@@ -102,8 +86,12 @@ describe("resolveHomeAccountWorkspaceId", () => {
           "ws-2": [makeThread("thread-2", 20)],
         },
         rateLimitsByWorkspace: {
-          "ws-1": makeRateLimits({ primary: { usedPercent: 30, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
-          "ws-2": makeRateLimits({ primary: { usedPercent: 60, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
+          "ws-1": makeRateLimits({
+            primary: { usedPercent: 30, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+          }),
+          "ws-2": makeRateLimits({
+            primary: { usedPercent: 60, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+          }),
         },
         accountByWorkspace: {
           "ws-1": makeAccount({ email: "older@example.com" }),
@@ -158,10 +146,7 @@ describe("resolveHomeAccountWorkspaceId", () => {
     expect(
       resolveHomeAccountWorkspaceId({
         usageWorkspaceId: "missing",
-        workspaces: [
-          makeWorkspace("ws-1", { connected: false }),
-          makeWorkspace("ws-2"),
-        ],
+        workspaces: [makeWorkspace("ws-1", { connected: false }), makeWorkspace("ws-2")],
         threadsByWorkspace: {
           "ws-1": [makeThread("thread-1", 20)],
           "ws-2": [makeThread("thread-2", 10)],
@@ -176,17 +161,18 @@ describe("resolveHomeAccountWorkspaceId", () => {
     expect(
       resolveHomeAccountWorkspaceId({
         usageWorkspaceId: "missing",
-        workspaces: [
-          makeWorkspace("ws-1", { connected: false }),
-          makeWorkspace("ws-2"),
-        ],
+        workspaces: [makeWorkspace("ws-1", { connected: false }), makeWorkspace("ws-2")],
         threadsByWorkspace: {
           "ws-1": [makeThread("thread-1", 20)],
           "ws-2": [makeThread("thread-2", 10)],
         },
         rateLimitsByWorkspace: {
-          "ws-1": makeRateLimits({ primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
-          "ws-2": makeRateLimits({ primary: { usedPercent: 42, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
+          "ws-1": makeRateLimits({
+            primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+          }),
+          "ws-2": makeRateLimits({
+            primary: { usedPercent: 42, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+          }),
         },
         accountByWorkspace: {
           "ws-1": makeAccount({ email: "stale@example.com" }),
@@ -220,10 +206,7 @@ describe("useHomeAccount", () => {
   it("returns Home account props for the All workspaces usage filter", async () => {
     const refreshAccountInfo = vi.fn();
     const refreshAccountRateLimits = vi.fn();
-    const workspaces = [
-      makeWorkspace("ws-1"),
-      makeWorkspace("ws-2"),
-    ];
+    const workspaces = [makeWorkspace("ws-1"), makeWorkspace("ws-2")];
 
     const { result } = renderHook(() =>
       useHomeAccount({
@@ -236,7 +219,10 @@ describe("useHomeAccount", () => {
         },
         threadListLoadingByWorkspace: makeThreadListLoadingState(workspaces),
         rateLimitsByWorkspace: { "ws-1": makeRateLimits(), "ws-2": makeRateLimits() },
-        accountByWorkspace: { "ws-1": makeAccount(), "ws-2": makeAccount({ email: "recent@example.com" }) },
+        accountByWorkspace: {
+          "ws-1": makeAccount(),
+          "ws-2": makeAccount({ email: "recent@example.com" }),
+        },
         refreshAccountInfo,
         refreshAccountRateLimits,
       }),
@@ -256,17 +242,10 @@ describe("useHomeAccount", () => {
   it("keeps the aggregate Home account workspace stable across thread activity updates", async () => {
     const refreshAccountInfo = vi.fn();
     const refreshAccountRateLimits = vi.fn();
-    const workspaces = [
-      makeWorkspace("ws-1"),
-      makeWorkspace("ws-2"),
-    ];
+    const workspaces = [makeWorkspace("ws-1"), makeWorkspace("ws-2")];
 
     const { result, rerender } = renderHook(
-      ({
-        threadsByWorkspace,
-      }: {
-        threadsByWorkspace: Record<string, ThreadSummary[]>;
-      }) =>
+      ({ threadsByWorkspace }: { threadsByWorkspace: Record<string, ThreadSummary[]> }) =>
         useHomeAccount({
           showHome: true,
           usageWorkspaceId: null,
@@ -318,10 +297,7 @@ describe("useHomeAccount", () => {
   it("returns Home account props from the selected workspace and refreshes them on Home", async () => {
     const refreshAccountInfo = vi.fn();
     const refreshAccountRateLimits = vi.fn();
-    const workspaces = [
-      makeWorkspace("ws-1"),
-      makeWorkspace("ws-2", { connected: false }),
-    ];
+    const workspaces = [makeWorkspace("ws-1"), makeWorkspace("ws-2", { connected: false })];
 
     const { result } = renderHook(() =>
       useHomeAccount({
@@ -359,10 +335,7 @@ describe("useHomeAccount", () => {
       useHomeAccount({
         showHome: true,
         usageWorkspaceId: "missing",
-        workspaces: [
-          makeWorkspace("ws-1", { connected: false }),
-          makeWorkspace("ws-2"),
-        ],
+        workspaces: [makeWorkspace("ws-1", { connected: false }), makeWorkspace("ws-2")],
         threadsByWorkspace: {
           "ws-1": [makeThread("thread-1", 20)],
           "ws-2": [makeThread("thread-2", 10)],
@@ -416,10 +389,7 @@ describe("useHomeAccount", () => {
   it("does not refresh twice when same-tick refresh callbacks trigger a rerender", async () => {
     const infoCalls: Array<{ workspaceId: string; tick: number }> = [];
     const rateCalls: Array<{ workspaceId: string; tick: number }> = [];
-    const workspaces = [
-      makeWorkspace("ws-1"),
-      makeWorkspace("ws-2"),
-    ];
+    const workspaces = [makeWorkspace("ws-1"), makeWorkspace("ws-2")];
 
     const { result } = renderHook(() => {
       const [tick, setTick] = useState(0);
@@ -466,10 +436,7 @@ describe("useHomeAccount", () => {
   it("recomputes the aggregate workspace after thread lists finish hydrating", async () => {
     const refreshAccountInfo = vi.fn();
     const refreshAccountRateLimits = vi.fn();
-    const workspaces = [
-      makeWorkspace("ws-1"),
-      makeWorkspace("ws-2"),
-    ];
+    const workspaces = [makeWorkspace("ws-1"), makeWorkspace("ws-2")];
 
     const { result, rerender } = renderHook(
       ({
@@ -525,10 +492,7 @@ describe("useHomeAccount", () => {
   it("falls back when the retained aggregate workspace loses usable account data", async () => {
     const refreshAccountInfo = vi.fn();
     const refreshAccountRateLimits = vi.fn();
-    const workspaces = [
-      makeWorkspace("ws-1"),
-      makeWorkspace("ws-2"),
-    ];
+    const workspaces = [makeWorkspace("ws-1"), makeWorkspace("ws-2")];
 
     const { result, rerender } = renderHook(
       ({
@@ -604,11 +568,7 @@ describe("useHomeAccount", () => {
     const refreshAccountRateLimits = vi.fn();
 
     const { result, rerender } = renderHook(
-      ({
-        workspaces,
-      }: {
-        workspaces: WorkspaceInfo[];
-      }) =>
+      ({ workspaces }: { workspaces: WorkspaceInfo[] }) =>
         useHomeAccount({
           showHome: true,
           usageWorkspaceId: null,
@@ -619,8 +579,12 @@ describe("useHomeAccount", () => {
           },
           threadListLoadingByWorkspace: makeThreadListLoadingState(workspaces),
           rateLimitsByWorkspace: {
-            "ws-1": makeRateLimits({ primary: { usedPercent: 30, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
-            "ws-2": makeRateLimits({ primary: { usedPercent: 60, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
+            "ws-1": makeRateLimits({
+              primary: { usedPercent: 30, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+            }),
+            "ws-2": makeRateLimits({
+              primary: { usedPercent: 60, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+            }),
           },
           accountByWorkspace: {
             "ws-1": makeAccount({ email: "older@example.com" }),
@@ -631,10 +595,7 @@ describe("useHomeAccount", () => {
         }),
       {
         initialProps: {
-          workspaces: [
-            makeWorkspace("ws-1"),
-            makeWorkspace("ws-2"),
-          ],
+          workspaces: [makeWorkspace("ws-1"), makeWorkspace("ws-2")],
         },
       },
     );
@@ -650,10 +611,7 @@ describe("useHomeAccount", () => {
     refreshAccountRateLimits.mockClear();
 
     rerender({
-      workspaces: [
-        makeWorkspace("ws-1"),
-        makeWorkspace("ws-2", { connected: false }),
-      ],
+      workspaces: [makeWorkspace("ws-1"), makeWorkspace("ws-2", { connected: false })],
     });
 
     await waitFor(() => {
@@ -681,11 +639,7 @@ describe("useHomeAccount", () => {
     ];
 
     const { result, rerender } = renderHook(
-      ({
-        threadsByWorkspace,
-        rateLimitsByWorkspace,
-        accountByWorkspace,
-      }: HookProps) =>
+      ({ threadsByWorkspace, rateLimitsByWorkspace, accountByWorkspace }: HookProps) =>
         useHomeAccount({
           showHome: true,
           usageWorkspaceId: null,
@@ -704,8 +658,12 @@ describe("useHomeAccount", () => {
             "ws-2": [makeThread("thread-2", 10)],
           },
           rateLimitsByWorkspace: {
-            "ws-1": makeRateLimits({ primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
-            "ws-2": makeRateLimits({ primary: { usedPercent: 42, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
+            "ws-1": makeRateLimits({
+              primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+            }),
+            "ws-2": makeRateLimits({
+              primary: { usedPercent: 42, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+            }),
           },
           accountByWorkspace: {
             "ws-1": makeAccount({ email: "stale@example.com" }),
@@ -725,8 +683,12 @@ describe("useHomeAccount", () => {
         "ws-2": [makeThread("thread-2", 30)],
       },
       rateLimitsByWorkspace: {
-        "ws-1": makeRateLimits({ primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
-        "ws-2": makeRateLimits({ primary: { usedPercent: 15, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
+        "ws-1": makeRateLimits({
+          primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+        }),
+        "ws-2": makeRateLimits({
+          primary: { usedPercent: 15, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+        }),
       },
       accountByWorkspace: {
         "ws-1": makeAccount({ email: "stale@example.com" }),
@@ -759,7 +721,9 @@ describe("useHomeAccount", () => {
         "ws-2": false,
       },
       rateLimitsByWorkspace: {
-        "ws-1": makeRateLimits({ primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
+        "ws-1": makeRateLimits({
+          primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+        }),
       },
       accountByWorkspace: {
         "ws-1": makeAccount({ email: "stale@example.com" }),
@@ -798,16 +762,15 @@ describe("useHomeAccount", () => {
     expect(refreshAccountRateLimits).not.toHaveBeenCalled();
 
     rerender({
-      workspaces: [
-        makeWorkspace("ws-1", { connected: false }),
-        makeWorkspace("ws-2"),
-      ],
+      workspaces: [makeWorkspace("ws-1", { connected: false }), makeWorkspace("ws-2")],
       threadListLoadingByWorkspace: {
         "ws-1": false,
         "ws-2": true,
       },
       rateLimitsByWorkspace: {
-        "ws-1": makeRateLimits({ primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
+        "ws-1": makeRateLimits({
+          primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+        }),
       },
       accountByWorkspace: {
         "ws-1": makeAccount({ email: "stale@example.com" }),
@@ -820,16 +783,15 @@ describe("useHomeAccount", () => {
     expect(refreshAccountRateLimits).not.toHaveBeenCalled();
 
     rerender({
-      workspaces: [
-        makeWorkspace("ws-1", { connected: false }),
-        makeWorkspace("ws-2"),
-      ],
+      workspaces: [makeWorkspace("ws-1", { connected: false }), makeWorkspace("ws-2")],
       threadListLoadingByWorkspace: {
         "ws-1": false,
         "ws-2": false,
       },
       rateLimitsByWorkspace: {
-        "ws-1": makeRateLimits({ primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
+        "ws-1": makeRateLimits({
+          primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+        }),
       },
       accountByWorkspace: {
         "ws-1": makeAccount({ email: "stale@example.com" }),
@@ -842,17 +804,18 @@ describe("useHomeAccount", () => {
     expect(refreshAccountRateLimits).not.toHaveBeenCalled();
 
     rerender({
-      workspaces: [
-        makeWorkspace("ws-1", { connected: false }),
-        makeWorkspace("ws-2"),
-      ],
+      workspaces: [makeWorkspace("ws-1", { connected: false }), makeWorkspace("ws-2")],
       threadListLoadingByWorkspace: {
         "ws-1": false,
         "ws-2": false,
       },
       rateLimitsByWorkspace: {
-        "ws-1": makeRateLimits({ primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
-        "ws-2": makeRateLimits({ primary: { usedPercent: 42, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
+        "ws-1": makeRateLimits({
+          primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+        }),
+        "ws-2": makeRateLimits({
+          primary: { usedPercent: 42, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+        }),
       },
       accountByWorkspace: {
         "ws-1": makeAccount({ email: "stale@example.com" }),
@@ -885,7 +848,9 @@ describe("useHomeAccount", () => {
         makeWorkspace("ws-2", { connected: false }),
       ],
       rateLimitsByWorkspace: {
-        "ws-1": makeRateLimits({ primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
+        "ws-1": makeRateLimits({
+          primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+        }),
       },
       accountByWorkspace: {
         "ws-1": makeAccount({ email: "stale@example.com" }),
@@ -893,11 +858,7 @@ describe("useHomeAccount", () => {
     };
 
     const { result, rerender } = renderHook(
-      ({
-        workspaces,
-        rateLimitsByWorkspace,
-        accountByWorkspace,
-      }: HookProps) =>
+      ({ workspaces, rateLimitsByWorkspace, accountByWorkspace }: HookProps) =>
         useHomeAccount({
           showHome: true,
           usageWorkspaceId: null,
@@ -922,13 +883,14 @@ describe("useHomeAccount", () => {
     expect(refreshAccountRateLimits).not.toHaveBeenCalled();
 
     rerender({
-      workspaces: [
-        makeWorkspace("ws-1", { connected: false }),
-        makeWorkspace("ws-2"),
-      ],
+      workspaces: [makeWorkspace("ws-1", { connected: false }), makeWorkspace("ws-2")],
       rateLimitsByWorkspace: {
-        "ws-1": makeRateLimits({ primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
-        "ws-2": makeRateLimits({ primary: { usedPercent: 42, windowDurationMins: 300, resetsAt: 1_700_000_000 } }),
+        "ws-1": makeRateLimits({
+          primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+        }),
+        "ws-2": makeRateLimits({
+          primary: { usedPercent: 42, windowDurationMins: 300, resetsAt: 1_700_000_000 },
+        }),
       },
       accountByWorkspace: {
         "ws-1": makeAccount({ email: "stale@example.com" }),

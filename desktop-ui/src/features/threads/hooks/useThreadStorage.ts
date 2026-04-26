@@ -1,20 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { MutableRefObject } from "react";
 import {
-  MAX_PINS_SOFT_LIMIT,
-  STORAGE_KEY_CUSTOM_NAMES,
-  STORAGE_KEY_PINNED_THREADS,
   type CustomNamesMap,
-  type PinnedThreadsMap,
-  type ThreadActivityMap,
   loadCustomNames,
   loadPinnedThreads,
   loadThreadActivity,
+  MAX_PINS_SOFT_LIMIT,
   makeCustomNameKey,
   makePinKey,
+  type PinnedThreadsMap,
+  STORAGE_KEY_CUSTOM_NAMES,
+  STORAGE_KEY_PINNED_THREADS,
   savePinnedThreads,
   saveThreadActivity,
+  type ThreadActivityMap,
 } from "@threads/utils/threadStorage";
+import type { MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type UseThreadStorageResult = {
   customNamesRef: MutableRefObject<CustomNamesMap>;
@@ -22,11 +22,7 @@ type UseThreadStorageResult = {
   threadActivityRef: MutableRefObject<ThreadActivityMap>;
   pinnedThreadsVersion: number;
   getCustomName: (workspaceId: string, threadId: string) => string | undefined;
-  recordThreadActivity: (
-    workspaceId: string,
-    threadId: string,
-    timestamp?: number,
-  ) => void;
+  recordThreadActivity: (workspaceId: string, threadId: string, timestamp?: number) => void;
   pinThread: (workspaceId: string, threadId: string) => boolean;
   unpinThread: (workspaceId: string, threadId: string) => void;
   isThreadPinned: (workspaceId: string, threadId: string) => boolean;
@@ -95,13 +91,11 @@ export function useThreadStorage(): UseThreadStorageResult {
     if (key in pinnedThreadsRef.current) {
       return false;
     }
-    const currentPinsForWorkspace = Object.keys(pinnedThreadsRef.current).filter(
-      (entry) => entry.startsWith(`${workspaceId}:`),
+    const currentPinsForWorkspace = Object.keys(pinnedThreadsRef.current).filter((entry) =>
+      entry.startsWith(`${workspaceId}:`),
     ).length;
     if (currentPinsForWorkspace >= MAX_PINS_SOFT_LIMIT) {
-      console.warn(
-        `Pin limit reached (${MAX_PINS_SOFT_LIMIT}). Consider unpinning some threads.`,
-      );
+      console.warn(`Pin limit reached (${MAX_PINS_SOFT_LIMIT}). Consider unpinning some threads.`);
     }
     const next = { ...pinnedThreadsRef.current, [key]: Date.now() };
     pinnedThreadsRef.current = next;
@@ -121,21 +115,15 @@ export function useThreadStorage(): UseThreadStorageResult {
     setPinnedThreadsVersion((version) => version + 1);
   }, []);
 
-  const isThreadPinned = useCallback(
-    (workspaceId: string, threadId: string): boolean => {
-      const key = makePinKey(workspaceId, threadId);
-      return key in pinnedThreadsRef.current;
-    },
-    [],
-  );
+  const isThreadPinned = useCallback((workspaceId: string, threadId: string): boolean => {
+    const key = makePinKey(workspaceId, threadId);
+    return key in pinnedThreadsRef.current;
+  }, []);
 
-  const getPinTimestamp = useCallback(
-    (workspaceId: string, threadId: string): number | null => {
-      const key = makePinKey(workspaceId, threadId);
-      return pinnedThreadsRef.current[key] ?? null;
-    },
-    [],
-  );
+  const getPinTimestamp = useCallback((workspaceId: string, threadId: string): number | null => {
+    const key = makePinKey(workspaceId, threadId);
+    return pinnedThreadsRef.current[key] ?? null;
+  }, []);
 
   return {
     customNamesRef,

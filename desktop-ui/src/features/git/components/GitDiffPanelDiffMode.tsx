@@ -1,18 +1,18 @@
+import Download from "lucide-react/dist/esm/icons/download";
+import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
+import Upload from "lucide-react/dist/esm/icons/upload";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import {
   MagicSparkleIcon,
   MagicSparkleLoaderIcon,
 } from "@/features/shared/components/MagicSparkleIcon";
-import Download from "lucide-react/dist/esm/icons/download";
-import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
-import Upload from "lucide-react/dist/esm/icons/upload";
-import { CommitButton, DiffSection, type DiffFile } from "./GitDiffPanelShared";
 import {
   DEPTH_OPTIONS,
   isGitRootNotFound,
   isMissingRepo,
   normalizeRootPath,
 } from "./GitDiffPanel.utils";
+import { CommitButton, type DiffFile, DiffSection } from "./GitDiffPanelShared";
 
 type GitDiffModeContentProps = {
   error: string | null | undefined;
@@ -214,9 +214,7 @@ export function GitDiffModeContent({
               </button>
             )}
           </div>
-          {gitRootScanLoading && (
-            <div className="diff-empty">Scanning for repositories...</div>
-          )}
+          {gitRootScanLoading && <div className="diff-empty">Scanning for repositories...</div>}
           {!gitRootScanLoading &&
             !gitRootScanError &&
             gitRootScanHasScanned &&

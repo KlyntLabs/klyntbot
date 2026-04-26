@@ -55,11 +55,7 @@ type UseQueuedSendResult = {
     appMentions?: AppMention[],
     submitIntent?: ComposerSendIntent,
   ) => Promise<void>;
-  queueMessage: (
-    text: string,
-    images?: string[],
-    appMentions?: AppMention[],
-  ) => Promise<void>;
+  queueMessage: (text: string, images?: string[], appMentions?: AppMention[]) => Promise<void>;
   removeQueuedMessage: (threadId: string, messageId: string) => void;
 };
 
@@ -129,18 +125,14 @@ export function useQueuedSend({
   startStatus,
   clearActiveImages,
 }: UseQueuedSendOptions): UseQueuedSendResult {
-  const [queuedByThread, setQueuedByThread] = useState<
-    Record<string, QueuedMessage[]>
-  >({});
-  const [inFlightByThread, setInFlightByThread] = useState<
-    Record<string, QueuedMessage | null>
-  >({});
-  const [hasStartedByThread, setHasStartedByThread] = useState<
-    Record<string, boolean>
-  >({});
+  const [queuedByThread, setQueuedByThread] = useState<Record<string, QueuedMessage[]>>({});
+  const [inFlightByThread, setInFlightByThread] = useState<Record<string, QueuedMessage | null>>(
+    {},
+  );
+  const [hasStartedByThread, setHasStartedByThread] = useState<Record<string, boolean>>({});
 
   const activeQueue = useMemo(
-    () => (activeThreadId ? queuedByThread[activeThreadId] ?? [] : []),
+    () => (activeThreadId ? (queuedByThread[activeThreadId] ?? []) : []),
     [activeThreadId, queuedByThread],
   );
 
@@ -151,17 +143,12 @@ export function useQueuedSend({
     }));
   }, []);
 
-  const removeQueuedMessage = useCallback(
-    (threadId: string, messageId: string) => {
-      setQueuedByThread((prev) => ({
-        ...prev,
-        [threadId]: (prev[threadId] ?? []).filter(
-          (entry) => entry.id !== messageId,
-        ),
-      }));
-    },
-    [],
-  );
+  const removeQueuedMessage = useCallback((threadId: string, messageId: string) => {
+    setQueuedByThread((prev) => ({
+      ...prev,
+      [threadId]: (prev[threadId] ?? []).filter((entry) => entry.id !== messageId),
+    }));
+  }, []);
 
   const prependQueuedMessage = useCallback((threadId: string, item: QueuedMessage) => {
     setQueuedByThread((prev) => ({
@@ -249,8 +236,7 @@ export function useQueuedSend({
       const command = parseSlashCommand(trimmed, appsEnabled);
       const nextImages = command ? [] : images;
       const nextMentions = command ? [] : appMentions;
-      const canSteerCurrentTurn =
-        isProcessing && steerEnabled && Boolean(activeTurnId);
+      const canSteerCurrentTurn = isProcessing && steerEnabled && Boolean(activeTurnId);
       const effectiveIntent: ComposerSendIntent = !isProcessing
         ? "default"
         : submitIntent === "queue"
@@ -285,16 +271,12 @@ export function useQueuedSend({
       const sendResult =
         nextMentions.length > 0
           ? await sendUserMessage(trimmed, nextImages, nextMentions, {
-            sendIntent: effectiveIntent,
-          })
+              sendIntent: effectiveIntent,
+            })
           : await sendUserMessage(trimmed, nextImages, undefined, {
-          sendIntent: effectiveIntent,
-          });
-      if (
-        sendResult.status === "steer_failed" &&
-        activeThreadId &&
-        isProcessing
-      ) {
+              sendIntent: effectiveIntent,
+            });
+      if (sendResult.status === "steer_failed" && activeThreadId && isProcessing) {
         enqueueMessage(activeThreadId, createQueuedItem(trimmed, nextImages, nextMentions));
       }
       clearActiveImages();
@@ -318,11 +300,7 @@ export function useQueuedSend({
   );
 
   const queueMessage = useCallback(
-    async (
-      text: string,
-      images: string[] = [],
-      appMentions: AppMention[] = [],
-    ) => {
+    async (text: string, images: string[] = [], appMentions: AppMention[] = []) => {
       const trimmed = text.trim();
       const command = parseSlashCommand(trimmed, appsEnabled);
       const nextImages = command ? [] : images;
@@ -340,14 +318,7 @@ export function useQueuedSend({
       enqueueMessage(activeThreadId, item);
       clearActiveImages();
     },
-    [
-      activeThreadId,
-      appsEnabled,
-      clearActiveImages,
-      createQueuedItem,
-      enqueueMessage,
-      isReviewing,
-    ],
+    [activeThreadId, appsEnabled, clearActiveImages, createQueuedItem, enqueueMessage, isReviewing],
   );
 
   useEffect(() => {
@@ -371,13 +342,7 @@ export function useQueuedSend({
       setInFlightByThread((prev) => ({ ...prev, [activeThreadId]: null }));
       setHasStartedByThread((prev) => ({ ...prev, [activeThreadId]: false }));
     }
-  }, [
-    activeThreadId,
-    hasStartedByThread,
-    inFlightByThread,
-    isProcessing,
-    isReviewing,
-  ]);
+  }, [activeThreadId, hasStartedByThread, inFlightByThread, isProcessing, isReviewing]);
 
   useEffect(() => {
     if (!activeThreadId || isProcessing || isReviewing || queueFlushPaused) {

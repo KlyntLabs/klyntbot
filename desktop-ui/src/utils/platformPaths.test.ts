@@ -19,10 +19,7 @@ function withNavigatorValues(
   const activeNavigator = globalScope.navigator as Navigator;
   const originalPlatform = Object.getOwnPropertyDescriptor(activeNavigator, "platform");
   const originalUserAgent = Object.getOwnPropertyDescriptor(activeNavigator, "userAgent");
-  const originalMaxTouchPoints = Object.getOwnPropertyDescriptor(
-    activeNavigator,
-    "maxTouchPoints",
-  );
+  const originalMaxTouchPoints = Object.getOwnPropertyDescriptor(activeNavigator, "maxTouchPoints");
   Object.defineProperty(activeNavigator, "platform", {
     configurable: true,
     value: values.platform ?? activeNavigator.platform ?? "",
@@ -64,8 +61,7 @@ describe("isMobilePlatform", () => {
     withNavigatorValues(
       {
         platform: "iPhone",
-        userAgent:
-          "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
+        userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15",
       },
       () => {
         expect(isMobilePlatform()).toBe(true);
@@ -77,8 +73,7 @@ describe("isMobilePlatform", () => {
     withNavigatorValues(
       {
         platform: "MacIntel",
-        userAgent:
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_0) AppleWebKit/537.36",
+        userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_0) AppleWebKit/537.36",
       },
       () => {
         expect(isMobilePlatform()).toBe(false);

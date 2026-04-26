@@ -10,9 +10,7 @@ export type PromptArgRange = {
 };
 
 function normalizeQuotes(input: string) {
-  return input
-    .replace(/[\u201C\u201D]/g, "\"")
-    .replace(/[\u2018\u2019]/g, "'");
+  return input.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
 }
 
 export function promptArgumentNames(content: string) {
@@ -108,7 +106,7 @@ function findPromptArgRangesInLine(line: string): PromptArgRange[] {
   const ranges: PromptArgRange[] = [];
   let index = 0;
   while (index < line.length) {
-    const assignIndex = normalized.indexOf("=\"", index);
+    const assignIndex = normalized.indexOf('="', index);
     if (assignIndex === -1) {
       break;
     }
@@ -117,7 +115,7 @@ function findPromptArgRangesInLine(line: string): PromptArgRange[] {
     let found = false;
     while (end < normalized.length) {
       const char = normalized[end];
-      if (char === "\"" && line[end - 1] !== "\\") {
+      if (char === '"' && line[end - 1] !== "\\") {
         found = true;
         break;
       }
@@ -225,9 +223,7 @@ type PromptArgsError =
   | { kind: "MissingAssignment"; token: string }
   | { kind: "MissingKey"; token: string };
 
-type PromptInputsResult =
-  | { values: Record<string, string> }
-  | { error: PromptArgsError };
+type PromptInputsResult = { values: Record<string, string> } | { error: PromptArgsError };
 
 function formatPromptArgsError(command: string, error: PromptArgsError) {
   if (error.kind === "MissingAssignment") {

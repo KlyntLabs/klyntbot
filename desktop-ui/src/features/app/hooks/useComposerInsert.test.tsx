@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
 import type { RefObject } from "react";
+import { describe, expect, it, vi } from "vitest";
 import { useComposerInsert } from "./useComposerInsert";
 
 describe("useComposerInsert", () => {

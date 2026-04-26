@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
 import type { RefObject } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 type UseComposerInsertArgs = {
   isEnabled: boolean;
@@ -37,11 +37,7 @@ export function useComposerInsert({
       const prefix = needsSpaceBefore ? " " : "";
       const suffix = needsSpaceAfter ? " " : "";
       const nextText = `${before}${prefix}${insertText}${suffix}${after}`;
-      const cursor =
-        before.length +
-        prefix.length +
-        insertText.length +
-        (needsSpaceAfter ? 1 : 0);
+      const cursor = before.length + prefix.length + insertText.length + (needsSpaceAfter ? 1 : 0);
       const focusComposer = () => {
         const node = textareaRef.current;
         if (!node) {

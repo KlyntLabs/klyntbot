@@ -1,7 +1,7 @@
-import { useCallback } from "react";
-import type { Dispatch } from "react";
-import type { ThreadAction } from "./useThreadsReducer";
 import { asString, normalizeStringList } from "@threads/utils/threadNormalize";
+import type { Dispatch } from "react";
+import { useCallback } from "react";
+import type { ThreadAction } from "./useThreadsReducer";
 
 type UseThreadLinkingOptions = {
   dispatch: Dispatch<ThreadAction>;
@@ -144,14 +144,9 @@ export function useThreadLinking({
   );
 
   const applyCollabThreadLinks = useCallback(
-    (
-      workspaceId: string,
-      fallbackThreadId: string,
-      item: Record<string, unknown>,
-    ) => {
+    (workspaceId: string, fallbackThreadId: string, item: Record<string, unknown>) => {
       const itemType = asString(item?.type ?? "");
-      const isCollabType =
-        itemType === "collabToolCall" || itemType === "collabAgentToolCall";
+      const isCollabType = itemType === "collabToolCall" || itemType === "collabAgentToolCall";
       if (!isCollabType && !hasCollabLinkHints(item)) {
         return;
       }
@@ -171,9 +166,7 @@ export function useThreadLinking({
               : [],
           ),
           ...normalizeThreadIdsFromAgentRefs(item.receiverAgents ?? item.receiver_agents),
-          ...normalizeThreadIdsFromAgentStatuses(
-            item.agentStatuses ?? item.agent_statuses,
-          ),
+          ...normalizeThreadIdsFromAgentStatuses(item.agentStatuses ?? item.agent_statuses),
           ...normalizeThreadIdsFromStatusMap(item.statuses),
           ...normalizeThreadIdsFromStatusMap(
             item.agentStatus ?? item.agentsStates ?? item.agents_states,
@@ -192,11 +185,7 @@ export function useThreadLinking({
   );
 
   const applyCollabThreadLinksFromThread = useCallback(
-    (
-      workspaceId: string,
-      fallbackThreadId: string,
-      thread: Record<string, unknown>,
-    ) => {
+    (workspaceId: string, fallbackThreadId: string, thread: Record<string, unknown>) => {
       const turns = Array.isArray(thread.turns) ? thread.turns : [];
       turns.forEach((turn) => {
         const turnRecord = turn as Record<string, unknown>;

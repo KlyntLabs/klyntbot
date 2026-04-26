@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
+
+import { subscribeAppServerEvents } from "@services/events";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppServerEvent } from "@/types";
-import { subscribeAppServerEvents } from "@services/events";
 import { useAppServerEvents } from "./useAppServerEvents";
 
 vi.mock("../../../services/events", () => ({
@@ -116,12 +117,7 @@ describe("useAppServerEvents", () => {
         },
       });
     });
-    expect(handlers.onPlanDelta).toHaveBeenCalledWith(
-      "ws-1",
-      "thread-1",
-      "plan-1",
-      "- Step 1",
-    );
+    expect(handlers.onPlanDelta).toHaveBeenCalledWith("ws-1", "thread-1", "plan-1", "- Step 1");
 
     act(() => {
       listener?.({
@@ -199,11 +195,9 @@ describe("useAppServerEvents", () => {
         },
       });
     });
-    expect(handlers.onThreadStatusChanged).toHaveBeenCalledWith(
-      "ws-1",
-      "thread-2",
-      { type: "active" },
-    );
+    expect(handlers.onThreadStatusChanged).toHaveBeenCalledWith("ws-1", "thread-2", {
+      type: "active",
+    });
 
     act(() => {
       listener?.({
@@ -247,11 +241,7 @@ describe("useAppServerEvents", () => {
         },
       });
     });
-    expect(handlers.onBackgroundThreadAction).toHaveBeenCalledWith(
-      "ws-1",
-      "thread-2",
-      "hide",
-    );
+    expect(handlers.onBackgroundThreadAction).toHaveBeenCalledWith("ws-1", "thread-2", "hide");
 
     act(() => {
       listener?.({
@@ -529,11 +519,9 @@ describe("useAppServerEvents", () => {
       });
     });
 
-    expect(handlers.onThreadStatusChanged).toHaveBeenCalledWith(
-      "ws-1",
-      "thread-1",
-      { type: "idle" },
-    );
+    expect(handlers.onThreadStatusChanged).toHaveBeenCalledWith("ws-1", "thread-1", {
+      type: "idle",
+    });
 
     await act(async () => {
       root.unmount();

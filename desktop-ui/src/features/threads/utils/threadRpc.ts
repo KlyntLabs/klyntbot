@@ -20,10 +20,7 @@ function firstNonEmptyString(...values: unknown[]): string | null {
 }
 
 function normalizeSubagentKind(value: string): string {
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[\s-]/g, "_");
+  const normalized = value.trim().toLowerCase().replace(/[\s-]/g, "_");
   if (normalized.startsWith("subagent_")) {
     return normalized.slice("subagent_".length);
   }
@@ -44,8 +41,7 @@ function getSubagentKind(source: unknown): string | null {
     return null;
   }
 
-  const subAgentRaw =
-    sourceRecord.subAgent ?? sourceRecord.sub_agent ?? sourceRecord.subagent;
+  const subAgentRaw = sourceRecord.subAgent ?? sourceRecord.sub_agent ?? sourceRecord.subagent;
   if (typeof subAgentRaw === "string") {
     const normalized = normalizeSubagentKind(subAgentRaw);
     return normalized || null;
@@ -57,10 +53,7 @@ function getSubagentKind(source: unknown): string | null {
   }
 
   const explicitKind = asString(
-    subAgentRecord.kind ??
-      subAgentRecord.type ??
-      subAgentRecord.name ??
-      subAgentRecord.id,
+    subAgentRecord.kind ?? subAgentRecord.type ?? subAgentRecord.name ?? subAgentRecord.id,
   );
   if (explicitKind) {
     const normalized = normalizeSubagentKind(explicitKind);
@@ -88,8 +81,7 @@ export function isSubagentThreadSource(source: unknown): boolean {
     return false;
   }
 
-  const subAgent =
-    sourceRecord.subAgent ?? sourceRecord.sub_agent ?? sourceRecord.subagent;
+  const subAgent = sourceRecord.subAgent ?? sourceRecord.sub_agent ?? sourceRecord.subagent;
   if (subAgent === null || subAgent === undefined) {
     return false;
   }
@@ -122,15 +114,11 @@ export function getParentThreadIdFromSource(source: unknown): string | null {
   if (!threadSpawn) {
     return null;
   }
-  const parentId = asString(
-    threadSpawn.parent_thread_id ?? threadSpawn.parentThreadId,
-  );
+  const parentId = asString(threadSpawn.parent_thread_id ?? threadSpawn.parentThreadId);
   return parentId || null;
 }
 
-export function getParentThreadIdFromThread(
-  thread: Record<string, unknown>,
-): string | null {
+export function getParentThreadIdFromThread(thread: Record<string, unknown>): string | null {
   const sourceParentId = getParentThreadIdFromSource(thread.source);
   if (sourceParentId) {
     return sourceParentId;
@@ -147,30 +135,22 @@ export function getParentThreadIdFromThread(
     return directParentId;
   }
   const spawnRaw =
-    thread.threadSpawn ??
-    thread.thread_spawn ??
-    thread.spawn ??
-    thread.subAgent ??
-    thread.subagent;
+    thread.threadSpawn ?? thread.thread_spawn ?? thread.spawn ?? thread.subAgent ?? thread.subagent;
   const spawn =
-    spawnRaw && typeof spawnRaw === "object"
-      ? (spawnRaw as Record<string, unknown>)
-      : null;
+    spawnRaw && typeof spawnRaw === "object" ? (spawnRaw as Record<string, unknown>) : null;
   if (!spawn) {
     return null;
   }
   const spawnParentId = asString(
-    spawn.parentThreadId ??
-      spawn.parent_thread_id ??
-      spawn.parentId ??
-      spawn.parent_id,
+    spawn.parentThreadId ?? spawn.parent_thread_id ?? spawn.parentId ?? spawn.parent_id,
   );
   return spawnParentId || null;
 }
 
-export function getSubagentMetadataFromThread(
-  thread: Record<string, unknown>,
-): { nickname: string | null; role: string | null } {
+export function getSubagentMetadataFromThread(thread: Record<string, unknown>): {
+  nickname: string | null;
+  role: string | null;
+} {
   const sourceRecord = asRecord(thread.source);
   const subAgent = asRecord(
     sourceRecord?.subAgent ?? sourceRecord?.sub_agent ?? sourceRecord?.subagent,
@@ -288,15 +268,12 @@ function classifyTurnStatus(status: string): TurnStatusKind {
   return "unknown";
 }
 
-function getExplicitActiveTurnState(
-  thread: Record<string, unknown>,
-): {
+function getExplicitActiveTurnState(thread: Record<string, unknown>): {
   explicit: boolean;
   activeTurnId: string | null;
   activeTurnStartedAtMs: number | null;
 } {
-  const hasExplicitTurnId =
-    "activeTurnId" in thread || "active_turn_id" in thread;
+  const hasExplicitTurnId = "activeTurnId" in thread || "active_turn_id" in thread;
   const activeTurnId = asString(thread.activeTurnId ?? thread.active_turn_id).trim();
   if (hasExplicitTurnId) {
     return {
@@ -307,10 +284,7 @@ function getExplicitActiveTurnState(
   }
 
   const activeTurnRaw =
-    thread.activeTurn ??
-    thread.active_turn ??
-    thread.currentTurn ??
-    thread.current_turn;
+    thread.activeTurn ?? thread.active_turn ?? thread.currentTurn ?? thread.current_turn;
   const hasExplicitTurnObject =
     "activeTurn" in thread ||
     "active_turn" in thread ||
@@ -324,9 +298,7 @@ function getExplicitActiveTurnState(
       activeTurnStartedAtMs: null,
     };
   }
-  const objectTurnId = asString(
-    activeTurn?.id ?? activeTurn?.turnId ?? activeTurn?.turn_id,
-  ).trim();
+  const objectTurnId = asString(activeTurn?.id ?? activeTurn?.turnId ?? activeTurn?.turn_id).trim();
   return {
     explicit: true,
     activeTurnId: objectTurnId || null,
@@ -334,9 +306,7 @@ function getExplicitActiveTurnState(
   };
 }
 
-export function getResumedTurnState(
-  thread: Record<string, unknown>,
-): ResumedTurnState {
+export function getResumedTurnState(thread: Record<string, unknown>): ResumedTurnState {
   const explicitState = getExplicitActiveTurnState(thread);
   if (explicitState.explicit) {
     return {
@@ -346,9 +316,7 @@ export function getResumedTurnState(
     };
   }
 
-  const turns = Array.isArray(thread.turns)
-    ? (thread.turns as Array<Record<string, unknown>>)
-    : [];
+  const turns = Array.isArray(thread.turns) ? (thread.turns as Array<Record<string, unknown>>) : [];
   let sawTerminalStatus = false;
   let sawUnknownStatus = false;
   for (let index = turns.length - 1; index >= 0; index -= 1) {
@@ -358,9 +326,7 @@ export function getResumedTurnState(
       continue;
     }
     const status = classifyTurnStatus(
-      normalizeTurnStatus(
-        turn.status ?? turn.turnStatus ?? turn.turn_status,
-      ),
+      normalizeTurnStatus(turn.status ?? turn.turnStatus ?? turn.turn_status),
     );
     if (status === "active") {
       const turnId = asString(turn.id ?? turn.turnId ?? turn.turn_id).trim();

@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { PanelTabs, type PanelTabId } from "./PanelTabs";
+import { type PanelTabId, PanelTabs } from "./PanelTabs";
 
 function PanelTabsHarness() {
   const [active, setActive] = useState<PanelTabId>("git");

@@ -1,11 +1,11 @@
+import { isTauri } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { isWindowsPlatform } from "@utils/platformPaths";
 import Copy from "lucide-react/dist/esm/icons/copy";
 import Minus from "lucide-react/dist/esm/icons/minus";
 import Square from "lucide-react/dist/esm/icons/square";
 import X from "lucide-react/dist/esm/icons/x";
-import { isTauri } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
-import { isWindowsPlatform } from "@utils/platformPaths";
 
 function currentWindowSafe() {
   try {

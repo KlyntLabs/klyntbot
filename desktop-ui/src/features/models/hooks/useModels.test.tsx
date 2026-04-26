@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+
+import { getConfigModel, getModelList } from "@services/tauri";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceInfo } from "@/types";
-import { getConfigModel, getModelList } from "@services/tauri";
 import { useModels } from "./useModels";
 
 vi.mock("../../../services/tauri", () => ({
@@ -40,9 +41,7 @@ describe("useModels", () => {
     });
     vi.mocked(getConfigModel).mockResolvedValueOnce("custom-model");
 
-    const { result } = renderHook(() =>
-      useModels({ activeWorkspace: workspace }),
-    );
+    const { result } = renderHook(() => useModels({ activeWorkspace: workspace }));
 
     await waitFor(() => expect(result.current.models.length).toBeGreaterThan(0));
 
@@ -75,9 +74,7 @@ describe("useModels", () => {
     });
     vi.mocked(getConfigModel).mockResolvedValueOnce("custom-model");
 
-    const { result } = renderHook(() =>
-      useModels({ activeWorkspace: workspace }),
-    );
+    const { result } = renderHook(() => useModels({ activeWorkspace: workspace }));
 
     await waitFor(() => expect(result.current.selectedModelId).toBe("provider-id"));
 
@@ -106,9 +103,7 @@ describe("useModels", () => {
     });
     vi.mocked(getConfigModel).mockResolvedValueOnce("custom-model");
 
-    const { result } = renderHook(() =>
-      useModels({ activeWorkspace: workspace }),
-    );
+    const { result } = renderHook(() => useModels({ activeWorkspace: workspace }));
 
     await waitFor(() => expect(result.current.models.length).toBeGreaterThan(1));
 

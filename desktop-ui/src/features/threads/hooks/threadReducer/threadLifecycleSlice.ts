@@ -14,10 +14,7 @@ function statusEquals(previous: ThreadStatus, nextStatus: ThreadStatus) {
   );
 }
 
-export function reduceThreadLifecycle(
-  state: ThreadState,
-  action: ThreadAction,
-): ThreadState {
+export function reduceThreadLifecycle(state: ThreadState, action: ThreadAction): ThreadState {
   switch (action.type) {
     case "setActiveThreadId":
       return {
@@ -30,24 +27,19 @@ export function reduceThreadLifecycle(
           ? {
               ...state.threadStatusById,
               [action.threadId]: {
-                isProcessing:
-                  state.threadStatusById[action.threadId]?.isProcessing ?? false,
+                isProcessing: state.threadStatusById[action.threadId]?.isProcessing ?? false,
                 hasUnread: false,
-                isReviewing:
-                  state.threadStatusById[action.threadId]?.isReviewing ?? false,
+                isReviewing: state.threadStatusById[action.threadId]?.isReviewing ?? false,
                 processingStartedAt:
-                  state.threadStatusById[action.threadId]?.processingStartedAt ??
-                  null,
-                lastDurationMs:
-                  state.threadStatusById[action.threadId]?.lastDurationMs ?? null,
+                  state.threadStatusById[action.threadId]?.processingStartedAt ?? null,
+                lastDurationMs: state.threadStatusById[action.threadId]?.lastDurationMs ?? null,
               },
             }
           : state.threadStatusById,
       };
     case "ensureThread": {
       const hidden =
-        state.hiddenThreadIdsByWorkspace[action.workspaceId]?.[action.threadId] ??
-        false;
+        state.hiddenThreadIdsByWorkspace[action.workspaceId]?.[action.threadId] ?? false;
       if (hidden) {
         return state;
       }
@@ -84,8 +76,7 @@ export function reduceThreadLifecycle(
       };
     }
     case "hideThread": {
-      const hiddenForWorkspace =
-        state.hiddenThreadIdsByWorkspace[action.workspaceId] ?? {};
+      const hiddenForWorkspace = state.hiddenThreadIdsByWorkspace[action.workspaceId] ?? {};
       if (hiddenForWorkspace[action.threadId]) {
         return state;
       }
@@ -99,8 +90,8 @@ export function reduceThreadLifecycle(
       const filtered = list.filter((thread) => thread.id !== action.threadId);
       const nextActive =
         state.activeThreadIdByWorkspace[action.workspaceId] === action.threadId
-          ? filtered[0]?.id ?? null
-          : state.activeThreadIdByWorkspace[action.workspaceId] ?? null;
+          ? (filtered[0]?.id ?? null)
+          : (state.activeThreadIdByWorkspace[action.workspaceId] ?? null);
 
       return {
         ...state,
@@ -123,8 +114,8 @@ export function reduceThreadLifecycle(
       const filtered = list.filter((thread) => thread.id !== action.threadId);
       const nextActive =
         state.activeThreadIdByWorkspace[action.workspaceId] === action.threadId
-          ? filtered[0]?.id ?? null
-          : state.activeThreadIdByWorkspace[action.workspaceId] ?? null;
+          ? (filtered[0]?.id ?? null)
+          : (state.activeThreadIdByWorkspace[action.workspaceId] ?? null);
       const { [action.threadId]: _, ...restItems } = state.itemsByThread;
       const { [action.threadId]: __, ...restStatus } = state.threadStatusById;
       const { [action.threadId]: ___, ...restTurns } = state.activeTurnIdByThread;
@@ -172,8 +163,7 @@ export function reduceThreadLifecycle(
       const hasUnread = previous?.hasUnread ?? false;
       const isReviewing = previous?.isReviewing ?? false;
       if (action.isProcessing) {
-        const nextStartedAt =
-          wasProcessing && startedAt ? startedAt : action.timestamp;
+        const nextStartedAt = wasProcessing && startedAt ? startedAt : action.timestamp;
         const nextStatus: ThreadStatus = {
           isProcessing: true,
           hasUnread,
@@ -195,7 +185,7 @@ export function reduceThreadLifecycle(
       const nextDuration =
         wasProcessing && startedAt
           ? Math.max(0, action.timestamp - startedAt)
-          : lastDurationMs ?? null;
+          : (lastDurationMs ?? null);
       const nextStatus: ThreadStatus = {
         isProcessing: false,
         hasUnread,
@@ -298,7 +288,9 @@ export function reduceThreadLifecycle(
         }
         const patchEntries = Object.entries(action.patch).filter(
           ([, value]) => value !== undefined,
-        ) as Array<[keyof typeof action.patch, NonNullable<(typeof action.patch)[keyof typeof action.patch]>]>;
+        ) as Array<
+          [keyof typeof action.patch, NonNullable<(typeof action.patch)[keyof typeof action.patch]>]
+        >;
         if (!patchEntries.length) {
           return thread;
         }
@@ -365,8 +357,7 @@ export function reduceThreadLifecycle(
       const visibleThreads = action.threads.filter((thread) => !hidden[thread.id]);
       const preserveAnchors = action.preserveAnchors === true;
       if (!preserveAnchors) {
-        const currentActiveThreadId =
-          state.activeThreadIdByWorkspace[action.workspaceId] ?? null;
+        const currentActiveThreadId = state.activeThreadIdByWorkspace[action.workspaceId] ?? null;
         const activeThreadStillVisible = currentActiveThreadId
           ? visibleThreads.some((thread) => thread.id === currentActiveThreadId)
           : false;
@@ -389,16 +380,12 @@ export function reduceThreadLifecycle(
         };
       }
       const existingThreads = state.threadsByWorkspace[action.workspaceId] ?? [];
-      const existingById = new Map(
-        existingThreads.map((thread) => [thread.id, thread] as const),
-      );
+      const existingById = new Map(existingThreads.map((thread) => [thread.id, thread] as const));
       const reconciled = [...visibleThreads];
       const includedIds = new Set(reconciled.map((thread) => thread.id));
       const freshenAnchorSummary = (summary: ThreadSummary) => {
-        const lastMessageTimestamp =
-          state.lastAgentMessageByThread[summary.id]?.timestamp ?? 0;
-        const processingStartedAt =
-          state.threadStatusById[summary.id]?.processingStartedAt ?? 0;
+        const lastMessageTimestamp = state.lastAgentMessageByThread[summary.id]?.timestamp ?? 0;
+        const processingStartedAt = state.threadStatusById[summary.id]?.processingStartedAt ?? 0;
         const nextUpdatedAt = Math.max(
           summary.updatedAt ?? 0,
           lastMessageTimestamp,

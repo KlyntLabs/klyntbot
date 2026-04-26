@@ -348,9 +348,7 @@ describe("threadItems", () => {
     if (prepared[0].kind === "explore") {
       expect(prepared[0].entries).toHaveLength(1);
       expect(prepared[0].entries[0].kind).toBe("read");
-      expect(prepared[0].entries[0].detail ?? prepared[0].entries[0].label).toBe(
-        "src/foo.ts",
-      );
+      expect(prepared[0].entries[0].detail ?? prepared[0].entries[0].label).toBe("src/foo.ts");
     }
   });
 
@@ -373,9 +371,7 @@ describe("threadItems", () => {
     if (prepared[0].kind === "explore") {
       expect(prepared[0].entries).toHaveLength(1);
       expect(prepared[0].entries[0].kind).toBe("read");
-      expect(prepared[0].entries[0].detail ?? prepared[0].entries[0].label).toBe(
-        "src/foo.ts",
-      );
+      expect(prepared[0].entries[0].detail ?? prepared[0].entries[0].label).toBe("src/foo.ts");
     }
   });
 
@@ -914,5 +910,4 @@ describe("threadItems", () => {
     const timestamp = getThreadCreatedTimestamp({ created_at: "2025-01-01T00:00:00Z" });
     expect(timestamp).toBe(Date.parse("2025-01-01T00:00:00Z"));
   });
-
 });

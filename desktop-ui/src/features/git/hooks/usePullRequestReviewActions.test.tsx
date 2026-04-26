@@ -50,9 +50,7 @@ const comments: GitHubPullRequestComment[] = [
   },
 ];
 
-function renderActions(
-  overrides: Partial<Parameters<typeof usePullRequestReviewActions>[0]> = {},
-) {
+function renderActions(overrides: Partial<Parameters<typeof usePullRequestReviewActions>[0]> = {}) {
   const options: Parameters<typeof usePullRequestReviewActions>[0] = {
     activeWorkspace: workspace,
     activeThreadId: "thread-active",
@@ -116,11 +114,12 @@ describe("usePullRequestReviewActions", () => {
   });
 
   it("prevents concurrent review launches from creating duplicate threads", async () => {
-    const startThreadForWorkspace = vi
-      .fn()
-      .mockImplementation(() => new Promise<string>((resolve) => {
-        setTimeout(() => resolve("thread-new"), 30);
-      }));
+    const startThreadForWorkspace = vi.fn().mockImplementation(
+      () =>
+        new Promise<string>((resolve) => {
+          setTimeout(() => resolve("thread-new"), 30);
+        }),
+    );
     const { result, options } = renderActions({ startThreadForWorkspace });
 
     await act(async () => {

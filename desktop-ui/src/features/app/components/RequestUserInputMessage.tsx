@@ -1,17 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import type {
-  RequestUserInputRequest,
-  RequestUserInputResponse,
-} from "@/types";
+import type { RequestUserInputRequest, RequestUserInputResponse } from "@/types";
 
 type RequestUserInputMessageProps = {
   requests: RequestUserInputRequest[];
   activeThreadId: string | null;
   activeWorkspaceId?: string | null;
-  onSubmit: (
-    request: RequestUserInputRequest,
-    response: RequestUserInputResponse,
-  ) => void;
+  onSubmit: (request: RequestUserInputRequest, response: RequestUserInputResponse) => void;
 };
 
 type SelectionState = Record<string, number | null>;
@@ -80,8 +74,7 @@ export function RequestUserInputMessage({
       const hasOptions = options.length > 0;
       if (hasOptions && selectedIndex !== null) {
         const selected = options[selectedIndex];
-        const selectedValue =
-          selected?.label?.trim() || selected?.description?.trim() || "";
+        const selectedValue = selected?.label?.trim() || selected?.description?.trim() || "";
         if (selectedValue) {
           answerList.push(selectedValue);
         }
@@ -121,9 +114,7 @@ export function RequestUserInputMessage({
         <div className="request-user-input-header">
           <div className="request-user-input-title">Input requested</div>
           {totalRequests > 1 ? (
-            <div className="request-user-input-queue">
-              {`Request 1 of ${totalRequests}`}
-            </div>
+            <div className="request-user-input-queue">{`Request 1 of ${totalRequests}`}</div>
           ) : null}
         </div>
         <div className="request-user-input-body">
@@ -135,18 +126,14 @@ export function RequestUserInputMessage({
               const notePlaceholder = question.isOther
                 ? "Type your answer (optional)"
                 : options.length
-                ? "Add notes (optional)"
-                : "Type your answer (optional)";
+                  ? "Add notes (optional)"
+                  : "Type your answer (optional)";
               return (
                 <section key={questionId} className="request-user-input-question">
                   {question.header ? (
-                    <div className="request-user-input-question-header">
-                      {question.header}
-                    </div>
+                    <div className="request-user-input-question-header">{question.header}</div>
                   ) : null}
-                  <div className="request-user-input-question-text">
-                    {question.question}
-                  </div>
+                  <div className="request-user-input-question-text">{question.question}</div>
                   {options.length ? (
                     <div className="request-user-input-options">
                       {options.map((option, optionIndex) => (
@@ -158,9 +145,7 @@ export function RequestUserInputMessage({
                           }`}
                           onClick={() => handleSelect(questionId, optionIndex)}
                         >
-                          <div className="request-user-input-option-label">
-                            {option.label}
-                          </div>
+                          <div className="request-user-input-option-label">{option.label}</div>
                           {option.description ? (
                             <div className="request-user-input-option-description">
                               {option.description}
@@ -174,18 +159,14 @@ export function RequestUserInputMessage({
                     className="request-user-input-notes"
                     placeholder={notePlaceholder}
                     value={notes[questionId] ?? ""}
-                    onChange={(event) =>
-                      handleNotesChange(questionId, event.target.value)
-                    }
+                    onChange={(event) => handleNotesChange(questionId, event.target.value)}
                     rows={2}
                   />
                 </section>
               );
             })
           ) : (
-            <div className="request-user-input-empty">
-              No questions provided.
-            </div>
+            <div className="request-user-input-empty">No questions provided.</div>
           )}
         </div>
         <div className="request-user-input-actions">

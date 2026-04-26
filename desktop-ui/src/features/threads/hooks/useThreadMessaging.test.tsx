@@ -1,16 +1,17 @@
 /** @vitest-environment jsdom */
-import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import * as Sentry from "@sentry/react";
 import {
-  sendUserMessage as sendUserMessageService,
-  steerTurn as steerTurnService,
-  startReview as startReviewService,
-  interruptTurn as interruptTurnService,
-  getAppsList as getAppsListService,
-  listMcpServerStatus as listMcpServerStatusService,
   compactThread as compactThreadService,
+  getAppsList as getAppsListService,
+  interruptTurn as interruptTurnService,
+  listMcpServerStatus as listMcpServerStatusService,
+  sendUserMessage as sendUserMessageService,
+  startReview as startReviewService,
+  steerTurn as steerTurnService,
 } from "@services/tauri";
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceInfo } from "@/types";
 import { useThreadMessaging } from "./useThreadMessaging";
 
@@ -73,13 +74,11 @@ describe("useThreadMessaging telemetry", () => {
         turn: { id: "turn-1" },
       },
     } as unknown as Awaited<ReturnType<typeof sendUserMessageService>>);
-    vi.mocked(steerTurnService).mockResolvedValue(
-      {
-        result: {
-          turnId: "turn-1",
-        },
-      } as unknown as Awaited<ReturnType<typeof steerTurnService>>,
-    );
+    vi.mocked(steerTurnService).mockResolvedValue({
+      result: {
+        turnId: "turn-1",
+      },
+    } as unknown as Awaited<ReturnType<typeof steerTurnService>>);
     vi.mocked(startReviewService).mockResolvedValue(
       {} as Awaited<ReturnType<typeof startReviewService>>,
     );
@@ -133,12 +132,7 @@ describe("useThreadMessaging telemetry", () => {
     );
 
     await act(async () => {
-      await result.current.sendUserMessageToThread(
-        workspace,
-        "thread-1",
-        "hello",
-        [],
-      );
+      await result.current.sendUserMessageToThread(workspace, "thread-1", "hello", []);
     });
 
     expect(Sentry.metrics.count).toHaveBeenCalledTimes(1);
@@ -192,9 +186,11 @@ describe("useThreadMessaging telemetry", () => {
     );
 
     await act(async () => {
-      await result.current.sendUserMessage("hello $calendar", [], [
-        { name: "Calendar App", path: "app://connector_calendar" },
-      ]);
+      await result.current.sendUserMessage(
+        "hello $calendar",
+        [],
+        [{ name: "Calendar App", path: "app://connector_calendar" }],
+      );
     });
 
     expect(sendUserMessageService).toHaveBeenCalledWith(
@@ -445,26 +441,13 @@ describe("useThreadMessaging telemetry", () => {
     );
 
     await act(async () => {
-      await result.current.sendUserMessageToThread(
-        workspace,
-        "thread-1",
-        "steer this",
-        [],
-      );
+      await result.current.sendUserMessageToThread(workspace, "thread-1", "steer this", []);
     });
 
-    expect(steerTurnService).toHaveBeenCalledWith(
-      "ws-1",
-      "thread-1",
-      "turn-1",
-      "steer this",
-      [],
-    );
+    expect(steerTurnService).toHaveBeenCalledWith("ws-1", "thread-1", "turn-1", "steer this", []);
     expect(sendUserMessageService).not.toHaveBeenCalled();
     expect(ensureWorkspaceRuntimeCodexArgs).not.toHaveBeenCalled();
-    expect(dispatch).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: "upsertItem" }),
-    );
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: "upsertItem" }));
   });
 
   it("resets stale processing state when turn/steer reports no active turn", async () => {
@@ -613,9 +596,7 @@ describe("useThreadMessaging telemetry", () => {
     const pushThreadErrorMessage = vi.fn();
     const markProcessing = vi.fn();
     const setActiveTurnId = vi.fn();
-    vi.mocked(steerTurnService).mockRejectedValueOnce(
-      new Error("steer network failure"),
-    );
+    vi.mocked(steerTurnService).mockRejectedValueOnce(new Error("steer network failure"));
 
     const { result } = renderHook(() =>
       useThreadMessaging({

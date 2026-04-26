@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
+
+import { openWorkspaceIn } from "@services/tauri";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { openWorkspaceIn } from "@services/tauri";
 import { fileTarget } from "../test/fileLinkAssertions";
 import { useFileLinkOpener } from "./useFileLinkOpener";
 

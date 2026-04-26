@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  collectMentionNames,
-  connectorMentionSlug,
-  resolveBoundAppMentions,
-} from "./appMentions";
+import { collectMentionNames, connectorMentionSlug, resolveBoundAppMentions } from "./appMentions";
 
 describe("connectorMentionSlug", () => {
   it("normalizes connector labels to mention slugs", () => {
@@ -25,9 +21,7 @@ describe("resolveBoundAppMentions", () => {
       },
     ]);
 
-    expect(mentions).toEqual([
-      { name: "Calendar App", path: "app://connector_calendar" },
-    ]);
+    expect(mentions).toEqual([{ name: "Calendar App", path: "app://connector_calendar" }]);
   });
 
   it("collects mention names with valid boundaries", () => {

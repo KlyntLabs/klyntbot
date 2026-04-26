@@ -1,21 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RefObject } from "react";
-import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { Terminal } from "@xterm/xterm";
+import type { RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@xterm/xterm/css/xterm.css";
-import type { DebugEntry, TerminalStatus, WorkspaceInfo } from "@/types";
-import { buildErrorDebugEntry } from "@utils/debugEntries";
 import {
   subscribeTerminalExit,
   subscribeTerminalOutput,
   type TerminalExitEvent,
   type TerminalOutputEvent,
 } from "@services/events";
-import {
-  openTerminalSession,
-  resizeTerminalSession,
-  writeTerminalSession,
-} from "@services/tauri";
+import { openTerminalSession, resizeTerminalSession, writeTerminalSession } from "@services/tauri";
+import { buildErrorDebugEntry } from "@utils/debugEntries";
+import type { DebugEntry, TerminalStatus, WorkspaceInfo } from "@/types";
 
 const MAX_BUFFER_CHARS = 200_000;
 
@@ -77,7 +73,7 @@ function getTerminalAppearance(container: HTMLElement | null): TerminalAppearanc
         foreground: "#d9dee7",
         cursor: "#d9dee7",
       },
-      fontFamily: "Menlo, Monaco, \"Courier New\", monospace",
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     };
   }
 
@@ -92,13 +88,12 @@ function getTerminalAppearance(container: HTMLElement | null): TerminalAppearanc
     styles.getPropertyValue("--terminal-foreground").trim() ||
     styles.getPropertyValue("--text-stronger").trim() ||
     "#d9dee7";
-  const cursor =
-    styles.getPropertyValue("--terminal-cursor").trim() || foreground;
+  const cursor = styles.getPropertyValue("--terminal-cursor").trim() || foreground;
   const selection = styles.getPropertyValue("--terminal-selection").trim();
   const fontFamily =
     styles.getPropertyValue("--terminal-font-family").trim() ||
     styles.getPropertyValue("--code-font-family").trim() ||
-    "Menlo, Monaco, \"Courier New\", monospace";
+    'Menlo, Monaco, "Courier New", monospace';
 
   return {
     theme: {
@@ -135,21 +130,24 @@ export function useTerminalSession({
   const [hasSession, setHasSession] = useState(false);
   const [readyKey, setReadyKey] = useState<string | null>(null);
   const [sessionResetCounter, setSessionResetCounter] = useState(0);
-  const cleanupTerminalSession = useCallback((workspaceId: string, terminalId: string) => {
-    const key = `${workspaceId}:${terminalId}`;
-    outputBuffersRef.current.delete(key);
-    openedSessionsRef.current.delete(key);
-    if (readyKey === key) {
-      setReadyKey(null);
-    }
-    setSessionResetCounter((prev) => prev + 1);
-    if (activeKeyRef.current === key) {
-      terminalRef.current?.reset();
-      setHasSession(false);
-      setStatus("idle");
-      setMessage("Open a terminal to start a session.");
-    }
-  }, [readyKey]);
+  const cleanupTerminalSession = useCallback(
+    (workspaceId: string, terminalId: string) => {
+      const key = `${workspaceId}:${terminalId}`;
+      outputBuffersRef.current.delete(key);
+      openedSessionsRef.current.delete(key);
+      if (readyKey === key) {
+        setReadyKey(null);
+      }
+      setSessionResetCounter((prev) => prev + 1);
+      if (activeKeyRef.current === key) {
+        terminalRef.current?.reset();
+        setHasSession(false);
+        setStatus("idle");
+        setMessage("Open a terminal to start a session.");
+      }
+    },
+    [readyKey],
+  );
 
   const activeKey = useMemo(() => {
     if (!activeWorkspace || !activeTerminalId) {

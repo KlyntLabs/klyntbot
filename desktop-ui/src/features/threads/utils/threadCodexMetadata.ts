@@ -24,10 +24,7 @@ function normalizeEffort(value: string | null): string | null {
   return normalized;
 }
 
-function pickString(
-  record: Record<string, unknown>,
-  keys: readonly string[],
-): string | null {
+function pickString(record: Record<string, unknown>, keys: readonly string[]): string | null {
   for (const key of keys) {
     const value = asString(record[key]);
     if (value) {
@@ -37,13 +34,7 @@ function pickString(
   return null;
 }
 
-const MODEL_KEYS = [
-  "modelId",
-  "model_id",
-  "model",
-  "modelName",
-  "model_name",
-] as const;
+const MODEL_KEYS = ["modelId", "model_id", "model", "modelName", "model_name"] as const;
 
 const EFFORT_KEYS = [
   "effort",
@@ -101,9 +92,7 @@ function extractFromTurn(turn: Record<string, unknown>): {
   modelId = turnLevel.modelId;
   effort = turnLevel.effort;
 
-  const items = Array.isArray(turn.items)
-    ? (turn.items as unknown[])
-    : [];
+  const items = Array.isArray(turn.items) ? (turn.items as unknown[]) : [];
 
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = asRecord(items[index]);
@@ -132,9 +121,7 @@ export function extractThreadCodexMetadata(thread: Record<string, unknown>): {
   let modelId: string | null = null;
   let effort: string | null = null;
 
-  const turns = Array.isArray(thread.turns)
-    ? (thread.turns as unknown[])
-    : [];
+  const turns = Array.isArray(thread.turns) ? (thread.turns as unknown[]) : [];
   for (let index = turns.length - 1; index >= 0; index -= 1) {
     const turn = asRecord(turns[index]);
     if (!turn) {

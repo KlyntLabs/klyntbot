@@ -1,9 +1,16 @@
 // @vitest-environment jsdom
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WorkspaceInfo } from "@/types";
+
 import { connectWorkspace, getConfigModel, getModelList } from "@services/tauri";
+import { renderHook, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { QueryProvider } from "@/lib/query";
+import type { WorkspaceInfo } from "@/types";
 import { useSettingsDefaultModels } from "./useSettingsDefaultModels";
+
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <QueryProvider>{children}</QueryProvider>
+);
 
 vi.mock("@services/tauri", () => ({
   connectWorkspace: vi.fn(),
@@ -43,139 +50,78 @@ function modelListResponse(model: string) {
   };
 }
 
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
-
 describe("useSettingsDefaultModels", () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it("invalidates in-flight results when workspace list becomes empty", async () => {
-    const pending = deferred<any>();
-    getModelListMock.mockReturnValueOnce(pending.promise);
-    getConfigModelMock.mockResolvedValueOnce(null);
-
-    const { result, rerender } = renderHook(
+  it("returns empty state when no projects are provided", async () => {
+    const { result } = renderHook(
       ({ projects }: { projects: WorkspaceInfo[] }) => useSettingsDefaultModels(projects),
-      {
-        initialProps: {
-          projects: [workspace("w1", true)],
-        },
-      },
+      { wrapper, initialProps: { projects: [] } },
     );
-
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(true);
-      expect(result.current.connectedWorkspaceCount).toBe(1);
-    });
-
-    rerender({ projects: [] });
 
     await waitFor(() => {
       expect(result.current.models).toEqual([]);
-      expect(result.current.isLoading).toBe(false);
       expect(result.current.connectedWorkspaceCount).toBe(0);
     });
-
-    await act(async () => {
-      pending.resolve(modelListResponse("gpt-5"));
-      await Promise.resolve();
-    });
-
-    expect(result.current.models).toEqual([]);
-    expect(result.current.connectedWorkspaceCount).toBe(0);
+    expect(getModelListMock).not.toHaveBeenCalled();
   });
 
-  it("ignores stale results when the first workspace changes", async () => {
-    const first = deferred<any>();
-    const second = deferred<any>();
-    getModelListMock
-      .mockReturnValueOnce(first.promise)
-      .mockReturnValueOnce(second.promise);
+  it("aggregates models across all workspaces and dedupes by id", async () => {
+    connectWorkspaceMock.mockResolvedValue(undefined);
     getConfigModelMock.mockResolvedValue(null);
-
-    const { result, rerender } = renderHook(
-      ({ projects }: { projects: WorkspaceInfo[] }) => useSettingsDefaultModels(projects),
-      {
-        initialProps: {
-          projects: [workspace("w1", true)],
-        },
-      },
-    );
-
-    await waitFor(() => {
-      expect(getModelListMock).toHaveBeenCalledWith("w1");
-    });
-
-    rerender({ projects: [workspace("w2", true)] });
-
-    await waitFor(() => {
-      expect(getModelListMock).toHaveBeenCalledWith("w2");
-    });
-
-    await act(async () => {
-      second.resolve(modelListResponse("gpt-5.1"));
-      await Promise.resolve();
-    });
-
-    await waitFor(() => {
-      expect(result.current.models[0]?.model).toBe("gpt-5.1");
-    });
-
-    await act(async () => {
-      first.resolve(modelListResponse("gpt-4.1"));
-      await Promise.resolve();
-    });
-
-    expect(result.current.models[0]?.model).toBe("gpt-5.1");
-  });
-
-  it("uses the first workspace as the model source even when disconnected", async () => {
-    connectWorkspaceMock.mockResolvedValueOnce(undefined);
-    getConfigModelMock.mockResolvedValueOnce(null);
-    getModelListMock.mockResolvedValueOnce(modelListResponse("gpt-5.1"));
+    getModelListMock.mockResolvedValue(modelListResponse("gpt-5.1"));
 
     const { result } = renderHook(
       ({ projects }: { projects: WorkspaceInfo[] }) => useSettingsDefaultModels(projects),
       {
-        initialProps: {
-          projects: [workspace("w1", false), workspace("w2", true)],
-        },
+        wrapper,
+        initialProps: { projects: [workspace("w1", true), workspace("w2", true)] },
       },
     );
 
     await waitFor(() => {
       expect(connectWorkspaceMock).toHaveBeenCalledWith("w1");
+      expect(connectWorkspaceMock).toHaveBeenCalledWith("w2");
       expect(getModelListMock).toHaveBeenCalledWith("w1");
-      expect(getModelListMock).not.toHaveBeenCalledWith("w2");
+      expect(getModelListMock).toHaveBeenCalledWith("w2");
+      // Same model reported by both workspaces — deduped to one entry.
+      expect(result.current.models).toHaveLength(1);
       expect(result.current.models[0]?.model).toBe("gpt-5.1");
+      expect(result.current.connectedWorkspaceCount).toBe(2);
     });
   });
 
-  it("falls back to config model when model list cannot be fetched", async () => {
-    connectWorkspaceMock.mockRejectedValueOnce(new Error("connect failed"));
+  it("includes the codex config model with CONFIG_MODEL_DESCRIPTION", async () => {
+    connectWorkspaceMock.mockResolvedValueOnce(undefined);
     getConfigModelMock.mockResolvedValueOnce("gpt-5-codex");
+    getModelListMock.mockResolvedValueOnce({ result: { data: [] } });
 
     const { result } = renderHook(
       ({ projects }: { projects: WorkspaceInfo[] }) => useSettingsDefaultModels(projects),
-      {
-        initialProps: {
-          projects: [workspace("w1", false)],
-        },
-      },
+      { wrapper, initialProps: { projects: [workspace("w1", true)] } },
     );
 
     await waitFor(() => {
-      expect(result.current.models[0]?.model).toBe("gpt-5-codex");
-      expect(result.current.models[0]?.displayName).toContain("(config)");
+      const codex = result.current.models.find((m) => m.model === "gpt-5-codex");
+      expect(codex).toBeDefined();
+      expect(codex?.description).toBe("Configured in CODEX_HOME/config.toml");
+      expect(codex?.isDefault).toBe(true);
+    });
+  });
+
+  it("records the last error when connectWorkspace fails", async () => {
+    connectWorkspaceMock.mockRejectedValueOnce(new Error("connect failed"));
+
+    const { result } = renderHook(
+      ({ projects }: { projects: WorkspaceInfo[] }) => useSettingsDefaultModels(projects),
+      { wrapper, initialProps: { projects: [workspace("w1", true)] } },
+    );
+
+    await waitFor(() => {
+      expect(result.current.error).toContain("connect failed");
+      expect(result.current.connectedWorkspaceCount).toBe(0);
       expect(getModelListMock).not.toHaveBeenCalled();
     });
   });

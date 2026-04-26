@@ -1,10 +1,10 @@
-import type { AppSettings, DictationModelStatus } from "@/types";
+import { formatDownloadSize } from "@utils/formatting";
 import {
   SettingsSection,
   SettingsToggleRow,
   SettingsToggleSwitch,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
-import { formatDownloadSize } from "@utils/formatting";
+import type { AppSettings, DictationModelStatus } from "@/types";
 
 type DictationModelOption = {
   id: string;

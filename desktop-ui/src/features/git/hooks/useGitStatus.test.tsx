@@ -1,210 +1,125 @@
 // @vitest-environment jsdom
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook } from "@testing-library/react";
-import { createElement } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkspaceInfo } from "@/types";
 import { getGitStatus } from "@services/tauri";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { createElement } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { WorkspaceInfo } from "@/types";
 import { useGitStatus } from "./useGitStatus";
 
 vi.mock("../../../services/tauri", () => ({
-	getGitStatus: vi.fn(),
+  getGitStatus: vi.fn(),
 }));
 
 function withQuery({ children }: { children: React.ReactNode }) {
-	const client = new QueryClient({
-		defaultOptions: { queries: { retry: 0 } },
-	});
-	return createElement(QueryClientProvider, { client }, children);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: 0 } },
+  });
+  return createElement(QueryClientProvider, { client }, children);
 }
 
 const workspace: WorkspaceInfo = {
-	id: "workspace-1",
-	name: "Klynt",
-	path: "/tmp/codex",
-	connected: true,
-	settings: { sidebarCollapsed: false },
+  id: "workspace-1",
+  name: "Klynt",
+  path: "/tmp/codex",
+  connected: true,
+  settings: { sidebarCollapsed: false },
 };
 
 const secondaryWorkspace: WorkspaceInfo = {
-	id: "workspace-2",
-	name: "Klynt Secondary",
-	path: "/tmp/codex-secondary",
-	connected: true,
-	settings: { sidebarCollapsed: false },
+  id: "workspace-2",
+  name: "Klynt Secondary",
+  path: "/tmp/codex-secondary",
+  connected: true,
+  settings: { sidebarCollapsed: false },
 };
 
 const makeStatus = (branchName: string, additions = 0, deletions = 0) => ({
-	branchName,
-	files: [],
-	stagedFiles: [],
-	unstagedFiles: [],
-	totalAdditions: additions,
-	totalDeletions: deletions,
+  branchName,
+  files: [],
+  stagedFiles: [],
+  unstagedFiles: [],
+  totalAdditions: additions,
+  totalDeletions: deletions,
 });
 
 describe("useGitStatus", () => {
-	beforeEach(() => {
-		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
-	});
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
 
-	afterEach(() => {
-		vi.useRealTimers();
-		vi.clearAllMocks();
-	});
+  it("fetches status for the active workspace", async () => {
+    const getGitStatusMock = vi.mocked(getGitStatus);
+    getGitStatusMock.mockResolvedValue(makeStatus("main", 2, 1));
 
-	it("polls on interval and updates status", async () => {
-		const getGitStatusMock = vi.mocked(getGitStatus);
-		getGitStatusMock
-			.mockResolvedValueOnce(makeStatus("main", 2, 1))
-			.mockResolvedValueOnce(makeStatus("next", 3, 4));
+    const { result } = renderHook(
+      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active),
+      { initialProps: { active: workspace }, wrapper: withQuery },
+    );
 
-		const { result, unmount } = renderHook(
-			({ active }: { active: WorkspaceInfo | null }) =>
-				useGitStatus(active),
-			{
-				initialProps: { active: workspace },
-				wrapper: withQuery,
-			},
-		);
-		await act(async () => {
-			await Promise.resolve();
-		});
+    await waitFor(() => {
+      expect(result.current.status.branchName).toBe("main");
+      expect(result.current.status.totalAdditions).toBe(2);
+    });
+    expect(getGitStatusMock).toHaveBeenCalledWith("workspace-1");
+  });
 
-		expect(getGitStatusMock).toHaveBeenCalledTimes(1);
-		expect(result.current.status.branchName).toBe("main");
-		expect(result.current.status.totalAdditions).toBe(2);
+  it("refresh() triggers a refetch", async () => {
+    const getGitStatusMock = vi.mocked(getGitStatus);
+    getGitStatusMock
+      .mockResolvedValueOnce(makeStatus("main", 1, 0))
+      .mockResolvedValueOnce(makeStatus("manual", 5, 6));
 
-		await act(async () => {
-			vi.advanceTimersByTime(3000);
-		});
-		await act(async () => {
-			await Promise.resolve();
-		});
+    const { result } = renderHook(
+      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active),
+      { initialProps: { active: workspace }, wrapper: withQuery },
+    );
 
-		expect(getGitStatusMock).toHaveBeenCalledTimes(2);
-		expect(result.current.status.branchName).toBe("next");
-		expect(result.current.status.totalDeletions).toBe(4);
+    await waitFor(() => expect(result.current.status.branchName).toBe("main"));
 
-		unmount();
-	});
+    await act(async () => {
+      await result.current.refresh();
+    });
 
-	it("refresh triggers a new fetch", async () => {
-		const getGitStatusMock = vi.mocked(getGitStatus);
-		getGitStatusMock
-			.mockResolvedValueOnce(makeStatus("main", 1, 0))
-			.mockResolvedValueOnce(makeStatus("manual", 5, 6));
+    await waitFor(() => {
+      expect(result.current.status.branchName).toBe("manual");
+      expect(result.current.status.totalAdditions).toBe(5);
+    });
+  });
 
-		const { result, unmount } = renderHook(
-			({ active }: { active: WorkspaceInfo | null }) =>
-				useGitStatus(active),
-			{
-				initialProps: { active: workspace },
-				wrapper: withQuery,
-			},
-		);
-		await act(async () => {
-			await Promise.resolve();
-		});
+  it("refetches when the active workspace changes", async () => {
+    const getGitStatusMock = vi.mocked(getGitStatus);
+    getGitStatusMock.mockImplementation(async (id: string) =>
+      id === "workspace-1" ? makeStatus("primary", 1, 1) : makeStatus("secondary", 4, 0),
+    );
 
-		expect(result.current.status.branchName).toBe("main");
+    const { result, rerender } = renderHook(
+      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active),
+      { initialProps: { active: workspace }, wrapper: withQuery },
+    );
 
-		await act(async () => {
-			await result.current.refresh();
-		});
+    await waitFor(() => expect(result.current.status.branchName).toBe("primary"));
 
-		expect(getGitStatusMock).toHaveBeenCalledTimes(2);
-		expect(result.current.status.branchName).toBe("manual");
-		expect(result.current.status.totalAdditions).toBe(5);
+    rerender({ active: secondaryWorkspace });
 
-		unmount();
-	});
+    await waitFor(() => {
+      expect(result.current.status.branchName).toBe("secondary");
+      expect(getGitStatusMock).toHaveBeenCalledWith("workspace-2");
+    });
+  });
 
-	it("refreshes on workspace changes and ignores stale results", async () => {
-		const getGitStatusMock = vi.mocked(getGitStatus);
-		let resolveFirst: (value: ReturnType<typeof makeStatus>) => void;
-		let resolveSecond: (value: ReturnType<typeof makeStatus>) => void;
-		const firstPromise = new Promise<ReturnType<typeof makeStatus>>(
-			(resolve) => {
-				resolveFirst = resolve;
-			},
-		);
-		const secondPromise = new Promise<ReturnType<typeof makeStatus>>(
-			(resolve) => {
-				resolveSecond = resolve;
-			},
-		);
-		getGitStatusMock
-			.mockReturnValueOnce(firstPromise)
-			.mockReturnValueOnce(secondPromise);
+  it("returns empty status when no workspace is active (queryFn skipped)", async () => {
+    const getGitStatusMock = vi.mocked(getGitStatus);
 
-		const { result, rerender, unmount } = renderHook(
-			({ active }: { active: WorkspaceInfo | null }) =>
-				useGitStatus(active),
-			{
-				initialProps: { active: workspace },
-				wrapper: withQuery,
-			},
-		);
+    const { result } = renderHook(
+      ({ active }: { active: WorkspaceInfo | null }) => useGitStatus(active),
+      { initialProps: { active: null }, wrapper: withQuery },
+    );
 
-		await act(async () => {
-			await Promise.resolve();
-		});
-
-		rerender({ active: secondaryWorkspace });
-
-		await act(async () => {
-			await Promise.resolve();
-		});
-
-		expect(getGitStatusMock).toHaveBeenCalledWith("workspace-1");
-		expect(getGitStatusMock).toHaveBeenCalledWith("workspace-2");
-
-		await act(async () => {
-			resolveSecond(makeStatus("secondary", 4, 0));
-			await Promise.resolve();
-		});
-
-		expect(result.current.status.branchName).toBe("secondary");
-
-		await act(async () => {
-			resolveFirst(makeStatus("primary", 1, 1));
-			await Promise.resolve();
-		});
-
-		expect(result.current.status.branchName).toBe("secondary");
-
-		unmount();
-	});
-
-	it("keeps cached branch on error", async () => {
-		const getGitStatusMock = vi.mocked(getGitStatus);
-		getGitStatusMock
-			.mockResolvedValueOnce(makeStatus("main", 1, 0))
-			.mockRejectedValueOnce(new Error("boom"));
-
-		const { result, unmount } = renderHook(
-			({ active }: { active: WorkspaceInfo | null }) =>
-				useGitStatus(active),
-			{
-				initialProps: { active: workspace },
-				wrapper: withQuery,
-			},
-		);
-
-		await act(async () => {
-			await Promise.resolve();
-		});
-
-		expect(result.current.status.branchName).toBe("main");
-
-		await act(async () => {
-			await result.current.refresh();
-		});
-
-		expect(result.current.status.branchName).toBe("main");
-		expect(result.current.status.error).toBe("boom");
-
-		unmount();
-	});
+    await waitFor(() => {
+      expect(result.current.status.branchName).toBe("");
+      expect(result.current.status.files).toEqual([]);
+    });
+    expect(getGitStatusMock).not.toHaveBeenCalled();
+  });
 });

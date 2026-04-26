@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef } from "react";
-import type { DebugEntry, RateLimitSnapshot } from "@/types";
 import { getAccountRateLimits } from "@services/tauri";
 import { normalizeRateLimits } from "@threads/utils/threadNormalize";
+import { useCallback, useEffect, useRef } from "react";
+import type { DebugEntry, RateLimitSnapshot } from "@/types";
 import type { ThreadAction } from "./useThreadsReducer";
 
 type UseThreadRateLimitsOptions = {
@@ -52,8 +52,7 @@ export function useThreadRateLimits({
           (response?.rateLimits as Record<string, unknown> | undefined) ??
           (response?.rate_limits as Record<string, unknown> | undefined);
         if (rateLimits) {
-          const previousRateLimits =
-            getCurrentRateLimitsRef.current?.(targetId) ?? null;
+          const previousRateLimits = getCurrentRateLimitsRef.current?.(targetId) ?? null;
           dispatch({
             type: "setRateLimits",
             workspaceId: targetId,

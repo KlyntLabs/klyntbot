@@ -19,8 +19,7 @@ function formatReasoning(item: Extract<ConversationItem, { kind: "reasoning" }>)
 function formatUserInput(item: Extract<ConversationItem, { kind: "userInput" }>) {
   const lines = item.questions.map((entry, index) => {
     const title = entry.question || entry.header || `Question ${index + 1}`;
-    const answers =
-      entry.answers.length > 0 ? entry.answers.join(" | ") : "No answer provided";
+    const answers = entry.answers.length > 0 ? entry.answers.join(" | ") : "No answer provided";
     return `- ${title}: ${answers}`;
   });
   return ["Input answered:", ...lines].join("\n");

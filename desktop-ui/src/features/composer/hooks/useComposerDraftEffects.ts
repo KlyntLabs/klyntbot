@@ -1,7 +1,7 @@
-import { useEffect, type RefObject } from "react";
-import type { AppMention, DictationTranscript, QueuedMessage } from "@/types";
 import { computeDictationInsertion } from "@utils/dictation";
+import { type RefObject, useEffect } from "react";
 import type { AppMentionBinding } from "@/features/apps/utils/appMentions";
+import type { AppMention, DictationTranscript, QueuedMessage } from "@/types";
 
 type UseComposerDraftEffectsArgs = {
   draftText: string;
@@ -125,12 +125,7 @@ export function useComposerDraftEffects({
     const textarea = textareaRef.current;
     const start = textarea?.selectionStart ?? selectionStart ?? text.length;
     const end = textarea?.selectionEnd ?? start;
-    const { nextText, nextCursor } = computeDictationInsertion(
-      text,
-      textToInsert,
-      start,
-      end,
-    );
+    const { nextText, nextCursor } = computeDictationInsertion(text, textToInsert, start, end);
     setComposerText(nextText);
     resetHistoryNavigation();
     requestAnimationFrame(() => {

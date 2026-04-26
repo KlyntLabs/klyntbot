@@ -1,32 +1,26 @@
 import type { WorkspaceInfo } from "@/types";
-import type { GitDiffSource, GitPanelMode } from "../types";
 import { useGitHubIssues } from "../hooks/useGitHubIssues";
-import { useGitHubPullRequests } from "../hooks/useGitHubPullRequests";
-import { useGitHubPullRequestDiffs } from "../hooks/useGitHubPullRequestDiffs";
 import { useGitHubPullRequestComments } from "../hooks/useGitHubPullRequestComments";
+import { useGitHubPullRequestDiffs } from "../hooks/useGitHubPullRequestDiffs";
+import { useGitHubPullRequests } from "../hooks/useGitHubPullRequests";
+import type { GitDiffSource, GitPanelMode } from "../types";
 
 type GitHubPanelDataProps = {
-	activeWorkspace: WorkspaceInfo | null;
-	gitPanelMode: GitPanelMode;
-	shouldLoadDiffs: boolean;
-	diffSource: GitDiffSource;
-	selectedPullRequestNumber: number | null;
+  activeWorkspace: WorkspaceInfo | null;
+  gitPanelMode: GitPanelMode;
+  shouldLoadDiffs: boolean;
+  diffSource: GitDiffSource;
+  selectedPullRequestNumber: number | null;
 };
 
 export function GitHubPanelData({
-	activeWorkspace,
-	selectedPullRequestNumber,
+  activeWorkspace,
+  selectedPullRequestNumber,
 }: GitHubPanelDataProps) {
-	useGitHubIssues(activeWorkspace);
-	useGitHubPullRequests(activeWorkspace);
-	useGitHubPullRequestDiffs(
-		activeWorkspace,
-		selectedPullRequestNumber ?? null,
-	);
-	useGitHubPullRequestComments(
-		activeWorkspace,
-		selectedPullRequestNumber ?? null,
-	);
+  useGitHubIssues(activeWorkspace);
+  useGitHubPullRequests(activeWorkspace);
+  useGitHubPullRequestDiffs(activeWorkspace, selectedPullRequestNumber ?? null);
+  useGitHubPullRequestComments(activeWorkspace, selectedPullRequestNumber ?? null);
 
-	return null;
+  return null;
 }

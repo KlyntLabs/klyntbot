@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
+
+import { subscribeAppServerEvents } from "@services/events";
+import { cancelCodexLogin, runCodexLogin } from "@services/tauri";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AppServerEvent, AccountSnapshot } from "@/types";
-import { cancelCodexLogin, runCodexLogin } from "@services/tauri";
-import { subscribeAppServerEvents } from "@services/events";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import type { AccountSnapshot, AppServerEvent } from "@/types";
 import { useAccountSwitching } from "./useAccountSwitching";
 
 vi.mock("../../../services/tauri", () => ({

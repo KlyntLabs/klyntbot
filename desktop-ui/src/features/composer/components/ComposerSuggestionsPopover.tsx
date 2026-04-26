@@ -1,18 +1,18 @@
-import { useEffect, type CSSProperties, type RefObject } from "react";
-import type { AutocompleteItem } from "../hooks/useComposerAutocomplete";
+import type { ReviewPromptState, ReviewPromptStep } from "@threads/hooks/useReviewPrompt";
+import { getFileTypeIconUrl } from "@utils/fileTypeIcons";
 import Brain from "lucide-react/dist/esm/icons/brain";
 import FileText from "lucide-react/dist/esm/icons/file-text";
 import GitFork from "lucide-react/dist/esm/icons/git-fork";
 import Info from "lucide-react/dist/esm/icons/info";
-import PlusCircle from "lucide-react/dist/esm/icons/plus-circle";
 import Plug from "lucide-react/dist/esm/icons/plug";
+import PlusCircle from "lucide-react/dist/esm/icons/plus-circle";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
 import ScrollText from "lucide-react/dist/esm/icons/scroll-text";
 import Wrench from "lucide-react/dist/esm/icons/wrench";
+import { type CSSProperties, type RefObject, useEffect } from "react";
 import { PopoverSurface } from "@/features/design-system/components/popover/PopoverPrimitives";
+import type { AutocompleteItem } from "../hooks/useComposerAutocomplete";
 import { ReviewInlinePrompt } from "./ReviewInlinePrompt";
-import type { ReviewPromptState, ReviewPromptStep } from "@threads/hooks/useReviewPrompt";
-import { getFileTypeIconUrl } from "@utils/fileTypeIcons";
 
 type ComposerSuggestionsPopoverProps = {
   highlightIndex: number;

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect, useState } from "react";
 
 export function useWindowLabel(defaultLabel = "main") {
   const [label, setLabel] = useState(defaultLabel);

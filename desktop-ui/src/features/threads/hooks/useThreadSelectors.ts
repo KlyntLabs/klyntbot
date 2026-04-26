@@ -1,10 +1,7 @@
 import { useMemo } from "react";
 import type { ConversationItem } from "@/types";
+import { getActiveItemsForThread, getActiveThreadIdForWorkspace } from "./threadSelectorsHelpers";
 import type { ThreadState } from "./useThreadsReducer";
-import {
-  getActiveItemsForThread,
-  getActiveThreadIdForWorkspace,
-} from "./threadSelectorsHelpers";
 
 type UseThreadSelectorsOptions = {
   activeWorkspaceId: string | null;

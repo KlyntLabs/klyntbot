@@ -1,14 +1,12 @@
+import { useWorkspaceActions } from "@app/hooks/useWorkspaceActions";
 import { useCallback } from "react";
 import { useWorkspaceDropZone } from "@/features/workspaces/hooks/useWorkspaceDropZone";
-import { useWorkspaceActions } from "@app/hooks/useWorkspaceActions";
 
 type UseMainAppWorkspaceActionsArgs = {
   workspaceActions: Parameters<typeof useWorkspaceActions>[0];
 };
 
-export function useMainAppWorkspaceActions({
-  workspaceActions,
-}: UseMainAppWorkspaceActionsArgs) {
+export function useMainAppWorkspaceActions({ workspaceActions }: UseMainAppWorkspaceActionsArgs) {
   const actionState = useWorkspaceActions(workspaceActions);
 
   const handleDropWorkspacePaths = useCallback(

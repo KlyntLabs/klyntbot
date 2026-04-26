@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
+
+import { subscribeAppServerEvents } from "@services/events";
+import { getSkillsList } from "@services/tauri";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppServerEvent, WorkspaceInfo } from "@/types";
-import { getSkillsList } from "@services/tauri";
-import { subscribeAppServerEvents } from "@services/events";
 import { useSkills } from "./useSkills";
 
 vi.mock("../../../services/tauri", () => ({
@@ -74,8 +75,9 @@ describe("useSkills", () => {
   });
 
   it("ignores non-canonical direct skills update methods", async () => {
-    vi.mocked(getSkillsList)
-      .mockResolvedValueOnce({ result: { skills: [{ name: "first", path: "/skills/first" }] } });
+    vi.mocked(getSkillsList).mockResolvedValueOnce({
+      result: { skills: [{ name: "first", path: "/skills/first" }] },
+    });
 
     const { result } = renderHook(() => useSkills(workspace));
 

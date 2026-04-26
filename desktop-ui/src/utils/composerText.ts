@@ -25,11 +25,7 @@ function nextAlpha(letter: string) {
   return String.fromCharCode(code + 1);
 }
 
-export function getFenceTriggerLine(
-  text: string,
-  cursor: number,
-  allowLanguageTags: boolean,
-) {
+export function getFenceTriggerLine(text: string, cursor: number, allowLanguageTags: boolean) {
   if (cursor < 3) {
     return null;
   }
@@ -46,7 +42,7 @@ export function getFenceTriggerLine(
     return null;
   }
   const indent = match[0]?.match(/^\s*/)?.[0] ?? "";
-  const tag = allowLanguageTags ? match[1] ?? "" : "";
+  const tag = allowLanguageTags ? (match[1] ?? "") : "";
   return { lineStart, lineEnd, indent, tag };
 }
 
@@ -100,9 +96,7 @@ export function getListContinuation(text: string, cursor: number) {
 
 export function isCursorInsideFence(text: string, cursor: number) {
   const before = text.slice(0, cursor);
-  const fenceCount = before
-    .split("\n")
-    .filter((line) => /^\s*```/.test(line)).length;
+  const fenceCount = before.split("\n").filter((line) => /^\s*```/.test(line)).length;
   return fenceCount % 2 === 1;
 }
 

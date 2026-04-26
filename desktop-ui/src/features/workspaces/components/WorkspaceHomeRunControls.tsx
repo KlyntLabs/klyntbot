@@ -1,21 +1,17 @@
-import { useCallback } from "react";
-import type { ModelOption, WorkspaceInfo } from "@/types";
-import type { WorkspaceRunMode } from "../hooks/useWorkspaceHome";
-import Laptop from "lucide-react/dist/esm/icons/laptop";
-import GitBranch from "lucide-react/dist/esm/icons/git-branch";
+import { useMenuController } from "@app/hooks/useMenuController";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
 import Cpu from "lucide-react/dist/esm/icons/cpu";
+import GitBranch from "lucide-react/dist/esm/icons/git-branch";
+import Laptop from "lucide-react/dist/esm/icons/laptop";
+import { useCallback } from "react";
 import {
   PopoverMenuItem,
   SplitActionMenu,
 } from "@/features/design-system/components/popover/PopoverPrimitives";
-import { useMenuController } from "@app/hooks/useMenuController";
-import {
-  buildModelSummary,
-  INSTANCE_OPTIONS,
-  resolveModelLabel,
-} from "./workspaceHomeHelpers";
+import type { ModelOption, WorkspaceInfo } from "@/types";
+import type { WorkspaceRunMode } from "../hooks/useWorkspaceHome";
+import { buildModelSummary, INSTANCE_OPTIONS, resolveModelLabel } from "./workspaceHomeHelpers";
 
 type WorkspaceHomeRunControlsProps = {
   workspaceKind: WorkspaceInfo["kind"];
@@ -72,7 +68,7 @@ export function WorkspaceHomeRunControls({
   } = modelsMenu;
 
   const selectedModel = selectedModelId
-    ? models.find((model) => model.id === selectedModelId) ?? null
+    ? (models.find((model) => model.id === selectedModelId) ?? null)
     : null;
   const selectedModelLabel = resolveModelLabel(selectedModel);
   const modelSummary = buildModelSummary(models, modelSelections);
@@ -176,9 +172,7 @@ export function WorkspaceHomeRunControls({
         )}
         {models.map((model) => {
           const isSelected =
-            runMode === "local"
-              ? model.id === selectedModelId
-              : Boolean(modelSelections[model.id]);
+            runMode === "local" ? model.id === selectedModelId : Boolean(modelSelections[model.id]);
           const count = modelSelections[model.id] ?? 1;
           return (
             <div
@@ -274,18 +268,8 @@ export function WorkspaceHomeRunControls({
                 strokeWidth="1.4"
                 strokeLinecap="round"
               />
-              <path
-                d="M9 12h6"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-              <path
-                d="M12 12v6"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
+              <path d="M9 12h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              <path d="M12 12v6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
             </svg>
           </span>
           <select

@@ -1,11 +1,8 @@
-import { useCallback, useRef } from "react";
-import type { Dispatch } from "react";
-import type { ApprovalRequest, DebugEntry } from "@/types";
+import { rememberApprovalRule, respondToServerRequest } from "@services/tauri";
 import { normalizeCommandTokens } from "@utils/approvalRules";
-import {
-  rememberApprovalRule,
-  respondToServerRequest,
-} from "@services/tauri";
+import type { Dispatch } from "react";
+import { useCallback, useRef } from "react";
+import type { ApprovalRequest, DebugEntry } from "@/types";
 import type { ThreadAction } from "./useThreadsReducer";
 
 type UseThreadApprovalsOptions = {
@@ -37,11 +34,7 @@ export function useThreadApprovals({ dispatch, onDebug }: UseThreadApprovalsOpti
 
   const handleApprovalDecision = useCallback(
     async (request: ApprovalRequest, decision: "accept" | "decline") => {
-      await respondToServerRequest(
-        request.workspace_id,
-        request.request_id,
-        decision,
-      );
+      await respondToServerRequest(request.workspace_id, request.request_id, decision);
       dispatch({
         type: "removeApproval",
         requestId: request.request_id,
@@ -67,11 +60,7 @@ export function useThreadApprovals({ dispatch, onDebug }: UseThreadApprovalsOpti
 
       rememberApprovalPrefix(request.workspace_id, command);
 
-      await respondToServerRequest(
-        request.workspace_id,
-        request.request_id,
-        "accept",
-      );
+      await respondToServerRequest(request.workspace_id, request.request_id, "accept");
       dispatch({
         type: "removeApproval",
         requestId: request.request_id,

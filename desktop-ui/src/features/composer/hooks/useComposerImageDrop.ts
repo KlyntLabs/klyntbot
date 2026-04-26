@@ -36,8 +36,7 @@ function readFilesAsDataUrls(files: File[]) {
       (file) =>
         new Promise<string>((resolve) => {
           const reader = new FileReader();
-          reader.onload = () =>
-            resolve(typeof reader.result === "string" ? reader.result : "");
+          reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
           reader.onerror = () => resolve("");
           reader.readAsDataURL(file);
         }),
@@ -74,10 +73,7 @@ type UseComposerImageDropArgs = {
   onAttachImages?: (paths: string[]) => void;
 };
 
-export function useComposerImageDrop({
-  disabled,
-  onAttachImages,
-}: UseComposerImageDropArgs) {
+export function useComposerImageDrop({ disabled, onAttachImages }: UseComposerImageDropArgs) {
   const [isDragOver, setIsDragOver] = useState(false);
   const dropTargetRef = useRef<HTMLDivElement | null>(null);
   const lastClientPositionRef = useRef<{ x: number; y: number } | null>(null);
@@ -95,10 +91,7 @@ export function useComposerImageDrop({
         setIsDragOver(false);
         return;
       }
-      const position = normalizeDragPosition(
-        event.payload.position,
-        lastClientPositionRef.current,
-      );
+      const position = normalizeDragPosition(event.payload.position, lastClientPositionRef.current);
       const rect = dropTargetRef.current.getBoundingClientRect();
       const isInside =
         position.x >= rect.left &&
@@ -173,9 +166,7 @@ export function useComposerImageDrop({
       onAttachImages?.(imagePaths);
       return;
     }
-    const fileImages = [...files, ...itemFiles].filter((file) =>
-      file.type.startsWith("image/"),
-    );
+    const fileImages = [...files, ...itemFiles].filter((file) => file.type.startsWith("image/"));
     if (fileImages.length === 0) {
       return;
     }
@@ -206,8 +197,7 @@ export function useComposerImageDrop({
         (file) =>
           new Promise<string>((resolve) => {
             const reader = new FileReader();
-            reader.onload = () =>
-              resolve(typeof reader.result === "string" ? reader.result : "");
+            reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
             reader.onerror = () => resolve("");
             reader.readAsDataURL(file);
           }),

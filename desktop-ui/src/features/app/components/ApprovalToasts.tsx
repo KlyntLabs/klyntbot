@@ -1,6 +1,5 @@
-import { useEffect, useMemo } from "react";
-import type { ApprovalRequest, WorkspaceInfo } from "@/types";
 import { getApprovalCommandInfo } from "@utils/approvalRules";
+import { useEffect, useMemo } from "react";
 import {
   ToastActions,
   ToastBody,
@@ -10,6 +9,7 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/features/design-system/components/toast/ToastPrimitives";
+import type { ApprovalRequest, WorkspaceInfo } from "@/types";
 
 type ApprovalToastsProps = {
   approvals: ApprovalRequest[];
@@ -115,9 +115,7 @@ export function ApprovalToasts({
                   const rendered = renderParamValue(value);
                   return (
                     <div key={key} className="approval-toast-detail">
-                      <div className="approval-toast-detail-label">
-                        {formatLabel(key)}
-                      </div>
+                      <div className="approval-toast-detail-label">{formatLabel(key)}</div>
                       {rendered.isCode ? (
                         <ToastError className="approval-toast-detail-code">
                           {rendered.text}
@@ -137,10 +135,7 @@ export function ApprovalToasts({
               )}
             </div>
             <ToastActions className="approval-toast-actions">
-              <button
-                className="secondary"
-                onClick={() => onDecision(request, "decline")}
-              >
+              <button className="secondary" onClick={() => onDecision(request, "decline")}>
                 Decline
               </button>
               {commandInfo && onRemember ? (
@@ -152,10 +147,7 @@ export function ApprovalToasts({
                   Always allow
                 </button>
               ) : null}
-              <button
-                className="primary"
-                onClick={() => onDecision(request, "accept")}
-              >
+              <button className="primary" onClick={() => onDecision(request, "accept")}>
                 Approve (Enter)
               </button>
             </ToastActions>

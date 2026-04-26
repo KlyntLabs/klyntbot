@@ -26,9 +26,6 @@ export async function resizeTerminalSession(
   return invoke("terminal_resize", { workspaceId, terminalId, cols, rows });
 }
 
-export async function closeTerminalSession(
-  workspaceId: string,
-  terminalId: string,
-): Promise<void> {
+export async function closeTerminalSession(workspaceId: string, terminalId: string): Promise<void> {
   return invoke("terminal_close", { workspaceId, terminalId });
 }

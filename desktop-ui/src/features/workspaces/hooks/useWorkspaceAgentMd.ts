@@ -1,7 +1,7 @@
-import { useCallback } from "react";
-import type { DebugEntry, WorkspaceInfo } from "@/types";
 import { readAgentMd, writeAgentMd } from "@services/tauri";
-import { useFileEditor, type FileEditorResponse } from "@/features/shared/hooks/useFileEditor";
+import { useCallback } from "react";
+import { type FileEditorResponse, useFileEditor } from "@/features/shared/hooks/useFileEditor";
+import type { DebugEntry, WorkspaceInfo } from "@/types";
 
 type UseWorkspaceAgentMdOptions = {
   activeWorkspace: WorkspaceInfo | null;
@@ -46,39 +46,42 @@ export function useWorkspaceAgentMd({ activeWorkspace, onDebug }: UseWorkspaceAg
     }
   }, [onDebug, workspaceId]);
 
-  const writeWithDebug = useCallback(async (content: string) => {
-    if (!workspaceId) {
-      return;
-    }
-    const requestWorkspaceId = workspaceId;
-    onDebug?.({
-      id: `${Date.now()}-client-agent-md-write`,
-      timestamp: Date.now(),
-      source: "client",
-      label: "agents.md/write",
-      payload: { workspaceId: requestWorkspaceId },
-    });
-    try {
-      await writeAgentMd(requestWorkspaceId, content);
+  const writeWithDebug = useCallback(
+    async (content: string) => {
+      if (!workspaceId) {
+        return;
+      }
+      const requestWorkspaceId = workspaceId;
       onDebug?.({
-        id: `${Date.now()}-server-agent-md-write`,
+        id: `${Date.now()}-client-agent-md-write`,
         timestamp: Date.now(),
-        source: "server",
-        label: "agents.md/write response",
-        payload: { ok: true },
+        source: "client",
+        label: "agents.md/write",
+        payload: { workspaceId: requestWorkspaceId },
       });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      onDebug?.({
-        id: `${Date.now()}-client-agent-md-write-error`,
-        timestamp: Date.now(),
-        source: "error",
-        label: "agents.md/write error",
-        payload: message,
-      });
-      throw error;
-    }
-  }, [onDebug, workspaceId]);
+      try {
+        await writeAgentMd(requestWorkspaceId, content);
+        onDebug?.({
+          id: `${Date.now()}-server-agent-md-write`,
+          timestamp: Date.now(),
+          source: "server",
+          label: "agents.md/write response",
+          payload: { ok: true },
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        onDebug?.({
+          id: `${Date.now()}-client-agent-md-write-error`,
+          timestamp: Date.now(),
+          source: "error",
+          label: "agents.md/write error",
+          payload: message,
+        });
+        throw error;
+      }
+    },
+    [onDebug, workspaceId],
+  );
 
   return useFileEditor({
     key: workspaceId,

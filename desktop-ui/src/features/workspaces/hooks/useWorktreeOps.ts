@@ -1,7 +1,4 @@
-import { useCallback, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
 import * as Sentry from "@sentry/react";
-import type { DebugEntry, WorkspaceInfo } from "@/types";
 import {
   addClone as addCloneService,
   addWorktree as addWorktreeService,
@@ -9,6 +6,9 @@ import {
   renameWorktree as renameWorktreeService,
   renameWorktreeUpstream as renameWorktreeUpstreamService,
 } from "@services/tauri";
+import type { Dispatch, SetStateAction } from "react";
+import { useCallback, useState } from "react";
+import type { DebugEntry, WorkspaceInfo } from "@/types";
 
 type UseWorktreeOpsOptions = {
   onDebug?: (entry: DebugEntry) => void;
@@ -21,9 +21,7 @@ export function useWorktreeOps({
   setWorkspaces,
   setActiveWorkspaceId,
 }: UseWorktreeOpsOptions) {
-  const [deletingWorktreeIds, setDeletingWorktreeIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [deletingWorktreeIds, setDeletingWorktreeIds] = useState<Set<string>>(() => new Set());
 
   const addWorktreeAgent = useCallback(
     async (
@@ -54,12 +52,7 @@ export function useWorktreeOps({
         },
       });
       try {
-        const workspace = await addWorktreeService(
-          parent.id,
-          trimmed,
-          trimmedName,
-          copyAgentsMd,
-        );
+        const workspace = await addWorktreeService(parent.id, trimmed, trimmedName, copyAgentsMd);
         setWorkspaces((prev) => [...prev, workspace]);
         if (options?.activate !== false) {
           setActiveWorkspaceId(workspace.id);
@@ -200,9 +193,7 @@ export function useWorktreeOps({
       }
       try {
         const updated = await renameWorktreeService(workspaceId, trimmed);
-        setWorkspaces((prev) =>
-          prev.map((entry) => (entry.id === workspaceId ? updated : entry)),
-        );
+        setWorkspaces((prev) => prev.map((entry) => (entry.id === workspaceId ? updated : entry)));
         return updated;
       } catch (error) {
         if (previous) {

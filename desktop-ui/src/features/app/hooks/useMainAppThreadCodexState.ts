@@ -1,4 +1,3 @@
-import { useCallback, useMemo } from "react";
 import { setWorkspaceRuntimeCodexArgs } from "@services/tauri";
 import { buildCodexArgsOptions } from "@threads/utils/codexArgsProfiles";
 import {
@@ -6,6 +5,7 @@ import {
   resolveWorkspaceRuntimeCodexArgsOverride,
 } from "@threads/utils/threadCodexParamsSeed";
 import type { ThreadCodexParams } from "@threads/utils/threadStorage";
+import { useCallback, useMemo } from "react";
 
 type ThreadCodexParamsPatch = Partial<
   Pick<
@@ -27,10 +27,7 @@ type ThreadCodexMetadata = {
 type UseMainAppThreadCodexStateArgs = {
   appCodexArgs: string | null | undefined;
   selectedCodexArgsOverride: string | null;
-  getThreadCodexParams: (
-    workspaceId: string,
-    threadId: string,
-  ) => ThreadCodexParams | null;
+  getThreadCodexParams: (workspaceId: string, threadId: string) => ThreadCodexParams | null;
   patchThreadCodexParams: (
     workspaceId: string,
     threadId: string,

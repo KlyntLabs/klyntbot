@@ -1,9 +1,9 @@
+import { useAppServerEvents } from "@app/hooks/useAppServerEvents";
+import { playNotificationSound } from "@utils/notificationSounds";
 import { useCallback, useMemo, useRef } from "react";
 import errorSoundUrl from "@/assets/error-notification.mp3";
 import successSoundUrl from "@/assets/success-notification.mp3";
 import type { DebugEntry } from "@/types";
-import { playNotificationSound } from "@utils/notificationSounds";
-import { useAppServerEvents } from "@app/hooks/useAppServerEvents";
 
 const DEFAULT_MIN_DURATION_MS = 60_000; // 1 minute
 
@@ -39,40 +39,34 @@ export function useAgentSoundNotifications({
     [onDebug],
   );
 
-  const consumeDuration = useCallback(
-    (workspaceId: string, threadId: string, turnId: string) => {
-      const threadKey = buildThreadKey(workspaceId, threadId);
-      let startedAt: number | undefined;
+  const consumeDuration = useCallback((workspaceId: string, threadId: string, turnId: string) => {
+    const threadKey = buildThreadKey(workspaceId, threadId);
+    let startedAt: number | undefined;
 
-      if (turnId) {
-        const turnKey = buildTurnKey(workspaceId, turnId);
-        startedAt = turnStartById.current.get(turnKey);
-        turnStartById.current.delete(turnKey);
-      }
+    if (turnId) {
+      const turnKey = buildTurnKey(workspaceId, turnId);
+      startedAt = turnStartById.current.get(turnKey);
+      turnStartById.current.delete(turnKey);
+    }
 
-      if (startedAt === undefined) {
-        startedAt = turnStartByThread.current.get(threadKey);
-      }
+    if (startedAt === undefined) {
+      startedAt = turnStartByThread.current.get(threadKey);
+    }
 
-      if (startedAt !== undefined) {
-        turnStartByThread.current.delete(threadKey);
-        return Date.now() - startedAt;
-      }
+    if (startedAt !== undefined) {
+      turnStartByThread.current.delete(threadKey);
+      return Date.now() - startedAt;
+    }
 
-      return null;
-    },
-    [],
-  );
+    return null;
+  }, []);
 
-  const recordStartIfMissing = useCallback(
-    (workspaceId: string, threadId: string) => {
-      const threadKey = buildThreadKey(workspaceId, threadId);
-      if (!turnStartByThread.current.has(threadKey)) {
-        turnStartByThread.current.set(threadKey, Date.now());
-      }
-    },
-    [],
-  );
+  const recordStartIfMissing = useCallback((workspaceId: string, threadId: string) => {
+    const threadKey = buildThreadKey(workspaceId, threadId);
+    if (!turnStartByThread.current.has(threadKey)) {
+      turnStartByThread.current.set(threadKey, Date.now());
+    }
+  }, []);
 
   const shouldPlaySound = useCallback(
     (durationMs: number | null, threadKey: string) => {
@@ -98,19 +92,13 @@ export function useAgentSoundNotifications({
     [enabled, isWindowFocused, minDurationMs],
   );
 
-  const handleTurnStarted = useCallback(
-    (workspaceId: string, threadId: string, turnId: string) => {
-      const startedAt = Date.now();
-      turnStartByThread.current.set(
-        buildThreadKey(workspaceId, threadId),
-        startedAt,
-      );
-      if (turnId) {
-        turnStartById.current.set(buildTurnKey(workspaceId, turnId), startedAt);
-      }
-    },
-    [],
-  );
+  const handleTurnStarted = useCallback((workspaceId: string, threadId: string, turnId: string) => {
+    const startedAt = Date.now();
+    turnStartByThread.current.set(buildThreadKey(workspaceId, threadId), startedAt);
+    if (turnId) {
+      turnStartById.current.set(buildTurnKey(workspaceId, turnId), startedAt);
+    }
+  }, []);
 
   const handleTurnCompleted = useCallback(
     (workspaceId: string, threadId: string, turnId: string) => {

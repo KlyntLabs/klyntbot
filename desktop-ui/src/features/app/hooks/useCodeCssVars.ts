@@ -11,4 +11,3 @@ export function useCodeCssVars(appSettings: AppSettings) {
     root.style.setProperty("--code-font-size", `${appSettings.codeFontSize}px`);
   }, [appSettings.codeFontFamily, appSettings.codeFontSize]);
 }
-

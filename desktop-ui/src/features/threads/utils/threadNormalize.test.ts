@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  normalizePlanUpdate,
-  normalizeRateLimits,
-  normalizeRootPath,
-} from "./threadNormalize";
+import { normalizePlanUpdate, normalizeRateLimits, normalizeRootPath } from "./threadNormalize";
 
 describe("normalizePlanUpdate", () => {
   it("normalizes a plan when the payload uses an array", () => {
@@ -54,9 +50,7 @@ describe("normalizeRootPath", () => {
   });
 
   it("strips Windows namespace prefixes from UNC paths", () => {
-    expect(normalizeRootPath("\\\\?\\UNC\\SERVER\\Share\\Repo\\")).toBe(
-      "//server/share/repo",
-    );
+    expect(normalizeRootPath("\\\\?\\UNC\\SERVER\\Share\\Repo\\")).toBe("//server/share/repo");
   });
 });
 
@@ -238,34 +232,34 @@ describe("normalizeRateLimits", () => {
     });
   });
 
-  it.each([{ balance: "0" }, { balance: null }])(
-    "preserves unlimited credits when a partial update only changes balance to $balance",
-    (credits) => {
-      const previous = {
-        primary: null,
-        secondary: null,
-        credits: {
-          hasCredits: true,
-          unlimited: true,
-          balance: "120",
-        },
-        planType: null,
-      } as const;
-
-      const normalized = normalizeRateLimits(
-        {
-          credits,
-        },
-        previous,
-      );
-
-      expect(normalized.credits).toEqual({
+  it.each([
+    { balance: "0" },
+    { balance: null },
+  ])("preserves unlimited credits when a partial update only changes balance to $balance", (credits) => {
+    const previous = {
+      primary: null,
+      secondary: null,
+      credits: {
         hasCredits: true,
         unlimited: true,
-        balance: credits.balance,
-      });
-    },
-  );
+        balance: "120",
+      },
+      planType: null,
+    } as const;
+
+    const normalized = normalizeRateLimits(
+      {
+        credits,
+      },
+      previous,
+    );
+
+    expect(normalized.credits).toEqual({
+      hasCredits: true,
+      unlimited: true,
+      balance: credits.balance,
+    });
+  });
 
   it("normalizes numeric credit balances", () => {
     const normalized = normalizeRateLimits({

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pushErrorToast } from "@services/toasts";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type FileEditorResponse = {
   exists: boolean;
@@ -153,4 +153,3 @@ export function useFileEditor({
     save,
   };
 }
-

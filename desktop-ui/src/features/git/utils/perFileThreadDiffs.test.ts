@@ -23,9 +23,7 @@ describe("buildPerFileThreadDiffs", () => {
         { path: "src/a.ts", kind: "add", diff: "diff-a-1" },
         { path: "src/b.ts", kind: "delete", diff: "diff-b-1" },
       ]),
-      fileChangeItem("change-2", [
-        { path: "src/a.ts", kind: "modify", diff: "diff-a-2" },
-      ]),
+      fileChangeItem("change-2", [{ path: "src/a.ts", kind: "modify", diff: "diff-a-2" }]),
     ];
 
     const result = buildPerFileThreadDiffs(items);
@@ -34,14 +32,8 @@ describe("buildPerFileThreadDiffs", () => {
     expect(result.groups[0]?.path).toBe("src/a.ts");
     expect(result.groups[1]?.path).toBe("src/b.ts");
 
-    expect(result.groups[0]?.edits.map((edit) => edit.label)).toEqual([
-      "Edit 1",
-      "Edit 2",
-    ]);
-    expect(result.groups[0]?.edits.map((edit) => edit.diff)).toEqual([
-      "diff-a-1",
-      "diff-a-2",
-    ]);
+    expect(result.groups[0]?.edits.map((edit) => edit.label)).toEqual(["Edit 1", "Edit 2"]);
+    expect(result.groups[0]?.edits.map((edit) => edit.diff)).toEqual(["diff-a-1", "diff-a-2"]);
     expect(result.groups[1]?.edits[0]?.label).toBe("Edit 1");
 
     expect(result.viewerEntries.map((entry) => entry.path)).toEqual([
@@ -78,12 +70,7 @@ describe("buildPerFileThreadDiffs", () => {
     ];
 
     const result = buildPerFileThreadDiffs(items);
-    expect(result.viewerEntries.map((entry) => entry.status)).toEqual([
-      "A",
-      "D",
-      "R",
-      "M",
-    ]);
+    expect(result.viewerEntries.map((entry) => entry.status)).toEqual(["A", "D", "R", "M"]);
   });
 
   it("computes additions and deletions per edit", () => {
@@ -137,24 +124,14 @@ describe("buildPerFileThreadDiffs", () => {
 
   it("keeps edit ids stable when earlier thread events are inserted", () => {
     const original = buildPerFileThreadDiffs([
-      fileChangeItem("change-1", [
-        { path: "src/a.ts", kind: "modify", diff: "diff-a-1" },
-      ]),
-      fileChangeItem("change-2", [
-        { path: "src/a.ts", kind: "modify", diff: "diff-a-2" },
-      ]),
+      fileChangeItem("change-1", [{ path: "src/a.ts", kind: "modify", diff: "diff-a-1" }]),
+      fileChangeItem("change-2", [{ path: "src/a.ts", kind: "modify", diff: "diff-a-2" }]),
     ]);
 
     const withEarlierEvent = buildPerFileThreadDiffs([
-      fileChangeItem("change-0", [
-        { path: "src/a.ts", kind: "modify", diff: "diff-a-0" },
-      ]),
-      fileChangeItem("change-1", [
-        { path: "src/a.ts", kind: "modify", diff: "diff-a-1" },
-      ]),
-      fileChangeItem("change-2", [
-        { path: "src/a.ts", kind: "modify", diff: "diff-a-2" },
-      ]),
+      fileChangeItem("change-0", [{ path: "src/a.ts", kind: "modify", diff: "diff-a-0" }]),
+      fileChangeItem("change-1", [{ path: "src/a.ts", kind: "modify", diff: "diff-a-1" }]),
+      fileChangeItem("change-2", [{ path: "src/a.ts", kind: "modify", diff: "diff-a-2" }]),
     ]);
 
     expect(original.viewerEntries[0]?.path).toBe("src/a.ts@@item-change-1@@change-0");
@@ -183,9 +160,7 @@ describe("buildPerFileThreadDiffs", () => {
         detail: "",
         output: "",
       },
-      fileChangeItem("change-1", [
-        { path: "src/a.ts", kind: "modify", diff: "diff-a-1" },
-      ]),
+      fileChangeItem("change-1", [{ path: "src/a.ts", kind: "modify", diff: "diff-a-1" }]),
     ];
 
     const result = buildPerFileThreadDiffs(items);

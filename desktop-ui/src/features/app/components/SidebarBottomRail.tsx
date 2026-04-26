@@ -40,9 +40,7 @@ function UsageRow({ label, percent, resetLabel }: UsageRowProps) {
     <div className="sidebar-usage-row">
       <div className="sidebar-usage-row-head">
         <span className="sidebar-usage-name">{label}</span>
-        <span className="sidebar-usage-value">
-          {percent === null ? "--" : `${percent}%`}
-        </span>
+        <span className="sidebar-usage-value">{percent === null ? "--" : `${percent}%`}</span>
       </div>
       <div className="sidebar-usage-bar" aria-hidden>
         <span className="sidebar-usage-bar-fill" style={{ width: `${percent ?? 0}%` }} />
@@ -93,23 +91,13 @@ export function SidebarBottomRail({
           {creditsLabel && <div className="sidebar-usage-credits">{creditsLabel}</div>}
         </div>
         <div className="sidebar-usage-list">
-          <UsageRow
-            label="Session"
-            percent={sessionPercent}
-            resetLabel={sessionResetLabel}
-          />
+          <UsageRow label="Session" percent={sessionPercent} resetLabel={sessionResetLabel} />
           {showWeekly && (
-            <UsageRow
-              label="Weekly"
-              percent={weeklyPercent}
-              resetLabel={weeklyResetLabel}
-            />
+            <UsageRow label="Weekly" percent={weeklyPercent} resetLabel={weeklyResetLabel} />
           )}
         </div>
       </div>
-      <div
-        className={`sidebar-bottom-actions${showAccountSwitcher ? "" : " is-compact"}`}
-      >
+      <div className={`sidebar-bottom-actions${showAccountSwitcher ? "" : " is-compact"}`}>
         {showAccountSwitcher && (
           <div className="sidebar-account-menu" ref={accountMenuRef}>
             <MenuTrigger
@@ -140,9 +128,7 @@ export function SidebarBottomRail({
                     aria-busy={accountSwitching}
                   >
                     <span className="sidebar-account-action-content">
-                      {accountSwitching && (
-                        <span className="sidebar-account-spinner" aria-hidden />
-                      )}
+                      {accountSwitching && <span className="sidebar-account-spinner" aria-hidden />}
                       <span>{accountActionLabel}</span>
                     </span>
                   </button>
@@ -164,17 +150,17 @@ export function SidebarBottomRail({
           </div>
         )}
         <div className="sidebar-utility-actions">
-            <button
-              className="ghost sidebar-labeled-button sidebar-utility-button"
-              type="button"
-              onClick={onOpenSettings}
-              aria-label="Open settings"
-            >
-              <span className="sidebar-labeled-button-icon" aria-hidden>
-                <Settings size={14} aria-hidden />
-              </span>
-              <span>Settings</span>
-            </button>
+          <button
+            className="ghost sidebar-labeled-button sidebar-utility-button"
+            type="button"
+            onClick={onOpenSettings}
+            aria-label="Open settings"
+          >
+            <span className="sidebar-labeled-button-icon" aria-hidden>
+              <Settings size={14} aria-hidden />
+            </span>
+            <span>Settings</span>
+          </button>
           {showDebugButton && (
             <button
               className="ghost sidebar-utility-button"

@@ -19,4 +19,3 @@ describe("WorkspaceHomeGitInitBanner", () => {
     expect((button as HTMLButtonElement).disabled).toBe(true);
   });
 });
-

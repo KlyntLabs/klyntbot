@@ -55,9 +55,7 @@ export function parseRawDiffLines(diff: string): ParsedDiffLine[] {
     });
 }
 
-export function isFallbackRawDiffLineHighlightable(
-  type: ParsedDiffLine["type"],
-) {
+export function isFallbackRawDiffLineHighlightable(type: ParsedDiffLine["type"]) {
   return type === "add" || type === "del" || type === "context";
 }
 

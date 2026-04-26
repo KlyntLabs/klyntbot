@@ -1,26 +1,25 @@
-import { createPortal } from "react-dom";
-import type { MouseEvent, MutableRefObject, ReactNode } from "react";
+import type { ThreadStatusById } from "@utils/threadStatus";
 import Copy from "lucide-react/dist/esm/icons/copy";
 import GitBranch from "lucide-react/dist/esm/icons/git-branch";
 import Plus from "lucide-react/dist/esm/icons/plus";
-
-import type { ThreadSummary, WorkspaceInfo } from "@/types";
-import type { ThreadStatusById } from "@utils/threadStatus";
+import type { MouseEvent, MutableRefObject, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   PopoverMenuItem,
   PopoverSurface,
 } from "@/features/design-system/components/popover/PopoverPrimitives";
-import { ThreadList } from "./ThreadList";
-import { ThreadLoading } from "./ThreadLoading";
-import { WorkspaceCard } from "./WorkspaceCard";
-import { WorkspaceGroup } from "./WorkspaceGroup";
-import { WorktreeSection } from "./WorktreeSection";
-import { getVisibleThreadListState } from "./threadSearchUtils";
+import type { ThreadSummary, WorkspaceInfo } from "@/types";
 import type {
   SidebarWorkspaceAddMenuAnchor,
   ThreadRowsResult,
   WorkspaceGroupSection,
 } from "./sidebarTypes";
+import { ThreadList } from "./ThreadList";
+import { ThreadLoading } from "./ThreadLoading";
+import { getVisibleThreadListState } from "./threadSearchUtils";
+import { WorkspaceCard } from "./WorkspaceCard";
+import { WorkspaceGroup } from "./WorkspaceGroup";
+import { WorktreeSection } from "./WorktreeSection";
 
 type SidebarWorkspaceGroupsProps = {
   groups: WorkspaceGroupSection[];
@@ -150,10 +149,7 @@ function SidebarWorkspaceEntry({
   const isExpanded = expandedWorkspaces.has(workspace.id);
   const workspaceMatchesSearch = isWorkspaceMatch(workspace);
   const searchExpanded = isExpanded || isSearchActive;
-  const {
-    unpinnedRows,
-    totalRoots: totalThreadRoots,
-  } = getThreadRows(
+  const { unpinnedRows, totalRoots: totalThreadRoots } = getThreadRows(
     threads,
     searchExpanded,
     workspace.id,
@@ -161,16 +157,14 @@ function SidebarWorkspaceEntry({
     pinnedThreadsVersion,
   );
   const nextCursor = threadListCursorByWorkspace[workspace.id] ?? null;
-  const {
-    visibleRows: filteredThreadRows,
-    displayRootCount: displayThreadRootCount,
-  } = getVisibleThreadListState({
-    rows: unpinnedRows,
-    totalRoots: totalThreadRoots,
-    workspaceName: workspace.name,
-    query: normalizedQuery,
-    isSearchActive,
-  });
+  const { visibleRows: filteredThreadRows, displayRootCount: displayThreadRootCount } =
+    getVisibleThreadListState({
+      rows: unpinnedRows,
+      totalRoots: totalThreadRoots,
+      workspaceName: workspace.name,
+      query: normalizedQuery,
+      isSearchActive,
+    });
   const showThreadList = filteredThreadRows.length > 0 || Boolean(nextCursor);
   const isLoadingThreads = threadListLoadingByWorkspace[workspace.id] ?? false;
   const showThreadLoader = isLoadingThreads && threads.length === 0;
@@ -188,12 +182,8 @@ function SidebarWorkspaceEntry({
       : (worktreesByParent.get(workspace.id) ?? []);
   const addMenuOpen = addMenuAnchor?.workspaceId === workspace.id;
   const isDraftNewAgent = newAgentDraftWorkspaceId === workspace.id;
-  const isDraftRowActive =
-    isDraftNewAgent &&
-    workspace.id === activeWorkspaceId &&
-    !activeThreadId;
-  const draftStatusClass =
-    startingDraftThreadWorkspaceId === workspace.id ? "processing" : "ready";
+  const isDraftRowActive = isDraftNewAgent && workspace.id === activeWorkspaceId && !activeThreadId;
+  const draftStatusClass = startingDraftThreadWorkspaceId === workspace.id ? "processing" : "ready";
 
   return (
     <WorkspaceCard
@@ -216,7 +206,8 @@ function SidebarWorkspaceEntry({
       onConnectWorkspace={onConnectWorkspace}
       onToggleAddMenu={onToggleAddMenu}
     >
-      {addMenuOpen && addMenuAnchor &&
+      {addMenuOpen &&
+        addMenuAnchor &&
         createPortal(
           <PopoverSurface
             className="workspace-add-menu"
@@ -400,11 +391,7 @@ export function SidebarWorkspaceGroups({
         onToggleCollapse={toggleGroupCollapse}
       >
         {group.workspaces.map((workspace) => (
-          <SidebarWorkspaceEntry
-            key={workspace.id}
-            workspace={workspace}
-            {...entryProps}
-          />
+          <SidebarWorkspaceEntry key={workspace.id} workspace={workspace} {...entryProps} />
         ))}
       </WorkspaceGroup>
     );

@@ -13,13 +13,15 @@ function resolveAudioContextConstructor(): AudioContextConstructor | null {
     return null;
   }
 
-  return (window.AudioContext ??
+  return (
+    window.AudioContext ??
     (
       window as typeof window & {
         webkitAudioContext?: AudioContextConstructor;
       }
     ).webkitAudioContext ??
-    null);
+    null
+  );
 }
 
 function getAudioContext(): AudioContext {
@@ -36,11 +38,7 @@ function getAudioContext(): AudioContext {
   return audioContext;
 }
 
-export function playNotificationSound(
-  url: string,
-  label: SoundLabel,
-  onDebug?: DebugLogger,
-) {
+export function playNotificationSound(url: string, label: SoundLabel, onDebug?: DebugLogger) {
   try {
     const ctx = getAudioContext();
 

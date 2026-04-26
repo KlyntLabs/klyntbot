@@ -5,9 +5,10 @@
 // subscriber that listens for `qk.threads.list()` updates and calls
 // setTraySessionUsage from the cache. Until then it stays as a prop-driven
 // effect.
+
+import { setTraySessionUsage } from "@services/tauri";
 import { isTauri } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef } from "react";
-import { setTraySessionUsage } from "@services/tauri";
 import type { RateLimitSnapshot, TraySessionUsage } from "@/types";
 import { getUsageLabels } from "../utils/usageLabels";
 
@@ -22,12 +23,7 @@ export function buildTraySessionUsage(
   accountRateLimits: RateLimitSnapshot | null,
   showRemaining: boolean,
 ): TraySessionUsage | null {
-  const {
-    sessionPercent,
-    weeklyPercent,
-    sessionResetLabel,
-    weeklyResetLabel,
-  } = getUsageLabels(
+  const { sessionPercent, weeklyPercent, sessionResetLabel, weeklyResetLabel } = getUsageLabels(
     accountRateLimits,
     showRemaining,
   );
@@ -35,9 +31,7 @@ export function buildTraySessionUsage(
     return null;
   }
 
-  const usageLabel = showRemaining
-    ? `${sessionPercent}% remaining`
-    : `${sessionPercent}% used`;
+  const usageLabel = showRemaining ? `${sessionPercent}% remaining` : `${sessionPercent}% used`;
   const weeklyUsageLabel =
     typeof weeklyPercent === "number"
       ? showRemaining
@@ -46,10 +40,7 @@ export function buildTraySessionUsage(
       : null;
 
   return {
-    sessionLabel:
-      sessionResetLabel === null
-        ? usageLabel
-        : `${usageLabel} · ${sessionResetLabel}`,
+    sessionLabel: sessionResetLabel === null ? usageLabel : `${usageLabel} · ${sessionResetLabel}`,
     weeklyLabel:
       weeklyUsageLabel === null
         ? null

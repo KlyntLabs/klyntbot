@@ -1,17 +1,11 @@
+import { GENERIC_APP_ICON, getKnownOpenAppIcon } from "@app/utils/openAppIcons";
+import type { OpenAppDraft } from "@settings/components/settingsTypes";
+import { fileManagerName, isMacPlatform } from "@utils/platformPaths";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import { SettingsSection } from "@/features/design-system/components/settings/SettingsPrimitives";
 import type { OpenAppTarget } from "@/types";
-import {
-  fileManagerName,
-  isMacPlatform,
-} from "@utils/platformPaths";
-import {
-  GENERIC_APP_ICON,
-  getKnownOpenAppIcon,
-} from "@app/utils/openAppIcons";
-import type { OpenAppDraft } from "@settings/components/settingsTypes";
 
 type SettingsOpenAppsSectionProps = {
   openAppDrafts: OpenAppDraft[];
@@ -51,8 +45,7 @@ export function SettingsOpenAppsSection({
             getKnownOpenAppIcon(target.id) ?? openAppIconById[target.id] ?? GENERIC_APP_ICON;
           const labelValid = isOpenAppLabelValid(target.label);
           const appNameValid = target.kind !== "app" || Boolean(target.appName?.trim());
-          const commandValid =
-            target.kind !== "command" || Boolean(target.command?.trim());
+          const commandValid = target.kind !== "command" || Boolean(target.command?.trim());
           const isComplete = labelValid && appNameValid && commandValid;
           const incompleteHint = !labelValid
             ? "Label required"

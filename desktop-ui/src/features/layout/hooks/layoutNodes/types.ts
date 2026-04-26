@@ -1,6 +1,6 @@
-import type { ComponentProps, ReactNode } from "react";
 import type { ApprovalToasts } from "@app/components/ApprovalToasts";
 import type { MainHeader } from "@app/components/MainHeader";
+import type { ComponentProps, ReactNode } from "react";
 import type { Composer } from "@/features/composer/components/Composer";
 import type { DebugPanel } from "@/features/debug/components/DebugPanel";
 import type { FileTreePanel } from "@/features/files/components/FileTreePanel";
@@ -16,22 +16,22 @@ import type { TerminalSessionState } from "@/features/terminal/hooks/useTerminal
 import type { UpdateToast } from "@/features/update/components/UpdateToast";
 
 export type WorktreeRenameState = {
-	name: string;
-	error: string | null;
-	notice: string | null;
-	isSubmitting: boolean;
-	isDirty: boolean;
-	upstream?: {
-		oldBranch: string;
-		newBranch: string;
-		error: string | null;
-		isSubmitting: boolean;
-		onConfirm: () => void;
-	} | null;
-	onFocus: () => void;
-	onChange: (value: string) => void;
-	onCancel: () => void;
-	onCommit: () => void;
+  name: string;
+  error: string | null;
+  notice: string | null;
+  isSubmitting: boolean;
+  isDirty: boolean;
+  upstream?: {
+    oldBranch: string;
+    newBranch: string;
+    error: string | null;
+    isSubmitting: boolean;
+    onConfirm: () => void;
+  } | null;
+  onFocus: () => void;
+  onChange: (value: string) => void;
+  onCancel: () => void;
+  onCommit: () => void;
 };
 
 export type ChatViewProps = {
@@ -65,44 +65,44 @@ export type LayoutPrimarySurface = {
 };
 
 export type LayoutGitSurface = {
-	filePanelMode: ComponentProps<typeof GitDiffPanel>["filePanelMode"];
-	fileTreeProps: ComponentProps<typeof FileTreePanel> | null;
-	promptPanelProps: ComponentProps<typeof PromptPanel>;
-	gitDiffPanelProps: ComponentProps<typeof GitDiffPanel>;
-	gitDiffViewerProps: ComponentProps<typeof GitDiffViewer>;
-	diffViewProps: {
-		centerMode: "chat" | "diff";
-		splitChatDiffView: boolean;
-		gitDiffViewStyle: "split" | "unified";
-	};
+  filePanelMode: ComponentProps<typeof GitDiffPanel>["filePanelMode"];
+  fileTreeProps: ComponentProps<typeof FileTreePanel> | null;
+  promptPanelProps: ComponentProps<typeof PromptPanel>;
+  gitDiffPanelProps: ComponentProps<typeof GitDiffPanel>;
+  gitDiffViewerProps: ComponentProps<typeof GitDiffViewer>;
+  diffViewProps: {
+    centerMode: "chat" | "diff";
+    splitChatDiffView: boolean;
+    gitDiffViewStyle: "split" | "unified";
+  };
 };
 
 export type LayoutSecondarySurface = {
-	planPanelProps: ComponentProps<typeof PlanPanel>;
-	terminalDockProps: Omit<ComponentProps<typeof TerminalDock>, "terminalNode">;
-	terminalState: TerminalSessionState | null;
-	debugPanelProps: ComponentProps<typeof DebugPanel>;
+  planPanelProps: ComponentProps<typeof PlanPanel>;
+  terminalDockProps: Omit<ComponentProps<typeof TerminalDock>, "terminalNode">;
+  terminalState: TerminalSessionState | null;
+  debugPanelProps: ComponentProps<typeof DebugPanel>;
 };
 
 export type LayoutNodesOptions = {
-	primary: LayoutPrimarySurface;
-	git: LayoutGitSurface;
-	secondary: LayoutSecondarySurface;
+  primary: LayoutPrimarySurface;
+  git: LayoutGitSurface;
+  secondary: LayoutSecondarySurface;
 };
 
 export type LayoutNodesResult = {
-	sidebarNode: ReactNode;
-	messagesNode: ReactNode;
-	composerNode: ReactNode;
-	approvalToastsNode: ReactNode;
-	updateToastNode: ReactNode;
-	errorToastsNode: ReactNode;
-	homeNode: ReactNode;
-	mainHeaderNode: ReactNode;
-	desktopTopbarLeftNode: ReactNode;
-	gitDiffPanelNode: ReactNode;
-	gitDiffViewerNode: ReactNode;
-	planPanelNode: ReactNode;
-	debugPanelNode: ReactNode;
-	terminalDockNode: ReactNode;
+  sidebarNode: ReactNode;
+  messagesNode: ReactNode;
+  composerNode: ReactNode;
+  approvalToastsNode: ReactNode;
+  updateToastNode: ReactNode;
+  errorToastsNode: ReactNode;
+  homeNode: ReactNode;
+  mainHeaderNode: ReactNode;
+  desktopTopbarLeftNode: ReactNode;
+  gitDiffPanelNode: ReactNode;
+  gitDiffViewerNode: ReactNode;
+  planPanelNode: ReactNode;
+  debugPanelNode: ReactNode;
+  terminalDockNode: ReactNode;
 };

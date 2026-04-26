@@ -19,13 +19,11 @@ type HarnessProps = {
   disabled?: boolean;
 };
 
-function ComposerHarness({
-  activeThreadId,
-  activeWorkspaceId,
-  disabled = false,
-}: HarnessProps) {
-  const { activeImages, attachImages, removeImage, clearActiveImages } =
-    useComposerImages({ activeThreadId, activeWorkspaceId });
+function ComposerHarness({ activeThreadId, activeWorkspaceId, disabled = false }: HarnessProps) {
+  const { activeImages, attachImages, removeImage, clearActiveImages } = useComposerImages({
+    activeThreadId,
+    activeWorkspaceId,
+  });
   const [text, setText] = useState("");
   const [, setSelectionStart] = useState<number | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -58,11 +56,7 @@ function ComposerHarness({
         onHighlightIndex={() => {}}
         onSelectSuggestion={() => {}}
       />
-      <button
-        type="button"
-        data-testid="clear-images"
-        onClick={clearActiveImages}
-      >
+      <button type="button" data-testid="clear-images" onClick={clearActiveImages}>
         Clear
       </button>
     </div>
@@ -103,9 +97,9 @@ function renderComposerHarness(initial: HarnessProps): RenderedHarness {
 }
 
 function getAttachmentNames(container: HTMLElement) {
-  return Array.from(
-    container.querySelectorAll(".composer-attachment-name"),
-  ).map((node) => node.textContent ?? "");
+  return Array.from(container.querySelectorAll(".composer-attachment-name")).map(
+    (node) => node.textContent ?? "",
+  );
 }
 
 function getTextarea(container: HTMLElement) {
@@ -188,10 +182,7 @@ describe("Composer attachments integration", () => {
       dispatchDrop(textarea, [image, imageTwo]);
     });
 
-    expect(getAttachmentNames(harness.container)).toEqual([
-      "photo.png",
-      "second.jpg",
-    ]);
+    expect(getAttachmentNames(harness.container)).toEqual(["photo.png", "second.jpg"]);
 
     harness.unmount();
   });
@@ -234,14 +225,9 @@ describe("Composer attachments integration", () => {
       dispatchDrop(textarea, [first, second]);
     });
 
-    expect(getAttachmentNames(harness.container)).toEqual([
-      "first.png",
-      "second.png",
-    ]);
+    expect(getAttachmentNames(harness.container)).toEqual(["first.png", "second.png"]);
 
-    const removeButtons = harness.container.querySelectorAll(
-      ".composer-attachment-remove",
-    );
+    const removeButtons = harness.container.querySelectorAll(".composer-attachment-remove");
     expect(removeButtons.length).toBe(2);
 
     act(() => {
@@ -250,9 +236,7 @@ describe("Composer attachments integration", () => {
 
     expect(getAttachmentNames(harness.container)).toEqual(["second.png"]);
 
-    const clearButton = harness.container.querySelector(
-      "[data-testid='clear-images']",
-    );
+    const clearButton = harness.container.querySelector("[data-testid='clear-images']");
     if (!clearButton) {
       throw new Error("Clear button missing");
     }

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { BranchInfo, WorkspaceInfo } from "@/types";
 import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
-import { BranchList } from "./BranchList";
+import type { BranchInfo, WorkspaceInfo } from "@/types";
 import { filterBranches } from "../utils/branchSearch";
+import { BranchList } from "./BranchList";
 
 type BranchSwitcherPromptProps = {
   branches: BranchInfo[];
@@ -20,7 +20,7 @@ function getWorktreeByBranch(
 ): WorkspaceInfo | null {
   const activeRepoWorkspaceId = activeWorkspace
     ? activeWorkspace.kind === "worktree"
-      ? activeWorkspace.parentId ?? null
+      ? (activeWorkspace.parentId ?? null)
       : activeWorkspace.id
     : null;
   if (!activeRepoWorkspaceId) {
@@ -62,9 +62,7 @@ export function BranchSwitcherPrompt({
   }, [filteredBranches.length]);
 
   useEffect(() => {
-    const itemEl = listRef.current?.children[selectedIndex] as
-      | HTMLElement
-      | undefined;
+    const itemEl = listRef.current?.children[selectedIndex] as HTMLElement | undefined;
     itemEl?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
@@ -81,9 +79,7 @@ export function BranchSwitcherPrompt({
     }
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setSelectedIndex((prev) =>
-        prev < filteredBranches.length - 1 ? prev + 1 : prev,
-      );
+      setSelectedIndex((prev) => (prev < filteredBranches.length - 1 ? prev + 1 : prev));
       return;
     }
     if (event.key === "ArrowUp") {
@@ -130,19 +126,11 @@ export function BranchSwitcherPrompt({
         onMouseEnter={setSelectedIndex}
         renderMeta={(branch) => {
           const isCurrent = branch.name === currentBranch;
-          const worktree = getWorktreeByBranch(
-            workspaces,
-            activeWorkspace,
-            branch.name,
-          );
+          const worktree = getWorktreeByBranch(workspaces, activeWorkspace, branch.name);
           return (
             <span className="branch-switcher-modal-item-meta">
-              {isCurrent && (
-                <span className="branch-switcher-modal-item-current">current</span>
-              )}
-              {worktree && (
-                <span className="branch-switcher-modal-item-worktree">worktree</span>
-              )}
+              {isCurrent && <span className="branch-switcher-modal-item-current">current</span>}
+              {worktree && <span className="branch-switcher-modal-item-worktree">worktree</span>}
             </span>
           );
         }}

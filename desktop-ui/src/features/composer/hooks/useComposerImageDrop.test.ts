@@ -28,7 +28,10 @@ type RenderedHook = {
   unmount: () => void;
 };
 
-function renderImageDropHook(options: { disabled: boolean; onAttachImages?: (paths: string[]) => void }): RenderedHook {
+function renderImageDropHook(options: {
+  disabled: boolean;
+  onAttachImages?: (paths: string[]) => void;
+}): RenderedHook {
   let result: HookResult | undefined;
 
   function Test() {
@@ -139,9 +142,7 @@ describe("useComposerImageDrop", () => {
       } as unknown as React.DragEvent<HTMLElement>);
     });
 
-    expect(onAttachImages).toHaveBeenCalledWith([
-      "data:image/jpeg;base64,MOCK",
-    ]);
+    expect(onAttachImages).toHaveBeenCalledWith(["data:image/jpeg;base64,MOCK"]);
 
     hook.unmount();
     restoreFileReader();
@@ -167,9 +168,7 @@ describe("useComposerImageDrop", () => {
     });
 
     expect(preventDefault).toHaveBeenCalled();
-    expect(onAttachImages).toHaveBeenCalledWith([
-      "data:image/png;base64,MOCK",
-    ]);
+    expect(onAttachImages).toHaveBeenCalledWith(["data:image/png;base64,MOCK"]);
 
     hook.unmount();
     restoreFileReader();
@@ -180,8 +179,7 @@ describe("useComposerImageDrop", () => {
     const hook = renderImageDropHook({ disabled: false, onAttachImages });
 
     const target = document.createElement("div");
-    target.getBoundingClientRect = () =>
-      ({ left: 0, top: 0, right: 100, bottom: 100 } as DOMRect);
+    target.getBoundingClientRect = () => ({ left: 0, top: 0, right: 100, bottom: 100 }) as DOMRect;
     hook.result.dropTargetRef.current = target;
 
     Object.defineProperty(window, "devicePixelRatio", {
@@ -229,8 +227,7 @@ describe("useComposerImageDrop", () => {
     const hook = renderImageDropHook({ disabled: false, onAttachImages });
 
     const target = document.createElement("div");
-    target.getBoundingClientRect = () =>
-      ({ left: 0, top: 0, right: 100, bottom: 100 } as DOMRect);
+    target.getBoundingClientRect = () => ({ left: 0, top: 0, right: 100, bottom: 100 }) as DOMRect;
     hook.result.dropTargetRef.current = target;
 
     await act(async () => {

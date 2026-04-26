@@ -1,38 +1,30 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import { pushErrorToast } from "@/services/toasts";
-import type {
-  AccessMode,
-  AppMention,
-  AppSettings,
-  ComposerSendIntent,
-  ServiceTier,
-} from "@/types";
-import { normalizeCodexArgsInput } from "@/utils/codexArgsInput";
-import { useThreadCodexParams } from "@threads/hooks/useThreadCodexParams";
+import type { useThreadCodexParams } from "@threads/hooks/useThreadCodexParams";
 import { getIgnoredCodexArgsFlagsMetadata } from "@threads/utils/codexArgsProfiles";
 import {
   buildThreadCodexSeedPatch,
   createPendingThreadSeed,
   NO_THREAD_SCOPE_SUFFIX,
-  resolveThreadCodexState,
   type PendingNewThreadSeed,
+  resolveThreadCodexState,
 } from "@threads/utils/threadCodexParamsSeed";
 import { makeThreadCodexParamsKey } from "@threads/utils/threadStorage";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { pushErrorToast } from "@/services/toasts";
+import type { AccessMode, AppMention, AppSettings, ComposerSendIntent, ServiceTier } from "@/types";
+import { normalizeCodexArgsInput } from "@/utils/codexArgsInput";
 import { useThreadCodexOrchestration } from "./useThreadCodexOrchestration";
 
 type SetState<T> = Dispatch<SetStateAction<T>>;
 
-type PersistThreadCodexParams = (
-  patch: {
-    modelId?: string | null;
-    effort?: string | null;
-    serviceTier?: ServiceTier | null | undefined;
-    accessMode?: AccessMode | null;
-    collaborationModeId?: string | null;
-    codexArgsOverride?: string | null;
-  },
-) => void;
+type PersistThreadCodexParams = (patch: {
+  modelId?: string | null;
+  effort?: string | null;
+  serviceTier?: ServiceTier | null | undefined;
+  accessMode?: AccessMode | null;
+  collaborationModeId?: string | null;
+  codexArgsOverride?: string | null;
+}) => void;
 
 type UseThreadSelectionHandlersOrchestrationParams = {
   appSettingsLoading: boolean;
@@ -154,10 +146,7 @@ export function useThreadCodexSyncOrchestration({
       return;
     }
 
-    const stored = getThreadCodexParams(
-      workspaceId,
-      threadId ?? NO_THREAD_SCOPE_SUFFIX,
-    );
+    const stored = getThreadCodexParams(workspaceId, threadId ?? NO_THREAD_SCOPE_SUFFIX);
     const noThreadStored = getThreadCodexParams(workspaceId, NO_THREAD_SCOPE_SUFFIX);
     const resolved = resolveThreadCodexState({
       workspaceId,
@@ -227,9 +216,7 @@ export function useThreadCodexSyncOrchestration({
         accessMode,
         selectedCollaborationModeId,
         codexArgsOverride:
-          selectedCodexArgsOverride === undefined
-            ? undefined
-            : selectedCodexArgsOverride,
+          selectedCodexArgsOverride === undefined ? undefined : selectedCodexArgsOverride,
         pendingSeed,
       }),
     );
@@ -498,13 +485,7 @@ export function useThreadUiOrchestration({
     removeThread(activeWorkspaceId, activeThreadId);
     clearDraftForThread(activeThreadId);
     removeImagesForThread(activeThreadId);
-  }, [
-    activeThreadId,
-    activeWorkspaceId,
-    clearDraftForThread,
-    removeImagesForThread,
-    removeThread,
-  ]);
+  }, [activeThreadId, activeWorkspaceId, clearDraftForThread, removeImagesForThread, removeThread]);
 
   return {
     handleComposerSendWithDraftStart,

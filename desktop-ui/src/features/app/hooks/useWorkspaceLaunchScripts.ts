@@ -1,16 +1,16 @@
+import { writeTerminalSession } from "@services/tauri";
+import { pushErrorToast } from "@services/toasts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TerminalSessionState } from "@/features/terminal/hooks/useTerminalSession";
 import type {
   LaunchScriptEntry,
   LaunchScriptIconId,
   WorkspaceInfo,
   WorkspaceSettings,
 } from "@/types";
-import type { TerminalSessionState } from "@/features/terminal/hooks/useTerminalSession";
-import { writeTerminalSession } from "@services/tauri";
-import { pushErrorToast } from "@services/toasts";
 import {
-  DEFAULT_LAUNCH_SCRIPT_ICON,
   coerceLaunchScriptIconId,
+  DEFAULT_LAUNCH_SCRIPT_ICON,
   getLaunchScriptIconLabel,
 } from "../utils/launchScriptIcons";
 
@@ -326,9 +326,7 @@ export function useWorkspaceLaunchScripts({
 
   useEffect(() => {
     const pending = pendingRunRef.current;
-    const pendingKey = pending
-      ? `${pending.workspaceId}:${pending.terminalId}`
-      : null;
+    const pendingKey = pending ? `${pending.workspaceId}:${pending.terminalId}` : null;
     if (
       !pending ||
       terminalState?.readyKey !== pendingKey ||

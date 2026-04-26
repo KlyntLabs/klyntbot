@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildCodexArgsOptions,
   buildCodexArgsBadgeLabel,
-  buildEffectiveCodexArgsBadgeLabel,
   buildCodexArgsOptionLabel,
+  buildCodexArgsOptions,
+  buildEffectiveCodexArgsBadgeLabel,
   getIgnoredCodexArgsFlagsMetadata,
   parseCodexArgsProfile,
   sanitizeRuntimeCodexArgs,
@@ -53,23 +53,23 @@ describe("codexArgsProfiles", () => {
   });
 
   it("builds badge labels from only the first recognized segment", () => {
-    expect(
-      buildCodexArgsBadgeLabel("--profile dev --auth-file auth.json --enable snapshots"),
-    ).toBe("profile:dev");
+    expect(buildCodexArgsBadgeLabel("--profile dev --auth-file auth.json --enable snapshots")).toBe(
+      "profile:dev",
+    );
   });
 
   it("skips valueless recognized flags and continues parsing later valid segments", () => {
     const parsed = parseCodexArgsProfile("--enable --profile dev");
 
-    expect(parsed.recognizedSegments.map((segment) => segment.label)).toEqual([
-      "profile:dev",
-    ]);
+    expect(parsed.recognizedSegments.map((segment) => segment.label)).toEqual(["profile:dev"]);
     expect(parsed.effectiveArgs).toBe("--profile dev");
   });
 
   it("returns empty effective override when args only contain ignored flags", () => {
     expect(
-      sanitizeRuntimeCodexArgs("--model gpt-5 --full-auto --no-alt-screen --sandbox workspace-write"),
+      sanitizeRuntimeCodexArgs(
+        "--model gpt-5 --full-auto --no-alt-screen --sandbox workspace-write",
+      ),
     ).toBeNull();
   });
 

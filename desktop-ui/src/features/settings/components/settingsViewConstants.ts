@@ -34,10 +34,7 @@ export const COMPOSER_PRESET_LABELS: Record<ComposerPreset, string> = {
   smart: "Smart",
 };
 
-export const COMPOSER_PRESET_CONFIGS: Record<
-  ComposerPreset,
-  ComposerPresetSettings
-> = {
+export const COMPOSER_PRESET_CONFIGS: Record<ComposerPreset, ComposerPresetSettings> = {
   default: {
     composerFenceExpandOnSpace: false,
     composerFenceExpandOnEnter: false,
@@ -89,10 +86,7 @@ export const SETTINGS_SECTION_LABELS: Record<CodexSection, string> = {
   features: "Features",
 };
 
-export const SHORTCUT_DRAFT_KEY_BY_SETTING: Record<
-  ShortcutSettingKey,
-  ShortcutDraftKey
-> = {
+export const SHORTCUT_DRAFT_KEY_BY_SETTING: Record<ShortcutSettingKey, ShortcutDraftKey> = {
   composerModelShortcut: "model",
   composerAccessShortcut: "access",
   composerReasoningShortcut: "reasoning",

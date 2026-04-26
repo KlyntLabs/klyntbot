@@ -29,20 +29,12 @@ export function HomeLatestAgentsSection({
               <div className="home-latest-card-header">
                 <div className="home-latest-project">
                   <span className="home-latest-project-name">{run.projectName}</span>
-                  {run.groupName && (
-                    <span className="home-latest-group">{run.groupName}</span>
-                  )}
+                  {run.groupName && <span className="home-latest-group">{run.groupName}</span>}
                 </div>
-                <div className="home-latest-time">
-                  {formatRelativeTime(run.timestamp)}
-                </div>
+                <div className="home-latest-time">{formatRelativeTime(run.timestamp)}</div>
               </div>
-              <div className="home-latest-message">
-                {run.message.trim() || "Agent replied."}
-              </div>
-              {run.isProcessing && (
-                <div className="home-latest-status">Running</div>
-              )}
+              <div className="home-latest-message">{run.message.trim() || "Agent replied."}</div>
+              {run.isProcessing && <div className="home-latest-status">Running</div>}
             </button>
           ))}
         </div>

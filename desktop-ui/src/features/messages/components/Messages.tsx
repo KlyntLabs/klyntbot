@@ -1,14 +1,14 @@
-import { memo, useCallback } from "react";
+import { PlanReadyFollowupMessage } from "@app/components/PlanReadyFollowupMessage";
+import { RequestUserInputMessage } from "@app/components/RequestUserInputMessage";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
+import { memo, useCallback } from "react";
 import type {
   ConversationItem,
   OpenAppTarget,
   RequestUserInputRequest,
   RequestUserInputResponse,
 } from "@/types";
-import { PlanReadyFollowupMessage } from "@app/components/PlanReadyFollowupMessage";
-import { RequestUserInputMessage } from "@app/components/RequestUserInputMessage";
 import { useFileLinkOpener } from "../hooks/useFileLinkOpener";
 import { formatCount, parseReasoning } from "../utils/messageRenderUtils";
 import {
@@ -197,12 +197,7 @@ export const Messages = memo(function Messages({
     if (item.kind === "userInput") {
       const isExpanded = expandedItems.has(item.id);
       return (
-        <UserInputRow
-          key={item.id}
-          item={item}
-          isExpanded={isExpanded}
-          onToggle={toggleExpanded}
-        />
+        <UserInputRow key={item.id} item={item} isExpanded={isExpanded} onToggle={toggleExpanded} />
       );
     }
     if (item.kind === "diff") {
@@ -232,19 +227,13 @@ export const Messages = memo(function Messages({
   };
 
   return (
-    <div
-      className="messages messages-full"
-      ref={containerRef}
-      onScroll={updateAutoScroll}
-    >
+    <div className="messages messages-full" ref={containerRef} onScroll={updateAutoScroll}>
       <div className="messages-inner">
         {groupedItems.map((entry) => {
           if (entry.kind === "toolGroup") {
             const { group } = entry;
             const isCollapsed = collapsedToolGroups.has(group.id);
-            const summaryParts = [
-              formatCount(group.toolCount, "tool call", "tool calls"),
-            ];
+            const summaryParts = [formatCount(group.toolCount, "tool call", "tool calls")];
             if (group.messageCount > 0) {
               summaryParts.push(formatCount(group.messageCount, "message", "messages"));
             }

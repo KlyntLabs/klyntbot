@@ -1,10 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  CollaborationModeOption,
-  DebugEntry,
-  WorkspaceInfo,
-} from "@/types";
 import { getCollaborationModes } from "@services/tauri";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CollaborationModeOption, DebugEntry, WorkspaceInfo } from "@/types";
 
 type UseCollaborationModesOptions = {
   activeWorkspace: WorkspaceInfo | null;
@@ -18,13 +14,11 @@ function pickWorkspaceDefaultModeId(modes: CollaborationModeOption[]): string | 
   return (
     modes.find(
       (mode) =>
-        mode.id.trim().toLowerCase() === "default" ||
-        mode.mode.trim().toLowerCase() === "default",
+        mode.id.trim().toLowerCase() === "default" || mode.mode.trim().toLowerCase() === "default",
     )?.id ??
     modes.find(
       (mode) =>
-        mode.id.trim().toLowerCase() === "code" ||
-        mode.mode.trim().toLowerCase() === "code",
+        mode.id.trim().toLowerCase() === "code" || mode.mode.trim().toLowerCase() === "code",
     )?.id ??
     modes[0]?.id ??
     null
@@ -124,12 +118,9 @@ export function useCollaborationModes({
               ? item.settings
               : {
                   model: item.model ?? null,
-                  reasoning_effort:
-                    item.reasoning_effort ?? item.reasoningEffort ?? null,
+                  reasoning_effort: item.reasoning_effort ?? item.reasoningEffort ?? null,
                   developer_instructions:
-                    item.developer_instructions ??
-                    item.developerInstructions ??
-                    null,
+                    item.developer_instructions ?? item.developerInstructions ?? null,
                 };
 
           const model = String(settings.model ?? "");
@@ -149,9 +140,7 @@ export function useCollaborationModes({
             mode: modeId,
             model,
             reasoningEffort: reasoningEffort ? String(reasoningEffort) : null,
-            developerInstructions: developerInstructions
-              ? String(developerInstructions)
-              : null,
+            developerInstructions: developerInstructions ? String(developerInstructions) : null,
             value: item as Record<string, unknown>,
           };
           return option;

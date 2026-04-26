@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useGitCommitDiffs } from "@/features/git/hooks/useGitCommitDiffs";
+import { useGitDiffs } from "@/features/git/hooks/useGitDiffs";
+import { useGitLog } from "@/features/git/hooks/useGitLog";
+import { useGitStatus } from "@/features/git/hooks/useGitStatus";
+import type { GitDiffSource, GitPanelMode } from "@/features/git/types";
+import { buildPerFileThreadDiffs } from "@/features/git/utils/perFileThreadDiffs";
 import type {
   ConversationItem,
   GitHubPullRequest,
   GitHubPullRequestDiff,
   WorkspaceInfo,
 } from "@/types";
-import { useGitStatus } from "@/features/git/hooks/useGitStatus";
-import { useGitDiffs } from "@/features/git/hooks/useGitDiffs";
-import { useGitLog } from "@/features/git/hooks/useGitLog";
-import { useGitCommitDiffs } from "@/features/git/hooks/useGitCommitDiffs";
-import type { GitDiffSource, GitPanelMode } from "@/features/git/types";
-import { buildPerFileThreadDiffs } from "@/features/git/utils/perFileThreadDiffs";
 
 export function useGitPanelController({
   activeWorkspace,
@@ -46,17 +46,10 @@ export function useGitPanelController({
   const [diffScrollRequestId, setDiffScrollRequestId] = useState(0);
   const pendingDiffScrollRef = useRef(false);
   const [gitPanelMode, setGitPanelMode] = useState<GitPanelMode>("diff");
-  const [gitDiffViewStyle, setGitDiffViewStyle] = useState<
-    "split" | "unified"
-  >("split");
-  const [filePanelMode, setFilePanelMode] = useState<
-    "git" | "files" | "prompts"
-  >("git");
-  const [selectedPullRequest, setSelectedPullRequest] =
-    useState<GitHubPullRequest | null>(null);
-  const [selectedCommitSha, setSelectedCommitSha] = useState<string | null>(
-    null,
-  );
+  const [gitDiffViewStyle, setGitDiffViewStyle] = useState<"split" | "unified">("split");
+  const [filePanelMode, setFilePanelMode] = useState<"git" | "files" | "prompts">("git");
+  const [selectedPullRequest, setSelectedPullRequest] = useState<GitHubPullRequest | null>(null);
+  const [selectedCommitSha, setSelectedCommitSha] = useState<string | null>(null);
   const [diffSource, setDiffSource] = useState<GitDiffSource>("local");
   void gitDiffIgnoreWhitespaceChanges;
 
@@ -65,9 +58,7 @@ export function useGitPanelController({
     [activeItems],
   );
 
-  const { status: gitStatus, refresh: refreshGitStatus } = useGitStatus(
-    activeWorkspace,
-  );
+  const { status: gitStatus, refresh: refreshGitStatus } = useGitStatus(activeWorkspace);
   const gitStatusRefreshTimeoutRef = useRef<number | null>(null);
   const activeWorkspaceIdRef = useRef<string | null>(activeWorkspace?.id ?? null);
   const activeWorkspaceRef = useRef(activeWorkspace);
@@ -108,15 +99,13 @@ export function useGitPanelController({
   const preloadedWorkspaceIdsRef = useRef<Set<string>>(new Set());
   const compactTab = isTablet ? tabletTab : activeTab;
   const diffUiVisible =
-    centerMode === "diff" ||
-    (isCompact ? compactTab === "git" : gitPanelMode === "diff");
+    centerMode === "diff" || (isCompact ? compactTab === "git" : gitPanelMode === "diff");
   const shouldPreloadDiffs = Boolean(
     gitDiffPreloadEnabled &&
       activeWorkspace &&
       !preloadedWorkspaceIdsRef.current.has(activeWorkspace.id),
   );
-  const shouldLoadSelectedLocalDiff =
-    centerMode === "diff" && Boolean(selectedDiffPath);
+  const shouldLoadSelectedLocalDiff = centerMode === "diff" && Boolean(selectedDiffPath);
   const shouldLoadLocalDiffsForSplitView = splitChatDiffView && diffSource === "local";
   const shouldLoadLocalDiffs =
     Boolean(activeWorkspace) &&
@@ -125,8 +114,7 @@ export function useGitPanelController({
         ? diffUiVisible
         : shouldLoadSelectedLocalDiff || shouldLoadLocalDiffsForSplitView));
   const shouldLoadDiffs =
-    Boolean(activeWorkspace) &&
-    (diffSource === "local" ? shouldLoadLocalDiffs : diffUiVisible);
+    Boolean(activeWorkspace) && (diffSource === "local" ? shouldLoadLocalDiffs : diffUiVisible);
   const {
     diffs: gitDiffs,
     isLoading: isDiffLoading,
@@ -161,13 +149,7 @@ export function useGitPanelController({
       return;
     }
     preloadedWorkspaceIdsRef.current.add(activeWorkspace.id);
-  }, [
-    activeWorkspace,
-    diffError,
-    gitDiffs.length,
-    isDiffLoading,
-    shouldPreloadDiffs,
-  ]);
+  }, [activeWorkspace, diffError, gitDiffs.length, isDiffLoading, shouldPreloadDiffs]);
 
   const {
     entries: gitLogEntries,
@@ -193,25 +175,25 @@ export function useGitPanelController({
       ? gitCommitDiffs
       : diffSource === "perFile"
         ? perFileDiffs
-      : diffSource === "pr"
-        ? prDiffs
-        : orderedGitDiffs;
+        : diffSource === "pr"
+          ? prDiffs
+          : orderedGitDiffs;
   const activeDiffLoading =
     diffSource === "commit"
       ? gitCommitDiffsLoading
       : diffSource === "perFile"
         ? false
-      : diffSource === "pr"
-        ? prDiffsLoading
-        : isDiffLoading;
+        : diffSource === "pr"
+          ? prDiffsLoading
+          : isDiffLoading;
   const activeDiffError =
     diffSource === "commit"
       ? gitCommitDiffsError
       : diffSource === "perFile"
         ? null
-      : diffSource === "pr"
-        ? prDiffsError
-        : diffError;
+        : diffSource === "pr"
+          ? prDiffsError
+          : diffError;
 
   const handleSelectDiff = useCallback(
     (path: string) => {

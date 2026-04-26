@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
-import type { AppSettings, WorkspaceInfo } from "@/types";
 import { normalizeWorktreeSetupScript } from "@settings/components/settingsViewHelpers";
+import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { AppSettings, WorkspaceInfo } from "@/types";
 
 type UseSettingsEnvironmentsSectionArgs = {
   appSettings: AppSettings;
@@ -43,7 +43,9 @@ export const useSettingsEnvironmentsSection = ({
   const [environmentWorkspaceId, setEnvironmentWorkspaceId] = useState<string | null>(null);
   const [environmentDraftScript, setEnvironmentDraftScript] = useState("");
   const [environmentSavedScript, setEnvironmentSavedScript] = useState<string | null>(null);
-  const [environmentLoadedWorkspaceId, setEnvironmentLoadedWorkspaceId] = useState<string | null>(null);
+  const [environmentLoadedWorkspaceId, setEnvironmentLoadedWorkspaceId] = useState<string | null>(
+    null,
+  );
   const [environmentError, setEnvironmentError] = useState<string | null>(null);
   const [environmentSaving, setEnvironmentSaving] = useState(false);
   const [globalWorktreesFolderDraft, setGlobalWorktreesFolderDraft] = useState(

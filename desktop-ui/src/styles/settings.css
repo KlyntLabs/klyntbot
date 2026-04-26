@@ -626,8 +626,9 @@
   background: var(--surface-control);
   color: var(--text-strong);
   font-size: var(--fs-sm);
-  transition: border-color var(--ds-dur-normal) var(--ds-ease-out-soft),
-              box-shadow var(--ds-dur-normal) var(--ds-ease-out-soft);
+  transition:
+    border-color var(--ds-dur-normal) var(--ds-ease-out-soft),
+    box-shadow var(--ds-dur-normal) var(--ds-ease-out-soft);
 }
 
 .settings-input--compact {
@@ -651,7 +652,6 @@
   letter-spacing: 0.02em;
 }
 
-
 .settings-scale-controls {
   display: flex;
   align-items: center;
@@ -672,8 +672,9 @@
   background: var(--surface-control);
   color: var(--text-strong);
   font-size: var(--fs-sm);
-  transition: border-color var(--ds-dur-normal) var(--ds-ease-out-soft),
-              box-shadow var(--ds-dur-normal) var(--ds-ease-out-soft);
+  transition:
+    border-color var(--ds-dur-normal) var(--ds-ease-out-soft),
+    box-shadow var(--ds-dur-normal) var(--ds-ease-out-soft);
 }
 
 .settings-select option {
@@ -1207,8 +1208,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  transition: background var(--ds-dur-normal) var(--ds-ease-out-soft),
-              border-color var(--ds-dur-normal) var(--ds-ease-out-soft);
+  transition:
+    background var(--ds-dur-normal) var(--ds-ease-out-soft),
+    border-color var(--ds-dur-normal) var(--ds-ease-out-soft);
 }
 
 .settings-toggle.on {

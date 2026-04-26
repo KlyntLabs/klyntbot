@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { WorkspaceInfo } from "@/types";
-import type { TerminalSessionState } from "@/features/terminal/hooks/useTerminalSession";
-import type { WorkspaceSettings } from "@/types";
 import { writeTerminalSession } from "@services/tauri";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { TerminalSessionState } from "@/features/terminal/hooks/useTerminalSession";
+import type { WorkspaceInfo, WorkspaceSettings } from "@/types";
 
 type PendingLaunch = {
   workspaceId: string;
@@ -110,24 +109,15 @@ export function useWorkspaceLaunchScript({
       script,
     };
     openTerminal();
-    restartLaunchSession(activeWorkspace.id, terminalId)
-      .catch((err) => {
-        pendingRunRef.current = null;
-        setError(err instanceof Error ? err.message : String(err));
-      });
-  }, [
-    activeWorkspace,
-    ensureLaunchTerminal,
-    onOpenEditor,
-    openTerminal,
-    restartLaunchSession,
-  ]);
+    restartLaunchSession(activeWorkspace.id, terminalId).catch((err) => {
+      pendingRunRef.current = null;
+      setError(err instanceof Error ? err.message : String(err));
+    });
+  }, [activeWorkspace, ensureLaunchTerminal, onOpenEditor, openTerminal, restartLaunchSession]);
 
   useEffect(() => {
     const pending = pendingRunRef.current;
-    const pendingKey = pending
-      ? `${pending.workspaceId}:${pending.terminalId}`
-      : null;
+    const pendingKey = pending ? `${pending.workspaceId}:${pending.terminalId}` : null;
     if (
       !pending ||
       terminalState?.readyKey !== pendingKey ||

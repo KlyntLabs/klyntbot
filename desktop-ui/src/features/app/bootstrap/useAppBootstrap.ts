@@ -1,9 +1,9 @@
-import { isMobilePlatform } from "@utils/platformPaths";
-import { useDebugLog } from "@/features/debug/hooks/useDebugLog";
 import { useAppSettingsController } from "@app/hooks/useAppSettingsController";
 import { useCodeCssVars } from "@app/hooks/useCodeCssVars";
 import { useDictationController } from "@app/hooks/useDictationController";
 import { useLiquidGlassEffect } from "@app/hooks/useLiquidGlassEffect";
+import { isMobilePlatform } from "@utils/platformPaths";
+import { useDebugLog } from "@/features/debug/hooks/useDebugLog";
 
 export function useAppBootstrap() {
   const appSettingsState = useAppSettingsController();
@@ -12,8 +12,7 @@ export function useAppBootstrap() {
   const dictationState = useDictationController(appSettingsState.appSettings);
   const debugState = useDebugLog();
 
-  const shouldReduceTransparency =
-    appSettingsState.reduceTransparency || isMobilePlatform();
+  const shouldReduceTransparency = appSettingsState.reduceTransparency || isMobilePlatform();
 
   useLiquidGlassEffect({
     reduceTransparency: shouldReduceTransparency,

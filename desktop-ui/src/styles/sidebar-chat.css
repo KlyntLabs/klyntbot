@@ -149,7 +149,9 @@
   padding: 4px 12px;
   border-radius: 999px;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
 }
 
 .sidebar-chat__upgrade:hover {

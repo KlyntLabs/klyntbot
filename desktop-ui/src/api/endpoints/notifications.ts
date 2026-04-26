@@ -13,9 +13,7 @@ export async function sendNotification(
     extra?: Record<string, unknown>;
   },
 ): Promise<void> {
-  const macosDebugBuild = await invoke<boolean>("is_macos_debug_build").catch(
-    () => false,
-  );
+  const macosDebugBuild = await invoke<boolean>("is_macos_debug_build").catch(() => false);
   const attemptFallback = async () => {
     try {
       await invoke("send_notification_fallback", { title, body });

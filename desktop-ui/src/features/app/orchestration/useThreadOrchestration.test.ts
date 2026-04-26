@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
+import type { PendingNewThreadSeed } from "@threads/utils/threadCodexParamsSeed";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { pushErrorToast } from "@/services/toasts";
 import type { AccessMode, AppSettings } from "@/types";
-import type { PendingNewThreadSeed } from "@threads/utils/threadCodexParamsSeed";
 import {
   useThreadCodexSyncOrchestration,
   useThreadSelectionHandlersOrchestration,
@@ -63,21 +63,15 @@ function makeSyncParams(
     threadCodexParamsVersion: 0,
     getThreadCodexParams,
     patchThreadCodexParams,
-    setThreadCodexSelectionKey: vi.fn() as unknown as Dispatch<
-      SetStateAction<string | null>
-    >,
+    setThreadCodexSelectionKey: vi.fn() as unknown as Dispatch<SetStateAction<string | null>>,
     setAccessMode: vi.fn() as unknown as Dispatch<SetStateAction<AccessMode>>,
     setPreferredModelId: vi.fn() as unknown as Dispatch<SetStateAction<string | null>>,
     setPreferredEffort: vi.fn() as unknown as Dispatch<SetStateAction<string | null>>,
     setPreferredServiceTier: vi.fn() as unknown as Dispatch<
       SetStateAction<"fast" | "flex" | null | undefined>
     >,
-    setPreferredCollabModeId: vi.fn() as unknown as Dispatch<
-      SetStateAction<string | null>
-    >,
-    setPreferredCodexArgsOverride: vi.fn() as unknown as Dispatch<
-      SetStateAction<string | null>
-    >,
+    setPreferredCollabModeId: vi.fn() as unknown as Dispatch<SetStateAction<string | null>>,
+    setPreferredCodexArgsOverride: vi.fn() as unknown as Dispatch<SetStateAction<string | null>>,
     activeThreadIdRef: { current: null } as MutableRefObject<string | null>,
     pendingNewThreadSeedRef: {
       current: null,
@@ -256,38 +250,34 @@ describe("useThreadCodexSyncOrchestration seed behavior", () => {
 
   it("syncs selected codex args from no-thread fallback when thread scope is inherit", async () => {
     const params = makeSyncParams();
-    params.getThreadCodexParams.mockImplementation(
-      (_workspaceId: string, threadId: string) => {
-        if (threadId === "thread-2") {
-          return {
-            modelId: null,
-            effort: null,
-            accessMode: null,
-            collaborationModeId: null,
-            codexArgsOverride: undefined,
-            updatedAt: 1,
-          };
-        }
-        if (threadId === "__no_thread__") {
-          return {
-            modelId: null,
-            effort: null,
-            accessMode: null,
-            collaborationModeId: null,
-            codexArgsOverride: "--profile inherited",
-            updatedAt: 2,
-          };
-        }
-        return null;
-      },
-    );
+    params.getThreadCodexParams.mockImplementation((_workspaceId: string, threadId: string) => {
+      if (threadId === "thread-2") {
+        return {
+          modelId: null,
+          effort: null,
+          accessMode: null,
+          collaborationModeId: null,
+          codexArgsOverride: undefined,
+          updatedAt: 1,
+        };
+      }
+      if (threadId === "__no_thread__") {
+        return {
+          modelId: null,
+          effort: null,
+          accessMode: null,
+          collaborationModeId: null,
+          codexArgsOverride: "--profile inherited",
+          updatedAt: 2,
+        };
+      }
+      return null;
+    });
 
     renderHook(() => useThreadCodexSyncOrchestration(params));
 
     await waitFor(() => {
-      expect(params.setPreferredCodexArgsOverride).toHaveBeenCalledWith(
-        "--profile inherited",
-      );
+      expect(params.setPreferredCodexArgsOverride).toHaveBeenCalledWith("--profile inherited");
     });
 
     expect(params.patchThreadCodexParams).not.toHaveBeenCalled();

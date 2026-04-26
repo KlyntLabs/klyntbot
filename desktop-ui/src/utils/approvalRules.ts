@@ -15,9 +15,7 @@ const COMMAND_KEYS = [
   "proposed_exec_policy_amendment",
 ];
 
-export function getApprovalCommandInfo(
-  params: Record<string, unknown>,
-): CommandInfo | null {
+export function getApprovalCommandInfo(params: Record<string, unknown>): CommandInfo | null {
   const tokens = extractTokens(params);
   if (!tokens || tokens.length === 0) {
     return null;
@@ -74,7 +72,7 @@ function extractTokens(value: unknown): string[] | null {
 function splitCommandLine(input: string): string[] {
   const tokens: string[] = [];
   let current = "";
-  let quote: "\"" | "'" | null = null;
+  let quote: '"' | "'" | null = null;
   let escaped = false;
 
   for (const char of input) {
@@ -98,7 +96,7 @@ function splitCommandLine(input: string): string[] {
       continue;
     }
 
-    if (char === "\"" || char === "'") {
+    if (char === '"' || char === "'") {
       quote = char;
       continue;
     }
@@ -125,10 +123,7 @@ export function normalizeCommandTokens(tokens: string[]): string[] {
   return tokens.map((token) => token.trim()).filter(Boolean);
 }
 
-export function matchesCommandPrefix(
-  command: string[],
-  allowlist: string[][],
-): boolean {
+export function matchesCommandPrefix(command: string[], allowlist: string[][]): boolean {
   const normalized = normalizeCommandTokens(command);
   if (!normalized.length) {
     return false;

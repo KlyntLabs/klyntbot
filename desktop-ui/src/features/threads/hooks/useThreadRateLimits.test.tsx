@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { getAccountRateLimits } from "@services/tauri";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { normalizeRateLimits } from "@threads/utils/threadNormalize";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useThreadRateLimits } from "./useThreadRateLimits";
 
 vi.mock("@services/tauri", () => ({
@@ -104,11 +105,7 @@ describe("useThreadRateLimits", () => {
     });
 
     const { rerender } = renderHook(
-      ({
-        getCurrentRateLimits,
-      }: {
-        getCurrentRateLimits: (workspaceId: string) => null;
-      }) =>
+      ({ getCurrentRateLimits }: { getCurrentRateLimits: (workspaceId: string) => null }) =>
         useThreadRateLimits({
           activeWorkspaceId: "ws-1",
           activeWorkspaceConnected: true,

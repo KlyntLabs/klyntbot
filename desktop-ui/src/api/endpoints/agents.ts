@@ -1,6 +1,5 @@
 import { invoke } from "../client";
 
-
 export type AgentSummary = {
   name: string;
   description: string | null;
@@ -51,9 +50,7 @@ export async function getAgentsSettings(): Promise<AgentsSettings> {
   return invoke<AgentsSettings>("get_agents_settings");
 }
 
-export async function setAgentsCoreSettings(
-  input: SetAgentsCoreInput,
-): Promise<AgentsSettings> {
+export async function setAgentsCoreSettings(input: SetAgentsCoreInput): Promise<AgentsSettings> {
   return invoke<AgentsSettings>("set_agents_core_settings", { input });
 }
 
@@ -73,10 +70,7 @@ export async function readAgentConfigToml(agentName: string): Promise<string> {
   return invoke<string>("read_agent_config_toml", { agentName });
 }
 
-export async function writeAgentConfigToml(
-  agentName: string,
-  content: string,
-): Promise<void> {
+export async function writeAgentConfigToml(agentName: string, content: string): Promise<void> {
   return invoke("write_agent_config_toml", { agentName, content });
 }
 

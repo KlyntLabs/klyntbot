@@ -61,10 +61,7 @@ function parseToolArgs(detail: string) {
   }
 }
 
-function firstStringField(
-  source: Record<string, unknown> | null,
-  keys: string[],
-) {
+function firstStringField(source: Record<string, unknown> | null, keys: string[]) {
   if (!source) {
     return "";
   }
@@ -77,11 +74,7 @@ function firstStringField(
   return "";
 }
 
-function formatCollabAgentLabel(agent: {
-  threadId: string;
-  nickname?: string;
-  role?: string;
-}) {
+function formatCollabAgentLabel(agent: { threadId: string; nickname?: string; role?: string }) {
   const nickname = agent.nickname?.trim();
   const role = agent.role?.trim();
   if (nickname && role) {
@@ -97,7 +90,10 @@ function formatCollabAgentLabel(agent: {
 }
 
 function summarizeCollabLabel(title: string, status?: string) {
-  const tool = title.replace(/^collab:\s*/i, "").trim().toLowerCase();
+  const tool = title
+    .replace(/^collab:\s*/i, "")
+    .trim()
+    .toLowerCase();
   const tone = statusToneFromText(status);
   if (tool.includes("wait")) {
     return tone === "processing" ? "waiting for" : "waited for";
@@ -117,9 +113,7 @@ function summarizeCollabLabel(title: string, status?: string) {
   return "sub-agent";
 }
 
-function summarizeCollabReceiver(
-  item: Extract<ConversationItem, { kind: "tool" }>,
-) {
+function summarizeCollabReceiver(item: Extract<ConversationItem, { kind: "tool" }>) {
   const receivers =
     item.collabReceivers && item.collabReceivers.length > 0
       ? item.collabReceivers
@@ -329,9 +323,7 @@ export function cleanCommandText(commandText: string) {
     /^(?:\/\S+\/)?(?:bash|zsh|sh|fish)(?:\.exe)?\s+-lc\s+(['"])([\s\S]+)\1$/,
   );
   const inner = shellMatch ? shellMatch[2] : trimmed;
-  const cdMatch = inner.match(
-    /^\s*cd\s+[^&;]+(?:\s*&&\s*|\s*;\s*)([\s\S]+)$/i,
-  );
+  const cdMatch = inner.match(/^\s*cd\s+[^&;]+(?:\s*&&\s*|\s*;\s*)([\s\S]+)$/i);
   const stripped = cdMatch ? cdMatch[1] : inner;
   return stripped.trim();
 }
@@ -389,13 +381,11 @@ export function buildToolSummary(
     if (toolName.toLowerCase().includes("search")) {
       return {
         label: statusToneFromText(item.status) === "processing" ? "searching" : "searched",
-        value:
-          firstStringField(args, ["query", "pattern", "text"]) || item.detail,
+        value: firstStringField(args, ["query", "pattern", "text"]) || item.detail,
       };
     }
     if (toolName.toLowerCase().includes("read")) {
-      const targetPath =
-        firstStringField(args, ["path", "file", "filename"]) || item.detail;
+      const targetPath = firstStringField(args, ["path", "file", "filename"]) || item.detail;
       return {
         label: "read",
         value: basename(targetPath),
@@ -457,9 +447,7 @@ export function toolStatusTone(
   return "processing";
 }
 
-export function formatToolStatusLabel(
-  item: Extract<ConversationItem, { kind: "tool" }>,
-) {
+export function formatToolStatusLabel(item: Extract<ConversationItem, { kind: "tool" }>) {
   if (item.toolType !== "hook") {
     return "";
   }
@@ -473,7 +461,6 @@ export function formatToolStatusLabel(
   }
   return parts.join(" • ");
 }
-
 
 export type PlanFollowupState = {
   shouldShow: boolean;

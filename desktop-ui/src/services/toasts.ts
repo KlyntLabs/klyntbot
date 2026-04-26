@@ -42,4 +42,3 @@ export function subscribeErrorToasts(listener: ErrorToastListener) {
     errorToastListeners.delete(listener);
   };
 }
-

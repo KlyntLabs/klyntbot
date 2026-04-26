@@ -13,9 +13,7 @@ export type SettingsSection =
 
 export function useSettingsModalState() {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(
-    null,
-  );
+  const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
 
   const openSettings = useCallback((section?: SettingsSection) => {
     setSettingsSection(section ?? null);

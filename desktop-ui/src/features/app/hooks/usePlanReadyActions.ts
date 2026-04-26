@@ -1,13 +1,9 @@
-import { useCallback } from "react";
-import type {
-  CollaborationModeOption,
-  SendMessageResult,
-  WorkspaceInfo,
-} from "@/types";
 import {
   makePlanReadyAcceptMessage,
   makePlanReadyChangesMessage,
 } from "@utils/internalPlanReadyMessages";
+import { useCallback } from "react";
+import type { CollaborationModeOption, SendMessageResult, WorkspaceInfo } from "@/types";
 
 type SendUserMessageOptions = {
   collaborationMode?: Record<string, unknown> | null;
@@ -51,9 +47,7 @@ export function usePlanReadyActions({
         return null;
       }
       return (
-        collaborationModes.find(
-          (mode) => mode.id.trim().toLowerCase() === normalized,
-        ) ??
+        collaborationModes.find((mode) => mode.id.trim().toLowerCase() === normalized) ??
         collaborationModes.find(
           (mode) => (mode.mode || mode.id).trim().toLowerCase() === normalized,
         ) ??
@@ -167,13 +161,9 @@ export function usePlanReadyActions({
       }
       const collaborationMode = buildCollaborationModePayloadFor(planMode);
       const message = makePlanReadyChangesMessage(trimmed);
-      await sendUserMessageToThread(
-        activeWorkspace,
-        activeThreadId,
-        message,
-        [],
-        { collaborationMode: collaborationMode ?? null },
-      );
+      await sendUserMessageToThread(activeWorkspace, activeThreadId, message, [], {
+        collaborationMode: collaborationMode ?? null,
+      });
     },
     [
       activeThreadId,

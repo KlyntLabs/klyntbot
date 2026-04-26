@@ -1,30 +1,30 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MouseEvent } from "react";
-import { createPortal } from "react-dom";
+import { readWorkspaceFile } from "@services/tauri";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
+import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import Plus from "lucide-react/dist/esm/icons/plus";
+import { getFileTypeIconUrl } from "@utils/fileTypeIcons";
+import { joinWorkspacePath, revealInFileManagerLabel } from "@utils/platformPaths";
+import { languageFromPath } from "@utils/syntax";
 import ChevronsUpDown from "lucide-react/dist/esm/icons/chevrons-up-down";
 import File from "lucide-react/dist/esm/icons/file";
 import Folder from "lucide-react/dist/esm/icons/folder";
 import GitBranch from "lucide-react/dist/esm/icons/git-branch";
+import Plus from "lucide-react/dist/esm/icons/plus";
 import Search from "lucide-react/dist/esm/icons/search";
-import type { PanelTabId } from "@/features/layout/components/PanelTabs";
-import { PanelShell } from "@/features/layout/components/PanelShell";
+import type { MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   PanelMeta,
   PanelSearchField,
 } from "@/features/design-system/components/panel/PanelPrimitives";
-import { readWorkspaceFile } from "@services/tauri";
-import type { OpenAppTarget } from "@/types";
+import { PanelShell } from "@/features/layout/components/PanelShell";
+import type { PanelTabId } from "@/features/layout/components/PanelTabs";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { languageFromPath } from "@utils/syntax";
-import { joinWorkspacePath, revealInFileManagerLabel } from "@utils/platformPaths";
-import { getFileTypeIconUrl } from "@utils/fileTypeIcons";
+import type { OpenAppTarget } from "@/types";
 import { FilePreviewPopover } from "./FilePreviewPopover";
 
 type FileTreeNode = {
@@ -230,10 +230,7 @@ export function FileTreePanel({
     return sourceEntries.filter((entry) => entry.lower.includes(normalizedQuery));
   }, [sourceEntries, normalizedQuery]);
 
-  const { nodes, folderPaths } = useMemo(
-    () => buildTree(visibleEntries),
-    [visibleEntries],
-  );
+  const { nodes, folderPaths } = useMemo(() => buildTree(visibleEntries), [visibleEntries]);
 
   const visibleFolderPaths = folderPaths;
   const hasFolders = visibleFolderPaths.size > 0;
@@ -477,8 +474,7 @@ export function FileTreePanel({
       }
       event.preventDefault();
       setIsDragSelecting(true);
-      const anchor =
-        event.shiftKey && previewSelection ? previewSelection.start : index;
+      const anchor = event.shiftKey && previewSelection ? previewSelection.start : index;
       dragAnchorLineRef.current = anchor;
       dragMovedRef.current = false;
       selectRangeFromAnchor(anchor, index);
@@ -513,9 +509,7 @@ export function FileTreePanel({
 
   const selectionHints = useMemo(
     () =>
-      previewKind === "text"
-        ? ["Shift + click or drag + click", "for multi-line selection"]
-        : [],
+      previewKind === "text" ? ["Shift + click or drag + click", "for multi-line selection"] : [],
     [previewKind],
   );
 
@@ -601,9 +595,7 @@ export function FileTreePanel({
           }}
         >
           {isFolder ? (
-            <span className={`file-tree-chevron${isExpanded ? " is-open" : ""}`}>
-              ›
-            </span>
+            <span className={`file-tree-chevron${isExpanded ? " is-open" : ""}`}>›</span>
           ) : (
             <span className="file-tree-spacer" aria-hidden />
           )}
@@ -697,9 +689,7 @@ export function FileTreePanel({
                 setFilterMode((prev) => (prev === "all" ? "modified" : "all"));
               }}
               aria-pressed={filterMode === "modified"}
-              aria-label={
-                filterMode === "modified" ? "Show all files" : "Show modified files only"
-              }
+              aria-label={filterMode === "modified" ? "Show all files" : "Show modified files only"}
               title={filterMode === "modified" ? "Show all files" : "Show modified files only"}
             >
               <GitBranch size={14} aria-hidden />
@@ -734,10 +724,7 @@ export function FileTreePanel({
                 : "No files available."}
           </div>
         ) : (
-          <div
-            className="file-tree-virtual"
-            style={{ height: rowVirtualizer.getTotalSize() }}
-          >
+          <div className="file-tree-virtual" style={{ height: rowVirtualizer.getTotalSize() }}>
             {virtualRows.map((virtualRow) => {
               const entry = flatNodes[virtualRow.index];
               if (!entry) {

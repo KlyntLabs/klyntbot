@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+
+import { getCollaborationModes } from "@services/tauri";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceInfo } from "@/types";
-import { getCollaborationModes } from "@services/tauri";
 import { useCollaborationModes } from "./useCollaborationModes";
 
 vi.mock("../../../services/tauri", () => ({
@@ -115,19 +116,13 @@ describe("useCollaborationModes", () => {
     );
 
     await waitFor(() =>
-      expect(result.current.collaborationModes.map((mode) => mode.id)).toEqual([
-        "plan",
-        "default",
-      ]),
+      expect(result.current.collaborationModes.map((mode) => mode.id)).toEqual(["plan", "default"]),
     );
 
     rerender({ workspace: { ...workspaceOne, id: "workspace-1b" } });
 
     await waitFor(() =>
-      expect(result.current.collaborationModes.map((mode) => mode.id)).toEqual([
-        "plan",
-        "default",
-      ]),
+      expect(result.current.collaborationModes.map((mode) => mode.id)).toEqual(["plan", "default"]),
     );
   });
 
@@ -184,11 +179,7 @@ describe("useCollaborationModes", () => {
     vi.mocked(getCollaborationModes).mockResolvedValue(makeModesResponse());
 
     const { result, rerender } = renderHook(
-      (props: {
-        enabled: boolean;
-        preferredModeId: string | null;
-        selectionKey: string;
-      }) =>
+      (props: { enabled: boolean; preferredModeId: string | null; selectionKey: string }) =>
         useCollaborationModes({
           activeWorkspace: workspaceOne,
           enabled: props.enabled,
@@ -224,11 +215,7 @@ describe("useCollaborationModes", () => {
     vi.mocked(getCollaborationModes).mockResolvedValue(makeModesResponse());
 
     const { result, rerender } = renderHook(
-      (props: {
-        enabled: boolean;
-        preferredModeId: string | null;
-        selectionKey: string;
-      }) =>
+      (props: { enabled: boolean; preferredModeId: string | null; selectionKey: string }) =>
         useCollaborationModes({
           activeWorkspace: workspaceOne,
           enabled: props.enabled,

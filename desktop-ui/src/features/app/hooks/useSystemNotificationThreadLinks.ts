@@ -51,8 +51,7 @@ export function useSystemNotificationThreadLinks({
       refreshInFlightRef.current = true;
       try {
         const refreshed = await refreshWorkspaces();
-        workspace =
-          refreshed?.find((entry) => entry.id === link.workspaceId) ?? null;
+        workspace = refreshed?.find((entry) => entry.id === link.workspaceId) ?? null;
       } finally {
         refreshInFlightRef.current = false;
       }

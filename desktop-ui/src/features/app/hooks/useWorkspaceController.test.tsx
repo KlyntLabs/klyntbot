@@ -1,8 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ask, message } from "@tauri-apps/plugin-dialog";
-import type { AppSettings, WorkspaceInfo } from "@/types";
+
 import {
   addWorkspace,
   isWorkspacePathDir,
@@ -10,7 +7,11 @@ import {
   pickWorkspacePaths,
   removeWorkspace,
 } from "@services/tauri";
+import { ask, message } from "@tauri-apps/plugin-dialog";
+import { act, renderHook } from "@testing-library/react";
 import { isMobilePlatform } from "@utils/platformPaths";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AppSettings, WorkspaceInfo } from "@/types";
 import { useWorkspaceController } from "./useWorkspaceController";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
@@ -227,9 +228,7 @@ describe("useWorkspaceController dialogs", () => {
     await act(async () => {
       result.current.appendMobileRemoteWorkspacePathFromRecent("/srv/two");
     });
-    expect(result.current.mobileRemoteWorkspacePathPrompt?.value).toBe(
-      "/srv/one\n/srv/two",
-    );
+    expect(result.current.mobileRemoteWorkspacePathPrompt?.value).toBe("/srv/one\n/srv/two");
   });
 
   it("accepts quoted mobile remote paths", async () => {

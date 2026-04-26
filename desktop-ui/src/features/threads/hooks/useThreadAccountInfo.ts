@@ -1,6 +1,6 @@
+import { getAccountInfo } from "@services/tauri";
 import { useCallback, useEffect } from "react";
 import type { AccountSnapshot, DebugEntry } from "@/types";
-import { getAccountInfo } from "@services/tauri";
 import type { ThreadAction } from "./useThreadsReducer";
 
 type UseThreadAccountInfoOptions = {
@@ -10,12 +10,9 @@ type UseThreadAccountInfoOptions = {
   onDebug?: (entry: DebugEntry) => void;
 };
 
-function normalizeAccountSnapshot(
-  response: Record<string, unknown> | null,
-): AccountSnapshot {
+function normalizeAccountSnapshot(response: Record<string, unknown> | null): AccountSnapshot {
   const accountValue =
-    (response?.result as Record<string, unknown> | undefined)?.account ??
-    response?.account;
+    (response?.result as Record<string, unknown> | undefined)?.account ?? response?.account;
   const account =
     accountValue && typeof accountValue === "object"
       ? (accountValue as Record<string, unknown>)
@@ -37,12 +34,10 @@ function normalizeAccountSnapshot(
     };
   }
 
-  const typeRaw =
-    typeof account.type === "string" ? account.type.toLowerCase() : "unknown";
+  const typeRaw = typeof account.type === "string" ? account.type.toLowerCase() : "unknown";
   const type = typeRaw === "chatgpt" || typeRaw === "apikey" ? typeRaw : "unknown";
   const emailRaw = typeof account.email === "string" ? account.email.trim() : "";
-  const planRaw =
-    typeof account.planType === "string" ? account.planType.trim() : "";
+  const planRaw = typeof account.planType === "string" ? account.planType.trim() : "";
 
   return {
     type,

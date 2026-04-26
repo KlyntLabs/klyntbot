@@ -1,5 +1,5 @@
-import { useLayoutEffect, useState, type CSSProperties, type RefObject } from "react";
 import { getCaretPosition } from "@utils/caretPosition";
+import { type CSSProperties, type RefObject, useLayoutEffect, useState } from "react";
 
 const CARET_ANCHOR_GAP = 8;
 
@@ -18,9 +18,7 @@ export function useComposerSuggestionStyle({
   text,
   textareaRef,
 }: UseComposerSuggestionStyleArgs) {
-  const [suggestionsStyle, setSuggestionsStyle] = useState<CSSProperties | undefined>(
-    undefined,
-  );
+  const [suggestionsStyle, setSuggestionsStyle] = useState<CSSProperties | undefined>(undefined);
 
   useLayoutEffect(() => {
     if (!isAutocompleteOpen) {
@@ -31,7 +29,8 @@ export function useComposerSuggestionStyle({
     if (!textarea) {
       return;
     }
-    const cursor = autocompleteAnchorIndex ?? textarea.selectionStart ?? selectionStart ?? text.length;
+    const cursor =
+      autocompleteAnchorIndex ?? textarea.selectionStart ?? selectionStart ?? text.length;
     const caret = getCaretPosition(textarea, cursor);
     if (!caret) {
       return;

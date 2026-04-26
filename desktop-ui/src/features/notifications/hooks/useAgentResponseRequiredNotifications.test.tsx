@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
+
+import { sendNotification } from "@services/tauri";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  ApprovalRequest,
-  RequestUserInputRequest,
-} from "@/types";
-import { sendNotification } from "@services/tauri";
+import type { ApprovalRequest, RequestUserInputRequest } from "@/types";
 import { useAgentResponseRequiredNotifications } from "./useAgentResponseRequiredNotifications";
 
 const useAppServerEventsMock = vi.fn();
@@ -230,9 +228,8 @@ describe("useAgentResponseRequiredNotifications", () => {
       }),
     );
 
-    const lastCall = useAppServerEventsMock.mock.calls[
-      useAppServerEventsMock.mock.calls.length - 1
-    ];
+    const lastCall =
+      useAppServerEventsMock.mock.calls[useAppServerEventsMock.mock.calls.length - 1];
     const handlers = lastCall?.[0] as {
       onItemCompleted?: (
         workspaceId: string,

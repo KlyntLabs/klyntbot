@@ -1,6 +1,6 @@
+import { matchesShortcut } from "@utils/shortcuts";
 import { useEffect } from "react";
 import type { AccessMode } from "@/types";
-import { matchesShortcut } from "@utils/shortcuts";
 
 type ModelOption = { id: string; displayName: string; model: string };
 
@@ -82,26 +82,19 @@ export function useComposerShortcuts({
           return;
         }
         const currentIndex = reasoningOptions.indexOf(selectedEffort ?? "");
-        const nextIndex =
-          currentIndex >= 0 ? (currentIndex + 1) % reasoningOptions.length : 0;
+        const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % reasoningOptions.length : 0;
         const nextEffort = reasoningOptions[nextIndex];
         if (nextEffort) {
           onSelectEffort(nextEffort);
         }
         return;
       }
-      if (
-        collaborationModes.length > 0 &&
-        matchesShortcut(event, collaborationShortcut)
-      ) {
+      if (collaborationModes.length > 0 && matchesShortcut(event, collaborationShortcut)) {
         event.preventDefault();
         const currentIndex = collaborationModes.findIndex(
           (mode) => mode.id === selectedCollaborationModeId,
         );
-        const nextIndex =
-          currentIndex >= 0
-            ? (currentIndex + 1) % collaborationModes.length
-            : 0;
+        const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % collaborationModes.length : 0;
         const nextMode = collaborationModes[nextIndex];
         if (nextMode) {
           onSelectCollaborationMode(nextMode.id);

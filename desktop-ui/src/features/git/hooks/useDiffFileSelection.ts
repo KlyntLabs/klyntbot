@@ -38,11 +38,7 @@ export function useDiffFileSelection({
   }, []);
 
   const handleFileClick = useCallback(
-    (
-      event: ReactMouseEvent<HTMLDivElement>,
-      path: string,
-      _section: "staged" | "unstaged",
-    ) => {
+    (event: ReactMouseEvent<HTMLDivElement>, path: string, _section: "staged" | "unstaged") => {
       const isMetaKey = event.metaKey || event.ctrlKey;
       const isShiftKey = event.shiftKey;
 

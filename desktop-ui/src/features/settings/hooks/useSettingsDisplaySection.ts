@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
-import type { AppSettings } from "@/types";
-import { clampUiScale } from "@utils/uiScale";
 import {
+  clampCodeFontSize,
   DEFAULT_CODE_FONT_FAMILY,
   DEFAULT_UI_FONT_FAMILY,
-  clampCodeFontSize,
   normalizeFontFamily,
 } from "@utils/fonts";
+import { clampUiScale } from "@utils/uiScale";
+import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useState } from "react";
+import type { AppSettings } from "@/types";
 
 type UseSettingsDisplaySectionArgs = {
   appSettings: AppSettings;
@@ -78,9 +78,7 @@ export const useSettingsDisplaySection = ({
   }, [appSettings.codeFontSize]);
 
   const trimmedScale = scaleDraft.trim();
-  const parsedPercent = trimmedScale
-    ? Number(trimmedScale.replace("%", ""))
-    : Number.NaN;
+  const parsedPercent = trimmedScale ? Number(trimmedScale.replace("%", "")) : Number.NaN;
   const parsedScale = Number.isFinite(parsedPercent) ? parsedPercent / 100 : null;
 
   const handleCommitScale = async () => {

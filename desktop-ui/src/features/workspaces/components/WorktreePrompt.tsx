@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
 import type { FocusEvent } from "react";
-import type { BranchInfo } from "@/types";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
 import { BranchList } from "@/features/git/components/BranchList";
 import { filterBranches } from "@/features/git/utils/branchSearch";
+import type { BranchInfo } from "@/types";
 
 type WorktreePromptProps = {
   workspaceName: string;
@@ -73,9 +73,7 @@ export function WorktreePrompt({
     if (!branchMenuOpen) {
       return;
     }
-    const itemEl = branchListRef.current?.children[selectedBranchIndex] as
-      | HTMLElement
-      | undefined;
+    const itemEl = branchListRef.current?.children[selectedBranchIndex] as HTMLElement | undefined;
     itemEl?.scrollIntoView({ block: "nearest" });
   }, [branchMenuOpen, selectedBranchIndex]);
 
@@ -83,9 +81,7 @@ export function WorktreePrompt({
     onChange(branchInfo.name);
     setBranchMenuOpen(false);
     requestAnimationFrame(() => {
-      const input = branchContainerRef.current?.querySelector(
-        "input",
-      ) as HTMLInputElement | null;
+      const input = branchContainerRef.current?.querySelector("input") as HTMLInputElement | null;
       input?.focus();
     });
   };
@@ -216,9 +212,7 @@ export function WorktreePrompt({
             itemLabelClassName="worktree-modal-branch-item-name"
             selectedItemClassName="selected"
             emptyClassName="worktree-modal-branch-empty"
-            emptyText={
-              branch.trim().length > 0 ? "No matching branches" : "No branches found"
-            }
+            emptyText={branch.trim().length > 0 ? "No matching branches" : "No branches found"}
             onMouseEnter={(index) => {
               setDidNavigateBranches(true);
               setSelectedBranchIndex(index);
@@ -243,8 +237,8 @@ export function WorktreePrompt({
       <div className="ds-modal-divider worktree-modal-divider" />
       <div className="worktree-modal-section-title">Environment setup script</div>
       <div className="worktree-modal-hint">
-        Stored on the project (Settings → Environments) and runs once in a dedicated
-        terminal after each new worktree is created.
+        Stored on the project (Settings → Environments) and runs once in a dedicated terminal after
+        each new worktree is created.
       </div>
       <textarea
         id="worktree-setup-script"

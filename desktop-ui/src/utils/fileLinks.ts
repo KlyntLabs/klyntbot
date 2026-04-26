@@ -9,8 +9,7 @@ const FILE_LOCATION_RANGE_SUFFIX_PATTERN = /^(.*?):(\d+)-(\d+)$/;
 const FILE_LOCATION_HASH_PATTERN = /^(.*?)#L(\d+)(?:C(\d+))?$/i;
 const FILE_URL_LOCATION_HASH_PATTERN = /^#L(\d+)(?:C(\d+))?$/i;
 
-export const FILE_LINK_SUFFIX_SOURCE =
-  "(?:(?::\\d+(?::\\d+)?|:\\d+-\\d+)|(?:#L\\d+(?:C\\d+)?))?";
+export const FILE_LINK_SUFFIX_SOURCE = "(?:(?::\\d+(?::\\d+)?|:\\d+-\\d+)|(?:#L\\d+(?:C\\d+)?))?";
 
 function parsePositiveInteger(value?: string) {
   if (!value) {
@@ -163,11 +162,7 @@ export function parseFileLocation(rawPath: string): ParsedFileLocation {
   };
 }
 
-export function formatFileLocation(
-  path: string,
-  line: number | null,
-  column: number | null,
-) {
+export function formatFileLocation(path: string, line: number | null, column: number | null) {
   if (line === null) {
     return path.trim();
   }
@@ -205,9 +200,7 @@ function encodeFileUrlPathname(pathname: string, treatPathnameAsOpaque = false) 
 
 function toFileUrlParts(path: string): FileUrlParts | null {
   const normalizedWindowsPath = path.replace(/\//g, "\\");
-  const namespaceUncMatch = normalizedWindowsPath.match(
-    /^\\\\\?\\UNC\\([^\\]+)\\([^\\]+)(.*)$/i,
-  );
+  const namespaceUncMatch = normalizedWindowsPath.match(/^\\\\\?\\UNC\\([^\\]+)\\([^\\]+)(.*)$/i);
   if (namespaceUncMatch) {
     return {
       host: "",

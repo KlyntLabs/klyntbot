@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildConversationItem } from "@utils/threadItems";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useThreadItemEvents } from "./useThreadItemEvents";
 
 vi.mock("@utils/threadItems", () => ({
@@ -24,8 +24,7 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
   const safeMessageActivity = vi.fn();
   const recordThreadActivity = vi.fn();
   const applyCollabThreadLinks = vi.fn();
-  const getCustomName =
-    overrides.getCustomName ?? vi.fn(() => undefined);
+  const getCustomName = overrides.getCustomName ?? vi.fn(() => undefined);
 
   const { result } = renderHook(() =>
     useThreadItemEvents({
@@ -69,8 +68,14 @@ describe("useThreadItemEvents", () => {
 
   it("dispatches item updates and marks review mode on item start", () => {
     const getCustomName = vi.fn(() => "Custom");
-    const { result, dispatch, markProcessing, markReviewing, safeMessageActivity, applyCollabThreadLinks } =
-      makeOptions({ getCustomName });
+    const {
+      result,
+      dispatch,
+      markProcessing,
+      markReviewing,
+      safeMessageActivity,
+      applyCollabThreadLinks,
+    } = makeOptions({ getCustomName });
     const item: ItemPayload = { type: "enteredReviewMode", id: "item-1" };
 
     act(() => {
@@ -206,11 +211,7 @@ describe("useThreadItemEvents", () => {
       result.current.onItemCompleted("ws-1", "thread-1", item);
     });
 
-    expect(onUserMessageCreated).toHaveBeenCalledWith(
-      "ws-1",
-      "thread-1",
-      "Hello from user",
-    );
+    expect(onUserMessageCreated).toHaveBeenCalledWith("ws-1", "thread-1", "Hello from user");
   });
 
   it("marks processing and appends agent deltas", () => {

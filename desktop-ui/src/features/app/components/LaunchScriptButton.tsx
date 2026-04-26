@@ -1,9 +1,9 @@
 import Play from "lucide-react/dist/esm/icons/play";
-import type { LaunchScriptIconId } from "@/types";
 import { PopoverSurface } from "@/features/design-system/components/popover/PopoverPrimitives";
+import type { LaunchScriptIconId } from "@/types";
 import { useMenuController } from "../hooks/useMenuController";
-import { LaunchScriptIconPicker } from "./LaunchScriptIconPicker";
 import { DEFAULT_LAUNCH_SCRIPT_ICON } from "../utils/launchScriptIcons";
+import { LaunchScriptIconPicker } from "./LaunchScriptIconPicker";
 
 type LaunchScriptButtonProps = {
   launchScript: string | null;
@@ -131,10 +131,7 @@ export function LaunchScriptButton({
           {showNew && newEditorOpen && onNewDraftChange && onNewDraftIconChange && onCreateNew && (
             <div className="launch-script-new">
               <div className="launch-script-title">New launch script</div>
-              <LaunchScriptIconPicker
-                value={newDraftIcon}
-                onChange={onNewDraftIconChange}
-              />
+              <LaunchScriptIconPicker value={newDraftIcon} onChange={onNewDraftIconChange} />
               <input
                 className="launch-script-input"
                 type="text"

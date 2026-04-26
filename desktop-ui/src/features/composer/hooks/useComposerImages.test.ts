@@ -16,9 +16,10 @@ type RenderedHook = {
   unmount: () => void;
 };
 
-function renderComposerImages(
-  initial: { activeThreadId: string | null; activeWorkspaceId: string | null },
-): RenderedHook {
+function renderComposerImages(initial: {
+  activeThreadId: string | null;
+  activeWorkspaceId: string | null;
+}): RenderedHook {
   let props = initial;
   let result: HookResult | undefined;
 
@@ -74,11 +75,7 @@ describe("useComposerImages", () => {
       hook.result.attachImages(["/tmp/b.png", "/tmp/c.png"]);
     });
 
-    expect(hook.result.activeImages).toEqual([
-      "/tmp/a.png",
-      "/tmp/b.png",
-      "/tmp/c.png",
-    ]);
+    expect(hook.result.activeImages).toEqual(["/tmp/a.png", "/tmp/b.png", "/tmp/c.png"]);
 
     hook.unmount();
   });

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
 import { getOpenAppIcon } from "@services/tauri";
+import { isMacPlatform } from "@utils/platformPaths";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { OpenAppTarget } from "@/types";
 import { getKnownOpenAppIcon } from "../utils/openAppIcons";
-import { isMacPlatform } from "@utils/platformPaths";
 
 type OpenAppIconMap = Record<string, string>;
 

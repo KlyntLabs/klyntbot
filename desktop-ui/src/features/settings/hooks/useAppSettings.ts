@@ -1,26 +1,29 @@
-import { useCallback, useMemo } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
-import type { AppSettings } from "@/types";
-import { getAppSettings, runCodexDoctor, updateAppSettings } from "@services/tauri";
-import { clampUiScale, UI_SCALE_DEFAULT } from "@utils/uiScale";
-import { CHAT_SCROLLBACK_DEFAULT, normalizeChatHistoryScrollbackItems } from "@utils/chatScrollback";
-import {
-  DEFAULT_CODE_FONT_FAMILY,
-  DEFAULT_UI_FONT_FAMILY,
-  CODE_FONT_SIZE_DEFAULT,
-  clampCodeFontSize,
-  normalizeFontFamily,
-} from "@utils/fonts";
 import {
   DEFAULT_OPEN_APP_ID,
   DEFAULT_OPEN_APP_TARGETS,
   OPEN_APP_STORAGE_KEY,
 } from "@app/constants";
 import { normalizeOpenAppTargets } from "@app/utils/openApp";
-import { getDefaultInterruptShortcut, isMacPlatform } from "@utils/shortcuts";
-import { isMobilePlatform } from "@utils/platformPaths";
+import { getAppSettings, runCodexDoctor, updateAppSettings } from "@services/tauri";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  CHAT_SCROLLBACK_DEFAULT,
+  normalizeChatHistoryScrollbackItems,
+} from "@utils/chatScrollback";
 import { DEFAULT_COMMIT_MESSAGE_PROMPT } from "@utils/commitMessagePrompt";
+import {
+  CODE_FONT_SIZE_DEFAULT,
+  clampCodeFontSize,
+  DEFAULT_CODE_FONT_FAMILY,
+  DEFAULT_UI_FONT_FAMILY,
+  normalizeFontFamily,
+} from "@utils/fonts";
+import { isMobilePlatform } from "@utils/platformPaths";
+import { getDefaultInterruptShortcut, isMacPlatform } from "@utils/shortcuts";
+import { clampUiScale, UI_SCALE_DEFAULT } from "@utils/uiScale";
+import { useCallback, useMemo } from "react";
+import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
+import type { AppSettings } from "@/types";
 
 const allowedThemes = new Set(["system", "light", "dark", "dim"]);
 const allowedPersonality = new Set(["friendly", "pragmatic"]);
@@ -220,9 +223,7 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
       ? normalizeOpenAppTargets(settings.openAppTargets)
       : DEFAULT_OPEN_APP_TARGETS;
   const storedOpenAppId =
-    typeof window === "undefined"
-      ? null
-      : window.localStorage.getItem(OPEN_APP_STORAGE_KEY);
+    typeof window === "undefined" ? null : window.localStorage.getItem(OPEN_APP_STORAGE_KEY);
   const hasPersistedSelection = normalizedTargets.some(
     (target) => target.id === settings.selectedOpenAppId,
   );
@@ -234,7 +235,7 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
     ? settings.selectedOpenAppId
     : hasStoredSelection
       ? storedOpenAppId
-      : normalizedTargets[0]?.id ?? DEFAULT_OPEN_APP_ID;
+      : (normalizedTargets[0]?.id ?? DEFAULT_OPEN_APP_ID);
   const commitMessagePrompt =
     settings.commitMessagePrompt && settings.commitMessagePrompt.trim().length > 0
       ? settings.commitMessagePrompt
@@ -249,21 +250,11 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
     codexArgs: settings.codexArgs?.trim() ? settings.codexArgs.trim() : null,
     uiScale: clampUiScale(settings.uiScale),
     theme: allowedThemes.has(settings.theme) ? settings.theme : "system",
-    uiFontFamily: normalizeFontFamily(
-      settings.uiFontFamily,
-      DEFAULT_UI_FONT_FAMILY,
-    ),
-    codeFontFamily: normalizeFontFamily(
-      settings.codeFontFamily,
-      DEFAULT_CODE_FONT_FAMILY,
-    ),
+    uiFontFamily: normalizeFontFamily(settings.uiFontFamily, DEFAULT_UI_FONT_FAMILY),
+    codeFontFamily: normalizeFontFamily(settings.codeFontFamily, DEFAULT_CODE_FONT_FAMILY),
     codeFontSize: clampCodeFontSize(settings.codeFontSize),
-    personality: allowedPersonality.has(settings.personality)
-      ? settings.personality
-      : "friendly",
-    followUpMessageBehavior: allowedFollowUpMessageBehavior.has(
-      settings.followUpMessageBehavior,
-    )
+    personality: allowedPersonality.has(settings.personality) ? settings.personality : "friendly",
+    followUpMessageBehavior: allowedFollowUpMessageBehavior.has(settings.followUpMessageBehavior)
       ? settings.followUpMessageBehavior
       : settings.steerEnabled
         ? "steer"
@@ -272,8 +263,7 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
       typeof settings.composerFollowUpHintEnabled === "boolean"
         ? settings.composerFollowUpHintEnabled
         : true,
-    reviewDeliveryMode:
-      settings.reviewDeliveryMode === "detached" ? "detached" : "inline",
+    reviewDeliveryMode: settings.reviewDeliveryMode === "detached" ? "detached" : "inline",
     chatHistoryScrollbackItems,
     commitMessagePrompt,
     openAppTargets: normalizedTargets,
@@ -282,65 +272,62 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
 }
 
 export function useAppSettings() {
-	const defaultSettings = useMemo(() => buildDefaultSettings(), []);
-	const queryClient = useQueryClient();
+  const defaultSettings = useMemo(() => buildDefaultSettings(), []);
+  const queryClient = useQueryClient();
 
-	const query = useTauriQuery<AppSettings>({
-		queryKey: qk.settings.app(),
-		queryFn: async () => {
-			try {
-				const response = await getAppSettings();
-				return normalizeAppSettings({
-					...defaultSettings,
-					...response,
-				});
-			} catch {
-				// Fall back to defaults if loading settings fails.
-				return defaultSettings;
-			}
-		},
-		fallback: defaultSettings,
-	});
+  const query = useTauriQuery<AppSettings>({
+    queryKey: qk.settings.app(),
+    queryFn: async () => {
+      try {
+        const response = await getAppSettings();
+        return normalizeAppSettings({
+          ...defaultSettings,
+          ...response,
+        });
+      } catch {
+        // Fall back to defaults if loading settings fails.
+        return defaultSettings;
+      }
+    },
+    fallback: defaultSettings,
+  });
 
-	const save = useTauriMutation<AppSettings, AppSettings>({
-		mutationFn: async (next) => {
-			const normalized = normalizeAppSettings(next);
-			const saved = await updateAppSettings(normalized);
-			return saved;
-		},
-		invalidates: [qk.settings.app()],
-		onSuccess: (saved) => {
-			queryClient.setQueryData<AppSettings>(
-				qk.settings.app(),
-				normalizeAppSettings({ ...defaultSettings, ...saved }),
-			);
-		},
-	});
+  const save = useTauriMutation<AppSettings, AppSettings>({
+    mutationFn: async (next) => {
+      const normalized = normalizeAppSettings(next);
+      const saved = await updateAppSettings(normalized);
+      return saved;
+    },
+    invalidates: [qk.settings.app()],
+    onSuccess: (saved) => {
+      queryClient.setQueryData<AppSettings>(
+        qk.settings.app(),
+        normalizeAppSettings({ ...defaultSettings, ...saved }),
+      );
+    },
+  });
 
-	const setSettings = useCallback(
-		(updater: AppSettings | ((prev: AppSettings) => AppSettings)) => {
-			queryClient.setQueryData<AppSettings>(qk.settings.app(), (prev) => {
-				const base = prev ?? defaultSettings;
-				return typeof updater === "function"
-					? (updater as (p: AppSettings) => AppSettings)(base)
-					: updater;
-			});
-		},
-		[queryClient, defaultSettings],
-	);
+  const setSettings = useCallback(
+    (updater: AppSettings | ((prev: AppSettings) => AppSettings)) => {
+      queryClient.setQueryData<AppSettings>(qk.settings.app(), (prev) => {
+        const base = prev ?? defaultSettings;
+        return typeof updater === "function"
+          ? (updater as (p: AppSettings) => AppSettings)(base)
+          : updater;
+      });
+    },
+    [queryClient, defaultSettings],
+  );
 
-	const doctor = useCallback(
-		async (codexBin: string | null, codexArgs: string | null) => {
-			return runCodexDoctor(codexBin, codexArgs);
-		},
-		[],
-	);
+  const doctor = useCallback(async (codexBin: string | null, codexArgs: string | null) => {
+    return runCodexDoctor(codexBin, codexArgs);
+  }, []);
 
-	return {
-		settings: query.data,
-		setSettings,
-		saveSettings: save.mutate,
-		doctor,
-		isLoading: query.isLoading,
-	};
+  return {
+    settings: query.data,
+    setSettings,
+    saveSettings: save.mutate,
+    doctor,
+    isLoading: query.isLoading,
+  };
 }

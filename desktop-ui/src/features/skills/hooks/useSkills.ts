@@ -1,7 +1,7 @@
-import { useCallback } from "react";
-import type { SkillOption, WorkspaceInfo } from "@/types";
 import { getSkillsList } from "@services/tauri";
+import { useCallback } from "react";
 import { qk, useTauriQuery } from "@/lib/query";
+import type { SkillOption, WorkspaceInfo } from "@/types";
 
 export function useSkills(activeWorkspace: WorkspaceInfo | null) {
   const workspaceId = activeWorkspace?.id ?? "";

@@ -23,16 +23,11 @@ export function isReservedGroupName(name: string) {
   return normalizeGroupName(name).toLowerCase() === RESERVED_GROUP_NAME.toLowerCase();
 }
 
-export function isDuplicateGroupName(
-  name: string,
-  groups: WorkspaceGroup[],
-  excludeId?: string,
-) {
+export function isDuplicateGroupName(name: string, groups: WorkspaceGroup[], excludeId?: string) {
   const normalized = normalizeGroupName(name).toLowerCase();
   return groups.some(
     (group) =>
-      group.id !== excludeId &&
-      normalizeGroupName(group.name).toLowerCase() === normalized,
+      group.id !== excludeId && normalizeGroupName(group.name).toLowerCase() === normalized,
   );
 }
 

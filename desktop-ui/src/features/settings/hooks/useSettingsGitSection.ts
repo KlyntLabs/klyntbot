@@ -1,6 +1,6 @@
+import { DEFAULT_COMMIT_MESSAGE_PROMPT } from "@utils/commitMessagePrompt";
 import { useCallback, useEffect, useState } from "react";
 import type { AppSettings, ModelOption } from "@/types";
-import { DEFAULT_COMMIT_MESSAGE_PROMPT } from "@utils/commitMessagePrompt";
 
 type UseSettingsGitSectionArgs = {
   appSettings: AppSettings;
@@ -34,8 +34,7 @@ export const useSettingsGitSection = ({
     setCommitMessagePromptDraft(appSettings.commitMessagePrompt);
   }, [appSettings.commitMessagePrompt]);
 
-  const commitMessagePromptDirty =
-    commitMessagePromptDraft !== appSettings.commitMessagePrompt;
+  const commitMessagePromptDirty = commitMessagePromptDraft !== appSettings.commitMessagePrompt;
 
   const handleSaveCommitMessagePrompt = useCallback(async () => {
     if (commitMessagePromptSaving || !commitMessagePromptDirty) {

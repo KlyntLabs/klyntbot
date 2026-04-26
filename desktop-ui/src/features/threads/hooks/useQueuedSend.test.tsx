@@ -12,9 +12,7 @@ const workspace: WorkspaceInfo = {
   settings: { sidebarCollapsed: false },
 };
 
-const makeOptions = (
-  overrides: Partial<Parameters<typeof useQueuedSend>[0]> = {},
-) => ({
+const makeOptions = (overrides: Partial<Parameters<typeof useQueuedSend>[0]> = {}) => ({
   activeThreadId: "thread-1",
   activeTurnId: "turn-1",
   isProcessing: false,
@@ -42,10 +40,9 @@ const makeOptions = (
 describe("useQueuedSend", () => {
   it("sends queued messages one at a time after processing completes", async () => {
     const options = makeOptions();
-    const { result, rerender } = renderHook(
-      (props) => useQueuedSend(props),
-      { initialProps: options },
-    );
+    const { result, rerender } = renderHook((props) => useQueuedSend(props), {
+      initialProps: options,
+    });
 
     await act(async () => {
       await result.current.queueMessage("First");
@@ -125,12 +122,9 @@ describe("useQueuedSend", () => {
     });
 
     expect(options.sendUserMessage).toHaveBeenCalledTimes(1);
-    expect(options.sendUserMessage).toHaveBeenCalledWith(
-      "Steer",
-      [],
-      undefined,
-      { sendIntent: "steer" },
-    );
+    expect(options.sendUserMessage).toHaveBeenCalledWith("Steer", [], undefined, {
+      sendIntent: "steer",
+    });
     expect(result.current.activeQueue).toHaveLength(0);
   });
 
@@ -173,12 +167,9 @@ describe("useQueuedSend", () => {
       await result.current.handleSend("Fallback to queue");
     });
 
-    expect(options.sendUserMessage).toHaveBeenCalledWith(
-      "Fallback to queue",
-      [],
-      undefined,
-      { sendIntent: "steer" },
-    );
+    expect(options.sendUserMessage).toHaveBeenCalledWith("Fallback to queue", [], undefined, {
+      sendIntent: "steer",
+    });
     expect(result.current.activeQueue).toHaveLength(1);
     expect(result.current.activeQueue[0]?.text).toBe("Fallback to queue");
 
@@ -195,10 +186,7 @@ describe("useQueuedSend", () => {
     });
 
     expect(options.sendUserMessage).toHaveBeenCalledTimes(2);
-    expect(options.sendUserMessage).toHaveBeenLastCalledWith(
-      "Fallback to queue",
-      [],
-    );
+    expect(options.sendUserMessage).toHaveBeenLastCalledWith("Fallback to queue", []);
   });
 
   it("retries queued send after failure", async () => {
@@ -229,10 +217,9 @@ describe("useQueuedSend", () => {
 
   it("queues messages per thread and only flushes the active thread", async () => {
     const options = makeOptions({ isProcessing: true });
-    const { result, rerender } = renderHook(
-      (props) => useQueuedSend(props),
-      { initialProps: options },
-    );
+    const { result, rerender } = renderHook((props) => useQueuedSend(props), {
+      initialProps: options,
+    });
 
     await act(async () => {
       await result.current.queueMessage("Thread-1");
@@ -276,20 +263,16 @@ describe("useQueuedSend", () => {
       ...workspace,
       connected: false,
     });
-    expect(options.sendUserMessage).toHaveBeenCalledWith(
-      "Connect",
-      [],
-      undefined,
-      { sendIntent: "default" },
-    );
+    expect(options.sendUserMessage).toHaveBeenCalledWith("Connect", [], undefined, {
+      sendIntent: "default",
+    });
   });
 
   it("ignores images for queued review messages and blocks while reviewing", async () => {
     const options = makeOptions();
-    const { result, rerender } = renderHook(
-      (props) => useQueuedSend(props),
-      { initialProps: options },
-    );
+    const { result, rerender } = renderHook((props) => useQueuedSend(props), {
+      initialProps: options,
+    });
 
     await act(async () => {
       await result.current.queueMessage("/review check this", ["img-1"]);
@@ -337,12 +320,7 @@ describe("useQueuedSend", () => {
     });
 
     expect(startThreadForWorkspace).toHaveBeenCalledWith("workspace-1");
-    expect(sendUserMessageToThread).toHaveBeenCalledWith(
-      workspace,
-      "thread-2",
-      "hello there",
-      [],
-    );
+    expect(sendUserMessageToThread).toHaveBeenCalledWith(workspace, "thread-2", "hello there", []);
     expect(options.sendUserMessage).not.toHaveBeenCalled();
   });
 
@@ -439,12 +417,9 @@ describe("useQueuedSend", () => {
     });
 
     expect(startApps).not.toHaveBeenCalled();
-    expect(options.sendUserMessage).toHaveBeenCalledWith(
-      "/apps now",
-      ["img-1"],
-      undefined,
-      { sendIntent: "default" },
-    );
+    expect(options.sendUserMessage).toHaveBeenCalledWith("/apps now", ["img-1"], undefined, {
+      sendIntent: "default",
+    });
   });
 
   it("routes /resume to the resume handler", async () => {
@@ -524,10 +499,7 @@ describe("useQueuedSend", () => {
     });
 
     expect(options.sendUserMessage).toHaveBeenCalledTimes(1);
-    expect(options.sendUserMessage).toHaveBeenCalledWith("Images", [
-      "img-1",
-      "img-2",
-    ]);
+    expect(options.sendUserMessage).toHaveBeenCalledWith("Images", ["img-1", "img-2"]);
   });
 
   it("does not flush queued messages while response is required", async () => {
@@ -557,5 +529,4 @@ describe("useQueuedSend", () => {
     expect(options.sendUserMessage).toHaveBeenCalledTimes(1);
     expect(options.sendUserMessage).toHaveBeenCalledWith("Held", []);
   });
-
 });

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const HISTORY_LIMIT = 200;
 const DEFAULT_HISTORY_KEY = "default";
@@ -22,9 +22,7 @@ function readStoredHistory(key: string): string[] {
     if (!Array.isArray(parsed)) {
       return [];
     }
-    return parsed
-      .filter((item): item is string => typeof item === "string")
-      .slice(-HISTORY_LIMIT);
+    return parsed.filter((item): item is string => typeof item === "string").slice(-HISTORY_LIMIT);
   } catch {
     return [];
   }
@@ -227,15 +225,7 @@ export function usePromptHistory({
       setHistoryIndex(nextIndex);
       applyHistoryValue(history[nextIndex]);
     },
-    [
-      applyHistoryValue,
-      disabled,
-      hasAttachments,
-      history,
-      historyIndex,
-      isAutocompleteOpen,
-      text,
-    ],
+    [applyHistoryValue, disabled, hasAttachments, history, historyIndex, isAutocompleteOpen, text],
   );
 
   const handleHistoryTextChange = useCallback(

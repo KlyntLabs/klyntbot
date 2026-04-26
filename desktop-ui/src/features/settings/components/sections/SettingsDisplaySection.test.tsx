@@ -14,7 +14,7 @@ describe("SettingsDisplaySection", () => {
     render(
       <SettingsDisplaySection
         appSettings={
-          ({
+          {
             theme: "system",
             usageShowRemaining: false,
             showMessageFilePath: true,
@@ -24,7 +24,7 @@ describe("SettingsDisplaySection", () => {
             codeFontSize: 11,
             notificationSoundsEnabled: true,
             systemNotificationsEnabled: true,
-          } as unknown) as AppSettings
+          } as unknown as AppSettings
         }
         reduceTransparency={false}
         scaleShortcutTitle=""
@@ -49,9 +49,7 @@ describe("SettingsDisplaySection", () => {
       />,
     );
 
-    const row = screen
-      .getByText("Auto-generate new thread titles")
-      .closest(".settings-toggle-row");
+    const row = screen.getByText("Auto-generate new thread titles").closest(".settings-toggle-row");
     expect(row).toBeTruthy();
     const button = within(row as HTMLElement).getByRole("button");
 
@@ -67,7 +65,7 @@ describe("SettingsDisplaySection", () => {
     render(
       <SettingsDisplaySection
         appSettings={
-          ({
+          {
             theme: "system",
             usageShowRemaining: false,
             showMessageFilePath: true,
@@ -78,7 +76,7 @@ describe("SettingsDisplaySection", () => {
             codeFontSize: 11,
             notificationSoundsEnabled: true,
             systemNotificationsEnabled: true,
-          } as unknown) as AppSettings
+          } as unknown as AppSettings
         }
         reduceTransparency={false}
         scaleShortcutTitle=""
@@ -120,7 +118,7 @@ describe("SettingsDisplaySection", () => {
     render(
       <SettingsDisplaySection
         appSettings={
-          ({
+          {
             theme: "system",
             usageShowRemaining: false,
             showMessageFilePath: true,
@@ -131,7 +129,7 @@ describe("SettingsDisplaySection", () => {
             codeFontSize: 11,
             notificationSoundsEnabled: true,
             systemNotificationsEnabled: true,
-          } as unknown) as AppSettings
+          } as unknown as AppSettings
         }
         reduceTransparency={false}
         scaleShortcutTitle=""
@@ -179,7 +177,7 @@ describe("SettingsDisplaySection", () => {
     render(
       <SettingsDisplaySection
         appSettings={
-          ({
+          {
             theme: "system",
             usageShowRemaining: false,
             showMessageFilePath: true,
@@ -190,7 +188,7 @@ describe("SettingsDisplaySection", () => {
             codeFontSize: 11,
             notificationSoundsEnabled: true,
             systemNotificationsEnabled: true,
-          } as unknown) as AppSettings
+          } as unknown as AppSettings
         }
         reduceTransparency={false}
         scaleShortcutTitle=""
@@ -229,7 +227,7 @@ describe("SettingsDisplaySection", () => {
     render(
       <SettingsDisplaySection
         appSettings={
-          ({
+          {
             theme: "system",
             usageShowRemaining: false,
             showMessageFilePath: true,
@@ -240,7 +238,7 @@ describe("SettingsDisplaySection", () => {
             codeFontSize: 11,
             notificationSoundsEnabled: true,
             systemNotificationsEnabled: true,
-          } as unknown) as AppSettings
+          } as unknown as AppSettings
         }
         reduceTransparency={false}
         scaleShortcutTitle=""
@@ -268,9 +266,7 @@ describe("SettingsDisplaySection", () => {
     const maxItemsInput = screen.getByLabelText("Max items per thread");
     fireEvent.change(maxItemsInput, { target: { value: "50" } });
 
-    const unlimitedRow = screen
-      .getByText("Unlimited chat history")
-      .closest(".settings-toggle-row");
+    const unlimitedRow = screen.getByText("Unlimited chat history").closest(".settings-toggle-row");
     expect(unlimitedRow).toBeTruthy();
     const unlimitedButton = within(unlimitedRow as HTMLElement).getByRole("button");
 
@@ -289,7 +285,7 @@ describe("SettingsDisplaySection", () => {
     render(
       <SettingsDisplaySection
         appSettings={
-          ({
+          {
             theme: "system",
             usageShowRemaining: false,
             showMessageFilePath: true,
@@ -300,7 +296,7 @@ describe("SettingsDisplaySection", () => {
             codeFontSize: 11,
             notificationSoundsEnabled: true,
             systemNotificationsEnabled: true,
-          } as unknown) as AppSettings
+          } as unknown as AppSettings
         }
         reduceTransparency={false}
         scaleShortcutTitle=""
@@ -342,5 +338,4 @@ describe("SettingsDisplaySection", () => {
       expect.objectContaining({ chatHistoryScrollbackItems: 200 }),
     );
   });
-
 });

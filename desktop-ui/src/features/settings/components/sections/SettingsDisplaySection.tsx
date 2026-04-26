@@ -1,13 +1,3 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import type { AppSettings } from "@/types";
-import {
-  CODE_FONT_SIZE_MAX,
-  CODE_FONT_SIZE_MIN,
-  CODE_FONT_SIZE_DEFAULT,
-  DEFAULT_CODE_FONT_FAMILY,
-  DEFAULT_UI_FONT_FAMILY,
-} from "@utils/fonts";
-
 import {
   CHAT_SCROLLBACK_DEFAULT,
   CHAT_SCROLLBACK_MAX,
@@ -17,10 +7,19 @@ import {
   isChatScrollbackPreset,
 } from "@utils/chatScrollback";
 import {
+  CODE_FONT_SIZE_DEFAULT,
+  CODE_FONT_SIZE_MAX,
+  CODE_FONT_SIZE_MIN,
+  DEFAULT_CODE_FONT_FAMILY,
+  DEFAULT_UI_FONT_FAMILY,
+} from "@utils/fonts";
+import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
+import {
   SettingsSection,
   SettingsToggleRow,
   SettingsToggleSwitch,
 } from "@/features/design-system/components/settings/SettingsPrimitives";
+import type { AppSettings } from "@/types";
 
 type SettingsDisplaySectionProps = {
   appSettings: AppSettings;
@@ -101,9 +100,7 @@ export function SettingsDisplaySection({
     if (!Number.isFinite(parsed)) {
       const current = appSettings.chatHistoryScrollbackItems;
       const fallback =
-        typeof current === "number" && Number.isFinite(current)
-          ? current
-          : CHAT_SCROLLBACK_DEFAULT;
+        typeof current === "number" && Number.isFinite(current) ? current : CHAT_SCROLLBACK_DEFAULT;
       setScrollbackDraft(String(fallback));
       return;
     }
@@ -239,8 +236,7 @@ export function SettingsDisplaySection({
           onClick={() =>
             void onUpdateAppSettings({
               ...appSettings,
-              threadTitleAutogenerationEnabled:
-                !appSettings.threadTitleAutogenerationEnabled,
+              threadTitleAutogenerationEnabled: !appSettings.threadTitleAutogenerationEnabled,
             })
           }
         />
@@ -279,8 +275,8 @@ export function SettingsDisplaySection({
           ))}
         </select>
         <div className="settings-help">
-          Higher values keep more history but may increase memory usage. Use “Sync from
-          server” on a thread to re-fetch older messages.
+          Higher values keep more history but may increase memory usage. Use “Sync from server” on a
+          thread to re-fetch older messages.
         </div>
       </div>
       <div className="settings-field">
@@ -330,8 +326,8 @@ export function SettingsDisplaySection({
           </button>
         </div>
         <div className="settings-help">
-          Range: {CHAT_SCROLLBACK_MIN}–{CHAT_SCROLLBACK_MAX}. Counts messages, tool calls,
-          and other conversation items.
+          Range: {CHAT_SCROLLBACK_MIN}–{CHAT_SCROLLBACK_MAX}. Counts messages, tool calls, and other
+          conversation items.
         </div>
       </div>
       <SettingsToggleRow
@@ -528,8 +524,7 @@ export function SettingsDisplaySection({
           onClick={() =>
             void onUpdateAppSettings({
               ...appSettings,
-              subagentSystemNotificationsEnabled:
-                !appSettings.subagentSystemNotificationsEnabled,
+              subagentSystemNotificationsEnabled: !appSettings.subagentSystemNotificationsEnabled,
             })
           }
         />

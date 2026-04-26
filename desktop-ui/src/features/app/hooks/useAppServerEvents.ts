@@ -1,10 +1,5 @@
-import { useEffect, useRef } from "react";
-import type {
-  AppServerEvent,
-  ApprovalRequest,
-  RequestUserInputRequest,
-} from "@/types";
 import { subscribeAppServerEvents } from "@services/events";
+import type { SupportedAppServerMethod } from "@utils/appServerEvents";
 import {
   getAppServerParams,
   getAppServerRawMethod,
@@ -12,7 +7,8 @@ import {
   isApprovalRequestMethod,
   isSupportedAppServerMethod,
 } from "@utils/appServerEvents";
-import type { SupportedAppServerMethod } from "@utils/appServerEvents";
+import { useEffect, useRef } from "react";
+import type { ApprovalRequest, AppServerEvent, RequestUserInputRequest } from "@/types";
 
 type AgentDelta = {
   workspaceId: string;
@@ -50,11 +46,7 @@ type AppServerEventHandlers = {
   onThreadClosed?: (workspaceId: string, threadId: string) => void;
   onThreadArchived?: (workspaceId: string, threadId: string) => void;
   onThreadUnarchived?: (workspaceId: string, threadId: string) => void;
-  onBackgroundThreadAction?: (
-    workspaceId: string,
-    threadId: string,
-    action: string,
-  ) => void;
+  onBackgroundThreadAction?: (workspaceId: string, threadId: string, action: string) => void;
   onApprovalRequest?: (request: ApprovalRequest) => void;
   onRequestUserInput?: (request: RequestUserInputRequest) => void;
   onAgentMessageDelta?: (event: AgentDelta) => void;
@@ -78,28 +70,45 @@ type AppServerEventHandlers = {
   onHookCompleted?: (event: HookEvent) => void;
   onItemStarted?: (workspaceId: string, threadId: string, item: Record<string, unknown>) => void;
   onItemCompleted?: (workspaceId: string, threadId: string, item: Record<string, unknown>) => void;
-  onReasoningSummaryDelta?: (workspaceId: string, threadId: string, itemId: string, delta: string) => void;
+  onReasoningSummaryDelta?: (
+    workspaceId: string,
+    threadId: string,
+    itemId: string,
+    delta: string,
+  ) => void;
   onReasoningSummaryBoundary?: (workspaceId: string, threadId: string, itemId: string) => void;
-  onReasoningTextDelta?: (workspaceId: string, threadId: string, itemId: string, delta: string) => void;
+  onReasoningTextDelta?: (
+    workspaceId: string,
+    threadId: string,
+    itemId: string,
+    delta: string,
+  ) => void;
   onPlanDelta?: (workspaceId: string, threadId: string, itemId: string, delta: string) => void;
-  onCommandOutputDelta?: (workspaceId: string, threadId: string, itemId: string, delta: string) => void;
+  onCommandOutputDelta?: (
+    workspaceId: string,
+    threadId: string,
+    itemId: string,
+    delta: string,
+  ) => void;
   onTerminalInteraction?: (
     workspaceId: string,
     threadId: string,
     itemId: string,
     stdin: string,
   ) => void;
-  onFileChangeOutputDelta?: (workspaceId: string, threadId: string, itemId: string, delta: string) => void;
+  onFileChangeOutputDelta?: (
+    workspaceId: string,
+    threadId: string,
+    itemId: string,
+    delta: string,
+  ) => void;
   onTurnDiffUpdated?: (workspaceId: string, threadId: string, diff: string) => void;
   onThreadTokenUsageUpdated?: (
     workspaceId: string,
     threadId: string,
     tokenUsage: Record<string, unknown> | null,
   ) => void;
-  onAccountRateLimitsUpdated?: (
-    workspaceId: string,
-    rateLimits: Record<string, unknown>,
-  ) => void;
+  onAccountRateLimitsUpdated?: (workspaceId: string, rateLimits: Record<string, unknown>) => void;
   onAccountUpdated?: (workspaceId: string, authMode: string | null) => void;
   onAccountLoginCompleted?: (
     workspaceId: string,
@@ -140,10 +149,7 @@ export const METHODS_ROUTED_IN_USE_APP_SERVER_EVENTS = [
   "turn/started",
 ] as const satisfies readonly SupportedAppServerMethod[];
 
-function parseHookEvent(
-  workspaceId: string,
-  params: Record<string, unknown>,
-): HookEvent | null {
+function parseHookEvent(workspaceId: string, params: Record<string, unknown>): HookEvent | null {
   const threadId = String(params.threadId ?? params.thread_id ?? "").trim();
   if (!threadId) {
     return null;
@@ -154,9 +160,7 @@ function parseHookEvent(
   }
   const turnIdRaw = params.turnId ?? params.turn_id ?? null;
   const turnId =
-    typeof turnIdRaw === "string" && turnIdRaw.trim().length > 0
-      ? turnIdRaw.trim()
-      : null;
+    typeof turnIdRaw === "string" && turnIdRaw.trim().length > 0 ? turnIdRaw.trim() : null;
   return {
     workspaceId,
     threadId,
@@ -168,7 +172,7 @@ function parseHookEvent(
 export function useAppServerEvents(handlers: AppServerEventHandlers) {
   // Use ref to keep handlers current without triggering re-subscription
   const handlersRef = useRef(handlers);
-  
+
   // Update ref on every render to always have latest handlers
   useEffect(() => {
     handlersRef.current = handlers;
@@ -224,7 +228,9 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
                 }
                 return { label, description };
               })
-              .filter((option): option is { label: string; description: string } => Boolean(option));
+              .filter((option): option is { label: string; description: string } =>
+                Boolean(option),
+              );
             return {
               id: String(question.id ?? "").trim(),
               header: String(question.header ?? ""),
@@ -439,9 +445,7 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
       if (method === "account/updated") {
         const authModeRaw = params.authMode ?? params.auth_mode ?? null;
         const authMode =
-          typeof authModeRaw === "string" && authModeRaw.trim().length > 0
-            ? authModeRaw
-            : null;
+          typeof authModeRaw === "string" && authModeRaw.trim().length > 0 ? authModeRaw : null;
         currentHandlers.onAccountUpdated?.(workspace_id, authMode);
         return;
       }
@@ -449,13 +453,10 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
       if (method === "account/login/completed") {
         const loginIdRaw = params.loginId ?? params.login_id ?? null;
         const loginId =
-          typeof loginIdRaw === "string" && loginIdRaw.trim().length > 0
-            ? loginIdRaw
-            : null;
+          typeof loginIdRaw === "string" && loginIdRaw.trim().length > 0 ? loginIdRaw : null;
         const success = Boolean(params.success);
         const errorRaw = params.error ?? null;
-        const error =
-          typeof errorRaw === "string" && errorRaw.trim().length > 0 ? errorRaw : null;
+        const error = typeof errorRaw === "string" && errorRaw.trim().length > 0 ? errorRaw : null;
         currentHandlers.onAccountLoginCompleted?.(workspace_id, {
           loginId,
           success,
