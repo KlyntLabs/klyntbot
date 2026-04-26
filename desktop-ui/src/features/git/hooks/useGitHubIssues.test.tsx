@@ -37,9 +37,9 @@ describe("useGitHubIssues", () => {
     });
 
     const { result, unmount } = renderHook(
-      ({ active, enabled }: { active: WorkspaceInfo | null; enabled: boolean }) =>
-        useGitHubIssues(active, enabled),
-      { initialProps: { active: workspace, enabled: true } },
+      ({ active }: { active: WorkspaceInfo | null }) =>
+        useGitHubIssues(active),
+      { initialProps: { active: workspace } },
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -57,9 +57,9 @@ describe("useGitHubIssues", () => {
     getGitHubIssuesMock.mockResolvedValueOnce({ total: 0, issues: [] });
 
     const { result, unmount } = renderHook(
-      ({ active, enabled }: { active: WorkspaceInfo | null; enabled: boolean }) =>
-        useGitHubIssues(active, enabled),
-      { initialProps: { active: workspace, enabled: true } },
+      ({ active }: { active: WorkspaceInfo | null }) =>
+        useGitHubIssues(active),
+      { initialProps: { active: workspace } },
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -77,9 +77,9 @@ describe("useGitHubIssues", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const { result, unmount } = renderHook(
-      ({ active, enabled }: { active: WorkspaceInfo | null; enabled: boolean }) =>
-        useGitHubIssues(active, enabled),
-      { initialProps: { active: workspace, enabled: true } },
+      ({ active }: { active: WorkspaceInfo | null }) =>
+        useGitHubIssues(active),
+      { initialProps: { active: workspace } },
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));

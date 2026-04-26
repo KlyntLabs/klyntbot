@@ -337,13 +337,7 @@ export function useMainAppGitState({
     worktreeApplyError,
     worktreeApplyLoading,
     worktreeApplySuccess,
-  } = useGitActions({
-    activeWorkspace,
-    onRefreshGitStatus: refreshGitStatus,
-    onRefreshGitDiffs: refreshGitDiffs,
-    onClearGitRootCandidates: clearGitRootCandidates,
-    onError: alertError,
-  });
+  } = useGitActions(activeWorkspace);
 
   const { activeGitRoot, handleSetGitRoot, handlePickGitRoot } = useGitRootSelection({
     activeWorkspace,

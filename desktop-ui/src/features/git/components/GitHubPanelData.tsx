@@ -61,7 +61,6 @@ export function GitHubPanelData({
   onPullRequestDiffsChange,
   onPullRequestCommentsChange,
 }: GitHubPanelDataProps) {
-  const issuesEnabled = gitPanelMode === "issues";
   const pullRequestsEnabled = gitPanelMode === "prs" && Boolean(activeWorkspace);
   const pullRequestDiffsEnabled =
     shouldLoadDiffs && diffSource === "pr" && Boolean(activeWorkspace);
@@ -72,7 +71,7 @@ export function GitHubPanelData({
     total: issuesTotal,
     isLoading: issuesLoading,
     error: issuesError,
-  } = useGitHubIssues(activeWorkspace, issuesEnabled);
+  } = useGitHubIssues(activeWorkspace);
 
   const {
     pullRequests,
