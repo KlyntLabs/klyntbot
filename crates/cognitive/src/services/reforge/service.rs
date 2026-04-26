@@ -216,7 +216,9 @@ pub async fn run_reforge(
             Ok(out) => {
                 debug!(applied = out.applied, "Phase 2.5 complete");
                 if let Some(n) = out.narrative {
-                    result.phase_errors.push(format!("phase 2.5 narrative: {n}"));
+                    result
+                        .phase_errors
+                        .push(format!("phase 2.5 narrative: {n}"));
                 }
             }
             Err(e) => {
@@ -353,7 +355,9 @@ pub async fn run_reforge(
         info!("Reforge Phase 6 ext: selective-delete signal");
         if let Err(e) = runner.run_selective_delete().await {
             warn!("Phase 6 selective-delete failed: {e}");
-            result.phase_errors.push(format!("phase 6 selective-delete: {e}"));
+            result
+                .phase_errors
+                .push(format!("phase 6 selective-delete: {e}"));
         }
     }
 
@@ -560,7 +564,9 @@ pub async fn run_reforge(
         info!("Reforge Phase 6.5 ext: cross-session dedup");
         if let Err(e) = runner.run_cross_session_dedup().await {
             warn!("Phase 6.5 cross-session dedup failed: {e}");
-            result.phase_errors.push(format!("phase 6.5 cross-dedup: {e}"));
+            result
+                .phase_errors
+                .push(format!("phase 6.5 cross-dedup: {e}"));
         }
     }
 

@@ -654,14 +654,12 @@ impl SemanticFactRepo {
         metadata_json: Option<&str>,
     ) -> Result<(), sqlx::Error> {
         self.upsert(fact).await?;
-        sqlx::query(
-            "UPDATE semantic_facts SET scope_repo_id = ?2, metadata = ?3 WHERE id = ?1",
-        )
-        .bind(&fact.id)
-        .bind(scope_repo_id)
-        .bind(metadata_json)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE semantic_facts SET scope_repo_id = ?2, metadata = ?3 WHERE id = ?1")
+            .bind(&fact.id)
+            .bind(scope_repo_id)
+            .bind(metadata_json)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 

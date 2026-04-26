@@ -89,21 +89,17 @@ pub fn sanitize(s: &str) -> String {
 
 /// Return the next version number for a skill name.
 pub async fn next_version_for(pool: &StoragePool, skill_name: &str) -> Result<i64> {
-    let row: Option<(i64,)> = sqlx::query_as(
-        "SELECT MAX(version) FROM skill_versions WHERE skill_name = ?1",
-    )
-    .bind(skill_name)
-    .fetch_optional(pool.inner())
-    .await
-    .map_err(|e| KlyntbotError::Storage(format!("next_version_for: {e}")))?;
+    let row: Option<(i64,)> =
+        sqlx::query_as("SELECT MAX(version) FROM skill_versions WHERE skill_name = ?1")
+            .bind(skill_name)
+            .fetch_optional(pool.inner())
+            .await
+            .map_err(|e| KlyntbotError::Storage(format!("next_version_for: {e}")))?;
     Ok(row.map(|r| r.0).unwrap_or(0) + 1)
 }
 
 /// Atomically write a SKILL.md file using a managed block.
-pub async fn write_skill_md(
-    pool: &StoragePool,
-    args: &JournalArgs,
-) -> Result<SkillWriteOutcome> {
+pub async fn write_skill_md(pool: &StoragePool, args: &JournalArgs) -> Result<SkillWriteOutcome> {
     let body = render_skill_body(&args.spec);
     let block = ManagedBlock::read(&args.skill_path)
         .map_err(|e| KlyntbotError::Storage(format!("managed_block read: {e}")))?;

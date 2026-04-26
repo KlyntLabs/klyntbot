@@ -10,9 +10,9 @@ async fn empty_returns_empty_rows() {
     StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
         .await
         .unwrap();
-    let svc = DecisionPointsService::new(std::sync::Arc::new(
-        cognitive::EpisodicMemoryRepo::new(pool.inner().clone()),
-    ));
+    let svc = DecisionPointsService::new(std::sync::Arc::new(cognitive::EpisodicMemoryRepo::new(
+        pool.inner().clone(),
+    )));
     let r = svc.list(Some("repo:x"), 50).await.unwrap();
     assert!(r.rows.is_empty());
 }

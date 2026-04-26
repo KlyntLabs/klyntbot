@@ -4,7 +4,9 @@ use coding_memory::code_state::{CodeState, CodeStateSnapshot};
 fn code_state_roundtrips_through_snapshot() {
     let states = vec![
         CodeState::Idle,
-        CodeState::StackTraceActive { error_type: "NullPointer".into() },
+        CodeState::StackTraceActive {
+            error_type: "NullPointer".into(),
+        },
         CodeState::RedTestsRunning,
         CodeState::GreenTestsRunning,
         CodeState::BuildFailing,

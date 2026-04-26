@@ -1,8 +1,8 @@
+use coding_memory::reforge::types::RepoArtifactPlan;
 use coding_memory::reforge::{
     CodingSynthesisHandler, CodingSynthesisInput, CodingSynthesisOutput, PromoteAction,
     RuleArtifactInput, RuleArtifactOutput, RuleArtifactsHandler,
 };
-use coding_memory::reforge::types::RepoArtifactPlan;
 use jiff::Timestamp;
 use std::path::PathBuf;
 

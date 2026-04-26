@@ -41,12 +41,11 @@ async fn supersedes_high_similarity_pair_preserves_both() {
     assert_eq!(row_count.0, 2);
 
     // The older row's valid_until is now non-null, and its superseded_by points to f2.
-    let (until, by): (Option<String>, Option<String>) = sqlx::query_as(
-        "SELECT valid_until, superseded_by FROM semantic_facts WHERE id = 'f1'",
-    )
-    .fetch_one(pool.inner())
-    .await
-    .unwrap();
+    let (until, by): (Option<String>, Option<String>) =
+        sqlx::query_as("SELECT valid_until, superseded_by FROM semantic_facts WHERE id = 'f1'")
+            .fetch_one(pool.inner())
+            .await
+            .unwrap();
     assert!(until.is_some());
     assert_eq!(by.as_deref(), Some("f2"));
 }

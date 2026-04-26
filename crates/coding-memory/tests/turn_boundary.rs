@@ -20,23 +20,46 @@ fn evt(session: &str, turn: Option<&str>, kind: EventKind) -> AgentEvent {
 #[test]
 fn user_prompt_does_not_fire_boundary() {
     let mut buf = TurnBuffer::new();
-    let b = buf.accept(&evt("s1", Some("t1"), EventKind::UserPrompt {
-        text: "hi".into(), attachments: vec![],
-    }));
+    let b = buf.accept(&evt(
+        "s1",
+        Some("t1"),
+        EventKind::UserPrompt {
+            text: "hi".into(),
+            attachments: vec![],
+        },
+    ));
     assert!(matches!(b, TurnBoundary::None));
 }
 
 #[test]
 fn assistant_msg_with_usage_fires_boundary() {
     let mut buf = TurnBuffer::new();
-    buf.accept(&evt("s1", Some("t1"), EventKind::UserPrompt { text: "hi".into(), attachments: vec![] }));
-    let b = buf.accept(&evt("s1", Some("t1"), EventKind::AssistantMsg {
-        text: "done".into(),
-        truncated: false,
-        token_usage: Some(TokenUsage { prompt_tokens: 10, completion_tokens: 5, cached_tokens: None }),
-    }));
+    buf.accept(&evt(
+        "s1",
+        Some("t1"),
+        EventKind::UserPrompt {
+            text: "hi".into(),
+            attachments: vec![],
+        },
+    ));
+    let b = buf.accept(&evt(
+        "s1",
+        Some("t1"),
+        EventKind::AssistantMsg {
+            text: "done".into(),
+            truncated: false,
+            token_usage: Some(TokenUsage {
+                prompt_tokens: 10,
+                completion_tokens: 5,
+                cached_tokens: None,
+            }),
+        },
+    ));
     match b {
-        TurnBoundary::Fire { session_id, turn_id } => {
+        TurnBoundary::Fire {
+            session_id,
+            turn_id,
+        } => {
             assert_eq!(session_id, "s1");
             assert_eq!(turn_id.as_deref(), Some("t1"));
         }
@@ -47,29 +70,69 @@ fn assistant_msg_with_usage_fires_boundary() {
 #[test]
 fn assistant_msg_without_usage_does_not_fire() {
     let mut buf = TurnBuffer::new();
-    let b = buf.accept(&evt("s1", Some("t1"), EventKind::AssistantMsg {
-        text: "partial".into(), truncated: true, token_usage: None,
-    }));
+    let b = buf.accept(&evt(
+        "s1",
+        Some("t1"),
+        EventKind::AssistantMsg {
+            text: "partial".into(),
+            truncated: true,
+            token_usage: None,
+        },
+    ));
     assert!(matches!(b, TurnBoundary::None));
 }
 
 #[test]
 fn session_end_fires_boundary() {
     let mut buf = TurnBuffer::new();
-    buf.accept(&evt("s1", Some("t1"), EventKind::UserPrompt { text: "hi".into(), attachments: vec![] }));
-    let b = buf.accept(&evt("s1", None, EventKind::SessionEnd { reason: "quit".into() }));
+    buf.accept(&evt(
+        "s1",
+        Some("t1"),
+        EventKind::UserPrompt {
+            text: "hi".into(),
+            attachments: vec![],
+        },
+    ));
+    let b = buf.accept(&evt(
+        "s1",
+        None,
+        EventKind::SessionEnd {
+            reason: "quit".into(),
+        },
+    ));
     assert!(matches!(b, TurnBoundary::Fire { .. }));
 }
 
 #[test]
 fn new_user_prompt_fires_previous_turn() {
     let mut buf = TurnBuffer::new();
-    buf.accept(&evt("s1", Some("t1"), EventKind::UserPrompt { text: "a".into(), attachments: vec![] }));
-    buf.accept(&evt("s1", Some("t1"), EventKind::ToolCall {
-        tool: "bash".into(), args_preview: "ls".into(),
-        ok: true, duration_ms: 1, result_preview: "".into(),
-    }));
-    let b = buf.accept(&evt("s1", Some("t2"), EventKind::UserPrompt { text: "b".into(), attachments: vec![] }));
+    buf.accept(&evt(
+        "s1",
+        Some("t1"),
+        EventKind::UserPrompt {
+            text: "a".into(),
+            attachments: vec![],
+        },
+    ));
+    buf.accept(&evt(
+        "s1",
+        Some("t1"),
+        EventKind::ToolCall {
+            tool: "bash".into(),
+            args_preview: "ls".into(),
+            ok: true,
+            duration_ms: 1,
+            result_preview: "".into(),
+        },
+    ));
+    let b = buf.accept(&evt(
+        "s1",
+        Some("t2"),
+        EventKind::UserPrompt {
+            text: "b".into(),
+            attachments: vec![],
+        },
+    ));
     // Previous t1 should fire because t2 is a different turn.
     match b {
         TurnBoundary::Fire { turn_id, .. } => assert_eq!(turn_id.as_deref(), Some("t1")),
@@ -80,7 +143,14 @@ fn new_user_prompt_fires_previous_turn() {
 #[test]
 fn idle_timeout_fires_stale_turns() {
     let mut buf = TurnBuffer::new();
-    buf.accept(&evt("s1", Some("t1"), EventKind::UserPrompt { text: "a".into(), attachments: vec![] }));
+    buf.accept(&evt(
+        "s1",
+        Some("t1"),
+        EventKind::UserPrompt {
+            text: "a".into(),
+            attachments: vec![],
+        },
+    ));
     let stale = buf.fire_idle_turns(std::time::Duration::from_secs(0));
     assert_eq!(stale.len(), 1);
     assert_eq!(stale[0].turn_id.as_deref(), Some("t1"));

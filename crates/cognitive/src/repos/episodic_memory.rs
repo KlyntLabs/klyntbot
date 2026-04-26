@@ -170,9 +170,7 @@ impl EpisodicMemoryRepo {
         limit: i64,
     ) -> Result<Vec<EpisodicMemory>, sqlx::Error> {
         let placeholders = (0..kinds.len()).map(|_| "?").collect::<Vec<_>>().join(",");
-        let mut q = format!(
-            "SELECT * FROM episodic_memories WHERE kind IN ({placeholders})"
-        );
+        let mut q = format!("SELECT * FROM episodic_memories WHERE kind IN ({placeholders})");
         if repo.is_some() {
             q.push_str(" AND scope_repo_id = ?");
         }

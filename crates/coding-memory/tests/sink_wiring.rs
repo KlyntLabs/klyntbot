@@ -12,8 +12,12 @@ use uuid::Uuid;
 #[tokio::test]
 async fn in_process_sink_hits_distiller() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations()).await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations()).await.unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
+        .await
+        .unwrap();
 
     let ingest = Arc::new(IngestEventLogRepo::new(pool.inner().clone()));
     let writer = DistillerWriter::new(
@@ -21,14 +25,20 @@ async fn in_process_sink_hits_distiller() {
         EpisodicMemoryRepo::new(pool.inner().clone()),
     );
     let provider = Arc::new(providers::ProviderManager::new(
-        Arc::new(providers::NoopProvider), None, None,
+        Arc::new(providers::NoopProvider),
+        None,
+        None,
     ));
-    let retriever = Arc::new(cognitive::UnifiedMemoryService::new(
-        SemanticFactRepo::new(pool.inner().clone()),
-    )) as Arc<dyn context_engine::MemoryRetriever>;
+    let retriever = Arc::new(cognitive::UnifiedMemoryService::new(SemanticFactRepo::new(
+        pool.inner().clone(),
+    ))) as Arc<dyn context_engine::MemoryRetriever>;
 
     let distiller = Arc::new(Distiller::new(
-        DistillerConfig::default(), ingest.clone(), writer, provider, retriever,
+        DistillerConfig::default(),
+        ingest.clone(),
+        writer,
+        provider,
+        retriever,
     ));
 
     let mut sink = InProcessSink::new();
@@ -42,7 +52,10 @@ async fn in_process_sink_hits_distiller() {
         cwd: PathBuf::from("/tmp"),
         repo: None,
         occurred_at: Timestamp::now(),
-        kind: EventKind::UserPrompt { text: "hi".into(), attachments: vec![] },
+        kind: EventKind::UserPrompt {
+            text: "hi".into(),
+            attachments: vec![],
+        },
     });
     ingest.insert(&event).await.unwrap();
     sink.accept_event(event).await.unwrap();
@@ -57,8 +70,13 @@ async fn in_process_sink_hits_distiller() {
         repo: None,
         occurred_at: Timestamp::now(),
         kind: EventKind::AssistantMsg {
-            text: "done".into(), truncated: false,
-            token_usage: Some(TokenUsage { prompt_tokens: 1, completion_tokens: 1, cached_tokens: None }),
+            text: "done".into(),
+            truncated: false,
+            token_usage: Some(TokenUsage {
+                prompt_tokens: 1,
+                completion_tokens: 1,
+                cached_tokens: None,
+            }),
         },
     });
     ingest.insert(&event2).await.unwrap();
@@ -67,7 +85,10 @@ async fn in_process_sink_hits_distiller() {
     // Give the spawned distill_turn a moment to complete
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
-    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM episodic_memories WHERE kind = 'turn_trace'")
-        .fetch_one(pool.inner()).await.unwrap();
+    let count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM episodic_memories WHERE kind = 'turn_trace'")
+            .fetch_one(pool.inner())
+            .await
+            .unwrap();
     assert_eq!(count.0, 1);
 }

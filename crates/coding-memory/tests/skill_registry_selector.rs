@@ -13,9 +13,15 @@ struct TestSkill {
 
 #[async_trait]
 impl RetrievalSkill for TestSkill {
-    fn name(&self) -> &'static str { self.name }
-    fn description(&self) -> &'static str { "test" }
-    fn tier(&self) -> BudgetTier { self.tier }
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn description(&self) -> &'static str {
+        "test"
+    }
+    fn tier(&self) -> BudgetTier {
+        self.tier
+    }
     async fn apply(&self, _: &EscalationContext) -> common::Result<EscalationOutcome> {
         Ok(EscalationOutcome {
             succeeded: self.succeeds,
@@ -31,9 +37,24 @@ async fn selector_stops_on_first_success() {
     let bus = Arc::new(bus::DomainEventBus::new(64));
     let reg = RetrievalSkillRegistry::new(
         vec![
-            Arc::new(TestSkill { name: "fail_a", tier: BudgetTier::Fast, succeeds: false, after: 0.1 }),
-            Arc::new(TestSkill { name: "succ_b", tier: BudgetTier::Fast, succeeds: true, after: 0.9 }),
-            Arc::new(TestSkill { name: "skip_c", tier: BudgetTier::Fast, succeeds: true, after: 0.99 }),
+            Arc::new(TestSkill {
+                name: "fail_a",
+                tier: BudgetTier::Fast,
+                succeeds: false,
+                after: 0.1,
+            }),
+            Arc::new(TestSkill {
+                name: "succ_b",
+                tier: BudgetTier::Fast,
+                succeeds: true,
+                after: 0.9,
+            }),
+            Arc::new(TestSkill {
+                name: "skip_c",
+                tier: BudgetTier::Fast,
+                succeeds: true,
+                after: 0.99,
+            }),
         ],
         bus,
     );
@@ -52,9 +73,12 @@ async fn selector_stops_on_first_success() {
 async fn selector_filters_by_tier() {
     let bus = Arc::new(bus::DomainEventBus::new(64));
     let reg = RetrievalSkillRegistry::new(
-        vec![
-            Arc::new(TestSkill { name: "ultra_only", tier: BudgetTier::Ultra, succeeds: true, after: 0.99 }),
-        ],
+        vec![Arc::new(TestSkill {
+            name: "ultra_only",
+            tier: BudgetTier::Ultra,
+            succeeds: true,
+            after: 0.99,
+        })],
         bus,
     );
     let ctx = EscalationContext {

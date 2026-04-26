@@ -26,13 +26,23 @@ impl LlmProvider for FixedProvider {
             content: Some("".into()),
             tool_calls: self.0.clone(),
             finish_reason: "stop".into(),
-            usage: Usage { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2, cache_read_tokens: 0, cache_write_tokens: 0 },
+            usage: Usage {
+                prompt_tokens: 1,
+                completion_tokens: 1,
+                total_tokens: 2,
+                cache_read_tokens: 0,
+                cache_write_tokens: 0,
+            },
             reasoning_content: None,
         })
     }
 
-    fn default_model(&self) -> &str { "fixed" }
-    fn name(&self) -> &str { "fixed-provider" }
+    fn default_model(&self) -> &str {
+        "fixed"
+    }
+    fn name(&self) -> &str {
+        "fixed-provider"
+    }
 }
 
 fn evt(session: &str, turn: Option<&str>, kind: EventKind) -> AgentEvent {
@@ -51,18 +61,41 @@ fn evt(session: &str, turn: Option<&str>, kind: EventKind) -> AgentEvent {
 #[tokio::test]
 async fn distill_turn_writes_turn_trace_plus_repo_context_fact() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations()).await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations()).await.unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
+        .await
+        .unwrap();
 
     let ingest = Arc::new(IngestEventLogRepo::new(pool.inner().clone()));
-    ingest.insert(&evt("s1", Some("t1"), EventKind::UserPrompt {
-        text: "what framework does this repo use?".into(), attachments: vec![],
-    })).await.unwrap();
-    ingest.insert(&evt("s1", Some("t1"), EventKind::AssistantMsg {
-        text: "It's a Tauri 2 app.".into(),
-        truncated: false,
-        token_usage: Some(TokenUsage { prompt_tokens: 50, completion_tokens: 20, cached_tokens: None }),
-    })).await.unwrap();
+    ingest
+        .insert(&evt(
+            "s1",
+            Some("t1"),
+            EventKind::UserPrompt {
+                text: "what framework does this repo use?".into(),
+                attachments: vec![],
+            },
+        ))
+        .await
+        .unwrap();
+    ingest
+        .insert(&evt(
+            "s1",
+            Some("t1"),
+            EventKind::AssistantMsg {
+                text: "It's a Tauri 2 app.".into(),
+                truncated: false,
+                token_usage: Some(TokenUsage {
+                    prompt_tokens: 50,
+                    completion_tokens: 20,
+                    cached_tokens: None,
+                }),
+            },
+        ))
+        .await
+        .unwrap();
 
     let writer = DistillerWriter::new(
         SemanticFactRepo::new(pool.inner().clone()),
@@ -84,21 +117,36 @@ async fn distill_turn_writes_turn_trace_plus_repo_context_fact() {
             name: "record_observation".into(),
             arguments: observation,
         }])),
-        None, None,
+        None,
+        None,
     ));
 
-    let retriever = Arc::new(cognitive::UnifiedMemoryService::new(
-        SemanticFactRepo::new(pool.inner().clone()),
-    )) as Arc<dyn context_engine::MemoryRetriever>;
+    let retriever = Arc::new(cognitive::UnifiedMemoryService::new(SemanticFactRepo::new(
+        pool.inner().clone(),
+    ))) as Arc<dyn context_engine::MemoryRetriever>;
 
-    let distiller = Distiller::new(DistillerConfig::default(), ingest.clone(), writer, provider, retriever);
+    let distiller = Distiller::new(
+        DistillerConfig::default(),
+        ingest.clone(),
+        writer,
+        provider,
+        retriever,
+    );
     let report = distiller.distill_turn("s1", Some("t1")).await.unwrap();
-    assert!(report.episodic_writes >= 1, "expected at least one turn_trace episode");
-    assert!(report.semantic_writes >= 1, "expected at least one fact from the LLM observation");
+    assert!(
+        report.episodic_writes >= 1,
+        "expected at least one turn_trace episode"
+    );
+    assert!(
+        report.semantic_writes >= 1,
+        "expected at least one fact from the LLM observation"
+    );
 
-    let count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM episodic_memories WHERE kind = 'turn_trace'",
-    ).fetch_one(pool.inner()).await.unwrap();
+    let count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM episodic_memories WHERE kind = 'turn_trace'")
+            .fetch_one(pool.inner())
+            .await
+            .unwrap();
     assert_eq!(count.0, 1);
 
     let fact_count: (i64,) = sqlx::query_as(

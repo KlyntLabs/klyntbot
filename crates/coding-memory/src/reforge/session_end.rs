@@ -54,11 +54,7 @@ impl SessionEndPass {
     }
 
     /// Run the pass.
-    pub async fn run(
-        &self,
-        session_id: &str,
-        repo_id: Option<&str>,
-    ) -> Result<SessionEndReport> {
+    pub async fn run(&self, session_id: &str, repo_id: Option<&str>) -> Result<SessionEndReport> {
         let mut report = SessionEndReport::default();
 
         // 1. Hebbian bump — pull retrieval rows for this session and bump pairs.
@@ -106,7 +102,10 @@ impl SessionEndPass {
             let hash = metadata
                 .as_deref()
                 .and_then(|s| serde_json::from_str::<Value>(s).ok())
-                .and_then(|v| v.get("problem_hash").and_then(|h| h.as_str().map(String::from)));
+                .and_then(|v| {
+                    v.get("problem_hash")
+                        .and_then(|h| h.as_str().map(String::from))
+                });
             let Some(hash) = hash else { continue };
             buckets.entry(hash).or_default().push((id, importance));
         }

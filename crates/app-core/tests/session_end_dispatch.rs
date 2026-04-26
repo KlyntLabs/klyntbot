@@ -1,6 +1,6 @@
 use app_core::coding_memory::reforge::register_session_end_dispatch;
-use coding_memory::reforge::SessionEndPass;
 use coding_memory::recall::telemetry::RecallInvocationRepo;
+use coding_memory::reforge::SessionEndPass;
 use storage::StoragePool;
 
 #[tokio::test]

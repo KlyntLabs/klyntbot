@@ -1,17 +1,26 @@
-use coding_memory::recall::renderers::render_user_prompt_block;
 use coding_memory::recall::budget::{HeuristicBudgeter, TokenBudgeter};
+use coding_memory::recall::renderers::render_user_prompt_block;
 
 #[tokio::test]
 async fn no_dead_end_no_warn_block() {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-    storage::StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations()).await.unwrap();
-    storage::StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations()).await.unwrap();
+    storage::StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
+    storage::StoragePool::run_feature_migrations(
+        pool.inner(),
+        &coding_memory::coding_memory_migrations(),
+    )
+    .await
+    .unwrap();
     let fact_repo = std::sync::Arc::new(cognitive::SemanticFactRepo::new(pool.inner().clone()));
     let ep_repo = std::sync::Arc::new(cognitive::EpisodicMemoryRepo::new(pool.inner().clone()));
     let ums = std::sync::Arc::new(cognitive::UnifiedMemoryService::new((*fact_repo).clone()));
     let svc = std::sync::Arc::new(coding_memory::recall::CodingRecallService::new(
         Default::default(),
-        ums, fact_repo, ep_repo,
+        ums,
+        fact_repo,
+        ep_repo,
         coding_memory::RecallInvocationRepo::new(pool.clone()),
         std::sync::Arc::new(HeuristicBudgeter),
     ));
@@ -25,8 +34,15 @@ async fn no_dead_end_no_warn_block() {
 #[tokio::test]
 async fn dead_end_seeded_yields_warn_block() {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-    storage::StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations()).await.unwrap();
-    storage::StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations()).await.unwrap();
+    storage::StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
+    storage::StoragePool::run_feature_migrations(
+        pool.inner(),
+        &coding_memory::coding_memory_migrations(),
+    )
+    .await
+    .unwrap();
     let fact_repo = std::sync::Arc::new(cognitive::SemanticFactRepo::new(pool.inner().clone()));
     let ep_repo = std::sync::Arc::new(cognitive::EpisodicMemoryRepo::new(pool.inner().clone()));
     let ums = std::sync::Arc::new(cognitive::UnifiedMemoryService::new((*fact_repo).clone()));
@@ -44,11 +60,16 @@ async fn dead_end_seeded_yields_warn_block() {
         metadata: Some(r#"{"memory_type":"counterfactual","reason":"too slow","attempt_id":"00000000-0000-0000-0000-000000000001","problem_hash":"abc"}"#.into()),
         ..Default::default()
     };
-    fact_repo.upsert_with_metadata(&cf, Some("repo:demo"), cf.metadata.as_deref()).await.unwrap();
+    fact_repo
+        .upsert_with_metadata(&cf, Some("repo:demo"), cf.metadata.as_deref())
+        .await
+        .unwrap();
 
     let svc = std::sync::Arc::new(coding_memory::recall::CodingRecallService::new(
         Default::default(),
-        ums, fact_repo, ep_repo,
+        ums,
+        fact_repo,
+        ep_repo,
         coding_memory::RecallInvocationRepo::new(pool.clone()),
         std::sync::Arc::new(HeuristicBudgeter),
     ));
@@ -59,5 +80,8 @@ async fn dead_end_seeded_yields_warn_block() {
     )
     .await
     .unwrap();
-    assert!(md.contains("⚠️ Heads-up"), "expected warn block; got:\n{md}");
+    assert!(
+        md.contains("⚠️ Heads-up"),
+        "expected warn block; got:\n{md}"
+    );
 }

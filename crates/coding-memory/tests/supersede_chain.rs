@@ -9,8 +9,12 @@ use uuid::Uuid;
 #[tokio::test]
 async fn supersede_chain_links_predecessor() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations()).await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations()).await.unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
+        .await
+        .unwrap();
     let writer = DistillerWriter::new(
         SemanticFactRepo::new(pool.inner().clone()),
         EpisodicMemoryRepo::new(pool.inner().clone()),
@@ -26,41 +30,64 @@ async fn supersede_chain_links_predecessor() {
     };
 
     let old = SemanticFact {
-        id: "old-id".into(), domain: "work".into(),
-        subject: "repo:x".into(), predicate: "framework".into(), object: "tauri".into(),
-        confidence: 0.9, source: "distiller".into(),
+        id: "old-id".into(),
+        domain: "work".into(),
+        subject: "repo:x".into(),
+        predicate: "framework".into(),
+        object: "tauri".into(),
+        confidence: 0.9,
+        source: "distiller".into(),
         valid_from: Timestamp::now().to_string(),
         valid_until: None,
         recorded_at: Timestamp::now().to_string(),
-        superseded_at: None, superseded_by: None,
-        stability: 1.0, last_accessed: None, access_count: 0,
-        convergence_score: 1.0, project_id: None,
-        memory_type: "fact".into(), scope_type: "user".into(), scope_id: None,
+        superseded_at: None,
+        superseded_by: None,
+        stability: 1.0,
+        last_accessed: None,
+        access_count: 0,
+        convergence_score: 1.0,
+        project_id: None,
+        memory_type: "fact".into(),
+        scope_type: "user".into(),
+        scope_id: None,
         scope_repo_id: None,
         metadata: None,
     };
     writer.facts().upsert(&old).await.unwrap();
 
     let new = SemanticFact {
-        id: "new-id".into(), domain: "work".into(),
-        subject: "repo:x".into(), predicate: "framework".into(), object: "tauri v2".into(),
-        confidence: 0.95, source: "distiller".into(),
+        id: "new-id".into(),
+        domain: "work".into(),
+        subject: "repo:x".into(),
+        predicate: "framework".into(),
+        object: "tauri v2".into(),
+        confidence: 0.95,
+        source: "distiller".into(),
         valid_from: Timestamp::now().to_string(),
         valid_until: None,
         recorded_at: Timestamp::now().to_string(),
-        superseded_at: None, superseded_by: None,
-        stability: 1.0, last_accessed: None, access_count: 0,
-        convergence_score: 1.0, project_id: None,
-        memory_type: "fact".into(), scope_type: "user".into(), scope_id: None,
+        superseded_at: None,
+        superseded_by: None,
+        stability: 1.0,
+        last_accessed: None,
+        access_count: 0,
+        convergence_score: 1.0,
+        project_id: None,
+        memory_type: "fact".into(),
+        scope_type: "user".into(),
+        scope_id: None,
         scope_repo_id: None,
         metadata: None,
     };
-    writer.write_fact(coding_memory::distiller::PreparedFact {
-        fact: new,
-        metadata_json: None,
-        scope_repo_id: None,
-        provenance: prov.clone(),
-    }).await.unwrap();
+    writer
+        .write_fact(coding_memory::distiller::PreparedFact {
+            fact: new,
+            metadata_json: None,
+            scope_repo_id: None,
+            provenance: prov.clone(),
+        })
+        .await
+        .unwrap();
 
     // Link the chain
     writer.facts().supersede("old-id", "new-id").await.unwrap();

@@ -1,16 +1,20 @@
-use coding_memory::distiller::writer::{DistillerWriter, PreparedFact, PreparedEpisode};
+use coding_memory::distiller::writer::{DistillerWriter, PreparedEpisode, PreparedFact};
 use coding_memory::distiller::DistillerError;
 use coding_memory::scope::{ProvenanceKind, ProvenanceMetadata};
-use cognitive::{EpisodicMemoryRepo, SemanticFactRepo};
 use cognitive::types::{EpisodicMemory, SemanticFact};
+use cognitive::{EpisodicMemoryRepo, SemanticFactRepo};
 use jiff::Timestamp;
 use storage::StoragePool;
 use uuid::Uuid;
 
 async fn prepared() -> (StoragePool, DistillerWriter) {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations()).await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations()).await.unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
+        .await
+        .unwrap();
     let facts = SemanticFactRepo::new(pool.inner().clone());
     let episodes = EpisodicMemoryRepo::new(pool.inner().clone());
     (pool, DistillerWriter::new(facts, episodes))
@@ -80,32 +84,42 @@ async fn write_fact_rejects_empty_provenance() {
     let (_pool, writer) = prepared().await;
     let mut prov = valid_provenance();
     prov.source_events.clear();
-    let r = writer.write_fact(PreparedFact {
-        fact: dummy_fact(),
-        metadata_json: None,
-        scope_repo_id: None,
-        provenance: prov,
-    }).await;
+    let r = writer
+        .write_fact(PreparedFact {
+            fact: dummy_fact(),
+            metadata_json: None,
+            scope_repo_id: None,
+            provenance: prov,
+        })
+        .await;
     assert!(matches!(r, Err(DistillerError::ProvenanceMissing)));
 }
 
 #[tokio::test]
 async fn write_fact_persists_metadata_and_scope_repo_id() {
     let (pool, writer) = prepared().await;
-    writer.write_fact(PreparedFact {
-        fact: dummy_fact(),
-        metadata_json: None,
-        scope_repo_id: Some("github.com/klynt/bot".into()),
-        provenance: valid_provenance(),
-    }).await.unwrap();
+    writer
+        .write_fact(PreparedFact {
+            fact: dummy_fact(),
+            metadata_json: None,
+            scope_repo_id: Some("github.com/klynt/bot".into()),
+            provenance: valid_provenance(),
+        })
+        .await
+        .unwrap();
 
-    let row: (Option<String>, Option<String>) = sqlx::query_as(
-        "SELECT scope_repo_id, metadata FROM semantic_facts LIMIT 1"
-    ).fetch_one(pool.inner()).await.unwrap();
+    let row: (Option<String>, Option<String>) =
+        sqlx::query_as("SELECT scope_repo_id, metadata FROM semantic_facts LIMIT 1")
+            .fetch_one(pool.inner())
+            .await
+            .unwrap();
     assert_eq!(row.0.as_deref(), Some("github.com/klynt/bot"));
     let meta: serde_json::Value = serde_json::from_str(&row.1.unwrap()).unwrap();
     assert!(meta["provenance"]["sourceEvents"].is_array());
-    assert!(!meta["provenance"]["sourceEvents"].as_array().unwrap().is_empty());
+    assert!(!meta["provenance"]["sourceEvents"]
+        .as_array()
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test]
@@ -113,12 +127,14 @@ async fn write_episode_rejects_empty_provenance() {
     let (_pool, writer) = prepared().await;
     let mut prov = valid_provenance();
     prov.source_events.clear();
-    let r = writer.write_episode(PreparedEpisode {
-        episode: dummy_episode(),
-        kind: "turn_trace".into(),
-        metadata_json: None,
-        scope_repo_id: None,
-        provenance: prov,
-    }).await;
+    let r = writer
+        .write_episode(PreparedEpisode {
+            episode: dummy_episode(),
+            kind: "turn_trace".into(),
+            metadata_json: None,
+            scope_repo_id: None,
+            provenance: prov,
+        })
+        .await;
     assert!(matches!(r, Err(DistillerError::ProvenanceMissing)));
 }

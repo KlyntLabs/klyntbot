@@ -36,9 +36,18 @@ async fn problem_class_refactor_fires_at_threshold() {
     let mirror_repo = cognitive::mirror::MirrorRepo::new(pool.clone());
     let source = CodingMetaRulesSource::new(mirror_repo);
 
-    source.accumulate(&fix_failed_signal("h1", 1)).await.unwrap();
-    source.accumulate(&fix_failed_signal("h1", 2)).await.unwrap();
-    source.accumulate(&fix_failed_signal("h1", 3)).await.unwrap();
+    source
+        .accumulate(&fix_failed_signal("h1", 1))
+        .await
+        .unwrap();
+    source
+        .accumulate(&fix_failed_signal("h1", 2))
+        .await
+        .unwrap();
+    source
+        .accumulate(&fix_failed_signal("h1", 3))
+        .await
+        .unwrap();
 
     let alerts: (i64,) = sqlx::query_as(
         "SELECT COUNT(*) FROM mirror_snippets WHERE coding_alert_kind = 'problem_class_refactor'",

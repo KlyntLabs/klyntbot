@@ -30,7 +30,11 @@ fn repo_context_becomes_prepared_fact() {
         outcome: None,
     };
     let built = build_prepared(&o, Some("github.com/klynt/bot"), &prov()).unwrap();
-    let PreparedFact { fact, scope_repo_id, .. } = match built {
+    let PreparedFact {
+        fact,
+        scope_repo_id,
+        ..
+    } = match built {
         coding_memory::distiller::fact_builder::Prepared::Fact(f) => f,
         _ => panic!("expected Fact"),
     };

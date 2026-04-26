@@ -66,16 +66,16 @@ impl SessionSummaryRepo {
         .fetch_optional(self.pool.inner())
         .await
         .map_err(|e| KlyntbotError::Storage(format!("session_summaries read: {e}")))?;
-        Ok(row.map(|(id, session_id, repo_id, summarised_at, summary_md, token_count)| {
-            SessionSummaryRow {
+        Ok(row.map(
+            |(id, session_id, repo_id, summarised_at, summary_md, token_count)| SessionSummaryRow {
                 id,
                 session_id,
                 repo_id,
                 summarised_at: summarised_at.parse().unwrap_or_else(|_| Timestamp::now()),
                 summary_md,
                 token_count: token_count as u32,
-            }
-        }))
+            },
+        ))
     }
 
     /// List recent summaries for a repo.
@@ -96,18 +96,18 @@ impl SessionSummaryRepo {
         .map_err(|e| KlyntbotError::Storage(format!("session_summaries list: {e}")))?;
         Ok(rows
             .into_iter()
-            .map(|(id, session_id, repo_id, summarised_at, summary_md, token_count)| {
-                SessionSummaryRow {
-                    id,
-                    session_id,
-                    repo_id,
-                    summarised_at: summarised_at
-                        .parse()
-                        .unwrap_or_else(|_| Timestamp::now()),
-                    summary_md,
-                    token_count: token_count as u32,
-                }
-            })
+            .map(
+                |(id, session_id, repo_id, summarised_at, summary_md, token_count)| {
+                    SessionSummaryRow {
+                        id,
+                        session_id,
+                        repo_id,
+                        summarised_at: summarised_at.parse().unwrap_or_else(|_| Timestamp::now()),
+                        summary_md,
+                        token_count: token_count as u32,
+                    }
+                },
+            )
             .collect())
     }
 

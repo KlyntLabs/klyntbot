@@ -72,11 +72,7 @@ fn detects_user_modification_to_managed_range() {
     let mutated = SAMPLE.replace("managed line 1", "user-edited line");
     fs::write(&path, &mutated).unwrap();
     let block2 = ManagedBlock::read(&path).expect("parse");
-    let outcome = block2.write_with_new_inside_if_unchanged(
-        &path,
-        "- new\n",
-        "cycle-2",
-        Some(&prior_hash),
-    );
+    let outcome =
+        block2.write_with_new_inside_if_unchanged(&path, "- new\n", "cycle-2", Some(&prior_hash));
     assert!(matches!(outcome, Err(ManagedBlockError::UserConflict)));
 }

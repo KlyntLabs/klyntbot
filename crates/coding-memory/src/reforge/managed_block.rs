@@ -130,11 +130,14 @@ impl ManagedBlock {
             }
         }
         let now = jiff::Timestamp::now().to_string();
-        let new_marker = format!(
-            "{START_PREFIX} | generated: {now} | cycle: {cycle_id} -->\n"
-        );
+        let new_marker = format!("{START_PREFIX} | generated: {now} | cycle: {cycle_id} -->\n");
         let mut rebuilt = String::with_capacity(
-            self.before.len() + new_marker.len() + new_body.len() + END_MARKER.len() + self.after.len() + 8,
+            self.before.len()
+                + new_marker.len()
+                + new_body.len()
+                + END_MARKER.len()
+                + self.after.len()
+                + 8,
         );
         rebuilt.push_str(&self.before);
         if !rebuilt.ends_with('\n') && !rebuilt.is_empty() {

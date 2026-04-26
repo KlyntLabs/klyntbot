@@ -26,5 +26,5 @@ pub use session_summary_repo::{SessionSummaryRepo, SessionSummaryRow};
 pub use synth_handler::{CodingSynthesisHandler, RuleArtifactsHandler};
 pub use types::{
     CodingPhaseHandlers, CodingSynthesisInput, CodingSynthesisOutput, ManagedBlockSection,
-    PromoteAction, ProjectSkillSpec, RepoArtifactPlan, RuleArtifactInput, RuleArtifactOutput,
+    ProjectSkillSpec, PromoteAction, RepoArtifactPlan, RuleArtifactInput, RuleArtifactOutput,
 };

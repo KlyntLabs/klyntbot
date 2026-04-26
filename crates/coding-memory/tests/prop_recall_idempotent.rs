@@ -1,5 +1,5 @@
-use coding_memory::recall::{CodingRecallService, CodingRecallServiceConfig};
 use coding_memory::recall::budget::HeuristicBudgeter;
+use coding_memory::recall::{CodingRecallService, CodingRecallServiceConfig};
 use proptest::prelude::*;
 use std::sync::Arc;
 

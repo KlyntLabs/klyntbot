@@ -16,7 +16,9 @@ fn entries_sorted_descending_by_when() {
         coding_memory::recall::timeline_builder::TimelineInput {
             id: ids[1],
             kind: "fix_attempt".into(),
-            when: now.saturating_add(jiff::SignedDuration::from_secs(60)).unwrap(),
+            when: now
+                .saturating_add(jiff::SignedDuration::from_secs(60))
+                .unwrap(),
             snippet: "newer".into(),
             related_ids: vec![],
         },

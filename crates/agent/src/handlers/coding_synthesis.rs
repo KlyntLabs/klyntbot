@@ -4,9 +4,7 @@
 //! it to emit promotion actions, decodes them into `PromoteAction`s.
 
 use async_trait::async_trait;
-use coding_memory::reforge::{
-    CodingSynthesisHandler, CodingSynthesisInput, CodingSynthesisOutput,
-};
+use coding_memory::reforge::{CodingSynthesisHandler, CodingSynthesisInput, CodingSynthesisOutput};
 use common::{KlyntbotError, ProviderError, Result};
 use providers::{ChatParams, DynProvider, Message, ResponseFormat};
 use tracing::warn;
@@ -53,7 +51,11 @@ impl CodingSynthesisHandler for CodingSynthesisHandlerImpl {
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| KlyntbotError::Provider(ProviderError::InvalidResponse(format!("Phase 2.5 chat: {e}"))))?;
+            .map_err(|e| {
+                KlyntbotError::Provider(ProviderError::InvalidResponse(format!(
+                    "Phase 2.5 chat: {e}"
+                )))
+            })?;
 
         let raw = response.content.unwrap_or_default();
 
@@ -167,9 +169,8 @@ mod tests {
     #[tokio::test]
     async fn malformed_response_triggers_recovery() {
         // LLM wrapped JSON in markdown fences
-        let provider = mock_provider_returning(
-            "```json\n{\"actions\":[],\"narrative\":\"recovered\"}\n```",
-        );
+        let provider =
+            mock_provider_returning("```json\n{\"actions\":[],\"narrative\":\"recovered\"}\n```");
         let handler = CodingSynthesisHandlerImpl::with_model(provider, "mock");
         let out = handler
             .synthesize_coding(&CodingSynthesisInput {

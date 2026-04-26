@@ -1,5 +1,7 @@
 use coding_memory::reforge::types::CodingPhaseHandlers;
-use coding_memory::reforge::{RuleArtifactGenerationPhase, RuleArtifactInput, RuleArtifactOutput, RuleArtifactsHandler};
+use coding_memory::reforge::{
+    RuleArtifactGenerationPhase, RuleArtifactInput, RuleArtifactOutput, RuleArtifactsHandler,
+};
 use storage::StoragePool;
 use tempfile::tempdir;
 
@@ -53,7 +55,9 @@ async fn writes_managed_block_for_each_enabled_artifact() {
     let summaries = coding_memory::reforge::SessionSummaryRepo::new(pool.clone());
     let utilization = coding_memory::recall::telemetry::RecallInvocationRepo::new(pool.clone());
     let sd = coding_memory::reforge::selective_delete::SelectiveDeleteLogRepo::new(pool.clone());
-    let pat = coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo::new(pool.clone());
+    let pat = coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo::new(
+        pool.clone(),
+    );
 
     let handler = Mock;
 

@@ -1,4 +1,6 @@
-use coding_memory::retrieval_skills::causal_context_expander::{CausalContextExpander, EdgeLookupFn};
+use coding_memory::retrieval_skills::causal_context_expander::{
+    CausalContextExpander, EdgeLookupFn,
+};
 use coding_memory::retrieval_skills::{BudgetTier, EscalationContext, RetrievalSkill};
 use std::sync::Arc;
 use uuid::Uuid;

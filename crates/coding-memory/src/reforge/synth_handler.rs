@@ -11,7 +11,10 @@ use common::Result;
 #[async_trait]
 pub trait CodingSynthesisHandler: Send + Sync {
     /// Run synthesis.
-    async fn synthesize_coding(&self, input: &CodingSynthesisInput) -> Result<CodingSynthesisOutput>;
+    async fn synthesize_coding(
+        &self,
+        input: &CodingSynthesisInput,
+    ) -> Result<CodingSynthesisOutput>;
 }
 
 /// Phase 3.5 LLM seam.

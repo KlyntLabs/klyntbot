@@ -1,8 +1,8 @@
 //! Invariant — no coding reforge phase reduces episodic memory row count.
 
 use coding_memory::reforge::{
-    types::CodingPhaseHandlers, CodingSynthesisPhase, CrossSessionDedup,
-    RuleArtifactGenerationPhase, selective_delete::SelectiveDeleteSignal,
+    selective_delete::SelectiveDeleteSignal, types::CodingPhaseHandlers, CodingSynthesisPhase,
+    CrossSessionDedup, RuleArtifactGenerationPhase,
 };
 use proptest::prelude::*;
 use storage::StoragePool;

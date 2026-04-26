@@ -1,4 +1,6 @@
-use coding_memory::retrieval_skills::{BudgetTier, EscalationContext, RetrievalSkill, QueryDecomposer};
+use coding_memory::retrieval_skills::{
+    BudgetTier, EscalationContext, QueryDecomposer, RetrievalSkill,
+};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -11,7 +13,10 @@ async fn compound_query_yields_multiple_subs() {
         Box::pin(async move {
             calls.lock().unwrap().push(q);
             common::Result::Ok((vec![0.8f32], vec![Uuid::new_v4()]))
-        }) as std::pin::Pin<Box<dyn std::future::Future<Output = common::Result<(Vec<f32>, Vec<Uuid>)>> + Send>>
+        })
+            as std::pin::Pin<
+                Box<dyn std::future::Future<Output = common::Result<(Vec<f32>, Vec<Uuid>)>> + Send>,
+            >
     }) as coding_memory::retrieval_skills::query_decomposer::RetrieveFn;
 
     let skill = QueryDecomposer::new(retrieve);

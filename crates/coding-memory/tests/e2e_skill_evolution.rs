@@ -36,7 +36,10 @@ async fn evolve_writes_skill_md_and_versions_row() {
     let evolver = ProjectSkillEvolverImpl::new(pool.clone(), base_dir.clone());
     let results = evolver.evolve("r1").await.unwrap();
 
-    assert!(!results.is_empty(), "expected at least one skill synthesis result");
+    assert!(
+        !results.is_empty(),
+        "expected at least one skill synthesis result"
+    );
 
     let result = &results[0];
     let skill_path = &result.skill_path;

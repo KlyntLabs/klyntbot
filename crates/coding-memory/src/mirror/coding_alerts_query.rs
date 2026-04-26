@@ -73,7 +73,8 @@ impl CodingAlertsQuery {
         }
         sql.push_str(&format!(" ORDER BY created_at DESC LIMIT {limit}"));
 
-        let mut q = sqlx::query_as::<_, (String, String, String, String, String, String, i64)>(&sql);
+        let mut q =
+            sqlx::query_as::<_, (String, String, String, String, String, String, i64)>(&sql);
         for b in &binds {
             q = q.bind(b);
         }
@@ -83,8 +84,8 @@ impl CodingAlertsQuery {
             .map_err(|e| KlyntbotError::Storage(format!("coding_alerts query: {e}")))?;
         Ok(rows
             .into_iter()
-            .map(|(id, headline, payload, kind, severity, created_at, dismissed)| {
-                CodingAlertRow {
+            .map(
+                |(id, headline, payload, kind, severity, created_at, dismissed)| CodingAlertRow {
                     id,
                     headline,
                     payload,
@@ -92,8 +93,8 @@ impl CodingAlertsQuery {
                     severity,
                     created_at,
                     dismissed: dismissed != 0,
-                }
-            })
+                },
+            )
             .collect())
     }
 }

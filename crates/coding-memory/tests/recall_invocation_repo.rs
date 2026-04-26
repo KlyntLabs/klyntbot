@@ -34,10 +34,7 @@ async fn insert_then_list() {
         metadata: serde_json::json!({}),
     };
     repo.insert(&row).await.expect("insert");
-    let page = repo
-        .list_by_session("sess1", 50, 0)
-        .await
-        .expect("list");
+    let page = repo.list_by_session("sess1", 50, 0).await.expect("list");
     assert_eq!(page.len(), 1);
     assert_eq!(page[0].layer, "index");
     assert_eq!(page[0].result_ids.len(), 2);

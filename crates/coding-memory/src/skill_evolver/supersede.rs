@@ -4,10 +4,7 @@ use common::{KlyntbotError, Result};
 use storage::StoragePool;
 
 /// Mark all but the latest version per `skill_name` as `status = 'superseded'`.
-pub async fn supersede_outdated_versions(
-    pool: &StoragePool,
-    skill_name: &str,
-) -> Result<u64> {
+pub async fn supersede_outdated_versions(pool: &StoragePool, skill_name: &str) -> Result<u64> {
     let result = sqlx::query(
         "UPDATE skill_versions
          SET status = 'superseded'

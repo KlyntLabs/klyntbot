@@ -29,7 +29,9 @@ async fn supersede_marks_older_versions() {
         .unwrap();
     }
 
-    let affected = supersede_outdated_versions(&pool, "my-skill").await.unwrap();
+    let affected = supersede_outdated_versions(&pool, "my-skill")
+        .await
+        .unwrap();
     assert_eq!(affected, 2);
 
     let rows: Vec<(String, i64)> = sqlx::query_as(
@@ -65,7 +67,9 @@ async fn supersede_single_version_does_nothing() {
     .await
     .unwrap();
 
-    let affected = supersede_outdated_versions(&pool, "my-skill").await.unwrap();
+    let affected = supersede_outdated_versions(&pool, "my-skill")
+        .await
+        .unwrap();
     assert_eq!(affected, 0);
 
     let active: i64 = sqlx::query_scalar(

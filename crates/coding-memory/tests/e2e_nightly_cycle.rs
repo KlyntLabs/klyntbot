@@ -5,13 +5,13 @@
 
 use async_trait::async_trait;
 use coding_memory::reforge::{
+    selective_delete::SelectiveDeleteSignal,
+    synth_handler::{CodingSynthesisHandler, RuleArtifactsHandler},
     types::{
         CodingPhaseHandlers, CodingSynthesisInput, CodingSynthesisOutput, PromoteAction,
         RuleArtifactInput, RuleArtifactOutput,
     },
-    synth_handler::{CodingSynthesisHandler, RuleArtifactsHandler},
     CodingSynthesisPhase, CrossSessionDedup, RuleArtifactGenerationPhase,
-    selective_delete::SelectiveDeleteSignal,
 };
 use jiff::Timestamp;
 use storage::StoragePool;
@@ -103,7 +103,9 @@ async fn nightly_cycle_produces_artifact_change() {
     let selective_delete_log =
         coding_memory::reforge::selective_delete::SelectiveDeleteLogRepo::new(pool.clone());
     let pattern_effectiveness_log =
-        coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo::new(pool.clone());
+        coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo::new(
+            pool.clone(),
+        );
 
     let synth = MockSynthesis;
     let artifacts = MockArtifacts;
@@ -128,10 +130,9 @@ async fn nightly_cycle_produces_artifact_change() {
         .unwrap();
 
     let synth_applied = CodingSynthesisPhase::run(&handlers).await.unwrap();
-    let artifact_applied =
-        RuleArtifactGenerationPhase::run(&handlers, &["claude_md".into()])
-            .await
-            .unwrap();
+    let artifact_applied = RuleArtifactGenerationPhase::run(&handlers, &["claude_md".into()])
+        .await
+        .unwrap();
     let delete_applied = SelectiveDeleteSignal::apply(&pool, &selective_delete_log)
         .await
         .unwrap();
@@ -146,7 +147,10 @@ async fn nightly_cycle_produces_artifact_change() {
     let file_written = claude_md.exists();
 
     assert!(
-        synth_applied > 0 || artifact_applied > 0 || delete_applied > 0 || dedup_applied > 0
+        synth_applied > 0
+            || artifact_applied > 0
+            || delete_applied > 0
+            || dedup_applied > 0
             || file_written
             || rule_after.0 > rule_before.0,
         "expected at least one artifact-related change"

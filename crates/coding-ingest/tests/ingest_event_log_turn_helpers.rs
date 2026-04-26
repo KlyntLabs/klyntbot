@@ -33,11 +33,22 @@ async fn prepared() -> (StoragePool, IngestEventLogRepo) {
 #[tokio::test]
 async fn fetch_turn_returns_only_events_for_session_turn() {
     let (_pool, repo) = prepared().await;
-    let up = EventKind::UserPrompt { text: "hi".into(), attachments: vec![] };
-    repo.insert(&evt("s1", Some("t1"), up.clone())).await.unwrap();
-    repo.insert(&evt("s1", Some("t1"), up.clone())).await.unwrap();
-    repo.insert(&evt("s1", Some("t2"), up.clone())).await.unwrap();
-    repo.insert(&evt("s2", Some("t1"), up.clone())).await.unwrap();
+    let up = EventKind::UserPrompt {
+        text: "hi".into(),
+        attachments: vec![],
+    };
+    repo.insert(&evt("s1", Some("t1"), up.clone()))
+        .await
+        .unwrap();
+    repo.insert(&evt("s1", Some("t1"), up.clone()))
+        .await
+        .unwrap();
+    repo.insert(&evt("s1", Some("t2"), up.clone()))
+        .await
+        .unwrap();
+    repo.insert(&evt("s2", Some("t1"), up.clone()))
+        .await
+        .unwrap();
 
     let rows = repo.fetch_turn("s1", Some("t1")).await.unwrap();
     assert_eq!(rows.len(), 2);
@@ -50,7 +61,13 @@ async fn fetch_turn_returns_only_events_for_session_turn() {
 #[tokio::test]
 async fn fetch_turn_null_turn_id() {
     let (_pool, repo) = prepared().await;
-    repo.insert(&evt("s1", None, EventKind::SessionEnd { reason: "x".into() })).await.unwrap();
+    repo.insert(&evt(
+        "s1",
+        None,
+        EventKind::SessionEnd { reason: "x".into() },
+    ))
+    .await
+    .unwrap();
     let rows = repo.fetch_turn("s1", None).await.unwrap();
     assert_eq!(rows.len(), 1);
     assert!(rows[0].turn_id.is_none());
@@ -59,9 +76,16 @@ async fn fetch_turn_null_turn_id() {
 #[tokio::test]
 async fn mark_processing_transitions_atomically() {
     let (_pool, repo) = prepared().await;
-    let up = EventKind::UserPrompt { text: "hi".into(), attachments: vec![] };
-    repo.insert(&evt("s1", Some("t1"), up.clone())).await.unwrap();
-    repo.insert(&evt("s1", Some("t1"), up.clone())).await.unwrap();
+    let up = EventKind::UserPrompt {
+        text: "hi".into(),
+        attachments: vec![],
+    };
+    repo.insert(&evt("s1", Some("t1"), up.clone()))
+        .await
+        .unwrap();
+    repo.insert(&evt("s1", Some("t1"), up.clone()))
+        .await
+        .unwrap();
 
     let claimed = repo.mark_processing("s1", Some("t1")).await.unwrap();
     assert_eq!(claimed, 2);
@@ -73,10 +97,15 @@ async fn mark_processing_transitions_atomically() {
 #[tokio::test]
 async fn mark_processed_completes_turn() {
     let (_pool, repo) = prepared().await;
-    let up = EventKind::UserPrompt { text: "hi".into(), attachments: vec![] };
+    let up = EventKind::UserPrompt {
+        text: "hi".into(),
+        attachments: vec![],
+    };
     repo.insert(&evt("s1", Some("t1"), up)).await.unwrap();
     repo.mark_processing("s1", Some("t1")).await.unwrap();
     let rows = repo.fetch_turn("s1", Some("t1")).await.unwrap();
-    repo.mark_processed_iter(rows.iter().map(|r| r.id.as_str())).await.unwrap();
+    repo.mark_processed_iter(rows.iter().map(|r| r.id.as_str()))
+        .await
+        .unwrap();
     assert_eq!(repo.count_unprocessed().await.unwrap(), 0);
 }

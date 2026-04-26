@@ -50,9 +50,7 @@ impl MirrorSignalSource for CodingRoutingSource {
 
     async fn accumulate(&self, signal: &AiSignal) -> common::Result<()> {
         if let Some(bus::DomainEvent::SkillRouted {
-            skill_name,
-            source,
-            ..
+            skill_name, source, ..
         }) = &signal.raw_event
         {
             if source.starts_with("project:") {

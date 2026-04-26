@@ -27,11 +27,19 @@ async fn returns_row_valid_at_timestamp() {
         valid_until: None,
         ..Default::default()
     };
-    fact_repo.upsert_with_metadata(&fact, Some("repo:x"), None).await.unwrap();
+    fact_repo
+        .upsert_with_metadata(&fact, Some("repo:x"), None)
+        .await
+        .unwrap();
 
     let svc = FactsAsOfService::new(fact_repo);
     let resp = svc
-        .query("auth", "uses", t0.saturating_add(jiff::SignedDuration::from_secs(60)).unwrap())
+        .query(
+            "auth",
+            "uses",
+            t0.saturating_add(jiff::SignedDuration::from_secs(60))
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.rows.len(), 1);

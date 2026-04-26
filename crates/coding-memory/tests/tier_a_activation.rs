@@ -45,9 +45,9 @@ async fn tier_a_produces_turn_trace_without_llm() {
         None,
         None,
     ));
-    let retriever = Arc::new(cognitive::UnifiedMemoryService::new(
-        SemanticFactRepo::new(pool.inner().clone()),
-    )) as Arc<dyn context_engine::MemoryRetriever>;
+    let retriever = Arc::new(cognitive::UnifiedMemoryService::new(SemanticFactRepo::new(
+        pool.inner().clone(),
+    ))) as Arc<dyn context_engine::MemoryRetriever>;
 
     let distiller = Arc::new(Distiller::new(
         DistillerConfig::default(),
@@ -103,12 +103,11 @@ async fn tier_a_produces_turn_trace_without_llm() {
     tokio::time::sleep(std::time::Duration::from_millis(600)).await;
 
     // Tier A (Phase A) should have produced a turn_trace even with NoopProvider.
-    let trace_count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM episodic_memories WHERE kind = 'turn_trace'",
-    )
-    .fetch_one(pool.inner())
-    .await
-    .unwrap();
+    let trace_count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM episodic_memories WHERE kind = 'turn_trace'")
+            .fetch_one(pool.inner())
+            .await
+            .unwrap();
     assert_eq!(trace_count.0, 1, "expected exactly one turn_trace episode");
 
     // No semantic facts should be written (NoopProvider can't synthesize).
@@ -117,7 +116,10 @@ async fn tier_a_produces_turn_trace_without_llm() {
             .fetch_one(pool.inner())
             .await
             .unwrap();
-    assert_eq!(fact_count.0, 0, "expected no semantic facts with noop provider");
+    assert_eq!(
+        fact_count.0, 0,
+        "expected no semantic facts with noop provider"
+    );
 
     // Events should be marked processed.
     assert_eq!(ingest.count_unprocessed().await.unwrap(), 0);

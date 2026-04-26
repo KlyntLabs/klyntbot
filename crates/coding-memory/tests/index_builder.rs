@@ -14,7 +14,11 @@ fn fact_to_index_entry_includes_token_estimate() {
         memory_type: "repo_context".into(),
         ..Default::default()
     };
-    let scored = ScoredFact { score: 0.8, fact, similarity: Some(0.8) };
+    let scored = ScoredFact {
+        score: 0.8,
+        fact,
+        similarity: Some(0.8),
+    };
     let builder = IndexBuilder::new();
     let entry = builder.from_scored_fact(&scored);
     assert_eq!(entry.kind, "repo_context");

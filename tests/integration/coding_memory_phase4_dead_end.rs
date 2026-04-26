@@ -1,12 +1,19 @@
-use coding_memory::recall::{CodingRecallService, CodingRecallServiceConfig};
 use coding_memory::recall::budget::HeuristicBudgeter;
+use coding_memory::recall::{CodingRecallService, CodingRecallServiceConfig};
 use std::sync::Arc;
 
 #[tokio::test]
 async fn repeat_attempt_yields_warning() {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-    storage::StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations()).await.unwrap();
-    storage::StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations()).await.unwrap();
+    storage::StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
+    storage::StoragePool::run_feature_migrations(
+        pool.inner(),
+        &coding_memory::coding_memory_migrations(),
+    )
+    .await
+    .unwrap();
     let fact_repo = Arc::new(cognitive::SemanticFactRepo::new(pool.inner().clone()));
     let ep_repo = Arc::new(cognitive::EpisodicMemoryRepo::new(pool.inner().clone()));
 
@@ -35,17 +42,30 @@ async fn repeat_attempt_yields_warning() {
         scope_repo_id: Some("repo:demo".into()),
         metadata: Some(r#"{"memory_type":"counterfactual","reason":"too slow","attempt_id":"00000000-0000-0000-0000-000000000001","problem_hash":"abc"}"#.into()),
     };
-    fact_repo.upsert_with_metadata(&cf, cf.scope_repo_id.as_deref(), cf.metadata.as_deref()).await.unwrap();
+    fact_repo
+        .upsert_with_metadata(&cf, cf.scope_repo_id.as_deref(), cf.metadata.as_deref())
+        .await
+        .unwrap();
 
     let ums = Arc::new(cognitive::UnifiedMemoryService::new((*fact_repo).clone()));
     let telem = coding_memory::RecallInvocationRepo::new(pool.clone());
     let svc = Arc::new(CodingRecallService::new(
         CodingRecallServiceConfig::default(),
-        ums, fact_repo, ep_repo, telem,
+        ums,
+        fact_repo,
+        ep_repo,
+        telem,
         Arc::new(HeuristicBudgeter),
     ));
     let md = coding_memory::recall::renderers::render_user_prompt_block(
-        &svc, "rewrite parser as recursive descent", Some("repo:demo")
-    ).await.unwrap();
-    assert!(md.contains("Heads-up") || md.contains("dead end") || md.contains("counterfactual"), "got:\n{md}");
+        &svc,
+        "rewrite parser as recursive descent",
+        Some("repo:demo"),
+    )
+    .await
+    .unwrap();
+    assert!(
+        md.contains("Heads-up") || md.contains("dead end") || md.contains("counterfactual"),
+        "got:\n{md}"
+    );
 }

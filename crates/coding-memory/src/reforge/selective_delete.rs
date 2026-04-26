@@ -85,13 +85,14 @@ impl SelectiveDeleteSignal {
         let mut applied = 0_u32;
         for (memory_id, retrievals, _) in candidates {
             // Try semantic_facts first, then episodic_memories.
-            let (kind, prior_stability) = match fetch_stability(pool, &memory_id, "semantic_facts").await? {
-                Some(s) => ("semantic_fact", s),
-                None => match fetch_stability(pool, &memory_id, "episodic_memories").await? {
-                    Some(s) => ("episodic_memory", s),
-                    None => continue,
-                },
-            };
+            let (kind, prior_stability) =
+                match fetch_stability(pool, &memory_id, "semantic_facts").await? {
+                    Some(s) => ("semantic_fact", s),
+                    None => match fetch_stability(pool, &memory_id, "episodic_memories").await? {
+                        Some(s) => ("episodic_memory", s),
+                        None => continue,
+                    },
+                };
             let new_stability = prior_stability * 0.5;
             update_stability(pool, &memory_id, kind, new_stability, &now).await?;
             log.insert(

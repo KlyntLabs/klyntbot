@@ -1,6 +1,6 @@
 use coding_memory::distiller::phase_b::{invoke_llm, LlmInvocation};
 use coding_memory::distiller::record_observation::Observation;
-use coding_memory::distiller::{TurnTrace, TurnTokenUsage};
+use coding_memory::distiller::{TurnTokenUsage, TurnTrace};
 use jiff::Timestamp;
 use providers::{NoopProvider, ProviderManager};
 use std::sync::Arc;
@@ -8,11 +8,20 @@ use std::time::Duration;
 
 fn trace() -> TurnTrace {
     TurnTrace {
-        session_id: "s".into(), turn_id: Some("t".into()),
-        files_read: vec![], files_modified: vec![],
-        commands_run: vec![], test_outcomes: vec![], errors_encountered: vec![],
-        token_usage: Some(TurnTokenUsage { prompt: 1, completion: 1, cached: 0 }),
-        started_at: Timestamp::now(), ended_at: None,
+        session_id: "s".into(),
+        turn_id: Some("t".into()),
+        files_read: vec![],
+        files_modified: vec![],
+        commands_run: vec![],
+        test_outcomes: vec![],
+        errors_encountered: vec![],
+        token_usage: Some(TurnTokenUsage {
+            prompt: 1,
+            completion: 1,
+            cached: 0,
+        }),
+        started_at: Timestamp::now(),
+        ended_at: None,
     }
 }
 

@@ -18,10 +18,7 @@ impl CrossSessionDedup {
     /// Run via vector similarity. Phase 5 ships the exact-match-only fallback
     /// because LanceDB embeddings live outside the in-memory test pool. Phase 6
     /// will replace this with similarity-based candidate pulls.
-    pub async fn run(
-        repo: &SemanticFactRepo,
-        _similarity_threshold: f32,
-    ) -> Result<u32> {
+    pub async fn run(repo: &SemanticFactRepo, _similarity_threshold: f32) -> Result<u32> {
         Self::run_test_only_exact_match(repo, 0.92).await
     }
 

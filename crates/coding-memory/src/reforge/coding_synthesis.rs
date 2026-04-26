@@ -108,16 +108,16 @@ async fn fetch_fix_attempts(
     .map_err(|e| KlyntbotError::Storage(format!("fix attempts: {e}")))?;
     Ok(rows
         .into_iter()
-        .map(|(id, content, importance, recorded_at, scope_repo_id)| {
-            SerializableEpisodicMemory {
+        .map(
+            |(id, content, importance, recorded_at, scope_repo_id)| SerializableEpisodicMemory {
                 id,
                 kind: "fix_attempt".into(),
                 content,
                 importance,
                 recorded_at,
                 scope_repo_id,
-            }
-        })
+            },
+        )
         .collect())
 }
 
@@ -136,16 +136,18 @@ async fn fetch_workflow_patterns(
     .map_err(|e| KlyntbotError::Storage(format!("workflow patterns: {e}")))?;
     Ok(rows
         .into_iter()
-        .map(|(id, rule, source, confidence, effectiveness, scope_repo_id)| {
-            SerializableProceduralRule {
-                id,
-                rule,
-                source,
-                confidence,
-                effectiveness,
-                scope_repo_id,
-            }
-        })
+        .map(
+            |(id, rule, source, confidence, effectiveness, scope_repo_id)| {
+                SerializableProceduralRule {
+                    id,
+                    rule,
+                    source,
+                    confidence,
+                    effectiveness,
+                    scope_repo_id,
+                }
+            },
+        )
         .collect())
 }
 
@@ -180,7 +182,17 @@ async fn fetch_repo_context(
     Ok(rows
         .into_iter()
         .map(
-            |(id, subject, predicate, object, confidence, memory_type, sensitivity, scope_repo_id, valid_from)| {
+            |(
+                id,
+                subject,
+                predicate,
+                object,
+                confidence,
+                memory_type,
+                sensitivity,
+                scope_repo_id,
+                valid_from,
+            )| {
                 SerializableSemanticFact {
                     id,
                     subject,
@@ -236,7 +248,16 @@ async fn fetch_counterfactuals(
     Ok(rows
         .into_iter()
         .map(
-            |(id, subject, predicate, object, confidence, sensitivity, scope_repo_id, valid_from)| {
+            |(
+                id,
+                subject,
+                predicate,
+                object,
+                confidence,
+                sensitivity,
+                scope_repo_id,
+                valid_from,
+            )| {
                 SerializableSemanticFact {
                     id,
                     subject,
@@ -255,7 +276,12 @@ async fn fetch_counterfactuals(
 
 async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>) -> Result<()> {
     match action {
-        PromoteAction::ExtractPattern { repo_id, rule, confidence, supporting } => {
+        PromoteAction::ExtractPattern {
+            repo_id,
+            rule,
+            confidence,
+            supporting,
+        } => {
             let r = ProceduralRule {
                 id: format!("rule_{}", Uuid::new_v4().simple()),
                 domain: "code".into(),
@@ -274,17 +300,26 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
                 scope_repo_id: repo_id.clone(),
                 last_applied: None,
                 application_count: 0,
-                metadata: Some(json!({
-                    "provenance": {
-                        "source": "reforge.coding_synthesis",
-                        "supporting": supporting,
-                    },
-                    "kind": "workflow_pattern",
-                }).to_string()),
+                metadata: Some(
+                    json!({
+                        "provenance": {
+                            "source": "reforge.coding_synthesis",
+                            "supporting": supporting,
+                        },
+                        "kind": "workflow_pattern",
+                    })
+                    .to_string(),
+                ),
             };
             handlers.rule_repo.insert(&r).await?;
         }
-        PromoteAction::ExtractFailurePattern { repo_id, rule, remediation, confidence, supporting } => {
+        PromoteAction::ExtractFailurePattern {
+            repo_id,
+            rule,
+            remediation,
+            confidence,
+            supporting,
+        } => {
             let combined = format!("{rule}\n\n**Remediation:** {remediation}");
             let r = ProceduralRule {
                 id: format!("rule_{}", Uuid::new_v4().simple()),
@@ -304,17 +339,23 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
                 scope_repo_id: repo_id.clone(),
                 last_applied: None,
                 application_count: 0,
-                metadata: Some(json!({
-                    "provenance": {
-                        "source": "reforge.coding_synthesis",
-                        "supporting": supporting,
-                    },
-                    "kind": "failure_pattern",
-                }).to_string()),
+                metadata: Some(
+                    json!({
+                        "provenance": {
+                            "source": "reforge.coding_synthesis",
+                            "supporting": supporting,
+                        },
+                        "kind": "failure_pattern",
+                    })
+                    .to_string(),
+                ),
             };
             handlers.rule_repo.insert(&r).await?;
         }
-        PromoteAction::PromoteToProblemClass { problem_hash, suggestion } => {
+        PromoteAction::PromoteToProblemClass {
+            problem_hash,
+            suggestion,
+        } => {
             // No fact write — emit a Mirror alert via the bus if available.
             if let Some(bus) = handlers.bus.clone() {
                 let alert_kind = CodingMirrorAlertKind::ProblemClassRefactor;
@@ -329,7 +370,13 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
                 });
             }
         }
-        PromoteAction::PromoteToProjectUnderstanding { repo_id, subject, predicate, object, convergence } => {
+        PromoteAction::PromoteToProjectUnderstanding {
+            repo_id,
+            subject,
+            predicate,
+            object,
+            convergence,
+        } => {
             if convergence < 0.7 {
                 return Ok(());
             }
@@ -355,17 +402,24 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
                 access_count: 0,
                 convergence_score: 0.0,
                 project_id: None,
-                metadata: Some(json!({
-                    "provenance": {
-                        "source": "reforge.coding_synthesis",
-                        "kind": "project_understanding",
-                    },
-                    "convergence_score": convergence,
-                }).to_string()),
+                metadata: Some(
+                    json!({
+                        "provenance": {
+                            "source": "reforge.coding_synthesis",
+                            "kind": "project_understanding",
+                        },
+                        "convergence_score": convergence,
+                    })
+                    .to_string(),
+                ),
             };
             handlers.fact_repo.upsert(&f).await?;
         }
-        PromoteAction::PromoteToUserHabit { rule, confidence, witness_repos } => {
+        PromoteAction::PromoteToUserHabit {
+            rule,
+            confidence,
+            witness_repos,
+        } => {
             let r = ProceduralRule {
                 id: format!("rule_{}", Uuid::new_v4().simple()),
                 domain: "code".into(),
@@ -384,17 +438,24 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
                 scope_repo_id: None,
                 last_applied: None,
                 application_count: 0,
-                metadata: Some(json!({
-                    "provenance": {
-                        "source": "reforge.coding_synthesis",
-                        "kind": "user_habit",
-                        "witness_repos": witness_repos,
-                    },
-                }).to_string()),
+                metadata: Some(
+                    json!({
+                        "provenance": {
+                            "source": "reforge.coding_synthesis",
+                            "kind": "user_habit",
+                            "witness_repos": witness_repos,
+                        },
+                    })
+                    .to_string(),
+                ),
             };
             handlers.rule_repo.insert(&r).await?;
         }
-        PromoteAction::PromoteToProblemSolutionPattern { problem_hash, solution, supporting_edges } => {
+        PromoteAction::PromoteToProblemSolutionPattern {
+            problem_hash,
+            solution,
+            supporting_edges,
+        } => {
             let r = ProceduralRule {
                 id: format!("rule_{}", Uuid::new_v4().simple()),
                 domain: "code".into(),
@@ -413,14 +474,17 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
                 scope_repo_id: None,
                 last_applied: None,
                 application_count: 0,
-                metadata: Some(json!({
-                    "provenance": {
-                        "source": "reforge.coding_synthesis",
-                        "kind": "problem_solution_pattern",
-                        "supporting_edges": supporting_edges,
-                    },
-                    "problem_hash": problem_hash,
-                }).to_string()),
+                metadata: Some(
+                    json!({
+                        "provenance": {
+                            "source": "reforge.coding_synthesis",
+                            "kind": "problem_solution_pattern",
+                            "supporting_edges": supporting_edges,
+                        },
+                        "problem_hash": problem_hash,
+                    })
+                    .to_string(),
+                ),
             };
             handlers.rule_repo.insert(&r).await?;
         }

@@ -13,10 +13,15 @@ fn trace() -> TurnTrace {
         test_outcomes: vec![TestOutcome {
             command: "cargo test".into(),
             framework: Some("cargo".into()),
-            passed: 10, failed: 0,
+            passed: 10,
+            failed: 0,
         }],
         errors_encountered: vec![],
-        token_usage: Some(TurnTokenUsage { prompt: 100, completion: 50, cached: 0 }),
+        token_usage: Some(TurnTokenUsage {
+            prompt: 100,
+            completion: 50,
+            cached: 0,
+        }),
         started_at: Timestamp::now(),
         ended_at: Some(Timestamp::now()),
     }

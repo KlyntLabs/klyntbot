@@ -10,9 +10,9 @@ async fn empty_history_returns_empty_steps() {
     StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
         .await
         .unwrap();
-    let svc = ChangeHistoryService::new(std::sync::Arc::new(
-        cognitive::SemanticFactRepo::new(pool.inner().clone()),
-    ));
+    let svc = ChangeHistoryService::new(std::sync::Arc::new(cognitive::SemanticFactRepo::new(
+        pool.inner().clone(),
+    )));
     let r = svc.query("nonexistent", "uses", None).await.unwrap();
     assert!(r.steps.is_empty());
 }

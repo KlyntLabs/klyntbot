@@ -30,10 +30,7 @@ impl RuleArtifactsHandlerImpl {
 
 #[async_trait]
 impl RuleArtifactsHandler for RuleArtifactsHandlerImpl {
-    async fn synthesize_artifact(
-        &self,
-        input: &RuleArtifactInput,
-    ) -> Result<RuleArtifactOutput> {
+    async fn synthesize_artifact(&self, input: &RuleArtifactInput) -> Result<RuleArtifactOutput> {
         let system = artifact_system_prompt(&input.artifact);
         let user = format!(
             "Generate the {} artifact for repo `{}` ({} facts, {} rules).\n\n\
@@ -51,7 +48,11 @@ impl RuleArtifactsHandler for RuleArtifactsHandlerImpl {
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| KlyntbotError::Provider(ProviderError::InvalidResponse(format!("Phase 3.5 chat: {e}"))))?;
+            .map_err(|e| {
+                KlyntbotError::Provider(ProviderError::InvalidResponse(format!(
+                    "Phase 3.5 chat: {e}"
+                )))
+            })?;
 
         let raw = response.content.unwrap_or_default();
 

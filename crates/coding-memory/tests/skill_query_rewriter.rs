@@ -1,4 +1,6 @@
-use coding_memory::retrieval_skills::{BudgetTier, EscalationContext, RetrievalSkill, QueryRewriter};
+use coding_memory::retrieval_skills::{
+    BudgetTier, EscalationContext, QueryRewriter, RetrievalSkill,
+};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -14,7 +16,10 @@ async fn produces_three_rewrites_and_unions_ids() {
         Box::pin(async move {
             calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             common::Result::Ok((vec![0.95f32, 0.7f32], ids))
-        }) as std::pin::Pin<Box<dyn std::future::Future<Output = common::Result<(Vec<f32>, Vec<Uuid>)>> + Send>>
+        })
+            as std::pin::Pin<
+                Box<dyn std::future::Future<Output = common::Result<(Vec<f32>, Vec<Uuid>)>> + Send>,
+            >
     }) as coding_memory::retrieval_skills::query_rewriter::RetrieveFn;
 
     let skill = QueryRewriter::new(retrieve);

@@ -45,8 +45,12 @@ async fn extract_pattern_persists_procedural_rule() {
     let co_act = cognitive::CoActivationRepo::new(pool.inner().clone());
     let summaries = coding_memory::reforge::SessionSummaryRepo::new(pool.clone());
     let utilization = coding_memory::recall::telemetry::RecallInvocationRepo::new(pool.clone());
-    let pat_eff_repo = coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo::new(pool.clone());
-    let sd_repo = coding_memory::reforge::selective_delete::SelectiveDeleteLogRepo::new(pool.clone());
+    let pat_eff_repo =
+        coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo::new(
+            pool.clone(),
+        );
+    let sd_repo =
+        coding_memory::reforge::selective_delete::SelectiveDeleteLogRepo::new(pool.clone());
 
     let handlers = CodingPhaseHandlers {
         synthesis: Some(&handler),
@@ -62,7 +66,9 @@ async fn extract_pattern_persists_procedural_rule() {
         bus: None,
     };
 
-    CodingSynthesisPhase::run(&handlers).await.expect("phase ok");
+    CodingSynthesisPhase::run(&handlers)
+        .await
+        .expect("phase ok");
 
     let count: (i64,) = sqlx::query_as(
         "SELECT COUNT(*) FROM procedural_rules WHERE source = 'observed' \
@@ -94,8 +100,12 @@ async fn promote_to_project_understanding_writes_semantic_fact() {
     let co_act = cognitive::CoActivationRepo::new(pool.inner().clone());
     let summaries = coding_memory::reforge::SessionSummaryRepo::new(pool.clone());
     let utilization = coding_memory::recall::telemetry::RecallInvocationRepo::new(pool.clone());
-    let pat_eff_repo = coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo::new(pool.clone());
-    let sd_repo = coding_memory::reforge::selective_delete::SelectiveDeleteLogRepo::new(pool.clone());
+    let pat_eff_repo =
+        coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo::new(
+            pool.clone(),
+        );
+    let sd_repo =
+        coding_memory::reforge::selective_delete::SelectiveDeleteLogRepo::new(pool.clone());
 
     let handlers = CodingPhaseHandlers {
         synthesis: Some(&handler),
@@ -111,7 +121,9 @@ async fn promote_to_project_understanding_writes_semantic_fact() {
         bus: None,
     };
 
-    CodingSynthesisPhase::run(&handlers).await.expect("phase ok");
+    CodingSynthesisPhase::run(&handlers)
+        .await
+        .expect("phase ok");
 
     let count: (i64,) = sqlx::query_as(
         "SELECT COUNT(*) FROM semantic_facts WHERE subject = 'repo:r1' \

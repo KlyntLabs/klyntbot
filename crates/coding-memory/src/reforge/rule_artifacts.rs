@@ -124,7 +124,17 @@ async fn build_plan(
     let facts: Vec<SerializableSemanticFact> = fact_rows
         .into_iter()
         .map(
-            |(id, subject, predicate, object, confidence, memory_type, sensitivity, scope_repo_id, valid_from)| {
+            |(
+                id,
+                subject,
+                predicate,
+                object,
+                confidence,
+                memory_type,
+                sensitivity,
+                scope_repo_id,
+                valid_from,
+            )| {
                 SerializableSemanticFact {
                     id,
                     subject,
@@ -153,16 +163,18 @@ async fn build_plan(
     .map_err(|e| KlyntbotError::Storage(format!("plan rules: {e}")))?;
     let rules: Vec<SerializableProceduralRule> = rule_rows
         .into_iter()
-        .map(|(id, rule, source, confidence, effectiveness, scope_repo_id)| {
-            SerializableProceduralRule {
-                id,
-                rule,
-                source,
-                confidence,
-                effectiveness,
-                scope_repo_id,
-            }
-        })
+        .map(
+            |(id, rule, source, confidence, effectiveness, scope_repo_id)| {
+                SerializableProceduralRule {
+                    id,
+                    rule,
+                    source,
+                    confidence,
+                    effectiveness,
+                    scope_repo_id,
+                }
+            },
+        )
         .collect();
 
     let enabled = enabled_artifacts
@@ -200,5 +212,8 @@ fn load_repo_paths() -> Result<HashMap<String, PathBuf>> {
         .map_err(|e| KlyntbotError::Storage(format!("repo_paths.json read: {e}")))?;
     let map: HashMap<String, String> = serde_json::from_str(&raw)
         .map_err(|e| KlyntbotError::Storage(format!("repo_paths.json parse: {e}")))?;
-    Ok(map.into_iter().map(|(k, v)| (k, PathBuf::from(v))).collect())
+    Ok(map
+        .into_iter()
+        .map(|(k, v)| (k, PathBuf::from(v)))
+        .collect())
 }

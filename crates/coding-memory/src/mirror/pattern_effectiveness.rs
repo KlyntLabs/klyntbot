@@ -157,13 +157,14 @@ impl MirrorSignalSource for PatternEffectivenessSource {
         for item in to_process {
             let outcome_value = Self::outcome_value(&item.outcome);
 
-            let current: Option<(f32,)> = sqlx::query_as(
-                "SELECT effectiveness_score FROM procedural_rules WHERE id = ?1",
-            )
-            .bind(&item.pattern_id)
-            .fetch_optional(self.pool.inner())
-            .await
-            .map_err(|e| KlyntbotError::Storage(format!("effectiveness_score fetch: {e}")))?;
+            let current: Option<(f32,)> =
+                sqlx::query_as("SELECT effectiveness_score FROM procedural_rules WHERE id = ?1")
+                    .bind(&item.pattern_id)
+                    .fetch_optional(self.pool.inner())
+                    .await
+                    .map_err(|e| {
+                        KlyntbotError::Storage(format!("effectiveness_score fetch: {e}"))
+                    })?;
 
             let Some((score_before,)) = current else {
                 continue;

@@ -14,7 +14,10 @@ async fn no_facts_returns_empty() {
     let fact_repo = std::sync::Arc::new(cognitive::SemanticFactRepo::new(pool.inner().clone()));
     let checker = DeadEndChecker::new(fact_repo, DeadEndConfig::default());
     let resp = checker
-        .check("rewrite the parser as a recursive descent", Some("repo:foo"))
+        .check(
+            "rewrite the parser as a recursive descent",
+            Some("repo:foo"),
+        )
         .await
         .expect("ok");
     assert!(resp.matches.is_empty());

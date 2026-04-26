@@ -42,11 +42,13 @@ pub async fn detect_candidates(
 
     Ok(rows
         .into_iter()
-        .map(|(id, rule_text, confidence, effectiveness)| WorkflowPatternCandidate {
-            id,
-            rule_text,
-            confidence: confidence as f32,
-            effectiveness: effectiveness as f32,
-        })
+        .map(
+            |(id, rule_text, confidence, effectiveness)| WorkflowPatternCandidate {
+                id,
+                rule_text,
+                confidence: confidence as f32,
+                effectiveness: effectiveness as f32,
+            },
+        )
         .collect())
 }

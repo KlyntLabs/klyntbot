@@ -4,11 +4,17 @@ use storage::StoragePool;
 #[tokio::test]
 async fn enqueue_and_list_due() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations()).await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations()).await.unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
+        .await
+        .unwrap();
 
     let repo = DistillationRetryRepo::new(pool.inner().clone());
-    repo.enqueue("s1", Some("t1"), RetryReason::LlmTimeout).await.unwrap();
+    repo.enqueue("s1", Some("t1"), RetryReason::LlmTimeout)
+        .await
+        .unwrap();
 
     let due = repo.list_due(10).await.unwrap();
     assert_eq!(due.len(), 1);
@@ -19,10 +25,16 @@ async fn enqueue_and_list_due() {
 #[tokio::test]
 async fn record_attempt_backs_off() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations()).await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations()).await.unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
+        .await
+        .unwrap();
     let repo = DistillationRetryRepo::new(pool.inner().clone());
-    repo.enqueue("s1", Some("t1"), RetryReason::LlmTimeout).await.unwrap();
+    repo.enqueue("s1", Some("t1"), RetryReason::LlmTimeout)
+        .await
+        .unwrap();
     let id = repo.list_due(10).await.unwrap()[0].id.clone();
 
     repo.record_attempt(&id).await.unwrap();
@@ -33,10 +45,16 @@ async fn record_attempt_backs_off() {
 #[tokio::test]
 async fn mark_done_removes_entry() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations()).await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations()).await.unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
+        .await
+        .unwrap();
     let repo = DistillationRetryRepo::new(pool.inner().clone());
-    repo.enqueue("s1", Some("t1"), RetryReason::LlmTimeout).await.unwrap();
+    repo.enqueue("s1", Some("t1"), RetryReason::LlmTimeout)
+        .await
+        .unwrap();
     let id = repo.list_due(10).await.unwrap()[0].id.clone();
     repo.mark_done(&id).await.unwrap();
     assert_eq!(repo.list_due(10).await.unwrap().len(), 0);

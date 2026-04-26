@@ -37,8 +37,8 @@ pub use token_counter::{
 
 pub mod rewriter;
 pub use rewriter::{
-    ActiveTaskContext, ActiveView, CodeStateSnapshot, CorrectionContext, RetrievalContext, RewriteResult,
-    RewriteSource, UserSituationSnapshot,
+    ActiveTaskContext, ActiveView, CodeStateSnapshot, CorrectionContext, RetrievalContext,
+    RewriteResult, RewriteSource, UserSituationSnapshot,
 };
 
 pub mod enhancement;

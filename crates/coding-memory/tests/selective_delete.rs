@@ -41,10 +41,11 @@ async fn halves_stability_on_uncited_memories() {
         .expect("apply");
     assert!(count >= 1);
 
-    let new_stability: (f32,) = sqlx::query_as("SELECT stability FROM semantic_facts WHERE id = 'f1'")
-        .fetch_one(pool.inner())
-        .await
-        .unwrap();
+    let new_stability: (f32,) =
+        sqlx::query_as("SELECT stability FROM semantic_facts WHERE id = 'f1'")
+            .fetch_one(pool.inner())
+            .await
+            .unwrap();
     assert!((new_stability.0 - 2.0).abs() < 1e-3);
 
     let log_count: (i64,) =

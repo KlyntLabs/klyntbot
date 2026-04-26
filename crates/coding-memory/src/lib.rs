@@ -23,12 +23,12 @@ pub mod error;
 pub mod facts;
 /// MCP tool stubs — registered with `default_exposed_tools()`.
 pub mod mcp;
+/// Mirror integration — alerts, effectiveness, stale-memory signals.
+pub mod mirror;
 /// Canonical bug-problem hashing (`blake3`-based).
 pub mod problem_hash;
 /// Recall service — MCP + passive injection stub.
 pub mod recall;
-/// Mirror integration — alerts, effectiveness, stale-memory signals.
-pub mod mirror;
 /// Reforge coding phases — 2.5 (synthesis), 3.5 (rule artifacts),
 /// session-end pass, selective-delete, cross-session dedup.
 pub mod reforge;
@@ -49,15 +49,19 @@ pub use error::{CodingMemoryError, NotImplementedInPhase};
 pub use mcp::{CodingMemoryToolset, CODING_MEMORY_MCP_TOOLS};
 pub use recall::telemetry::{RecallInvocationRepo, RecallInvocationRow};
 pub use recall::CodingRecallService;
+pub use reforge::synth_handler::{CodingSynthesisHandler, RuleArtifactsHandler};
+pub use reforge::types::{
+    CodingPhaseHandlers, CodingSynthesisInput, CodingSynthesisOutput, PromoteAction,
+    RuleArtifactInput, RuleArtifactOutput,
+};
+pub use reforge::{
+    CodingSynthesisPhase as CodingSynthesisPhaseImpl,
+    RuleArtifactGenerationPhase as RuleArtifactGenerationPhaseImpl, SessionEndPass,
+    SessionSummaryRepo, SessionSummaryRow,
+};
 pub use retrieval_skills::{
     BudgetTier, EscalationContext, EscalationOutcome, RetrievalSkill, RetrievalSkillRegistry,
 };
-pub use reforge::{
-    CodingSynthesisPhase as CodingSynthesisPhaseImpl, RuleArtifactGenerationPhase as RuleArtifactGenerationPhaseImpl,
-    SessionEndPass, SessionSummaryRepo, SessionSummaryRow,
-};
-pub use reforge::types::{CodingPhaseHandlers, CodingSynthesisInput, CodingSynthesisOutput, PromoteAction, RuleArtifactInput, RuleArtifactOutput};
-pub use reforge::synth_handler::{CodingSynthesisHandler, RuleArtifactsHandler};
 
 use tools_core::FeatureMigration;
 

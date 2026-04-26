@@ -19,7 +19,11 @@ fn decodes_valid_fix_attempt() {
         "scope": "repo",
         "reasoning": "tests passed after the edit"
     });
-    let obs: Observation = decode_observations(&[json]).unwrap().into_iter().next().unwrap();
+    let obs: Observation = decode_observations(&[json])
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
     assert_eq!(obs.kind, CodingKind::FixAttempt);
     assert_eq!(obs.confidence, 0.85);
     assert!(matches!(obs.scope, ObservationScope::Repo));
@@ -42,7 +46,11 @@ fn clamps_confidence_to_0_1() {
         "subject": "user", "predicate": "prefers", "object": "tabs",
         "confidence": 1.7, "scope": "global", "reasoning": "observed 5x"
     });
-    let obs = decode_observations(&[json]).unwrap().into_iter().next().unwrap();
+    let obs = decode_observations(&[json])
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
     assert!((obs.confidence - 1.0).abs() < f32::EPSILON);
 }
 
