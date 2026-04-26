@@ -147,6 +147,10 @@ struct DistillerInner {
     retriever: Arc<dyn context_engine::MemoryRetriever>,
     retry_repo: Option<DistillationRetryRepo>,
     buffer: Mutex<TurnBuffer>,
+    /// Optional event bus. When `Some`, every successful fact / episode write
+    /// publishes a `DomainEvent::CodingMemoryUpdated` so UI panels can refresh
+    /// without polling. `None` keeps standalone use (tests, CLI replays) silent.
+    event_bus: Option<Arc<bus::DomainEventBus>>,
 }
 
 impl std::fmt::Debug for DistillerInner {
@@ -182,6 +186,7 @@ impl Distiller {
                 retriever,
                 retry_repo: None,
                 buffer: Mutex::new(TurnBuffer::new()),
+                event_bus: None,
             }),
         }
     }
@@ -191,6 +196,15 @@ impl Distiller {
         let inner =
             Arc::get_mut(&mut self.inner).expect("Distiller::with_retry_repo called after clone");
         inner.retry_repo = Some(repo);
+        self
+    }
+
+    /// Attach a domain-event bus. Returns `self` for chaining alongside
+    /// `with_retry_repo`. Idempotent — last call wins.
+    pub fn with_event_bus(mut self, bus: Arc<bus::DomainEventBus>) -> Self {
+        let inner =
+            Arc::get_mut(&mut self.inner).expect("Distiller::with_event_bus called after clone");
+        inner.event_bus = Some(bus);
         self
     }
 

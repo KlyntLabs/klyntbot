@@ -891,6 +891,7 @@ impl AppCore {
             d = d.with_retry_repo(coding_memory::distiller::DistillationRetryRepo::new(
                 storage_pool.inner().clone(),
             ));
+            d = d.with_event_bus(domain_event_bus.clone());
             Arc::new(d)
         };
 
