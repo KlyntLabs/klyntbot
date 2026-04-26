@@ -208,6 +208,17 @@ impl Distiller {
         self
     }
 
+    /// Publishes a `CodingMemoryUpdated` event if a bus is attached. Cheap:
+    /// `broadcast::send` returns immediately even with no subscribers.
+    fn publish_memory_updated(&self, kind: bus::CodingMemoryKind, id: &str) {
+        if let Some(bus) = &self.inner.event_bus {
+            bus.publish(bus::DomainEvent::CodingMemoryUpdated {
+                kind,
+                id: id.to_string(),
+            });
+        }
+    }
+
     /// Accept an event into the per-turn buffer. Triggers `distill_turn` on boundary.
     pub async fn accept_event(&self, event: AgentEvent) -> Result<()> {
         let boundary = {
@@ -412,11 +423,13 @@ impl Distiller {
             };
             match prepared {
                 fact_builder::Prepared::Episode(ep) => {
+                    let episode_id = ep.episode.id.clone();
                     self.inner
                         .writer
                         .write_episode(ep)
                         .await
                         .map_err(common::KlyntbotError::from)?;
+                    self.publish_memory_updated(bus::CodingMemoryKind::Episode, &episode_id);
                     report.episodic_writes += 1;
                     // Task 27 — Tier B1 counterfactual derivation.
                     // When a FixAttempt observation reports outcome ∈ {failure, abandoned},
@@ -456,11 +469,13 @@ impl Distiller {
                                 },
                                 provenance: prov_llm.clone(),
                             };
+                            let fact_id = prepared_fact.fact.id.clone();
                             self.inner
                                 .writer
                                 .write_fact(prepared_fact)
                                 .await
                                 .map_err(common::KlyntbotError::from)?;
+                            self.publish_memory_updated(bus::CodingMemoryKind::Fact, &fact_id);
                             report.semantic_writes += 1;
                         }
                     }
@@ -491,11 +506,13 @@ impl Distiller {
                             let _ = self.inner.writer.bump_access(&predecessor_id).await;
                         }
                         ReconcileDecision::Add => {
+                            let fact_id = pf.fact.id.clone();
                             self.inner
                                 .writer
                                 .write_fact(pf)
                                 .await
                                 .map_err(common::KlyntbotError::from)?;
+                            self.publish_memory_updated(bus::CodingMemoryKind::Fact, &fact_id);
                             report.semantic_writes += 1;
                         }
                         ReconcileDecision::Supersede { predecessor_id } => {
@@ -506,6 +523,7 @@ impl Distiller {
                                 .write_fact(pf)
                                 .await
                                 .map_err(common::KlyntbotError::from)?;
+                            self.publish_memory_updated(bus::CodingMemoryKind::Fact, &succ_id);
                             let _ = self
                                 .inner
                                 .writer
@@ -556,4 +574,111 @@ pub trait RecordObservationTool: Send + Sync {
         scope: crate::facts::StyleScope,
         reasoning: String,
     ) -> Result<()>;
+}
+
+/// Test-only helpers for driving single writes without full Phase A→C orchestration.
+impl Distiller {
+    /// Write a minimal fact and return its id. Used by integration tests.
+    pub async fn write_fact_for_test(
+        &self,
+        session_id: &str,
+        text: &str,
+    ) -> common::Result<String> {
+        use crate::distiller::writer::PreparedFact;
+        use crate::scope::{ProvenanceKind, ProvenanceMetadata};
+        use cognitive::types::SemanticFact;
+        use jiff::Timestamp;
+        use uuid::Uuid;
+
+        let id = Uuid::new_v4().to_string();
+        let fact = SemanticFact {
+            id: id.clone(),
+            domain: "work".into(),
+            subject: "test".into(),
+            predicate: "has".into(),
+            object: text.into(),
+            confidence: 0.9,
+            source: "distiller".into(),
+            valid_from: Timestamp::now().to_string(),
+            valid_until: None,
+            recorded_at: Timestamp::now().to_string(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 1.0,
+            project_id: None,
+            memory_type: "fact".into(),
+            scope_type: "user".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+        };
+        let pf = PreparedFact {
+            fact,
+            metadata_json: None,
+            scope_repo_id: None,
+            provenance: ProvenanceMetadata {
+                source_events: vec![Uuid::new_v4()],
+                session_id: session_id.into(),
+                turn_id: Some("t1".into()),
+                distilled_at: Timestamp::now(),
+                distiller_model: "test".into(),
+                source_kind: ProvenanceKind::DistillerLlm,
+            },
+        };
+        self.inner.writer.write_fact(pf).await.map_err(common::KlyntbotError::from)?;
+        self.publish_memory_updated(bus::CodingMemoryKind::Fact, &id);
+        Ok(id)
+    }
+
+    /// Write a minimal episode and return its id. Used by integration tests.
+    pub async fn write_episode_for_test(
+        &self,
+        session_id: &str,
+    ) -> common::Result<String> {
+        use crate::distiller::writer::PreparedEpisode;
+        use crate::scope::{ProvenanceKind, ProvenanceMetadata};
+        use cognitive::types::EpisodicMemory;
+        use jiff::Timestamp;
+        use uuid::Uuid;
+
+        let id = Uuid::new_v4().to_string();
+        let episode = EpisodicMemory {
+            id: id.clone(),
+            domain: "coding".into(),
+            content: "test episode".into(),
+            summary: None,
+            importance: 0.5,
+            occurred_at: Timestamp::now().to_string(),
+            recorded_at: Timestamp::now().to_string(),
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            project_id: None,
+            scope_type: "user".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+            kind: Some("turn_trace".into()),
+        };
+        let ep = PreparedEpisode {
+            episode,
+            kind: "turn_trace".into(),
+            metadata_json: None,
+            scope_repo_id: None,
+            provenance: ProvenanceMetadata {
+                source_events: vec![Uuid::new_v4()],
+                session_id: session_id.into(),
+                turn_id: Some("t1".into()),
+                distilled_at: Timestamp::now(),
+                distiller_model: "test".into(),
+                source_kind: ProvenanceKind::DistillerLlm,
+            },
+        };
+        self.inner.writer.write_episode(ep).await.map_err(common::KlyntbotError::from)?;
+        self.publish_memory_updated(bus::CodingMemoryKind::Episode, &id);
+        Ok(id)
+    }
 }
