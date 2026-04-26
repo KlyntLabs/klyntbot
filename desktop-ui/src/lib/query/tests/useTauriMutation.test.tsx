@@ -29,7 +29,7 @@ describe("useTauriMutation", () => {
 		mockedIpc.mockResolvedValueOnce({ ok: true });
 		const client = new QueryClient();
 		const { result } = renderHook(
-			() => useTauriMutation({ command: "task_toggle_complete" }),
+			() => useTauriMutation<unknown, { id: string }>({ command: "task_toggle_complete" }),
 			{ wrapper: wrap(client) },
 		);
 
@@ -46,7 +46,7 @@ describe("useTauriMutation", () => {
 		const spy = vi.spyOn(client, "invalidateQueries");
 
 		const { result } = renderHook(
-			() => useTauriMutation({ command: "task_toggle_complete" }),
+			() => useTauriMutation<unknown, { id: string }>({ command: "task_toggle_complete" }),
 			{ wrapper: wrap(client) },
 		);
 

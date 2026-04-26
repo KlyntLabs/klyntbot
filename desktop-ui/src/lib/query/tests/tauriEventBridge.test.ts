@@ -3,12 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { qk } from "../queryKeys";
 import { startTauriEventBridge } from "../tauriEventBridge";
 
-type Handler = (payload: unknown) => void;
-
 function fakeListenFactory() {
-	const subs = new Map<string, Handler>();
-	const listen = vi.fn(async (event: string, handler: Handler) => {
-		subs.set(event, handler);
+	const subs = new Map<string, (payload: unknown) => void>();
+	const listen = vi.fn(async <T = unknown>(event: string, handler: (payload: T) => void) => {
+		subs.set(event, handler as (payload: unknown) => void);
 		return () => subs.delete(event);
 	});
 	const fire = (event: string, payload: unknown) =>
@@ -22,7 +20,7 @@ describe("tauriEventBridge", () => {
 		const spy = vi.spyOn(client, "invalidateQueries");
 		const { listen, fire } = fakeListenFactory();
 
-		const stop = await startTauriEventBridge(client, listen);
+		const stop = await startTauriEventBridge(client, listen as any);
 		fire("entity:updated", { entityKind: "task", id: "t1" });
 
 		expect(spy).toHaveBeenCalledWith({ queryKey: qk.tasks.all() });
@@ -34,7 +32,7 @@ describe("tauriEventBridge", () => {
 		const spy = vi.spyOn(client, "invalidateQueries");
 		const { listen, fire } = fakeListenFactory();
 
-		const stop = await startTauriEventBridge(client, listen);
+		const stop = await startTauriEventBridge(client, listen as any);
 		fire("focus:phase_changed", { phase: "break" });
 
 		expect(spy).toHaveBeenCalledWith({ queryKey: qk.focus.status() });
@@ -46,7 +44,7 @@ describe("tauriEventBridge", () => {
 		const spy = vi.spyOn(client, "invalidateQueries");
 		const { listen, fire } = fakeListenFactory();
 
-		const stop = await startTauriEventBridge(client, listen);
+		const stop = await startTauriEventBridge(client, listen as any);
 		fire("entity:updated", { entityKind: "unknownKind", id: "x" });
 
 		expect(spy).not.toHaveBeenCalled();
@@ -58,7 +56,7 @@ describe("tauriEventBridge", () => {
 		const { listen, subs, fire } = fakeListenFactory();
 		const spy = vi.spyOn(client, "invalidateQueries");
 
-		const stop = await startTauriEventBridge(client, listen);
+		const stop = await startTauriEventBridge(client, listen as any);
 		expect(subs.size).toBeGreaterThan(0);
 		stop();
 		expect(subs.size).toBe(0);

@@ -25,7 +25,7 @@ export function useTauriQuery<TData>(
 		queryFn: () => ipc<TData>(opts.command, opts.args),
 		enabled: opts.enabled,
 		staleTime: opts.staleTime,
-		placeholderData: opts.fallback,
+		placeholderData: opts.fallback as any,
 	});
 
 	return {
@@ -33,5 +33,5 @@ export function useTauriQuery<TData>(
 		// `placeholderData` keeps the fallback as `data` until the query
 		// succeeds, so the cast is safe.
 		data: (result.data ?? opts.fallback) as TData,
-	};
+	} as UseQueryResult<TData> & { data: TData };
 }
