@@ -54,7 +54,7 @@
   background: rgba(46, 170, 220, 0.14);
   color: var(--text-strong);
   padding: 4px 10px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -70,7 +70,7 @@
 .mobile-setup-wizard-subtitle {
   margin: 0;
   color: var(--text-subtle);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.45;
 }
 
@@ -81,7 +81,7 @@
 }
 
 .mobile-setup-wizard-label {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-strong);
 }
@@ -92,7 +92,7 @@
   background: var(--surface-control);
   color: var(--text-strong);
   padding: 10px 11px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .mobile-setup-wizard-input:focus {
@@ -114,7 +114,7 @@
   background: rgba(116, 198, 157, 0.12);
   color: var(--text-strong);
   padding: 9px 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.4;
 }
 
@@ -126,6 +126,6 @@
 
 .mobile-setup-wizard-hint {
   color: var(--text-subtle);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1.45;
 }

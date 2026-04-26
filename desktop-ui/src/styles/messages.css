@@ -44,13 +44,13 @@
 
 .messages-loading-label {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   letter-spacing: 0.02em;
 }
 
 .thinking {
   padding: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-fainter);
   margin-bottom: 0;
 }
@@ -63,7 +63,7 @@
   padding: 8px 12px;
   margin: 0;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.01em;
   border-radius: 999px;
   border: 1px solid var(--cm-border-strong);
@@ -121,7 +121,7 @@
   gap: 12px;
   margin: 2px 0 4px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   text-transform: none;
   letter-spacing: 0.02em;
 }
@@ -170,7 +170,7 @@
   border-radius: 18px;
   border: 1px solid var(--cm-border-emphasis);
   background: var(--cm-surface-panel-soft);
-  font-size: 14px;
+  font-size: var(--fs-md);
   line-height: 1.55;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -413,7 +413,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
@@ -422,7 +422,7 @@
 }
 
 .review-badge {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 2px 6px;
@@ -448,7 +448,7 @@
   justify-content: space-between;
   gap: 8px;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
@@ -460,7 +460,7 @@
 }
 
 .item-chevron {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-faint);
   transition: transform 0.2s ease;
 }
@@ -475,14 +475,14 @@
 }
 
 .item-title {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .item-subtitle {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-faint);
   white-space: nowrap;
   overflow: hidden;
@@ -491,7 +491,7 @@
 }
 
 .item-status {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-subtle);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -502,7 +502,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   min-width: 0;
 }
@@ -542,7 +542,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-stronger);
   min-width: 0;
 }
@@ -682,14 +682,14 @@
 
 .tool-inline-status {
   margin-left: auto;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   color: var(--text-subtle);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .tool-inline-detail {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   white-space: pre-wrap;
 }
@@ -707,7 +707,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-stronger);
 }
 
@@ -727,7 +727,7 @@
   flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .explore-inline-kind {
@@ -746,7 +746,7 @@
 
 .explore-inline-detail {
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   min-width: 0;
   flex: 1 1 auto;
   overflow-wrap: anywhere;
@@ -768,7 +768,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .user-input-inline-question {
@@ -786,14 +786,14 @@
 
 .user-input-inline-answer {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .user-input-inline-empty-answer {
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .tool-inline-clamp {
@@ -820,18 +820,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-quiet);
 }
 
 .tool-inline-change-kind {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   color: var(--text-subtle);
 }
 
 .tool-inline-change-path {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-stronger);
 }
 
@@ -839,7 +839,7 @@
   background: var(--surface-command);
   border-radius: 8px;
   padding: 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-quiet);
 }
 
@@ -849,7 +849,7 @@
 }
 
 .tool-inline-action {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1.2;
   padding: 4px 8px;
 }
@@ -909,7 +909,7 @@
   padding: 0;
   cursor: pointer;
   text-align: left;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   letter-spacing: 0.02em;
 }
@@ -977,7 +977,7 @@
 
 .tool-group-body .tool-inline-summary {
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .tool-group-body .tool-inline-icon,
@@ -988,7 +988,7 @@
 
 .tool-group-body .tool-inline-command {
   padding: 1px 6px;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   line-height: 1.2;
   border-radius: 6px;
 }
@@ -996,7 +996,7 @@
 .tool-group-body .tool-inline-detail,
 .tool-group-body .explore-inline-item,
 .tool-group-body .user-input-inline-entry {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   line-height: 1.35;
 }
 
@@ -1006,7 +1006,7 @@
 }
 
 .reasoning-inline-detail {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.55;
   color: var(--text-muted);
 }
@@ -1047,7 +1047,7 @@
 }
 
 .tool-label {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-fainter);
@@ -1057,7 +1057,7 @@
   background: var(--surface-command);
   border-radius: 8px;
   padding: 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-stronger);
   margin: 0;
   max-width: 100%;
@@ -1066,7 +1066,7 @@
 }
 
 .tool-cwd {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   word-break: break-all;
 }
@@ -1081,18 +1081,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-quiet);
 }
 
 .file-change-kind {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   color: var(--text-subtle);
 }
 
 .file-change-path {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-stronger);
 }
 
@@ -1100,7 +1100,7 @@
   background: var(--surface-command);
   border-radius: 8px;
   padding: 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-quiet);
   margin: 0;
   max-width: 100%;
@@ -1110,7 +1110,7 @@
 .markdown {
   white-space: normal;
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
   color: var(--text-stronger);
 }
@@ -1214,7 +1214,7 @@
   padding: 4px 8px;
   background: var(--surface-control);
   border-bottom: 1px solid var(--border-strong);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-faint);
@@ -1228,7 +1228,7 @@
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   padding: 2px 8px;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-stronger);
@@ -1331,7 +1331,7 @@
   z-index: 1;
   background: color-mix(in srgb, var(--surface-control) 90%, transparent);
   border-bottom: 1px solid var(--border-strong);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;

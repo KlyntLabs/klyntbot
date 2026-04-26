@@ -1,7 +1,7 @@
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left";
 import { ApprovalToasts } from "@app/components/ApprovalToasts";
 import { MainHeader } from "@app/components/MainHeader";
-import { Sidebar } from "@app/components/Sidebar";
+import { SidebarChatLayout } from "@app/components/SidebarChatLayout";
 import { Composer } from "@/features/composer/components/Composer";
 import { Home } from "@/features/home/components/Home";
 import { Messages } from "@/features/messages/components/Messages";
@@ -27,7 +27,12 @@ type PrimaryLayoutNodes = Pick<
 export function buildPrimaryNodes(
 	options: PrimaryLayoutNodesOptions,
 ): PrimaryLayoutNodes {
-	const sidebarNode = <Sidebar {...options.sidebarProps} />;
+	const sidebarNode = (
+		<SidebarChatLayout
+			onSelectHome={options.sidebarProps.onSelectHome}
+			onOpenSettings={options.sidebarProps.onOpenSettings}
+		/>
+	);
 
 	const messagesNode = <Messages {...options.messagesProps} />;
 

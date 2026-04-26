@@ -40,18 +40,18 @@
 }
 
 .ds-modal-title {
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--ds-text-strong);
 }
 
 .ds-modal-subtitle {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--ds-text-subtle);
 }
 
 .ds-modal-label {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--ds-text-faint);
 }
 
@@ -62,7 +62,7 @@
   background: var(--ds-surface-muted);
   color: var(--ds-text-strong);
   padding: 10px 12px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   width: 100%;
   transition: border-color var(--ds-dur-normal) var(--ds-ease-out-soft),
               box-shadow var(--ds-dur-normal) var(--ds-ease-out-soft);
@@ -89,7 +89,7 @@
 }
 
 .ds-modal-error {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: #ff8f8f;
   background: rgba(255, 79, 79, 0.12);
   border: 1px solid rgba(255, 79, 79, 0.4);

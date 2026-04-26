@@ -34,6 +34,8 @@ cd desktop-ui && bun run lint           # Biome check only (no auto-fix)
 
 **Tailwind v4 + CSS tokens:** All theming in `src/styles/theme.css` via CSS variables + `@theme inline`. No `tailwind.config.js`. Never hardcode hex/rgba — use token utilities (`bg-surface-base`, `text-muted`, `border-border`). For new visual patterns, add a CSS variable to `:root` first, register in `@theme inline`, then use via Tailwind.
 
+**Typography tokens:** Never hardcode `font-size: Npx` in CSS. Use the scale in `src/styles/ds-tokens.css`: `--fs-2xs` (10.5px) / `--fs-xs` (11.5px) / `--fs-sm` (12.5px, default body — also exposed as `--fs-base`) / `--fs-md` (13.5px) / `--fs-lg` (15px) / `--fs-xl` (17px). Pick by role, not number — default text uses `var(--fs-base)`, secondary/labels step down to `--fs-xs`, headings step up to `--fs-lg`/`--fs-xl`. If no token fits (e.g. display headings ≥20px), add a new `--fs-*` to ds-tokens.css rather than hardcoding.
+
 **`glass-panel`:** Glassmorphism class for dropdowns/popups/dialogs. Uses `@apply backdrop-blur-[80px] backdrop-saturate-150`.
 
 **Biome 2.0:** Line width 100. Organizes imports automatically. Warnings (not errors) on `noArrayIndexKey`, `noNonNullAssertion`, `noStaticElementInteractions`, `noImportantStyles`.

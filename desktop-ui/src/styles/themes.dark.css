@@ -10,7 +10,7 @@
     "Helvetica Neue", Arial, sans-serif;
   --code-font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo,
     Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --code-font-size: 11px;
+  --code-font-size: var(--fs-xs);
   --code-font-weight: 400;
   --code-line-height: 1.28;
   --text-primary: #e6e7ea;

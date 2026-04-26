@@ -50,14 +50,14 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: 18px;
+  font-size: var(--fs-xl);
   font-weight: 600;
   color: var(--text-strong);
 }
 
 .diff-viewer-pr-jump {
   padding: 4px 10px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
@@ -66,7 +66,7 @@
 
 .diff-viewer-pr-checkout {
   padding: 4px 10px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
 }
 
@@ -99,7 +99,7 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -123,7 +123,7 @@
 }
 
 .diff-viewer-pr-pill {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   text-transform: uppercase;
   padding: 2px 6px;
@@ -140,7 +140,7 @@
 }
 
 .diff-viewer-pr-markdown {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-stronger);
 }
 
@@ -153,7 +153,7 @@
 }
 
 .diff-viewer-pr-empty {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -169,7 +169,7 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -184,7 +184,7 @@
 
 .diff-viewer-pr-timeline-button {
   padding: 4px 10px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .diff-viewer-pr-timeline-list {
@@ -237,7 +237,7 @@
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -248,13 +248,13 @@
 
 .diff-viewer-pr-timeline-text {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-stronger);
 }
 
 .diff-viewer-pr-comment {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-stronger);
 }
 
@@ -263,7 +263,7 @@
 }
 
 .diff-viewer-pr-timeline-state {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   padding-left: 12px;
 }
@@ -273,7 +273,7 @@
 }
 
 .diff-viewer-pr-timeline-divider {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-faint);
   padding-left: 12px;
 }
@@ -318,7 +318,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   background: var(--surface-messages);
   padding: 12px 12px 10px;
@@ -338,7 +338,7 @@
 }
 
 .diff-viewer-review-action {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--border-muted);
@@ -347,7 +347,7 @@
 .diff-viewer-review-thread {
   margin-left: auto;
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-family: var(--code-font-family);
 }
 
@@ -368,7 +368,7 @@
 
 .diff-viewer-status {
   font-weight: 700;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 2px 6px;
   border-radius: 999px;
   border: 1px solid var(--border-stronger);
@@ -776,7 +776,7 @@
 .diff-viewer-placeholder,
 .diff-viewer-empty {
   color: var(--text-subtle);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   padding: 8px 0;
 }
 
@@ -827,7 +827,7 @@
 
 .diff-viewer-empty-title {
   margin: 2px 0 2px;
-  font-size: 17px;
+  font-size: var(--fs-xl);
   line-height: 1.2;
   color: var(--text-emphasis);
   letter-spacing: 0.01em;
@@ -837,7 +837,7 @@
   margin: 0;
   max-width: 560px;
   color: var(--text-subtle);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.45;
 }
 
@@ -845,13 +845,13 @@
   margin: 0;
   max-width: 560px;
   color: var(--text-faint);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1.4;
 }
 
 .diff-viewer-loading {
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 6px 0;
 }
 
@@ -911,7 +911,7 @@
   min-height: 140px;
   padding: 12px 16px;
   color: var(--text-subtle);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   text-align: center;
   border-radius: 8px;
   background: var(--surface-strong);
@@ -929,7 +929,7 @@
 }
 
 .image-diff-meta {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   margin-top: 8px;

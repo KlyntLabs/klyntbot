@@ -22,18 +22,18 @@
 
 .error-toast-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .error-toast-dismiss {
-  font-size: 18px;
+  font-size: var(--fs-xl);
   line-height: 1;
   padding: 0 4px;
 }
 
 .error-toast-body {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   opacity: 0.95;
 }
 
