@@ -157,9 +157,13 @@ pub async fn request_response(
     let buf = serde_json::to_vec(payload)
         .map_err(|e| common::KlyntbotError::Storage(format!("encode: {e}")))?;
     let len = (buf.len() as u32).to_le_bytes();
-    stream.write_all(&len).await
+    stream
+        .write_all(&len)
+        .await
         .map_err(|e| common::KlyntbotError::Storage(format!("write len: {e}")))?;
-    stream.write_all(&buf).await
+    stream
+        .write_all(&buf)
+        .await
         .map_err(|e| common::KlyntbotError::Storage(format!("write buf: {e}")))?;
     stream.shutdown().await.ok();
     let mut len_buf = [0u8; 4];

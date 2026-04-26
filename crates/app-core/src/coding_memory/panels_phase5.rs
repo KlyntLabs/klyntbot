@@ -41,13 +41,11 @@ pub async fn mirror_alert_action(
     let now = jiff::Timestamp::now().to_string();
     match args.action.as_str() {
         "approve" => {
-            sqlx::query(
-                "UPDATE mirror_snippets SET user_feedback = 'Helpful' WHERE id = ?1",
-            )
-            .bind(&args.id)
-            .execute(pool.inner())
-            .await
-            .map_err(|e| KlyntbotError::Storage(format!("approve: {e}")))?;
+            sqlx::query("UPDATE mirror_snippets SET user_feedback = 'Helpful' WHERE id = ?1")
+                .bind(&args.id)
+                .execute(pool.inner())
+                .await
+                .map_err(|e| KlyntbotError::Storage(format!("approve: {e}")))?;
         }
         "reject" => {
             sqlx::query(
@@ -68,7 +66,11 @@ pub async fn mirror_alert_action(
                 .await
                 .map_err(|e| KlyntbotError::Storage(format!("snooze: {e}")))?;
         }
-        other => return Err(KlyntbotError::Tool(common::ToolError::InvalidParams(format!("unknown action: {other}")))),
+        other => {
+            return Err(KlyntbotError::Tool(common::ToolError::InvalidParams(
+                format!("unknown action: {other}"),
+            )))
+        }
     }
     Ok(())
 }
@@ -80,13 +82,12 @@ pub async fn effectiveness_trends(
 ) -> Result<EffectivenessTrendsResponse> {
     let log = PatternEffectivenessLogRepo::new(pool.clone());
     let rows = log.recent(&pattern_id, 50).await?;
-    let pattern_name: Option<(String,)> = sqlx::query_as(
-        "SELECT rule FROM procedural_rules WHERE id = ?1",
-    )
-    .bind(&pattern_id)
-    .fetch_optional(pool.inner())
-    .await
-    .map_err(|e| KlyntbotError::Storage(format!("pattern name: {e}")))?;
+    let pattern_name: Option<(String,)> =
+        sqlx::query_as("SELECT rule FROM procedural_rules WHERE id = ?1")
+            .bind(&pattern_id)
+            .fetch_optional(pool.inner())
+            .await
+            .map_err(|e| KlyntbotError::Storage(format!("pattern name: {e}")))?;
     let mut buckets: Vec<EffectivenessTrendBucket> = rows
         .into_iter()
         .map(|(_outcome, ts, _before, after)| EffectivenessTrendBucket {
@@ -103,9 +104,7 @@ pub async fn effectiveness_trends(
 }
 
 /// Handler for `coding_memory_reforge_cycle_list`.
-pub async fn reforge_cycle_list(
-    pool: storage::StoragePool,
-) -> Result<Vec<ReforgeCycleSummary>> {
+pub async fn reforge_cycle_list(pool: storage::StoragePool) -> Result<Vec<ReforgeCycleSummary>> {
     // Cycle rollup is derived from `skill_versions` cycle markers — Phase 5 ships a
     // simple distinct-cycle listing; later phases add a dedicated cycle-summary table.
     let rows: Vec<(String, String, i64)> = sqlx::query_as(
@@ -164,13 +163,12 @@ pub async fn project_skills_for_repo(
     let mut out = Vec::new();
     for (skill_name, active_version, status, pattern_id) in rows {
         let eff = if let Some(pid) = pattern_id {
-            let row: Option<(f32,)> = sqlx::query_as(
-                "SELECT effectiveness_score FROM procedural_rules WHERE id = ?1",
-            )
-            .bind(&pid)
-            .fetch_optional(pool.inner())
-            .await
-            .map_err(|e| KlyntbotError::Storage(format!("project skill eff: {e}")))?;
+            let row: Option<(f32,)> =
+                sqlx::query_as("SELECT effectiveness_score FROM procedural_rules WHERE id = ?1")
+                    .bind(&pid)
+                    .fetch_optional(pool.inner())
+                    .await
+                    .map_err(|e| KlyntbotError::Storage(format!("project skill eff: {e}")))?;
             row.map(|(s,)| s).unwrap_or(0.5)
         } else {
             0.5

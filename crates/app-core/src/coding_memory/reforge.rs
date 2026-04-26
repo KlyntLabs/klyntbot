@@ -15,10 +15,7 @@ use std::sync::Arc;
 use tracing::warn;
 
 /// Subscribe `SessionEndPass` to `DomainEvent::CodingSessionEnded`.
-pub async fn register_session_end_dispatch(
-    bus: Arc<DomainEventBus>,
-    pass: Arc<SessionEndPass>,
-) {
+pub async fn register_session_end_dispatch(bus: Arc<DomainEventBus>, pass: Arc<SessionEndPass>) {
     let mut rx = bus.subscribe();
     tokio::spawn(async move {
         while let Ok(event) = rx.recv().await {
@@ -75,12 +72,15 @@ impl CodingPhaseRunnerImpl {
         let episodic_repo = cognitive::EpisodicMemoryRepo::new(db.clone());
         let rule_repo = cognitive::ProceduralRuleRepo::new(db.clone());
         let co_activation_repo = cognitive::CoActivationRepo::new(db.clone());
-        let utilization_repo = coding_memory::recall::telemetry::RecallInvocationRepo::new(pool.clone());
+        let utilization_repo =
+            coding_memory::recall::telemetry::RecallInvocationRepo::new(pool.clone());
         let session_summary_repo = coding_memory::reforge::SessionSummaryRepo::new(pool.clone());
         let selective_delete_log =
             coding_memory::reforge::selective_delete::SelectiveDeleteLogRepo::new(pool.clone());
         let pattern_effectiveness_log =
-            coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo::new(pool.clone());
+            coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo::new(
+                pool.clone(),
+            );
         Self {
             pool,
             fact_repo,
@@ -148,8 +148,7 @@ impl cognitive::services::reforge::CodingPhaseRunner for CodingPhaseRunnerImpl {
     }
 
     async fn run_selective_delete(&self) -> common::Result<CodingPhaseRunnerOutcome> {
-        let applied =
-            SelectiveDeleteSignal::apply(&self.pool, &self.selective_delete_log).await?;
+        let applied = SelectiveDeleteSignal::apply(&self.pool, &self.selective_delete_log).await?;
         Ok(CodingPhaseRunnerOutcome {
             applied,
             narrative: None,

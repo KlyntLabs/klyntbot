@@ -13,10 +13,10 @@ pub mod desktop_lock;
 pub mod event;
 /// Path-based privacy exclusion filter.
 pub mod excludes;
-/// `HookClient` — socket-first-else-buffer dispatcher.
-pub mod hook_client;
 /// Hook CLI entry point — shared by `klyntbot-hook` binary and desktop's `--hook` mode.
 pub mod hook_cli;
+/// `HookClient` — socket-first-else-buffer dispatcher.
+pub mod hook_client;
 /// `RepoScope` — repo identity attached to events.
 pub mod scope;
 /// Cwd → `RepoScope` resolver (cached).

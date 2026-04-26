@@ -186,11 +186,7 @@ impl IngestEventLogRepo {
 
     /// Atomically flip `processing` from 0→1 for every row in the turn. Returns the count flipped.
     /// Already-processing rows are skipped — making the call idempotent.
-    pub async fn mark_processing(
-        &self,
-        session_id: &str,
-        turn_id: Option<&str>,
-    ) -> Result<u64> {
+    pub async fn mark_processing(&self, session_id: &str, turn_id: Option<&str>) -> Result<u64> {
         let res = match turn_id {
             Some(tid) => {
                 sqlx::query(
@@ -228,7 +224,10 @@ impl IngestEventLogRepo {
             return Ok(0);
         }
         let mut total: u64 = 0;
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| KlyntbotError::Storage(format!("mark_processed tx: {e}")))?;
         for id in ids {
             let res = sqlx::query(
@@ -240,7 +239,8 @@ impl IngestEventLogRepo {
             .map_err(|e| KlyntbotError::Storage(format!("mark_processed row: {e}")))?;
             total += res.rows_affected();
         }
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| KlyntbotError::Storage(format!("mark_processed commit: {e}")))?;
         Ok(total)
     }

@@ -72,7 +72,10 @@ impl crate::AppCore {
 
     async fn set_cli_enabled(&self, cli: &str, enabled: bool) -> Result<(), ApiError> {
         if cli != "claude-code" {
-            return Err(ApiError::new("BAD_REQUEST", "only claude-code is supported"));
+            return Err(ApiError::new(
+                "BAD_REQUEST",
+                "only claude-code is supported",
+            ));
         }
         let settings = claude_code_settings_path()?;
         if enabled {

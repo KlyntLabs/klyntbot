@@ -164,15 +164,20 @@ async fn handle_connection(
     if json_val.get("op").is_some() {
         // Route through op_handler if available.
         if let Some(handler) = op_handler {
-            let resp = handler.handle(json_val).await.unwrap_or_else(|e| {
-                serde_json::json!({"error": e.to_string()})
-            });
+            let resp = handler
+                .handle(json_val)
+                .await
+                .unwrap_or_else(|e| serde_json::json!({"error": e.to_string()}));
             let resp_bytes = serde_json::to_vec(&resp)
                 .map_err(|e| KlyntbotError::Storage(format!("encode resp: {e}")))?;
             let resp_len = (resp_bytes.len() as u32).to_le_bytes();
-            stream.write_all(&resp_len).await
+            stream
+                .write_all(&resp_len)
+                .await
                 .map_err(|e| KlyntbotError::Storage(format!("write resp len: {e}")))?;
-            stream.write_all(&resp_bytes).await
+            stream
+                .write_all(&resp_bytes)
+                .await
                 .map_err(|e| KlyntbotError::Storage(format!("write resp body: {e}")))?;
         }
         return Ok(());
