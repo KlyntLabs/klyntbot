@@ -2,6 +2,9 @@
 
 use crate::error::StorageError;
 use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio_util::sync::CancellationToken;
 
 /// Newtype wrapper around `sqlx::SqlitePool` with auto-migration on connect.
 #[derive(Clone)]
@@ -129,6 +132,73 @@ impl std::fmt::Debug for StoragePool {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StoragePool").finish_non_exhaustive()
     }
+}
+
+impl StoragePool {
+    /// Spawn a background task that polls `PRAGMA data_version` at the given
+    /// interval. When the version changes between ticks (i.e. a different
+    /// connection wrote since we last looked), publish
+    /// `DomainEvent::DataVersionBumped` on `bus`. Returns a
+    /// `CancellationToken` that the caller stores to keep the watcher alive
+    /// and to stop it on shutdown.
+    ///
+    /// IMPORTANT: SQLite's `PRAGMA data_version` only advances when *other*
+    /// connections commit. Holding a long-lived borrow on a single connection
+    /// would mask all updates — that's why we use `fetch_one(&self.0)`
+    /// (a sqlx pool) on every tick, which checks out a fresh connection.
+    pub async fn start_data_version_watcher(
+        &self,
+        bus: Arc<bus::DomainEventBus>,
+        interval: Duration,
+    ) -> CancellationToken {
+        let token = CancellationToken::new();
+        let token_child = token.clone();
+        let pool = self.clone();
+        tokio::spawn(async move {
+            let mut last = match read_data_version(&pool).await {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::warn!("data_version_watcher: initial read failed: {e}");
+                    return;
+                }
+            };
+            let mut ticker = tokio::time::interval(interval);
+            // Skip the immediate first tick — interval fires once at start.
+            ticker.tick().await;
+            loop {
+                tokio::select! {
+                    _ = token_child.cancelled() => {
+                        tracing::debug!("data_version_watcher: cancelled");
+                        break;
+                    }
+                    _ = ticker.tick() => {
+                        match read_data_version(&pool).await {
+                            Ok(current) if current != last => {
+                                bus.publish(bus::DomainEvent::DataVersionBumped {
+                                    previous: last,
+                                    current,
+                                });
+                                last = current;
+                            }
+                            Ok(_) => {} // no change
+                            Err(e) => {
+                                tracing::warn!("data_version_watcher: read failed: {e}");
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        token
+    }
+}
+
+async fn read_data_version(pool: &StoragePool) -> sqlx::Result<u32> {
+    // `PRAGMA data_version` returns one row, one column (an i64).
+    let v: i64 = sqlx::query_scalar("PRAGMA data_version")
+        .fetch_one(pool.inner())
+        .await?;
+    Ok(v as u32)
 }
 
 #[cfg(test)]
