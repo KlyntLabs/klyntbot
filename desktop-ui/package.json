@@ -15,6 +15,8 @@
   "dependencies": {
     "@pierre/diffs": "^1.1.19",
     "@sentry/react": "^10.50.0",
+    "@tanstack/react-query": "^5",
+    "@tanstack/react-query-devtools": "^5",
     "@tanstack/react-virtual": "^3.13.24",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.7.0",
