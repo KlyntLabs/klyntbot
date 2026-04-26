@@ -34,9 +34,17 @@ const ENTITY_INVALIDATIONS: Record<EntityKind, QueryKey[]> = {
 // Static list of (event_name, queryKeys) for non-entity events that still
 // need to invalidate something.
 const STATIC_ROUTES: ReadonlyArray<readonly [string, QueryKey[]]> = [
-	["focus:state_changed", [qk.focus.status()]],
+	["focus:state_changed", [qk.focus.status(), qk.launcher.dndActive()]],
 	["focus:phase_changed", [qk.focus.status()]],
 	["focus:sync", [qk.focus.status()]],
+	["chat:thread_created", [qk.threads.list()]],
+	["chat:thread_updated", [qk.threads.list()]],
+	["chat:message_added", [qk.threads.list()]],
+	["mcp:server_status", [qk.system.mcpServers()]],
+	["mcp:startup_complete", [qk.system.mcpServers()]],
+	["productivity:nudge", [qk.launcher.dashboard()]],
+	["score:updated", [qk.launcher.dashboard()]],
+	["bucket:completed", [qk.launcher.dashboard()]],
 ];
 
 const ALL_EVENTS = ["entity:updated", ...STATIC_ROUTES.map(([n]) => n)];

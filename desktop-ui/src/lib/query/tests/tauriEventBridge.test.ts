@@ -65,3 +65,84 @@ describe("tauriEventBridge", () => {
 		expect(spy).not.toHaveBeenCalled();
 	});
 });
+
+
+it("chat:thread_created invalidates threads.list", async () => {
+	const client = new QueryClient();
+	const spy = vi.spyOn(client, "invalidateQueries");
+	const { listen, fire } = fakeListenFactory();
+	const stop = await startTauriEventBridge(client, listen as any);
+	fire("chat:thread_created", { id: "t1" });
+	expect(spy).toHaveBeenCalledWith({ queryKey: qk.threads.list() });
+	stop();
+});
+
+it("chat:thread_updated invalidates threads.list", async () => {
+	const client = new QueryClient();
+	const spy = vi.spyOn(client, "invalidateQueries");
+	const { listen, fire } = fakeListenFactory();
+	const stop = await startTauriEventBridge(client, listen as any);
+	fire("chat:thread_updated", { id: "t1" });
+	expect(spy).toHaveBeenCalledWith({ queryKey: qk.threads.list() });
+	stop();
+});
+
+it("chat:message_added invalidates threads.list", async () => {
+	const client = new QueryClient();
+	const spy = vi.spyOn(client, "invalidateQueries");
+	const { listen, fire } = fakeListenFactory();
+	const stop = await startTauriEventBridge(client, listen as any);
+	fire("chat:message_added", { sessionKey: "s1" });
+	expect(spy).toHaveBeenCalledWith({ queryKey: qk.threads.list() });
+	stop();
+});
+
+it("mcp:server_status invalidates system.mcpServers", async () => {
+	const client = new QueryClient();
+	const spy = vi.spyOn(client, "invalidateQueries");
+	const { listen, fire } = fakeListenFactory();
+	const stop = await startTauriEventBridge(client, listen as any);
+	fire("mcp:server_status", { serverName: "x", status: "ready" });
+	expect(spy).toHaveBeenCalledWith({ queryKey: qk.system.mcpServers() });
+	stop();
+});
+
+it("mcp:startup_complete invalidates system.mcpServers", async () => {
+	const client = new QueryClient();
+	const spy = vi.spyOn(client, "invalidateQueries");
+	const { listen, fire } = fakeListenFactory();
+	const stop = await startTauriEventBridge(client, listen as any);
+	fire("mcp:startup_complete", {});
+	expect(spy).toHaveBeenCalledWith({ queryKey: qk.system.mcpServers() });
+	stop();
+});
+
+it("score:updated invalidates launcher.dashboard", async () => {
+	const client = new QueryClient();
+	const spy = vi.spyOn(client, "invalidateQueries");
+	const { listen, fire } = fakeListenFactory();
+	const stop = await startTauriEventBridge(client, listen as any);
+	fire("score:updated", { score: 0.8 });
+	expect(spy).toHaveBeenCalledWith({ queryKey: qk.launcher.dashboard() });
+	stop();
+});
+
+it("bucket:completed invalidates launcher.dashboard", async () => {
+	const client = new QueryClient();
+	const spy = vi.spyOn(client, "invalidateQueries");
+	const { listen, fire } = fakeListenFactory();
+	const stop = await startTauriEventBridge(client, listen as any);
+	fire("bucket:completed", { bucket: "x" });
+	expect(spy).toHaveBeenCalledWith({ queryKey: qk.launcher.dashboard() });
+	stop();
+});
+
+it("focus:state_changed invalidates dndActive too", async () => {
+	const client = new QueryClient();
+	const spy = vi.spyOn(client, "invalidateQueries");
+	const { listen, fire } = fakeListenFactory();
+	const stop = await startTauriEventBridge(client, listen as any);
+	fire("focus:state_changed", { state: "active" });
+	expect(spy).toHaveBeenCalledWith({ queryKey: qk.launcher.dndActive() });
+	stop();
+});
