@@ -1,19 +1,19 @@
 // @vitest-environment jsdom
-
-import { subscribeAppServerEvents } from "@services/events";
 import { getSkillsList } from "@services/tauri";
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AppServerEvent, WorkspaceInfo } from "@/types";
+import { renderHook, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { QueryProvider } from "@/lib/query";
+import type { WorkspaceInfo } from "@/types";
 import { useSkills } from "./useSkills";
 
 vi.mock("../../../services/tauri", () => ({
   getSkillsList: vi.fn(),
 }));
 
-vi.mock("../../../services/events", () => ({
-  subscribeAppServerEvents: vi.fn(),
-}));
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <QueryProvider>{children}</QueryProvider>
+);
 
 const workspace: WorkspaceInfo = {
   id: "workspace-1",
@@ -23,102 +23,66 @@ const workspace: WorkspaceInfo = {
   settings: { sidebarCollapsed: false },
 };
 
-let listener: ((event: AppServerEvent) => void) | null = null;
-const unlisten = vi.fn();
-
-beforeEach(() => {
-  listener = null;
-  unlisten.mockReset();
-  vi.mocked(subscribeAppServerEvents).mockImplementation((cb) => {
-    listener = cb;
-    return unlisten;
-  });
-});
-
-afterEach(() => {
-  vi.clearAllMocks();
-});
-
 describe("useSkills", () => {
-  it("refreshes skills on canonical codex/event/skills_update_available notifications", async () => {
-    vi.mocked(getSkillsList)
-      .mockResolvedValueOnce({ result: { skills: [{ name: "first", path: "/skills/first" }] } })
-      .mockResolvedValueOnce({
-        result: {
-          skills: [
-            { name: "first", path: "/skills/first" },
-            { name: "second", path: "/skills/second" },
-          ],
-        },
-      });
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
 
-    const { result } = renderHook(() => useSkills(workspace));
+  it("returns empty when no workspace is active", async () => {
+    const { result } = renderHook(() => useSkills(null), { wrapper });
 
     await waitFor(() => {
-      expect(getSkillsList).toHaveBeenCalledTimes(1);
-      expect(result.current.skills.map((skill) => skill.name)).toEqual(["first"]);
+      expect(result.current.skills).toEqual([]);
     });
+    expect(getSkillsList).not.toHaveBeenCalled();
+  });
 
-    act(() => {
-      listener?.({
-        workspace_id: "workspace-1",
-        message: {
-          method: "codex/event/skills_update_available",
-        },
-      });
-    });
+  it("fetches skills for the active workspace", async () => {
+    vi.mocked(getSkillsList).mockResolvedValueOnce([{ name: "first", path: "/skills/first" }]);
+
+    const { result } = renderHook(() => useSkills(workspace), { wrapper });
 
     await waitFor(() => {
-      expect(getSkillsList).toHaveBeenCalledTimes(2);
-      expect(result.current.skills.map((skill) => skill.name)).toEqual(["first", "second"]);
+      expect(result.current.skills.map((s) => s.name)).toEqual(["first"]);
+    });
+    expect(getSkillsList).toHaveBeenCalledWith("workspace-1");
+  });
+
+  it("filters out entries missing a name", async () => {
+    vi.mocked(getSkillsList).mockResolvedValueOnce([
+      { name: "first", path: "/skills/first" },
+      { name: "", path: "/skills/blank" },
+    ]);
+
+    const { result } = renderHook(() => useSkills(workspace), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.skills).toHaveLength(1);
+      expect(result.current.skills[0]?.name).toBe("first");
     });
   });
 
-  it("ignores non-canonical direct skills update methods", async () => {
-    vi.mocked(getSkillsList).mockResolvedValueOnce({
-      result: { skills: [{ name: "first", path: "/skills/first" }] },
-    });
+  it("refetches when the active workspace changes", async () => {
+    vi.mocked(getSkillsList).mockImplementation(async (id) =>
+      id === "workspace-1"
+        ? [{ name: "ws1-skill", path: "/skills/ws1" }]
+        : [{ name: "ws2-skill", path: "/skills/ws2" }],
+    );
 
-    const { result } = renderHook(() => useSkills(workspace));
+    const { result, rerender } = renderHook(({ ws }) => useSkills(ws), {
+      wrapper,
+      initialProps: { ws: workspace },
+    });
 
     await waitFor(() => {
-      expect(getSkillsList).toHaveBeenCalledTimes(1);
-      expect(result.current.skills.map((skill) => skill.name)).toEqual(["first"]);
+      expect(result.current.skills[0]?.name).toBe("ws1-skill");
     });
 
-    act(() => {
-      listener?.({
-        workspace_id: "workspace-1",
-        message: { method: "skills/updateAvailable" },
-      });
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(getSkillsList).toHaveBeenCalledTimes(1);
-    expect(result.current.skills.map((skill) => skill.name)).toEqual(["first"]);
-  });
-
-  it("ignores skills update events from other workspaces", async () => {
-    vi.mocked(getSkillsList).mockResolvedValue({
-      result: { skills: [{ name: "first", path: "/skills/first" }] },
-    });
-
-    renderHook(() => useSkills(workspace));
+    rerender({ ws: { ...workspace, id: "workspace-2" } });
 
     await waitFor(() => {
-      expect(getSkillsList).toHaveBeenCalledTimes(1);
+      expect(result.current.skills[0]?.name).toBe("ws2-skill");
+      expect(getSkillsList).toHaveBeenCalledWith("workspace-2");
     });
-
-    act(() => {
-      listener?.({
-        workspace_id: "workspace-2",
-        message: {
-          method: "codex/event/skills_update_available",
-        },
-      });
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(getSkillsList).toHaveBeenCalledTimes(1);
   });
 });

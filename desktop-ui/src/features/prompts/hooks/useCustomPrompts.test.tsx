@@ -2,9 +2,15 @@
 
 import { getGlobalPromptsDir } from "@services/tauri";
 import { act, renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { QueryProvider } from "@/lib/query";
 import type { WorkspaceInfo } from "@/types";
 import { useCustomPrompts } from "./useCustomPrompts";
+
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <QueryProvider>{children}</QueryProvider>
+);
 
 vi.mock("../../../services/tauri", () => ({
   createPrompt: vi.fn(),
@@ -28,7 +34,7 @@ const workspace: WorkspaceInfo = {
 
 describe("useCustomPrompts", () => {
   it("returns null when no workspace is selected", async () => {
-    const { result } = renderHook(() => useCustomPrompts(null));
+    const { result } = renderHook(() => useCustomPrompts(null), { wrapper });
 
     let path: string | null = "unset";
     await act(async () => {
@@ -41,7 +47,7 @@ describe("useCustomPrompts", () => {
 
   it("requests the global prompts dir when a workspace is selected", async () => {
     getGlobalPromptsDirMock.mockResolvedValue("/tmp/.codex/prompts");
-    const { result } = renderHook(() => useCustomPrompts(workspace));
+    const { result } = renderHook(() => useCustomPrompts(workspace), { wrapper });
 
     let path: string | null = null;
     await act(async () => {
