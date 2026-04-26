@@ -219,12 +219,8 @@ export function useMainAppGitState({
     gitPullRequestComments,
     gitPullRequestCommentsLoading,
     gitPullRequestCommentsError,
-    handleGitIssuesChange,
-    handleGitPullRequestsChange,
-    handleGitPullRequestDiffsChange,
-    handleGitPullRequestCommentsChange,
     resetGitHubPanelState,
-  } = useGitHubPanelController();
+  } = useGitHubPanelController(activeWorkspace);
 
   useEffect(() => {
     resetGitHubPanelState();
@@ -463,10 +459,6 @@ export function useMainAppGitState({
     gitPullRequestComments,
     gitPullRequestCommentsLoading,
     gitPullRequestCommentsError,
-    handleGitIssuesChange,
-    handleGitPullRequestsChange,
-    handleGitPullRequestDiffsChange,
-    handleGitPullRequestCommentsChange,
     gitRemoteUrl,
     refreshGitRemote,
     gitRootCandidates,

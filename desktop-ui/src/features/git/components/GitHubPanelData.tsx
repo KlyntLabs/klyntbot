@@ -1,147 +1,32 @@
-import { useEffect } from "react";
-import type {
-  GitHubIssue,
-  GitHubPullRequest,
-  GitHubPullRequestComment,
-  GitHubPullRequestDiff,
-  WorkspaceInfo,
-} from "@/types";
+import type { WorkspaceInfo } from "@/types";
 import type { GitDiffSource, GitPanelMode } from "../types";
 import { useGitHubIssues } from "../hooks/useGitHubIssues";
 import { useGitHubPullRequests } from "../hooks/useGitHubPullRequests";
 import { useGitHubPullRequestDiffs } from "../hooks/useGitHubPullRequestDiffs";
 import { useGitHubPullRequestComments } from "../hooks/useGitHubPullRequestComments";
 
-type IssuesState = {
-  issues: GitHubIssue[];
-  total: number;
-  isLoading: boolean;
-  error: string | null;
-};
-
-type PullRequestsState = {
-  pullRequests: GitHubPullRequest[];
-  total: number;
-  isLoading: boolean;
-  error: string | null;
-};
-
-type PullRequestDiffsState = {
-  diffs: GitHubPullRequestDiff[];
-  isLoading: boolean;
-  error: string | null;
-};
-
-type PullRequestCommentsState = {
-  comments: GitHubPullRequestComment[];
-  isLoading: boolean;
-  error: string | null;
-};
-
 type GitHubPanelDataProps = {
-  activeWorkspace: WorkspaceInfo | null;
-  gitPanelMode: GitPanelMode;
-  shouldLoadDiffs: boolean;
-  diffSource: GitDiffSource;
-  selectedPullRequestNumber: number | null;
-  onIssuesChange: (state: IssuesState) => void;
-  onPullRequestsChange: (state: PullRequestsState) => void;
-  onPullRequestDiffsChange: (state: PullRequestDiffsState) => void;
-  onPullRequestCommentsChange: (state: PullRequestCommentsState) => void;
+	activeWorkspace: WorkspaceInfo | null;
+	gitPanelMode: GitPanelMode;
+	shouldLoadDiffs: boolean;
+	diffSource: GitDiffSource;
+	selectedPullRequestNumber: number | null;
 };
 
 export function GitHubPanelData({
-  activeWorkspace,
-  gitPanelMode: _gitPanelMode,
-  shouldLoadDiffs: _shouldLoadDiffs,
-  diffSource: _diffSource,
-  selectedPullRequestNumber,
-  onIssuesChange,
-  onPullRequestsChange,
-  onPullRequestDiffsChange,
-  onPullRequestCommentsChange,
+	activeWorkspace,
+	selectedPullRequestNumber,
 }: GitHubPanelDataProps) {
-  const {
-    issues,
-    total: issuesTotal,
-    isLoading: issuesLoading,
-    error: issuesError,
-  } = useGitHubIssues(activeWorkspace);
+	useGitHubIssues(activeWorkspace);
+	useGitHubPullRequests(activeWorkspace);
+	useGitHubPullRequestDiffs(
+		activeWorkspace,
+		selectedPullRequestNumber ?? null,
+	);
+	useGitHubPullRequestComments(
+		activeWorkspace,
+		selectedPullRequestNumber ?? null,
+	);
 
-  const {
-    pullRequests,
-    total: pullRequestsTotal,
-    isLoading: pullRequestsLoading,
-    error: pullRequestsError,
-  } = useGitHubPullRequests(activeWorkspace);
-
-  const {
-    diffs: pullRequestDiffs,
-    isLoading: pullRequestDiffsLoading,
-    error: pullRequestDiffsError,
-  } = useGitHubPullRequestDiffs(
-    activeWorkspace,
-    selectedPullRequestNumber ?? null,
-  );
-
-  const {
-    comments: pullRequestComments,
-    isLoading: pullRequestCommentsLoading,
-    error: pullRequestCommentsError,
-  } = useGitHubPullRequestComments(
-    activeWorkspace,
-    selectedPullRequestNumber ?? null,
-  );
-
-  useEffect(() => {
-    onIssuesChange({
-      issues,
-      total: issuesTotal,
-      isLoading: issuesLoading,
-      error: issuesError,
-    });
-  }, [issues, issuesError, issuesLoading, issuesTotal, onIssuesChange]);
-
-  useEffect(() => {
-    onPullRequestsChange({
-      pullRequests,
-      total: pullRequestsTotal,
-      isLoading: pullRequestsLoading,
-      error: pullRequestsError,
-    });
-  }, [
-    onPullRequestsChange,
-    pullRequests,
-    pullRequestsError,
-    pullRequestsLoading,
-    pullRequestsTotal,
-  ]);
-
-  useEffect(() => {
-    onPullRequestDiffsChange({
-      diffs: pullRequestDiffs,
-      isLoading: pullRequestDiffsLoading,
-      error: pullRequestDiffsError,
-    });
-  }, [
-    onPullRequestDiffsChange,
-    pullRequestDiffs,
-    pullRequestDiffsError,
-    pullRequestDiffsLoading,
-  ]);
-
-  useEffect(() => {
-    onPullRequestCommentsChange({
-      comments: pullRequestComments,
-      isLoading: pullRequestCommentsLoading,
-      error: pullRequestCommentsError,
-    });
-  }, [
-    onPullRequestCommentsChange,
-    pullRequestComments,
-    pullRequestCommentsError,
-    pullRequestCommentsLoading,
-  ]);
-
-  return null;
+	return null;
 }
