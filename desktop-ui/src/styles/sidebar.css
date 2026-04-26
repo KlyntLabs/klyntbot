@@ -1,9 +1,10 @@
 .sidebar {
   --sidebar-padding: 20px;
   padding: var(--sidebar-top-padding, 36px) var(--sidebar-padding) 20px;
-  /* Codex-style solid dark slate — no vibrancy bleed. */
+  /* Translucent fill — let native window vibrancy (HudWindow/liquid-glass) bleed through. */
   background: var(--surface-sidebar);
-  backdrop-filter: none;
+  -webkit-backdrop-filter: blur(40px) saturate(1.4);
+  backdrop-filter: blur(40px) saturate(1.4);
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
