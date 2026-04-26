@@ -52,20 +52,15 @@ type GitHubPanelDataProps = {
 
 export function GitHubPanelData({
   activeWorkspace,
-  gitPanelMode,
-  shouldLoadDiffs,
-  diffSource,
+  gitPanelMode: _gitPanelMode,
+  shouldLoadDiffs: _shouldLoadDiffs,
+  diffSource: _diffSource,
   selectedPullRequestNumber,
   onIssuesChange,
   onPullRequestsChange,
   onPullRequestDiffsChange,
   onPullRequestCommentsChange,
 }: GitHubPanelDataProps) {
-  const pullRequestsEnabled = gitPanelMode === "prs" && Boolean(activeWorkspace);
-  const pullRequestDiffsEnabled =
-    shouldLoadDiffs && diffSource === "pr" && Boolean(activeWorkspace);
-  const pullRequestCommentsEnabled = pullRequestDiffsEnabled;
-
   const {
     issues,
     total: issuesTotal,
@@ -78,7 +73,7 @@ export function GitHubPanelData({
     total: pullRequestsTotal,
     isLoading: pullRequestsLoading,
     error: pullRequestsError,
-  } = useGitHubPullRequests(activeWorkspace, pullRequestsEnabled);
+  } = useGitHubPullRequests(activeWorkspace);
 
   const {
     diffs: pullRequestDiffs,
@@ -87,7 +82,6 @@ export function GitHubPanelData({
   } = useGitHubPullRequestDiffs(
     activeWorkspace,
     selectedPullRequestNumber ?? null,
-    pullRequestDiffsEnabled,
   );
 
   const {
@@ -97,7 +91,6 @@ export function GitHubPanelData({
   } = useGitHubPullRequestComments(
     activeWorkspace,
     selectedPullRequestNumber ?? null,
-    pullRequestCommentsEnabled,
   );
 
   useEffect(() => {
