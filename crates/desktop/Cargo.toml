@@ -61,6 +61,7 @@ base64 = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rmcp = { workspace = true, features = ["server", "transport-io", "transport-streamable-http-server"] }
+mcp-bridge = { path = "../mcp-bridge" }
 mimalloc = { workspace = true }
 
 [features]

@@ -3,7 +3,7 @@
 
 pub use ::app_core::AppCore;
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use ::app_core::events::{AppEventEmitter, CompoundEmitter};
 use ::app_core::EventChannels;
@@ -15,6 +15,12 @@ use tauri::{Emitter, Manager};
 use tokio::sync::{broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
+
+
+/// Process-wide handle to the MCP→desktop event bridge. Held forever so
+/// the accept loop runs for the desktop's lifetime; on shutdown the
+/// `Drop` impl unlinks the socket.
+static BRIDGE_SERVER: OnceLock<mcp_bridge::BridgeServer> = OnceLock::new();
 
 /// Bridges `AppEventEmitter` to Tauri's native event system.
 struct TauriEventEmitter {
@@ -28,6 +34,8 @@ impl AppEventEmitter for TauriEventEmitter {
         }
     }
 }
+
+
 
 /// Initialize `AppCore` and wire event channels to Tauri emitters.
 ///
@@ -54,6 +62,38 @@ pub async fn init(
     let (core, channels) =
         AppCore::init_with_sender(common::AppMode::Desktop, None, Some(sender), Some(emitter))
             .await?;
+    // Cross-process event bridge — receives frames from a child
+    // `klyntbot mcp serve --stdio` process and re-emits them via Tauri's
+    // global broadcast so every webview's `tauriEventBridge` (Plan 1) picks
+    // them up.
+    if let Some(socket_path) = mcp_bridge::bridge_socket_path() {
+        let app_handle_for_bridge = app_handle.clone();
+        let handler: mcp_bridge::server::FrameHandler = Box::new(move |frame| {
+            use tauri::Emitter;
+            if let Err(e) = app_handle_for_bridge.emit(&frame.event, frame.payload) {
+                tracing::warn!(
+                    "mcp-bridge: failed to re-emit event {}: {e}",
+                    frame.event
+                );
+            }
+        });
+        match mcp_bridge::BridgeServer::start(socket_path.clone(), handler).await {
+            Ok(server) => {
+                if BRIDGE_SERVER.set(server).is_err() {
+                    tracing::warn!("mcp-bridge: BRIDGE_SERVER already initialized");
+                }
+                tracing::info!("mcp-bridge: listening at {}", socket_path.display());
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "mcp-bridge: failed to bind {}: {e}; cross-process events disabled",
+                    socket_path.display()
+                );
+            }
+        }
+    } else {
+        tracing::warn!("mcp-bridge: cannot resolve socket path; bridge disabled");
+    }
     wire_event_channels(&core, channels, &app_handle, &global_event_tx);
     Ok((core, global_event_tx))
 }
