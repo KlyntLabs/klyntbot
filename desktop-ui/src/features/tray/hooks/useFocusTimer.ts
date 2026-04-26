@@ -11,8 +11,7 @@ import type {
 	FocusSyncPayload,
 	FocusWarningPayload,
 } from "../types";
-import { useTrayMutation } from "./useTrayMutation";
-import { useTrayQuery } from "./useTrayQuery";
+import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
 
 const SETTINGS_KEY = "klynt:focus:settings";
 
@@ -58,53 +57,54 @@ interface CoachingIntervention {
 export type { FocusPhase, FocusPreset, FocusSettings } from "../types";
 
 export function useFocusTimer() {
-	const initialStatusQuery = useTrayQuery<FocusSessionStatus>(
-		"focus_session_status",
-		undefined,
-		{ active: false, sync: null, session: null },
-	);
+	const initialStatusQuery = useTauriQuery<FocusSessionStatus>({
+		queryKey: qk.focus.status(),
+		command: "focus_session_status",
+		fallback: { active: false, sync: null, session: null },
+	});
 	const initialStatus = initialStatusQuery.data;
-	const refetch = initialStatusQuery.refetch;
+	const refetch = () => initialStatusQuery.refetch();
 
-	const startMut = useTrayMutation<FocusSession, Record<string, unknown>>(
-		"focus_session_start",
-	);
-	const stopMut = useTrayMutation<FocusSession | null, { notes?: string }>(
-		"focus_session_stop",
-	);
-	const pauseMut = useTrayMutation<boolean, Record<string, never>>(
-		"focus_session_pause",
-	);
-	const resumeMut = useTrayMutation<boolean, Record<string, never>>(
-		"focus_session_resume",
-	);
-	const extendMut = useTrayMutation<boolean, { extra_secs: number }>(
-		"focus_session_extend",
-	);
-	const startBreakMut = useTrayMutation<boolean, Record<string, never>>(
-		"focus_session_start_break",
-	);
-	const extendWorkMut = useTrayMutation<boolean, { extra_mins: number }>(
-		"focus_session_extend_work",
-	);
-	const skipBreakMut = useTrayMutation<boolean, Record<string, never>>(
-		"focus_session_skip_break",
-	);
-	const takeBreakMut = useTrayMutation<boolean, Record<string, never>>(
-		"focus_session_take_break",
-	);
-	const logDistractionMut = useTrayMutation<void, { app_name: string }>(
-		"distraction_dismiss",
-	);
+	const startMut = useTauriMutation<FocusSession, Record<string, unknown>>({
+		command: "focus_session_start",
+	});
+	const stopMut = useTauriMutation<FocusSession | null, { notes?: string }>({
+		command: "focus_session_stop",
+	});
+	const pauseMut = useTauriMutation<boolean, Record<string, never>>({
+		command: "focus_session_pause",
+	});
+	const resumeMut = useTauriMutation<boolean, Record<string, never>>({
+		command: "focus_session_resume",
+	});
+	const extendMut = useTauriMutation<boolean, { extra_secs: number }>({
+		command: "focus_session_extend",
+	});
+	const startBreakMut = useTauriMutation<boolean, Record<string, never>>({
+		command: "focus_session_start_break",
+	});
+	const extendWorkMut = useTauriMutation<boolean, { extra_mins: number }>({
+		command: "focus_session_extend_work",
+	});
+	const skipBreakMut = useTauriMutation<boolean, Record<string, never>>({
+		command: "focus_session_skip_break",
+	});
+	const takeBreakMut = useTauriMutation<boolean, Record<string, never>>({
+		command: "focus_session_take_break",
+	});
+	const logDistractionMut = useTauriMutation<void, { app_name: string }>({
+		command: "distraction_dismiss",
+	});
 
 	const [todayDate] = useState(todayISO);
-	const todaySessionsQuery = useTrayQuery<FocusSession[]>(
-		"productivity_sessions",
-		{ date: todayDate },
-		[],
-	);
+	const todaySessionsQuery = useTauriQuery<FocusSession[]>({
+		queryKey: qk.focus.todaySessions(),
+		command: "productivity_sessions",
+		args: { date: todayDate },
+		fallback: [],
+	});
 	const todaySessions = todaySessionsQuery.data;
-	const refetchToday = todaySessionsQuery.refetch;
+	const refetchToday = () => todaySessionsQuery.refetch();
 
 	const [serverState, setServerState] = useState<FocusSyncPayload | null>(null);
 	const [receivedAt, setReceivedAt] = useState<number>(0);
@@ -326,17 +326,17 @@ export function useFocusTimer() {
 		longBreakAfter,
 		todayStats,
 		activePreset,
-		loading:
-			startMut.loading ||
-			stopMut.loading ||
-			pauseMut.loading ||
-			resumeMut.loading ||
-			extendMut.loading ||
-			startBreakMut.loading ||
-			extendWorkMut.loading ||
-			skipBreakMut.loading ||
-			takeBreakMut.loading ||
-			logDistractionMut.loading,
+		isLoading:
+			startMut.isLoading ||
+			stopMut.isLoading ||
+			pauseMut.isLoading ||
+			resumeMut.isLoading ||
+			extendMut.isLoading ||
+			startBreakMut.isLoading ||
+			extendWorkMut.isLoading ||
+			skipBreakMut.isLoading ||
+			takeBreakMut.isLoading ||
+			logDistractionMut.isLoading,
 
 		start,
 		stop,
