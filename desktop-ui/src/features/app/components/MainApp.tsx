@@ -391,7 +391,7 @@ export default function MainApp() {
 		reasoningSupported,
 		onFocusComposer: () => composerInputRef.current?.focus(),
 	});
-	const { skills } = useSkills({ activeWorkspace, onDebug: addDebugEntry });
+	const { skills } = useSkills(activeWorkspace);
 	const {
 		prompts,
 		createPrompt,
