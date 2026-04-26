@@ -1,4 +1,5 @@
 import { useAppBootstrapOrchestration } from "@app/bootstrap/useAppBootstrapOrchestration";
+import { useChatThreads } from "@/features/chat/hooks/useChatThreads";
 import { MainAppShell } from "@app/components/MainAppShell";
 import { useAccountSwitching } from "@app/hooks/useAccountSwitching";
 import { useArchiveShortcut } from "@app/hooks/useArchiveShortcut";
@@ -317,6 +318,20 @@ export default function MainApp() {
 	useEffect(() => {
 		setSelectedServiceTier(preferredServiceTier);
 	}, [preferredServiceTier, threadCodexSelectionKey]);
+
+	const [appView, setAppView] = useState<"home" | "chat">("home");
+	const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);
+	const { threads: chatThreads, refetch: refetchChatThreads } = useChatThreads();
+
+	const onNewChat = useCallback(() => {
+		setSelectedSessionKey(`chat:${crypto.randomUUID()}`);
+		setAppView("chat");
+	}, []);
+
+	const onSelectThread = useCallback((sessionKey: string) => {
+		setSelectedSessionKey(sessionKey);
+		setAppView("chat");
+	}, []);
 
 	const {
 		handleSelectModel,
@@ -1761,6 +1776,14 @@ export default function MainApp() {
 		dismissErrorToast,
 		showDebugButton,
 		handleDebugClick,
+		chatView: {
+			appView,
+			selectedSessionKey,
+			onNewChat,
+			onSelectThread,
+			chatThreads,
+			refetchChatThreads,
+		},
 	});
 
 	const {
