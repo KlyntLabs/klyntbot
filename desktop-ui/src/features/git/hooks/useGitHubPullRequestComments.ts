@@ -29,7 +29,11 @@ export function useGitHubPullRequestComments(
 	return {
 		comments: query.data,
 		isLoading: query.isLoading,
-		error: query.error == null ? null : String(query.error),
+		error: query.error == null
+			? null
+			: query.error instanceof Error
+				? query.error.message
+				: String(query.error),
 		refresh,
 	};
 }

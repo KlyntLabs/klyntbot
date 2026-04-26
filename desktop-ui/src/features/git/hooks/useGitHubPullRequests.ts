@@ -29,7 +29,11 @@ export function useGitHubPullRequests(
 		pullRequests: query.data.pullRequests,
 		total: query.data.total,
 		isLoading: query.isLoading,
-		error: query.error == null ? null : String(query.error),
+		error: query.error == null
+			? null
+			: query.error instanceof Error
+				? query.error.message
+				: String(query.error),
 		refresh,
 	};
 }
