@@ -384,11 +384,8 @@ export function useMainAppGitState({
   } = useGitCommitController({
     activeWorkspace,
     activeWorkspaceId,
-    activeWorkspaceIdRef,
     commitMessageModelId,
     gitStatus,
-    refreshGitStatus,
-    refreshGitLog,
   });
 
   const {
