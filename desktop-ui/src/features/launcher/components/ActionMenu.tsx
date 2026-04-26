@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLauncherApi, useLauncherState } from "../store";
-import { ipc } from "@/utils/tauri-bridge";
+import { useTauriMutation } from "@/lib/query";
 import type { LauncherItem, LauncherItemKind } from "../types";
 
 interface Action {
@@ -17,8 +17,22 @@ export function ActionMenu() {
 	const [focusedIndex, setFocusedIndex] = useState(0);
 	const menuRef = useRef<HTMLDivElement>(null);
 
+	const launcherOpenApp = useTauriMutation<void, { path: string }>({
+		command: "launcher_open_app",
+		invalidates: [],
+	});
+
+	const openPath = useCallback(
+		(path: string) => {
+			launcherOpenApp.mutate({ path }).catch((err) =>
+				console.error("Failed to open:", err),
+			);
+		},
+		[launcherOpenApp],
+	);
+
 	const item = results[selectedIndex] ?? null;
-	const actions = item ? getActionsForItem(item) : [];
+	const actions = item ? getActionsForItem(item, openPath) : [];
 
 	const close = useCallback(
 		() => setActionMenuOpen(false),
@@ -131,40 +145,37 @@ function copyText(text: string) {
 		.catch((err) => console.error("Failed to copy:", err));
 }
 
-function openPath(path: string) {
-	ipc("launcher_open_app", { path }).catch((err) =>
-		console.error("Failed to open:", err),
-	);
-}
-
-function getActionsForItem(item: LauncherItem): Action[] {
+function getActionsForItem(
+	item: LauncherItem,
+	openPath: (path: string) => void,
+): Action[] {
 	const { kind } = item;
 	switch (kind.type) {
 		case "application":
-			return applicationActions(item, kind);
+			return applicationActions(item, kind, openPath);
 		case "file":
-			return fileActions(kind);
+			return fileActions(kind, openPath);
 		case "contentMatch":
-			return contentMatchActions(kind);
+			return contentMatchActions(kind, openPath);
 		case "gitRepo":
-			return gitRepoActions(kind);
+			return gitRepoActions(kind, openPath);
 		case "bookmark":
 		case "browserHistory":
 		case "urlNavigation":
-			return urlActions(kind as { url: string });
+			return urlActions(kind as { url: string }, openPath);
 		case "task":
-			return taskActions(item);
+			return taskActions(item, openPath);
 		case "note":
-			return noteActions(item);
+			return noteActions(item, openPath);
 		case "calculator":
 			return calculatorActions(kind);
 		case "contact":
-			return contactActions(kind);
+			return contactActions(kind, openPath);
 		case "systemCommand":
 		case "script":
 			return executeActions(item);
 		case "sshHost":
-			return sshActions(kind);
+			return sshActions(kind, openPath);
 		case "brewPackage":
 			return brewActions(kind);
 		default:
@@ -180,6 +191,7 @@ type KindOf<T extends LauncherItemKind["type"]> = Extract<
 function applicationActions(
 	item: LauncherItem,
 	kind: KindOf<"application">,
+	openPath: (path: string) => void,
 ): Action[] {
 	return [
 		{ label: "Open", shortcut: "Enter", handler: () => openPath(kind.path) },
@@ -192,7 +204,7 @@ function applicationActions(
 	];
 }
 
-function fileActions(kind: KindOf<"file">): Action[] {
+function fileActions(kind: KindOf<"file">, openPath: (path: string) => void): Action[] {
 	const actions: Action[] = [
 		{ label: "Open", shortcut: "Enter", handler: () => openPath(kind.path) },
 		{
@@ -210,7 +222,10 @@ function fileActions(kind: KindOf<"file">): Action[] {
 	return actions;
 }
 
-function contentMatchActions(kind: KindOf<"contentMatch">): Action[] {
+function contentMatchActions(
+	kind: KindOf<"contentMatch">,
+	openPath: (path: string) => void,
+): Action[] {
 	return [
 		{ label: "Open", shortcut: "Enter", handler: () => openPath(kind.path) },
 		{
@@ -221,7 +236,10 @@ function contentMatchActions(kind: KindOf<"contentMatch">): Action[] {
 	];
 }
 
-function gitRepoActions(kind: KindOf<"gitRepo">): Action[] {
+function gitRepoActions(
+	kind: KindOf<"gitRepo">,
+	openPath: (path: string) => void,
+): Action[] {
 	return [
 		{ label: "Open", shortcut: "Enter", handler: () => openPath(kind.path) },
 		{ label: "Reveal in Finder", handler: () => openPath(kind.path) },
@@ -233,14 +251,14 @@ function gitRepoActions(kind: KindOf<"gitRepo">): Action[] {
 	];
 }
 
-function urlActions(kind: { url: string }): Action[] {
+function urlActions(kind: { url: string }, openPath: (path: string) => void): Action[] {
 	return [
 		{ label: "Open URL", shortcut: "Enter", handler: () => openPath(kind.url) },
 		{ label: "Copy URL", handler: () => copyText(kind.url) },
 	];
 }
 
-function taskActions(item: LauncherItem): Action[] {
+function taskActions(item: LauncherItem, openPath: (path: string) => void): Action[] {
 	return [
 		{
 			label: "Open in App",
@@ -251,7 +269,7 @@ function taskActions(item: LauncherItem): Action[] {
 	];
 }
 
-function noteActions(item: LauncherItem): Action[] {
+function noteActions(item: LauncherItem, openPath: (path: string) => void): Action[] {
 	return [
 		{
 			label: "Open in App",
@@ -273,7 +291,10 @@ function calculatorActions(kind: KindOf<"calculator">): Action[] {
 	];
 }
 
-function contactActions(kind: KindOf<"contact">): Action[] {
+function contactActions(
+	kind: KindOf<"contact">,
+	openPath: (path: string) => void,
+): Action[] {
 	const actions: Action[] = [];
 	const { email, phone } = kind;
 	if (email)
@@ -298,7 +319,7 @@ function executeActions(item: LauncherItem): Action[] {
 	];
 }
 
-function sshActions(kind: KindOf<"sshHost">): Action[] {
+function sshActions(kind: KindOf<"sshHost">, openPath: (path: string) => void): Action[] {
 	const sshCmd = kind.user
 		? `ssh ${kind.user}@${kind.host}`
 		: `ssh ${kind.host}`;
