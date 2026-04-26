@@ -98,7 +98,8 @@ pub async fn init(
     // bypassed the bridge (e.g. a CLI mutation, or the MCP child running
     // with the bridge socket unreachable). 5s cadence is conservative —
     // this is a safety net, not a primary signal.
-    let dv_token = core.storage_pool
+    let dv_token = core
+        .storage_pool
         .start_data_version_watcher(
             channels.domain_event_bus.clone(),
             std::time::Duration::from_secs(5),

@@ -174,7 +174,6 @@ pub struct CronStatusResponse {
     pub next_wake_at_ms: Option<i64>,
 }
 
-
 #[cfg(test)]
 mod phase4_kind_tests {
     use super::*;
@@ -193,9 +192,21 @@ mod phase4_kind_tests {
 
     #[test]
     fn parse_coding_kinds() {
-        assert!(matches!(EntityKind::parse("coding_fact"), Some(EntityKind::CodingFact)));
-        assert!(matches!(EntityKind::parse("codingfact"), Some(EntityKind::CodingFact)));
-        assert!(matches!(EntityKind::parse("coding_episode"), Some(EntityKind::CodingEpisode)));
-        assert!(matches!(EntityKind::parse("codingepisode"), Some(EntityKind::CodingEpisode)));
+        assert!(matches!(
+            EntityKind::parse("coding_fact"),
+            Some(EntityKind::CodingFact)
+        ));
+        assert!(matches!(
+            EntityKind::parse("codingfact"),
+            Some(EntityKind::CodingFact)
+        ));
+        assert!(matches!(
+            EntityKind::parse("coding_episode"),
+            Some(EntityKind::CodingEpisode)
+        ));
+        assert!(matches!(
+            EntityKind::parse("codingepisode"),
+            Some(EntityKind::CodingEpisode)
+        ));
     }
 }

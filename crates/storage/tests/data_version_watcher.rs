@@ -58,7 +58,10 @@ async fn watcher_fires_when_other_pool_writes() {
         .expect("bus closed");
     match evt {
         DomainEvent::DataVersionBumped { previous, current } => {
-            assert!(current > previous, "current ({current}) should exceed previous ({previous})");
+            assert!(
+                current > previous,
+                "current ({current}) should exceed previous ({previous})"
+            );
         }
         other => panic!("unexpected event: {other:?}"),
     }
@@ -83,10 +86,7 @@ async fn watcher_does_not_fire_without_writes() {
         .await;
 
     let res = timeout(Duration::from_millis(300), rx.recv()).await;
-    assert!(
-        res.is_err(),
-        "watcher fired despite no writes: {res:?}"
-    );
+    assert!(res.is_err(), "watcher fired despite no writes: {res:?}");
 }
 
 #[tokio::test]

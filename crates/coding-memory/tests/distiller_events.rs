@@ -7,8 +7,8 @@ use storage::StoragePool;
 use tokio::time::{timeout, Duration};
 
 mod harness {
-    use coding_memory::distiller::{Distiller, DistillerConfig, DistillerWriter};
     use coding_ingest::store::IngestEventLogRepo;
+    use coding_memory::distiller::{Distiller, DistillerConfig, DistillerWriter};
     use cognitive::{EpisodicMemoryRepo, SemanticFactRepo};
     use std::sync::Arc;
     use storage::StoragePool;
@@ -18,9 +18,12 @@ mod harness {
         StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
             .await
             .unwrap();
-        StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
-            .await
-            .unwrap();
+        StoragePool::run_feature_migrations(
+            pool.inner(),
+            &coding_memory::coding_memory_migrations(),
+        )
+        .await
+        .unwrap();
         let inner = pool.inner().clone();
         let ingest_repo = Arc::new(IngestEventLogRepo::new(inner.clone()));
         let fact_repo = SemanticFactRepo::new(inner.clone());
@@ -33,8 +36,14 @@ mod harness {
             None,
             None,
         ));
-        Distiller::new(DistillerConfig::default(), ingest_repo, writer, provider, retriever)
-            .with_event_bus(bus)
+        Distiller::new(
+            DistillerConfig::default(),
+            ingest_repo,
+            writer,
+            provider,
+            retriever,
+        )
+        .with_event_bus(bus)
     }
 }
 
@@ -44,7 +53,10 @@ async fn fact_write_publishes_coding_memory_updated() {
     let mut rx = bus.subscribe();
     let d = harness::build(bus.clone()).await;
 
-    let id = d.write_fact_for_test("session-x", "fact text").await.unwrap();
+    let id = d
+        .write_fact_for_test("session-x", "fact text")
+        .await
+        .unwrap();
 
     let evt = timeout(Duration::from_millis(200), rx.recv())
         .await
@@ -52,7 +64,10 @@ async fn fact_write_publishes_coding_memory_updated() {
         .expect("bus closed");
 
     match evt {
-        DomainEvent::CodingMemoryUpdated { kind, id: emitted_id } => {
+        DomainEvent::CodingMemoryUpdated {
+            kind,
+            id: emitted_id,
+        } => {
             assert_eq!(kind, CodingMemoryKind::Fact);
             assert_eq!(emitted_id, id);
         }
@@ -73,7 +88,10 @@ async fn episode_write_publishes_coding_memory_updated() {
         .expect("no event")
         .expect("closed");
     match evt {
-        DomainEvent::CodingMemoryUpdated { kind, id: emitted_id } => {
+        DomainEvent::CodingMemoryUpdated {
+            kind,
+            id: emitted_id,
+        } => {
             assert_eq!(kind, CodingMemoryKind::Episode);
             assert_eq!(emitted_id, id);
         }

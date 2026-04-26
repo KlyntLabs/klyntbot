@@ -1316,7 +1316,10 @@ mod phase4_event_tests {
 
     #[test]
     fn data_version_bumped_serializes() {
-        let evt = DomainEvent::DataVersionBumped { previous: 41, current: 42 };
+        let evt = DomainEvent::DataVersionBumped {
+            previous: 41,
+            current: 42,
+        };
         let v = serde_json::to_value(&evt).unwrap();
         let inner = &v["DataVersionBumped"];
         assert_eq!(inner["previous"], 41);
@@ -1335,7 +1338,10 @@ mod phase4_event_tests {
 
     #[test]
     fn data_version_bumped_belongs_to_general_domain() {
-        let evt = DomainEvent::DataVersionBumped { previous: 0, current: 1 };
+        let evt = DomainEvent::DataVersionBumped {
+            previous: 0,
+            current: 1,
+        };
         assert_eq!(evt.variant_name(), "DataVersionBumped");
         // No specific subsystem owns it; goes to General.
         assert_eq!(evt.domain().as_str(), "general");

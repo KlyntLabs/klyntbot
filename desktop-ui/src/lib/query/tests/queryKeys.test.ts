@@ -83,7 +83,6 @@ describe("queryKeys — phase 2 domains", () => {
   });
 });
 
-
 describe("codingMemory keys", () => {
   it("all is the root", () => {
     expect(qk.codingMemory.all()).toEqual(["codingMemory"]);

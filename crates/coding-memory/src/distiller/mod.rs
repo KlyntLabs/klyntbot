@@ -628,16 +628,17 @@ impl Distiller {
                 source_kind: ProvenanceKind::DistillerLlm,
             },
         };
-        self.inner.writer.write_fact(pf).await.map_err(common::KlyntbotError::from)?;
+        self.inner
+            .writer
+            .write_fact(pf)
+            .await
+            .map_err(common::KlyntbotError::from)?;
         self.publish_memory_updated(bus::CodingMemoryKind::Fact, &id);
         Ok(id)
     }
 
     /// Write a minimal episode and return its id. Used by integration tests.
-    pub async fn write_episode_for_test(
-        &self,
-        session_id: &str,
-    ) -> common::Result<String> {
+    pub async fn write_episode_for_test(&self, session_id: &str) -> common::Result<String> {
         use crate::distiller::writer::PreparedEpisode;
         use crate::scope::{ProvenanceKind, ProvenanceMetadata};
         use cognitive::types::EpisodicMemory;
@@ -677,7 +678,11 @@ impl Distiller {
                 source_kind: ProvenanceKind::DistillerLlm,
             },
         };
-        self.inner.writer.write_episode(ep).await.map_err(common::KlyntbotError::from)?;
+        self.inner
+            .writer
+            .write_episode(ep)
+            .await
+            .map_err(common::KlyntbotError::from)?;
         self.publish_memory_updated(bus::CodingMemoryKind::Episode, &id);
         Ok(id)
     }

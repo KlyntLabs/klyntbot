@@ -50,11 +50,7 @@ const STATIC_ROUTES: ReadonlyArray<readonly [string, QueryKey[]]> = [
   ["bucket:completed", [qk.launcher.dashboard()]],
 ];
 
-const ALL_EVENTS = [
-  "entity:updated",
-  "data:version_bumped",
-  ...STATIC_ROUTES.map(([n]) => n),
-];
+const ALL_EVENTS = ["entity:updated", "data:version_bumped", ...STATIC_ROUTES.map(([n]) => n)];
 
 export async function startTauriEventBridge(
   client: QueryClient,

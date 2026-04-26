@@ -155,7 +155,6 @@ it("focus:state_changed invalidates dndActive too", async () => {
   stop();
 });
 
-
 describe("coding memory + data_version", () => {
   it("entity:updated{kind:'codingFact'} invalidates codingMemory.all()", async () => {
     const client = new QueryClient();
