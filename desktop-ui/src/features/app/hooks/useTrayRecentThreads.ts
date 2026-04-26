@@ -1,3 +1,10 @@
+// NOTE: This hook receives `workspaces` + `threadsByWorkspace` as props from
+// MainApp.tsx, which still owns those slices via local state. When threads
+// are migrated to TanStack Query (a follow-up plan after the chat feature
+// migrates), this hook should be rewritten as a queryClient.getQueryCache()
+// subscriber that listens for `qk.threads.list()` updates and calls
+// setTrayRecentThreads from the cache. Until then it stays as a prop-driven
+// effect.
 import { isTauri } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef } from "react";
 import { setTrayRecentThreads } from "@services/tauri";
