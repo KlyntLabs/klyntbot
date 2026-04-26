@@ -1802,7 +1802,7 @@ export default function MainApp() {
 		terminalDockNode,
 	} = useMainAppLayoutNodes(layoutSurfaces);
 
-	const mainMessagesNode = showWorkspaceHome ? workspaceHomeNode : messagesNode;
+	const mainMessagesNode = showWorkspaceHome && appView !== "chat" ? workspaceHomeNode : messagesNode;
 	const compactThreadConnectionState: "live" | "polling" | "disconnected" =
 		!activeWorkspace?.connected ? "disconnected" : remoteThreadConnectionState;
 	const mainAppShellProps = useMainAppShellProps({
