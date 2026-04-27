@@ -343,6 +343,22 @@ async codingMemoryStatus() : Promise<Result<CodingMemoryStatusResponse, ApiError
     else return { status: "error", error: e  as any };
 }
 },
+async codingMemoryDistillNow(sessionId: string, turnId: string | null) : Promise<Result<unknown, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_distill_now", { sessionId, turnId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryCheckDeadEnds(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_check_dead_ends", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async codingMemoryCliHealth() : Promise<Result<CliHealthRow[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_memory_cli_health") };
@@ -466,6 +482,14 @@ async codingMemoryProjectSkillsForRepo(repoId: string) : Promise<Result<ProjectS
 async cognitiveUserModel() : Promise<Result<UserModelSummaryResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("cognitive_user_model") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveInjectEvent(eventType: string, payload: unknown) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_inject_event", { eventType, payload }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2583,6 +2607,14 @@ async projectCreate(params: ProjectCreateParams) : Promise<Result<ProjectRespons
     else return { status: "error", error: e  as any };
 }
 },
+async projectUpdateInstructions(id: string, instructions: unknown) : Promise<Result<ProjectResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_update_instructions", { id, instructions }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async projectGet(id: string) : Promise<Result<ProjectResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("project_get", { id }) };
@@ -2695,9 +2727,25 @@ async appInfo() : Promise<Result<AppInfoResponse, ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async configGetSection(section: string) : Promise<Result<unknown, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("config_get_section", { section }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async configMarkSetupCompleted() : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("config_mark_setup_completed") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async configUpdateSection(section: string, patch: unknown) : Promise<Result<unknown, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("config_update_section", { section, patch }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3005,6 +3053,14 @@ async viewGetActive() : Promise<Result<ActiveViewResponse, ApiError>> {
 async voiceStartDictation() : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("voice_start_dictation") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceSimulateEvent(event: unknown) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_simulate_event", { event }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

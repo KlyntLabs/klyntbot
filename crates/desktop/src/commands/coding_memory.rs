@@ -134,12 +134,13 @@ pub async fn coding_memory_sensitivity(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_distill_now(
     state: State<'_, Arc<AppCore>>,
     session_id: String,
     turn_id: Option<String>,
-) -> Result<serde_json::Value, ApiError> {
-    state.coding_memory_distill_now(session_id, turn_id).await
+) -> Result<desktop_shared::specta_helpers::JsonValueWrapper, ApiError> {
+    state.coding_memory_distill_now(session_id, turn_id).await.map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
 #[tauri::command]
@@ -176,14 +177,16 @@ pub async fn coding_memory_recall_fetch(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_check_dead_ends(
     state: State<'_, Arc<AppCore>>,
-    args: serde_json::Value,
-) -> Result<serde_json::Value, String> {
+    args: desktop_shared::specta_helpers::JsonValueWrapper,
+) -> Result<desktop_shared::specta_helpers::JsonValueWrapper, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
-    app_core::coding_memory::recall::check_dead_ends_handler(svc, args)
+    app_core::coding_memory::recall::check_dead_ends_handler(svc, args.0)
         .await
         .map_err(|e| e.to_string())
+        .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
 #[tauri::command]

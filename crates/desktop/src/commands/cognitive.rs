@@ -242,12 +242,13 @@ pub async fn coaching_seed_patterns(state: State<'_, Arc<AppCore>>) -> Result<bo
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_inject_event(
     state: State<'_, Arc<AppCore>>,
     event_type: String,
-    payload: serde_json::Value,
+    payload: desktop_shared::specta_helpers::JsonValueWrapper,
 ) -> Result<bool, ApiError> {
-    state.cognitive_inject_event(event_type, payload).await
+    state.cognitive_inject_event(event_type, payload.0).await
 }
 
 #[tauri::command]

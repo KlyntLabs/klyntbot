@@ -58,6 +58,8 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::chat::chat_cancel,
             // coding_memory
             crate::commands::coding_memory::coding_memory_status,
+            crate::commands::coding_memory::coding_memory_distill_now,
+            crate::commands::coding_memory::coding_memory_check_dead_ends,
             crate::commands::coding_memory::coding_memory_cli_health,
             crate::commands::coding_memory::coding_memory_session_replay,
             crate::commands::coding_memory::coding_memory_enable_cli,
@@ -75,6 +77,7 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::coding_memory::coding_memory_project_skills_for_repo,
             // cognitive
             crate::commands::cognitive::cognitive_user_model,
+            crate::commands::cognitive::cognitive_inject_event,
             crate::commands::cognitive::cognitive_facts_list,
             crate::commands::cognitive::cognitive_episodic_list,
             crate::commands::cognitive::cognitive_rules_list,
@@ -365,6 +368,7 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::project_sources::project_source_list,
             // projects
             crate::commands::projects::project_create,
+            crate::commands::projects::project_update_instructions,
             crate::commands::projects::project_get,
             crate::commands::projects::project_update,
             crate::commands::projects::project_delete,
@@ -383,7 +387,9 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::review_stats::review_stats_summary,
             // settings
             crate::commands::settings::app_info,
+            crate::commands::settings::config_get_section,
             crate::commands::settings::config_mark_setup_completed,
+            crate::commands::settings::config_update_section,
             crate::commands::settings::mcp_get_config,
             crate::commands::settings::mcp_add_server,
             crate::commands::settings::mcp_remove_server,
@@ -430,6 +436,7 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::view::view_get_active,
             // voice
             crate::commands::voice::voice_start_dictation,
+            crate::commands::voice::voice_simulate_event,
             crate::commands::voice::voice_stop_dictation,
             crate::commands::voice::voice_list_devices,
             crate::commands::voice::voice_model_status,

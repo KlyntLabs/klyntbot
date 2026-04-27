@@ -3,7 +3,7 @@ use desktop_shared::commands::{
     McpUpdateServerParams,
 };
 use desktop_shared::errors::ApiError;
-use serde_json::Value;
+use desktop_shared::specta_helpers::JsonValueWrapper;
 use std::sync::Arc;
 use tauri::State;
 
@@ -62,8 +62,8 @@ pub async fn app_info(state: State<'_, Arc<AppCore>>) -> Result<AppInfoResponse,
 pub async fn config_get_section(
     state: State<'_, Arc<AppCore>>,
     section: String,
-) -> Result<Value, ApiError> {
-    state.config_get_section(section).await
+) -> Result<JsonValueWrapper, ApiError> {
+    state.config_get_section(section).await.map(JsonValueWrapper)
 }
 
 #[tauri::command]
@@ -71,9 +71,9 @@ pub async fn config_get_section(
 pub async fn config_update_section(
     state: State<'_, Arc<AppCore>>,
     section: String,
-    patch: Value,
-) -> Result<Value, ApiError> {
-    state.config_update_section(section, patch).await
+    patch: JsonValueWrapper,
+) -> Result<JsonValueWrapper, ApiError> {
+    state.config_update_section(section, patch.0).await.map(JsonValueWrapper)
 }
 
 #[tauri::command]

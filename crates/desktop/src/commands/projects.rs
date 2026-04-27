@@ -65,13 +65,14 @@ pub async fn project_archive(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_update_instructions(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-    instructions: serde_json::Value,
+    instructions: desktop_shared::specta_helpers::JsonValueWrapper,
 ) -> Result<ProjectResponse, ApiError> {
-    let (result, updates) = state.project_update_instructions(id, instructions).await?;
+    let (result, updates) = state.project_update_instructions(id, instructions.0).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }

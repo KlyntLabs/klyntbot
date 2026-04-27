@@ -13,6 +13,7 @@
 //! }
 //! ```
 
+use serde::{Deserialize, Serialize};
 use specta::{datatype::DataType, Generics, Type, TypeMap};
 
 /// Renders to TypeScript `unknown`. Use as `#[specta(type = JsonValue)]` on
@@ -20,6 +21,19 @@ use specta::{datatype::DataType, Generics, Type, TypeMap};
 pub struct JsonValue;
 
 impl Type for JsonValue {
+    fn inline(_type_map: &mut TypeMap, _generics: Generics) -> DataType {
+        DataType::Unknown
+    }
+}
+
+/// Newtype wrapper around `serde_json::Value` that implements `specta::Type`.
+///
+/// Use this for command parameters or return types that need to pass arbitrary
+/// JSON when the underlying type is `serde_json::Value`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JsonValueWrapper(pub serde_json::Value);
+
+impl Type for JsonValueWrapper {
     fn inline(_type_map: &mut TypeMap, _generics: Generics) -> DataType {
         DataType::Unknown
     }
