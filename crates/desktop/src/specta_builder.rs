@@ -603,9 +603,8 @@ pub fn build_specta() -> Builder<tauri::Wry> {
 
 /// Returns the set of command names registered in the tauri-specta builder.
 ///
-/// This is the typed subset of all Tauri commands (≈415). The remaining
-/// ~50 commands use raw `serde_json::Value` and are handled by
-/// `tauri::generate_handler![]` directly.
+/// All 465 Tauri commands are typed via tauri-specta. This function exports
+/// the bindings and extracts the command names for parity testing.
 pub fn specta_command_names() -> std::collections::BTreeSet<String> {
     let builder = build_specta();
     let ts = builder
