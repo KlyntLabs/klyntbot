@@ -7,7 +7,6 @@ edition.workspace = true
 common.workspace = true
 config.workspace = true
 storage.workspace = true
-bus.workspace = true
 async-trait.workspace = true
 jiff = { workspace = true }
 uuid = { workspace = true }
