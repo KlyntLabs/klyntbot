@@ -11,7 +11,7 @@ config.workspace = true
 bus.workspace = true
 storage.workspace = true
 tools-core.workspace = true
-extism = "1"
+extism = { workspace = true }
 tokio.workspace = true
 sqlx.workspace = true
 serde.workspace = true

@@ -18,7 +18,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
 cron.workspace = true
-rrule = "0.14"
+rrule = { workspace = true }
 tracing.workspace = true
 thiserror = { workspace = true }
 tokio-util.workspace = true

@@ -26,14 +26,14 @@ jiff = { workspace = true, features = ["serde"] }
 thiserror = { workspace = true }
 blake3 = "1"
 tiktoken-rs = "0.5"
-regex = "1"
+regex = { workspace = true }
 sha2 = { workspace = true }
 dirs = { workspace = true }
 tempfile = { workspace = true }
 
 [dev-dependencies]
 cognitive = { workspace = true }
-proptest = "1"
+proptest = { workspace = true }
 
 [lints]
 workspace = true

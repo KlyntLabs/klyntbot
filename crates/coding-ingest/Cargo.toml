@@ -19,8 +19,8 @@ jiff = { workspace = true, features = ["serde"] }
 thiserror = { workspace = true }
 sqlx = { workspace = true }
 globset = "0.4"
-url = "2.5"
-once_cell = "1"
+url = { workspace = true }
+once_cell = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
