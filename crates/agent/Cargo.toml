@@ -8,7 +8,6 @@ license.workspace = true
 [dependencies]
 activity-log.workspace = true
 autotuner.workspace = true
-aho-corasick.workspace = true
 ai-core.workspace = true
 common.workspace = true
 bus.workspace = true
@@ -37,17 +36,13 @@ tokio = { workspace = true }
 tracing.workspace = true
 uuid = { workspace = true }
 jiff = { workspace = true }
-base64.workspace = true
-mime_guess.workspace = true
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml.workspace = true
 which.workspace = true
 futures-util.workspace = true
 tokio-util.workspace = true
-dirs.workspace = true
 async-trait.workspace = true
-rand.workspace = true
 regex.workspace = true
 sha2.workspace = true
 
