@@ -61,6 +61,7 @@ pub async fn focus_shortcuts_installed() -> Result<bool, ApiError> {
 
 /// Activate a DND focus session ending at `ends_at` (RFC 3339).
 #[tauri::command]
+#[specta::specta]
 pub async fn focus_activate(
     state: State<'_, Arc<AppCore>>,
     mode: FocusMode,
@@ -77,6 +78,7 @@ pub async fn focus_activate(
 
 /// Deactivate the active DND session for `mode`. Idempotent.
 #[tauri::command]
+#[specta::specta]
 pub async fn focus_deactivate(
     state: State<'_, Arc<AppCore>>,
     mode: FocusMode,
@@ -89,6 +91,7 @@ pub async fn focus_deactivate(
 
 /// Extend the active session for `mode`, setting a new end time (RFC 3339).
 #[tauri::command]
+#[specta::specta]
 pub async fn focus_extend(
     state: State<'_, Arc<AppCore>>,
     mode: FocusMode,
@@ -105,6 +108,7 @@ pub async fn focus_extend(
 
 /// Return the current active session for `mode`, or `null` if none.
 #[tauri::command]
+#[specta::specta]
 pub async fn focus_active(
     state: State<'_, Arc<AppCore>>,
     mode: FocusMode,

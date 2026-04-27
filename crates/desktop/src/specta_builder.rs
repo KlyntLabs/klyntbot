@@ -180,6 +180,10 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::finance::finance_daily_spending,
             crate::commands::finance::finance_period_summary,
             // focus
+            crate::commands::focus::focus_activate,
+            crate::commands::focus::focus_active,
+            crate::commands::focus::focus_deactivate,
+            crate::commands::focus::focus_extend,
             crate::commands::focus::focus_install_shortcuts,
             crate::commands::focus::focus_shortcuts_installed,
             // groups

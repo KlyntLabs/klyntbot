@@ -1248,6 +1248,50 @@ async financePeriodSummary(dateFrom: string, dateTo: string) : Promise<Result<Fi
 }
 },
 /**
+ * Activate a DND focus session ending at `ends_at` (RFC 3339).
+ */
+async focusActivate(mode: FocusMode, endsAt: string) : Promise<Result<FocusSession, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_activate", { mode, endsAt }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Return the current active session for `mode`, or `null` if none.
+ */
+async focusActive(mode: FocusMode) : Promise<Result<FocusSession | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_active", { mode }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Deactivate the active DND session for `mode`. Idempotent.
+ */
+async focusDeactivate(mode: FocusMode) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_deactivate", { mode }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Extend the active session for `mode`, setting a new end time (RFC 3339).
+ */
+async focusExtend(mode: FocusMode, newEndsAt: string) : Promise<Result<FocusSession, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_extend", { mode, newEndsAt }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Extract both bundled shortcuts to a temp dir and open them in Shortcuts.app
  * so the user is prompted to add them to their library.
  * 
@@ -4175,6 +4219,8 @@ export type FlashcardSubmitAnswerParams = { cardId: string; userAnswer: string; 
 export type FlashcardUpdateParams = { id: string; front: string; back: string; deck: string; tags: string[] | null; clozeData: unknown | null; vocabData: unknown | null }
 export type FocusDashboard = { taskName: string | null; elapsedSecs: number; targetSecs: number | null; sessionId: string }
 export type FocusDndUnavailablePayload = { message: string }
+export type FocusMode = "dnd"
+export type FocusSession = { id: number; mode: FocusMode; startedAt: string; endsAt: string; endedAt: string | null; alarmId: string | null; source: string }
 export type FocusSessionResponse = { id: string; actionId: string | null; projectId: string | null; sessionType: string; targetMins: number | null; startedAt: string; endedAt: string | null; actualMins: number | null; interruptions: number; qualityScore: number | null; completed: boolean; notes: string | null }
 export type FocusSessionStatusResponse = { active: boolean; sync: FocusSyncPayload | null; session: FocusSessionResponse | null }
 export type FocusStatePayload = { state: string; since: string }

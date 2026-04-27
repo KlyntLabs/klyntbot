@@ -49,13 +49,16 @@ impl FocusSessionRow {
 
 // ── Public domain type ────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FocusSession {
     pub id: i64,
     pub mode: FocusMode,
+    #[specta(type = String)]
     pub started_at: Timestamp,
+    #[specta(type = String)]
     pub ends_at: Timestamp,
+    #[specta(type = Option<String>)]
     pub ended_at: Option<Timestamp>,
     pub alarm_id: Option<String>,
     pub source: String,
