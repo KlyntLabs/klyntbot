@@ -301,6 +301,7 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             // pending_memory
             crate::commands::pending_memory::approve_pending_memory,
             crate::commands::pending_memory::dismiss_pending_memory,
+            crate::commands::pending_memory::list_pending_memories,
             // permissions
             crate::commands::permissions::permissions_check_accessibility,
             crate::commands::permissions::permissions_open_accessibility,
@@ -355,6 +356,7 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::productivity::focus_session_extend_work,
             crate::commands::productivity::focus_session_skip_break,
             crate::commands::productivity::focus_session_take_break,
+            crate::commands::productivity::focus_session_start_break,
             crate::commands::productivity::productivity_patterns,
             crate::commands::productivity::productivity_hourly_breakdown,
             // project_conversations

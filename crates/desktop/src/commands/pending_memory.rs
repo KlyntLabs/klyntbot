@@ -8,10 +8,11 @@ use crate::app_core::AppCore;
 
 // ── Response type ────────────────────────────────────────────────────────
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingMemoryResponse {
     pub id: String,
+    #[specta(type = desktop_shared::specta_helpers::JsonValue)]
     pub fact: serde_json::Value,
     pub reason: String,
     pub created_at: String,
@@ -31,6 +32,7 @@ impl From<cognitive::repos::PendingMemoryRow> for PendingMemoryResponse {
 // ── Commands ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn list_pending_memories(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,

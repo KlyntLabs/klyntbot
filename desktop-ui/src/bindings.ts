@@ -2127,6 +2127,14 @@ async dismissPendingMemory(id: string) : Promise<Result<null, ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async listPendingMemories(limit: number | null) : Promise<Result<PendingMemoryResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_pending_memories", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async permissionsCheckAccessibility() : Promise<Result<boolean, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("permissions_check_accessibility") };
@@ -2530,6 +2538,14 @@ async focusSessionSkipBreak() : Promise<Result<boolean, ApiError>> {
 async focusSessionTakeBreak() : Promise<Result<boolean, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("focus_session_take_break") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusSessionStartBreak() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_session_start_break") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -4129,6 +4145,7 @@ export type ObjectiveCreateParams = { title: string; projectId: string; descript
 export type ObjectiveResponse = { id: string; title: string; status: string; progress: number; projectId: string; keyResults: KeyResultResponse[] | null }
 export type ObjectiveSummaryResponse = { id: string; title: string; progress: number; status: string }
 export type ObjectiveUpdateParams = { id: string; title: string | null; description: string | null; status: string | null; priority: number | null; dueDate: string | null }
+export type PendingMemoryResponse = { id: string; fact: unknown; reason: string; createdAt: string }
 export type PersonaChatMessage = { role: string; content: string }
 export type PersonaChatParams = { noteId: string; personaId: string; personaName: string; personaRole: string; personaTone: string; userMessage: string; history: PersonaChatMessage[] }
 export type PersonaChatResponse = { reply: string }

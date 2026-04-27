@@ -501,6 +501,7 @@ pub async fn focus_session_extend(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn focus_session_start_break(
     timer: State<'_, Arc<FocusTimer>>,
 ) -> Result<bool, ApiError> {
