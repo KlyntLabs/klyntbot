@@ -1,14 +1,13 @@
 /** @vitest-environment jsdom */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { isTauri } from "@tauri-apps/api/core";
 
-const isTauriMock = vi.hoisted(() => vi.fn());
+const isTauriMock = vi.mocked(isTauri);
 const getCurrentWindowMock = vi.hoisted(() => vi.fn());
 const isWindowsPlatformMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@tauri-apps/api/core", () => ({
-  isTauri: isTauriMock,
-}));
+vi.mock("@tauri-apps/api/core");
 
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: getCurrentWindowMock,
