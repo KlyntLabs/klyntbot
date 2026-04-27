@@ -11,21 +11,16 @@ bus.workspace = true
 cognitive.workspace = true
 context_engine.workspace = true
 autotuner.workspace = true
-session.workspace = true
-scheduling.workspace = true
 providers.workspace = true
 feature-tasks.workspace = true
 feature-notes.workspace = true
 feature-finance.workspace = true
 feature-productivity.workspace = true
-feature-learning.workspace = true
 feature-coaching.workspace = true
 activity-log.workspace = true
 agent.workspace = true
 app-core.workspace = true
-ai-core.workspace = true
 tools.workspace = true
-tokio-util = { workspace = true }
 
 async-trait.workspace = true
 jiff = { workspace = true }
