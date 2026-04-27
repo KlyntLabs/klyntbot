@@ -11,11 +11,9 @@ ai-core-macros = { workspace = true }
 bus = { workspace = true }
 common.workspace = true
 config.workspace = true
-storage.workspace = true
 tools-core.workspace = true
 voice-engine.workspace = true
 async-trait.workspace = true
-jiff = { workspace = true }
 serde = { workspace = true }
 serde_json.workspace = true
 tracing.workspace = true
