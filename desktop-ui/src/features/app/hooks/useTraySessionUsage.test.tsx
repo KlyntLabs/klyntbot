@@ -1,15 +1,14 @@
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { isTauri } from "@tauri-apps/api/core";
 import type { RateLimitSnapshot } from "@/types";
 import { buildTraySessionUsage, useTraySessionUsage } from "./useTraySessionUsage";
 
-const isTauriMock = vi.hoisted(() => vi.fn(() => true));
+const isTauriMock = vi.mocked(isTauri);
 const setTraySessionUsageMock = vi.fn();
 
-vi.mock("@tauri-apps/api/core", () => ({
-  isTauri: isTauriMock,
-}));
+vi.mock("@tauri-apps/api/core");
 
 vi.mock("@services/tauri", () => ({
   setTraySessionUsage: (...args: unknown[]) => setTraySessionUsageMock(...args),
