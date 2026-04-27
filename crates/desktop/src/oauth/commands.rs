@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use desktop_shared::commands::{McpConfigResponse, OAuthStartParams};
 use desktop_shared::errors::ApiError;
-use desktop_shared::events::{McpOAuthCompletePayload, MCP_OAUTH_COMPLETE, MCP_OAUTH_ERROR};
+use desktop_shared::events::{McpOAuthCompletePayload, MCP_OAUTH_ERROR};
 use rand::distr::Alphanumeric;
 use rand::Rng;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -215,13 +215,12 @@ pub async fn mcp_oauth_start(
                     }
                 }
 
-                let _ = app.emit(
-                    MCP_OAUTH_COMPLETE,
-                    McpOAuthCompletePayload {
-                        server_name,
-                        provider: provider_id,
-                    },
-                );
+                use tauri_specta::Event;
+                let payload = McpOAuthCompletePayload {
+                    server_name,
+                    provider: provider_id,
+                };
+                let _ = payload.emit(&app);
             }
             Err(e) => {
                 warn!(error = %e, "OAuth token exchange failed");

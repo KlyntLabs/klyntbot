@@ -7,8 +7,7 @@
 use std::sync::Arc;
 
 use desktop_shared::events::{
-    FocusDndUnavailablePayload, FocusSyncPayload, FocusWarningPayload, FOCUS_DND_UNAVAILABLE,
-    FOCUS_PHASE_CHANGED, FOCUS_SYNC, FOCUS_WARNING,
+    FocusDndUnavailablePayload, FocusSyncPayload, FocusWarningPayload, FOCUS_PHASE_CHANGED,
 };
 use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager};
@@ -176,15 +175,14 @@ impl FocusTimer {
             if !was {
                 if let Err(e) = platform_macos::dnd::toggle_dnd() {
                     warn!("Failed to enable DND: {e}");
-                    let _ = app.emit(
-                        FOCUS_DND_UNAVAILABLE,
-                        FocusDndUnavailablePayload {
-                            message: format!(
-                                "Could not enable Do Not Disturb: {e}. \
-                                 Create a Shortcut named 'Toggle Do Not Disturb' to enable this."
-                            ),
-                        },
-                    );
+                    use tauri_specta::Event;
+                    let payload = FocusDndUnavailablePayload {
+                        message: format!(
+                            "Could not enable Do Not Disturb: {e}. \
+                             Create a Shortcut named 'Toggle Do Not Disturb' to enable this."
+                        ),
+                    };
+                    let _ = payload.emit(&app);
                 }
             }
             was
@@ -624,13 +622,12 @@ async fn session_loop(
         {
             warning_shown = true;
             open_tray_window(&app);
-            let _ = app.emit(
-                FOCUS_WARNING,
-                FocusWarningPayload {
-                    phase: phase.as_str().to_string(),
-                    remaining_secs: phase.remaining(),
-                },
-            );
+            use tauri_specta::Event;
+            let payload = FocusWarningPayload {
+                phase: phase.as_str().to_string(),
+                remaining_secs: phase.remaining(),
+            };
+            let _ = payload.emit(&app);
         }
 
         update_tray_title(&app, phase.remaining(), false, truncated_title.as_deref());
@@ -650,17 +647,16 @@ async fn session_loop(
         };
 
         if should_sync {
-            let _ = app.emit(
-                FOCUS_SYNC,
-                build_sync_payload(
-                    &phase,
-                    cycle_position,
-                    &config,
-                    paused,
-                    truncated_title.as_deref(),
-                    dnd_enabled,
-                ),
+            use tauri_specta::Event;
+            let payload = build_sync_payload(
+                &phase,
+                cycle_position,
+                &config,
+                paused,
+                truncated_title.as_deref(),
+                dnd_enabled,
             );
+            let _ = payload.emit(&app);
         }
     }
 }

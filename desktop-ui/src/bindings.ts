@@ -3251,6 +3251,147 @@ async workspaceWriteFile(filename: string, content: string) : Promise<Result<Wor
 /** user-defined events **/
 
 
+export const events = __makeEvents__<{
+activitySwitch: ActivitySwitchPayload,
+activityTick: ActivityTickPayload,
+agentAgentSelected: AgentSelectedPayload,
+agentError: AgentErrorPayload,
+autotunerPromotion: MemoryPromotedPayload,
+bucketCompleted: BucketPayload,
+budgetWarningPayload: BudgetWarningPayload,
+chatMessageAdded: ChatMessagePayload,
+classificationCompletePayload: ClassificationCompletePayload,
+confidenceAssessedPayload: ConfidenceAssessedPayload,
+consensusReachedPayload: ConsensusReachedPayload,
+contentChunkPayload: ContentChunkPayload,
+contextAssembledPayload: ContextAssembledPayload,
+dataVersionBumpedPayload: DataVersionBumpedPayload,
+debateJudgeDecisionPayload: DebateJudgeDecisionPayload,
+debateRoundCompletedPayload: DebateRoundCompletedPayload,
+debateRoundStartedPayload: DebateRoundStartedPayload,
+delegationCompletedPayload: DelegationCompletedPayload,
+delegationStartedPayload: DelegationStartedPayload,
+distractionDetected: DistractionDetectedPayload,
+distractionIntervention: InterventionPayload,
+distractionVerdict: VerdictPayload,
+donePayload: DonePayload,
+enhancementStagePayload: EnhancementStagePayload,
+entityCreatedPayload: EntityCreatedPayload,
+entityUpdated: EntityUpdatedPayload,
+executionStartedPayload: ExecutionStartedPayload,
+focusAutoDetected: AutoFocusPayload,
+focusDndUnavailable: FocusDndUnavailablePayload,
+focusStateChanged: FocusStatePayload,
+focusSync: FocusSyncPayload,
+focusWarning: FocusWarningPayload,
+insightGenerated: InsightPayload,
+interactionRequestPayload: InteractionRequestPayload,
+iterationStartPayload: IterationStartPayload,
+learningEventPayload: LearningEventPayload,
+mcpOauthComplete: McpOAuthCompletePayload,
+mcpServerStatus: McpServerStatusPayload,
+mcpStartupComplete: McpStartupCompletePayload,
+memoryAccessPayload: MemoryAccessPayload,
+messageSegment: MessageSegment,
+personaPerspectivePayload: PersonaPerspectivePayload,
+pipelineStartedPayload: PipelineStartedPayload,
+planGeneratedPayload: PlanGeneratedPayload,
+planStepCompletedPayload: PlanStepCompletedPayload,
+productivityDistraction: DistractionPayload,
+productivityNudge: NudgePayload,
+retrievalEnhancedPayload: RetrievalEnhancedPayload,
+scoreUpdated: ScorePayload,
+skillLoadedPayload: SkillLoadedPayload,
+subagentSpawnedPayload: SubagentSpawnedPayload,
+toolEndPayload: ToolEndPayload,
+toolStartPayload: ToolStartPayload,
+transparencyAgentSelected: TransparencyAgentSelected,
+transparencyClassification: TransparencyClassification,
+transparencyCost: TransparencyCost,
+transparencyData: TransparencyData,
+transparencyDelegation: TransparencyDelegation,
+transparencyEnhancement: TransparencyEnhancement,
+transparencyExecution: TransparencyExecution,
+transparencyLearning: TransparencyLearning,
+transparencyMemoryAccess: TransparencyMemoryAccess,
+transparencyPlan: TransparencyPlan,
+transparencySkill: TransparencySkill,
+transparencySubagent: TransparencySubagent,
+transparencyTiming: TransparencyTiming,
+transparencyTool: TransparencyTool,
+transparencyUsage: TransparencyUsage,
+usageReportPayload: UsageReportPayload
+}>({
+activitySwitch: "activity:switch",
+activityTick: "activity:tick",
+agentAgentSelected: "agent:agent_selected",
+agentError: "agent:error",
+autotunerPromotion: "autotuner:promotion",
+bucketCompleted: "bucket:completed",
+budgetWarningPayload: "budget-warning-payload",
+chatMessageAdded: "chat:message_added",
+classificationCompletePayload: "classification-complete-payload",
+confidenceAssessedPayload: "confidence-assessed-payload",
+consensusReachedPayload: "consensus-reached-payload",
+contentChunkPayload: "content-chunk-payload",
+contextAssembledPayload: "context-assembled-payload",
+dataVersionBumpedPayload: "data-version-bumped-payload",
+debateJudgeDecisionPayload: "debate-judge-decision-payload",
+debateRoundCompletedPayload: "debate-round-completed-payload",
+debateRoundStartedPayload: "debate-round-started-payload",
+delegationCompletedPayload: "delegation-completed-payload",
+delegationStartedPayload: "delegation-started-payload",
+distractionDetected: "distraction:detected",
+distractionIntervention: "distraction:intervention",
+distractionVerdict: "distraction:verdict",
+donePayload: "done-payload",
+enhancementStagePayload: "enhancement-stage-payload",
+entityCreatedPayload: "entity-created-payload",
+entityUpdated: "entity:updated",
+executionStartedPayload: "execution-started-payload",
+focusAutoDetected: "focus:auto_detected",
+focusDndUnavailable: "focus:dnd_unavailable",
+focusStateChanged: "focus:state_changed",
+focusSync: "focus:sync",
+focusWarning: "focus:warning",
+insightGenerated: "insight:generated",
+interactionRequestPayload: "interaction-request-payload",
+iterationStartPayload: "iteration-start-payload",
+learningEventPayload: "learning-event-payload",
+mcpOauthComplete: "mcp:oauth_complete",
+mcpServerStatus: "mcp:server_status",
+mcpStartupComplete: "mcp:startup_complete",
+memoryAccessPayload: "memory-access-payload",
+messageSegment: "message-segment",
+personaPerspectivePayload: "persona-perspective-payload",
+pipelineStartedPayload: "pipeline-started-payload",
+planGeneratedPayload: "plan-generated-payload",
+planStepCompletedPayload: "plan-step-completed-payload",
+productivityDistraction: "productivity:distraction",
+productivityNudge: "productivity:nudge",
+retrievalEnhancedPayload: "retrieval-enhanced-payload",
+scoreUpdated: "score:updated",
+skillLoadedPayload: "skill-loaded-payload",
+subagentSpawnedPayload: "subagent-spawned-payload",
+toolEndPayload: "tool-end-payload",
+toolStartPayload: "tool-start-payload",
+transparencyAgentSelected: "transparency-agent-selected",
+transparencyClassification: "transparency-classification",
+transparencyCost: "transparency-cost",
+transparencyData: "transparency-data",
+transparencyDelegation: "transparency-delegation",
+transparencyEnhancement: "transparency-enhancement",
+transparencyExecution: "transparency-execution",
+transparencyLearning: "transparency-learning",
+transparencyMemoryAccess: "transparency-memory-access",
+transparencyPlan: "transparency-plan",
+transparencySkill: "transparency-skill",
+transparencySubagent: "transparency-subagent",
+transparencyTiming: "transparency-timing",
+transparencyTool: "transparency-tool",
+transparencyUsage: "transparency-usage",
+usageReportPayload: "usage-report-payload"
+})
 
 /** user-defined constants **/
 
@@ -3273,7 +3414,10 @@ export type ActivityBucket = {
 date: string; count: number }
 export type ActivityCategoryResponse = { id: string; name: string; categoryType: string; color: string | null; icon: string | null; isSystem: boolean; rules: CategoryRulesResponse | null }
 export type ActivityEventResponse = { id: string; timestamp: string; source: string; actor: string; resourceName: string | null; action: string; contentPreview: string | null; appName: string | null; durationSecs: number | null }
+export type ActivitySwitchPayload = { fromApp: string | null; toApp: string; toSite: string | null; categoryType: string | null }
+export type ActivityTickPayload = { appName: string; siteName: string | null; categoryType: string | null; isIdle: boolean }
 export type ActivityTimelineResponse = { appName: string; windowTitle: string | null; siteName: string | null; categoryId: string | null; startedAt: string; durationSecs: number | null; isIdle: boolean; projectId: string | null; focusSessionId: string | null }
+export type AgentErrorPayload = { sessionKey: string; message: string }
 /**
  * Content of a single agent file.
  */
@@ -3306,6 +3450,7 @@ hasOverride: boolean }
  * A full agent profile listing with its files.
  */
 export type AgentProfileSummary = { name: string; description: string; isBuiltin: boolean; hasOverride: boolean; files: AgentFileSummary[] }
+export type AgentSelectedPayload = { sessionKey: string; name: string; description: string }
 export type AgentStatusResponse = { status: string; activeTaskCount: number; focusTask: TaskResponse | null }
 export type AiSuggestionResponse = { suggestion: string | null; confidence: number; relatedFactIds: string[] }
 /**
@@ -3385,18 +3530,26 @@ export type BacklinkResponse = { note: NoteResponse; context: string | null }
 export type BadgeKind = "success" | "warn" | "error" | "info"
 export type BrainGrowth = { correctionsCaptured7D: number; trialsEvaluated7D: number; promotedThisWeek: number; status: string }
 export type BrainVersion = { version: number; trialId: string | null; promotedAt: string; params: unknown; reason: string; parentVersion: number | null; metricsAtPromotion: unknown; reverted: boolean }
+export type BucketPayload = { bucketStart: string; productiveSecs: number; distractingSecs: number; dominantApp: string | null }
+export type BudgetWarningPayload = { sessionKey: string; monthlySpendUsd: number; monthlyBudgetUsd: number; usagePercent: number }
 export type CalendarDashboard = { eventId: string; title: string; startsAt: string; endsAt: string; minutesUntil: number }
 export type CaptureStatusResponse = { shellHookInstalled: boolean; fileWatcherActive: boolean; fileWatcherDirectories: string[]; ingestionApiEnabled: boolean; ingestionApiPort: number; eventCounts24H: Partial<{ [key in string]: number }> }
 export type CategoryRulesResponse = { appNames: string[]; bundleIds: string[]; urlPatterns: string[] }
 export type CategoryUsageResponse = { categoryId: string; category: string; categoryType: string; durationSecs: number }
 export type ChampionSummary = { trial_id: string | null; description: string; impact: string; promoted_at: string; days_active: number }
 export type ChangesSummaryResponse = { summary: string }
+export type ChatMessagePayload = { sessionKey: string; 
+/**
+ * Source that produced the message (e.g., "chat", "voice", "mcp", "cron").
+ */
+source: string }
 export type ChatMessageResponse = { id: string; role: string; content: string; timestamp: string; segments?: MessageSegment[] | null; transparency?: TransparencyData | null; personaId?: string | null; personaName?: string | null }
 /**
  * Detailed session response for `chat_get_session`.
  */
 export type ChatSessionResponse = { sessionKey: string; title: string; messageCount: number; createdAt: string; updatedAt: string; projectId: string | null; conversationType: string | null; pinned: boolean; squadId?: string | null }
 export type ChatThreadResponse = { sessionKey: string; title: string; messageCount: number; updatedAt: string; contextType: string | null; entityKind: string | null; entityId: string | null; areaId: string | null; areaName: string | null; projectId: string | null; projectName: string | null; squadId?: string | null; squadName?: string | null; squadIcon?: string | null }
+export type ClassificationCompletePayload = { sessionKey: string; strategy: string; confidence: number; source: string }
 export type CliHealthRow = { cli: string; enabled: boolean; lastEventAt: string | null; eventCount24H: number }
 export type ClipboardContentType = "text" | "image" | "file"
 export type CodingMemoryStatusResponse = { daemonAlive: boolean; bufferedEventCount: number; unprocessedEventCount: number; socketPath: string }
@@ -3408,7 +3561,11 @@ export type ColumnUpdateParams = { id: string; name: string | null; options: str
 export type ColumnValueSetParams = { taskId: string; columnId: string; value: unknown }
 export type CompactionResultResponse = { archivedCount: number; deletedEpisodic: number; rulesDeactivated: number }
 export type ComponentStatusResponse = { name: string; status: string; handlerType: string; notes: string }
+export type ConfidenceAssessedPayload = { sessionKey: string; score: number; action: string }
 export type ConfusableResponse = { hasConfusable: boolean; confusableWord: string | null; confusableMeaning: string | null; explanation: string | null }
+export type ConsensusReachedPayload = { sessionKey: string; round: number; consensusScore: number; summary: string }
+export type ContentChunkPayload = { sessionKey: string; data: string }
+export type ContextAssembledPayload = { sessionKey: string; totalTokens: number; durationMs: number }
 export type ContextResumeResponse = { contextId: string; contextTitle: string; summary: string; suggestedPrompt: string; recentResources: string[] }
 export type ContextSummary = { totalNotes: number; totalWords: number; strongAtoms: number; fadingAtoms: number; 
 /**
@@ -3484,17 +3641,26 @@ export type DailySpending = { date: string; totalSpending: number; txCount: numb
 export type DashboardData = { focus: FocusDashboard | null; calendar: CalendarDashboard[]; tasks: TaskDashboard[]; productivity: ProductivityDashboard }
 export type DashboardIntelligenceResponse = { activeContext: WorkContextSummary | null; focusRecommendation: string | null; sessionSummary: SessionBlock[]; contextSwitches: number; switchQuality: string; productivityScore: number; scoreTrend: number; patterns: string[]; nudges: DashboardNudge[]; resourceClusters: ResourceCluster[] }
 export type DashboardNudge = { message: string; nudgeType: string; priority: string }
+export type DataVersionBumpedPayload = { previous: number; current: number }
+export type DebateJudgeDecisionPayload = { sessionKey: string; round: number; consensusScore: number; decision: string; speakingOrder: string[]; reasoning: string }
+export type DebateRoundCompletedPayload = { sessionKey: string; round: number; consensusScore: number }
+export type DebateRoundStartedPayload = { sessionKey: string; round: number; totalRounds: number; phase: string }
 export type DeckPreferenceResponse = { deck: string; answerMode: string }
 export type DeckSummaryResponse = { name: string; cardCount: number; dueCount: number }
+export type DelegationCompletedPayload = { sessionKey: string; fromAgent: string; toAgent: string; success: boolean; durationMs: number }
+export type DelegationStartedPayload = { sessionKey: string; fromAgent: string; toAgent: string; query: string; depth: number }
 export type DeliveredInterventionResponse = { id: string; interventionType: string; message: string; triggerName: string; timestamp: string }
 export type DetectConfusablesParams = { word: string; sourceLang: string }
 export type DetectedPatternResponse = { name: string; confidence: number; signalCount: number; description: string; domain: string }
 export type DiagnoseResult = { ok: boolean; message: string }
 export type DiffSegmentResponse = { text: string; status: string }
+export type DistractionDetectedPayload = { appName: string; sessionId: string; previousApp: string; previousContext: string; reason: string }
+export type DistractionPayload = { appName: string; sessionId: string }
 export type DistractionResponse = { action: string; appName: string | null }
 export type DomainCount = { domain: string; count: number }
 export type DomainHealthEntry = { domain: string; score: number; totalFacts: number; activeFacts: number; fastFailures: number }
 export type DomainHistory = { domain: string; points: RetentionPoint[] }
+export type DonePayload = { sessionKey: string; content: string }
 /**
  * Bucket for the effectiveness chart.
  */
@@ -3525,6 +3691,12 @@ patternName: string;
 buckets: EffectivenessTrendBucket[] }
 export type EnhancementStagePayload = { name: string; status: string; statusDetail?: string | null; latencyMs: number; llmCalls: number; outputSummary: string }
 export type EnrichAnnotationParams = { annotationId: string; quotedText: string; sourceLang: string; targetLang: string }
+export type EntityCreatedPayload = { sessionKey: string; 
+/**
+ * Raw entity type string from the agent (may not map to a known EntityKind).
+ */
+entityType: string; entityId: string }
+export type EntityKind = "task" | "project" | "objective" | "area" | "keyResult" | "focusSession" | "productivity" | "note" | "notebook" | "finance" | "source" | "conversation" | "mirrorSnippet" | "brainVersion" | "pendingMemory" | "codingFact" | "codingEpisode"
 export type EntityLinkCreateParams = { sourceKind: string; sourceId: string; targetKind: string; targetId: string; linkType: string | null; metadata: unknown | null }
 export type EntityLinkResponse = { id: string; sourceKind: string; sourceId: string; targetKind: string; targetId: string; linkType: string; metadata: unknown | null; createdAt: string }
 export type EntityMergeParams = { keepId: string; mergeId: string }
@@ -3532,10 +3704,12 @@ export type EntityNeighborhoodResponse = { center: EntityResponse; neighbors: En
 export type EntityRelationshipResponse = { entity: EntityResponse; relationshipType: string; strength: number; direction: string }
 export type EntityResponse = { id: string; name: string; entityType: string; description: string | null; mentionCount: number; lastSeenAt: string }
 export type EntitySearchParams = { query: string; entityType: string | null; limit: number | null }
+export type EntityUpdatedPayload = { entityKind: EntityKind; id: string }
 export type EpisodicMemoryResponse = { id: string; domain: string; content: string; summary: string | null; importance: number; occurredAt: string; recordedAt: string; stability: number; accessCount: number }
 export type EvalGrades = { meaning: string; grammar: string; naturalness: string; wordChoice: string }
 export type EvaluateTranslationParams = { sourceText: string; userTranslation: string; sourceLang: string; targetLang: string }
 export type ExecStatus = { kind: "ok" } | { kind: "err"; message: string }
+export type ExecutionStartedPayload = { sessionKey: string; engine: string; maxIterations: number }
 export type ExperimentSummary = { id: string; variant_count: number; messages_scored: number; hypothesis: string; started_at: string }
 export type FabricActionParams = { action: string; payload: unknown }
 export type FabricActionResponse = { success: boolean; message: string | null }
@@ -3592,9 +3766,12 @@ export type FlashcardSaveGeneratedParams = { noteId: string | null; deck: string
 export type FlashcardSubmitAnswerParams = { cardId: string; userAnswer: string; mode: string }
 export type FlashcardUpdateParams = { id: string; front: string; back: string; deck: string; tags: string[] | null; clozeData: unknown | null; vocabData: unknown | null }
 export type FocusDashboard = { taskName: string | null; elapsedSecs: number; targetSecs: number | null; sessionId: string }
+export type FocusDndUnavailablePayload = { message: string }
 export type FocusSessionResponse = { id: string; actionId: string | null; projectId: string | null; sessionType: string; targetMins: number | null; startedAt: string; endedAt: string | null; actualMins: number | null; interruptions: number; qualityScore: number | null; completed: boolean; notes: string | null }
 export type FocusSessionStatusResponse = { active: boolean; sync: FocusSyncPayload | null; session: FocusSessionResponse | null }
+export type FocusStatePayload = { state: string; since: string }
 export type FocusSyncPayload = { phase: string; remainingSecs: number; totalSecs: number; cyclePosition: number; longBreakAfter: number; paused: boolean; actionTitle: string | null; dndActive: boolean }
+export type FocusWarningPayload = { phase: string; remainingSecs: number }
 export type GeneratedCardPreview = { front: string; back: string; cardType: string; tags: string[]; sourceContext: string | null; clozeData: unknown | null; vocabData: unknown | null; difficultyEstimate: number | null; prerequisiteConcepts: string[] | null }
 export type GoalProgressResponse = { id: number; goalType: string; metric: string; targetValue: number; currentValue: number; met: boolean; projectId: string | null }
 export type GradeResultResponse = { score: number | null; suggestedRating: string; gradingMethod: string; explanation: string | null; diffHighlights: DiffSegmentResponse[]; expectedAnswer: string; coachingNudge: string | null; socraticSuggestion: string | null; keyConceptsPresent: string[]; keyConceptsMissing: string[] }
@@ -3611,6 +3788,7 @@ export type InsightChatParams = { noteId: string; tabName: string; userMessage: 
 export type InsightChatStarted = { sessionKey: string; messageId: string }
 export type InsightEvolutionPoint = { version: number; generatedAt: string; flashcardSuccess: number; semanticDrift: number; gapClosure: number; quizScore: number; overallProgress: number; changeNote: string }
 export type InsightEvolutionResponse = { noteId: string; noteTitle: string; versions: InsightEvolutionPoint[] }
+export type InsightPayload = { id: string; insightType: string; title: string; sentiment: string }
 export type InsightQuizSubmitParams = { insightReviewId: string; score: number; total: number }
 export type InsightReviewResponse = { insightReviewId: string; noteId: string; version: number; generatedAt: string; synthesis: string | null; gapAnalysis: string | null; selfAssessment: QuizQuestion[] | null; conceptMap: string | null; perspectives: string | null; personaIds: string[] | null; 
 /**
@@ -3622,7 +3800,10 @@ export type InsightSaveFlashcardsParams = { noteId: string; insightReviewId: str
 export type InsightScopeConfigParams = { scopeType?: string | null; radius: number | null; nodeIds?: string[] | null; includeCognitive: boolean | null; deepDive: boolean | null; mergeThreshold: number | null }
 export type InsightVersionResponse = { id: string; version: number; generatedAt: string; inputHash: string; hasParent: boolean }
 export type IntelligenceSessionResponse = { id: string; sessionType: string; startedAt: string; endedAt: string | null; durationSecs: number | null; dominantCategory: string | null; categoryPurity: number | null; qualityScore: number | null; title: string | null; description: string | null; appBreakdown: string | null; contextSwitches: number; distractionCount: number; source: string }
+export type InteractionRequestPayload = { sessionKey: string; requestId: string; request: unknown }
 export type InterventionLogResponse = { id: string; interventionType: string; message: string; triggerName: string; feedback: string | null; deliveredAt: string; feedbackAt: string | null }
+export type InterventionPayload = { appName: string; windowTitle: string | null; sessionId: string; needsLlm: boolean; heuristicVerdict: string }
+export type IterationStartPayload = { sessionKey: string; iteration: number; maxIterations: number }
 export type KeyResultCreateParams = { objectiveId: string; title: string; targetValue: number | null; unit: string | null; trackingMode: string | null }
 export type KeyResultResponse = { id: string; title: string; progress: number; current: number; target: number; unit: string }
 export type KeyResultSummaryResponse = { id: string; title: string; progress: number }
@@ -3637,6 +3818,7 @@ export type LauncherExecuteResult = { status: ExecStatus; message: string | null
 export type LauncherItem = { id: string; title: string; subtitle: string | null; icon: string | null; kind: LauncherItemKind; score: number; no_view?: boolean; arguments?: ArgSpec[] }
 export type LauncherItemKind = { type: "application"; path: string; running: boolean } | { type: "task"; task_id: string; status: string } | { type: "note"; note_id: string; preview: string } | { type: "clipboardEntry"; entry_id: number; content_type: ClipboardContentType } | { type: "systemCommand"; action: SystemAction } | { type: "script"; path: string; name: string } | { type: "calculator"; expression: string; result: number } | { type: "calendar"; event_id: string; starts_at: string } | { type: "aiChat"; query: string } | { type: "file"; path: string; kind: FileKind } | { type: "contentMatch"; path: string; line: number; preview: string } | { type: "contact"; name: string; email: string | null; phone: string | null } | { type: "systemPref"; pane_id: string } | { type: "runningApp"; pid: number; path: string } | { type: "bookmark"; url: string; browser: string } | { type: "browserHistory"; url: string; visited_at: string } | { type: "brewPackage"; name: string; is_cask: boolean } | { type: "sshHost"; host: string; user: string | null } | { type: "gitRepo"; path: string } | { type: "urlNavigation"; url: string } | { type: "windowAction"; action: WindowAction }
 export type LearnedRuleResponse = { id: number; pattern: string; patternType: string; classification: string; confidence: number; hitCount: number; lastUsedAt: string; createdAt: string }
+export type LearningEventPayload = { sessionKey: string; eventType: string; detail: string }
 export type LinkSuggestionResponse = { note: NoteResponse; score: number; reason: string }
 export type LinkedContextParams = { noteId: string; sectionText: string }
 export type LinkedContextResponse = { semanticFacts: LinkedFact[]; episodicMemories: LinkedMemory[]; relatedAnnotations: AnnotationResponse[]; proceduralRules: LinkedRule[] }
@@ -3645,12 +3827,21 @@ export type LinkedFact = { id: string; subject: string; predicate: string; objec
 export type LinkedMemory = { id: string; content: string; domain: string; createdAt: string }
 export type LinkedRule = { id: string; ruleText: string; domain: string; signalCount: number }
 export type McpConfigResponse = { enabled: boolean; servers: McpServerResponse[] }
+export type McpOAuthCompletePayload = { serverName: string; provider: string }
 export type McpServerResponse = { name: string; transport: string; enabled: boolean; command: string | null; args: string[] | null; env: Partial<{ [key in string]: string }> | null; url: string | null; headers: Partial<{ [key in string]: string }> | null; oauthProvider?: string | null; oauthConnected: boolean }
+export type McpServerStatusPayload = { serverName: string; 
+/**
+ * One of: "starting", "ready", "failed", "skipped"
+ */
+status: string; toolCount?: number | null; error?: string | null }
+export type McpStartupCompletePayload = { ready: number; failed: number; skipped: number }
+export type MemoryAccessPayload = { sessionKey: string; action: string; query: string | null; resultsCount: number }
 /**
  * One row in the Memory Browser panel — flat triple from `semantic_facts`.
  */
 export type MemoryBrowserRow = { id: string; subject: string; predicate: string; object: string }
 export type MemoryHealthResponse = { overall: number; domains: DomainHealthEntry[]; totalFacts90D: number; fastFailures90D: number; trendPct: number | null; computedAt: string }
+export type MemoryPromotedPayload = { sessionKey: string; factId: string; fromScope: string; toScope: string; subject: string; predicate: string }
 export type MemoryReferenceDetail = { refType: string; title: string; subtitle: string; details: Partial<{ [key in string]: string }> }
 export type MemoryStatsResponse = { activeFacts: number; archivedFacts: number; episodicCount: number; rulesCount: number; lastCompaction: string | null }
 /**
@@ -3788,6 +3979,7 @@ icon?: string | null;
  * `None` = don't change, `Some(None)` = clear color, `Some(Some(hex))` = set color
  */
 color?: string | null; parentId?: string | null }
+export type NudgePayload = { nudgeType: string; message: string }
 export type OAuthStartParams = { provider: string; serverName: string }
 export type ObjectiveCreateParams = { title: string; projectId: string; description: string | null; priority: number | null; dueDate: string | null }
 export type ObjectiveResponse = { id: string; title: string; status: string; progress: number; projectId: string; keyResults: KeyResultResponse[] | null }
@@ -3797,7 +3989,11 @@ export type PersonaChatMessage = { role: string; content: string }
 export type PersonaChatParams = { noteId: string; personaId: string; personaName: string; personaRole: string; personaTone: string; userMessage: string; history: PersonaChatMessage[] }
 export type PersonaChatResponse = { reply: string }
 export type PersonaMetaResponse = { id: string; name: string; role: string; icon: string; tone: string }
+export type PersonaPerspectivePayload = { sessionKey: string; personaId: string; personaName: string; personaIcon: string; personaRole: string; content: string; challenge: string | null }
 export type PersonaResponse = { id: string; name: string; role: string; expertise: string; perspective: string; tone: string; icon: string; source: string; domains: string[]; isActive: boolean; relevanceScore: number; createdAt: string; updatedAt: string }
+export type PipelineStartedPayload = { sessionKey: string }
+export type PlanGeneratedPayload = { sessionKey: string; steps: string[]; rawPlan: string }
+export type PlanStepCompletedPayload = { sessionKey: string; stepIndex: number; description: string; toolName: string }
 export type PracticeCompleteParams = { sessionId: string; saveToSr: boolean }
 export type PracticeCompleteResponse = { averageScore: number; weakUnitCount: number; flashcardsCreated: number }
 export type PracticeConfirmParams = { sessionId: string; index: number; finalTranslation: string; confidenceRating: number; edited: boolean; overallGrade: string; scoresJson?: string | null }
@@ -3926,6 +4122,7 @@ export type ReforgeStateResponse = { lastRunAt: string | null; lastRunStats: unk
 export type ResourceCluster = { resources: string[]; accessCount: number }
 export type RetentionHistoryResponse = { overall: RetentionPoint[]; domains: DomainHistory[] }
 export type RetentionPoint = { date: string; avgRetention: number; reviewCount: number }
+export type RetrievalEnhancedPayload = { sessionKey: string; stages: EnhancementStagePayload[]; totalLatencyMs: number; totalLlmCalls: number }
 export type ReviewSessionSaveParams = { sessionId: string; cardsReviewed: number; avgScore: number; durationSeconds: number; modesUsed: string[]; propagationCount: number; weakCardIds: string[]; sessionData: string; 
 /**
  * "completed" | "abandoned"
@@ -3949,6 +4146,7 @@ export type ScopePreviewResponse = { notes: ScopePreviewNote[]; links: ScopePrev
  * Summary of what context the AI will see.
  */
 contextSummary: ContextSummary }
+export type ScorePayload = { score: number; productiveSecs: number; distractingSecs: number }
 export type ScoredNoteResponse = { note: NoteResponse; score: number; reason: string }
 export type SemanticFactResponse = { id: string; domain: string; subject: string; predicate: string; object: string; confidence: number; source: string; validFrom: string; validUntil: string | null; stability: number; retrievability: number; lastAccessed: string | null; accessCount: number; status: string }
 /**
@@ -3990,6 +4188,7 @@ export type ShortcutsConfig = { launcher: string; tray: string }
 export type SignalResponse = { eventType: string; timestamp: string; metadata: string }
 export type SignalWindowResponse = { windowSize: number; signals: SignalResponse[]; triggers: TriggerConditionResponse[] }
 export type SkillListResponse = { skillNames: string[] }
+export type SkillLoadedPayload = { sessionKey: string; name: string; trigger: string; agent?: string | null }
 export type SkillRouteStats = { count: number; percentage: number; avgConfidence: number; topTriggers: string[] }
 export type SkillVersionDetailResponse = { id: string; skillName: string; version: number; filePath: string; content: string; diff: string | null; source: string; reason: string | null; createdAt: string }
 export type SkillVersionResponse = { id: string; skillName: string; version: number; filePath: string; diff: string | null; source: string; reason: string | null; createdAt: string }
@@ -4002,6 +4201,7 @@ export type StatusLabelResponse = { id: string; workflowId: string; name: string
 export type StatusWorkflowResponse = { id: string; name: string; isTemplate: boolean; isGlobalDefault: boolean; labels: StatusLabelResponse[] }
 export type StrategyFeedbackResponse = { strategyType: string; domain: string; timesUsed: number; acceptanceRate: number; effectiveness: number; behavioralPositive: number; behavioralNegative: number }
 export type StrugglingCardResponse = { id: string; front: string; back: string; deck: string; lapses: number; reviewCount: number; sourceNoteId: string | null }
+export type SubagentSpawnedPayload = { sessionKey: string; label: string; profile: string }
 export type SuggestedAction = { BoostSkill: { skill: string } } | "ViewDetails" | { ApproveMetaRule: { rule_id: string } } | { DismissMetaRule: { rule_id: string } } | { KillTrial: { trial_id: string } } | { ContinueTrial: { trial_id: string } } | { RevertBrainVersion: { version: number } } | "Unknown"
 export type SystemAction = "lockScreen" | "sleep" | "restart" | "shutdown" | "emptyTrash" | "toggleDarkMode" | "toggleDoNotDisturb" | "ejectAll"
 export type SystemStatusResponse = { domainBusSubscribers: number; domainBusPublished: number; backgroundServiceRunning: boolean; backgroundEventsProcessed: number; activeFacts: number; episodicCount: number; rulesCount: number; components: ComponentStatusResponse[] }
@@ -4033,6 +4233,8 @@ export type TimelineResponse = { entries: TimelineEntry[]; summary: TimelineSumm
 export type TimelineSource = "productivity" | "focus" | "task" | "todo" | "note" | "finance" | "system" | "calendar"
 export type TimelineSummary = { totalTrackedSecs: number; focusSecs: number; tasksCompleted: number; tasksCreated: number; notesTouched: number; transactionsCount: number; topApps: TopAppSummary[]; sourceBreakdown: SourceBreakdown[] }
 export type TodayTaskResponse = { id: string; title: string; priority: string | null; status: string; completed: boolean; isOverdue: boolean; isDueToday: boolean; dueDisplay: string | null }
+export type ToolEndPayload = { sessionKey: string; name: string; action?: string | null; success: boolean; durationMs: number; result?: string | null; estimatedTokens?: number | null; agent?: string | null }
+export type ToolStartPayload = { sessionKey: string; name: string; action?: string | null; agent?: string | null }
 export type TopAppSummary = { appName: string; durationSecs: number; percentage: number }
 export type TopicDetail = { topicId: string; facts: FactNode[] }
 export type TopicDetailParams = { topicId: string }
@@ -4075,9 +4277,11 @@ export type TrialPreview = { id: string; trialId: string; startedAt: string; pre
 export type TriggerConditionResponse = { name: string; cooldownRemainingSecs: number; lastFired: string | null }
 export type UpdatePersonaParams = { id: string; name: string | null; role: string | null; expertise: string | null; perspective: string | null; tone: string | null; icon: string | null; domains: string[] | null }
 export type UpdateSquadParams = { id: string; name: string | null; description: string | null; icon: string | null; domains: string[] | null; orchestratorSkill: string | null; defaultInteractionMode: string | null }
+export type UsageReportPayload = { sessionKey: string; promptTokens: number; completionTokens: number; cacheReadTokens: number; cacheWriteTokens: number; estimatedCostUsd: number; model: string; responseTimeMs: number }
 export type UserFeedback = "Helpful" | "NotHelpful" | "Dismissed"
 export type UserModelSummaryResponse = { identityCount: number; energyCount: number; workCount: number; financeCount: number; learningCount: number; preferencesCount: number; identityPreview: string[]; energyPreview: string[]; workPreview: string[]; financePreview: string[]; learningPreview: string[]; preferencesPreview: string[] }
 export type UserSituationResponse = { energyLevel: number; focusState: number; deadlinePressure: number; distractionRisk: number; coachingReceptivity: number; taskAvoidanceDetected: boolean; hoursActiveToday: number; minsSinceBreak: number; hourOfDay: number; recentContextSwitches: number }
+export type VerdictPayload = { classification: string; displayText: string }
 export type VocabItem = { word: string; reading: string | null; meaning: string; partOfSpeech: string; exampleSentence: string | null }
 export type VocabularySaveParams = { words: VocabItem[]; noteId: string | null; deck: string }
 export type VoiceConversationStartResponse = { sessionKey: string; sessionTitle: string; isContinuing: boolean }

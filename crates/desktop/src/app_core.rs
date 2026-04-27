@@ -190,6 +190,7 @@ fn wire_event_channels(
                                     timer.stop(&handle).await;
                                 }
 
+                                use tauri_specta::Event;
                                 let payload = events::AutoFocusPayload {
                                     started_at: started_at.to_string(),
                                     ended_at: ended_at.to_string(),
@@ -197,7 +198,7 @@ fn wire_event_channels(
                                     dominant_app,
                                     productive_ratio,
                                 };
-                                if let Err(e) = handle.emit(events::FOCUS_AUTO_DETECTED, payload) {
+                                if let Err(e) = payload.emit(&handle) {
                                     warn!("failed to emit auto-focus ended event: {e}");
                                 }
                             }
@@ -220,31 +221,31 @@ fn wire_event_channels(
                         to_app,
                         to_site,
                         category_type,
-                    } => emit_handle.emit(
-                        events::ACTIVITY_SWITCH,
+                    } => {
+                        use tauri_specta::Event;
                         events::ActivitySwitchPayload {
                             from_app,
                             to_app,
                             to_site,
                             category_type,
-                        },
-                    ),
+                        }.emit(&emit_handle)
+                    }
                     DashboardEvent::ScoreUpdated {
                         score,
                         productive_secs,
                         distracting_secs,
-                    } => emit_handle.emit(
-                        events::SCORE_UPDATED,
+                    } => {
+                        use tauri_specta::Event;
                         events::ScorePayload {
                             score,
                             productive_secs,
                             distracting_secs,
-                        },
-                    ),
-                    DashboardEvent::FocusStateChanged { state, since } => emit_handle.emit(
-                        events::FOCUS_STATE_CHANGED,
-                        events::FocusStatePayload { state, since },
-                    ),
+                        }.emit(&emit_handle)
+                    }
+                    DashboardEvent::FocusStateChanged { state, since } => {
+                        use tauri_specta::Event;
+                        events::FocusStatePayload { state, since }.emit(&emit_handle)
+                    }
                 };
                 if let Err(e) = res {
                     warn!("DashboardEmitter: failed to emit event: {e}");
@@ -258,13 +259,12 @@ fn wire_event_channels(
     // Nudge records → Tauri event
     if let Some(nudge_rx) = channels.nudge_rx {
         spawn_channel_forwarder(nudge_rx, app_handle, shutdown, |handle, nudge| {
-            if let Err(e) = handle.emit(
-                events::PRODUCTIVITY_NUDGE,
-                events::NudgePayload {
-                    nudge_type: nudge.nudge_type.to_string(),
-                    message: nudge.message,
-                },
-            ) {
+            use tauri_specta::Event;
+            let payload = events::NudgePayload {
+                nudge_type: nudge.nudge_type.to_string(),
+                message: nudge.message,
+            };
+            if let Err(e) = payload.emit(handle) {
                 warn!("failed to emit nudge event: {e}");
             }
         });
@@ -304,7 +304,8 @@ fn wire_event_channels(
                 let _ = overlay.show();
                 let _ = overlay.set_focus();
                 // Emit directly to the overlay window
-                if let Err(e) = overlay.emit(events::DISTRACTION_INTERVENTION, &intervention) {
+                use tauri_specta::Event;
+                if let Err(e) = intervention.emit(&overlay) {
                     warn!("failed to emit intervention to overlay: {e}");
                 }
             } else {
@@ -312,7 +313,8 @@ fn wire_event_channels(
             }
 
             // Also broadcast for other listeners (e.g. main window banner)
-            if let Err(e) = handle.emit(events::DISTRACTION_INTERVENTION, intervention) {
+            use tauri_specta::Event;
+            if let Err(e) = intervention.emit(handle) {
                 warn!("failed to broadcast distraction intervention: {e}");
             }
 
@@ -324,7 +326,7 @@ fn wire_event_channels(
                 previous_context: alert.previous_context,
                 reason: "Distracting app detected during focus session".to_string(),
             };
-            if let Err(e) = handle.emit(events::DISTRACTION_DETECTED, detected) {
+            if let Err(e) = detected.emit(handle) {
                 warn!("failed to emit distraction detected: {e}");
             }
         });
@@ -434,7 +436,6 @@ fn wire_event_channels(
         let app_handle_clone = app_handle.clone();
         let token = shutdown.clone();
         tokio::spawn(async move {
-            use tauri::Emitter;
             loop {
                 tokio::select! {
                     _ = token.cancelled() => break,
@@ -444,23 +445,22 @@ fn wire_event_channels(
                                 bus::CodingMemoryKind::Fact => desktop_shared::types::EntityKind::CodingFact,
                                 bus::CodingMemoryKind::Episode => desktop_shared::types::EntityKind::CodingEpisode,
                             };
+                            use tauri_specta::Event;
                             let payload = desktop_shared::events::EntityUpdatedPayload {
                                 entity_kind,
                                 id,
                             };
-                            if let Err(e) = app_handle_clone
-                                .emit(desktop_shared::events::ENTITY_UPDATED, &payload)
-                            {
+                            if let Err(e) = payload.emit(&app_handle_clone) {
                                 tracing::warn!("phase4: failed to emit entity:updated for coding memory: {e}");
                             }
                         }
                         Ok(bus::DomainEvent::DataVersionBumped { previous, current }) => {
-                            // Generic "broad invalidate" signal — payload is informational only.
-                            let payload = serde_json::json!({
-                                "previous": previous,
-                                "current": current,
-                            });
-                            if let Err(e) = app_handle_clone.emit("data:version_bumped", &payload) {
+                            use tauri_specta::Event;
+                            let payload = desktop_shared::events::DataVersionBumpedPayload {
+                                previous,
+                                current,
+                            };
+                            if let Err(e) = payload.emit(&app_handle_clone) {
                                 tracing::warn!("phase4: failed to emit data:version_bumped: {e}");
                             }
                         }

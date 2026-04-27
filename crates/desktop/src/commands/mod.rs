@@ -54,9 +54,9 @@ pub mod workspace;
 #[cfg(debug_assertions)]
 pub(crate) mod dev_helpers;
 
-use desktop_shared::events::{EntityUpdatedPayload, ENTITY_UPDATED};
+use desktop_shared::events::EntityUpdatedPayload;
 use desktop_shared::types::EntityKind;
-use tauri::Emitter;
+use tauri_specta::Event;
 
 pub fn emit_updates(app: &tauri::AppHandle, updates: &[::app_core::EntityUpdate]) {
     for u in updates {
@@ -69,7 +69,7 @@ pub fn emit_entity_updated(app: &tauri::AppHandle, kind: EntityKind, id: &str) {
         entity_kind: kind,
         id: id.to_string(),
     };
-    if let Err(e) = app.emit(ENTITY_UPDATED, &payload) {
+    if let Err(e) = payload.emit(app) {
         tracing::warn!("failed to emit entity:updated event: {e}");
     }
 }
