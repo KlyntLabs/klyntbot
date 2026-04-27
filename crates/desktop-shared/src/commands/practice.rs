@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Segment Extraction ────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeSegmentParams {
     pub note_id: String,
@@ -10,7 +10,7 @@ pub struct PracticeSegmentParams {
     pub target_lang: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeSegment {
     pub index: u32,
@@ -23,7 +23,7 @@ pub struct PracticeSegment {
     pub skipped: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeSegmentResponse {
     pub segments: Vec<PracticeSegment>,
@@ -33,7 +33,7 @@ pub struct PracticeSegmentResponse {
 
 // ── Session Start ─────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeStartParams {
     pub note_id: String,
@@ -44,7 +44,7 @@ pub struct PracticeStartParams {
     pub start_index: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeSessionResponse {
     pub id: String,
@@ -63,7 +63,7 @@ pub struct PracticeSessionResponse {
 
 // ── Submit Translation ────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeSubmitParams {
     pub session_id: String,
@@ -71,7 +71,7 @@ pub struct PracticeSubmitParams {
     pub user_translation: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeEvalResponse {
     #[serde(alias = "overall_grade")]
@@ -87,7 +87,7 @@ pub struct PracticeEvalResponse {
     pub coaching_nudge: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeScores {
     pub meaning: String,
@@ -97,7 +97,7 @@ pub struct PracticeScores {
     pub word_choice: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeCorrection {
     pub original: String,
@@ -107,7 +107,7 @@ pub struct PracticeCorrection {
 
 // ── Confirm Segment ───────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeConfirmParams {
     pub session_id: String,
@@ -120,7 +120,7 @@ pub struct PracticeConfirmParams {
     pub scores_json: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeConfirmResponse {
     pub next_index: u32,
@@ -129,7 +129,7 @@ pub struct PracticeConfirmResponse {
 
 // ── Get / List Sessions ───────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeGetParams {
     #[serde(default)]
@@ -138,7 +138,7 @@ pub struct PracticeGetParams {
     pub note_id: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeListParams {
     pub note_id: String,
@@ -146,14 +146,14 @@ pub struct PracticeListParams {
 
 // ── Complete Session ──────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeCompleteParams {
     pub session_id: String,
     pub save_to_sr: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PracticeCompleteResponse {
     pub average_score: f64,

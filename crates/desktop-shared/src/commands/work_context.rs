@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Work Contexts ─────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkContextResponse {
     pub id: String,
@@ -40,7 +40,7 @@ impl From<activity_log::WorkContext> for WorkContextResponse {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkResourceResponse {
     pub id: String,
@@ -64,7 +64,7 @@ impl From<activity_log::WorkResource> for WorkResourceResponse {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkContextDetailResponse {
     pub context: WorkContextResponse,
@@ -73,7 +73,7 @@ pub struct WorkContextDetailResponse {
     pub recent_events: Vec<ActivityEventResponse>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityEventResponse {
     pub id: String,
@@ -103,7 +103,7 @@ impl From<activity_log::ActivityLogEntry> for ActivityEventResponse {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextTimelineBlockResponse {
     pub context_id: Option<String>,
@@ -116,7 +116,7 @@ pub struct ContextTimelineBlockResponse {
     pub is_idle: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextResumeResponse {
     pub context_id: String,
@@ -126,7 +126,7 @@ pub struct ContextResumeResponse {
     pub recent_resources: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkContextUpdateParams {
     pub id: String,
@@ -138,7 +138,7 @@ pub struct WorkContextUpdateParams {
 
 // ── Inference Stats ──────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InferenceStatsResponse {
     pub active_context_count: i64,
@@ -151,7 +151,7 @@ pub struct InferenceStatsResponse {
     pub last_run_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InferenceConfigUpdate {
     pub assignment_threshold: Option<f64>,
@@ -166,7 +166,7 @@ pub struct InferenceConfigUpdate {
 
 // ── Dashboard Intelligence ───────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardIntelligenceResponse {
     pub active_context: Option<WorkContextSummary>,
@@ -181,7 +181,7 @@ pub struct DashboardIntelligenceResponse {
     pub resource_clusters: Vec<ResourceCluster>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkContextSummary {
     pub id: String,
@@ -192,7 +192,7 @@ pub struct WorkContextSummary {
     pub confidence: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionBlock {
     pub context_type: String,
@@ -201,7 +201,7 @@ pub struct SessionBlock {
     pub color: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardNudge {
     pub message: String,
@@ -209,7 +209,7 @@ pub struct DashboardNudge {
     pub priority: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceCluster {
     pub resources: Vec<String>,

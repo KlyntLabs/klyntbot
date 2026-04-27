@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Finance ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinancePortfolioResponse {
     pub id: String,
@@ -14,13 +14,13 @@ pub struct FinancePortfolioResponse {
     pub holding_count: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceNetWorthResponse {
     pub totals_by_currency: Vec<CurrencyNetWorth>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CurrencyNetWorth {
     pub currency: String,
@@ -44,7 +44,7 @@ impl CurrencyNetWorth {
 
 // ── Finance Mutation Params ───────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceAccountCreateParams {
     pub name: String,
@@ -55,7 +55,7 @@ pub struct FinanceAccountCreateParams {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceAccountUpdateParams {
     pub id: String,
@@ -66,7 +66,7 @@ pub struct FinanceAccountUpdateParams {
     pub is_archived: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceTransactionCreateParams {
     pub account_id: String,
@@ -80,7 +80,7 @@ pub struct FinanceTransactionCreateParams {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceTransactionUpdateParams {
     pub id: String,
@@ -92,7 +92,7 @@ pub struct FinanceTransactionUpdateParams {
     pub tx_date: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceBudgetCreateParams {
     pub name: String,
@@ -106,7 +106,7 @@ pub struct FinanceBudgetCreateParams {
     pub alert_threshold: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceBudgetUpdateParams {
     pub id: String,
@@ -116,7 +116,7 @@ pub struct FinanceBudgetUpdateParams {
     pub is_active: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceGoalCreateParams {
     pub name: String,
@@ -129,7 +129,7 @@ pub struct FinanceGoalCreateParams {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceGoalUpdateParams {
     pub id: String,
@@ -140,7 +140,7 @@ pub struct FinanceGoalUpdateParams {
     pub status: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceLiabilityCreateParams {
     pub name: String,
@@ -154,7 +154,7 @@ pub struct FinanceLiabilityCreateParams {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceLiabilityUpdateParams {
     pub id: String,
@@ -164,7 +164,7 @@ pub struct FinanceLiabilityUpdateParams {
     pub notes: Option<Option<String>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinancePortfolioCreateParams {
     pub name: String,
@@ -172,7 +172,7 @@ pub struct FinancePortfolioCreateParams {
     pub currency: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceInvestmentCreateParams {
     pub portfolio_id: String,
@@ -186,7 +186,7 @@ pub struct FinanceInvestmentCreateParams {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceInvestmentUpdateParams {
     pub id: String,
@@ -198,7 +198,7 @@ pub struct FinanceInvestmentUpdateParams {
 
 // ── Allocation Target Params ─────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceAllocationTargetUpsertParams {
     pub portfolio_id: String,
@@ -209,7 +209,7 @@ pub struct FinanceAllocationTargetUpsertParams {
 
 // ── Investment Transaction Params ────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceInvestmentTxCreateParams {
     pub investment_id: String,
@@ -225,7 +225,7 @@ pub struct FinanceInvestmentTxCreateParams {
 
 // ── Date Range Params ────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceDateRangeParams {
     pub date_from: String,
@@ -234,7 +234,7 @@ pub struct FinanceDateRangeParams {
 
 // ── Finance Filter Params ────────────────────────────────────────────
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceTransactionFilterParams {
     pub account_id: Option<String>,
@@ -248,14 +248,14 @@ pub struct FinanceTransactionFilterParams {
 
 // ── Finance Report Responses ─────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceCategoryReportResponse {
     pub total: i64,
     pub breakdown: Vec<FinanceCategoryBreakdown>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceCategoryBreakdown {
     pub category: String,
@@ -263,7 +263,7 @@ pub struct FinanceCategoryBreakdown {
     pub pct: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceTrendPoint {
     pub period: String,
@@ -271,7 +271,7 @@ pub struct FinanceTrendPoint {
     pub change_pct: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceMonthlySummaryResponse {
     pub current_income: i64,
@@ -280,7 +280,7 @@ pub struct FinanceMonthlySummaryResponse {
     pub previous_spending: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DailySpending {
     pub date: String,
@@ -288,13 +288,13 @@ pub struct DailySpending {
     pub tx_count: i32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceDailySpendingResponse {
     pub days: Vec<DailySpending>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinancePeriodSummaryResponse {
     pub income: i64,

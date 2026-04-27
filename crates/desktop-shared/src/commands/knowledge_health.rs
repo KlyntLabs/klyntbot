@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct KnowledgeHealthSummary {
     pub total_atoms: usize,
@@ -9,7 +9,7 @@ pub struct KnowledgeHealthSummary {
     pub topics: Vec<TopicHealthResponse>,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TopicHealthResponse {
     pub id: String,
@@ -19,13 +19,13 @@ pub struct TopicHealthResponse {
     pub avg_retention: f64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TopicDetailParams {
     pub topic_id: String,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TopicDetailResponse {
     pub topic: TopicHealthResponse,

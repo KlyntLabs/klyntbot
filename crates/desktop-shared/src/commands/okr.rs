@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Objective / Key Result ──────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectiveResponse {
     pub id: String,
@@ -13,7 +13,7 @@ pub struct ObjectiveResponse {
     pub key_results: Option<Vec<KeyResultResponse>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyResultResponse {
     pub id: String,
@@ -24,7 +24,7 @@ pub struct KeyResultResponse {
     pub unit: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectiveCreateParams {
     pub title: String,
@@ -34,7 +34,7 @@ pub struct ObjectiveCreateParams {
     pub due_date: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectiveUpdateParams {
     pub id: String,
@@ -45,7 +45,7 @@ pub struct ObjectiveUpdateParams {
     pub due_date: Option<Option<String>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyResultCreateParams {
     pub objective_id: String,
@@ -55,7 +55,7 @@ pub struct KeyResultCreateParams {
     pub tracking_mode: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyResultUpdateParams {
     pub id: String,

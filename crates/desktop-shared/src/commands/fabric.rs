@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricNote {
     pub id: String,
@@ -12,7 +12,7 @@ pub struct FabricNote {
     pub entity_count: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricLink {
     pub source_id: String,
@@ -20,7 +20,7 @@ pub struct FabricLink {
     pub link_type: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricCommunity {
     pub id: String,
@@ -31,7 +31,7 @@ pub struct FabricCommunity {
     pub member_note_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricGraphBase {
     pub notes: Vec<FabricNote>,
@@ -42,14 +42,14 @@ pub struct FabricGraphBase {
     pub live_pulse_active: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricExpandParams {
     pub layer: String,
     pub scopes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricEntity {
     pub id: String,
@@ -58,7 +58,7 @@ pub struct FabricEntity {
     pub mention_count: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricEntityEdge {
     pub entity_id: String,
@@ -66,14 +66,14 @@ pub struct FabricEntityEdge {
     pub weight: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricEntitiesResponse {
     pub entities: Vec<FabricEntity>,
     pub edges: Vec<FabricEntityEdge>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricTreeNode {
     pub id: String,
@@ -84,14 +84,14 @@ pub struct FabricTreeNode {
     pub level: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricTreeNodesResponse {
     pub note_id: String,
     pub nodes: Vec<FabricTreeNode>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricMember {
     pub note_id: String,
@@ -99,7 +99,7 @@ pub struct FabricMember {
     pub membership_score: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricCommunityDetail {
     pub community_id: String,
@@ -109,7 +109,7 @@ pub struct FabricCommunityDetail {
     pub members: Vec<FabricMember>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase", tag = "type", content = "data")]
 pub enum FabricExpandResponse {
     Entities(FabricEntitiesResponse),
@@ -117,27 +117,29 @@ pub enum FabricExpandResponse {
     CommunityDetail(Vec<FabricCommunityDetail>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricActionParams {
     pub action: String,
+    #[specta(type = crate::specta_helpers::JsonValue)]
     pub payload: serde_json::Value,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricActionResponse {
     pub success: bool,
     pub message: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricGraphEvent {
     #[serde(rename = "type")]
     pub event_type: String,
     pub node_type: String,
     pub id: String,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub data: Option<serde_json::Value>,
     pub animation_hint: String,
     pub intensity: f64,

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Calendar ──────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CalendarEventInput {
     pub title: String,

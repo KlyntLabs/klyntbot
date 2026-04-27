@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SquadResponse {
     pub id: String,
@@ -17,7 +17,7 @@ pub struct SquadResponse {
     pub updated_at: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SquadMemberResponse {
     pub persona_id: String,
@@ -28,7 +28,7 @@ pub struct SquadMemberResponse {
     pub sort_order: i64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSquadParams {
     pub name: String,
@@ -39,7 +39,7 @@ pub struct CreateSquadParams {
     pub member_persona_ids: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSquadParams {
     pub id: String,
@@ -51,7 +51,7 @@ pub struct UpdateSquadParams {
     pub default_interaction_mode: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SquadMemberParams {
     pub squad_id: String,

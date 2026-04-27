@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Notes ──────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteResponse {
     pub id: String,
@@ -24,7 +24,7 @@ pub struct NoteResponse {
 }
 
 /// Lightweight note for list views — excludes body, HTML, split/perspective data.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteListItem {
     pub id: String,
@@ -39,7 +39,7 @@ pub struct NoteListItem {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteCreateParams {
     pub title: String,
@@ -52,13 +52,13 @@ pub struct NoteCreateParams {
     pub color: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteEditingFinishedParams {
     pub note_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteUpdateParams {
     pub id: String,
@@ -99,7 +99,7 @@ where
     Ok(Some(Option::deserialize(deserializer)?))
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotebookUpdateParams {
     pub id: String,
@@ -114,7 +114,7 @@ pub struct NotebookUpdateParams {
     pub parent_id: Option<Option<String>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotebookResponse {
     pub id: String,
@@ -126,14 +126,14 @@ pub struct NotebookResponse {
     pub note_count: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteLinkResponse {
     pub source_id: String,
     pub target_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteVersionResponse {
     pub id: String,
@@ -142,7 +142,7 @@ pub struct NoteVersionResponse {
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NotebookCreateParams {
     pub title: String,
@@ -153,7 +153,7 @@ pub struct NotebookCreateParams {
 
 // ── Hybrid search ────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct HybridSearchResponse {
     pub exact: Vec<NoteResponse>,
@@ -162,13 +162,13 @@ pub struct HybridSearchResponse {
 
 // ── Inbox ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InboxCreateParams {
     pub content: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InboxItemResponse {
     pub id: String,
@@ -179,7 +179,7 @@ pub struct InboxItemResponse {
 
 // ── Suggestions ──────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteSuggestionsResponse {
     pub related_notes: Vec<ScoredNoteResponse>,
@@ -187,7 +187,7 @@ pub struct NoteSuggestionsResponse {
     pub suggested_tags: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ScoredNoteResponse {
     pub note: NoteResponse,
@@ -195,7 +195,7 @@ pub struct ScoredNoteResponse {
     pub reason: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LinkSuggestionResponse {
     pub note: NoteResponse,
@@ -205,7 +205,7 @@ pub struct LinkSuggestionResponse {
 
 // ── Backlinks ─────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct BacklinkResponse {
     pub note: NoteResponse,
@@ -214,7 +214,7 @@ pub struct BacklinkResponse {
 
 // ── Insight Review ───────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightReviewStarted {
     pub insight_review_id: String,
@@ -222,7 +222,7 @@ pub struct InsightReviewStarted {
     pub cached: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightReviewResponse {
     pub insight_review_id: String,
@@ -240,7 +240,7 @@ pub struct InsightReviewResponse {
     pub personas: Vec<PersonaMetaResponse>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PersonaMetaResponse {
     pub id: String,
@@ -250,7 +250,7 @@ pub struct PersonaMetaResponse {
     pub tone: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct QuizQuestion {
     pub id: String,
@@ -265,7 +265,7 @@ pub struct QuizQuestion {
     pub difficulty_score: f64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TabContent {
     pub tab: String,
@@ -275,7 +275,7 @@ pub struct TabContent {
     pub personas: Vec<PersonaMetaResponse>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardResponse {
     pub id: String,
@@ -283,9 +283,13 @@ pub struct FlashcardResponse {
     pub front: String,
     pub back: String,
     pub card_type: String,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub cloze_data: Option<serde_json::Value>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub vocab_data: Option<serde_json::Value>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub image_data: Option<serde_json::Value>,
+    #[specta(type = crate::specta_helpers::JsonValue)]
     pub tags: serde_json::Value,
     pub source_note_id: Option<String>,
     pub source_context: Option<String>,
@@ -298,7 +302,7 @@ pub struct FlashcardResponse {
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightSaveFlashcardsParams {
     pub note_id: String,
@@ -309,7 +313,7 @@ pub struct InsightSaveFlashcardsParams {
 
 // ── Note Retention Health ────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteRetentionHealthResponse {
     pub avg_stability: f64,
@@ -320,7 +324,7 @@ pub struct NoteRetentionHealthResponse {
 
 // ── Struggling Cards ─────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct StrugglingCardResponse {
     pub id: String,
@@ -334,7 +338,7 @@ pub struct StrugglingCardResponse {
 
 // ── Insight Tab Chat ────────────────────────────────────────────
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightChatParams {
     pub note_id: String,
@@ -344,7 +348,7 @@ pub struct InsightChatParams {
     pub squad_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightChatStarted {
     pub session_key: String,
@@ -353,7 +357,7 @@ pub struct InsightChatStarted {
 
 // ── Flashcard Review ──────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DeckSummaryResponse {
     pub name: String,
@@ -361,7 +365,7 @@ pub struct DeckSummaryResponse {
     pub due_count: i64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardReviewParams {
     pub card_id: String,
@@ -369,7 +373,7 @@ pub struct FlashcardReviewParams {
     pub recall_speed_ms: Option<i64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardCreateParams {
     pub deck: String,
@@ -378,11 +382,13 @@ pub struct FlashcardCreateParams {
     pub card_type: String,
     pub tags: Option<Vec<String>>,
     pub source_note_id: Option<String>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub cloze_data: Option<serde_json::Value>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub vocab_data: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardUpdateParams {
     pub id: String,
@@ -390,11 +396,13 @@ pub struct FlashcardUpdateParams {
     pub back: String,
     pub deck: String,
     pub tags: Option<Vec<String>>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub cloze_data: Option<serde_json::Value>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub vocab_data: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardListParams {
     pub deck: String,
@@ -404,7 +412,7 @@ pub struct FlashcardListParams {
 
 // ── Card Generation ─────────────────────────────────────────────
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardGenerateParams {
     /// Generate from a specific note (fetches note content)
@@ -415,7 +423,7 @@ pub struct FlashcardGenerateParams {
     pub deck_hint: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct GeneratedCardPreview {
     pub front: String,
@@ -423,20 +431,22 @@ pub struct GeneratedCardPreview {
     pub card_type: String,
     pub tags: Vec<String>,
     pub source_context: Option<String>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub cloze_data: Option<serde_json::Value>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub vocab_data: Option<serde_json::Value>,
     pub difficulty_estimate: Option<i32>,
     pub prerequisite_concepts: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardGenerateResponse {
     pub cards: Vec<GeneratedCardPreview>,
     pub deck_suggestion: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardSaveGeneratedParams {
     pub note_id: Option<String>,
@@ -446,7 +456,7 @@ pub struct FlashcardSaveGeneratedParams {
 
 // ── Insight Quiz ─────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightQuizSubmitParams {
     pub insight_review_id: String,
@@ -456,7 +466,7 @@ pub struct InsightQuizSubmitParams {
 
 // ── Insight Versions ─────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightVersionResponse {
     pub id: String,
@@ -468,7 +478,7 @@ pub struct InsightVersionResponse {
 
 // ── Insight Evolution ────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightEvolutionResponse {
     pub note_id: String,
@@ -476,7 +486,7 @@ pub struct InsightEvolutionResponse {
     pub versions: Vec<InsightEvolutionPoint>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightEvolutionPoint {
     pub version: i64,
@@ -491,7 +501,7 @@ pub struct InsightEvolutionPoint {
 
 // ── Scenario Challenge ───────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ScenarioChallengeResponse {
     pub title: String,
@@ -504,7 +514,7 @@ pub struct ScenarioChallengeResponse {
 
 // ── Changes Summary ──────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangesSummaryResponse {
     pub summary: String,
@@ -512,7 +522,7 @@ pub struct ChangesSummaryResponse {
 
 // ── Knowledge Growth ─────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct KnowledgeGrowthResponse {
     pub new_facts_count: usize,
@@ -522,7 +532,7 @@ pub struct KnowledgeGrowthResponse {
     pub period_days: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DomainCount {
     pub domain: String,
@@ -531,7 +541,7 @@ pub struct DomainCount {
 
 // ── Insight Scope Preview ────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ScopePreviewResponse {
     pub notes: Vec<ScopePreviewNote>,
@@ -540,7 +550,7 @@ pub struct ScopePreviewResponse {
     pub context_summary: ContextSummary,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ScopePreviewNote {
     pub id: String,
@@ -550,7 +560,7 @@ pub struct ScopePreviewNote {
     pub word_count: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextSummary {
     pub total_notes: u32,
@@ -569,14 +579,14 @@ pub struct ContextSummary {
     pub deep_dive: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ScopePreviewLink {
     pub source_id: String,
     pub target_id: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ScopePreviewParams {
     pub note_id: String,
@@ -586,7 +596,7 @@ pub struct ScopePreviewParams {
 
 // ── Insight Scope Config ─────────────────────────────────────────
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightScopeConfigParams {
     #[serde(default)]
@@ -601,7 +611,7 @@ pub struct InsightScopeConfigParams {
 
 // ── Persona Management ──────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PersonaResponse {
     pub id: String,
@@ -619,7 +629,7 @@ pub struct PersonaResponse {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CreatePersonaParams {
     pub name: String,
@@ -631,7 +641,7 @@ pub struct CreatePersonaParams {
     pub domains: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePersonaParams {
     pub id: String,
@@ -644,14 +654,14 @@ pub struct UpdatePersonaParams {
     pub domains: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SetPersonaPinsParams {
     pub note_id: String,
     pub persona_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RatePersonaParams {
     pub id: String,
@@ -660,7 +670,7 @@ pub struct RatePersonaParams {
 
 // ── Distractor Generation ────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardDistractorParams {
     pub card_id: String,
@@ -672,7 +682,7 @@ fn default_distractor_count() -> usize {
     3
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardDistractorResponse {
     pub distractors: Vec<String>,
@@ -681,7 +691,7 @@ pub struct FlashcardDistractorResponse {
 
 // ── Active Recall Grading ────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardSubmitAnswerParams {
     pub card_id: String,
@@ -689,7 +699,7 @@ pub struct FlashcardSubmitAnswerParams {
     pub mode: String, // "typed" | "voice" | "cloze_fill"
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct GradeResultResponse {
     pub score: Option<f64>,
@@ -704,14 +714,14 @@ pub struct GradeResultResponse {
     pub key_concepts_missing: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DiffSegmentResponse {
     pub text: String,
     pub status: String, // "match" | "missing" | "extra" | "partial"
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardExplainParams {
     pub card_id: String,
@@ -719,7 +729,7 @@ pub struct FlashcardExplainParams {
     pub grade_explanation: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashcardExplainResponse {
     pub explanation: String,
@@ -728,7 +738,7 @@ pub struct FlashcardExplainResponse {
 
 // ── Deck Preference ──────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DeckPreferenceResponse {
     pub deck: String,
@@ -737,7 +747,7 @@ pub struct DeckPreferenceResponse {
 
 // ── Persona Chat ────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PersonaChatParams {
     pub note_id: String,
@@ -749,14 +759,14 @@ pub struct PersonaChatParams {
     pub history: Vec<PersonaChatMessage>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PersonaChatMessage {
     pub role: String,
     pub content: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PersonaChatResponse {
     pub reply: String,
@@ -764,7 +774,7 @@ pub struct PersonaChatResponse {
 
 // ── Recent Learning Sessions ─────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecentLearningSession {
     pub session_key: String,
@@ -775,7 +785,7 @@ pub struct RecentLearningSession {
 
 // ── Review Session ────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ReviewSessionSaveParams {
     pub session_id: String,
@@ -792,28 +802,28 @@ pub struct ReviewSessionSaveParams {
 
 // ── Import / Export ──────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteImportParams {
     pub paths: Vec<String>,
     pub notebook_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteImportResult {
     pub imported: u32,
     pub skipped: Vec<SkippedFile>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SkippedFile {
     pub path: String,
     pub reason: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteExportParams {
     pub note_ids: Option<Vec<String>>,
@@ -822,7 +832,7 @@ pub struct NoteExportParams {
     pub output_filename: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteExportResult {
     pub exported: u32,

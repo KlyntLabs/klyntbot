@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TopicNode {
     pub id: String,
@@ -16,7 +16,7 @@ pub struct TopicNode {
     pub community_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TopicEdge {
     pub source_topic_id: String,
@@ -24,7 +24,7 @@ pub struct TopicEdge {
     pub strength: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CognitiveCommunity {
     pub id: String,
@@ -33,7 +33,7 @@ pub struct CognitiveCommunity {
     pub member_topic_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RuleNode {
     pub id: String,
@@ -43,7 +43,7 @@ pub struct RuleNode {
     pub confidence: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct GraphStats {
     pub total_facts: u32,
@@ -53,7 +53,7 @@ pub struct GraphStats {
     pub avg_convergence: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CognitiveGraphData {
     pub topics: Vec<TopicNode>,
@@ -63,7 +63,7 @@ pub struct CognitiveGraphData {
     pub stats: GraphStats,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FactNode {
     pub id: String,
@@ -77,14 +77,14 @@ pub struct FactNode {
     pub last_accessed: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TopicDetail {
     pub topic_id: String,
     pub facts: Vec<FactNode>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TopicExpandParams {
     pub subject: String,

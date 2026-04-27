@@ -1,6 +1,6 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct MorningBriefingResponse {
     pub streak_days: usize,
@@ -12,7 +12,7 @@ pub struct MorningBriefingResponse {
     pub atoms_created_this_week: i64,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FadingAtomSummary {
     pub id: String,
@@ -21,7 +21,7 @@ pub struct FadingAtomSummary {
     pub domain: String,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TopicSummary {
     pub name: String,

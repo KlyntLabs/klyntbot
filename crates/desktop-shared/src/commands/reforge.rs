@@ -2,15 +2,16 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ReforgeStateResponse {
     pub last_run_at: Option<String>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub last_run_stats: Option<serde_json::Value>,
     pub run_count: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillVersionResponse {
     pub id: String,
@@ -23,7 +24,7 @@ pub struct SkillVersionResponse {
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillVersionDetailResponse {
     pub id: String,
@@ -37,7 +38,7 @@ pub struct SkillVersionDetailResponse {
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillListResponse {
     pub skill_names: Vec<String>,

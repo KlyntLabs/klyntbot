@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Task ────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskResponse {
     pub id: String,
@@ -36,7 +36,7 @@ pub struct TaskResponse {
     pub scheduled_end: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskCreateParams {
     pub title: String,
@@ -56,7 +56,7 @@ pub struct TaskCreateParams {
 
 // ── AI Suggestion ───────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SuggestionResponse {
     pub id: String,
@@ -70,7 +70,7 @@ pub struct SuggestionResponse {
 
 // ── AI Decomposition ────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DecompositionResponse {
     pub id: String,
@@ -82,7 +82,7 @@ pub struct DecompositionResponse {
     pub auto_applied: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PlannedSubtaskResponse {
     pub temp_id: String,
@@ -96,7 +96,7 @@ pub struct PlannedSubtaskResponse {
 
 // ── AI Forecast ────────────────────────────────────────────────────────
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskForecastResponse {
     pub estimated_minutes: i32,
@@ -108,7 +108,7 @@ pub struct TaskForecastResponse {
     pub risks: Vec<ForecastRiskResponse>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ForecastRiskResponse {
     pub kind: String,
@@ -118,7 +118,7 @@ pub struct ForecastRiskResponse {
 
 // ── Today Task (tray view) ──────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TodayTaskResponse {
     pub id: String,
@@ -133,7 +133,7 @@ pub struct TodayTaskResponse {
 
 // ── Task Update ────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskUpdateParams {
     pub id: String,
@@ -158,7 +158,7 @@ pub struct TaskUpdateParams {
 
 // ── Status Workflows ──────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusWorkflowResponse {
     pub id: String,
@@ -168,7 +168,7 @@ pub struct StatusWorkflowResponse {
     pub labels: Vec<StatusLabelResponse>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusLabelResponse {
     pub id: String,
@@ -179,7 +179,7 @@ pub struct StatusLabelResponse {
     pub position: i32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowCreateParams {
     pub name: String,
@@ -187,7 +187,7 @@ pub struct WorkflowCreateParams {
     pub source_workflow_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LabelCreateParams {
     pub workflow_id: String,
@@ -197,7 +197,7 @@ pub struct LabelCreateParams {
     pub position: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LabelUpdateParams {
     pub id: String,
@@ -207,7 +207,7 @@ pub struct LabelUpdateParams {
     pub position: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LabelReorderParams {
     pub workflow_id: String,
@@ -216,7 +216,7 @@ pub struct LabelReorderParams {
 
 // ── Task Groups ─────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskGroupResponse {
     pub id: String,
@@ -227,7 +227,7 @@ pub struct TaskGroupResponse {
     pub task_count: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskGroupCreateParams {
     pub project_id: Option<String>,
@@ -235,7 +235,7 @@ pub struct TaskGroupCreateParams {
     pub color: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskGroupUpdateParams {
     pub id: String,
@@ -244,7 +244,7 @@ pub struct TaskGroupUpdateParams {
     pub position: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskGroupReorderParams {
     pub project_id: Option<String>,
@@ -253,7 +253,7 @@ pub struct TaskGroupReorderParams {
 
 // ── Custom Columns ──────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomColumnResponse {
     pub id: String,
@@ -265,15 +265,16 @@ pub struct CustomColumnResponse {
     pub width: i32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomColumnValueResponse {
     pub task_id: String,
     pub column_id: String,
+    #[specta(type = crate::specta_helpers::JsonValue)]
     pub value: serde_json::Value,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ColumnCreateParams {
     pub project_id: String,
@@ -283,7 +284,7 @@ pub struct ColumnCreateParams {
     pub width: Option<i32>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ColumnUpdateParams {
     pub id: String,
@@ -292,17 +293,18 @@ pub struct ColumnUpdateParams {
     pub width: Option<i32>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ColumnReorderParams {
     pub project_id: String,
     pub ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ColumnValueSetParams {
     pub task_id: String,
     pub column_id: String,
+    #[specta(type = crate::specta_helpers::JsonValue)]
     pub value: serde_json::Value,
 }

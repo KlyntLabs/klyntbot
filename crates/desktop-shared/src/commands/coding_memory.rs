@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CodingMemoryStatusResponse {
     pub daemon_alive: bool,
@@ -9,7 +9,7 @@ pub struct CodingMemoryStatusResponse {
     pub socket_path: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CliHealthRow {
     pub cli: String,
@@ -18,7 +18,7 @@ pub struct CliHealthRow {
     pub event_count_24h: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionReplayEntry {
     pub id: String,
@@ -29,7 +29,7 @@ pub struct SessionReplayEntry {
     pub payload: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnoseResult {
     pub ok: bool,
@@ -37,7 +37,7 @@ pub struct DiagnoseResult {
 }
 
 /// One row in the Memory Browser panel — flat triple from `semantic_facts`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoryBrowserRow {
     pub id: String,
@@ -47,7 +47,7 @@ pub struct MemoryBrowserRow {
 }
 
 /// One bucket in the Activity Timeline panel — daily ingest event count.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityBucket {
     /// ISO-8601 date (YYYY-MM-DD).
@@ -56,7 +56,7 @@ pub struct ActivityBucket {
 }
 
 /// Per-(date × model) cost row.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CostBreakdownRow {
     /// ISO-8601 date (YYYY-MM-DD).
@@ -76,7 +76,7 @@ pub struct CostBreakdownRow {
 }
 
 /// Cost Tracker response — per-row breakdown + aggregate totals.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CostBreakdown {
     pub rows: Vec<CostBreakdownRow>,
@@ -94,7 +94,7 @@ pub struct CostBreakdown {
 }
 
 /// One row in the Sensitivity Inspector panel.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SensitivityRow {
     pub id: String,
@@ -107,7 +107,7 @@ pub struct SensitivityRow {
 }
 
 /// Args for `coding_memory_recall_index`.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecallIndexArgs {
     pub query: String,
@@ -119,7 +119,7 @@ pub struct RecallIndexArgs {
 }
 
 /// Args for `coding_memory_recall_timeline`. One of `ids` or `query` is required.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecallTimelineArgs {
     pub ids: Option<Vec<String>>,
@@ -130,7 +130,7 @@ pub struct RecallTimelineArgs {
 }
 
 /// Args for `coding_memory_recall_fetch`. `includeProvenance` defaults to true.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecallFetchArgs {
     pub ids: Vec<String>,
@@ -142,7 +142,7 @@ pub struct RecallFetchArgs {
 
 /// Args for `coding_memory_check_dead_ends`. `approach` is the candidate fix
 /// being evaluated against historical FixAttempt outcomes.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DeadEndArgs {
     pub approach: String,
@@ -150,7 +150,7 @@ pub struct DeadEndArgs {
 }
 
 /// Args for `coding_memory_recall_facts_as_of`.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FactsAsOfArgs {
     pub subject: String,
@@ -160,7 +160,7 @@ pub struct FactsAsOfArgs {
 }
 
 /// Args for `coding_memory_recall_change_history`.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangeHistoryArgs {
     pub subject: String,
@@ -171,7 +171,7 @@ pub struct ChangeHistoryArgs {
 }
 
 /// Args for `coding_memory_recall_decision_points`.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DecisionPointsArgs {
     pub query: String,
@@ -196,7 +196,7 @@ fn default_true() -> bool {
 
 /// One telemetry row in the Recall Log panel — mirrors
 /// `coding_memory::RecallInvocationRow`. View-shaped DTO for the UI.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecallToolInvocation {
     pub id: String,
@@ -212,7 +212,7 @@ pub struct RecallToolInvocation {
 }
 
 /// Paginated response for `coding_memory_recall_log`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecallLogPage {
     pub rows: Vec<RecallToolInvocation>,
@@ -222,7 +222,7 @@ pub struct RecallLogPage {
 }
 
 /// Args for `coding_memory_recall_log`.
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecallLogArgs {
     pub layer: Option<String>,
@@ -236,7 +236,7 @@ fn default_limit_50() -> i64 {
 }
 
 /// Args for `coding_memory_session_replay_recall_overlay`.
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionRecallOverlayArgs {
     pub session_id: String,
@@ -250,7 +250,7 @@ fn default_limit_200() -> i64 {
 }
 
 /// Args for `coding_memory_mirror_alerts_feed`.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct MirrorAlertsFeedArgs {
     /// Filter by kind (string form of `CodingMirrorAlertKind`).
@@ -264,7 +264,7 @@ pub struct MirrorAlertsFeedArgs {
 }
 
 /// Row in the alerts feed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct MirrorAlertRow {
     /// Snippet id.
@@ -284,7 +284,7 @@ pub struct MirrorAlertRow {
 }
 
 /// Args for `coding_memory_mirror_alert_action`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct MirrorAlertActionArgs {
     /// Alert id.
@@ -294,7 +294,7 @@ pub struct MirrorAlertActionArgs {
 }
 
 /// Bucket for the effectiveness chart.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EffectivenessTrendBucket {
     /// ISO date.
@@ -304,7 +304,7 @@ pub struct EffectivenessTrendBucket {
 }
 
 /// Response for `coding_memory_effectiveness_trends`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EffectivenessTrendsResponse {
     /// Pattern id.
@@ -316,7 +316,7 @@ pub struct EffectivenessTrendsResponse {
 }
 
 /// Args for `coding_memory_reforge_cycle_diff`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ReforgeCycleDiffArgs {
     /// Repo id.
@@ -330,7 +330,7 @@ pub struct ReforgeCycleDiffArgs {
 }
 
 /// Response for `coding_memory_reforge_cycle_diff`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ReforgeCycleDiffResponse {
     /// Left body.
@@ -342,7 +342,7 @@ pub struct ReforgeCycleDiffResponse {
 }
 
 /// Cycle summary row.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ReforgeCycleSummary {
     /// Cycle id.
@@ -356,7 +356,7 @@ pub struct ReforgeCycleSummary {
 }
 
 /// Project-skill row for the in-app skill listing.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSkillRow {
     /// Skill name.

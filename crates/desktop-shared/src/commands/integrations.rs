@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 // ── AI Tool Integration ─────────────────────────────────────────────
 
 /// Info about a detected AI coding tool.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AiToolInfo {
     /// Machine ID (e.g., "claude-code", "cursor").
@@ -19,7 +19,7 @@ pub struct AiToolInfo {
 }
 
 /// Params for installing skills to selected AI tools.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AiToolsInstallParams {
     /// List of tool IDs to install for (e.g., ["claude-code", "cursor"]).
@@ -27,7 +27,7 @@ pub struct AiToolsInstallParams {
 }
 
 /// Result of installing skills to one AI tool.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AiToolInstallResult {
     pub tool_id: String,

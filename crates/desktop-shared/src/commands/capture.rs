@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Capture / Ingestion ───────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct IngestRequest {
     pub source: String,
@@ -12,6 +12,7 @@ pub struct IngestRequest {
     pub resource_name: Option<String>,
     pub action: String,
     pub content_preview: Option<String>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub metadata: Option<serde_json::Value>,
     pub app_name: Option<String>,
     pub project_id: Option<String>,
@@ -51,14 +52,14 @@ impl IngestRequest {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct IngestResponse {
     pub id: Option<String>,
     pub status: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchIngestResponse {
     pub ingested: usize,
@@ -66,7 +67,7 @@ pub struct BatchIngestResponse {
     pub status: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ShellHookStatusResponse {
     pub installed: bool,
@@ -74,7 +75,7 @@ pub struct ShellHookStatusResponse {
     pub rc_file: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureStatusResponse {
     pub shell_hook_installed: bool,

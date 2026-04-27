@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Timeline / Dashboard ──────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TimelineQuery {
     pub start_date: String,
@@ -14,14 +14,14 @@ pub struct TimelineQuery {
     pub tz_offset_mins: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TimelineResponse {
     pub entries: Vec<TimelineEntry>,
     pub summary: TimelineSummary,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TimelineEntry {
     pub id: String,
@@ -35,10 +35,11 @@ pub struct TimelineEntry {
     pub entity_id: Option<String>,
     pub entity_route: Option<String>,
     pub color: String,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub metadata: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum TimelineSource {
     Productivity,
@@ -51,7 +52,7 @@ pub enum TimelineSource {
     Calendar,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum TimelineEntryType {
     AppUsage,
@@ -73,7 +74,7 @@ pub enum TimelineEntryType {
     TaskFieldUpdated,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TimelineSummary {
     pub total_tracked_secs: i64,
@@ -86,7 +87,7 @@ pub struct TimelineSummary {
     pub source_breakdown: Vec<SourceBreakdown>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TopAppSummary {
     pub app_name: String,
@@ -94,7 +95,7 @@ pub struct TopAppSummary {
     pub percentage: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceBreakdown {
     pub source: TimelineSource,

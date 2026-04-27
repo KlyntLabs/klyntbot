@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Annotation CRUD ─────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AnnotationCreateParams {
     pub note_id: String,
@@ -15,7 +15,7 @@ pub struct AnnotationCreateParams {
     pub tags: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AnnotationUpdateParams {
     pub id: String,
@@ -23,7 +23,7 @@ pub struct AnnotationUpdateParams {
     pub tags: Option<String>,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AnnotationResponse {
     pub id: String,
@@ -41,14 +41,14 @@ pub struct AnnotationResponse {
 
 // ── Linked Context ──────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LinkedContextParams {
     pub note_id: String,
     pub section_text: String,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LinkedContextResponse {
     pub semantic_facts: Vec<LinkedFact>,
@@ -57,7 +57,7 @@ pub struct LinkedContextResponse {
     pub procedural_rules: Vec<LinkedRule>,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LinkedFact {
     pub id: String,
@@ -68,7 +68,7 @@ pub struct LinkedFact {
     pub source_note: Option<String>,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LinkedMemory {
     pub id: String,
@@ -77,7 +77,7 @@ pub struct LinkedMemory {
     pub created_at: String,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LinkedRule {
     pub id: String,
@@ -88,7 +88,7 @@ pub struct LinkedRule {
 
 // ── AI Suggestion ───────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AiSuggestionResponse {
     pub suggestion: Option<String>,

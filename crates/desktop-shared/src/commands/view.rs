@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Parameters for setting the active desktop view.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SetActiveViewParams {
     /// Dashboard identifier (e.g., "finance", "tasks", "projects", "notes", "dashboard").
@@ -14,7 +14,7 @@ pub struct SetActiveViewParams {
 }
 
 /// Response when getting the current active view.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ActiveViewResponse {
     pub dashboard: Option<String>,

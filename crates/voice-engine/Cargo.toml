@@ -17,6 +17,7 @@ hound = "3.5"
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+specta = { workspace = true }
 tokio = { workspace = true, features = ["sync", "time", "rt", "fs"] }
 tracing.workspace = true
 jiff.workspace = true

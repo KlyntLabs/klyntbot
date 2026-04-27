@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VoiceConversationStartResponse {
     pub session_key: String,
@@ -10,7 +10,7 @@ pub struct VoiceConversationStartResponse {
     pub is_continuing: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VoiceConversationStatusResponse {
     pub phase: String,

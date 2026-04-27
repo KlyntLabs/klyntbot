@@ -15256,6 +15256,7 @@ dependencies = [
  "reqwest 0.13.2",
  "serde",
  "serde_json",
+ "specta",
  "tempfile",
  "tokio",
  "tracing",

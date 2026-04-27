@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Translation Breakdown ───────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TranslateBreakdownParams {
     pub text: String,
@@ -14,7 +14,7 @@ pub struct TranslateBreakdownParams {
     pub is_selection: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TranslateBreakdownResponse {
     pub translation: String,
@@ -22,7 +22,7 @@ pub struct TranslateBreakdownResponse {
     pub grammar_patterns: Vec<GrammarPattern>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WordBreakdown {
     pub word: String,
@@ -35,7 +35,7 @@ pub struct WordBreakdown {
     pub is_new: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct GrammarPattern {
     pub pattern: String,
@@ -45,7 +45,7 @@ pub struct GrammarPattern {
 
 // ── Translation Evaluation ──────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EvaluateTranslationParams {
     pub source_text: String,
@@ -54,7 +54,7 @@ pub struct EvaluateTranslationParams {
     pub target_lang: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TranslationEvalResponse {
     pub grades: EvalGrades,
@@ -62,7 +62,7 @@ pub struct TranslationEvalResponse {
     pub model_translation: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EvalGrades {
     pub meaning: String,
@@ -71,7 +71,7 @@ pub struct EvalGrades {
     pub word_choice: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Correction {
     pub original: String,
@@ -82,7 +82,7 @@ pub struct Correction {
 
 // ── Vocabulary Save ─────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VocabularySaveParams {
     pub words: Vec<VocabItem>,
@@ -90,7 +90,7 @@ pub struct VocabularySaveParams {
     pub deck: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VocabItem {
     pub word: String,
@@ -102,14 +102,14 @@ pub struct VocabItem {
 
 // ── Confusable Detection ────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DetectConfusablesParams {
     pub word: String,
     pub source_lang: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfusableResponse {
     pub has_confusable: bool,
@@ -120,7 +120,7 @@ pub struct ConfusableResponse {
 
 // ── Annotation Enrichment ───────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EnrichAnnotationParams {
     pub annotation_id: String,
@@ -129,7 +129,7 @@ pub struct EnrichAnnotationParams {
     pub target_lang: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AnnotationEnrichmentResponse {
     pub translation: String,
@@ -138,7 +138,7 @@ pub struct AnnotationEnrichmentResponse {
 
 // ── Quick Translate (popup) ───────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct QuickTranslateParams {
     pub text: String,
@@ -146,7 +146,7 @@ pub struct QuickTranslateParams {
     pub target_lang: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct QuickTranslateResponse {
     pub translation: String,

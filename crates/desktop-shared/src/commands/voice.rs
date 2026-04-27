@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use voice_engine::{EngineKind, VoiceSessionState};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VoiceCaptureInfo {
     pub session_id: String,
@@ -11,7 +11,7 @@ pub struct VoiceCaptureInfo {
     pub state: VoiceSessionState,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VoiceStatusResponse {
     pub state: VoiceSessionState,
@@ -20,7 +20,7 @@ pub struct VoiceStatusResponse {
 }
 
 /// Audio device listing for settings UI.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioDevicesResponse {
     pub input: Vec<String>,
@@ -32,7 +32,7 @@ pub struct AudioDevicesResponse {
 }
 
 /// Per-model download status for settings UI.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VoiceModelStatusResponse {
     pub asr: ModelStatus,
@@ -44,7 +44,7 @@ pub struct VoiceModelStatusResponse {
     pub tts_loaded: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelStatus {
     pub downloaded: bool,

@@ -4,7 +4,7 @@ use crate::events::FocusSyncPayload;
 
 // ── Productivity ───────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProductivitySummaryResponse {
     pub date: String,
@@ -32,7 +32,7 @@ pub struct ProductivitySummaryResponse {
     pub avg_recovery_secs: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AppUsageResponse {
     pub app_name: String,
@@ -40,7 +40,7 @@ pub struct AppUsageResponse {
     pub category: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CategoryUsageResponse {
     pub category_id: String,
@@ -49,7 +49,7 @@ pub struct CategoryUsageResponse {
     pub duration_secs: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TrackedAppResponse {
     pub display_name: String,
@@ -61,7 +61,7 @@ pub struct TrackedAppResponse {
     pub event_count: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectUsageResponse {
     pub project_id: String,
@@ -70,7 +70,7 @@ pub struct ProjectUsageResponse {
     pub color: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProductivityProjectResponse {
     pub id: String,
@@ -81,7 +81,7 @@ pub struct ProductivityProjectResponse {
     pub is_auto_detected: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FocusSessionResponse {
     pub id: String,
@@ -89,7 +89,9 @@ pub struct FocusSessionResponse {
     pub project_id: Option<String>,
     pub session_type: String,
     pub target_mins: Option<i64>,
+    #[specta(type = crate::specta_helpers::Timestamp)]
     pub started_at: jiff::Timestamp,
+    #[specta(type = Option<crate::specta_helpers::Timestamp>)]
     pub ended_at: Option<jiff::Timestamp>,
     pub actual_mins: Option<i64>,
     pub interruptions: i64,
@@ -98,7 +100,7 @@ pub struct FocusSessionResponse {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FocusSessionStatusResponse {
     pub active: bool,
@@ -106,14 +108,14 @@ pub struct FocusSessionStatusResponse {
     pub session: Option<FocusSessionResponse>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DistractionResponse {
     pub action: String,
     pub app_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct IntelligenceSessionResponse {
     pub id: String,
@@ -132,13 +134,14 @@ pub struct IntelligenceSessionResponse {
     pub source: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityTimelineResponse {
     pub app_name: String,
     pub window_title: Option<String>,
     pub site_name: Option<String>,
     pub category_id: Option<String>,
+    #[specta(type = crate::specta_helpers::Timestamp)]
     pub started_at: jiff::Timestamp,
     pub duration_secs: Option<i64>,
     pub is_idle: bool,
@@ -146,7 +149,7 @@ pub struct ActivityTimelineResponse {
     pub focus_session_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityCategoryResponse {
     pub id: String,
@@ -158,7 +161,7 @@ pub struct ActivityCategoryResponse {
     pub rules: Option<CategoryRulesResponse>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CategoryRulesResponse {
     pub app_names: Vec<String>,
@@ -166,7 +169,7 @@ pub struct CategoryRulesResponse {
     pub url_patterns: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct GoalProgressResponse {
     pub id: i64,
@@ -178,13 +181,14 @@ pub struct GoalProgressResponse {
     pub project_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TimeEntryResponse {
     pub id: i64,
     pub description: String,
     pub category_id: Option<String>,
     pub project_id: Option<String>,
+    #[specta(type = crate::specta_helpers::Timestamp)]
     pub started_at: jiff::Timestamp,
     pub duration_secs: i64,
     pub source: String,
@@ -192,7 +196,7 @@ pub struct TimeEntryResponse {
 
 // ── Insight Cards ─────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightCardResponse {
     pub id: String,
@@ -204,12 +208,13 @@ pub struct InsightCardResponse {
     pub baseline_value: Option<f64>,
     pub date: String,
     pub dismissed: bool,
+    #[specta(type = crate::specta_helpers::Timestamp)]
     pub generated_at: jiff::Timestamp,
 }
 
 // ── Weekly Assessment ──────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WeeklyAssessmentResponse {
     pub id: String,
@@ -225,7 +230,7 @@ pub struct WeeklyAssessmentResponse {
 
 // ── Productivity Patterns ────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProductivityPatternsResponse {
     pub peak_focus_hours: Vec<u32>,
@@ -238,7 +243,7 @@ pub struct ProductivityPatternsResponse {
 
 // ── Hourly Breakdown ─────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct HourlyBreakdownResponse {
     pub hour: u32,
@@ -252,7 +257,7 @@ pub struct HourlyBreakdownResponse {
 
 // ── Distraction ────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LearnedRuleResponse {
     pub id: i64,

@@ -25,7 +25,7 @@ impl Default for Language {
 }
 
 /// Which transcription engine produced the result.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum EngineKind {
     Local,

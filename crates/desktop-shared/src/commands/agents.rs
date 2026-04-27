@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Summary of a single agent file (AGENT.md or a skill).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentFileSummary {
     /// e.g. "AGENT.md" or "skills/todo.md"
@@ -17,7 +17,7 @@ pub struct AgentFileSummary {
 }
 
 /// A full agent profile listing with its files.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentProfileSummary {
     pub name: String,
@@ -28,7 +28,7 @@ pub struct AgentProfileSummary {
 }
 
 /// Content of a single agent file.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentFileContent {
     pub agent_name: String,
