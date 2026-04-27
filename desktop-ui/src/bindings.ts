@@ -479,6 +479,70 @@ async codingMemoryProjectSkillsForRepo(repoId: string) : Promise<Result<ProjectS
     else return { status: "error", error: e  as any };
 }
 },
+async codingMemoryRecallIndex(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_index", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallTimeline(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_timeline", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallFetch(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_fetch", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallFactsAsOf(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_facts_as_of", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallChangeHistory(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_change_history", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallDecisionPoints(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_decision_points", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallLog(args: RecallLogArgs) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_log", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemorySessionReplayRecallOverlay(args: SessionRecallOverlayArgs) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_session_replay_recall_overlay", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async cognitiveUserModel() : Promise<Result<UserModelSummaryResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("cognitive_user_model") };
@@ -4520,6 +4584,10 @@ export type QuickTranslateParams = { text: string; sourceLang: string; targetLan
 export type QuickTranslateResponse = { translation: string; words: WordBreakdown[] }
 export type QuizQuestion = { id: string; type: string; question: string; choices: string[] | null; correctAnswer: string; explanation: string; sourceNotes: string[]; difficulty: string; difficultyScore: number }
 export type RatePersonaParams = { id: string; helpful: boolean }
+/**
+ * Args for `coding_memory_recall_log`.
+ */
+export type RecallLogArgs = { layer: string | null; limit?: number; offset?: number }
 export type RecentLearningSession = { sessionKey: string; title: string; updatedAt: string; preview: string }
 /**
  * Args for `coding_memory_reforge_cycle_diff`.
@@ -4622,6 +4690,10 @@ export type SessionBlock = { contextType: string; totalDurationMins: number; ses
  * Optional session context sent from the frontend alongside a chat message.
  */
 export type SessionContextInput = { entityKind: string | null; entityId: string | null; contextType: string | null; isEphemeral: boolean | null; squadId: string | null }
+/**
+ * Args for `coding_memory_session_replay_recall_overlay`.
+ */
+export type SessionRecallOverlayArgs = { sessionId: string; limit?: number; offset?: number }
 export type SessionReplayEntry = { id: string; source: string; sessionId: string; kind: string; occurredAt: string; payload: string }
 export type SessionSummaryResponse = { key: string; title: string | null; conversationType: string | null; updatedAt: string }
 /**

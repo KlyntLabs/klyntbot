@@ -144,36 +144,42 @@ pub async fn coding_memory_distill_now(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_index(
     state: State<'_, Arc<AppCore>>,
-    args: serde_json::Value,
-) -> Result<serde_json::Value, String> {
+    args: desktop_shared::specta_helpers::JsonValueWrapper,
+) -> Result<desktop_shared::specta_helpers::JsonValueWrapper, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
-    app_core::coding_memory::recall::recall_index_handler(svc, args)
+    app_core::coding_memory::recall::recall_index_handler(svc, args.0)
         .await
         .map_err(|e| e.to_string())
+        .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_timeline(
     state: State<'_, Arc<AppCore>>,
-    args: serde_json::Value,
-) -> Result<serde_json::Value, String> {
+    args: desktop_shared::specta_helpers::JsonValueWrapper,
+) -> Result<desktop_shared::specta_helpers::JsonValueWrapper, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
-    app_core::coding_memory::recall::recall_timeline_handler(svc, args)
+    app_core::coding_memory::recall::recall_timeline_handler(svc, args.0)
         .await
         .map_err(|e| e.to_string())
+        .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_fetch(
     state: State<'_, Arc<AppCore>>,
-    args: serde_json::Value,
-) -> Result<serde_json::Value, String> {
+    args: desktop_shared::specta_helpers::JsonValueWrapper,
+) -> Result<desktop_shared::specta_helpers::JsonValueWrapper, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
-    app_core::coding_memory::recall::recall_fetch_handler(svc, args)
+    app_core::coding_memory::recall::recall_fetch_handler(svc, args.0)
         .await
         .map_err(|e| e.to_string())
+        .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
 #[tauri::command]
@@ -190,63 +196,77 @@ pub async fn coding_memory_check_dead_ends(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_facts_as_of(
     state: State<'_, Arc<AppCore>>,
-    args: serde_json::Value,
-) -> Result<serde_json::Value, String> {
+    args: desktop_shared::specta_helpers::JsonValueWrapper,
+) -> Result<desktop_shared::specta_helpers::JsonValueWrapper, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
-    app_core::coding_memory::recall::recall_facts_as_of_handler(svc, args)
+    app_core::coding_memory::recall::recall_facts_as_of_handler(svc, args.0)
         .await
         .map_err(|e| e.to_string())
+        .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_change_history(
     state: State<'_, Arc<AppCore>>,
-    args: serde_json::Value,
-) -> Result<serde_json::Value, String> {
+    args: desktop_shared::specta_helpers::JsonValueWrapper,
+) -> Result<desktop_shared::specta_helpers::JsonValueWrapper, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
-    app_core::coding_memory::recall::recall_change_history_handler(svc, args)
+    app_core::coding_memory::recall::recall_change_history_handler(svc, args.0)
         .await
         .map_err(|e| e.to_string())
+        .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_decision_points(
     state: State<'_, Arc<AppCore>>,
-    args: serde_json::Value,
-) -> Result<serde_json::Value, String> {
+    args: desktop_shared::specta_helpers::JsonValueWrapper,
+) -> Result<desktop_shared::specta_helpers::JsonValueWrapper, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
-    app_core::coding_memory::recall::recall_decision_points_handler(svc, args)
+    app_core::coding_memory::recall::recall_decision_points_handler(svc, args.0)
         .await
         .map_err(|e| e.to_string())
+        .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_log(
     state: State<'_, Arc<AppCore>>,
     args: RecallLogArgs,
-) -> Result<Vec<coding_memory::RecallInvocationRow>, String> {
+) -> Result<desktop_shared::specta_helpers::JsonValueWrapper, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
-    app_core::coding_memory::recall::recall_log_handler(svc, args.layer, args.limit, args.offset)
+    let rows = app_core::coding_memory::recall::recall_log_handler(svc, args.layer, args.limit, args.offset)
         .await
+        .map_err(|e| e.to_string())?;
+    serde_json::to_value(rows)
+        .map(desktop_shared::specta_helpers::JsonValueWrapper)
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_session_replay_recall_overlay(
     state: State<'_, Arc<AppCore>>,
     args: SessionRecallOverlayArgs,
-) -> Result<Vec<coding_memory::RecallInvocationRow>, String> {
+) -> Result<desktop_shared::specta_helpers::JsonValueWrapper, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
-    app_core::coding_memory::recall::session_recall_overlay_handler(
+    let rows = app_core::coding_memory::recall::session_recall_overlay_handler(
         svc,
         args.session_id,
         args.limit,
         args.offset,
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+    serde_json::to_value(rows)
+        .map(desktop_shared::specta_helpers::JsonValueWrapper)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
