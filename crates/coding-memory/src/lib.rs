@@ -40,6 +40,8 @@ pub mod retrieval_skills;
 pub mod scope;
 /// `MemorySink` trait + `InProcessSink` / `IngestSocketSink` stubs.
 pub mod sink;
+/// Tree-sitter symbol extraction (Phase 6).
+pub mod symbols;
 /// Project skill evolver — Detect, Synthesize, Write, Journal, Supersede.
 pub mod skill_evolver;
 /// Scope-aware skill store extension + project skill evolution.
@@ -62,6 +64,7 @@ pub use reforge::{
 pub use retrieval_skills::{
     BudgetTier, EscalationContext, EscalationOutcome, RetrievalSkill, RetrievalSkillRegistry,
 };
+pub use symbols::{Language, SymbolExtractor, TreeSitterExtractor};
 
 use tools_core::FeatureMigration;
 
