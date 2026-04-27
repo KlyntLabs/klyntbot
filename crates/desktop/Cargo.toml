@@ -14,11 +14,8 @@ tauri-build = { version = "2", features = [] }
 app-core = { workspace = true }
 autotuner = { workspace = true }
 coding-ingest = { workspace = true }
-coding-memory = { workspace = true }
 desktop-shared = { workspace = true }
-agent = { workspace = true }
 bus = { workspace = true }
-channels = { workspace = true }
 cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }
@@ -28,10 +25,8 @@ klyntbot-server = { workspace = true }
 dashmap = { workspace = true }
 feature-productivity = { workspace = true }
 platform-macos = { workspace = true }
-providers = { workspace = true }
 session = { workspace = true }
 storage = { workspace = true }
-tools = { workspace = true }
 voice-engine = { workspace = true }
 tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
 tauri-plugin-global-shortcut = "2"
