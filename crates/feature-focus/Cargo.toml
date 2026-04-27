@@ -15,7 +15,6 @@ specta = { workspace = true }
 sqlx = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }
-tracing = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
