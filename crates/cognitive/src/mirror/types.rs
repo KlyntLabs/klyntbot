@@ -234,14 +234,23 @@ pub struct MetaRule {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, specta::Type)]
 pub enum MetaRuleAction {
-    AdjustRouting { skill: String, direction: String },
+    AdjustRouting {
+        skill: String,
+        direction: String,
+    },
     ForceClarification,
-    SwitchMode { mode: String },
-    CreateExperiment { hypothesis: String },
-    SurfaceInsight { message: String },
+    SwitchMode {
+        mode: String,
+    },
+    CreateExperiment {
+        hypothesis: String,
+    },
+    SurfaceInsight {
+        message: String,
+    },
     Custom {
         #[specta(type = crate::specta_helpers::JsonValue)]
-        payload: serde_json::Value
+        payload: serde_json::Value,
     },
 }
 

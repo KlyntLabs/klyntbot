@@ -2,8 +2,8 @@ use desktop_shared::commands::{
     AppInfoResponse, McpAddServerParams, McpConfigResponse, McpRemoveParams, McpToggleParams,
     McpUpdateServerParams,
 };
-use desktop_shared::CommandResult;
 use desktop_shared::specta_helpers::JsonValueWrapper;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -63,7 +63,10 @@ pub async fn config_get_section(
     state: State<'_, Arc<AppCore>>,
     section: String,
 ) -> CommandResult<JsonValueWrapper> {
-    state.config_get_section(section).await.map(JsonValueWrapper)
+    state
+        .config_get_section(section)
+        .await
+        .map(JsonValueWrapper)
 }
 
 #[tauri::command]
@@ -73,7 +76,10 @@ pub async fn config_update_section(
     section: String,
     patch: JsonValueWrapper,
 ) -> CommandResult<JsonValueWrapper> {
-    state.config_update_section(section, patch.0).await.map(JsonValueWrapper)
+    state
+        .config_update_section(section, patch.0)
+        .await
+        .map(JsonValueWrapper)
 }
 
 #[tauri::command]

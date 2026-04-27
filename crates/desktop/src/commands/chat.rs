@@ -128,10 +128,7 @@ pub async fn chat_delete_stale_sessions(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn chat_cancel(
-    state: State<'_, Arc<AppCore>>,
-    session_key: String,
-) -> CommandResult<()> {
+pub async fn chat_cancel(state: State<'_, Arc<AppCore>>, session_key: String) -> CommandResult<()> {
     state.chat_cancel(session_key).await
 }
 

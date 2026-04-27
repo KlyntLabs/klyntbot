@@ -15,10 +15,7 @@ pub async fn list_squads(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<Sq
 
 #[tauri::command]
 #[specta::specta]
-pub async fn get_squad(
-    state: State<'_, Arc<AppCore>>,
-    id: String,
-) -> CommandResult<SquadResponse> {
+pub async fn get_squad(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<SquadResponse> {
     state.get_squad(&id).await
 }
 

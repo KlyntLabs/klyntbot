@@ -23,9 +23,7 @@ pub async fn view_clear_active(state: State<'_, Arc<AppCore>>) -> CommandResult<
 
 #[tauri::command]
 #[specta::specta]
-pub async fn view_get_active(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<ActiveViewResponse> {
+pub async fn view_get_active(state: State<'_, Arc<AppCore>>) -> CommandResult<ActiveViewResponse> {
     state.view_get_active().await
 }
 

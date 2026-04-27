@@ -72,7 +72,9 @@ pub async fn project_update_instructions(
     id: String,
     instructions: desktop_shared::specta_helpers::JsonValueWrapper,
 ) -> CommandResult<ProjectResponse> {
-    let (result, updates) = state.project_update_instructions(id, instructions.0).await?;
+    let (result, updates) = state
+        .project_update_instructions(id, instructions.0)
+        .await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }

@@ -44,10 +44,7 @@ pub async fn note_list(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn note_get(
-    state: State<'_, Arc<AppCore>>,
-    id: String,
-) -> CommandResult<NoteResponse> {
+pub async fn note_get(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<NoteResponse> {
     state.note_get(id).await
 }
 
@@ -181,9 +178,7 @@ pub async fn note_save_attachment(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn notebook_list(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<NotebookResponse>> {
+pub async fn notebook_list(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<NotebookResponse>> {
     state.notebook_list().await
 }
 
@@ -315,9 +310,7 @@ pub async fn inbox_create(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn inbox_list(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<InboxItemResponse>> {
+pub async fn inbox_list(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<InboxItemResponse>> {
     state.inbox_list().await
 }
 
@@ -604,10 +597,7 @@ pub async fn flashcard_list_cards(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn flashcard_delete(
-    state: State<'_, Arc<AppCore>>,
-    id: String,
-) -> CommandResult<bool> {
+pub async fn flashcard_delete(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<bool> {
     state.flashcard_delete(&id).await
 }
 

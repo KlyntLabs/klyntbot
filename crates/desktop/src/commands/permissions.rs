@@ -1,7 +1,7 @@
 //! macOS permission check commands.
 
-use desktop_shared::CommandResult;
 use desktop_shared::permissions;
+use desktop_shared::CommandResult;
 
 #[tauri::command]
 #[specta::specta]

@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{McpConfigResponse, OAuthStartParams};
-use desktop_shared::{errors::ApiError, CommandResult};
 use desktop_shared::events::{McpOAuthCompletePayload, MCP_OAUTH_ERROR};
+use desktop_shared::{errors::ApiError, CommandResult};
 use rand::distr::Alphanumeric;
 use rand::Rng;
 use tauri::{AppHandle, Emitter, Manager, State};

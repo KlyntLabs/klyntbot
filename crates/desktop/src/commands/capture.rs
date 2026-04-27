@@ -23,25 +23,19 @@ pub async fn capture_shell_hook_status(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn capture_install_shell_hook(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<String> {
+pub async fn capture_install_shell_hook(state: State<'_, Arc<AppCore>>) -> CommandResult<String> {
     state.install_shell_hook().await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn capture_uninstall_shell_hook(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<String> {
+pub async fn capture_uninstall_shell_hook(state: State<'_, Arc<AppCore>>) -> CommandResult<String> {
     state.uninstall_shell_hook().await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn capture_get_ingestion_token(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<String> {
+pub async fn capture_get_ingestion_token(state: State<'_, Arc<AppCore>>) -> CommandResult<String> {
     state.get_ingestion_token().await
 }
 

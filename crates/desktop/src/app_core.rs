@@ -228,7 +228,8 @@ fn wire_event_channels(
                             to_app,
                             to_site,
                             category_type,
-                        }.emit(&emit_handle)
+                        }
+                        .emit(&emit_handle)
                     }
                     DashboardEvent::ScoreUpdated {
                         score,
@@ -240,7 +241,8 @@ fn wire_event_channels(
                             score,
                             productive_secs,
                             distracting_secs,
-                        }.emit(&emit_handle)
+                        }
+                        .emit(&emit_handle)
                     }
                     DashboardEvent::FocusStateChanged { state, since } => {
                         use tauri_specta::Event;

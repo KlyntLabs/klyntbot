@@ -88,9 +88,7 @@ pub async fn task_list_children(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn today_tasks(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<TodayTaskResponse>> {
+pub async fn today_tasks(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<TodayTaskResponse>> {
     state.today_tasks().await
 }
 

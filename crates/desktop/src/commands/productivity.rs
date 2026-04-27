@@ -8,8 +8,8 @@ use desktop_shared::commands::{
     IntelligenceSessionResponse, ProductivityPatternsResponse, ProductivityProjectResponse,
     ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse, WeeklyAssessmentResponse,
 };
-use desktop_shared::{errors::ApiError, CommandResult};
 use desktop_shared::events::AutoFocusPayload;
+use desktop_shared::{errors::ApiError, CommandResult};
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -287,8 +287,8 @@ pub async fn productivity_auto_focus_end(
     state: State<'_, Arc<AppCore>>,
     event: desktop_shared::specta_helpers::JsonValueWrapper,
 ) -> CommandResult<FocusSessionResponse> {
-    let event: feature_productivity::auto_focus::AutoFocusEvent = serde_json::from_value(event.0)
-        .map_err(|e| ApiError::new("BAD_REQUEST", e.to_string()))?;
+    let event: feature_productivity::auto_focus::AutoFocusEvent =
+        serde_json::from_value(event.0).map_err(|e| ApiError::new("BAD_REQUEST", e.to_string()))?;
     state.productivity_auto_focus_end(event).await
 }
 
@@ -420,7 +420,11 @@ pub async fn focus_session_start(
 
     // Start persistent session in AppCore
     let session = state
-        .productivity_focus_start(params.action_id.clone(), None, Some(params.work_secs as i64 / 60))
+        .productivity_focus_start(
+            params.action_id.clone(),
+            None,
+            Some(params.work_secs as i64 / 60),
+        )
         .await?;
 
     // Start the desktop timer (phase state machine)
@@ -496,9 +500,7 @@ pub async fn focus_session_extend(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn focus_session_start_break(
-    timer: State<'_, Arc<FocusTimer>>,
-) -> CommandResult<bool> {
+pub async fn focus_session_start_break(timer: State<'_, Arc<FocusTimer>>) -> CommandResult<bool> {
     Ok(timer.send_command(SessionCommand::StartBreak).await)
 }
 

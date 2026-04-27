@@ -26,8 +26,7 @@ fn bindings_are_current() {
     let bindings_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../desktop-ui/src/bindings.ts");
 
-    let on_disk = std::fs::read_to_string(&bindings_path)
-        .unwrap_or_else(|_| String::new());
+    let on_disk = std::fs::read_to_string(&bindings_path).unwrap_or_else(|_| String::new());
 
     if on_disk != generated {
         // Write the new file so the developer can `git diff` it.

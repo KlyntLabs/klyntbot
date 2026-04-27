@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use desktop_shared::{errors::ApiError, CommandResult};
 use desktop_shared::types::EntityKind;
+use desktop_shared::{errors::ApiError, CommandResult};
 use tauri::State;
 
 use crate::app_core::AppCore;

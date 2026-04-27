@@ -11,9 +11,7 @@ use crate::app_core::AppCore;
 
 #[tauri::command]
 #[specta::specta]
-pub async fn fabric_graph_base(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<FabricGraphBase> {
+pub async fn fabric_graph_base(state: State<'_, Arc<AppCore>>) -> CommandResult<FabricGraphBase> {
     state.fabric_graph_base().await
 }
 

@@ -140,7 +140,10 @@ pub async fn coding_memory_distill_now(
     session_id: String,
     turn_id: Option<String>,
 ) -> CommandResult<desktop_shared::specta_helpers::JsonValueWrapper> {
-    state.coding_memory_distill_now(session_id, turn_id).await.map(desktop_shared::specta_helpers::JsonValueWrapper)
+    state
+        .coding_memory_distill_now(session_id, turn_id)
+        .await
+        .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
 #[tauri::command]
@@ -241,9 +244,14 @@ pub async fn coding_memory_recall_log(
     args: RecallLogArgs,
 ) -> Result<desktop_shared::specta_helpers::JsonValueWrapper, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
-    let rows = app_core::coding_memory::recall::recall_log_handler(svc, args.layer, args.limit, args.offset)
-        .await
-        .map_err(|e| e.to_string())?;
+    let rows = app_core::coding_memory::recall::recall_log_handler(
+        svc,
+        args.layer,
+        args.limit,
+        args.offset,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     serde_json::to_value(rows)
         .map(desktop_shared::specta_helpers::JsonValueWrapper)
         .map_err(|e| e.to_string())

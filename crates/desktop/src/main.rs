@@ -36,12 +36,12 @@ fn configure_mimalloc() {
     }
 }
 
-use desktop::{
-    app_core, claude_code_integration, commands, focus_timer, lazy_window, oauth,
-    shortcuts, specta_builder, tray_countdown,
-};
 #[cfg(debug_assertions)]
 use desktop::dev_server;
+use desktop::{
+    app_core, claude_code_integration, commands, focus_timer, lazy_window, oauth, shortcuts,
+    specta_builder, tray_countdown,
+};
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;

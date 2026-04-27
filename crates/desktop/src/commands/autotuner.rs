@@ -54,10 +54,7 @@ pub async fn autotuner_resume(state: State<'_, Arc<AppCore>>) -> CommandResult<(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn autotuner_set_pace(
-    state: State<'_, Arc<AppCore>>,
-    pace: String,
-) -> CommandResult<()> {
+pub async fn autotuner_set_pace(state: State<'_, Arc<AppCore>>, pace: String) -> CommandResult<()> {
     state.autotuner_set_pace(&pace).await
 }
 
@@ -69,9 +66,7 @@ pub async fn autotuner_get_toast_count(state: State<'_, Arc<AppCore>>) -> Comman
 
 #[tauri::command]
 #[specta::specta]
-pub async fn autotuner_increment_toast_count(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<i64> {
+pub async fn autotuner_increment_toast_count(state: State<'_, Arc<AppCore>>) -> CommandResult<i64> {
     state.autotuner_increment_toast_count().await
 }
 

@@ -84,9 +84,7 @@ pub async fn finance_investments_filtered(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn finance_goals(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<FinanceGoalRow>> {
+pub async fn finance_goals(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<FinanceGoalRow>> {
     state.finance_goals().await
 }
 

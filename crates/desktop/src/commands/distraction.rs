@@ -54,10 +54,7 @@ pub async fn distraction_learned_rules(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn distraction_delete_rule(
-    state: State<'_, Arc<AppCore>>,
-    id: i64,
-) -> CommandResult<()> {
+pub async fn distraction_delete_rule(state: State<'_, Arc<AppCore>>, id: i64) -> CommandResult<()> {
     state.distraction_delete_rule(id).await
 }
 

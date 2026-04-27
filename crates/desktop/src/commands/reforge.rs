@@ -8,9 +8,7 @@ use crate::app_core::AppCore;
 
 #[tauri::command]
 #[specta::specta]
-pub async fn reforge_state(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<ReforgeStateResponse> {
+pub async fn reforge_state(state: State<'_, Arc<AppCore>>) -> CommandResult<ReforgeStateResponse> {
     state.reforge_state().await
 }
 

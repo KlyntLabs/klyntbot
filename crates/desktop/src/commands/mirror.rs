@@ -4,8 +4,8 @@ use cognitive::mirror::{
     BrainVersion, FeedbackTarget, MirrorResponse, MirrorState, NarrativeSnippet, RoutingSnapshot,
     TrendNarrative, UserFeedback,
 };
-use desktop_shared::{errors::ApiError, CommandResult};
 use desktop_shared::types::EntityKind;
+use desktop_shared::{errors::ApiError, CommandResult};
 use tauri::State;
 use uuid::Uuid;
 

@@ -54,9 +54,7 @@ pub async fn cognitive_memory_stats(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn memory_health(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<MemoryHealthResponse> {
+pub async fn memory_health(state: State<'_, Arc<AppCore>>) -> CommandResult<MemoryHealthResponse> {
     state.memory_health().await
 }
 
