@@ -1289,6 +1289,14 @@ async launcherOpenApp(path: string) : Promise<Result<null, ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async launcherClipboardPaste(id: number) : Promise<Result<ClipboardEntry | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_clipboard_paste", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getMirrorState() : Promise<Result<MirrorState, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_mirror_state") };
@@ -2322,6 +2330,22 @@ async productivityTimeEntryCreate(description: string, durationMins: number, cat
 async productivityTimeEntryDelete(id: number) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("productivity_time_entry_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityCalendarEvents(date: string) : Promise<Result<CalendarEvent[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_calendar_events", { date }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async calendarSyncEvents(events: CalendarEventInput[]) : Promise<Result<CalendarEvent[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("calendar_sync_events", { events }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3590,6 +3614,8 @@ export type BrainVersion = { version: number; trialId: string | null; promotedAt
 export type BucketPayload = { bucketStart: string; productiveSecs: number; distractingSecs: number; dominantApp: string | null }
 export type BudgetWarningPayload = { sessionKey: string; monthlySpendUsd: number; monthlyBudgetUsd: number; usagePercent: number }
 export type CalendarDashboard = { eventId: string; title: string; startsAt: string; endsAt: string; minutesUntil: number }
+export type CalendarEvent = { id: string; calendarId: string; title: string; description: string | null; startedAt: string; endedAt: string; location: string | null; attendeesCount: number; isRecurring: boolean; recurrenceId: string | null; source: string; externalUid: string; sessionId: string | null; color: string | null; syncedAt: string; createdAt: string; updatedAt: string }
+export type CalendarEventInput = { title: string; startedAt: string; endedAt: string; externalUid: string; calendarId: string | null; description: string | null; location: string | null; attendeesCount: number | null; isRecurring: boolean | null; recurrenceId: string | null; source: string | null; color: string | null }
 export type CaptureStatusResponse = { shellHookInstalled: boolean; fileWatcherActive: boolean; fileWatcherDirectories: string[]; ingestionApiEnabled: boolean; ingestionApiPort: number; eventCounts24H: Partial<{ [key in string]: number }> }
 export type CategoryRulesResponse = { appNames: string[]; bundleIds: string[]; urlPatterns: string[] }
 export type CategoryUsageResponse = { categoryId: string; category: string; categoryType: string; durationSecs: number }
@@ -3609,6 +3635,7 @@ export type ChatThreadResponse = { sessionKey: string; title: string; messageCou
 export type ClassificationCompletePayload = { sessionKey: string; strategy: string; confidence: number; source: string }
 export type CliHealthRow = { cli: string; enabled: boolean; lastEventAt: string | null; eventCount24H: number }
 export type ClipboardContentType = "text" | "image" | "file"
+export type ClipboardEntry = { id: number; content: string; content_type: string; source_app: string | null; preview: string | null; file_path: string | null; pinned: boolean; created_at: string }
 export type CodingMemoryStatusResponse = { daemonAlive: boolean; bufferedEventCount: number; unprocessedEventCount: number; socketPath: string }
 export type CognitiveCommunity = { id: string; name: string; color: string; memberTopicIds: string[] }
 export type CognitiveGraphData = { topics: TopicNode[]; edges: TopicEdge[]; communities: CognitiveCommunity[]; rules: RuleNode[]; stats: GraphStats }

@@ -11,6 +11,7 @@ tools-core = { path = "../tools-core" }
 jiff = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+specta = { workspace = true }
 sqlx = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true, features = ["fs", "process"] }

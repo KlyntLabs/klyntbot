@@ -389,7 +389,7 @@ pub struct CategorizationCacheEntry {
     pub expires_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct CalendarEvent {
     pub id: String,

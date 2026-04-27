@@ -190,6 +190,7 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::launcher::launcher_system_command,
             crate::commands::launcher::launcher_window_action,
             crate::commands::launcher::launcher_open_app,
+            crate::commands::launcher::launcher_clipboard_paste,
             // mirror
             crate::commands::mirror::get_mirror_state,
             crate::commands::mirror::get_routing_history,
@@ -329,6 +330,8 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::productivity::productivity_goal_toggle,
             crate::commands::productivity::productivity_time_entry_create,
             crate::commands::productivity::productivity_time_entry_delete,
+            crate::commands::productivity::productivity_calendar_events,
+            crate::commands::productivity::calendar_sync_events,
             crate::commands::productivity::productivity_category_upsert,
             crate::commands::productivity::productivity_category_delete,
             crate::commands::productivity::productivity_recategorize_app,

@@ -375,6 +375,7 @@ pub async fn productivity_weekly_assessment(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_calendar_events(
     state: State<'_, Arc<AppCore>>,
     date: String,
@@ -383,6 +384,7 @@ pub async fn productivity_calendar_events(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn calendar_sync_events(
     state: State<'_, Arc<AppCore>>,
     events: Vec<desktop_shared::commands::CalendarEventInput>,
