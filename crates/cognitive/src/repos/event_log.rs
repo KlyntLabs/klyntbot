@@ -11,7 +11,7 @@ pub struct EventLogRepo {
 }
 
 /// A persisted domain event row.
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, specta::Type)]
 pub struct DomainEventRow {
     pub id: String,
     pub event_type: String,
@@ -22,7 +22,7 @@ pub struct DomainEventRow {
 }
 
 /// A persisted pipeline event row.
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, specta::Type)]
 pub struct PipelineEventRow {
     pub id: String,
     pub event_kind: String,

@@ -53,3 +53,57 @@ Non-blocking issues deferred for later. Not part of any active plan; pick up onc
 **Next steps:**
 - Not a bug. To exercise in test: either wait for real usage over days, or write a one-off integration test that seeds many episodic memories, forces `record_co_retrieval` with repeated fact pairs, and asserts `co_activation.strength >= 2.0` triggers a `CoActivationStrengthened` event.
 
+---
+
+## 4. Launcher: `FocusDashboard` widget — decide whether to remove backend or implement
+
+**Observed (2026-04-27):** Backend `build_dashboard_data()` populates `DashboardData.focus: Option<FocusDashboard>` (active session, elapsed/target seconds, task name) but the React `Dashboard.tsx` never renders a focus widget. User has indicated they do **not** want the focus dashboard shown in the launcher.
+
+**Scope:** Backend code at `crates/app-core/src/handlers/launcher/dashboard.rs:19-48` and `FocusDashboard` type in `crates/feature-launcher/src/types.rs` are dead from the launcher's perspective. The data is still computed and serialized but ignored on the frontend.
+
+**Next steps:**
+1. Confirm `FocusDashboard` data is not consumed elsewhere (search for `FocusDashboard` usages outside the launcher).
+2. Remove `focus` field from `DashboardData`, drop the `build_focus_dashboard` helper, drop `FocusDashboard` type if unreferenced.
+3. Update `desktop-ui/src/features/launcher/types.ts` to remove `FocusDashboard` interface and `focus` field.
+
+**Does NOT affect:** Other dashboard widgets (calendar, tasks, productivity) which are wired and rendered.
+
+---
+
+## 5. Launcher: `onOpenTask` callback never wired
+
+**Observed (2026-04-27):** `Dashboard.tsx` accepts an `onOpenTask?: (taskId: string) => void` prop and `TasksWidget` invokes it on click, but `Launcher.tsx:205` renders `<Dashboard />` without passing the callback. Dashboard task rows are silently unclickable.
+
+**Scope:** Pure frontend prop-drilling gap. Deferred until **task UI re-integration** completes — there is no "open task in main window" route to call yet.
+
+**Next steps:**
+1. After task UI is re-integrated and main-window task routes exist, pass `onOpenTask={(id) => emit("navigate", { path: "/tasks/" + id })}` from `Launcher.tsx`.
+2. Add a regression test that verifies clicking a task row in the dashboard emits the navigation event.
+
+---
+
+## 6. Launcher: silent IPC error handling — no user-facing toast
+
+**Observed (2026-04-27):** All Tauri IPC errors in `useExecuteItem.ts`, `ActionMenu.tsx`, and `FocusActiveChip.tsx` are caught with `.catch(console.error)` and never surfaced to the user. 17+ execute paths fail invisibly (e.g., `launcher_open_app` failure on a missing path, `focus_activate` failure mid-DND).
+
+**Scope:** UX quality gap. The `show_status_badge` Tauri command already exists (used by `noView` items in `useExecuteItem.ts:225`) — the same plumbing can be reused for error toasts.
+
+**Next steps:**
+1. Add a small `notifyError(message: string)` helper that calls `show_status_badge` with `kind: "error"` and a sensible duration.
+2. Replace every `.catch(console.error)` in launcher hooks/components with `.catch((err) => notifyError("Could not …: " + err))`.
+3. Distinguish user-fixable failures (path not found, permission denied) from internal errors with separate copy.
+
+---
+
+## 7. Launcher: DND duration threading deferred (originally "Task 3.4")
+
+**Observed (2026-04-27):** `crates/desktop/src/commands/launcher.rs:89-91` reads `let _ = args;` with comment *"DND duration threading deferred to Task 3.4 when SystemCommands::execute gains a duration parameter."* The frontend works around this via the separate `focus_activate` IPC path, but the Rust `SystemCommands::execute` still ignores duration args.
+
+**Scope:** Cosmetic from the user's perspective (DND duration works via the workaround), but the workaround diverges system-command DND from script-runner args, complicating future args-bearing commands.
+
+**Next steps:**
+1. Add a `duration_secs: Option<u64>` parameter to `SystemCommands::execute(&self, action: &str, duration_secs: Option<u64>)`.
+2. Inside `ToggleDoNotDisturb`, if `duration_secs` is provided, schedule auto-deactivation; else toggle indefinitely.
+3. Plumb the value from `launcher_system_command(args: HashMap<String,String>)` by parsing `args.get("duration_secs").and_then(|s| s.parse().ok())`.
+4. Once stable, drop the frontend-side `focus_activate` workaround in `useExecuteItem.ts:86-97`.
+

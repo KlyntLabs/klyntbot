@@ -252,6 +252,7 @@ pub async fn cognitive_inject_event(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_event_log(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
@@ -260,6 +261,7 @@ pub async fn cognitive_event_log(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_pipeline_log(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,

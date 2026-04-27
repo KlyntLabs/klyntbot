@@ -283,10 +283,13 @@ pub async fn productivity_auto_focus_start(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_auto_focus_end(
     state: State<'_, Arc<AppCore>>,
-    event: AutoFocusEvent,
+    event: desktop_shared::specta_helpers::JsonValueWrapper,
 ) -> Result<FocusSessionResponse, ApiError> {
+    let event: feature_productivity::auto_focus::AutoFocusEvent = serde_json::from_value(event.0)
+        .map_err(|e| ApiError::new("BAD_REQUEST", e.to_string()))?;
     state.productivity_auto_focus_end(event).await
 }
 

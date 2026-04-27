@@ -335,6 +335,14 @@ async chatCancel(sessionKey: string) : Promise<Result<null, ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async chatRespondInteraction(sessionKey: string, requestId: string, response: unknown) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_respond_interaction", { sessionKey, requestId, response }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async codingMemoryStatus() : Promise<Result<CodingMemoryStatusResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_memory_status") };
@@ -770,6 +778,22 @@ async cognitiveGraphData() : Promise<Result<CognitiveGraphData, ApiError>> {
 async cognitiveGraphExpandTopic(params: TopicExpandParams) : Promise<Result<TopicDetail, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("cognitive_graph_expand_topic", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveEventLog(limit: number | null) : Promise<Result<DomainEventRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_event_log", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitivePipelineLog(limit: number | null) : Promise<Result<PipelineEventRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_pipeline_log", { limit }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2731,6 +2755,14 @@ async productivityAutoFocusStart() : Promise<Result<FocusSessionResponse, ApiErr
     else return { status: "error", error: e  as any };
 }
 },
+async productivityAutoFocusEnd(event: unknown) : Promise<Result<FocusSessionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_auto_focus_end", { event }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async productivityAutoFocusConfirm(payload: AutoFocusPayload) : Promise<Result<FocusSessionResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("productivity_auto_focus_confirm", { payload }) };
@@ -4123,6 +4155,10 @@ export type DistractionDetectedPayload = { appName: string; sessionId: string; p
 export type DistractionPayload = { appName: string; sessionId: string }
 export type DistractionResponse = { action: string; appName: string | null }
 export type DomainCount = { domain: string; count: number }
+/**
+ * A persisted domain event row.
+ */
+export type DomainEventRow = { id: string; event_type: string; domain: string; salience: string; payload: string; timestamp: string }
 export type DomainHealthEntry = { domain: string; score: number; totalFacts: number; activeFacts: number; fastFailures: number }
 export type DomainHistory = { domain: string; points: RetentionPoint[] }
 export type DonePayload = { sessionKey: string; content: string }
@@ -4514,6 +4550,10 @@ export type PersonaChatResponse = { reply: string }
 export type PersonaMetaResponse = { id: string; name: string; role: string; icon: string; tone: string }
 export type PersonaPerspectivePayload = { sessionKey: string; personaId: string; personaName: string; personaIcon: string; personaRole: string; content: string; challenge: string | null }
 export type PersonaResponse = { id: string; name: string; role: string; expertise: string; perspective: string; tone: string; icon: string; source: string; domains: string[]; isActive: boolean; relevanceScore: number; createdAt: string; updatedAt: string }
+/**
+ * A persisted pipeline event row.
+ */
+export type PipelineEventRow = { id: string; event_kind: string; observation: string | null; facts_extracted: number | null; operation: string | null; fact_triple: string | null; timestamp: string }
 export type PipelineStartedPayload = { sessionKey: string }
 export type PlanGeneratedPayload = { sessionKey: string; steps: string[]; rawPlan: string }
 export type PlanStepCompletedPayload = { sessionKey: string; stepIndex: number; description: string; toolName: string }

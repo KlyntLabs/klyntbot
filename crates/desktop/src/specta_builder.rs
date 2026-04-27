@@ -56,6 +56,7 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::chat::chat_list_sessions_by_project,
             crate::commands::chat::chat_delete_stale_sessions,
             crate::commands::chat::chat_cancel,
+            crate::commands::chat::chat_respond_interaction,
             // coding_memory
             crate::commands::coding_memory::coding_memory_status,
             crate::commands::coding_memory::coding_memory_distill_now,
@@ -113,6 +114,8 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::cognitive::coaching_seed_patterns,
             crate::commands::cognitive::cognitive_graph_data,
             crate::commands::cognitive::cognitive_graph_expand_topic,
+            crate::commands::cognitive::cognitive_event_log,
+            crate::commands::cognitive::cognitive_pipeline_log,
             // columns
             crate::commands::columns::custom_column_list,
             crate::commands::columns::custom_column_create,
@@ -378,6 +381,7 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::productivity::productivity_insights,
             crate::commands::productivity::productivity_insight_dismiss,
             crate::commands::productivity::productivity_auto_focus_start,
+            crate::commands::productivity::productivity_auto_focus_end,
             crate::commands::productivity::productivity_auto_focus_confirm,
             crate::commands::productivity::distraction_respond,
             crate::commands::productivity::productivity_projects_list,

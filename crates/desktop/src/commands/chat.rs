@@ -85,12 +85,15 @@ pub async fn chat_delete_thread(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn chat_respond_interaction(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
     request_id: String,
-    response: common::FormResponse,
+    response: desktop_shared::specta_helpers::JsonValueWrapper,
 ) -> Result<(), ApiError> {
+    let response: common::FormResponse = serde_json::from_value(response.0)
+        .map_err(|e| ApiError::new("BAD_REQUEST", e.to_string()))?;
     state
         .chat_respond_interaction(session_key, request_id, response)
         .await
