@@ -30,7 +30,8 @@ impl super::SearchSource for ContentGrepSource {
     }
 
     fn cache_ttl(&self) -> Option<std::time::Duration> {
-        Some(std::time::Duration::from_secs(5))
+        // rg spawn dominates miss cost (~50ms); longer TTL amortizes better
+        Some(std::time::Duration::from_secs(8))
     }
 
     async fn search(&self, query: &str, limit: usize) -> Vec<LauncherItem> {
