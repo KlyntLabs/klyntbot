@@ -26,7 +26,6 @@ jiff = { workspace = true, features = ["serde"] }
 thiserror = { workspace = true }
 blake3 = "1"
 tiktoken-rs = "0.5"
-regex = { workspace = true }
 sha2 = { workspace = true }
 dirs = { workspace = true }
 tempfile = { workspace = true }
