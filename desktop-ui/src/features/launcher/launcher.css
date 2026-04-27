@@ -798,7 +798,7 @@
   font-family: var(--code-font-family, monospace);
 }
 
-/* ── Stubs ───────────────────────────────────────────── */
+/* ── Chat & Voice ────────────────────────────────────── */
 .lc-chat {
   display: flex;
   flex-direction: column;
