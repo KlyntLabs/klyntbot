@@ -4,6 +4,8 @@ import { useDndActive } from "../hooks/useDndActive";
 import { formatRemaining } from "../lib/formatRemaining";
 import { useLauncherApi, useLauncherState } from "../store";
 import type { FocusSession, LauncherItem } from "../types";
+import { EmptyState } from "./EmptyState";
+import { LoadingState } from "./LoadingState";
 
 interface ResultsListProps {
   onExecute: (index: number) => void;
@@ -13,6 +15,7 @@ export function ResultsList({ onExecute }: ResultsListProps) {
   const results = useLauncherState((s) => s.results);
   const selectedIndex = useLauncherState((s) => s.selectedIndex);
   const isSearching = useLauncherState((s) => s.isSearching);
+  const query = useLauncherState((s) => s.query);
   const dndActive = useDndActive();
   const { setSelectedIndex } = useLauncherApi();
   const listRef = useRef<HTMLDivElement>(null);
@@ -33,20 +36,11 @@ export function ResultsList({ onExecute }: ResultsListProps) {
   }, [selectedIndex]);
 
   if (isSearching && results.length === 0) {
-    return (
-      <div className="lc-empty">
-        <div className="lc-empty-dots">
-          <span style={{ animationDelay: "0ms" }} />
-          <span style={{ animationDelay: "150ms" }} />
-          <span style={{ animationDelay: "300ms" }} />
-        </div>
-        <span className="lc-muted-sm">Searching...</span>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   if (results.length === 0) {
-    return <div className="lc-empty-text">No results</div>;
+    return <EmptyState query={query} />;
   }
 
   const uniqueGroups = new Set(results.map((item) => groupLabel(item.kind.type)));

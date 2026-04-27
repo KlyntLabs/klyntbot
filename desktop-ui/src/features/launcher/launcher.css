@@ -147,11 +147,44 @@
 
 /* ── Empty / loading ─────────────────────────────────── */
 .lc-empty {
-  padding: 16px;
+  padding: 28px 16px;
   display: flex;
-  gap: 8px;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  animation: lc-result-in 0.2s ease-out both;
+}
+.lc-empty-icon {
+  font-size: 28px;
+  opacity: 0.7;
+}
+.lc-empty-title {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.lc-empty-hints {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  gap: 6px 16px;
+}
+.lc-empty-hints li {
+  font-size: var(--fs-xs);
+  color: var(--text-faint, rgba(255, 255, 255, 0.5));
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lc-empty-hints kbd {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-control, rgba(255, 255, 255, 0.08));
+  color: var(--text-muted);
+  font-family: var(--code-font-family, monospace);
+  font-size: var(--fs-2xs);
 }
 .lc-empty-text {
   padding: 16px;
@@ -182,6 +215,44 @@
 .lc-dim-xs {
   color: var(--text-dim, rgba(255, 255, 255, 0.35));
   font-size: var(--fs-xs);
+}
+
+/* Skeleton loader */
+.lc-loading {
+  padding: 8px 0;
+}
+.lc-loading-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+}
+.lc-loading-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: var(--surface-control, rgba(255, 255, 255, 0.08));
+  animation: lc-skeleton-pulse 1.6s ease-in-out infinite;
+}
+.lc-loading-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lc-loading-line {
+  height: 10px;
+  border-radius: 3px;
+  background: var(--surface-control, rgba(255, 255, 255, 0.08));
+  width: 70%;
+  animation: lc-skeleton-pulse 1.6s ease-in-out infinite;
+}
+.lc-loading-line.short {
+  width: 40%;
+}
+@keyframes lc-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
 
 /* ── Results list ────────────────────────────────────── */
@@ -820,5 +891,10 @@
 @keyframes lc-voice-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .lc-voice-orb { animation: none !important; transition: none !important; }
+  .lc-voice-orb,
+  .lc-loading-icon,
+  .lc-loading-line { animation: none !important; transition: none !important; }
+  .lc-row,
+  .lc-empty,
+  .lc-action-menu { animation: none !important; }
 }

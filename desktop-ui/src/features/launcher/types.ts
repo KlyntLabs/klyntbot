@@ -22,6 +22,7 @@ export interface LauncherItem {
   icon?: string;
   kind: LauncherItemKind;
   score: number;
+  pinned?: boolean;
   noView?: boolean;
   arguments?: ArgSpec[];
 }
