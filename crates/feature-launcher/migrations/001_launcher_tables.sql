@@ -1,12 +1,3 @@
--- Frequency learning for search ranking
-CREATE TABLE IF NOT EXISTS launcher_frequencies (
-    item_id TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    count INTEGER NOT NULL DEFAULT 0,
-    last_used TEXT NOT NULL,
-    PRIMARY KEY (item_id, kind)
-);
-
 -- Usage log for frecency calculation (exponential decay)
 CREATE TABLE IF NOT EXISTS launcher_usage_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

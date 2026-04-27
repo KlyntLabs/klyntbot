@@ -22,6 +22,7 @@ export interface LauncherItem {
   icon?: string;
   kind: LauncherItemKind;
   score: number;
+  pinned?: boolean;
   noView?: boolean;
   arguments?: ArgSpec[];
 }
@@ -86,17 +87,9 @@ export interface FocusSession {
 }
 
 export interface DashboardData {
-  focus: FocusDashboard | null;
   calendar: CalendarDashboard[];
   tasks: TaskDashboard[];
   productivity: ProductivityDashboard;
-}
-
-export interface FocusDashboard {
-  taskName: string | null;
-  elapsedSecs: number;
-  targetSecs: number | null;
-  sessionId: string;
 }
 
 export interface CalendarDashboard {

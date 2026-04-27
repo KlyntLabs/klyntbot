@@ -1,6 +1,6 @@
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
-    CalendarDashboard, DashboardData, FocusDashboard, ProductivityDashboard, TaskDashboard,
+    CalendarDashboard, DashboardData, ProductivityDashboard, TaskDashboard,
 };
 use feature_productivity::repos::ProductivityRepos;
 use storage::Repos;
@@ -163,7 +163,6 @@ pub async fn build_dashboard_data(
     };
 
     Ok(DashboardData {
-        focus,
         calendar,
         tasks,
         productivity,

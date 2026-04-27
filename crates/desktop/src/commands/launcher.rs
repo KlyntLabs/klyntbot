@@ -4,9 +4,10 @@ use std::sync::Arc;
 
 use desktop_macros::{klynt_command, klynt_raw_command};
 use desktop_shared::{errors::ApiError, CommandResult};
+use feature_focus::FocusMode;
 use feature_launcher::{
-    ClipboardEntry, DashboardData, LauncherExecuteResult, LauncherItem, ScriptRunner, SystemAction,
-    SystemCommands, WindowAction,
+    ClipboardEntry, DashboardData, LauncherExecuteResult, LauncherItem, Pin, ScriptRunner,
+    SystemAction, SystemCommands, WindowAction,
 };
 use tauri::State;
 
@@ -23,16 +24,36 @@ pub async fn launcher_search(
 pub async fn launcher_execute(
     item_id: String,
     kind: String,
-    args: Option<std::collections::HashMap<String, String>>,
 ) -> LauncherExecuteResult {
     state
-        .launcher_execute(item_id, kind, args.unwrap_or_default())
+        .launcher_execute(item_id, kind)
         .await
 }
 
 #[klynt_command]
 pub async fn launcher_dashboard() -> DashboardData {
     state.launcher_dashboard().await
+}
+
+#[klynt_command]
+pub async fn launcher_pin(
+    item_id: String,
+    kind: String,
+) -> () {
+    state.launcher_pin(item_id, kind).await
+}
+
+#[klynt_command]
+pub async fn launcher_unpin(
+    item_id: String,
+    kind: String,
+) -> () {
+    state.launcher_unpin(item_id, kind).await
+}
+
+#[klynt_command]
+pub async fn launcher_list_pinned() -> Vec<Pin> {
+    state.launcher_list_pinned().await
 }
 
 #[klynt_command]
@@ -75,15 +96,42 @@ pub async fn launcher_run_script(
 #[tauri::command]
 #[specta::specta]
 pub async fn launcher_system_command(
+    state: State<'_, Arc<AppCore>>,
     action: SystemAction,
     args: Option<std::collections::HashMap<String, String>>,
 ) -> CommandResult<()> {
-    // args accepted here for IPC stability; DND duration threading deferred to Task 3.4
-    // when SystemCommands::execute gains a duration parameter.
-    let _ = args;
-    SystemCommands::execute(&action)
+    let args = args.unwrap_or_default();
+    let duration = args.get("duration").and_then(|s| parse_human_duration(s));
+
+    if matches!(action, SystemAction::ToggleDoNotDisturb) && duration.is_some() {
+        let ends_at = jiff::Timestamp::now()
+            .checked_add(duration.unwrap())
+            .ok_or_else(|| ApiError::new("BAD_DURATION", "Invalid duration".to_string()))?;
+        let mgr = state.dnd_manager().map_err(|e| ApiError::new("DND_ERROR", e.to_string()))?;
+        mgr.activate(FocusMode::Dnd, ends_at)
+            .await
+            .map_err(|e| ApiError::new("FOCUS_ACTIVATE_ERROR", e.to_string()))?;
+        return Ok(());
+    }
+
+    SystemCommands::execute(&action, duration)
         .await
         .map_err(|e| ApiError::new("SYSTEM_COMMAND_ERROR", e.to_string()))
+}
+
+fn parse_human_duration(s: &str) -> Option<std::time::Duration> {
+    let s = s.trim();
+    let (num_str, unit) = s.split_at(s.len().saturating_sub(1));
+    let num: u64 = num_str.parse().ok()?;
+    match unit {
+        "m" | "M" => Some(std::time::Duration::from_secs(num * 60)),
+        "h" | "H" => Some(std::time::Duration::from_secs(num * 3600)),
+        "d" | "D" => Some(std::time::Duration::from_secs(num * 86400)),
+        _ => {
+            // Try parsing as bare minutes if no unit
+            num_str.parse::<u64>().ok().map(|n| std::time::Duration::from_secs(n * 60))
+        }
+    }
 }
 
 #[klynt_raw_command]
@@ -117,6 +165,28 @@ pub async fn launcher_open_app(path: String) -> CommandResult<()> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_minutes() {
+        assert_eq!(parse_human_duration("30m"), Some(std::time::Duration::from_secs(1800)));
+    }
+    #[test]
+    fn parses_hours() {
+        assert_eq!(parse_human_duration("2h"), Some(std::time::Duration::from_secs(7200)));
+    }
+    #[test]
+    fn parses_days() {
+        assert_eq!(parse_human_duration("1d"), Some(std::time::Duration::from_secs(86400)));
+    }
+    #[test]
+    fn rejects_garbage() {
+        assert_eq!(parse_human_duration("xyz"), None);
+    }
+}
+
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
@@ -133,11 +203,20 @@ pub(crate) async fn dispatch_dev(
         "launcher_execute" => {
             let item_id = dev::get(body, "itemId").unwrap_or_default();
             let kind = dev::get(body, "kind").unwrap_or_default();
-            let args: std::collections::HashMap<String, String> =
-                dev::get(body, "args").unwrap_or_default();
-            dev::val(core.launcher_execute(item_id, kind, args).await)
+            dev::val(core.launcher_execute(item_id, kind).await)
         }
         "launcher_dashboard" => dev::val(core.launcher_dashboard().await),
+        "launcher_pin" => {
+            let item_id = dev::get(body, "itemId").unwrap_or_default();
+            let kind = dev::get(body, "kind").unwrap_or_default();
+            dev::val(core.launcher_pin(item_id, kind).await)
+        }
+        "launcher_unpin" => {
+            let item_id = dev::get(body, "itemId").unwrap_or_default();
+            let kind = dev::get(body, "kind").unwrap_or_default();
+            dev::val(core.launcher_unpin(item_id, kind).await)
+        }
+        "launcher_list_pinned" => dev::val(core.launcher_list_pinned().await),
         "launcher_clipboard_paste" => {
             let id: i64 = dev::get(body, "id").unwrap_or_default();
             dev::val(core.launcher_clipboard_paste(id).await)

@@ -76,6 +76,7 @@ pub struct LauncherSourcesConfig {
     pub notes: SourceToggle,
     pub clipboard: ClipboardSourceConfig,
     pub window_presets: SourceToggle,
+    pub calendar: CalendarSourceConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,6 +88,25 @@ pub struct SourceToggle {
 impl Default for SourceToggle {
     fn default() -> Self {
         Self { enabled: true }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CalendarSourceConfig {
+    pub enabled: bool,
+    #[serde(default = "default_lookback")]
+    pub lookback_days: u32,
+    #[serde(default = "default_lookahead")]
+    pub lookahead_days: u32,
+}
+
+fn default_lookback() -> u32 { 1 }
+fn default_lookahead() -> u32 { 7 }
+
+impl Default for CalendarSourceConfig {
+    fn default() -> Self {
+        Self { enabled: true, lookback_days: 1, lookahead_days: 7 }
     }
 }
 

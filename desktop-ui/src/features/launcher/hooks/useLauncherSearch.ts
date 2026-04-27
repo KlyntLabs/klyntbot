@@ -3,7 +3,7 @@ import { qk, useTauriQuery } from "@/lib/query";
 import { useLauncherApi, useLauncherState } from "../store";
 import type { LauncherItem } from "../types";
 
-const DEBOUNCE_MS = 30;
+const DEBOUNCE_MS = 16; // one frame for responsive typing
 
 export function useLauncherSearch() {
   const query = useLauncherState((s) => s.query);
