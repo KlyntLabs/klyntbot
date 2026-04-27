@@ -54,4 +54,22 @@ impl AppCore {
         let repo = self.launcher_clipboard_repo()?;
         repo.pin(id, pinned).await.map_err(map_storage_err)
     }
+
+    /// Pin a launcher item.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn launcher_pin(&self, item_id: String, kind: String) -> Result<(), ApiError> {
+        self.launcher_engine()?.pins_repo.pin(&item_id, &kind).await.map_err(Into::into)
+    }
+
+    /// Unpin a launcher item.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn launcher_unpin(&self, item_id: String, kind: String) -> Result<(), ApiError> {
+        self.launcher_engine()?.pins_repo.unpin(&item_id, &kind).await.map_err(Into::into)
+    }
+
+    /// List pinned launcher items.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn launcher_list_pinned(&self) -> Result<Vec<feature_launcher::Pin>, ApiError> {
+        self.launcher_engine()?.pins_repo.list_pinned().await.map_err(Into::into)
+    }
 }

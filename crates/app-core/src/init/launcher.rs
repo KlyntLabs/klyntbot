@@ -35,7 +35,8 @@ pub(super) async fn init_launcher(
 
     let launcher_config = &config.launcher;
     let frequency_repo = FrequencyRepo::new(pool.clone());
-    let clipboard_repo = ClipboardRepo::new(pool);
+    let clipboard_repo = ClipboardRepo::new(pool.clone());
+    let pins_repo = feature_launcher::PinsRepo::new(&storage_pool);
 
     let mut sources: Vec<Arc<dyn feature_launcher::SearchSource>> = Vec::new();
     let icon_cache_dir = config.data_dir_path().join("cache").join("app-icons");
@@ -369,6 +370,7 @@ pub(super) async fn init_launcher(
         registry,
         frequency_repo,
         clipboard_repo,
+        pins_repo,
         _file_watcher: file_watcher,
     });
 

@@ -36,6 +36,8 @@ pub struct LauncherItem {
     pub no_view: bool,
     #[serde(default)]
     pub arguments: Vec<ArgSpec>,
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, specta::Type)]

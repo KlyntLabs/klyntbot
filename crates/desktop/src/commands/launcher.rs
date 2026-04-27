@@ -6,8 +6,8 @@ use desktop_macros::{klynt_command, klynt_raw_command};
 use desktop_shared::{errors::ApiError, CommandResult};
 use feature_focus::FocusMode;
 use feature_launcher::{
-    ClipboardEntry, DashboardData, LauncherExecuteResult, LauncherItem, ScriptRunner, SystemAction,
-    SystemCommands, WindowAction,
+    ClipboardEntry, DashboardData, LauncherExecuteResult, LauncherItem, Pin, ScriptRunner,
+    SystemAction, SystemCommands, WindowAction,
 };
 use tauri::State;
 
@@ -33,6 +33,27 @@ pub async fn launcher_execute(
 #[klynt_command]
 pub async fn launcher_dashboard() -> DashboardData {
     state.launcher_dashboard().await
+}
+
+#[klynt_command]
+pub async fn launcher_pin(
+    item_id: String,
+    kind: String,
+) -> () {
+    state.launcher_pin(item_id, kind).await
+}
+
+#[klynt_command]
+pub async fn launcher_unpin(
+    item_id: String,
+    kind: String,
+) -> () {
+    state.launcher_unpin(item_id, kind).await
+}
+
+#[klynt_command]
+pub async fn launcher_list_pinned() -> Vec<Pin> {
+    state.launcher_list_pinned().await
 }
 
 #[klynt_command]
@@ -185,6 +206,17 @@ pub(crate) async fn dispatch_dev(
             dev::val(core.launcher_execute(item_id, kind).await)
         }
         "launcher_dashboard" => dev::val(core.launcher_dashboard().await),
+        "launcher_pin" => {
+            let item_id = dev::get(body, "itemId").unwrap_or_default();
+            let kind = dev::get(body, "kind").unwrap_or_default();
+            dev::val(core.launcher_pin(item_id, kind).await)
+        }
+        "launcher_unpin" => {
+            let item_id = dev::get(body, "itemId").unwrap_or_default();
+            let kind = dev::get(body, "kind").unwrap_or_default();
+            dev::val(core.launcher_unpin(item_id, kind).await)
+        }
+        "launcher_list_pinned" => dev::val(core.launcher_list_pinned().await),
         "launcher_clipboard_paste" => {
             let id: i64 = dev::get(body, "id").unwrap_or_default();
             dev::val(core.launcher_clipboard_paste(id).await)

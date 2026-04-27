@@ -105,7 +105,8 @@ impl SystemCommands {
                     score: 0.5,
                     no_view: cmd.no_view,
                     arguments: arg_specs(cmd.arguments),
-                })
+                                    pinned: false,
+                    })
                 .collect();
         }
 
@@ -155,7 +156,8 @@ impl SystemCommands {
                 score: (score as f64) / 1000.0 * 1.0,
                 no_view: cmd.no_view,
                 arguments: arg_specs(cmd.arguments),
-            })
+                            pinned: false,
+                })
             .collect()
     }
 

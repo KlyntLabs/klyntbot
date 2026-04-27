@@ -82,7 +82,8 @@ fn make_item(p: &crate::window_mgmt::presets::Preset) -> LauncherItem {
         no_view: true,
         arguments: vec![],
     }
-}
+    pinned: false,
+    }
 
 #[cfg(test)]
 mod tests {
