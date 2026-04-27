@@ -378,6 +378,14 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::retention_history::retention_history,
             // review_stats
             crate::commands::review_stats::review_stats_summary,
+            // settings
+            crate::commands::settings::app_info,
+            crate::commands::settings::config_mark_setup_completed,
+            crate::commands::settings::mcp_get_config,
+            crate::commands::settings::mcp_add_server,
+            crate::commands::settings::mcp_remove_server,
+            crate::commands::settings::mcp_toggle_server,
+            crate::commands::settings::mcp_update_server,
             // shortcuts
             crate::commands::shortcuts::shortcuts_get,
             crate::commands::shortcuts::shortcuts_update,

@@ -2663,6 +2663,62 @@ async reviewStatsSummary() : Promise<Result<ReviewStatsSummaryResponse, ApiError
     else return { status: "error", error: e  as any };
 }
 },
+async appInfo() : Promise<Result<AppInfoResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("app_info") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async configMarkSetupCompleted() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("config_mark_setup_completed") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mcpGetConfig() : Promise<Result<McpConfigResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_get_config") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mcpAddServer(params: McpAddServerParams) : Promise<Result<McpConfigResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_add_server", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mcpRemoveServer(params: McpRemoveParams) : Promise<Result<McpConfigResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_remove_server", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mcpToggleServer(params: McpToggleParams) : Promise<Result<McpConfigResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_toggle_server", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mcpUpdateServer(params: McpUpdateServerParams) : Promise<Result<McpConfigResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_update_server", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async shortcutsGet() : Promise<Result<ShortcutsConfig, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("shortcuts_get") };
@@ -3506,6 +3562,7 @@ code: string;
  * Human-readable error message
  */
 message: string }
+export type AppInfoResponse = { version: string; dataDir: string; setupCompleted: boolean }
 export type AppUsageResponse = { appName: string; durationSecs: number; category: string | null }
 export type AreaCreateParams = { name: string; color: string | null; icon: string | null }
 export type AreaResponse = { id: string; name: string; color: string; icon: string | null; projectCount: number; taskCount: number }
@@ -3826,8 +3883,10 @@ export type LinkedEntitiesResponse = { tasks: ActionSummaryResponse[]; notes: No
 export type LinkedFact = { id: string; subject: string; predicate: string; object: string; confidence: number; sourceNote: string | null }
 export type LinkedMemory = { id: string; content: string; domain: string; createdAt: string }
 export type LinkedRule = { id: string; ruleText: string; domain: string; signalCount: number }
+export type McpAddServerParams = { name: string; transport: string; command: string | null; args: string[] | null; env: Partial<{ [key in string]: string }> | null; url: string | null; headers: Partial<{ [key in string]: string }> | null }
 export type McpConfigResponse = { enabled: boolean; servers: McpServerResponse[] }
 export type McpOAuthCompletePayload = { serverName: string; provider: string }
+export type McpRemoveParams = { name: string }
 export type McpServerResponse = { name: string; transport: string; enabled: boolean; command: string | null; args: string[] | null; env: Partial<{ [key in string]: string }> | null; url: string | null; headers: Partial<{ [key in string]: string }> | null; oauthProvider?: string | null; oauthConnected: boolean }
 export type McpServerStatusPayload = { serverName: string; 
 /**
@@ -3835,6 +3894,8 @@ export type McpServerStatusPayload = { serverName: string;
  */
 status: string; toolCount?: number | null; error?: string | null }
 export type McpStartupCompletePayload = { ready: number; failed: number; skipped: number }
+export type McpToggleParams = { name: string; enabled: boolean }
+export type McpUpdateServerParams = { name: string; transport: string | null; command: string | null; args: string[] | null; env: Partial<{ [key in string]: string }> | null; url: string | null; headers: Partial<{ [key in string]: string }> | null }
 export type MemoryAccessPayload = { sessionKey: string; action: string; query: string | null; resultsCount: number }
 /**
  * One row in the Memory Browser panel — flat triple from `semantic_facts`.
