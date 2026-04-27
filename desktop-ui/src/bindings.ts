@@ -943,9 +943,73 @@ async fabricGraphAction(params: FabricActionParams) : Promise<Result<FabricActio
     else return { status: "error", error: e  as any };
 }
 },
+async financeAccounts() : Promise<Result<FinanceAccountRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_accounts") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeTransactions(limit: number | null) : Promise<Result<FinanceTransactionRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_transactions", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeTransactionsFiltered(params: FinanceTransactionFilterParams) : Promise<Result<FinanceTransactionRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_transactions_filtered", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeBudgetUsage() : Promise<Result<BudgetUsageRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_budget_usage") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async financePortfolios() : Promise<Result<FinancePortfolioResponse[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("finance_portfolios") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeInvestments() : Promise<Result<FinanceInvestmentRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_investments") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeInvestmentsFiltered(portfolioId: string | null) : Promise<Result<FinanceInvestmentRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_investments_filtered", { portfolioId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeGoals() : Promise<Result<FinanceGoalRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_goals") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeLiabilities() : Promise<Result<FinanceLiabilityRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_liabilities") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -967,9 +1031,33 @@ async financeExchangeRates() : Promise<Result<Partial<{ [key in string]: number 
     else return { status: "error", error: e  as any };
 }
 },
+async financeAccountCreate(params: FinanceAccountCreateParams) : Promise<Result<FinanceAccountRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_account_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeAccountUpdate(params: FinanceAccountUpdateParams) : Promise<Result<FinanceAccountRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_account_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async financeAccountDelete(id: string) : Promise<Result<boolean, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("finance_account_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeTransactionCreate(params: FinanceTransactionCreateParams) : Promise<Result<FinanceTransactionRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_transaction_create", { params }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -983,9 +1071,41 @@ async financeTransactionDelete(id: string) : Promise<Result<boolean, ApiError>> 
     else return { status: "error", error: e  as any };
 }
 },
+async financeBudgetCreate(params: FinanceBudgetCreateParams) : Promise<Result<FinanceBudgetRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_budget_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeBudgetUpdate(params: FinanceBudgetUpdateParams) : Promise<Result<FinanceBudgetRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_budget_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async financeBudgetDelete(id: string) : Promise<Result<boolean, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("finance_budget_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeGoalCreate(params: FinanceGoalCreateParams) : Promise<Result<FinanceGoalRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_goal_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeGoalUpdate(params: FinanceGoalUpdateParams) : Promise<Result<FinanceGoalRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_goal_update", { params }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -999,9 +1119,81 @@ async financeGoalDelete(id: string) : Promise<Result<boolean, ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async financeLiabilityCreate(params: FinanceLiabilityCreateParams) : Promise<Result<FinanceLiabilityRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_liability_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeLiabilityUpdate(params: FinanceLiabilityUpdateParams) : Promise<Result<FinanceLiabilityRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_liability_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async financeLiabilityDelete(id: string) : Promise<Result<boolean, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("finance_liability_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financePortfolioCreate(params: FinancePortfolioCreateParams) : Promise<Result<FinancePortfolioRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_portfolio_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeInvestmentCreate(params: FinanceInvestmentCreateParams) : Promise<Result<FinanceInvestmentRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_investment_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeInvestmentUpdate(params: FinanceInvestmentUpdateParams) : Promise<Result<FinanceInvestmentRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_investment_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeAllocationTargetUpsert(params: FinanceAllocationTargetUpsertParams) : Promise<Result<FinanceAllocationTargetRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_allocation_target_upsert", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeAllocationTargets(portfolioId: string) : Promise<Result<FinanceAllocationTargetRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_allocation_targets", { portfolioId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeInvestmentTxCreate(params: FinanceInvestmentTxCreateParams) : Promise<Result<FinanceInvestmentTxRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_investment_tx_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeInvestmentTxs(investmentId: string) : Promise<Result<FinanceInvestmentTxRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_investment_txs", { investmentId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3684,6 +3876,15 @@ export type BadgeKind = "success" | "warn" | "error" | "info"
 export type BrainGrowth = { correctionsCaptured7D: number; trialsEvaluated7D: number; promotedThisWeek: number; status: string }
 export type BrainVersion = { version: number; trialId: string | null; promotedAt: string; params: unknown; reason: string; parentVersion: number | null; metricsAtPromotion: unknown; reverted: boolean }
 export type BucketPayload = { bucketStart: string; productiveSecs: number; distractingSecs: number; dominantApp: string | null }
+/**
+ * Result of the `budget_usage` join query: all budget fields plus the
+ * `spent` amount (sum of matching expense transactions in the current period).
+ */
+export type BudgetUsageRow = { id: string; name: string; amount: number; currency: string; period: string; category: string | null; method: string; jarType: string | null; startDate: string; endDate: string | null; isActive: boolean; alertThreshold: number; createdAt: string; updatedAt: string; baseAmount: number; baseCurrency: string; exchangeRate: number; 
+/**
+ * Sum of expense amounts matching this budget's category in the current period.
+ */
+spent: number }
 export type BudgetWarningPayload = { sessionKey: string; monthlySpendUsd: number; monthlyBudgetUsd: number; usagePercent: number }
 export type CalendarDashboard = { eventId: string; title: string; startsAt: string; endsAt: string; minutesUntil: number }
 export type CalendarEvent = { id: string; calendarId: string; title: string; description: string | null; startedAt: string; endedAt: string; location: string | null; attendeesCount: number; isRecurring: boolean; recurrenceId: string | null; source: string; externalUid: string; sessionId: string | null; color: string | null; syncedAt: string; createdAt: string; updatedAt: string }
@@ -3888,13 +4089,64 @@ export type FactUpdateParams = { object: string | null; confidence: number | nul
 export type FadingAtomSummary = { id: string; subject: string; retentionPct: number; domain: string }
 export type FeedbackTarget = "Narrative" | "Snippet" | "Routing"
 export type FileKind = "file" | "folder" | "image" | "document" | "code" | "archive"
+export type FinanceAccountCreateParams = { name: string; accountType: string; currency: string | null; balance: number | null; institution: string | null; notes: string | null }
+/**
+ * Row struct for the `finance_accounts` table.
+ */
+export type FinanceAccountRow = { id: string; name: string; accountType: string; currency: string; balance: number; institution: string | null; notes: string | null; isArchived: boolean; createdAt: string; updatedAt: string; baseBalance: number; baseCurrency: string; exchangeRate: number }
+export type FinanceAccountUpdateParams = { id: string; name: string | null; balance: number | null; institution: string | null; notes: string | null; isArchived: boolean | null }
+/**
+ * Row struct for the `finance_allocation_targets` table.
+ */
+export type FinanceAllocationTargetRow = { id: string; portfolioId: string; assetClass: string; targetWeight: string; toleranceBand: string; createdAt: string; updatedAt: string }
+export type FinanceAllocationTargetUpsertParams = { portfolioId: string; assetClass: string; targetWeight: string; toleranceBand: string }
+export type FinanceBudgetCreateParams = { name: string; amount: number; period: string; currency: string | null; category: string | null; method: string | null; startDate: string | null; endDate: string | null; alertThreshold: number | null }
+/**
+ * Row struct for the `finance_budgets` table.
+ */
+export type FinanceBudgetRow = { id: string; name: string; amount: number; currency: string; period: string; category: string | null; method: string; jarType: string | null; startDate: string; endDate: string | null; isActive: boolean; alertThreshold: number; createdAt: string; updatedAt: string; baseAmount: number; baseCurrency: string; exchangeRate: number }
+export type FinanceBudgetUpdateParams = { id: string; name: string | null; amount: number | null; category: string | null; isActive: boolean | null }
 export type FinanceCategoryBreakdown = { category: string; amount: number; pct: number }
 export type FinanceCategoryReportResponse = { total: number; breakdown: FinanceCategoryBreakdown[] }
 export type FinanceDailySpendingResponse = { days: DailySpending[] }
+export type FinanceGoalCreateParams = { name: string; goalType: string; targetAmount: number; currency: string | null; currentAmount: number | null; deadline: string | null; monthlyContribution: number | null; notes: string | null }
+/**
+ * Row struct for the `finance_goals` table.
+ */
+export type FinanceGoalRow = { id: string; name: string; goalType: string; targetAmount: number; currentAmount: number; currency: string; status: string; deadline: string | null; monthlyContribution: number | null; expectedReturnRate: number | null; inflationRate: number | null; notes: string | null; createdAt: string; updatedAt: string; baseTargetAmount: number; baseCurrentAmount: number; baseCurrency: string; exchangeRate: number }
+export type FinanceGoalUpdateParams = { id: string; currentAmount: number | null; targetAmount: number | null; monthlyContribution: number | null; deadline: string | null; status: string | null }
+export type FinanceInvestmentCreateParams = { portfolioId: string; assetType: string; costBasis: number; quantity: string; symbol: string | null; name: string | null; currency: string | null; purchaseDate: string | null; notes: string | null }
+/**
+ * Row struct for the `finance_investments` table.
+ */
+export type FinanceInvestmentRow = { id: string; portfolioId: string; assetType: string; symbol: string | null; name: string; quantity: string; costBasis: number; currency: string; currentPrice: number | null; currentValue: number | null; purchaseDate: string | null; assetClass: string | null; notes: string | null; createdAt: string; updatedAt: string; marketCurrency: string | null; baseCostBasis: number; baseCurrentValue: number; baseCurrency: string; purchaseRate: number; marketRate: number }
+export type FinanceInvestmentTxCreateParams = { investmentId: string; txType: string; totalAmount: number; currency: string; txDate: string; quantity: number | null; pricePerUnit: number | null; fees: number | null; notes: string | null }
+/**
+ * Row struct for the `finance_investment_transactions` table.
+ */
+export type FinanceInvestmentTxRow = { id: string; investmentId: string; txType: string; quantity: number | null; pricePerUnit: number | null; totalAmount: number; currency: string; fees: number; txDate: string; notes: string | null; createdAt: string; baseTotalAmount: number; baseCurrency: string; exchangeRate: number }
+export type FinanceInvestmentUpdateParams = { id: string; currentPrice: number | null; currentValue: number | null; quantity: string | null; notes: string | null }
+export type FinanceLiabilityCreateParams = { name: string; liabilityType: string; principal: number; currency: string | null; remaining: number | null; interestRate: number | null; monthlyPayment: number | null; dueDate: string | null; notes: string | null }
+/**
+ * Row struct for the `finance_liabilities` table.
+ */
+export type FinanceLiabilityRow = { id: string; name: string; liabilityType: string; principal: number; remaining: number; currency: string; interestRate: number | null; monthlyPayment: number | null; dueDate: string | null; notes: string | null; createdAt: string; updatedAt: string; basePrincipal: number; baseRemaining: number; baseCurrency: string; exchangeRate: number }
+export type FinanceLiabilityUpdateParams = { id: string; remaining: number | null; monthlyPayment: number | null; interestRate: number | null; notes: string | null }
 export type FinanceMonthlySummaryResponse = { currentIncome: number; currentSpending: number; previousIncome: number; previousSpending: number }
 export type FinanceNetWorthResponse = { totalsByCurrency: CurrencyNetWorth[] }
 export type FinancePeriodSummaryResponse = { income: number; spending: number }
+export type FinancePortfolioCreateParams = { name: string; description: string | null; currency: string | null }
 export type FinancePortfolioResponse = { id: string; name: string; description: string | null; currency: string; totalValue: number; totalCostBasis: number; holdingCount: number }
+/**
+ * Row struct for the `finance_portfolios` table.
+ */
+export type FinancePortfolioRow = { id: string; name: string; description: string | null; currency: string; createdAt: string; updatedAt: string }
+export type FinanceTransactionCreateParams = { accountId: string; txType: string; amount: number; currency: string | null; category: string | null; subcategory: string | null; counterparty: string | null; txDate: string | null; notes: string | null }
+export type FinanceTransactionFilterParams = { accountId: string | null; txType: string | null; category: string | null; dateFrom: string | null; dateTo: string | null; query: string | null; limit: number | null }
+/**
+ * Row struct for the `finance_transactions` table.
+ */
+export type FinanceTransactionRow = { id: string; accountId: string; txType: string; amount: number; currency: string; category: string | null; subcategory: string | null; counterparty: string | null; notes: string | null; txDate: string; transferId: string | null; isRecurring: boolean; recurringRule: string | null; createdAt: string; updatedAt: string; baseAmount: number; baseCurrency: string; exchangeRate: number }
 export type FinanceTrendPoint = { period: string; value: number; changePct: number | null }
 export type FlashcardCreateParams = { deck: string; front: string; back: string; cardType: string; tags: string[] | null; sourceNoteId: string | null; clozeData: unknown | null; vocabData: unknown | null }
 export type FlashcardDistractorParams = { cardId: string; count?: number }

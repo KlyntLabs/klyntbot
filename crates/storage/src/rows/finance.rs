@@ -12,7 +12,7 @@ use sqlx::FromRow;
 // ============================================================
 
 /// Row struct for the `finance_accounts` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceAccountRow {
     pub id: String,
@@ -31,7 +31,7 @@ pub struct FinanceAccountRow {
 }
 
 /// Row struct for the `finance_transactions` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceTransactionRow {
     pub id: String,
@@ -55,7 +55,7 @@ pub struct FinanceTransactionRow {
 }
 
 /// Row struct for the `finance_budgets` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceBudgetRow {
     pub id: String,
@@ -78,7 +78,7 @@ pub struct FinanceBudgetRow {
 }
 
 /// Row struct for the `finance_portfolios` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinancePortfolioRow {
     pub id: String,
@@ -90,7 +90,7 @@ pub struct FinancePortfolioRow {
 }
 
 /// Row struct for the `finance_investments` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceInvestmentRow {
     pub id: String,
@@ -124,7 +124,7 @@ impl FinanceInvestmentRow {
 }
 
 /// Row struct for the `finance_investment_transactions` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceInvestmentTxRow {
     pub id: String,
@@ -144,7 +144,7 @@ pub struct FinanceInvestmentTxRow {
 }
 
 /// Row struct for the `finance_goals` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceGoalRow {
     pub id: String,
@@ -168,7 +168,7 @@ pub struct FinanceGoalRow {
 }
 
 /// Row struct for the `finance_liabilities` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceLiabilityRow {
     pub id: String,
@@ -190,7 +190,7 @@ pub struct FinanceLiabilityRow {
 }
 
 /// Row struct for the `finance_exchange_rates` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceExchangeRateRow {
     pub from_currency: String,
@@ -200,7 +200,7 @@ pub struct FinanceExchangeRateRow {
 }
 
 /// Row struct for the `finance_allocation_targets` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceAllocationTargetRow {
     pub id: String,
@@ -213,7 +213,7 @@ pub struct FinanceAllocationTargetRow {
 }
 
 /// Row struct for the `finance_net_worth_snapshots` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FinanceNetWorthSnapshotRow {
     pub id: String,
@@ -362,7 +362,7 @@ pub struct FinanceInvestmentFilter {
 
 /// Result of the `budget_usage` join query: all budget fields plus the
 /// `spent` amount (sum of matching expense transactions in the current period).
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct BudgetUsageRow {
     pub id: String,
@@ -387,7 +387,7 @@ pub struct BudgetUsageRow {
 }
 
 /// Aggregated portfolio summary (holdings count + cost/value totals).
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PortfolioSummaryRow {
     pub portfolio_id: String,
