@@ -1,7 +1,7 @@
 //! `SymbolExtractor` trait + tree-sitter-backed `TreeSitterExtractor`.
 
 use crate::scope::AnchoredSymbol;
-use crate::symbols::Language;
+use crate::symbols::{Language, SymbolCache};
 use std::path::Path;
 use tree_sitter::{Parser, Query, QueryCursor, StreamingIterator};
 
@@ -13,22 +13,47 @@ pub trait SymbolExtractor: Send + Sync + std::fmt::Debug {
     fn extract(&self, path: &Path, source: &str, git_hash: &str) -> Vec<AnchoredSymbol>;
 }
 
-/// Tree-sitter–backed extractor.
-#[derive(Debug, Default)]
+/// Tree-sitter–backed extractor with a bounded LRU cache.
+#[derive(Debug)]
 pub struct TreeSitterExtractor {
-    _private: (),
+    cache: SymbolCache,
+}
+
+impl Default for TreeSitterExtractor {
+    fn default() -> Self {
+        Self {
+            cache: SymbolCache::default(),
+        }
+    }
 }
 
 impl TreeSitterExtractor {
-    /// Construct.
+    /// Construct with default cache capacity (256 entries).
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Construct with a custom cache capacity.
+    #[must_use]
+    pub fn with_cache_capacity(cap: usize) -> Self {
+        Self {
+            cache: SymbolCache::with_capacity(cap),
+        }
+    }
+
+    fn content_hash(source: &str) -> [u8; 32] {
+        *blake3::hash(source.as_bytes()).as_bytes()
     }
 }
 
 impl SymbolExtractor for TreeSitterExtractor {
     fn extract(&self, path: &Path, source: &str, git_hash: &str) -> Vec<AnchoredSymbol> {
+        let hash = Self::content_hash(source);
+        if let Some(hit) = self.cache.get(&path.to_path_buf(), &hash) {
+            return hit;
+        }
+
         let Some(lang) = Language::from_path(path) else {
             return Vec::new();
         };
@@ -102,6 +127,7 @@ impl SymbolExtractor for TreeSitterExtractor {
                 byte_span: Some((span_start, span_end)),
             });
         }
+        self.cache.insert(path.to_path_buf(), hash, out.clone());
         out
     }
 }
