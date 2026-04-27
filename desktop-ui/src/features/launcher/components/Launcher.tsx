@@ -14,7 +14,7 @@ import { ArgChipBar } from "./ArgChipBar";
 import { Dashboard } from "./Dashboard";
 import { DetailPanel } from "./DetailPanel";
 import { FocusActiveChip } from "./FocusActiveChip";
-import { LauncherChatStub } from "./LauncherChatStub";
+import { LauncherChat } from "./LauncherChat";
 import { LauncherInput } from "./LauncherInput";
 import { ResultsList } from "./ResultsList";
 import { VoiceRecorder } from "./VoiceRecorder";
@@ -169,13 +169,18 @@ function LauncherShell() {
             onCancel={() => setMode("dashboard")}
           />
         ) : mode === "chat" && chatSessionKey ? (
-          <LauncherChatStub
-            initialQuery={chatInitialQuery}
+          <LauncherChat
+            initialQuery={chatInitialQuery ?? ""}
+            sessionKey={chatSessionKey}
             onBack={() => {
               setMode("dashboard");
               reset();
             }}
-            onExpand={expandToMain}
+            onExpandToMain={(key) => {
+              emit("navigate", { path: "/chat" });
+              emit("open-chat", { sessionKey: key });
+              getCurrentWindow().hide();
+            }}
           />
         ) : (
           <div ref={bodyRef} className="lc-body">
