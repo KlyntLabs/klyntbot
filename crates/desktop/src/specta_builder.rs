@@ -388,6 +388,7 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::productivity::productivity_project_upsert,
             crate::commands::productivity::productivity_project_delete,
             crate::commands::productivity::productivity_weekly_assessment,
+            crate::commands::productivity::focus_session_start,
             crate::commands::productivity::focus_session_stop,
             crate::commands::productivity::focus_session_status,
             crate::commands::productivity::focus_session_pause,

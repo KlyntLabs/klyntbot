@@ -110,6 +110,20 @@ pub struct FocusSessionStatusResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
+pub struct FocusSessionStartParams {
+    pub work_secs: u64,
+    pub short_break_secs: u64,
+    pub long_break_secs: u64,
+    pub long_break_after: u32,
+    pub action_id: Option<String>,
+    pub action_title: Option<String>,
+    pub dnd_enabled: Option<bool>,
+    pub sound_enabled: Option<bool>,
+    pub notification_enabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
 pub struct DistractionResponse {
     pub action: String,
     pub app_name: Option<String>,

@@ -10,7 +10,6 @@ use desktop_shared::commands::{
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::events::AutoFocusPayload;
-use feature_productivity::auto_focus::AutoFocusEvent;
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -400,27 +399,19 @@ pub async fn calendar_sync_events(
 use crate::focus_timer::{FocusSessionConfig, SessionCommand};
 use desktop_shared::commands::FocusSessionStatusResponse;
 
-#[allow(clippy::too_many_arguments)]
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn focus_session_start(
     state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
     app: tauri::AppHandle,
-    work_secs: u64,
-    short_break_secs: u64,
-    long_break_secs: u64,
-    long_break_after: u32,
-    action_id: Option<String>,
-    action_title: Option<String>,
-    dnd_enabled: Option<bool>,
-    sound_enabled: Option<bool>,
-    notification_enabled: Option<bool>,
+    params: desktop_shared::commands::FocusSessionStartParams,
 ) -> Result<FocusSessionResponse, ApiError> {
     let config = FocusSessionConfig {
-        work_secs,
-        short_break_secs,
-        long_break_secs,
-        long_break_after,
+        work_secs: params.work_secs,
+        short_break_secs: params.short_break_secs,
+        long_break_secs: params.long_break_secs,
+        long_break_after: params.long_break_after,
     };
 
     // Clean up any orphaned DB sessions (from app restart or stale timer)
@@ -429,7 +420,7 @@ pub async fn focus_session_start(
 
     // Start persistent session in AppCore
     let session = state
-        .productivity_focus_start(action_id.clone(), None, Some(work_secs as i64 / 60))
+        .productivity_focus_start(params.action_id.clone(), None, Some(params.work_secs as i64 / 60))
         .await?;
 
     // Start the desktop timer (phase state machine)
@@ -437,11 +428,11 @@ pub async fn focus_session_start(
         .start(
             app,
             config,
-            action_id,
-            action_title,
-            dnd_enabled.unwrap_or(false),
-            sound_enabled.unwrap_or(true),
-            notification_enabled.unwrap_or(true),
+            params.action_id,
+            params.action_title,
+            params.dnd_enabled.unwrap_or(false),
+            params.sound_enabled.unwrap_or(true),
+            params.notification_enabled.unwrap_or(true),
         )
         .await
         .map_err(|e| ApiError::new("TIMER_ERROR", e.to_string()))?;

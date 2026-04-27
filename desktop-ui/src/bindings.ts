@@ -2811,6 +2811,14 @@ async productivityWeeklyAssessment(weekStart: string) : Promise<Result<WeeklyAss
     else return { status: "error", error: e  as any };
 }
 },
+async focusSessionStart(params: FocusSessionStartParams) : Promise<Result<FocusSessionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_session_start", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async focusSessionStop(notes: string | null) : Promise<Result<FocusSessionResponse | null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("focus_session_stop", { notes }) };
@@ -4322,6 +4330,7 @@ export type FocusDndUnavailablePayload = { message: string }
 export type FocusMode = "dnd"
 export type FocusSession = { id: number; mode: FocusMode; startedAt: string; endsAt: string; endedAt: string | null; alarmId: string | null; source: string }
 export type FocusSessionResponse = { id: string; actionId: string | null; projectId: string | null; sessionType: string; targetMins: number | null; startedAt: string; endedAt: string | null; actualMins: number | null; interruptions: number; qualityScore: number | null; completed: boolean; notes: string | null }
+export type FocusSessionStartParams = { workSecs: number; shortBreakSecs: number; longBreakSecs: number; longBreakAfter: number; actionId: string | null; actionTitle: string | null; dndEnabled: boolean | null; soundEnabled: boolean | null; notificationEnabled: boolean | null }
 export type FocusSessionStatusResponse = { active: boolean; sync: FocusSyncPayload | null; session: FocusSessionResponse | null }
 export type FocusStatePayload = { state: string; since: string }
 export type FocusSyncPayload = { phase: string; remainingSecs: number; totalSecs: number; cyclePosition: number; longBreakAfter: number; paused: boolean; actionTitle: string | null; dndActive: boolean }
