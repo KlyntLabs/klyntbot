@@ -43,7 +43,7 @@ pub enum SidebarItem {
     Settings,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum EntityKind {
     Task,
@@ -188,6 +188,15 @@ mod phase4_kind_tests {
     fn coding_episode_serializes_camel_case() {
         let v = serde_json::to_value(EntityKind::CodingEpisode).unwrap();
         assert_eq!(v, serde_json::json!("codingEpisode"));
+    }
+
+    #[test]
+    fn entity_kind_implements_specta_type() {
+        use specta::Type;
+        let mut map = specta::TypeMap::default();
+        let dt = EntityKind::reference(&mut map, &[]);
+        // We don't pin the exact shape — just that it produces a value.
+        let _ = dt;
     }
 
     #[test]

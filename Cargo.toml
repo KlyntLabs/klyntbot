@@ -147,6 +147,9 @@ tempfile = "3.14"
 jiff = { version = "0.2", features = ["serde", "tz-system"] }
 iana-time-zone = "0.1"
 rrule = "0.14"
+specta = { version = "=2.0.0-rc.22", default-features = false, features = ["derive"] }
+specta-typescript = "0.0.9"
+tauri-specta = { version = "=2.0.0-rc.21", default-features = false, features = ["derive", "typescript"] }
 aho-corasick = "1"
 fastembed = "5"
 lance = "4"

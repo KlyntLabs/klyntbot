@@ -3,6 +3,10 @@ name = "desktop"
 version.workspace = true
 edition.workspace = true
 
+[lib]
+name = "desktop"
+path = "src/lib.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -63,6 +67,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rmcp = { workspace = true, features = ["server", "transport-io", "transport-streamable-http-server"] }
 mcp-bridge = { path = "../mcp-bridge" }
 mimalloc = { workspace = true }
+specta = { workspace = true }
+specta-typescript = { workspace = true }
+tauri-specta = { workspace = true }
 
 [features]
 default = ["qwen3"]
