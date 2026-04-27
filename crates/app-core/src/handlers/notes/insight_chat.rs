@@ -159,7 +159,7 @@ impl AppCore {
     /// When `squad_id` is set, makes parallel per-persona LLM calls and stores
     /// each response as a separate message with `persona_id`. Otherwise, streams
     /// a single AI response.
-    #[tracing::instrument(skip(self), err)]
+    #[tracing::instrument(skip(self, emitter), err)]
     pub async fn note_insight_tab_chat(
         &self,
         params: &InsightChatParams,

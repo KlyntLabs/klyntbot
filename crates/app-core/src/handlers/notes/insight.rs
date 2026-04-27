@@ -40,7 +40,7 @@ fn row_to_insight_response(row: feature_insights::InsightReviewRow) -> InsightRe
 }
 
 impl AppCore {
-    #[tracing::instrument(skip(self), err)]
+    #[tracing::instrument(skip(self, emitter_override), err)]
     pub async fn note_insight_review(
         &self,
         note_id: &str,

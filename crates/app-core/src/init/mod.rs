@@ -68,7 +68,7 @@ impl AppCore {
     ///
     /// Returns `(AppCore, EventChannels)`. The caller wires `EventChannels`
     /// receivers to their transport layer (Tauri events, SSE, etc.).
-    #[tracing::instrument(skip(self), err)]
+    #[tracing::instrument(err)]
     pub async fn init(
         mode: common::AppMode,
         config_override: Option<config::Config>,
@@ -85,7 +85,7 @@ impl AppCore {
     /// When `event_emitter` is `Some`, entity update events from MCP tool
     /// mutations are forwarded to the frontend. When `None`, a no-op emitter
     /// is used (CLI / standalone MCP server).
-    #[tracing::instrument(skip(self), err)]
+    #[tracing::instrument(skip(notification_sender, event_emitter), err)]
     pub async fn init_with_sender(
         mode: common::AppMode,
         config_override: Option<config::Config>,

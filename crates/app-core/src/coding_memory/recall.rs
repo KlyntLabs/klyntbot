@@ -12,7 +12,7 @@ pub struct RecallOpHandler {
 impl RecallOpHandler {
     /// Construct with the shared recall service.
     #[must_use]
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(svc))]
     pub fn new(svc: Arc<CodingRecallService>) -> Self {
         Self { svc }
     }

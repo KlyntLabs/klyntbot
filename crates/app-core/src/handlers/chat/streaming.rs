@@ -1852,7 +1852,7 @@ impl AppCore {
     }
 
     /// Spawn the streaming relay as a background task with the given emitter.
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self, stream_info, emitter))]
     pub fn spawn_chat_relay(
         &self,
         stream_info: ChatStreamInfo,
