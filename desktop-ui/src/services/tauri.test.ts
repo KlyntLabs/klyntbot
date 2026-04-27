@@ -55,9 +55,9 @@ import {
   writeGlobalCodexConfigToml,
 } from "./tauri";
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-}));
+import { mockTauriCore } from "@/test/mockTauri";
+
+vi.mock("@tauri-apps/api/core", () => mockTauriCore());
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
