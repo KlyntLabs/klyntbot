@@ -18,6 +18,12 @@ cargo fmt --all --check                            # Check formatting
 
 Root facade crate has 5 test binaries in `tests/`: `integration/` (cross-crate via facade), `e2e/` (agent loop + reminders), `unit/` (config, providers), `plugins.rs` (WASM, needs `--features plugin-integration` + pre-built plugin), `simulation/` (scenario-based agent smoke tests). Shared fixtures in `tests/common/`. All tests use ephemeral SQLite (`StoragePool::connect_in_memory()`). No external DB needed.
 
+## Dependency hygiene
+
+Run periodically (e.g. before a release):
+- `cargo machete` — fast static check for unused deps in `Cargo.toml`
+- `cargo +nightly udeps --workspace` — slower but compiler-driven; catches what machete misses
+
 ## Desktop UI (desktop-ui/)
 
 ```bash
