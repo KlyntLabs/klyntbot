@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Memory DTOs ─────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SemanticFactResponse {
     pub id: String,
@@ -21,7 +21,7 @@ pub struct SemanticFactResponse {
     pub status: String, // "active" | "superseded" | "archived"
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EpisodicMemoryResponse {
     pub id: String,
@@ -35,7 +35,7 @@ pub struct EpisodicMemoryResponse {
     pub access_count: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProceduralRuleResponse {
     pub id: String,
@@ -49,7 +49,7 @@ pub struct ProceduralRuleResponse {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct UserModelSummaryResponse {
     pub identity_count: usize,
@@ -66,7 +66,7 @@ pub struct UserModelSummaryResponse {
     pub preferences_preview: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoryStatsResponse {
     pub active_facts: usize,
@@ -78,7 +78,7 @@ pub struct MemoryStatsResponse {
 
 // ── Coaching DTOs ───────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct UserSituationResponse {
     pub energy_level: f64,
@@ -93,7 +93,7 @@ pub struct UserSituationResponse {
     pub recent_context_switches: i32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SignalResponse {
     pub event_type: String,
@@ -101,7 +101,7 @@ pub struct SignalResponse {
     pub metadata: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TriggerConditionResponse {
     pub name: String,
@@ -109,7 +109,7 @@ pub struct TriggerConditionResponse {
     pub last_fired: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SignalWindowResponse {
     pub window_size: usize,
@@ -117,7 +117,7 @@ pub struct SignalWindowResponse {
     pub triggers: Vec<TriggerConditionResponse>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DetectedPatternResponse {
     pub name: String,
@@ -127,7 +127,7 @@ pub struct DetectedPatternResponse {
     pub domain: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DeliveredInterventionResponse {
     pub id: String,
@@ -137,7 +137,7 @@ pub struct DeliveredInterventionResponse {
     pub timestamp: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct StrategyFeedbackResponse {
     pub strategy_type: String,
@@ -149,7 +149,7 @@ pub struct StrategyFeedbackResponse {
     pub behavioral_negative: i32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RouterStatusResponse {
     pub hourly_count: usize,
@@ -158,7 +158,7 @@ pub struct RouterStatusResponse {
     pub daily_limit: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct InterventionLogResponse {
     pub id: String,
@@ -172,19 +172,20 @@ pub struct InterventionLogResponse {
 
 // ── Events DTOs ─────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DomainEventPayload {
     pub event_type: String,
     pub salience: String, // "extract" | "accumulate" | "discard"
     pub domain: String,
     pub timestamp: String,
+    #[specta(type = crate::specta_helpers::JsonValue)]
     pub payload: serde_json::Value,
 }
 
 // ── System DTOs ─────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentStatusResponse {
     pub name: String,
@@ -193,7 +194,7 @@ pub struct ComponentStatusResponse {
     pub notes: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemStatusResponse {
     pub domain_bus_subscribers: usize,
@@ -208,7 +209,7 @@ pub struct SystemStatusResponse {
 
 // ── Mutation Params ─────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FactCreateParams {
     pub domain: String,
@@ -218,14 +219,14 @@ pub struct FactCreateParams {
     pub confidence: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FactUpdateParams {
     pub object: Option<String>,
     pub confidence: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RuleCreateParams {
     pub domain: String,
@@ -235,7 +236,7 @@ pub struct RuleCreateParams {
 
 // ── Knowledge Trust DTOs ────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoryHealthResponse {
     pub overall: f64,
@@ -246,7 +247,7 @@ pub struct MemoryHealthResponse {
     pub computed_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DomainHealthEntry {
     pub domain: String,
@@ -256,7 +257,7 @@ pub struct DomainHealthEntry {
     pub fast_failures: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CompactionResultResponse {
     pub archived_count: u64,
@@ -266,7 +267,7 @@ pub struct CompactionResultResponse {
 
 // ── Memory Reference Detail ────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoryReferenceDetail {
     pub ref_type: String,

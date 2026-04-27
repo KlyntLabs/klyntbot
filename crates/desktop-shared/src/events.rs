@@ -6,7 +6,7 @@ use crate::types::EntityKind;
 ///
 /// Serializes to `{ "type": "text", "content": "..." }` or
 /// `{ "type": "tool", "name": "...", "success": true, "durationMs": 123 }`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(tag = "type")]
 pub enum MessageSegment {
     #[serde(rename = "text")]
@@ -85,14 +85,14 @@ pub const SCORE_UPDATED: &str = "score:updated";
 pub const BUCKET_COMPLETED: &str = "bucket:completed";
 pub const INSIGHT_GENERATED: &str = "insight:generated";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct McpOAuthCompletePayload {
     pub server_name: String,
     pub provider: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct McpServerStatusPayload {
     pub server_name: String,
@@ -104,7 +104,7 @@ pub struct McpServerStatusPayload {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct McpStartupCompletePayload {
     pub ready: usize,
@@ -112,21 +112,21 @@ pub struct McpStartupCompletePayload {
     pub skipped: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ContentChunkPayload {
     pub session_key: String,
     pub data: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct DonePayload {
     pub session_key: String,
     pub content: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolStartPayload {
     pub session_key: String,
@@ -137,7 +137,7 @@ pub struct ToolStartPayload {
     pub agent: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolEndPayload {
     pub session_key: String,
@@ -154,14 +154,14 @@ pub struct ToolEndPayload {
     pub agent: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentErrorPayload {
     pub session_key: String,
     pub message: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct EntityCreatedPayload {
     pub session_key: String,
@@ -170,20 +170,20 @@ pub struct EntityCreatedPayload {
     pub entity_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct EntityUpdatedPayload {
     pub entity_kind: EntityKind,
     pub id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatThreadPayload {
     pub session_key: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatMessagePayload {
     pub session_key: String,
@@ -191,13 +191,13 @@ pub struct ChatMessagePayload {
     pub source: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct PipelineStartedPayload {
     pub session_key: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextAssembledPayload {
     pub session_key: String,
@@ -205,7 +205,7 @@ pub struct ContextAssembledPayload {
     pub duration_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct EnhancementStagePayload {
     pub name: String,
@@ -217,7 +217,7 @@ pub struct EnhancementStagePayload {
     pub output_summary: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct RetrievalEnhancedPayload {
     pub session_key: String,
@@ -226,7 +226,7 @@ pub struct RetrievalEnhancedPayload {
     pub total_llm_calls: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ClassificationCompletePayload {
     pub session_key: String,
@@ -235,7 +235,7 @@ pub struct ClassificationCompletePayload {
     pub source: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ExecutionStartedPayload {
     pub session_key: String,
@@ -243,15 +243,16 @@ pub struct ExecutionStartedPayload {
     pub max_iterations: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct InteractionRequestPayload {
     pub session_key: String,
     pub request_id: String,
+    #[specta(type = crate::specta_helpers::JsonValue)]
     pub request: common::InteractionRequest,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct IterationStartPayload {
     pub session_key: String,
@@ -259,7 +260,7 @@ pub struct IterationStartPayload {
     pub max_iterations: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfidenceAssessedPayload {
     pub session_key: String,
@@ -267,7 +268,7 @@ pub struct ConfidenceAssessedPayload {
     pub action: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct UsageReportPayload {
     pub session_key: String,
@@ -280,7 +281,7 @@ pub struct UsageReportPayload {
     pub response_time_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoryAccessPayload {
     pub session_key: String,
@@ -289,7 +290,7 @@ pub struct MemoryAccessPayload {
     pub results_count: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillLoadedPayload {
     pub session_key: String,
@@ -299,7 +300,7 @@ pub struct SkillLoadedPayload {
     pub agent: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct LearningEventPayload {
     pub session_key: String,
@@ -307,7 +308,7 @@ pub struct LearningEventPayload {
     pub detail: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct SubagentSpawnedPayload {
     pub session_key: String,
@@ -315,7 +316,7 @@ pub struct SubagentSpawnedPayload {
     pub profile: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentSelectedPayload {
     pub session_key: String,
@@ -323,7 +324,7 @@ pub struct AgentSelectedPayload {
     pub description: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct DelegationStartedPayload {
     pub session_key: String,
@@ -333,7 +334,7 @@ pub struct DelegationStartedPayload {
     pub depth: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct DelegationCompletedPayload {
     pub session_key: String,
@@ -343,14 +344,14 @@ pub struct DelegationCompletedPayload {
     pub duration_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct DistractionPayload {
     pub app_name: String,
     pub session_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct NudgePayload {
     pub nudge_type: String,
@@ -361,7 +362,7 @@ pub const COACHING_INTERVENTION: &str = "coaching:intervention";
 pub const DISTRACTION_INTERVENTION: &str = "distraction:intervention";
 pub const DISTRACTION_VERDICT: &str = "distraction:verdict";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct InterventionPayload {
     pub app_name: String,
@@ -371,14 +372,14 @@ pub struct InterventionPayload {
     pub heuristic_verdict: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct VerdictPayload {
     pub classification: String,
     pub display_text: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanGeneratedPayload {
     pub session_key: String,
@@ -386,7 +387,7 @@ pub struct PlanGeneratedPayload {
     pub raw_plan: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanStepCompletedPayload {
     pub session_key: String,
@@ -395,7 +396,7 @@ pub struct PlanStepCompletedPayload {
     pub tool_name: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct BudgetWarningPayload {
     pub session_key: String,
@@ -404,7 +405,7 @@ pub struct BudgetWarningPayload {
     pub usage_percent: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct PersonaPerspectivePayload {
     pub session_key: String,
@@ -416,7 +417,7 @@ pub struct PersonaPerspectivePayload {
     pub challenge: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct DebateRoundStartedPayload {
     pub session_key: String,
@@ -425,7 +426,7 @@ pub struct DebateRoundStartedPayload {
     pub phase: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct DebateJudgeDecisionPayload {
     pub session_key: String,
@@ -436,7 +437,7 @@ pub struct DebateJudgeDecisionPayload {
     pub reasoning: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct DebateRoundCompletedPayload {
     pub session_key: String,
@@ -444,7 +445,7 @@ pub struct DebateRoundCompletedPayload {
     pub consensus_score: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ConsensusReachedPayload {
     pub session_key: String,
@@ -453,7 +454,7 @@ pub struct ConsensusReachedPayload {
     pub summary: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoryPromotedPayload {
     pub session_key: String,
@@ -466,7 +467,7 @@ pub struct MemoryPromotedPayload {
 
 /// Accumulated transparency data for an assistant message.
 /// Serialized into `SessionMessage.metadata.transparency`.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyData {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -501,7 +502,7 @@ pub struct TransparencyData {
     pub enhancement: Option<TransparencyEnhancement>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyEnhancement {
     pub stages: Vec<EnhancementStagePayload>,
@@ -509,7 +510,7 @@ pub struct TransparencyEnhancement {
     pub total_llm_calls: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyUsage {
     pub prompt_tokens: u32,
@@ -518,14 +519,14 @@ pub struct TransparencyUsage {
     pub cache_write_tokens: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyCost {
     pub estimated_usd: f64,
     pub model: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyTiming {
     pub total_ms: u64,
@@ -533,7 +534,7 @@ pub struct TransparencyTiming {
     pub context_assembly_ms: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyTool {
     pub name: String,
@@ -547,7 +548,7 @@ pub struct TransparencyTool {
     pub agent: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyMemoryAccess {
     pub action: String,
@@ -555,7 +556,7 @@ pub struct TransparencyMemoryAccess {
     pub results_count: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencySkill {
     pub name: String,
@@ -564,7 +565,7 @@ pub struct TransparencySkill {
     pub agent: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyExecution {
     pub engine: String,
@@ -573,7 +574,7 @@ pub struct TransparencyExecution {
     pub escalations: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyClassification {
     pub strategy: String,
@@ -581,28 +582,28 @@ pub struct TransparencyClassification {
     pub source: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyAgentSelected {
     pub name: String,
     pub description: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencySubagent {
     pub label: String,
     pub profile: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyLearning {
     pub event_type: String,
     pub detail: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyDelegation {
     pub from_agent: String,
@@ -614,14 +615,14 @@ pub struct TransparencyDelegation {
     pub duration_ms: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyPlan {
     pub steps: Vec<String>,
     pub completed_steps: Vec<usize>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityTickPayload {
     pub app_name: String,
@@ -630,7 +631,7 @@ pub struct ActivityTickPayload {
     pub is_idle: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivitySwitchPayload {
     pub from_app: Option<String>,
@@ -639,14 +640,14 @@ pub struct ActivitySwitchPayload {
     pub category_type: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct FocusStatePayload {
     pub state: String,
     pub since: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct AutoFocusPayload {
     pub started_at: String,
@@ -656,7 +657,7 @@ pub struct AutoFocusPayload {
     pub productive_ratio: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct ScorePayload {
     pub score: f64,
@@ -664,7 +665,7 @@ pub struct ScorePayload {
     pub distracting_secs: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct BucketPayload {
     pub bucket_start: String,
@@ -673,7 +674,7 @@ pub struct BucketPayload {
     pub dominant_app: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightPayload {
     pub id: String,
@@ -682,7 +683,7 @@ pub struct InsightPayload {
     pub sentiment: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct FocusSyncPayload {
     pub phase: String,
@@ -695,20 +696,20 @@ pub struct FocusSyncPayload {
     pub dnd_active: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct FocusWarningPayload {
     pub phase: String,
     pub remaining_secs: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct FocusDndUnavailablePayload {
     pub message: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 #[serde(rename_all = "camelCase")]
 pub struct DistractionDetectedPayload {
     pub app_name: String,

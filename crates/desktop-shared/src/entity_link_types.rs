@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EntityLinkResponse {
     pub id: String,
@@ -9,11 +9,12 @@ pub struct EntityLinkResponse {
     pub target_kind: String,
     pub target_id: String,
     pub link_type: String,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub metadata: Option<serde_json::Value>,
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EntityLinkCreateParams {
     pub source_kind: String,
@@ -21,17 +22,18 @@ pub struct EntityLinkCreateParams {
     pub target_kind: String,
     pub target_id: String,
     pub link_type: Option<String>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub metadata: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct EntityLinksForEntityParams {
     pub kind: String,
     pub id: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LinkedEntitiesResponse {
     pub tasks: Vec<ActionSummaryResponse>,
@@ -42,7 +44,7 @@ pub struct LinkedEntitiesResponse {
     pub key_results: Vec<KeyResultSummaryResponse>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ActionSummaryResponse {
     pub id: String,
@@ -51,7 +53,7 @@ pub struct ActionSummaryResponse {
     pub priority: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteSummaryResponse {
     pub id: String,
@@ -59,7 +61,7 @@ pub struct NoteSummaryResponse {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummaryResponse {
     pub key: String,
@@ -68,7 +70,7 @@ pub struct SessionSummaryResponse {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectiveSummaryResponse {
     pub id: String,
@@ -77,7 +79,7 @@ pub struct ObjectiveSummaryResponse {
     pub status: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyResultSummaryResponse {
     pub id: String,
@@ -85,7 +87,7 @@ pub struct KeyResultSummaryResponse {
     pub progress: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSourceResponse {
     pub id: String,
@@ -95,13 +97,14 @@ pub struct ProjectSourceResponse {
     pub content: Option<String>,
     pub url: Option<String>,
     pub file_path: Option<String>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub metadata: Option<serde_json::Value>,
     pub tags: Vec<String>,
     pub created_at: String,
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSourceCreateParams {
     pub project_id: String,
@@ -110,17 +113,19 @@ pub struct ProjectSourceCreateParams {
     pub content: Option<String>,
     pub url: Option<String>,
     pub file_path: Option<String>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub metadata: Option<serde_json::Value>,
     pub tags: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSourceUpdateParams {
     pub id: String,
     pub title: Option<String>,
     pub content: Option<Option<String>>,
     pub url: Option<Option<String>>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub metadata: Option<serde_json::Value>,
     pub tags: Option<Vec<String>>,
 }

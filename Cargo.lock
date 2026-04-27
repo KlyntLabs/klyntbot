@@ -4194,6 +4194,7 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
+ "tauri-specta",
  "voice-engine",
 ]
 

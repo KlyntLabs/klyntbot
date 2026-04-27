@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum Priority {
     P1,
@@ -9,7 +9,7 @@ pub enum Priority {
     P4,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum Status {
     Todo,
@@ -18,7 +18,7 @@ pub enum Status {
     Archived,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum AreaFilter {
     All,
@@ -26,7 +26,7 @@ pub enum AreaFilter {
     Personal,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ViewMode {
     Table,
@@ -34,7 +34,7 @@ pub enum ViewMode {
     Tree,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum SidebarItem {
     Chat,
@@ -100,13 +100,14 @@ impl EntityKind {
 
 // ── Cron / Automations ──────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CronJobResponse {
     pub id: String,
     pub name: String,
     pub enabled: bool,
     pub origin: String,
+    #[specta(type = crate::specta_helpers::JsonValue)]
     pub schedule: serde_json::Value,
     pub payload: CronPayloadResponse,
     pub state: CronJobStateResponse,
@@ -115,7 +116,7 @@ pub struct CronJobResponse {
     pub delete_after_run: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CronPayloadResponse {
     pub kind: String,
@@ -127,7 +128,7 @@ pub struct CronPayloadResponse {
     pub to: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CronJobStateResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -140,10 +141,11 @@ pub struct CronJobStateResponse {
     pub last_error: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CronJobCreateParams {
     pub name: String,
+    #[specta(type = crate::specta_helpers::JsonValue)]
     pub schedule: serde_json::Value,
     pub message: String,
     #[serde(default)]
@@ -154,11 +156,12 @@ pub struct CronJobCreateParams {
     pub delete_after_run: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CronJobUpdateParams {
     pub id: String,
     pub name: Option<String>,
+    #[specta(type = Option<crate::specta_helpers::JsonValue>)]
     pub schedule: Option<serde_json::Value>,
     pub message: Option<String>,
     pub deliver: Option<bool>,
@@ -166,7 +169,7 @@ pub struct CronJobUpdateParams {
     pub to: Option<Option<String>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CronStatusResponse {
     pub enabled: bool,
