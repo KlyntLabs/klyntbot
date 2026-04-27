@@ -10,11 +10,9 @@ vi.mock("../../../services/dragDrop", () => ({
   subscribeWindowDragDrop: vi.fn(() => () => {}),
 }));
 
-import { mockTauriCore } from "@/test/mockTauri";
-
-vi.mock("@tauri-apps/api/core", () =>
-  mockTauriCore({ convertFileSrc: (path: string) => `tauri://${path}` })
-);
+vi.mock("@tauri-apps/api/core", () => ({
+  convertFileSrc: (path: string) => `tauri://${path}`,
+}));
 
 vi.mock("../../../utils/platformPaths", async () => {
   const actual = await vi.importActual<typeof import("../../../utils/platformPaths")>(
