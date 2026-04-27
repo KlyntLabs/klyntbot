@@ -154,7 +154,7 @@ specta-typescript = "0.0.9"
 tauri-specta = { version = "=2.0.0-rc.21", default-features = false, features = ["derive", "typescript"] }
 aho-corasick = "1"
 fastembed = "5"
-lance = "4"
+lance = "=4.0.0"
 lance-io = "4"
 lancedb = "0.27"
 arrow = "57"
