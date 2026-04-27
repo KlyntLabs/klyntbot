@@ -172,6 +172,7 @@ Transform vague tasks into verifiable goals — "fix the bug" → "write a test 
 - Tests: `#[cfg(test)] mod tests` inline. Integration tests in `tests/` via facade crate.
 - Commits: Conventional format — `feat(scope): description`, `fix(scope): description`.
 - Zero clippy warnings policy. `desktop` crate has pre-existing exceptions.
+- **Tracing:** every public method on an `AppCore` handler must be annotated with `#[tracing::instrument(skip(self), err)]`. New handler methods inherit the convention. The Tauri command shells in `crates/desktop/src/commands/` are NOT instrumented (thin adapters); the trace span lives one layer down.
 
 ## Non-goals
 
