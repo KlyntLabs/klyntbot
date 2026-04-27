@@ -15,6 +15,50 @@ use super::{TestOutcome, TurnTokenUsage, TurnTrace};
 use coding_ingest::event::{AgentEvent, EventKind, FileOp};
 use jiff::Timestamp;
 
+use crate::scope::AnchoredSymbol;
+use crate::symbols::SymbolExtractor;
+
+/// Produce anchored symbols for the files modified during this turn. Reads
+/// each file from disk (best-effort — IO errors yield `vec![]`) and extracts
+/// via the supplied tree-sitter extractor. `git_hash` should be the repo's
+/// current HEAD or, when unavailable, the literal `"unknown"`.
+pub fn extract_refactor_anchors(
+    extractor: &dyn SymbolExtractor,
+    files: &[(std::path::PathBuf, i64)],
+    git_hash: &str,
+) -> Vec<AnchoredSymbol> {
+    let mut out = Vec::new();
+    for (path, _delta) in files {
+        let Ok(source) = std::fs::read_to_string(path) else {
+            continue;
+        };
+        out.extend(extractor.extract(path, &source, git_hash));
+    }
+    out
+}
+
+/// Variant of `extract_refactor_anchors` that uses pre-extracted SymbolRefs
+/// from `FileEditEnriched` events without re-parsing — the klynt-cli first-class
+/// fast path.
+#[must_use]
+pub fn anchors_from_enriched(events: &[AgentEvent]) -> Vec<AnchoredSymbol> {
+    let mut out = Vec::new();
+    for AgentEvent::V1(v1) in events {
+        if let EventKind::FileEditEnriched { anchored_symbols, .. } = &v1.kind {
+            for sym in anchored_symbols {
+                out.push(AnchoredSymbol {
+                    file_path: sym.file_path.clone(),
+                    symbol: sym.symbol.clone(),
+                    kind: "function".into(),
+                    git_hash: sym.git_hash.clone(),
+                    byte_span: None,
+                });
+            }
+        }
+    }
+    out
+}
+
 /// Build the `TurnTrace` for one turn from its ordered events.
 pub fn compute_turn_trace(
     session_id: &str,

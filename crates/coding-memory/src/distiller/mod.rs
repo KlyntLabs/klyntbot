@@ -15,6 +15,8 @@ use tokio::sync::Mutex;
 use turn_buffer::{TurnBoundary, TurnBuffer};
 use uuid::Uuid;
 
+use crate::symbols::{SymbolExtractor, TreeSitterExtractor};
+
 pub use retry_queue::{DistillationRetryRepo, RetryReason, RetryRow};
 
 /// Distiller-scoped error taxonomy.
@@ -151,6 +153,8 @@ struct DistillerInner {
     /// publishes a `DomainEvent::CodingMemoryUpdated` so UI panels can refresh
     /// without polling. `None` keeps standalone use (tests, CLI replays) silent.
     event_bus: Option<Arc<bus::DomainEventBus>>,
+    /// Symbol extractor for anchored_symbols population (Phase 6).
+    extractor: Arc<dyn SymbolExtractor>,
 }
 
 impl std::fmt::Debug for DistillerInner {
@@ -177,6 +181,25 @@ impl Distiller {
         provider: Arc<ProviderManager>,
         retriever: Arc<dyn context_engine::MemoryRetriever>,
     ) -> Self {
+        Self::with_extractor(
+            config,
+            ingest_repo,
+            writer,
+            provider,
+            retriever,
+            Arc::new(TreeSitterExtractor::new()),
+        )
+    }
+
+    /// Construct with a caller-supplied symbol extractor (used by tests with a mock).
+    pub fn with_extractor(
+        config: DistillerConfig,
+        ingest_repo: Arc<IngestEventLogRepo>,
+        writer: writer::DistillerWriter,
+        provider: Arc<ProviderManager>,
+        retriever: Arc<dyn context_engine::MemoryRetriever>,
+        extractor: Arc<dyn SymbolExtractor>,
+    ) -> Self {
         Self {
             inner: Arc::new(DistillerInner {
                 config,
@@ -187,6 +210,7 @@ impl Distiller {
                 retry_repo: None,
                 buffer: Mutex::new(TurnBuffer::new()),
                 event_bus: None,
+                extractor,
             }),
         }
     }
@@ -417,7 +441,7 @@ impl Distiller {
 
         // Phase C per observation.
         for obs in &observations {
-            let prepared = match fact_builder::build_prepared(obs, repo_id.as_deref(), &prov_llm) {
+            let prepared = match fact_builder::build_prepared(obs, repo_id.as_deref(), &prov_llm, Some(&*self.inner.extractor)) {
                 Ok(p) => p,
                 Err(_) => continue,
             };

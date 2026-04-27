@@ -28,8 +28,9 @@ fn repo_context_becomes_prepared_fact() {
         scope: ObservationScope::Repo,
         reasoning: "Cargo.toml lists tauri 2".into(),
         outcome: None,
+        files: vec![],
     };
-    let built = build_prepared(&o, Some("github.com/klynt/bot"), &prov()).unwrap();
+    let built = build_prepared(&o, Some("github.com/klynt/bot"), &prov(), None).unwrap();
     let PreparedFact {
         fact,
         scope_repo_id,
@@ -56,8 +57,9 @@ fn style_preference_becomes_prepared_fact_with_preferences_domain() {
         scope: ObservationScope::Global,
         reasoning: "observed 3x".into(),
         outcome: None,
+        files: vec![],
     };
-    let built = build_prepared(&o, None, &prov()).unwrap();
+    let built = build_prepared(&o, None, &prov(), None).unwrap();
     let fact = match built {
         coding_memory::distiller::fact_builder::Prepared::Fact(PreparedFact { fact, .. }) => fact,
         _ => panic!(),
@@ -77,8 +79,9 @@ fn fix_attempt_becomes_prepared_episode_with_kind() {
         scope: ObservationScope::Repo,
         reasoning: "tests now pass".into(),
         outcome: None,
+        files: vec![],
     };
-    let built = build_prepared(&o, Some("github.com/klynt/bot"), &prov()).unwrap();
+    let built = build_prepared(&o, Some("github.com/klynt/bot"), &prov(), None).unwrap();
     let ep = match built {
         coding_memory::distiller::fact_builder::Prepared::Episode(e) => e,
         _ => panic!("expected Episode"),
@@ -98,8 +101,9 @@ fn workflow_pattern_becomes_prepared_fact_with_pattern_memory_type() {
         scope: ObservationScope::Repo,
         reasoning: "observed 4x".into(),
         outcome: None,
+        files: vec![],
     };
-    let built = build_prepared(&o, Some("x"), &prov()).unwrap();
+    let built = build_prepared(&o, Some("x"), &prov(), None).unwrap();
     let fact = match built {
         coding_memory::distiller::fact_builder::Prepared::Fact(PreparedFact { fact, .. }) => fact,
         _ => panic!(),
