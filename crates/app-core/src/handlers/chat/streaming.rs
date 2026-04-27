@@ -3,13 +3,13 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
+use agent::AgentEvent;
 use agent::engines::debate;
 use agent::engines::debate_types::{
     DebateConfig, DebateContext, DebateEvent, DebateResult, DefaultInteractionMode,
     SquadInteractionMode,
 };
 use agent::engines::interaction::detect_interaction_mode;
-use agent::AgentEvent;
 use cognitive::{BlackboardRepo, PersonaAccuracyRepo, ResolvedSquad};
 use common::EntityCard;
 use desktop_shared::commands::{ChatMessageResponse, SessionContextInput};
@@ -735,6 +735,7 @@ fn emit_debate_completed_event(
 
 // ── Public free functions ────────────────────────────────────────────────
 
+#[tracing::instrument(skip(repos, agent, active_streams), err)]
 pub async fn chat_send(
     repos: &Repos,
     agent: &Arc<agent::AgentLoop>,
@@ -819,6 +820,7 @@ pub async fn chat_send(
     Ok((user_msg, stream_info))
 }
 
+#[tracing::instrument(skip(active_streams, pending_interactions), err)]
 pub async fn chat_cancel(
     active_streams: &ActiveStreams,
     pending_interactions: &PendingInteractions,
@@ -835,6 +837,7 @@ pub async fn chat_cancel(
     Ok(())
 }
 
+#[tracing::instrument(skip(repos, pending_interactions, emitter), err)]
 pub async fn chat_respond_interaction(
     repos: &Repos,
     pending_interactions: &PendingInteractions,
@@ -900,6 +903,17 @@ pub async fn chat_respond_interaction(
 /// This contains the entire streaming loop extracted from the desktop
 /// `chat_send` command. The caller is responsible for spawning this as a
 /// background task and providing the appropriate emitter implementation.
+#[tracing::instrument(skip(
+    repos,
+    active_streams,
+    pending_interactions,
+    event_rx,
+    interaction_rx,
+    emitter,
+    journey_tracker,
+    domain_event_bus,
+    user_message
+))]
 #[allow(clippy::too_many_arguments)]
 pub async fn relay_chat_stream(
     repos: Repos,

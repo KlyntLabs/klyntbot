@@ -53,6 +53,7 @@ pub fn grade_semantic(cosine_sim: f64, accept_threshold: f64, fail_threshold: f6
 }
 
 /// Build (system_prompt, user_prompt) for LLM grading of a flashcard answer.
+#[tracing::instrument]
 pub fn build_grading_prompt(
     front: &str,
     back: &str,

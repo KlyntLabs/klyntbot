@@ -13,6 +13,7 @@ use crate::state::AppCore;
 
 // ── Public free functions ────────────────────────────────────────────────
 
+#[tracing::instrument(skip(repos, squad_repo), err)]
 pub async fn chat_threads(
     repos: &Repos,
     squad_repo: Option<&cognitive::SquadRepo>,
@@ -118,6 +119,7 @@ pub async fn chat_threads(
         .collect())
 }
 
+#[tracing::instrument(skip(repos, persona_repo), err)]
 pub async fn chat_messages(
     repos: &Repos,
     persona_repo: Option<&cognitive::PersonaRepo>,
@@ -186,6 +188,7 @@ pub async fn chat_messages(
         .collect())
 }
 
+#[tracing::instrument(skip(repos), err)]
 pub async fn chat_pin_thread(repos: &Repos, session_key: String) -> Result<(), ApiError> {
     repos
         .session_context
@@ -195,6 +198,7 @@ pub async fn chat_pin_thread(repos: &Repos, session_key: String) -> Result<(), A
     Ok(())
 }
 
+#[tracing::instrument(skip(repos), err)]
 pub async fn chat_rename_thread(
     repos: &Repos,
     session_key: String,
@@ -212,6 +216,7 @@ pub async fn chat_rename_thread(
     Ok(())
 }
 
+#[tracing::instrument(skip(repos, active_streams, pending_interactions), err)]
 pub async fn chat_delete_thread(
     repos: &Repos,
     active_streams: &ActiveStreams,

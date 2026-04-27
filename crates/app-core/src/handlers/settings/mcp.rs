@@ -66,6 +66,7 @@ pub fn find_server_mut<'a>(
 }
 
 /// Build an `McpTransport` from user-provided params.
+#[tracing::instrument(err)]
 pub fn build_transport(
     transport_type: &str,
     command: Option<String>,

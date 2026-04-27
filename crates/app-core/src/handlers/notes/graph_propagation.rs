@@ -20,6 +20,7 @@ use desktop_shared::commands::FlashcardResponse;
 /// - For "again": no positive propagation, but apply negative propagation
 /// - Walk note_links graph: boost = 1.0 * quality_factor * 0.15
 /// - Walk same-domain atoms: boost = 0.5 * quality_factor * 0.15
+#[tracing::instrument(skip(repo, card), err)]
 pub async fn propagate_review(
     repo: &FlashcardRepo,
     card: &FlashcardRow,

@@ -6,6 +6,7 @@ use storage::AreaRow;
 use crate::errors::map_storage_err;
 use crate::state::{AppCore, EntityUpdate, HandlerResult};
 
+#[tracing::instrument(skip(state), err)]
 pub async fn build_area_response(state: &AppCore, row: &AreaRow) -> Result<AreaResponse, ApiError> {
     let (project_count, task_count) = tokio::try_join!(
         state.repos.areas.count_projects(&row.id),
@@ -40,7 +41,7 @@ impl AppCore {
         Ok(results)
     }
 
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self), err)]
     pub async fn area_create(&self, params: AreaCreateParams) -> HandlerResult<AreaResponse> {
         let id = uuid::Uuid::new_v4().to_string();
         let now: storage::SqlTs = jiff::Timestamp::now().into();
@@ -80,7 +81,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self), err)]
     pub async fn area_update(&self, params: AreaUpdateParams) -> HandlerResult<AreaResponse> {
         let updated = self
             .repos
@@ -105,7 +106,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self), err)]
     pub async fn area_delete(&self, id: String) -> HandlerResult<bool> {
         let deleted = self
             .repos
@@ -126,7 +127,7 @@ impl AppCore {
         Ok((deleted, updates))
     }
 
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self), err)]
     pub async fn area_reorder(&self, id: String, position: i32) -> HandlerResult<AreaResponse> {
         let updated = self
             .repos

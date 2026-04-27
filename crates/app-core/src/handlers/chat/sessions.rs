@@ -34,6 +34,7 @@ fn session_row_to_response(
     }
 }
 
+#[tracing::instrument(skip(repos), err)]
 pub async fn chat_get_session(
     repos: &Repos,
     session_key: String,
@@ -47,6 +48,7 @@ pub async fn chat_get_session(
     Ok(session_row_to_response(&session, msg_count))
 }
 
+#[tracing::instrument(skip(repos), err)]
 pub async fn chat_list_sessions_by_project(
     repos: &Repos,
     project_id: String,
@@ -78,6 +80,7 @@ pub async fn chat_list_sessions_by_project(
         .collect())
 }
 
+#[tracing::instrument(skip(repos), err)]
 pub async fn chat_delete_stale_sessions(repos: &Repos, before_days: u32) -> Result<u64, ApiError> {
     repos
         .sessions
