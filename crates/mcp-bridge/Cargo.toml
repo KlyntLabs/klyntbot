@@ -16,7 +16,6 @@ thiserror = { workspace = true }
 app-core = { path = "../app-core" }
 desktop-shared = { path = "../desktop-shared" }
 config = { path = "../config" }
-common = { path = "../common" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "time", "macros"] }
