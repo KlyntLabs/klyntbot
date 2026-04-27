@@ -8,7 +8,7 @@ use desktop_shared::commands::{
     IntelligenceSessionResponse, ProductivityPatternsResponse, ProductivityProjectResponse,
     ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse, WeeklyAssessmentResponse,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 use desktop_shared::events::AutoFocusPayload;
 use tauri::State;
 
@@ -19,7 +19,7 @@ use crate::focus_timer::FocusTimer;
 #[specta::specta]
 pub async fn productivity_today(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Option<ProductivitySummaryResponse>, ApiError> {
+) -> CommandResult<Option<ProductivitySummaryResponse>> {
     state.productivity_today().await
 }
 
@@ -31,7 +31,7 @@ pub async fn productivity_timeline(
     limit: Option<i64>,
     offset: Option<i64>,
     tz_offset_mins: Option<i32>,
-) -> Result<Vec<ActivityTimelineResponse>, ApiError> {
+) -> CommandResult<Vec<ActivityTimelineResponse>> {
     state
         .productivity_timeline(date, limit, offset, tz_offset_mins)
         .await
@@ -44,7 +44,7 @@ pub async fn productivity_focus_start(
     action_id: Option<String>,
     project_id: Option<String>,
     target_mins: Option<i64>,
-) -> Result<FocusSessionResponse, ApiError> {
+) -> CommandResult<FocusSessionResponse> {
     state
         .productivity_focus_start(action_id, project_id, target_mins)
         .await
@@ -55,7 +55,7 @@ pub async fn productivity_focus_start(
 pub async fn productivity_focus_end(
     state: State<'_, Arc<AppCore>>,
     notes: Option<String>,
-) -> Result<Option<FocusSessionResponse>, ApiError> {
+) -> CommandResult<Option<FocusSessionResponse>> {
     state.productivity_focus_end(notes).await
 }
 
@@ -63,7 +63,7 @@ pub async fn productivity_focus_end(
 #[specta::specta]
 pub async fn productivity_focus_status(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Option<FocusSessionResponse>, ApiError> {
+) -> CommandResult<Option<FocusSessionResponse>> {
     state.productivity_focus_status().await
 }
 
@@ -72,7 +72,7 @@ pub async fn productivity_focus_status(
 pub async fn productivity_sessions(
     state: State<'_, Arc<AppCore>>,
     date: String,
-) -> Result<Vec<FocusSessionResponse>, ApiError> {
+) -> CommandResult<Vec<FocusSessionResponse>> {
     state.productivity_sessions(date).await
 }
 
@@ -82,7 +82,7 @@ pub async fn productivity_intelligence_sessions(
     state: State<'_, Arc<AppCore>>,
     date: String,
     tz_offset_mins: Option<i32>,
-) -> Result<Vec<IntelligenceSessionResponse>, ApiError> {
+) -> CommandResult<Vec<IntelligenceSessionResponse>> {
     state
         .productivity_intelligence_sessions(date, tz_offset_mins)
         .await
@@ -92,7 +92,7 @@ pub async fn productivity_intelligence_sessions(
 #[specta::specta]
 pub async fn productivity_weekly(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<ProductivitySummaryResponse>, ApiError> {
+) -> CommandResult<Vec<ProductivitySummaryResponse>> {
     state.productivity_weekly().await
 }
 
@@ -100,7 +100,7 @@ pub async fn productivity_weekly(
 #[specta::specta]
 pub async fn productivity_categories(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<ActivityCategoryResponse>, ApiError> {
+) -> CommandResult<Vec<ActivityCategoryResponse>> {
     state.productivity_categories().await
 }
 
@@ -108,7 +108,7 @@ pub async fn productivity_categories(
 #[specta::specta]
 pub async fn productivity_tracked_apps(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<TrackedAppResponse>, ApiError> {
+) -> CommandResult<Vec<TrackedAppResponse>> {
     state.productivity_tracked_apps().await
 }
 
@@ -118,7 +118,7 @@ pub async fn productivity_summary_range(
     state: State<'_, Arc<AppCore>>,
     start_date: String,
     end_date: String,
-) -> Result<Vec<ProductivitySummaryResponse>, ApiError> {
+) -> CommandResult<Vec<ProductivitySummaryResponse>> {
     state.productivity_summary_range(start_date, end_date).await
 }
 
@@ -127,7 +127,7 @@ pub async fn productivity_summary_range(
 pub async fn productivity_activity_feed(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
-) -> Result<Vec<ActivityTimelineResponse>, ApiError> {
+) -> CommandResult<Vec<ActivityTimelineResponse>> {
     state.productivity_activity_feed(limit).await
 }
 
@@ -135,7 +135,7 @@ pub async fn productivity_activity_feed(
 #[specta::specta]
 pub async fn productivity_goals(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<GoalProgressResponse>, ApiError> {
+) -> CommandResult<Vec<GoalProgressResponse>> {
     state.productivity_goals().await
 }
 
@@ -145,7 +145,7 @@ pub async fn productivity_pomodoro_start(
     state: State<'_, Arc<AppCore>>,
     work_mins: Option<i64>,
     break_mins: Option<i64>,
-) -> Result<FocusSessionResponse, ApiError> {
+) -> CommandResult<FocusSessionResponse> {
     state
         .productivity_pomodoro_start(work_mins, break_mins)
         .await
@@ -156,7 +156,7 @@ pub async fn productivity_pomodoro_start(
 pub async fn productivity_time_entries(
     state: State<'_, Arc<AppCore>>,
     date: String,
-) -> Result<Vec<TimeEntryResponse>, ApiError> {
+) -> CommandResult<Vec<TimeEntryResponse>> {
     state.productivity_time_entries(date).await
 }
 
@@ -167,7 +167,7 @@ pub async fn productivity_goal_create(
     goal_type: String,
     metric: String,
     target_value: f64,
-) -> Result<GoalProgressResponse, ApiError> {
+) -> CommandResult<GoalProgressResponse> {
     state
         .productivity_goal_create(goal_type, metric, target_value)
         .await
@@ -178,7 +178,7 @@ pub async fn productivity_goal_create(
 pub async fn productivity_goal_delete(
     state: State<'_, Arc<AppCore>>,
     id: i64,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.productivity_goal_delete(id).await
 }
 
@@ -188,7 +188,7 @@ pub async fn productivity_goal_toggle(
     state: State<'_, Arc<AppCore>>,
     id: i64,
     enabled: bool,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.productivity_goal_toggle(id, enabled).await
 }
 
@@ -200,7 +200,7 @@ pub async fn productivity_time_entry_create(
     duration_mins: i64,
     category_id: Option<String>,
     project_id: Option<String>,
-) -> Result<TimeEntryResponse, ApiError> {
+) -> CommandResult<TimeEntryResponse> {
     state
         .productivity_time_entry_create(description, duration_mins, category_id, project_id)
         .await
@@ -211,7 +211,7 @@ pub async fn productivity_time_entry_create(
 pub async fn productivity_time_entry_delete(
     state: State<'_, Arc<AppCore>>,
     id: i64,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.productivity_time_entry_delete(id).await
 }
 
@@ -225,7 +225,7 @@ pub async fn productivity_category_upsert(
     color: Option<String>,
     icon: Option<String>,
     rules: Option<CategoryRulesResponse>,
-) -> Result<ActivityCategoryResponse, ApiError> {
+) -> CommandResult<ActivityCategoryResponse> {
     state
         .productivity_category_upsert(id, name, category_type, color, icon, rules)
         .await
@@ -236,7 +236,7 @@ pub async fn productivity_category_upsert(
 pub async fn productivity_category_delete(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     state.productivity_category_delete(id).await
 }
 
@@ -247,7 +247,7 @@ pub async fn productivity_recategorize_app(
     app_name: String,
     site_name: Option<String>,
     new_category_id: String,
-) -> Result<u64, ApiError> {
+) -> CommandResult<u64> {
     state
         .productivity_recategorize_app(app_name, site_name, new_category_id)
         .await
@@ -260,7 +260,7 @@ pub async fn productivity_recategorize_app(
 pub async fn productivity_insights(
     state: State<'_, Arc<AppCore>>,
     date: Option<String>,
-) -> Result<Vec<InsightCardResponse>, ApiError> {
+) -> CommandResult<Vec<InsightCardResponse>> {
     state.productivity_insights(date).await
 }
 
@@ -269,7 +269,7 @@ pub async fn productivity_insights(
 pub async fn productivity_insight_dismiss(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.productivity_insight_dismiss(id).await
 }
 
@@ -277,7 +277,7 @@ pub async fn productivity_insight_dismiss(
 #[specta::specta]
 pub async fn productivity_auto_focus_start(
     state: State<'_, Arc<AppCore>>,
-) -> Result<FocusSessionResponse, ApiError> {
+) -> CommandResult<FocusSessionResponse> {
     state.productivity_auto_focus_start().await
 }
 
@@ -286,7 +286,7 @@ pub async fn productivity_auto_focus_start(
 pub async fn productivity_auto_focus_end(
     state: State<'_, Arc<AppCore>>,
     event: desktop_shared::specta_helpers::JsonValueWrapper,
-) -> Result<FocusSessionResponse, ApiError> {
+) -> CommandResult<FocusSessionResponse> {
     let event: feature_productivity::auto_focus::AutoFocusEvent = serde_json::from_value(event.0)
         .map_err(|e| ApiError::new("BAD_REQUEST", e.to_string()))?;
     state.productivity_auto_focus_end(event).await
@@ -297,7 +297,7 @@ pub async fn productivity_auto_focus_end(
 pub async fn productivity_auto_focus_confirm(
     state: State<'_, Arc<AppCore>>,
     payload: AutoFocusPayload,
-) -> Result<FocusSessionResponse, ApiError> {
+) -> CommandResult<FocusSessionResponse> {
     state.productivity_auto_focus_confirm(payload).await
 }
 
@@ -308,7 +308,7 @@ pub async fn distraction_respond(
     timer: State<'_, Arc<FocusTimer>>,
     app: tauri::AppHandle,
     response: DistractionResponse,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let app_name = response.app_name.unwrap_or_default();
     match response.action.as_str() {
         "back_to_work" => {
@@ -339,7 +339,7 @@ pub async fn distraction_respond(
 #[specta::specta]
 pub async fn productivity_projects_list(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<ProductivityProjectResponse>, ApiError> {
+) -> CommandResult<Vec<ProductivityProjectResponse>> {
     state.productivity_projects_list().await
 }
 
@@ -352,7 +352,7 @@ pub async fn productivity_project_upsert(
     path: String,
     url_patterns: Option<Vec<String>>,
     color: Option<String>,
-) -> Result<ProductivityProjectResponse, ApiError> {
+) -> CommandResult<ProductivityProjectResponse> {
     state
         .productivity_project_upsert(id, display_name, path, url_patterns, color)
         .await
@@ -363,7 +363,7 @@ pub async fn productivity_project_upsert(
 pub async fn productivity_project_delete(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.productivity_project_delete(id).await
 }
 
@@ -372,7 +372,7 @@ pub async fn productivity_project_delete(
 pub async fn productivity_weekly_assessment(
     state: State<'_, Arc<AppCore>>,
     week_start: String,
-) -> Result<WeeklyAssessmentResponse, ApiError> {
+) -> CommandResult<WeeklyAssessmentResponse> {
     state.productivity_weekly_assessment(week_start).await
 }
 
@@ -381,7 +381,7 @@ pub async fn productivity_weekly_assessment(
 pub async fn productivity_calendar_events(
     state: State<'_, Arc<AppCore>>,
     date: String,
-) -> Result<Vec<feature_productivity::types::CalendarEvent>, ApiError> {
+) -> CommandResult<Vec<feature_productivity::types::CalendarEvent>> {
     state.productivity_calendar_events(date).await
 }
 
@@ -390,7 +390,7 @@ pub async fn productivity_calendar_events(
 pub async fn calendar_sync_events(
     state: State<'_, Arc<AppCore>>,
     events: Vec<desktop_shared::commands::CalendarEventInput>,
-) -> Result<Vec<feature_productivity::types::CalendarEvent>, ApiError> {
+) -> CommandResult<Vec<feature_productivity::types::CalendarEvent>> {
     state.calendar_sync_events(events).await
 }
 
@@ -406,7 +406,7 @@ pub async fn focus_session_start(
     timer: State<'_, Arc<FocusTimer>>,
     app: tauri::AppHandle,
     params: desktop_shared::commands::FocusSessionStartParams,
-) -> Result<FocusSessionResponse, ApiError> {
+) -> CommandResult<FocusSessionResponse> {
     let config = FocusSessionConfig {
         work_secs: params.work_secs,
         short_break_secs: params.short_break_secs,
@@ -447,7 +447,7 @@ pub async fn focus_session_stop(
     timer: State<'_, Arc<FocusTimer>>,
     app: tauri::AppHandle,
     notes: Option<String>,
-) -> Result<Option<FocusSessionResponse>, ApiError> {
+) -> CommandResult<Option<FocusSessionResponse>> {
     timer.stop(&app).await;
     // End whichever session is active (focus or break)
     let focus_result = state.productivity_focus_end(notes).await.unwrap_or(None);
@@ -462,7 +462,7 @@ pub async fn focus_session_stop(
 pub async fn focus_session_status(
     state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
-) -> Result<FocusSessionStatusResponse, ApiError> {
+) -> CommandResult<FocusSessionStatusResponse> {
     let session = state.productivity_focus_status().await?;
     let config = timer.status().await;
 
@@ -475,13 +475,13 @@ pub async fn focus_session_status(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn focus_session_pause(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
+pub async fn focus_session_pause(timer: State<'_, Arc<FocusTimer>>) -> CommandResult<bool> {
     Ok(timer.send_command(SessionCommand::Pause).await)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn focus_session_resume(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
+pub async fn focus_session_resume(timer: State<'_, Arc<FocusTimer>>) -> CommandResult<bool> {
     Ok(timer.send_command(SessionCommand::Resume).await)
 }
 
@@ -490,7 +490,7 @@ pub async fn focus_session_resume(timer: State<'_, Arc<FocusTimer>>) -> Result<b
 pub async fn focus_session_extend(
     timer: State<'_, Arc<FocusTimer>>,
     extra_secs: u64,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     Ok(timer.send_command(SessionCommand::Extend(extra_secs)).await)
 }
 
@@ -498,7 +498,7 @@ pub async fn focus_session_extend(
 #[specta::specta]
 pub async fn focus_session_start_break(
     timer: State<'_, Arc<FocusTimer>>,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     Ok(timer.send_command(SessionCommand::StartBreak).await)
 }
 
@@ -507,7 +507,7 @@ pub async fn focus_session_start_break(
 pub async fn focus_session_extend_work(
     timer: State<'_, Arc<FocusTimer>>,
     extra_mins: u64,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     Ok(timer
         .send_command(SessionCommand::ExtendWork(extra_mins * 60))
         .await)
@@ -515,13 +515,13 @@ pub async fn focus_session_extend_work(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn focus_session_skip_break(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
+pub async fn focus_session_skip_break(timer: State<'_, Arc<FocusTimer>>) -> CommandResult<bool> {
     Ok(timer.send_command(SessionCommand::SkipBreak).await)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn focus_session_take_break(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
+pub async fn focus_session_take_break(timer: State<'_, Arc<FocusTimer>>) -> CommandResult<bool> {
     Ok(timer.send_command(SessionCommand::TakeBreak).await)
 }
 
@@ -532,7 +532,7 @@ pub async fn focus_session_take_break(timer: State<'_, Arc<FocusTimer>>) -> Resu
 pub async fn productivity_patterns(
     state: State<'_, Arc<AppCore>>,
     days: Option<u32>,
-) -> Result<ProductivityPatternsResponse, ApiError> {
+) -> CommandResult<ProductivityPatternsResponse> {
     state.productivity_patterns(days).await
 }
 
@@ -543,7 +543,7 @@ pub async fn productivity_hourly_breakdown(
     start_date: String,
     end_date: String,
     tz_offset_mins: Option<i32>,
-) -> Result<Vec<HourlyBreakdownResponse>, ApiError> {
+) -> CommandResult<Vec<HourlyBreakdownResponse>> {
     state
         .productivity_hourly_breakdown(start_date, end_date, tz_offset_mins)
         .await
@@ -597,7 +597,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "productivity_today" => dev::val(core.productivity_today().await),

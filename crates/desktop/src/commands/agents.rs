@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use app_core::AppCore;
 use desktop_shared::commands::{AgentFileContent, AgentFileSummary, AgentProfileSummary};
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 
 #[cfg(test)]
 pub(crate) const DEV_COMMANDS: &[&str] = &[
@@ -19,7 +19,7 @@ use tauri::State;
 #[specta::specta]
 pub async fn agent_list_profiles(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<AgentProfileSummary>, ApiError> {
+) -> CommandResult<Vec<AgentProfileSummary>> {
     state.agent_list_profiles().await
 }
 
@@ -29,7 +29,7 @@ pub async fn agent_read_file(
     state: State<'_, Arc<AppCore>>,
     agent_name: String,
     filename: String,
-) -> Result<AgentFileContent, ApiError> {
+) -> CommandResult<AgentFileContent> {
     state.agent_read_file(&agent_name, &filename).await
 }
 
@@ -40,7 +40,7 @@ pub async fn agent_write_file(
     agent_name: String,
     filename: String,
     content: String,
-) -> Result<AgentFileContent, ApiError> {
+) -> CommandResult<AgentFileContent> {
     state
         .agent_write_file(&agent_name, &filename, &content)
         .await
@@ -51,7 +51,7 @@ pub async fn agent_write_file(
 pub async fn agent_create_profile(
     state: State<'_, Arc<AppCore>>,
     name: String,
-) -> Result<AgentProfileSummary, ApiError> {
+) -> CommandResult<AgentProfileSummary> {
     state.agent_create_profile(&name).await
 }
 
@@ -61,7 +61,7 @@ pub async fn agent_create_skill(
     state: State<'_, Arc<AppCore>>,
     agent_name: String,
     skill_name: String,
-) -> Result<AgentFileSummary, ApiError> {
+) -> CommandResult<AgentFileSummary> {
     state.agent_create_skill(&agent_name, &skill_name).await
 }
 
@@ -71,7 +71,7 @@ pub async fn agent_delete_file(
     state: State<'_, Arc<AppCore>>,
     agent_name: String,
     filename: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     state.agent_delete_file(&agent_name, &filename).await
 }
 
@@ -80,7 +80,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "agent_list_profiles" => dev::val(core.agent_list_profiles().await),

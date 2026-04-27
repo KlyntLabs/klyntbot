@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{McpConfigResponse, OAuthStartParams};
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 use desktop_shared::events::{McpOAuthCompletePayload, MCP_OAUTH_ERROR};
 use rand::distr::Alphanumeric;
 use rand::Rng;
@@ -24,7 +24,7 @@ pub async fn mcp_oauth_start(
     app: AppHandle,
     state: State<'_, Arc<AppCore>>,
     params: OAuthStartParams,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     info!(
         provider = %params.provider,
         server = %params.server_name,
@@ -244,7 +244,7 @@ pub async fn mcp_oauth_start(
 pub async fn mcp_oauth_disconnect(
     state: State<'_, Arc<AppCore>>,
     server_name: String,
-) -> Result<McpConfigResponse, ApiError> {
+) -> CommandResult<McpConfigResponse> {
     let mut cfg = state.config.write().await;
 
     let server =

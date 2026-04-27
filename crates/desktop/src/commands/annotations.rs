@@ -2,7 +2,7 @@ use desktop_shared::commands::{
     AiSuggestionResponse, AnnotationCreateParams, AnnotationResponse, AnnotationUpdateParams,
     LinkedContextParams, LinkedContextResponse,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -13,7 +13,7 @@ use crate::app_core::AppCore;
 pub async fn annotation_create(
     state: State<'_, Arc<AppCore>>,
     params: AnnotationCreateParams,
-) -> Result<AnnotationResponse, ApiError> {
+) -> CommandResult<AnnotationResponse> {
     state.annotation_create(params).await
 }
 
@@ -22,13 +22,13 @@ pub async fn annotation_create(
 pub async fn annotation_update(
     state: State<'_, Arc<AppCore>>,
     params: AnnotationUpdateParams,
-) -> Result<AnnotationResponse, ApiError> {
+) -> CommandResult<AnnotationResponse> {
     state.annotation_update(params).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn annotation_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<(), ApiError> {
+pub async fn annotation_delete(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<()> {
     state.annotation_delete(id).await
 }
 
@@ -38,7 +38,7 @@ pub async fn annotation_list_for_note(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
     limit: Option<i64>,
-) -> Result<Vec<AnnotationResponse>, ApiError> {
+) -> CommandResult<Vec<AnnotationResponse>> {
     state.annotation_list_for_note(note_id, limit).await
 }
 
@@ -48,7 +48,7 @@ pub async fn annotation_get_ai_suggestion(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
     selected_text: String,
-) -> Result<AiSuggestionResponse, ApiError> {
+) -> CommandResult<AiSuggestionResponse> {
     state
         .annotation_get_ai_suggestion(note_id, selected_text)
         .await
@@ -59,7 +59,7 @@ pub async fn annotation_get_ai_suggestion(
 pub async fn note_get_linked_context(
     state: State<'_, Arc<AppCore>>,
     params: LinkedContextParams,
-) -> Result<LinkedContextResponse, ApiError> {
+) -> CommandResult<LinkedContextResponse> {
     state.note_get_linked_context(params).await
 }
 
@@ -80,7 +80,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "annotation_create" => dev::val(

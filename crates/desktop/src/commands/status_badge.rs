@@ -5,7 +5,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::app_core::AppCore;
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 use feature_launcher::BadgeKind;
 
 const WIN_LABEL: &str = "status_badge";
@@ -19,7 +19,7 @@ pub async fn show_status_badge(
     text: String,
     kind: BadgeKind,
     duration_ms: Option<u32>,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let dur = duration_ms.unwrap_or(2000);
 
     if let Some(existing) = app.get_webview_window(WIN_LABEL) {
@@ -76,7 +76,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     _core: &Arc<AppCore>,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
     if cmd != "show_status_badge" {
         return None;

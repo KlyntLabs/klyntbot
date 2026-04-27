@@ -3,20 +3,20 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::voice::{AudioDevicesResponse, VoiceModelStatusResponse};
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use tauri::State;
 
 use crate::app_core::AppCore;
 
 #[tauri::command]
 #[specta::specta]
-pub async fn voice_start_dictation(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
+pub async fn voice_start_dictation(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
     state.voice_start_dictation().await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn voice_stop_dictation(state: State<'_, Arc<AppCore>>) -> Result<String, ApiError> {
+pub async fn voice_stop_dictation(state: State<'_, Arc<AppCore>>) -> CommandResult<String> {
     state.voice_stop_dictation().await
 }
 
@@ -25,7 +25,7 @@ pub async fn voice_stop_dictation(state: State<'_, Arc<AppCore>>) -> Result<Stri
 pub async fn voice_simulate_event(
     state: State<'_, Arc<AppCore>>,
     event: desktop_shared::specta_helpers::JsonValueWrapper,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.voice_simulate_event(event.0).await
 }
 
@@ -33,7 +33,7 @@ pub async fn voice_simulate_event(
 #[specta::specta]
 pub async fn voice_list_devices(
     state: State<'_, Arc<AppCore>>,
-) -> Result<AudioDevicesResponse, ApiError> {
+) -> CommandResult<AudioDevicesResponse> {
     state.voice_list_devices()
 }
 
@@ -41,7 +41,7 @@ pub async fn voice_list_devices(
 #[specta::specta]
 pub async fn voice_model_status(
     state: State<'_, Arc<AppCore>>,
-) -> Result<VoiceModelStatusResponse, ApiError> {
+) -> CommandResult<VoiceModelStatusResponse> {
     state.voice_model_status()
 }
 
@@ -50,7 +50,7 @@ pub async fn voice_model_status(
 pub async fn voice_download_model(
     state: State<'_, Arc<AppCore>>,
     model: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.voice_download_model(model).await
 }
 
@@ -59,7 +59,7 @@ pub async fn voice_download_model(
 pub async fn voice_delete_model(
     state: State<'_, Arc<AppCore>>,
     model: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.voice_delete_model(model).await
 }
 
@@ -68,7 +68,7 @@ pub async fn voice_delete_model(
 pub async fn voice_test_persona(
     state: State<'_, Arc<AppCore>>,
     persona: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.voice_test_persona(persona).await
 }
 
@@ -89,7 +89,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
 
     Some(match cmd {

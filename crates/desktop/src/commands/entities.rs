@@ -3,7 +3,7 @@ use std::sync::Arc;
 use desktop_shared::commands::{
     EntityMergeParams, EntityNeighborhoodResponse, EntityResponse, EntitySearchParams,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -13,7 +13,7 @@ use crate::app_core::AppCore;
 pub async fn entity_search(
     state: State<'_, Arc<AppCore>>,
     params: EntitySearchParams,
-) -> Result<Vec<EntityResponse>, ApiError> {
+) -> CommandResult<Vec<EntityResponse>> {
     state.entity_search(&params).await
 }
 
@@ -22,7 +22,7 @@ pub async fn entity_search(
 pub async fn entity_merge(
     state: State<'_, Arc<AppCore>>,
     params: EntityMergeParams,
-) -> Result<EntityResponse, ApiError> {
+) -> CommandResult<EntityResponse> {
     state.entity_merge(&params).await
 }
 
@@ -32,7 +32,7 @@ pub async fn entity_get_neighborhood(
     state: State<'_, Arc<AppCore>>,
     entity_id: String,
     depth: Option<u32>,
-) -> Result<EntityNeighborhoodResponse, ApiError> {
+) -> CommandResult<EntityNeighborhoodResponse> {
     state
         .entity_get_neighborhood(&entity_id, depth.unwrap_or(1))
         .await
@@ -49,7 +49,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "entity_search" => dev::val(

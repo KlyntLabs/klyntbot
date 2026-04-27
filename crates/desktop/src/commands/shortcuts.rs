@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use app_core::AppCore;
 use config::ShortcutsConfig;
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 use tauri::{AppHandle, State};
 
 use crate::shortcuts::register_shortcuts;
 
 #[tauri::command]
 #[specta::specta]
-pub async fn shortcuts_get(state: State<'_, Arc<AppCore>>) -> Result<ShortcutsConfig, ApiError> {
+pub async fn shortcuts_get(state: State<'_, Arc<AppCore>>) -> CommandResult<ShortcutsConfig> {
     let cfg = state.config.read().await;
     Ok(cfg.shortcuts.clone())
 }
@@ -21,7 +21,7 @@ pub async fn shortcuts_update(
     state: State<'_, Arc<AppCore>>,
     launcher: String,
     tray: String,
-) -> Result<ShortcutsConfig, ApiError> {
+) -> CommandResult<ShortcutsConfig> {
     let shortcuts = ShortcutsConfig { launcher, tray };
 
     // Snapshot current config for rollback.
@@ -54,7 +54,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
 
     Some(match cmd {

@@ -11,7 +11,7 @@ use desktop_shared::commands::{
     FinancePortfolioResponse, FinanceTransactionCreateParams, FinanceTransactionFilterParams,
     FinanceTrendPoint,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use storage::rows::finance::{
     BudgetUsageRow, FinanceAccountRow, FinanceAllocationTargetRow, FinanceBudgetRow,
     FinanceGoalRow, FinanceInvestmentRow, FinanceInvestmentTxRow, FinanceLiabilityRow,
@@ -27,7 +27,7 @@ use crate::app_core::AppCore;
 #[specta::specta]
 pub async fn finance_accounts(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<FinanceAccountRow>, ApiError> {
+) -> CommandResult<Vec<FinanceAccountRow>> {
     state.finance_accounts().await
 }
 
@@ -36,7 +36,7 @@ pub async fn finance_accounts(
 pub async fn finance_transactions(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
-) -> Result<Vec<FinanceTransactionRow>, ApiError> {
+) -> CommandResult<Vec<FinanceTransactionRow>> {
     state.finance_transactions(limit).await
 }
 
@@ -45,7 +45,7 @@ pub async fn finance_transactions(
 pub async fn finance_transactions_filtered(
     state: State<'_, Arc<AppCore>>,
     params: FinanceTransactionFilterParams,
-) -> Result<Vec<FinanceTransactionRow>, ApiError> {
+) -> CommandResult<Vec<FinanceTransactionRow>> {
     state.finance_transactions_filtered(params).await
 }
 
@@ -53,7 +53,7 @@ pub async fn finance_transactions_filtered(
 #[specta::specta]
 pub async fn finance_budget_usage(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<BudgetUsageRow>, ApiError> {
+) -> CommandResult<Vec<BudgetUsageRow>> {
     state.finance_budget_usage().await
 }
 
@@ -61,7 +61,7 @@ pub async fn finance_budget_usage(
 #[specta::specta]
 pub async fn finance_portfolios(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<FinancePortfolioResponse>, ApiError> {
+) -> CommandResult<Vec<FinancePortfolioResponse>> {
     state.finance_portfolios().await
 }
 
@@ -69,7 +69,7 @@ pub async fn finance_portfolios(
 #[specta::specta]
 pub async fn finance_investments(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<FinanceInvestmentRow>, ApiError> {
+) -> CommandResult<Vec<FinanceInvestmentRow>> {
     state.finance_investments().await
 }
 
@@ -78,7 +78,7 @@ pub async fn finance_investments(
 pub async fn finance_investments_filtered(
     state: State<'_, Arc<AppCore>>,
     portfolio_id: Option<String>,
-) -> Result<Vec<FinanceInvestmentRow>, ApiError> {
+) -> CommandResult<Vec<FinanceInvestmentRow>> {
     state.finance_investments_filtered(portfolio_id).await
 }
 
@@ -86,7 +86,7 @@ pub async fn finance_investments_filtered(
 #[specta::specta]
 pub async fn finance_goals(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<FinanceGoalRow>, ApiError> {
+) -> CommandResult<Vec<FinanceGoalRow>> {
     state.finance_goals().await
 }
 
@@ -94,7 +94,7 @@ pub async fn finance_goals(
 #[specta::specta]
 pub async fn finance_liabilities(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<FinanceLiabilityRow>, ApiError> {
+) -> CommandResult<Vec<FinanceLiabilityRow>> {
     state.finance_liabilities().await
 }
 
@@ -102,7 +102,7 @@ pub async fn finance_liabilities(
 #[specta::specta]
 pub async fn finance_net_worth(
     state: State<'_, Arc<AppCore>>,
-) -> Result<FinanceNetWorthResponse, ApiError> {
+) -> CommandResult<FinanceNetWorthResponse> {
     state.finance_net_worth().await
 }
 
@@ -110,7 +110,7 @@ pub async fn finance_net_worth(
 #[specta::specta]
 pub async fn finance_exchange_rates(
     state: State<'_, Arc<AppCore>>,
-) -> Result<HashMap<String, f64>, ApiError> {
+) -> CommandResult<HashMap<String, f64>> {
     state.finance_exchange_rates().await
 }
 
@@ -122,7 +122,7 @@ pub async fn finance_account_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceAccountCreateParams,
-) -> Result<FinanceAccountRow, ApiError> {
+) -> CommandResult<FinanceAccountRow> {
     let (result, updates) = state.finance_account_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -134,7 +134,7 @@ pub async fn finance_account_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceAccountUpdateParams,
-) -> Result<FinanceAccountRow, ApiError> {
+) -> CommandResult<FinanceAccountRow> {
     let (result, updates) = state.finance_account_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -146,7 +146,7 @@ pub async fn finance_account_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.finance_account_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -158,7 +158,7 @@ pub async fn finance_transaction_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceTransactionCreateParams,
-) -> Result<FinanceTransactionRow, ApiError> {
+) -> CommandResult<FinanceTransactionRow> {
     let (result, updates) = state.finance_transaction_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -170,7 +170,7 @@ pub async fn finance_transaction_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.finance_transaction_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -182,7 +182,7 @@ pub async fn finance_budget_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceBudgetCreateParams,
-) -> Result<FinanceBudgetRow, ApiError> {
+) -> CommandResult<FinanceBudgetRow> {
     let (result, updates) = state.finance_budget_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -194,7 +194,7 @@ pub async fn finance_budget_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceBudgetUpdateParams,
-) -> Result<FinanceBudgetRow, ApiError> {
+) -> CommandResult<FinanceBudgetRow> {
     let (result, updates) = state.finance_budget_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -206,7 +206,7 @@ pub async fn finance_budget_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.finance_budget_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -218,7 +218,7 @@ pub async fn finance_goal_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceGoalCreateParams,
-) -> Result<FinanceGoalRow, ApiError> {
+) -> CommandResult<FinanceGoalRow> {
     let (result, updates) = state.finance_goal_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -230,7 +230,7 @@ pub async fn finance_goal_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceGoalUpdateParams,
-) -> Result<FinanceGoalRow, ApiError> {
+) -> CommandResult<FinanceGoalRow> {
     let (result, updates) = state.finance_goal_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -242,7 +242,7 @@ pub async fn finance_goal_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.finance_goal_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -254,7 +254,7 @@ pub async fn finance_liability_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceLiabilityCreateParams,
-) -> Result<FinanceLiabilityRow, ApiError> {
+) -> CommandResult<FinanceLiabilityRow> {
     let (result, updates) = state.finance_liability_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -266,7 +266,7 @@ pub async fn finance_liability_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceLiabilityUpdateParams,
-) -> Result<FinanceLiabilityRow, ApiError> {
+) -> CommandResult<FinanceLiabilityRow> {
     let (result, updates) = state.finance_liability_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -278,7 +278,7 @@ pub async fn finance_liability_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.finance_liability_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -290,7 +290,7 @@ pub async fn finance_portfolio_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinancePortfolioCreateParams,
-) -> Result<FinancePortfolioRow, ApiError> {
+) -> CommandResult<FinancePortfolioRow> {
     let (result, updates) = state.finance_portfolio_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -302,7 +302,7 @@ pub async fn finance_investment_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceInvestmentCreateParams,
-) -> Result<FinanceInvestmentRow, ApiError> {
+) -> CommandResult<FinanceInvestmentRow> {
     let (result, updates) = state.finance_investment_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -314,7 +314,7 @@ pub async fn finance_investment_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceInvestmentUpdateParams,
-) -> Result<FinanceInvestmentRow, ApiError> {
+) -> CommandResult<FinanceInvestmentRow> {
     let (result, updates) = state.finance_investment_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -328,7 +328,7 @@ pub async fn finance_allocation_target_upsert(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceAllocationTargetUpsertParams,
-) -> Result<FinanceAllocationTargetRow, ApiError> {
+) -> CommandResult<FinanceAllocationTargetRow> {
     let (result, updates) = state.finance_allocation_target_upsert(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -339,7 +339,7 @@ pub async fn finance_allocation_target_upsert(
 pub async fn finance_allocation_targets(
     state: State<'_, Arc<AppCore>>,
     portfolio_id: String,
-) -> Result<Vec<FinanceAllocationTargetRow>, ApiError> {
+) -> CommandResult<Vec<FinanceAllocationTargetRow>> {
     state.finance_allocation_targets(portfolio_id).await
 }
 
@@ -351,7 +351,7 @@ pub async fn finance_investment_tx_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: FinanceInvestmentTxCreateParams,
-) -> Result<FinanceInvestmentTxRow, ApiError> {
+) -> CommandResult<FinanceInvestmentTxRow> {
     let (result, updates) = state.finance_investment_tx_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -362,7 +362,7 @@ pub async fn finance_investment_tx_create(
 pub async fn finance_investment_txs(
     state: State<'_, Arc<AppCore>>,
     investment_id: String,
-) -> Result<Vec<FinanceInvestmentTxRow>, ApiError> {
+) -> CommandResult<Vec<FinanceInvestmentTxRow>> {
     state.finance_investment_txs(investment_id).await
 }
 
@@ -374,7 +374,7 @@ pub async fn finance_report_spending(
     state: State<'_, Arc<AppCore>>,
     date_from: Option<String>,
     date_to: Option<String>,
-) -> Result<FinanceCategoryReportResponse, ApiError> {
+) -> CommandResult<FinanceCategoryReportResponse> {
     state.finance_report_spending(date_from, date_to).await
 }
 
@@ -384,7 +384,7 @@ pub async fn finance_report_income(
     state: State<'_, Arc<AppCore>>,
     date_from: Option<String>,
     date_to: Option<String>,
-) -> Result<FinanceCategoryReportResponse, ApiError> {
+) -> CommandResult<FinanceCategoryReportResponse> {
     state.finance_report_income(date_from, date_to).await
 }
 
@@ -394,7 +394,7 @@ pub async fn finance_report_trends(
     state: State<'_, Arc<AppCore>>,
     metric: String,
     periods: Option<i64>,
-) -> Result<Vec<FinanceTrendPoint>, ApiError> {
+) -> CommandResult<Vec<FinanceTrendPoint>> {
     state.finance_report_trends(metric, periods).await
 }
 
@@ -402,7 +402,7 @@ pub async fn finance_report_trends(
 #[specta::specta]
 pub async fn finance_monthly_summary(
     state: State<'_, Arc<AppCore>>,
-) -> Result<FinanceMonthlySummaryResponse, ApiError> {
+) -> CommandResult<FinanceMonthlySummaryResponse> {
     state.finance_monthly_summary().await
 }
 
@@ -412,7 +412,7 @@ pub async fn finance_daily_spending(
     state: State<'_, Arc<AppCore>>,
     date_from: String,
     date_to: String,
-) -> Result<FinanceDailySpendingResponse, ApiError> {
+) -> CommandResult<FinanceDailySpendingResponse> {
     state.finance_daily_spending(date_from, date_to).await
 }
 
@@ -422,7 +422,7 @@ pub async fn finance_period_summary(
     state: State<'_, Arc<AppCore>>,
     date_from: String,
     date_to: String,
-) -> Result<FinancePeriodSummaryResponse, ApiError> {
+) -> CommandResult<FinancePeriodSummaryResponse> {
     state.finance_period_summary(date_from, date_to).await
 }
 
@@ -475,7 +475,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         // Queries

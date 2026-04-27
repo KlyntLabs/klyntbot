@@ -4,7 +4,7 @@ use cognitive::mirror::{
     BrainVersion, FeedbackTarget, MirrorResponse, MirrorState, NarrativeSnippet, RoutingSnapshot,
     TrendNarrative, UserFeedback,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 use desktop_shared::types::EntityKind;
 use tauri::State;
 use uuid::Uuid;
@@ -29,7 +29,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
 
 #[tauri::command]
 #[specta::specta]
-pub async fn get_mirror_state(state: State<'_, Arc<AppCore>>) -> Result<MirrorState, ApiError> {
+pub async fn get_mirror_state(state: State<'_, Arc<AppCore>>) -> CommandResult<MirrorState> {
     let facade = state.mirror_facade()?;
     Ok(facade.get_state().await?)
 }
@@ -39,7 +39,7 @@ pub async fn get_mirror_state(state: State<'_, Arc<AppCore>>) -> Result<MirrorSt
 pub async fn get_routing_history(
     state: State<'_, Arc<AppCore>>,
     days: Option<u32>,
-) -> Result<Vec<RoutingSnapshot>, ApiError> {
+) -> CommandResult<Vec<RoutingSnapshot>> {
     let facade = state.mirror_facade()?;
     Ok(facade.get_routing_history(days.unwrap_or(7)).await?)
 }
@@ -49,7 +49,7 @@ pub async fn get_routing_history(
 pub async fn get_mirror_narratives(
     state: State<'_, Arc<AppCore>>,
     limit: Option<u32>,
-) -> Result<Vec<TrendNarrative>, ApiError> {
+) -> CommandResult<Vec<TrendNarrative>> {
     let facade = state.mirror_facade()?;
     Ok(facade.get_narratives(limit.unwrap_or(10)).await?)
 }
@@ -58,7 +58,7 @@ pub async fn get_mirror_narratives(
 #[specta::specta]
 pub async fn get_pending_snippets(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<NarrativeSnippet>, ApiError> {
+) -> CommandResult<Vec<NarrativeSnippet>> {
     let facade = state.mirror_facade()?;
     Ok(facade.get_pending_snippets().await?)
 }
@@ -71,7 +71,7 @@ pub async fn submit_mirror_feedback(
     item_id: Uuid,
     target: FeedbackTarget,
     feedback: UserFeedback,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let facade = state.mirror_facade()?;
     facade.submit_feedback(item_id, target, feedback).await?;
     super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &item_id.to_string());
@@ -83,7 +83,7 @@ pub async fn submit_mirror_feedback(
 pub async fn generate_mirror_response(
     state: State<'_, Arc<AppCore>>,
     query: String,
-) -> Result<MirrorResponse, ApiError> {
+) -> CommandResult<MirrorResponse> {
     let facade = state.mirror_facade()?;
     Ok(facade.generate_mirror_response(query, None).await?)
 }
@@ -94,7 +94,7 @@ pub async fn approve_meta_rule(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     rule_id: Uuid,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let facade = state.mirror_facade()?;
     facade.approve_meta_rule(rule_id).await?;
     super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &rule_id.to_string());
@@ -107,7 +107,7 @@ pub async fn dismiss_meta_rule(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     rule_id: Uuid,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let facade = state.mirror_facade()?;
     facade.dismiss_meta_rule(rule_id).await?;
     super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &rule_id.to_string());
@@ -118,7 +118,7 @@ pub async fn dismiss_meta_rule(
 #[specta::specta]
 pub async fn get_brain_versions(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<BrainVersion>, ApiError> {
+) -> CommandResult<Vec<BrainVersion>> {
     let facade = state.mirror_facade()?;
     Ok(facade.get_brain_versions().await?)
 }
@@ -129,7 +129,7 @@ pub async fn revert_brain_version(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     version: u32,
-) -> Result<BrainVersion, ApiError> {
+) -> CommandResult<BrainVersion> {
     let facade = state.mirror_facade()?;
     let result = facade.revert_to_version(version).await?;
     super::emit_entity_updated(&app, EntityKind::BrainVersion, &version.to_string());
@@ -142,7 +142,7 @@ pub async fn kill_trial(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     trial_id: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let facade = state.mirror_facade()?;
     facade.kill_trial(&trial_id).await?;
     super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &trial_id);
@@ -155,7 +155,7 @@ pub async fn continue_trial(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     trial_id: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let facade = state.mirror_facade()?;
     facade.continue_trial(&trial_id).await?;
     super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &trial_id);
@@ -169,7 +169,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
 
     let facade = match core.mirror_facade() {

@@ -2,7 +2,7 @@ use desktop_shared::commands::{
     AppInfoResponse, McpAddServerParams, McpConfigResponse, McpRemoveParams, McpToggleParams,
     McpUpdateServerParams,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use desktop_shared::specta_helpers::JsonValueWrapper;
 use std::sync::Arc;
 use tauri::State;
@@ -11,7 +11,7 @@ use crate::app_core::AppCore;
 
 #[tauri::command]
 #[specta::specta]
-pub async fn mcp_get_config(state: State<'_, Arc<AppCore>>) -> Result<McpConfigResponse, ApiError> {
+pub async fn mcp_get_config(state: State<'_, Arc<AppCore>>) -> CommandResult<McpConfigResponse> {
     state.mcp_get_config().await
 }
 
@@ -20,7 +20,7 @@ pub async fn mcp_get_config(state: State<'_, Arc<AppCore>>) -> Result<McpConfigR
 pub async fn mcp_add_server(
     state: State<'_, Arc<AppCore>>,
     params: McpAddServerParams,
-) -> Result<McpConfigResponse, ApiError> {
+) -> CommandResult<McpConfigResponse> {
     state.mcp_add_server(params).await
 }
 
@@ -29,7 +29,7 @@ pub async fn mcp_add_server(
 pub async fn mcp_remove_server(
     state: State<'_, Arc<AppCore>>,
     params: McpRemoveParams,
-) -> Result<McpConfigResponse, ApiError> {
+) -> CommandResult<McpConfigResponse> {
     state.mcp_remove_server(params).await
 }
 
@@ -38,7 +38,7 @@ pub async fn mcp_remove_server(
 pub async fn mcp_toggle_server(
     state: State<'_, Arc<AppCore>>,
     params: McpToggleParams,
-) -> Result<McpConfigResponse, ApiError> {
+) -> CommandResult<McpConfigResponse> {
     state.mcp_toggle_server(params).await
 }
 
@@ -47,13 +47,13 @@ pub async fn mcp_toggle_server(
 pub async fn mcp_update_server(
     state: State<'_, Arc<AppCore>>,
     params: McpUpdateServerParams,
-) -> Result<McpConfigResponse, ApiError> {
+) -> CommandResult<McpConfigResponse> {
     state.mcp_update_server(params).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn app_info(state: State<'_, Arc<AppCore>>) -> Result<AppInfoResponse, ApiError> {
+pub async fn app_info(state: State<'_, Arc<AppCore>>) -> CommandResult<AppInfoResponse> {
     state.app_info().await
 }
 
@@ -62,7 +62,7 @@ pub async fn app_info(state: State<'_, Arc<AppCore>>) -> Result<AppInfoResponse,
 pub async fn config_get_section(
     state: State<'_, Arc<AppCore>>,
     section: String,
-) -> Result<JsonValueWrapper, ApiError> {
+) -> CommandResult<JsonValueWrapper> {
     state.config_get_section(section).await.map(JsonValueWrapper)
 }
 
@@ -72,13 +72,13 @@ pub async fn config_update_section(
     state: State<'_, Arc<AppCore>>,
     section: String,
     patch: JsonValueWrapper,
-) -> Result<JsonValueWrapper, ApiError> {
+) -> CommandResult<JsonValueWrapper> {
     state.config_update_section(section, patch.0).await.map(JsonValueWrapper)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn config_mark_setup_completed(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
+pub async fn config_mark_setup_completed(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
     state.config_mark_setup_completed().await
 }
 
@@ -102,7 +102,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "mcp_get_config" => dev::val(core.mcp_get_config().await),

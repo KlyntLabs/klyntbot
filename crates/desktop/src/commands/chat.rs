@@ -5,7 +5,7 @@ use std::sync::Arc;
 use desktop_shared::commands::{
     ChatMessageResponse, ChatSessionResponse, ChatThreadResponse, SessionContextInput,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 use tauri::{Emitter, State};
 
 use crate::app_core::AppCore;
@@ -23,7 +23,7 @@ impl ::app_core::events::AppEventEmitter for TauriEmitter {
 #[specta::specta]
 pub async fn chat_threads(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<ChatThreadResponse>, ApiError> {
+) -> CommandResult<Vec<ChatThreadResponse>> {
     state.chat_threads().await
 }
 
@@ -33,7 +33,7 @@ pub async fn chat_messages(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
     limit: Option<i64>,
-) -> Result<Vec<ChatMessageResponse>, ApiError> {
+) -> CommandResult<Vec<ChatMessageResponse>> {
     state.chat_messages(session_key, limit).await
 }
 
@@ -45,7 +45,7 @@ pub async fn chat_send(
     content: String,
     session_key: String,
     context: Option<SessionContextInput>,
-) -> Result<ChatMessageResponse, ApiError> {
+) -> CommandResult<ChatMessageResponse> {
     let (user_msg, stream_info) = state.chat_send(content, session_key, context).await?;
 
     // Spawn background task to relay streaming events via Tauri emitter
@@ -61,7 +61,7 @@ pub async fn chat_send(
 pub async fn chat_pin_thread(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.chat_pin_thread(session_key).await
 }
 
@@ -71,7 +71,7 @@ pub async fn chat_rename_thread(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
     title: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.chat_rename_thread(session_key, title).await
 }
 
@@ -80,7 +80,7 @@ pub async fn chat_rename_thread(
 pub async fn chat_delete_thread(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.chat_delete_thread(session_key).await
 }
 
@@ -91,7 +91,7 @@ pub async fn chat_respond_interaction(
     session_key: String,
     request_id: String,
     response: desktop_shared::specta_helpers::JsonValueWrapper,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let response: common::FormResponse = serde_json::from_value(response.0)
         .map_err(|e| ApiError::new("BAD_REQUEST", e.to_string()))?;
     state
@@ -104,7 +104,7 @@ pub async fn chat_respond_interaction(
 pub async fn chat_get_session(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
-) -> Result<ChatSessionResponse, ApiError> {
+) -> CommandResult<ChatSessionResponse> {
     state.chat_get_session(session_key).await
 }
 
@@ -113,7 +113,7 @@ pub async fn chat_get_session(
 pub async fn chat_list_sessions_by_project(
     state: State<'_, Arc<AppCore>>,
     project_id: String,
-) -> Result<Vec<ChatThreadResponse>, ApiError> {
+) -> CommandResult<Vec<ChatThreadResponse>> {
     state.chat_list_sessions_by_project(project_id).await
 }
 
@@ -122,7 +122,7 @@ pub async fn chat_list_sessions_by_project(
 pub async fn chat_delete_stale_sessions(
     state: State<'_, Arc<AppCore>>,
     before_days: u32,
-) -> Result<u64, ApiError> {
+) -> CommandResult<u64> {
     state.chat_delete_stale_sessions(before_days).await
 }
 
@@ -131,7 +131,7 @@ pub async fn chat_delete_stale_sessions(
 pub async fn chat_cancel(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.chat_cancel(session_key).await
 }
 
@@ -159,7 +159,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "chat_threads" => dev::val(core.chat_threads().await),

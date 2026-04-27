@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use app_core::journey::Milestone;
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 use tauri::State;
 
 use crate::app_core::AppCore;
 
 #[tauri::command]
 #[specta::specta]
-pub async fn journey_milestones(state: State<'_, Arc<AppCore>>) -> Result<Vec<String>, ApiError> {
+pub async fn journey_milestones(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<String>> {
     let tracker = state
         .journey_tracker
         .as_ref()
@@ -21,7 +21,7 @@ pub async fn journey_milestones(state: State<'_, Arc<AppCore>>) -> Result<Vec<St
 pub async fn journey_mark_complete(
     state: State<'_, Arc<AppCore>>,
     milestone: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let tracker = state
         .journey_tracker
         .as_ref()
@@ -34,7 +34,7 @@ pub async fn journey_mark_complete(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn journey_item_count(state: State<'_, Arc<AppCore>>) -> Result<i64, ApiError> {
+pub async fn journey_item_count(state: State<'_, Arc<AppCore>>) -> CommandResult<i64> {
     if let Some(ref tracker) = state.journey_tracker {
         Ok(tracker.total_item_count().await)
     } else {
@@ -56,7 +56,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     use app_core::journey::Milestone;
 

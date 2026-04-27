@@ -4,7 +4,7 @@ use desktop_shared::commands::fabric::{
     FabricActionParams, FabricActionResponse, FabricExpandParams, FabricExpandResponse,
     FabricGraphBase,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -13,7 +13,7 @@ use crate::app_core::AppCore;
 #[specta::specta]
 pub async fn fabric_graph_base(
     state: State<'_, Arc<AppCore>>,
-) -> Result<FabricGraphBase, ApiError> {
+) -> CommandResult<FabricGraphBase> {
     state.fabric_graph_base().await
 }
 
@@ -22,7 +22,7 @@ pub async fn fabric_graph_base(
 pub async fn fabric_graph_expand(
     state: State<'_, Arc<AppCore>>,
     params: FabricExpandParams,
-) -> Result<FabricExpandResponse, ApiError> {
+) -> CommandResult<FabricExpandResponse> {
     state.fabric_graph_expand(params).await
 }
 
@@ -31,7 +31,7 @@ pub async fn fabric_graph_expand(
 pub async fn fabric_graph_action(
     state: State<'_, Arc<AppCore>>,
     params: FabricActionParams,
-) -> Result<FabricActionResponse, ApiError> {
+) -> CommandResult<FabricActionResponse> {
     state.fabric_graph_action(params).await
 }
 
@@ -49,7 +49,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "fabric_graph_base" => dev::val(core.fabric_graph_base().await),

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{TimelineQuery, TimelineResponse, TimelineSource};
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -15,7 +15,7 @@ pub async fn timeline_query(
     sources: Option<Vec<TimelineSource>>,
     include_point_events: Option<bool>,
     tz_offset_mins: Option<i32>,
-) -> Result<TimelineResponse, ApiError> {
+) -> CommandResult<TimelineResponse> {
     state
         .timeline_query(TimelineQuery {
             start_date,
@@ -37,7 +37,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "timeline_query" => dev::val(

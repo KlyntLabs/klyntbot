@@ -1,7 +1,7 @@
 use desktop_shared::commands::{
     TaskGroupCreateParams, TaskGroupReorderParams, TaskGroupResponse, TaskGroupUpdateParams,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -12,7 +12,7 @@ use crate::app_core::AppCore;
 pub async fn group_list(
     state: State<'_, Arc<AppCore>>,
     project_id: Option<String>,
-) -> Result<Vec<TaskGroupResponse>, ApiError> {
+) -> CommandResult<Vec<TaskGroupResponse>> {
     state.group_list(project_id).await
 }
 
@@ -21,7 +21,7 @@ pub async fn group_list(
 pub async fn group_create(
     state: State<'_, Arc<AppCore>>,
     params: TaskGroupCreateParams,
-) -> Result<TaskGroupResponse, ApiError> {
+) -> CommandResult<TaskGroupResponse> {
     state.group_create(params).await
 }
 
@@ -30,13 +30,13 @@ pub async fn group_create(
 pub async fn group_update(
     state: State<'_, Arc<AppCore>>,
     params: TaskGroupUpdateParams,
-) -> Result<TaskGroupResponse, ApiError> {
+) -> CommandResult<TaskGroupResponse> {
     state.group_update(params).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn group_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<bool, ApiError> {
+pub async fn group_delete(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<bool> {
     state.group_delete(id).await
 }
 
@@ -45,7 +45,7 @@ pub async fn group_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<
 pub async fn group_reorder(
     state: State<'_, Arc<AppCore>>,
     params: TaskGroupReorderParams,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.group_reorder(params).await
 }
 
@@ -65,7 +65,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "group_list" => dev::val(core.group_list(dev::get(body, "projectId")).await),

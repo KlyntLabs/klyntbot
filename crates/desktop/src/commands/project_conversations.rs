@@ -1,5 +1,5 @@
 use desktop_shared::entity_link_types::SessionSummaryResponse;
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -10,7 +10,7 @@ use crate::app_core::AppCore;
 pub async fn project_conversations_list(
     state: State<'_, Arc<AppCore>>,
     project_id: String,
-) -> Result<Vec<SessionSummaryResponse>, ApiError> {
+) -> CommandResult<Vec<SessionSummaryResponse>> {
     state.project_conversations_list(project_id).await
 }
 
@@ -24,7 +24,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "project_conversations_list" => {

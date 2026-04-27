@@ -17,7 +17,7 @@ use desktop_shared::commands::{
     ScenarioChallengeResponse, ScopePreviewParams, ScopePreviewResponse, SetPersonaPinsParams,
     StrugglingCardResponse, TabContent, UpdatePersonaParams,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 use tauri::{Emitter, State};
 
 use crate::app_core::AppCore;
@@ -38,7 +38,7 @@ impl ::app_core::events::AppEventEmitter for TauriEmitter {
 pub async fn note_list(
     state: State<'_, Arc<AppCore>>,
     notebook_id: Option<String>,
-) -> Result<Vec<NoteListItem>, ApiError> {
+) -> CommandResult<Vec<NoteListItem>> {
     state.note_list(notebook_id).await
 }
 
@@ -47,7 +47,7 @@ pub async fn note_list(
 pub async fn note_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<NoteResponse, ApiError> {
+) -> CommandResult<NoteResponse> {
     state.note_get(id).await
 }
 
@@ -57,7 +57,7 @@ pub async fn note_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: NoteCreateParams,
-) -> Result<NoteResponse, ApiError> {
+) -> CommandResult<NoteResponse> {
     let (result, updates) = state.note_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -69,7 +69,7 @@ pub async fn note_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: NoteUpdateParams,
-) -> Result<NoteResponse, ApiError> {
+) -> CommandResult<NoteResponse> {
     let (result, updates) = state.note_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -81,7 +81,7 @@ pub async fn note_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.note_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -92,7 +92,7 @@ pub async fn note_delete(
 pub async fn note_search(
     state: State<'_, Arc<AppCore>>,
     query: String,
-) -> Result<Vec<NoteListItem>, ApiError> {
+) -> CommandResult<Vec<NoteListItem>> {
     state.note_search(query).await
 }
 
@@ -101,7 +101,7 @@ pub async fn note_search(
 pub async fn note_search_semantic(
     state: State<'_, Arc<AppCore>>,
     query: String,
-) -> Result<Vec<NoteListItem>, ApiError> {
+) -> CommandResult<Vec<NoteListItem>> {
     state.note_search_semantic(&query).await
 }
 
@@ -110,7 +110,7 @@ pub async fn note_search_semantic(
 pub async fn note_search_hybrid(
     state: State<'_, Arc<AppCore>>,
     query: String,
-) -> Result<HybridSearchResponse, ApiError> {
+) -> CommandResult<HybridSearchResponse> {
     state.note_search_hybrid(&query).await
 }
 
@@ -118,7 +118,7 @@ pub async fn note_search_hybrid(
 #[specta::specta]
 pub async fn note_links_all(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<NoteLinkResponse>, ApiError> {
+) -> CommandResult<Vec<NoteLinkResponse>> {
     state.note_links_all().await
 }
 
@@ -128,7 +128,7 @@ pub async fn note_list_by_entity(
     state: State<'_, Arc<AppCore>>,
     entity_type: String,
     entity_id: String,
-) -> Result<Vec<NoteListItem>, ApiError> {
+) -> CommandResult<Vec<NoteListItem>> {
     state.note_list_by_entity(entity_type, entity_id).await
 }
 
@@ -139,7 +139,7 @@ pub async fn note_list_by_entity(
 pub async fn note_version_list(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> Result<Vec<NoteVersionResponse>, ApiError> {
+) -> CommandResult<Vec<NoteVersionResponse>> {
     state.note_version_list(note_id).await
 }
 
@@ -148,7 +148,7 @@ pub async fn note_version_list(
 pub async fn note_version_create(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> Result<NoteVersionResponse, ApiError> {
+) -> CommandResult<NoteVersionResponse> {
     state.note_version_create(note_id).await
 }
 
@@ -159,7 +159,7 @@ pub async fn note_version_restore(
     app: tauri::AppHandle,
     version_id: String,
     note_id: String,
-) -> Result<NoteResponse, ApiError> {
+) -> CommandResult<NoteResponse> {
     let (result, updates) = state.note_version_restore(version_id, note_id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -173,7 +173,7 @@ pub async fn note_save_attachment(
     state: State<'_, Arc<AppCore>>,
     data: String,
     filename: String,
-) -> Result<String, ApiError> {
+) -> CommandResult<String> {
     state.note_save_attachment(data, filename).await
 }
 
@@ -183,7 +183,7 @@ pub async fn note_save_attachment(
 #[specta::specta]
 pub async fn notebook_list(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<NotebookResponse>, ApiError> {
+) -> CommandResult<Vec<NotebookResponse>> {
     state.notebook_list().await
 }
 
@@ -193,7 +193,7 @@ pub async fn notebook_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: NotebookCreateParams,
-) -> Result<NotebookResponse, ApiError> {
+) -> CommandResult<NotebookResponse> {
     let (result, updates) = state.notebook_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -205,7 +205,7 @@ pub async fn notebook_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: NotebookUpdateParams,
-) -> Result<NotebookResponse, ApiError> {
+) -> CommandResult<NotebookResponse> {
     let (result, updates) = state.notebook_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -217,7 +217,7 @@ pub async fn notebook_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.notebook_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -231,7 +231,7 @@ pub async fn note_archive(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let (_, updates) = state.note_archive(&id).await?;
     super::emit_updates(&app, &updates);
     Ok(())
@@ -243,7 +243,7 @@ pub async fn note_unarchive(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let (_, updates) = state.note_unarchive(&id).await?;
     super::emit_updates(&app, &updates);
     Ok(())
@@ -253,7 +253,7 @@ pub async fn note_unarchive(
 #[specta::specta]
 pub async fn note_list_archived(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<NoteListItem>, ApiError> {
+) -> CommandResult<Vec<NoteListItem>> {
     state.note_list_archived().await
 }
 
@@ -264,7 +264,7 @@ pub async fn note_list_archived(
 pub async fn note_backlinks(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<Vec<BacklinkResponse>, ApiError> {
+) -> CommandResult<Vec<BacklinkResponse>> {
     state.note_backlinks(&id).await
 }
 
@@ -275,7 +275,7 @@ pub async fn note_backlinks(
 pub async fn note_suggestions(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<NoteSuggestionsResponse, ApiError> {
+) -> CommandResult<NoteSuggestionsResponse> {
     state.note_suggestions(&id).await
 }
 
@@ -283,7 +283,7 @@ pub async fn note_suggestions(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn note_tags_all(state: State<'_, Arc<AppCore>>) -> Result<Vec<(String, i64)>, ApiError> {
+pub async fn note_tags_all(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<(String, i64)>> {
     state
         .note_repo
         .get_all_tags()
@@ -298,7 +298,7 @@ pub async fn note_tags_all(state: State<'_, Arc<AppCore>>) -> Result<Vec<(String
 pub async fn note_unlinked_mentions(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<Vec<NoteResponse>, ApiError> {
+) -> CommandResult<Vec<NoteResponse>> {
     state.note_unlinked_mentions(&id).await
 }
 
@@ -309,7 +309,7 @@ pub async fn note_unlinked_mentions(
 pub async fn inbox_create(
     state: State<'_, Arc<AppCore>>,
     params: InboxCreateParams,
-) -> Result<InboxItemResponse, ApiError> {
+) -> CommandResult<InboxItemResponse> {
     state.inbox_create(&params.content).await
 }
 
@@ -317,13 +317,13 @@ pub async fn inbox_create(
 #[specta::specta]
 pub async fn inbox_list(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<InboxItemResponse>, ApiError> {
+) -> CommandResult<Vec<InboxItemResponse>> {
     state.inbox_list().await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn inbox_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<(), ApiError> {
+pub async fn inbox_delete(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<()> {
     state.inbox_delete(&id).await
 }
 
@@ -336,7 +336,7 @@ pub async fn note_insight_review(
     note_id: String,
     scope_config: Option<desktop_shared::commands::InsightScopeConfigParams>,
     squad_id: Option<String>,
-) -> Result<InsightReviewStarted, ApiError> {
+) -> CommandResult<InsightReviewStarted> {
     state
         .note_insight_review(&note_id, scope_config.as_ref(), squad_id.as_deref(), None)
         .await
@@ -347,7 +347,7 @@ pub async fn note_insight_review(
 pub async fn note_insight_cache_get(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> Result<Option<InsightReviewResponse>, ApiError> {
+) -> CommandResult<Option<InsightReviewResponse>> {
     state.note_insight_cache_get(&note_id).await
 }
 
@@ -356,7 +356,7 @@ pub async fn note_insight_cache_get(
 pub async fn note_insight_save_flashcards(
     state: State<'_, Arc<AppCore>>,
     params: InsightSaveFlashcardsParams,
-) -> Result<Vec<FlashcardResponse>, ApiError> {
+) -> CommandResult<Vec<FlashcardResponse>> {
     state.insight_save_flashcards(params).await
 }
 
@@ -365,7 +365,7 @@ pub async fn note_insight_save_flashcards(
 pub async fn note_insight_submit_quiz(
     state: State<'_, Arc<AppCore>>,
     params: InsightQuizSubmitParams,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.note_insight_submit_quiz(&params).await
 }
 
@@ -375,7 +375,7 @@ pub async fn note_insight_regenerate_tab(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
     tab: String,
-) -> Result<TabContent, ApiError> {
+) -> CommandResult<TabContent> {
     state.note_insight_regenerate_tab(&note_id, &tab).await
 }
 
@@ -385,7 +385,7 @@ pub async fn note_insight_debate(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
     squad_id: Option<String>,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state
         .note_insight_debate(&note_id, squad_id.as_deref())
         .await
@@ -396,7 +396,7 @@ pub async fn note_insight_debate(
 pub async fn note_insight_list_versions(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> Result<Vec<InsightVersionResponse>, ApiError> {
+) -> CommandResult<Vec<InsightVersionResponse>> {
     state.note_insight_list_versions(&note_id).await
 }
 
@@ -405,7 +405,7 @@ pub async fn note_insight_list_versions(
 pub async fn note_insight_get_evolution(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> Result<InsightEvolutionResponse, ApiError> {
+) -> CommandResult<InsightEvolutionResponse> {
     state.note_insight_get_evolution(&note_id).await
 }
 
@@ -414,7 +414,7 @@ pub async fn note_insight_get_evolution(
 pub async fn note_insight_get_version(
     state: State<'_, Arc<AppCore>>,
     insight_id: String,
-) -> Result<InsightReviewResponse, ApiError> {
+) -> CommandResult<InsightReviewResponse> {
     state.note_insight_get_version(&insight_id).await
 }
 
@@ -423,7 +423,7 @@ pub async fn note_insight_get_version(
 pub async fn note_insight_generate_scenario(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> Result<ScenarioChallengeResponse, ApiError> {
+) -> CommandResult<ScenarioChallengeResponse> {
     state.note_insight_generate_scenario(&note_id).await
 }
 
@@ -432,7 +432,7 @@ pub async fn note_insight_generate_scenario(
 pub async fn note_insight_changes_summary(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> Result<Option<ChangesSummaryResponse>, ApiError> {
+) -> CommandResult<Option<ChangesSummaryResponse>> {
     state.note_insight_changes_summary(&note_id).await
 }
 
@@ -441,7 +441,7 @@ pub async fn note_insight_changes_summary(
 pub async fn note_insight_knowledge_growth(
     state: State<'_, Arc<AppCore>>,
     days: Option<u32>,
-) -> Result<KnowledgeGrowthResponse, ApiError> {
+) -> CommandResult<KnowledgeGrowthResponse> {
     state.note_insight_knowledge_growth(days.unwrap_or(7)).await
 }
 
@@ -451,7 +451,7 @@ pub async fn note_insight_knowledge_growth(
 #[specta::specta]
 pub async fn note_insight_list_personas(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<PersonaResponse>, ApiError> {
+) -> CommandResult<Vec<PersonaResponse>> {
     state.note_insight_list_personas().await
 }
 
@@ -460,7 +460,7 @@ pub async fn note_insight_list_personas(
 pub async fn note_insight_create_persona(
     state: State<'_, Arc<AppCore>>,
     params: CreatePersonaParams,
-) -> Result<PersonaResponse, ApiError> {
+) -> CommandResult<PersonaResponse> {
     state.note_insight_create_persona(params).await
 }
 
@@ -469,7 +469,7 @@ pub async fn note_insight_create_persona(
 pub async fn note_insight_update_persona(
     state: State<'_, Arc<AppCore>>,
     params: UpdatePersonaParams,
-) -> Result<PersonaResponse, ApiError> {
+) -> CommandResult<PersonaResponse> {
     state.note_insight_update_persona(params).await
 }
 
@@ -478,7 +478,7 @@ pub async fn note_insight_update_persona(
 pub async fn note_insight_delete_persona(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.note_insight_delete_persona(&id).await
 }
 
@@ -488,7 +488,7 @@ pub async fn note_insight_toggle_persona(
     state: State<'_, Arc<AppCore>>,
     id: String,
     active: bool,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.note_insight_toggle_persona(&id, active).await
 }
 
@@ -497,7 +497,7 @@ pub async fn note_insight_toggle_persona(
 pub async fn note_insight_set_pins(
     state: State<'_, Arc<AppCore>>,
     params: SetPersonaPinsParams,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.note_insight_set_pins(params).await
 }
 
@@ -506,7 +506,7 @@ pub async fn note_insight_set_pins(
 pub async fn note_insight_rate_persona(
     state: State<'_, Arc<AppCore>>,
     params: RatePersonaParams,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.note_insight_rate_persona(params).await
 }
 
@@ -515,7 +515,7 @@ pub async fn note_insight_rate_persona(
 pub async fn note_insight_auto_generate_persona(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> Result<PersonaResponse, ApiError> {
+) -> CommandResult<PersonaResponse> {
     state.note_insight_auto_generate_persona(&note_id).await
 }
 
@@ -524,7 +524,7 @@ pub async fn note_insight_auto_generate_persona(
 pub async fn note_insight_persona_chat(
     state: State<'_, Arc<AppCore>>,
     params: PersonaChatParams,
-) -> Result<PersonaChatResponse, ApiError> {
+) -> CommandResult<PersonaChatResponse> {
     state.note_insight_persona_chat(&params).await
 }
 
@@ -533,7 +533,7 @@ pub async fn note_insight_persona_chat(
 pub async fn note_insight_preview_scope(
     state: State<'_, Arc<AppCore>>,
     params: ScopePreviewParams,
-) -> Result<ScopePreviewResponse, ApiError> {
+) -> CommandResult<ScopePreviewResponse> {
     state.note_insight_preview_scope(params).await
 }
 
@@ -543,7 +543,7 @@ pub async fn note_insight_preview_scope(
 #[specta::specta]
 pub async fn flashcard_list_decks(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<DeckSummaryResponse>, ApiError> {
+) -> CommandResult<Vec<DeckSummaryResponse>> {
     state.flashcard_list_decks().await
 }
 
@@ -553,7 +553,7 @@ pub async fn flashcard_get_due(
     state: State<'_, Arc<AppCore>>,
     deck: String,
     limit: Option<i64>,
-) -> Result<Vec<FlashcardResponse>, ApiError> {
+) -> CommandResult<Vec<FlashcardResponse>> {
     state.flashcard_get_due(&deck, limit.unwrap_or(10)).await
 }
 
@@ -562,7 +562,7 @@ pub async fn flashcard_get_due(
 pub async fn flashcard_record_review(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardReviewParams,
-) -> Result<FlashcardResponse, ApiError> {
+) -> CommandResult<FlashcardResponse> {
     state.flashcard_record_review(params).await
 }
 
@@ -571,7 +571,7 @@ pub async fn flashcard_record_review(
 pub async fn flashcard_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<FlashcardResponse, ApiError> {
+) -> CommandResult<FlashcardResponse> {
     state.flashcard_get(&id).await
 }
 
@@ -580,7 +580,7 @@ pub async fn flashcard_get(
 pub async fn flashcard_create(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardCreateParams,
-) -> Result<FlashcardResponse, ApiError> {
+) -> CommandResult<FlashcardResponse> {
     state.flashcard_create(params).await
 }
 
@@ -589,7 +589,7 @@ pub async fn flashcard_create(
 pub async fn flashcard_update(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardUpdateParams,
-) -> Result<FlashcardResponse, ApiError> {
+) -> CommandResult<FlashcardResponse> {
     state.flashcard_update(params).await
 }
 
@@ -598,7 +598,7 @@ pub async fn flashcard_update(
 pub async fn flashcard_list_cards(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardListParams,
-) -> Result<Vec<FlashcardResponse>, ApiError> {
+) -> CommandResult<Vec<FlashcardResponse>> {
     state.flashcard_list_cards(params).await
 }
 
@@ -607,7 +607,7 @@ pub async fn flashcard_list_cards(
 pub async fn flashcard_delete(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     state.flashcard_delete(&id).await
 }
 
@@ -616,13 +616,13 @@ pub async fn flashcard_delete(
 pub async fn flashcard_get_all_due(
     state: State<'_, Arc<AppCore>>,
     limit: i64,
-) -> Result<Vec<FlashcardResponse>, ApiError> {
+) -> CommandResult<Vec<FlashcardResponse>> {
     state.flashcard_get_all_due(limit).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn flashcard_total_due(state: State<'_, Arc<AppCore>>) -> Result<i64, ApiError> {
+pub async fn flashcard_total_due(state: State<'_, Arc<AppCore>>) -> CommandResult<i64> {
     state.flashcard_total_due().await
 }
 
@@ -631,7 +631,7 @@ pub async fn flashcard_total_due(state: State<'_, Arc<AppCore>>) -> Result<i64, 
 pub async fn flashcard_list_struggling(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
-) -> Result<Vec<StrugglingCardResponse>, ApiError> {
+) -> CommandResult<Vec<StrugglingCardResponse>> {
     state.flashcard_list_struggling(limit.unwrap_or(5)).await
 }
 
@@ -640,7 +640,7 @@ pub async fn flashcard_list_struggling(
 pub async fn flashcard_generate(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardGenerateParams,
-) -> Result<FlashcardGenerateResponse, ApiError> {
+) -> CommandResult<FlashcardGenerateResponse> {
     state.flashcard_generate(params).await
 }
 
@@ -649,7 +649,7 @@ pub async fn flashcard_generate(
 pub async fn flashcard_save_generated(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardSaveGeneratedParams,
-) -> Result<Vec<FlashcardResponse>, ApiError> {
+) -> CommandResult<Vec<FlashcardResponse>> {
     state.flashcard_save_generated(params).await
 }
 
@@ -660,7 +660,7 @@ pub async fn flashcard_save_generated(
 pub async fn flashcard_submit_answer(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardSubmitAnswerParams,
-) -> Result<GradeResultResponse, ApiError> {
+) -> CommandResult<GradeResultResponse> {
     state.flashcard_submit_answer(params).await
 }
 
@@ -669,7 +669,7 @@ pub async fn flashcard_submit_answer(
 pub async fn flashcard_explain_answer(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardExplainParams,
-) -> Result<FlashcardExplainResponse, ApiError> {
+) -> CommandResult<FlashcardExplainResponse> {
     state.flashcard_explain_answer(params).await
 }
 
@@ -678,7 +678,7 @@ pub async fn flashcard_explain_answer(
 pub async fn flashcard_generate_distractors(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardDistractorParams,
-) -> Result<FlashcardDistractorResponse, ApiError> {
+) -> CommandResult<FlashcardDistractorResponse> {
     state.flashcard_generate_distractors(params).await
 }
 
@@ -688,7 +688,7 @@ pub async fn flashcard_save_mode_preference(
     state: State<'_, Arc<AppCore>>,
     deck: String,
     mode: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state
         .deck_preference_repo()?
         .set(&deck, &mode)
@@ -702,7 +702,7 @@ pub async fn flashcard_save_mode_preference(
 pub async fn flashcard_get_mode_preference(
     state: State<'_, Arc<AppCore>>,
     deck: String,
-) -> Result<Option<DeckPreferenceResponse>, ApiError> {
+) -> CommandResult<Option<DeckPreferenceResponse>> {
     let row = state
         .deck_preference_repo()?
         .get(&deck)
@@ -719,7 +719,7 @@ pub async fn flashcard_get_mode_preference(
 pub async fn flashcard_get_prerequisites(
     state: State<'_, Arc<AppCore>>,
     card_id: String,
-) -> Result<Vec<FlashcardResponse>, ApiError> {
+) -> CommandResult<Vec<FlashcardResponse>> {
     state.flashcard_get_prerequisites(&card_id).await
 }
 
@@ -728,7 +728,7 @@ pub async fn flashcard_get_prerequisites(
 pub async fn flashcard_save_session(
     state: State<'_, Arc<AppCore>>,
     params: desktop_shared::commands::ReviewSessionSaveParams,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.flashcard_save_session(params).await
 }
 
@@ -737,7 +737,7 @@ pub async fn flashcard_save_session(
 pub async fn flashcard_recent_learning_sessions(
     state: State<'_, Arc<AppCore>>,
     limit: Option<usize>,
-) -> Result<Vec<RecentLearningSession>, ApiError> {
+) -> CommandResult<Vec<RecentLearningSession>> {
     state
         .flashcard_recent_learning_sessions(limit.unwrap_or(3))
         .await
@@ -750,7 +750,7 @@ pub async fn flashcard_recent_learning_sessions(
 pub async fn note_retention_health(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> Result<Option<NoteRetentionHealthResponse>, ApiError> {
+) -> CommandResult<Option<NoteRetentionHealthResponse>> {
     state.note_retention_health(note_id).await
 }
 
@@ -761,7 +761,7 @@ pub async fn note_retention_health(
 pub async fn note_editing_finished(
     state: State<'_, Arc<AppCore>>,
     params: NoteEditingFinishedParams,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.note_editing_finished(params).await
 }
 
@@ -773,7 +773,7 @@ pub async fn note_insight_tab_chat(
     app: tauri::AppHandle,
     state: State<'_, Arc<AppCore>>,
     params: InsightChatParams,
-) -> Result<InsightChatStarted, ApiError> {
+) -> CommandResult<InsightChatStarted> {
     let emitter: Arc<dyn ::app_core::events::AppEventEmitter> = Arc::new(TauriEmitter(app));
     state.note_insight_tab_chat(&params, emitter).await
 }
@@ -783,7 +783,7 @@ pub async fn note_insight_tab_chat(
 pub async fn note_insight_clear_tab_chats(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.note_insight_clear_tab_chats(&note_id).await
 }
 
@@ -795,7 +795,7 @@ pub async fn note_import_files(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: desktop_shared::commands::NoteImportParams,
-) -> Result<desktop_shared::commands::NoteImportResult, ApiError> {
+) -> CommandResult<desktop_shared::commands::NoteImportResult> {
     let result = state.note_import_files(params).await?;
     super::emit_updates(
         &app,
@@ -813,7 +813,7 @@ pub async fn note_export(
     state: State<'_, Arc<AppCore>>,
     _app: tauri::AppHandle,
     params: desktop_shared::commands::NoteExportParams,
-) -> Result<desktop_shared::commands::NoteExportResult, ApiError> {
+) -> CommandResult<desktop_shared::commands::NoteExportResult> {
     state.note_export(params).await
 }
 
@@ -905,7 +905,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "note_list" => dev::val(core.note_list(dev::get(body, "notebook_id")).await),

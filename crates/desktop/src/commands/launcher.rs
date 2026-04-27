@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 use feature_launcher::{
     ClipboardEntry, DashboardData, LauncherExecuteResult, LauncherItem, ScriptRunner, SystemAction,
     SystemCommands, WindowAction,
@@ -16,7 +16,7 @@ use crate::app_core::AppCore;
 pub async fn launcher_search(
     state: State<'_, Arc<AppCore>>,
     query: String,
-) -> Result<Vec<LauncherItem>, ApiError> {
+) -> CommandResult<Vec<LauncherItem>> {
     state.launcher_search(query).await
 }
 
@@ -27,7 +27,7 @@ pub async fn launcher_execute(
     item_id: String,
     kind: String,
     args: Option<std::collections::HashMap<String, String>>,
-) -> Result<LauncherExecuteResult, ApiError> {
+) -> CommandResult<LauncherExecuteResult> {
     state
         .launcher_execute(item_id, kind, args.unwrap_or_default())
         .await
@@ -35,7 +35,7 @@ pub async fn launcher_execute(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn launcher_dashboard(state: State<'_, Arc<AppCore>>) -> Result<DashboardData, ApiError> {
+pub async fn launcher_dashboard(state: State<'_, Arc<AppCore>>) -> CommandResult<DashboardData> {
     state.launcher_dashboard().await
 }
 
@@ -44,7 +44,7 @@ pub async fn launcher_dashboard(state: State<'_, Arc<AppCore>>) -> Result<Dashbo
 pub async fn launcher_clipboard_paste(
     state: State<'_, Arc<AppCore>>,
     id: i64,
-) -> Result<Option<ClipboardEntry>, ApiError> {
+) -> CommandResult<Option<ClipboardEntry>> {
     state.launcher_clipboard_paste(id).await
 }
 
@@ -53,7 +53,7 @@ pub async fn launcher_clipboard_paste(
 pub async fn launcher_clipboard_delete(
     state: State<'_, Arc<AppCore>>,
     id: i64,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.launcher_clipboard_delete(id).await
 }
 
@@ -63,7 +63,7 @@ pub async fn launcher_clipboard_pin(
     state: State<'_, Arc<AppCore>>,
     id: i64,
     pinned: bool,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.launcher_clipboard_pin(id, pinned).await
 }
 
@@ -72,7 +72,7 @@ pub async fn launcher_clipboard_pin(
 pub async fn launcher_run_script(
     path: String,
     args: Option<std::collections::HashMap<String, String>>,
-) -> Result<String, ApiError> {
+) -> CommandResult<String> {
     let script_path = std::path::Path::new(&path);
     let args = args.unwrap_or_default();
     ScriptRunner::execute_with_args(script_path, &args)
@@ -85,7 +85,7 @@ pub async fn launcher_run_script(
 pub async fn launcher_system_command(
     action: SystemAction,
     args: Option<std::collections::HashMap<String, String>>,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     // args accepted here for IPC stability; DND duration threading deferred to Task 3.4
     // when SystemCommands::execute gains a duration parameter.
     let _ = args;
@@ -96,7 +96,7 @@ pub async fn launcher_system_command(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn launcher_window_action(action: WindowAction) -> Result<(), ApiError> {
+pub async fn launcher_window_action(action: WindowAction) -> CommandResult<()> {
     feature_launcher::window_manager()
         .execute(&action)
         .map_err(|e| ApiError::new("WINDOW_ACTION_ERROR", e.to_string()))
@@ -104,7 +104,7 @@ pub async fn launcher_window_action(action: WindowAction) -> Result<(), ApiError
 
 #[tauri::command]
 #[specta::specta]
-pub async fn launcher_open_app(path: String) -> Result<(), ApiError> {
+pub async fn launcher_open_app(path: String) -> CommandResult<()> {
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
@@ -142,7 +142,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
 
     Some(match cmd {

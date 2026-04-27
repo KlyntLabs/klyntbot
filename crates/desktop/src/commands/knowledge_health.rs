@@ -1,5 +1,5 @@
 use desktop_shared::commands::{KnowledgeHealthSummary, TopicDetailParams, TopicDetailResponse};
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -9,7 +9,7 @@ use crate::app_core::AppCore;
 #[specta::specta]
 pub async fn knowledge_health_summary(
     state: State<'_, Arc<AppCore>>,
-) -> Result<KnowledgeHealthSummary, ApiError> {
+) -> CommandResult<KnowledgeHealthSummary> {
     state.knowledge_health_summary().await
 }
 
@@ -18,7 +18,7 @@ pub async fn knowledge_health_summary(
 pub async fn knowledge_topic_detail(
     state: State<'_, Arc<AppCore>>,
     params: TopicDetailParams,
-) -> Result<TopicDetailResponse, ApiError> {
+) -> CommandResult<TopicDetailResponse> {
     state.knowledge_topic_detail(params).await
 }
 
@@ -32,7 +32,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "knowledge_health_summary" => dev::val(core.knowledge_health_summary().await),

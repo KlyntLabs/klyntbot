@@ -1,5 +1,5 @@
 use desktop_shared::commands::{ObjectiveCreateParams, ObjectiveResponse, ObjectiveUpdateParams};
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -11,7 +11,7 @@ pub async fn objective_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ObjectiveCreateParams,
-) -> Result<ObjectiveResponse, ApiError> {
+) -> CommandResult<ObjectiveResponse> {
     let (result, updates) = state.objective_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -22,7 +22,7 @@ pub async fn objective_create(
 pub async fn objective_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<ObjectiveResponse, ApiError> {
+) -> CommandResult<ObjectiveResponse> {
     state.objective_get(id).await
 }
 
@@ -32,7 +32,7 @@ pub async fn objective_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ObjectiveUpdateParams,
-) -> Result<ObjectiveResponse, ApiError> {
+) -> CommandResult<ObjectiveResponse> {
     let (result, updates) = state.objective_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -44,7 +44,7 @@ pub async fn objective_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.objective_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -65,7 +65,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "objective_create" => dev::val_rh(

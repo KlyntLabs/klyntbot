@@ -1,5 +1,5 @@
 use desktop_shared::commands::{CaptureStatusResponse, ShellHookStatusResponse};
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -9,7 +9,7 @@ use crate::app_core::AppCore;
 #[specta::specta]
 pub async fn capture_status(
     state: State<'_, Arc<AppCore>>,
-) -> Result<CaptureStatusResponse, ApiError> {
+) -> CommandResult<CaptureStatusResponse> {
     state.get_capture_status().await
 }
 
@@ -17,7 +17,7 @@ pub async fn capture_status(
 #[specta::specta]
 pub async fn capture_shell_hook_status(
     state: State<'_, Arc<AppCore>>,
-) -> Result<ShellHookStatusResponse, ApiError> {
+) -> CommandResult<ShellHookStatusResponse> {
     state.get_shell_hook_status().await
 }
 
@@ -25,7 +25,7 @@ pub async fn capture_shell_hook_status(
 #[specta::specta]
 pub async fn capture_install_shell_hook(
     state: State<'_, Arc<AppCore>>,
-) -> Result<String, ApiError> {
+) -> CommandResult<String> {
     state.install_shell_hook().await
 }
 
@@ -33,7 +33,7 @@ pub async fn capture_install_shell_hook(
 #[specta::specta]
 pub async fn capture_uninstall_shell_hook(
     state: State<'_, Arc<AppCore>>,
-) -> Result<String, ApiError> {
+) -> CommandResult<String> {
     state.uninstall_shell_hook().await
 }
 
@@ -41,7 +41,7 @@ pub async fn capture_uninstall_shell_hook(
 #[specta::specta]
 pub async fn capture_get_ingestion_token(
     state: State<'_, Arc<AppCore>>,
-) -> Result<String, ApiError> {
+) -> CommandResult<String> {
     state.get_ingestion_token().await
 }
 
@@ -49,7 +49,7 @@ pub async fn capture_get_ingestion_token(
 #[specta::specta]
 pub async fn capture_regenerate_ingestion_token(
     state: State<'_, Arc<AppCore>>,
-) -> Result<String, ApiError> {
+) -> CommandResult<String> {
     state.regenerate_ingestion_token().await
 }
 
@@ -70,7 +70,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     _body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
     Some(match cmd {
         "capture_status" => dev::val(core.get_capture_status().await),

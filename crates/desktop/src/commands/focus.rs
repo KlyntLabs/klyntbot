@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 use feature_focus::repo::FocusSession;
 use feature_focus::FocusMode;
 use tauri::State;
@@ -17,7 +17,7 @@ use crate::app_core::AppCore;
 /// Non-macOS: always returns an UNSUPPORTED error.
 #[tauri::command]
 #[specta::specta]
-pub async fn focus_install_shortcuts() -> Result<(), ApiError> {
+pub async fn focus_install_shortcuts() -> CommandResult<()> {
     #[cfg(target_os = "macos")]
     {
         use feature_focus::bridge::macos::install_bundled_shortcut;
@@ -41,7 +41,7 @@ pub async fn focus_install_shortcuts() -> Result<(), ApiError> {
 /// Shortcuts library. Returns `false` on non-macOS.
 #[tauri::command]
 #[specta::specta]
-pub async fn focus_shortcuts_installed() -> Result<bool, ApiError> {
+pub async fn focus_shortcuts_installed() -> CommandResult<bool> {
     #[cfg(target_os = "macos")]
     {
         use feature_focus::bridge::macos::is_shortcut_installed;
@@ -66,7 +66,7 @@ pub async fn focus_activate(
     state: State<'_, Arc<AppCore>>,
     mode: FocusMode,
     ends_at: String,
-) -> Result<FocusSession, ApiError> {
+) -> CommandResult<FocusSession> {
     let ts = ends_at
         .parse::<jiff::Timestamp>()
         .map_err(|e| ApiError::new("BAD_TIMESTAMP", e.to_string()))?;
@@ -82,7 +82,7 @@ pub async fn focus_activate(
 pub async fn focus_deactivate(
     state: State<'_, Arc<AppCore>>,
     mode: FocusMode,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let mgr = state.dnd_manager()?;
     mgr.deactivate(mode)
         .await
@@ -96,7 +96,7 @@ pub async fn focus_extend(
     state: State<'_, Arc<AppCore>>,
     mode: FocusMode,
     new_ends_at: String,
-) -> Result<FocusSession, ApiError> {
+) -> CommandResult<FocusSession> {
     let ts = new_ends_at
         .parse::<jiff::Timestamp>()
         .map_err(|e| ApiError::new("BAD_TIMESTAMP", e.to_string()))?;
@@ -112,7 +112,7 @@ pub async fn focus_extend(
 pub async fn focus_active(
     state: State<'_, Arc<AppCore>>,
     mode: FocusMode,
-) -> Result<Option<FocusSession>, ApiError> {
+) -> CommandResult<Option<FocusSession>> {
     let mgr = state.dnd_manager()?;
     mgr.active(mode)
         .await
@@ -136,7 +136,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
 
     Some(match cmd {

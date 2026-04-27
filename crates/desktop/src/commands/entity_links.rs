@@ -1,5 +1,5 @@
 use desktop_shared::entity_link_types::*;
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -11,7 +11,7 @@ pub async fn entity_link_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: EntityLinkCreateParams,
-) -> Result<EntityLinkResponse, ApiError> {
+) -> CommandResult<EntityLinkResponse> {
     let (result, updates) = state.entity_link_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -23,7 +23,7 @@ pub async fn entity_link_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.entity_link_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -35,7 +35,7 @@ pub async fn entity_links_for_entity(
     state: State<'_, Arc<AppCore>>,
     kind: String,
     id: String,
-) -> Result<LinkedEntitiesResponse, ApiError> {
+) -> CommandResult<LinkedEntitiesResponse> {
     state.entity_links_for_entity(kind, id).await
 }
 
@@ -53,7 +53,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "entity_link_create" => dev::val_rh(

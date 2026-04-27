@@ -3,7 +3,7 @@ use desktop_shared::commands::{
     InferenceConfigUpdate, InferenceStatsResponse, WorkContextDetailResponse, WorkContextResponse,
     WorkContextUpdateParams,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -14,7 +14,7 @@ use crate::app_core::AppCore;
 pub async fn list_work_contexts(
     state: State<'_, Arc<AppCore>>,
     status: Option<String>,
-) -> Result<Vec<WorkContextResponse>, ApiError> {
+) -> CommandResult<Vec<WorkContextResponse>> {
     state.list_work_contexts(status).await
 }
 
@@ -23,7 +23,7 @@ pub async fn list_work_contexts(
 pub async fn get_work_context(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<Option<WorkContextResponse>, ApiError> {
+) -> CommandResult<Option<WorkContextResponse>> {
     state.get_work_context(id).await
 }
 
@@ -32,7 +32,7 @@ pub async fn get_work_context(
 pub async fn get_work_context_detail(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<WorkContextDetailResponse, ApiError> {
+) -> CommandResult<WorkContextDetailResponse> {
     state.get_work_context_detail(id).await
 }
 
@@ -41,7 +41,7 @@ pub async fn get_work_context_detail(
 pub async fn update_work_context(
     state: State<'_, Arc<AppCore>>,
     params: WorkContextUpdateParams,
-) -> Result<WorkContextResponse, ApiError> {
+) -> CommandResult<WorkContextResponse> {
     state.update_work_context(params).await
 }
 
@@ -50,7 +50,7 @@ pub async fn update_work_context(
 pub async fn archive_work_context(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<WorkContextResponse, ApiError> {
+) -> CommandResult<WorkContextResponse> {
     state.archive_work_context(id).await
 }
 
@@ -60,7 +60,7 @@ pub async fn merge_work_contexts(
     state: State<'_, Arc<AppCore>>,
     keep_id: String,
     remove_id: String,
-) -> Result<WorkContextResponse, ApiError> {
+) -> CommandResult<WorkContextResponse> {
     state.merge_work_contexts(keep_id, remove_id).await
 }
 
@@ -69,7 +69,7 @@ pub async fn merge_work_contexts(
 pub async fn search_work_contexts(
     state: State<'_, Arc<AppCore>>,
     query: String,
-) -> Result<Vec<WorkContextResponse>, ApiError> {
+) -> CommandResult<Vec<WorkContextResponse>> {
     state.search_work_contexts(query).await
 }
 
@@ -79,7 +79,7 @@ pub async fn get_context_timeline(
     state: State<'_, Arc<AppCore>>,
     date: String,
     tz_offset_mins: Option<i32>,
-) -> Result<Vec<ContextTimelineBlockResponse>, ApiError> {
+) -> CommandResult<Vec<ContextTimelineBlockResponse>> {
     state.get_context_timeline(date, tz_offset_mins).await
 }
 
@@ -88,7 +88,7 @@ pub async fn get_context_timeline(
 pub async fn get_context_resume_data(
     state: State<'_, Arc<AppCore>>,
     context_id: String,
-) -> Result<ContextResumeResponse, ApiError> {
+) -> CommandResult<ContextResumeResponse> {
     state.get_context_resume_data(context_id).await
 }
 
@@ -96,7 +96,7 @@ pub async fn get_context_resume_data(
 #[specta::specta]
 pub async fn get_inference_stats(
     state: State<'_, Arc<AppCore>>,
-) -> Result<InferenceStatsResponse, ApiError> {
+) -> CommandResult<InferenceStatsResponse> {
     state.get_inference_stats().await
 }
 
@@ -106,7 +106,7 @@ pub async fn get_dashboard_intelligence(
     state: State<'_, Arc<AppCore>>,
     date: String,
     tz_offset_mins: Option<i32>,
-) -> Result<DashboardIntelligenceResponse, ApiError> {
+) -> CommandResult<DashboardIntelligenceResponse> {
     state
         .get_dashboard_intelligence(&date, tz_offset_mins)
         .await
@@ -117,7 +117,7 @@ pub async fn get_dashboard_intelligence(
 pub async fn update_inference_config(
     state: State<'_, Arc<AppCore>>,
     config: InferenceConfigUpdate,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.update_inference_config(config).await
 }
 
@@ -144,7 +144,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "list_work_contexts" => dev::val(core.list_work_contexts(dev::get(body, "status")).await),

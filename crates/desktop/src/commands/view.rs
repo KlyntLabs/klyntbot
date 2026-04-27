@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::view::{ActiveViewResponse, SetActiveViewParams};
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -11,13 +11,13 @@ use crate::app_core::AppCore;
 pub async fn view_set_active(
     state: State<'_, Arc<AppCore>>,
     params: SetActiveViewParams,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.view_set_active(params).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn view_clear_active(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
+pub async fn view_clear_active(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
     state.view_clear_active().await
 }
 
@@ -25,7 +25,7 @@ pub async fn view_clear_active(state: State<'_, Arc<AppCore>>) -> Result<(), Api
 #[specta::specta]
 pub async fn view_get_active(
     state: State<'_, Arc<AppCore>>,
-) -> Result<ActiveViewResponse, ApiError> {
+) -> CommandResult<ActiveViewResponse> {
     state.view_get_active().await
 }
 
@@ -40,7 +40,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "view_set_active" => dev::val(

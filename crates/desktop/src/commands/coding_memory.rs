@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tauri::State;
 
 use desktop_shared::commands::coding_memory::*;
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 
 use crate::app_core::AppCore;
 
@@ -43,7 +43,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
 #[specta::specta]
 pub async fn coding_memory_status(
     state: State<'_, Arc<AppCore>>,
-) -> Result<CodingMemoryStatusResponse, ApiError> {
+) -> CommandResult<CodingMemoryStatusResponse> {
     state.coding_memory_status().await
 }
 
@@ -51,7 +51,7 @@ pub async fn coding_memory_status(
 #[specta::specta]
 pub async fn coding_memory_cli_health(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<CliHealthRow>, ApiError> {
+) -> CommandResult<Vec<CliHealthRow>> {
     state.coding_memory_cli_health().await
 }
 
@@ -62,7 +62,7 @@ pub async fn coding_memory_session_replay(
     session_id: Option<String>,
     limit: Option<i64>,
     offset: Option<i64>,
-) -> Result<Vec<SessionReplayEntry>, ApiError> {
+) -> CommandResult<Vec<SessionReplayEntry>> {
     state
         .coding_memory_session_replay(session_id, limit.unwrap_or(500), offset.unwrap_or(0))
         .await
@@ -73,7 +73,7 @@ pub async fn coding_memory_session_replay(
 pub async fn coding_memory_enable_cli(
     state: State<'_, Arc<AppCore>>,
     cli: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.coding_memory_enable_cli(cli).await
 }
 
@@ -82,7 +82,7 @@ pub async fn coding_memory_enable_cli(
 pub async fn coding_memory_disable_cli(
     state: State<'_, Arc<AppCore>>,
     cli: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.coding_memory_disable_cli(cli).await
 }
 
@@ -91,7 +91,7 @@ pub async fn coding_memory_disable_cli(
 pub async fn coding_memory_diagnose_cli(
     state: State<'_, Arc<AppCore>>,
     cli: String,
-) -> Result<DiagnoseResult, ApiError> {
+) -> CommandResult<DiagnoseResult> {
     state.coding_memory_diagnose_cli(cli).await
 }
 
@@ -101,7 +101,7 @@ pub async fn coding_memory_browser(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
     offset: Option<i64>,
-) -> Result<Vec<MemoryBrowserRow>, ApiError> {
+) -> CommandResult<Vec<MemoryBrowserRow>> {
     state.coding_memory_browser(limit, offset).await
 }
 
@@ -110,7 +110,7 @@ pub async fn coding_memory_browser(
 pub async fn coding_memory_activity(
     state: State<'_, Arc<AppCore>>,
     days: Option<i64>,
-) -> Result<Vec<ActivityBucket>, ApiError> {
+) -> CommandResult<Vec<ActivityBucket>> {
     state.coding_memory_activity(days).await
 }
 
@@ -119,7 +119,7 @@ pub async fn coding_memory_activity(
 pub async fn coding_memory_cost(
     state: State<'_, Arc<AppCore>>,
     days: Option<i64>,
-) -> Result<CostBreakdown, ApiError> {
+) -> CommandResult<CostBreakdown> {
     state.coding_memory_cost(days).await
 }
 
@@ -129,7 +129,7 @@ pub async fn coding_memory_sensitivity(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
     offset: Option<i64>,
-) -> Result<Vec<SensitivityRow>, ApiError> {
+) -> CommandResult<Vec<SensitivityRow>> {
     state.coding_memory_sensitivity(limit, offset).await
 }
 
@@ -139,7 +139,7 @@ pub async fn coding_memory_distill_now(
     state: State<'_, Arc<AppCore>>,
     session_id: String,
     turn_id: Option<String>,
-) -> Result<desktop_shared::specta_helpers::JsonValueWrapper, ApiError> {
+) -> CommandResult<desktop_shared::specta_helpers::JsonValueWrapper> {
     state.coding_memory_distill_now(session_id, turn_id).await.map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
@@ -274,7 +274,7 @@ pub async fn coding_memory_session_replay_recall_overlay(
 pub async fn coding_memory_mirror_alerts_feed(
     state: State<'_, Arc<AppCore>>,
     args: MirrorAlertsFeedArgs,
-) -> Result<Vec<MirrorAlertRow>, ApiError> {
+) -> CommandResult<Vec<MirrorAlertRow>> {
     app_core::coding_memory::panels_phase5::mirror_alerts_feed(state.storage_pool.clone(), args)
         .await
         .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
@@ -285,7 +285,7 @@ pub async fn coding_memory_mirror_alerts_feed(
 pub async fn coding_memory_mirror_alert_action(
     state: State<'_, Arc<AppCore>>,
     args: MirrorAlertActionArgs,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     app_core::coding_memory::panels_phase5::mirror_alert_action(state.storage_pool.clone(), args)
         .await
         .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
@@ -296,7 +296,7 @@ pub async fn coding_memory_mirror_alert_action(
 pub async fn coding_memory_effectiveness_trends(
     state: State<'_, Arc<AppCore>>,
     pattern_id: String,
-) -> Result<EffectivenessTrendsResponse, ApiError> {
+) -> CommandResult<EffectivenessTrendsResponse> {
     app_core::coding_memory::panels_phase5::effectiveness_trends(
         state.storage_pool.clone(),
         pattern_id,
@@ -309,7 +309,7 @@ pub async fn coding_memory_effectiveness_trends(
 #[specta::specta]
 pub async fn coding_memory_reforge_cycle_list(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<ReforgeCycleSummary>, ApiError> {
+) -> CommandResult<Vec<ReforgeCycleSummary>> {
     app_core::coding_memory::panels_phase5::reforge_cycle_list(state.storage_pool.clone())
         .await
         .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
@@ -320,7 +320,7 @@ pub async fn coding_memory_reforge_cycle_list(
 pub async fn coding_memory_reforge_cycle_diff(
     state: State<'_, Arc<AppCore>>,
     args: ReforgeCycleDiffArgs,
-) -> Result<ReforgeCycleDiffResponse, ApiError> {
+) -> CommandResult<ReforgeCycleDiffResponse> {
     app_core::coding_memory::panels_phase5::reforge_cycle_diff(state.storage_pool.clone(), args)
         .await
         .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
@@ -331,7 +331,7 @@ pub async fn coding_memory_reforge_cycle_diff(
 pub async fn coding_memory_project_skills_for_repo(
     state: State<'_, Arc<AppCore>>,
     repo_id: String,
-) -> Result<Vec<ProjectSkillRow>, ApiError> {
+) -> CommandResult<Vec<ProjectSkillRow>> {
     app_core::coding_memory::panels_phase5::project_skills_for_repo(
         state.storage_pool.clone(),
         repo_id,
@@ -346,7 +346,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &Arc<AppCore>,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
     Some(match cmd {
         "coding_memory_status" => dev::val(core.coding_memory_status().await),

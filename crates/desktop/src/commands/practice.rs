@@ -4,7 +4,7 @@ use desktop_shared::commands::{
     PracticeSegmentParams, PracticeSegmentResponse, PracticeSessionResponse, PracticeStartParams,
     PracticeSubmitParams,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -15,7 +15,7 @@ use crate::app_core::AppCore;
 pub async fn practice_segment_note(
     state: State<'_, Arc<AppCore>>,
     params: PracticeSegmentParams,
-) -> Result<PracticeSegmentResponse, ApiError> {
+) -> CommandResult<PracticeSegmentResponse> {
     state.practice_segment_note(params).await
 }
 
@@ -24,7 +24,7 @@ pub async fn practice_segment_note(
 pub async fn practice_start_session(
     state: State<'_, Arc<AppCore>>,
     params: PracticeStartParams,
-) -> Result<PracticeSessionResponse, ApiError> {
+) -> CommandResult<PracticeSessionResponse> {
     state.practice_start_session(params).await
 }
 
@@ -33,7 +33,7 @@ pub async fn practice_start_session(
 pub async fn practice_submit_unit(
     state: State<'_, Arc<AppCore>>,
     params: PracticeSubmitParams,
-) -> Result<PracticeEvalResponse, ApiError> {
+) -> CommandResult<PracticeEvalResponse> {
     state.practice_submit_unit(params).await
 }
 
@@ -42,7 +42,7 @@ pub async fn practice_submit_unit(
 pub async fn practice_confirm_unit(
     state: State<'_, Arc<AppCore>>,
     params: PracticeConfirmParams,
-) -> Result<PracticeConfirmResponse, ApiError> {
+) -> CommandResult<PracticeConfirmResponse> {
     state.practice_confirm_unit(params).await
 }
 
@@ -51,7 +51,7 @@ pub async fn practice_confirm_unit(
 pub async fn practice_get_session(
     state: State<'_, Arc<AppCore>>,
     params: PracticeGetParams,
-) -> Result<Option<PracticeSessionResponse>, ApiError> {
+) -> CommandResult<Option<PracticeSessionResponse>> {
     state.practice_get_session(params).await
 }
 
@@ -60,7 +60,7 @@ pub async fn practice_get_session(
 pub async fn practice_complete_session(
     state: State<'_, Arc<AppCore>>,
     params: PracticeCompleteParams,
-) -> Result<PracticeCompleteResponse, ApiError> {
+) -> CommandResult<PracticeCompleteResponse> {
     state.practice_complete_session(params).await
 }
 
@@ -69,7 +69,7 @@ pub async fn practice_complete_session(
 pub async fn practice_list_sessions(
     state: State<'_, Arc<AppCore>>,
     params: PracticeListParams,
-) -> Result<Vec<PracticeSessionResponse>, ApiError> {
+) -> CommandResult<Vec<PracticeSessionResponse>> {
     state.practice_list_sessions(params).await
 }
 
@@ -91,7 +91,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "practice_segment_note" => dev::val(

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use app_core::handlers::autotuner::AutoTunerStatus;
 use autotuner::{ChampionSummary, ExperimentSummary};
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -21,7 +21,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
 
 #[tauri::command]
 #[specta::specta]
-pub async fn autotuner_status(state: State<'_, Arc<AppCore>>) -> Result<AutoTunerStatus, ApiError> {
+pub async fn autotuner_status(state: State<'_, Arc<AppCore>>) -> CommandResult<AutoTunerStatus> {
     state.autotuner_status().await
 }
 
@@ -30,25 +30,25 @@ pub async fn autotuner_status(state: State<'_, Arc<AppCore>>) -> Result<AutoTune
 pub async fn autotuner_history(
     state: State<'_, Arc<AppCore>>,
     limit: Option<u32>,
-) -> Result<Vec<ExperimentSummary>, ApiError> {
+) -> CommandResult<Vec<ExperimentSummary>> {
     state.autotuner_history(limit.unwrap_or(20)).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn autotuner_revert(state: State<'_, Arc<AppCore>>) -> Result<ChampionSummary, ApiError> {
+pub async fn autotuner_revert(state: State<'_, Arc<AppCore>>) -> CommandResult<ChampionSummary> {
     state.autotuner_revert().await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn autotuner_pause(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
+pub async fn autotuner_pause(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
     state.autotuner_pause().await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn autotuner_resume(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
+pub async fn autotuner_resume(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
     state.autotuner_resume().await
 }
 
@@ -57,13 +57,13 @@ pub async fn autotuner_resume(state: State<'_, Arc<AppCore>>) -> Result<(), ApiE
 pub async fn autotuner_set_pace(
     state: State<'_, Arc<AppCore>>,
     pace: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.autotuner_set_pace(&pace).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn autotuner_get_toast_count(state: State<'_, Arc<AppCore>>) -> Result<i64, ApiError> {
+pub async fn autotuner_get_toast_count(state: State<'_, Arc<AppCore>>) -> CommandResult<i64> {
     state.autotuner_get_toast_count().await
 }
 
@@ -71,7 +71,7 @@ pub async fn autotuner_get_toast_count(state: State<'_, Arc<AppCore>>) -> Result
 #[specta::specta]
 pub async fn autotuner_increment_toast_count(
     state: State<'_, Arc<AppCore>>,
-) -> Result<i64, ApiError> {
+) -> CommandResult<i64> {
     state.autotuner_increment_toast_count().await
 }
 
@@ -82,7 +82,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "autotuner_status" => dev::val(core.autotuner_status().await),

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use app_core::AppCore;
 use desktop_shared::commands::{WorkspaceFile, WorkspaceFileContent};
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use tauri::State;
 
 #[cfg(test)]
@@ -16,7 +16,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
 #[specta::specta]
 pub async fn workspace_list_files(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<WorkspaceFile>, ApiError> {
+) -> CommandResult<Vec<WorkspaceFile>> {
     state.workspace_list_files().await
 }
 
@@ -25,7 +25,7 @@ pub async fn workspace_list_files(
 pub async fn workspace_read_file(
     state: State<'_, Arc<AppCore>>,
     filename: String,
-) -> Result<WorkspaceFileContent, ApiError> {
+) -> CommandResult<WorkspaceFileContent> {
     state.workspace_read_file(&filename).await
 }
 
@@ -35,7 +35,7 @@ pub async fn workspace_write_file(
     state: State<'_, Arc<AppCore>>,
     filename: String,
     content: String,
-) -> Result<WorkspaceFileContent, ApiError> {
+) -> CommandResult<WorkspaceFileContent> {
     state.workspace_write_file(&filename, &content).await
 }
 
@@ -44,7 +44,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "workspace_list_files" => dev::val(core.workspace_list_files().await),

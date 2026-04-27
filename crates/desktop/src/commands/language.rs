@@ -4,7 +4,7 @@ use desktop_shared::commands::{
     QuickTranslateResponse, TranslateBreakdownParams, TranslateBreakdownResponse,
     TranslationEvalResponse, VocabularySaveParams,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -15,7 +15,7 @@ use crate::app_core::AppCore;
 pub async fn language_translate_breakdown(
     state: State<'_, Arc<AppCore>>,
     params: TranslateBreakdownParams,
-) -> Result<TranslateBreakdownResponse, ApiError> {
+) -> CommandResult<TranslateBreakdownResponse> {
     state.language_translate_breakdown(params).await
 }
 
@@ -24,7 +24,7 @@ pub async fn language_translate_breakdown(
 pub async fn language_evaluate_translation(
     state: State<'_, Arc<AppCore>>,
     params: EvaluateTranslationParams,
-) -> Result<TranslationEvalResponse, ApiError> {
+) -> CommandResult<TranslationEvalResponse> {
     state.language_evaluate_translation(params).await
 }
 
@@ -33,7 +33,7 @@ pub async fn language_evaluate_translation(
 pub async fn language_save_vocabulary(
     state: State<'_, Arc<AppCore>>,
     params: VocabularySaveParams,
-) -> Result<Vec<desktop_shared::commands::FlashcardResponse>, ApiError> {
+) -> CommandResult<Vec<desktop_shared::commands::FlashcardResponse>> {
     state.language_save_vocabulary(params).await
 }
 
@@ -42,7 +42,7 @@ pub async fn language_save_vocabulary(
 pub async fn language_detect_confusables(
     state: State<'_, Arc<AppCore>>,
     params: DetectConfusablesParams,
-) -> Result<ConfusableResponse, ApiError> {
+) -> CommandResult<ConfusableResponse> {
     state.language_detect_confusables(params).await
 }
 
@@ -51,7 +51,7 @@ pub async fn language_detect_confusables(
 pub async fn language_enrich_annotation(
     state: State<'_, Arc<AppCore>>,
     params: EnrichAnnotationParams,
-) -> Result<AnnotationEnrichmentResponse, ApiError> {
+) -> CommandResult<AnnotationEnrichmentResponse> {
     state.language_enrich_annotation(params).await
 }
 
@@ -60,7 +60,7 @@ pub async fn language_enrich_annotation(
 pub async fn language_quick_translate(
     state: State<'_, Arc<AppCore>>,
     params: QuickTranslateParams,
-) -> Result<QuickTranslateResponse, ApiError> {
+) -> CommandResult<QuickTranslateResponse> {
     state.language_quick_translate(params).await
 }
 
@@ -81,7 +81,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "language_translate_breakdown" => dev::val(

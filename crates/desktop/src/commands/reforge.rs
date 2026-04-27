@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::reforge::*;
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -10,7 +10,7 @@ use crate::app_core::AppCore;
 #[specta::specta]
 pub async fn reforge_state(
     state: State<'_, Arc<AppCore>>,
-) -> Result<ReforgeStateResponse, ApiError> {
+) -> CommandResult<ReforgeStateResponse> {
     state.reforge_state().await
 }
 
@@ -18,7 +18,7 @@ pub async fn reforge_state(
 #[specta::specta]
 pub async fn reforge_skill_names(
     state: State<'_, Arc<AppCore>>,
-) -> Result<SkillListResponse, ApiError> {
+) -> CommandResult<SkillListResponse> {
     state.skill_names().await
 }
 
@@ -27,7 +27,7 @@ pub async fn reforge_skill_names(
 pub async fn reforge_skill_versions(
     skill_name: String,
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<SkillVersionResponse>, ApiError> {
+) -> CommandResult<Vec<SkillVersionResponse>> {
     state.skill_version_list(&skill_name).await
 }
 
@@ -37,7 +37,7 @@ pub async fn reforge_skill_version_detail(
     skill_name: String,
     version: i64,
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<SkillVersionDetailResponse>, ApiError> {
+) -> CommandResult<Vec<SkillVersionDetailResponse>> {
     state.skill_version_detail(&skill_name, version).await
 }
 
@@ -48,7 +48,7 @@ pub async fn reforge_skill_reset(
     file_path: String,
     version: i64,
     state: State<'_, Arc<AppCore>>,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state
         .skill_version_reset(&skill_name, &file_path, version)
         .await
@@ -70,7 +70,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
 
     Some(match cmd {

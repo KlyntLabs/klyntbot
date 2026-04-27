@@ -1,5 +1,5 @@
 use desktop_shared::commands::AgentStatusResponse;
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -7,7 +7,7 @@ use crate::app_core::AppCore;
 
 #[tauri::command]
 #[specta::specta]
-pub async fn agent_status(state: State<'_, Arc<AppCore>>) -> Result<AgentStatusResponse, ApiError> {
+pub async fn agent_status(state: State<'_, Arc<AppCore>>) -> CommandResult<AgentStatusResponse> {
     state.agent_status().await
 }
 
@@ -21,7 +21,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     _body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
     Some(match cmd {
         "agent_status" => dev::val(core.agent_status().await),

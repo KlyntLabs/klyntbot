@@ -2,7 +2,7 @@ use desktop_shared::commands::{
     ColumnCreateParams, ColumnReorderParams, ColumnUpdateParams, ColumnValueSetParams,
     CustomColumnResponse, CustomColumnValueResponse,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -13,7 +13,7 @@ use crate::app_core::AppCore;
 pub async fn custom_column_list(
     state: State<'_, Arc<AppCore>>,
     project_id: String,
-) -> Result<Vec<CustomColumnResponse>, ApiError> {
+) -> CommandResult<Vec<CustomColumnResponse>> {
     state.custom_column_list(project_id).await
 }
 
@@ -22,7 +22,7 @@ pub async fn custom_column_list(
 pub async fn custom_column_create(
     state: State<'_, Arc<AppCore>>,
     params: ColumnCreateParams,
-) -> Result<CustomColumnResponse, ApiError> {
+) -> CommandResult<CustomColumnResponse> {
     state.custom_column_create(params).await
 }
 
@@ -31,7 +31,7 @@ pub async fn custom_column_create(
 pub async fn custom_column_update(
     state: State<'_, Arc<AppCore>>,
     params: ColumnUpdateParams,
-) -> Result<CustomColumnResponse, ApiError> {
+) -> CommandResult<CustomColumnResponse> {
     state.custom_column_update(params).await
 }
 
@@ -40,7 +40,7 @@ pub async fn custom_column_update(
 pub async fn custom_column_delete(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     state.custom_column_delete(id).await
 }
 
@@ -49,7 +49,7 @@ pub async fn custom_column_delete(
 pub async fn custom_column_reorder(
     state: State<'_, Arc<AppCore>>,
     params: ColumnReorderParams,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.custom_column_reorder(params).await
 }
 
@@ -58,7 +58,7 @@ pub async fn custom_column_reorder(
 pub async fn custom_column_values(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
-) -> Result<Vec<CustomColumnValueResponse>, ApiError> {
+) -> CommandResult<Vec<CustomColumnValueResponse>> {
     state.custom_column_values(task_id).await
 }
 
@@ -67,7 +67,7 @@ pub async fn custom_column_values(
 pub async fn custom_column_value_set(
     state: State<'_, Arc<AppCore>>,
     params: ColumnValueSetParams,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.custom_column_value_set(params).await
 }
 
@@ -77,7 +77,7 @@ pub async fn custom_column_value_delete(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
     column_id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     state.custom_column_value_delete(task_id, column_id).await
 }
 
@@ -100,7 +100,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "custom_column_list" => {

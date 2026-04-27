@@ -1,5 +1,5 @@
 use desktop_shared::commands::MorningBriefingResponse;
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -9,7 +9,7 @@ use crate::app_core::AppCore;
 #[specta::specta]
 pub async fn morning_briefing_summary(
     state: State<'_, Arc<AppCore>>,
-) -> Result<MorningBriefingResponse, ApiError> {
+) -> CommandResult<MorningBriefingResponse> {
     state.morning_briefing().await
 }
 
@@ -23,7 +23,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     _body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
     Some(match cmd {
         "morning_briefing_summary" => dev::val(core.morning_briefing().await),

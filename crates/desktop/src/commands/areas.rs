@@ -1,5 +1,5 @@
 use desktop_shared::commands::{AreaCreateParams, AreaResponse, AreaUpdateParams};
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -7,7 +7,7 @@ use crate::app_core::AppCore;
 
 #[tauri::command]
 #[specta::specta]
-pub async fn area_list(state: State<'_, Arc<AppCore>>) -> Result<Vec<AreaResponse>, ApiError> {
+pub async fn area_list(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<AreaResponse>> {
     state.area_list().await
 }
 
@@ -17,7 +17,7 @@ pub async fn area_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: AreaCreateParams,
-) -> Result<AreaResponse, ApiError> {
+) -> CommandResult<AreaResponse> {
     let (result, updates) = state.area_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -29,7 +29,7 @@ pub async fn area_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: AreaUpdateParams,
-) -> Result<AreaResponse, ApiError> {
+) -> CommandResult<AreaResponse> {
     let (result, updates) = state.area_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -41,7 +41,7 @@ pub async fn area_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.area_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -54,7 +54,7 @@ pub async fn area_reorder(
     app: tauri::AppHandle,
     id: String,
     position: i32,
-) -> Result<AreaResponse, ApiError> {
+) -> CommandResult<AreaResponse> {
     let (result, updates) = state.area_reorder(id, position).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -76,7 +76,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "area_list" => dev::val(core.area_list().await),

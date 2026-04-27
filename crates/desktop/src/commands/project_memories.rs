@@ -1,5 +1,5 @@
 use desktop_shared::cognitive_commands::SemanticFactResponse;
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -10,7 +10,7 @@ use crate::app_core::AppCore;
 pub async fn project_memories_list(
     state: State<'_, Arc<AppCore>>,
     project_id: String,
-) -> Result<Vec<SemanticFactResponse>, ApiError> {
+) -> CommandResult<Vec<SemanticFactResponse>> {
     state.project_memories_list(project_id).await
 }
 
@@ -20,7 +20,7 @@ pub async fn project_memories_by_type(
     state: State<'_, Arc<AppCore>>,
     project_id: String,
     memory_type: String,
-) -> Result<Vec<SemanticFactResponse>, ApiError> {
+) -> CommandResult<Vec<SemanticFactResponse>> {
     state
         .project_memories_by_type(project_id, memory_type)
         .await
@@ -36,7 +36,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
     Some(match cmd {
         "project_memories_list" => {

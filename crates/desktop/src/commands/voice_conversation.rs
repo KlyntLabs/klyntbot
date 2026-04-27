@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::voice_conversation::*;
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -19,7 +19,7 @@ fn set_tray_voice(active: bool, phase: u8) {
 pub async fn voice_conversation_start(
     state: State<'_, Arc<AppCore>>,
     session_key: Option<String>,
-) -> Result<VoiceConversationStartResponse, ApiError> {
+) -> CommandResult<VoiceConversationStartResponse> {
     let result = state.voice_conversation_start(session_key).await?;
     set_tray_voice(true, 1);
     Ok(result)
@@ -27,7 +27,7 @@ pub async fn voice_conversation_start(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn voice_conversation_pause(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
+pub async fn voice_conversation_pause(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
     let result = state.voice_conversation_pause().await;
     set_tray_voice(false, 0);
     result
@@ -35,7 +35,7 @@ pub async fn voice_conversation_pause(state: State<'_, Arc<AppCore>>) -> Result<
 
 #[tauri::command]
 #[specta::specta]
-pub async fn voice_conversation_resume(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
+pub async fn voice_conversation_resume(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
     let result = state.voice_conversation_resume().await;
     set_tray_voice(true, 1);
     result
@@ -43,13 +43,13 @@ pub async fn voice_conversation_resume(state: State<'_, Arc<AppCore>>) -> Result
 
 #[tauri::command]
 #[specta::specta]
-pub async fn voice_conversation_interrupt(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
+pub async fn voice_conversation_interrupt(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
     state.voice_conversation_interrupt().await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn voice_conversation_continue(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
+pub async fn voice_conversation_continue(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
     state.voice_conversation_continue().await
 }
 
@@ -57,7 +57,7 @@ pub async fn voice_conversation_continue(state: State<'_, Arc<AppCore>>) -> Resu
 #[specta::specta]
 pub async fn voice_conversation_new_session(
     state: State<'_, Arc<AppCore>>,
-) -> Result<VoiceConversationStartResponse, ApiError> {
+) -> CommandResult<VoiceConversationStartResponse> {
     let result = state.voice_conversation_new_session().await?;
     set_tray_voice(true, 1);
     Ok(result)
@@ -65,7 +65,7 @@ pub async fn voice_conversation_new_session(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn voice_conversation_end(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
+pub async fn voice_conversation_end(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
     let result = state.voice_conversation_end().await;
     set_tray_voice(false, 0);
     result
@@ -75,7 +75,7 @@ pub async fn voice_conversation_end(state: State<'_, Arc<AppCore>>) -> Result<()
 #[specta::specta]
 pub async fn voice_conversation_status(
     state: State<'_, Arc<AppCore>>,
-) -> Result<VoiceConversationStatusResponse, ApiError> {
+) -> CommandResult<VoiceConversationStatusResponse> {
     state.voice_conversation_status_with_title().await
 }
 
@@ -98,7 +98,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     _body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
 
     Some(match cmd {

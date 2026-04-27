@@ -2,7 +2,7 @@ use desktop_shared::commands::{
     LabelCreateParams, LabelReorderParams, LabelUpdateParams, StatusLabelResponse,
     StatusWorkflowResponse, WorkflowCreateParams,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -12,7 +12,7 @@ use crate::app_core::AppCore;
 #[specta::specta]
 pub async fn workflow_list(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<StatusWorkflowResponse>, ApiError> {
+) -> CommandResult<Vec<StatusWorkflowResponse>> {
     state.workflow_list().await
 }
 
@@ -21,7 +21,7 @@ pub async fn workflow_list(
 pub async fn workflow_get(
     id: String,
     state: State<'_, Arc<AppCore>>,
-) -> Result<Option<StatusWorkflowResponse>, ApiError> {
+) -> CommandResult<Option<StatusWorkflowResponse>> {
     state.workflow_get(id).await
 }
 
@@ -30,7 +30,7 @@ pub async fn workflow_get(
 pub async fn workflow_get_effective(
     project_id: Option<String>,
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<StatusLabelResponse>, ApiError> {
+) -> CommandResult<Vec<StatusLabelResponse>> {
     state.workflow_get_effective(project_id).await
 }
 
@@ -39,13 +39,13 @@ pub async fn workflow_get_effective(
 pub async fn workflow_create(
     params: WorkflowCreateParams,
     state: State<'_, Arc<AppCore>>,
-) -> Result<StatusWorkflowResponse, ApiError> {
+) -> CommandResult<StatusWorkflowResponse> {
     state.workflow_create(params).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn workflow_delete(id: String, state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
+pub async fn workflow_delete(id: String, state: State<'_, Arc<AppCore>>) -> CommandResult<bool> {
     state.workflow_delete(id).await
 }
 
@@ -54,7 +54,7 @@ pub async fn workflow_delete(id: String, state: State<'_, Arc<AppCore>>) -> Resu
 pub async fn label_create(
     params: LabelCreateParams,
     state: State<'_, Arc<AppCore>>,
-) -> Result<StatusLabelResponse, ApiError> {
+) -> CommandResult<StatusLabelResponse> {
     state.label_create(params).await
 }
 
@@ -63,13 +63,13 @@ pub async fn label_create(
 pub async fn label_update(
     params: LabelUpdateParams,
     state: State<'_, Arc<AppCore>>,
-) -> Result<StatusLabelResponse, ApiError> {
+) -> CommandResult<StatusLabelResponse> {
     state.label_update(params).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn label_delete(id: String, state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
+pub async fn label_delete(id: String, state: State<'_, Arc<AppCore>>) -> CommandResult<bool> {
     state.label_delete(id).await
 }
 
@@ -78,7 +78,7 @@ pub async fn label_delete(id: String, state: State<'_, Arc<AppCore>>) -> Result<
 pub async fn label_reorder(
     params: LabelReorderParams,
     state: State<'_, Arc<AppCore>>,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.label_reorder(params).await
 }
 
@@ -102,7 +102,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "workflow_list" => dev::val(core.workflow_list().await),

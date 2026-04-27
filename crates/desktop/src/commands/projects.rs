@@ -1,7 +1,7 @@
 use desktop_shared::commands::{
     ProjectCreateParams, ProjectHealthMetricsResponse, ProjectResponse, ProjectUpdateParams,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -13,7 +13,7 @@ pub async fn project_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ProjectCreateParams,
-) -> Result<ProjectResponse, ApiError> {
+) -> CommandResult<ProjectResponse> {
     let (result, updates) = state.project_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -24,7 +24,7 @@ pub async fn project_create(
 pub async fn project_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<ProjectResponse, ApiError> {
+) -> CommandResult<ProjectResponse> {
     state.project_get(id).await
 }
 
@@ -34,7 +34,7 @@ pub async fn project_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ProjectUpdateParams,
-) -> Result<ProjectResponse, ApiError> {
+) -> CommandResult<ProjectResponse> {
     let (result, updates) = state.project_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -46,7 +46,7 @@ pub async fn project_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.project_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -58,7 +58,7 @@ pub async fn project_archive(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<ProjectResponse, ApiError> {
+) -> CommandResult<ProjectResponse> {
     let (result, updates) = state.project_archive(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -71,7 +71,7 @@ pub async fn project_update_instructions(
     app: tauri::AppHandle,
     id: String,
     instructions: desktop_shared::specta_helpers::JsonValueWrapper,
-) -> Result<ProjectResponse, ApiError> {
+) -> CommandResult<ProjectResponse> {
     let (result, updates) = state.project_update_instructions(id, instructions.0).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -84,7 +84,7 @@ pub async fn project_update_role(
     app: tauri::AppHandle,
     id: String,
     role: String,
-) -> Result<ProjectResponse, ApiError> {
+) -> CommandResult<ProjectResponse> {
     let (result, updates) = state.project_update_role(id, role).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -95,7 +95,7 @@ pub async fn project_update_role(
 pub async fn project_health_metrics(
     state: State<'_, Arc<AppCore>>,
     project_id: String,
-) -> Result<ProjectHealthMetricsResponse, ApiError> {
+) -> CommandResult<ProjectHealthMetricsResponse> {
     state.project_health_metrics(project_id).await
 }
 
@@ -118,7 +118,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "project_create" => dev::val_rh(

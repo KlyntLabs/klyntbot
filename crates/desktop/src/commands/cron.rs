@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use app_core::AppCore;
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use desktop_shared::types::{
     CronJobCreateParams, CronJobResponse, CronJobUpdateParams, CronStatusResponse,
 };
@@ -12,13 +12,13 @@ use tauri::State;
 pub async fn cron_list(
     state: State<'_, Arc<AppCore>>,
     include_disabled: Option<bool>,
-) -> Result<Vec<CronJobResponse>, ApiError> {
+) -> CommandResult<Vec<CronJobResponse>> {
     state.cron_list(include_disabled.unwrap_or(true)).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn cron_status(state: State<'_, Arc<AppCore>>) -> Result<CronStatusResponse, ApiError> {
+pub async fn cron_status(state: State<'_, Arc<AppCore>>) -> CommandResult<CronStatusResponse> {
     state.cron_status().await
 }
 
@@ -29,7 +29,7 @@ pub async fn cron_enable(
     app: tauri::AppHandle,
     id: String,
     enabled: bool,
-) -> Result<CronJobResponse, ApiError> {
+) -> CommandResult<CronJobResponse> {
     let (result, updates) = state.cron_enable(id, enabled).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -37,13 +37,13 @@ pub async fn cron_enable(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn cron_run(state: State<'_, Arc<AppCore>>, id: String) -> Result<bool, ApiError> {
+pub async fn cron_run(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<bool> {
     state.cron_run(id).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn cron_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<bool, ApiError> {
+pub async fn cron_delete(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<bool> {
     state.cron_delete(id).await
 }
 
@@ -53,7 +53,7 @@ pub async fn cron_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: CronJobCreateParams,
-) -> Result<CronJobResponse, ApiError> {
+) -> CommandResult<CronJobResponse> {
     let (result, updates) = state.cron_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -65,7 +65,7 @@ pub async fn cron_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: CronJobUpdateParams,
-) -> Result<CronJobResponse, ApiError> {
+) -> CommandResult<CronJobResponse> {
     let (result, updates) = state.cron_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -89,7 +89,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "cron_list" => dev::val(

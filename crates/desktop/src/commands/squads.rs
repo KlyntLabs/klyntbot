@@ -4,12 +4,12 @@ use app_core::AppCore;
 use desktop_shared::commands::{
     CreateSquadParams, SquadMemberParams, SquadResponse, UpdateSquadParams,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use tauri::State;
 
 #[tauri::command]
 #[specta::specta]
-pub async fn list_squads(state: State<'_, Arc<AppCore>>) -> Result<Vec<SquadResponse>, ApiError> {
+pub async fn list_squads(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<SquadResponse>> {
     state.list_squads().await
 }
 
@@ -18,7 +18,7 @@ pub async fn list_squads(state: State<'_, Arc<AppCore>>) -> Result<Vec<SquadResp
 pub async fn get_squad(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<SquadResponse, ApiError> {
+) -> CommandResult<SquadResponse> {
     state.get_squad(&id).await
 }
 
@@ -27,7 +27,7 @@ pub async fn get_squad(
 pub async fn create_squad(
     state: State<'_, Arc<AppCore>>,
     params: CreateSquadParams,
-) -> Result<SquadResponse, ApiError> {
+) -> CommandResult<SquadResponse> {
     state.create_squad(params).await
 }
 
@@ -36,13 +36,13 @@ pub async fn create_squad(
 pub async fn update_squad(
     state: State<'_, Arc<AppCore>>,
     params: UpdateSquadParams,
-) -> Result<SquadResponse, ApiError> {
+) -> CommandResult<SquadResponse> {
     state.update_squad(params).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn delete_squad(state: State<'_, Arc<AppCore>>, id: String) -> Result<(), ApiError> {
+pub async fn delete_squad(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<()> {
     state.delete_squad(&id).await
 }
 
@@ -51,7 +51,7 @@ pub async fn delete_squad(state: State<'_, Arc<AppCore>>, id: String) -> Result<
 pub async fn add_squad_member(
     state: State<'_, Arc<AppCore>>,
     params: SquadMemberParams,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.add_squad_member(params).await
 }
 
@@ -61,7 +61,7 @@ pub async fn remove_squad_member(
     state: State<'_, Arc<AppCore>>,
     squad_id: String,
     persona_id: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.remove_squad_member(&squad_id, &persona_id).await
 }
 
@@ -83,7 +83,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "list_squads" => dev::val(core.list_squads().await),

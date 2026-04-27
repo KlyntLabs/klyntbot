@@ -1,5 +1,5 @@
 use desktop_shared::commands::{KeyResultCreateParams, KeyResultResponse, KeyResultUpdateParams};
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -11,7 +11,7 @@ pub async fn key_result_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: KeyResultCreateParams,
-) -> Result<KeyResultResponse, ApiError> {
+) -> CommandResult<KeyResultResponse> {
     let (result, updates) = state.key_result_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -23,7 +23,7 @@ pub async fn key_result_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: KeyResultUpdateParams,
-) -> Result<KeyResultResponse, ApiError> {
+) -> CommandResult<KeyResultResponse> {
     let (result, updates) = state.key_result_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -36,7 +36,7 @@ pub async fn key_result_update_metric(
     app: tauri::AppHandle,
     id: String,
     current_value: f64,
-) -> Result<KeyResultResponse, ApiError> {
+) -> CommandResult<KeyResultResponse> {
     let (result, updates) = state.key_result_update_metric(id, current_value).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -48,7 +48,7 @@ pub async fn key_result_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.key_result_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -69,7 +69,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "key_result_create" => dev::val_rh(

@@ -1,5 +1,5 @@
 use desktop_shared::entity_link_types::*;
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use std::sync::Arc;
 use tauri::State;
 
@@ -11,7 +11,7 @@ pub async fn project_source_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ProjectSourceCreateParams,
-) -> Result<ProjectSourceResponse, ApiError> {
+) -> CommandResult<ProjectSourceResponse> {
     let (result, updates) = state.project_source_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -23,7 +23,7 @@ pub async fn project_source_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.project_source_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -34,7 +34,7 @@ pub async fn project_source_delete(
 pub async fn project_source_list(
     state: State<'_, Arc<AppCore>>,
     project_id: String,
-) -> Result<Vec<ProjectSourceResponse>, ApiError> {
+) -> CommandResult<Vec<ProjectSourceResponse>> {
     state.project_source_list(project_id).await
 }
 
@@ -52,7 +52,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "project_source_create" => dev::val_rh(

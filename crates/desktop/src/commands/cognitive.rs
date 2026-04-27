@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use desktop_shared::cognitive_commands::*;
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -12,7 +12,7 @@ use crate::app_core::AppCore;
 #[specta::specta]
 pub async fn cognitive_user_model(
     state: State<'_, Arc<AppCore>>,
-) -> Result<UserModelSummaryResponse, ApiError> {
+) -> CommandResult<UserModelSummaryResponse> {
     state.cognitive_user_model().await
 }
 
@@ -21,7 +21,7 @@ pub async fn cognitive_user_model(
 pub async fn cognitive_facts_list(
     state: State<'_, Arc<AppCore>>,
     domain: Option<String>,
-) -> Result<Vec<SemanticFactResponse>, ApiError> {
+) -> CommandResult<Vec<SemanticFactResponse>> {
     state.cognitive_facts_list(domain).await
 }
 
@@ -31,7 +31,7 @@ pub async fn cognitive_episodic_list(
     state: State<'_, Arc<AppCore>>,
     domain: Option<String>,
     limit: Option<i64>,
-) -> Result<Vec<EpisodicMemoryResponse>, ApiError> {
+) -> CommandResult<Vec<EpisodicMemoryResponse>> {
     state.cognitive_episodic_list(domain, limit).await
 }
 
@@ -40,7 +40,7 @@ pub async fn cognitive_episodic_list(
 pub async fn cognitive_rules_list(
     state: State<'_, Arc<AppCore>>,
     domain: Option<String>,
-) -> Result<Vec<ProceduralRuleResponse>, ApiError> {
+) -> CommandResult<Vec<ProceduralRuleResponse>> {
     state.cognitive_rules_list(domain).await
 }
 
@@ -48,7 +48,7 @@ pub async fn cognitive_rules_list(
 #[specta::specta]
 pub async fn cognitive_memory_stats(
     state: State<'_, Arc<AppCore>>,
-) -> Result<MemoryStatsResponse, ApiError> {
+) -> CommandResult<MemoryStatsResponse> {
     state.cognitive_memory_stats().await
 }
 
@@ -56,7 +56,7 @@ pub async fn cognitive_memory_stats(
 #[specta::specta]
 pub async fn memory_health(
     state: State<'_, Arc<AppCore>>,
-) -> Result<MemoryHealthResponse, ApiError> {
+) -> CommandResult<MemoryHealthResponse> {
     state.memory_health().await
 }
 
@@ -66,7 +66,7 @@ pub async fn memory_health(
 #[specta::specta]
 pub async fn coaching_situation(
     state: State<'_, Arc<AppCore>>,
-) -> Result<UserSituationResponse, ApiError> {
+) -> CommandResult<UserSituationResponse> {
     state.coaching_situation().await
 }
 
@@ -74,7 +74,7 @@ pub async fn coaching_situation(
 #[specta::specta]
 pub async fn coaching_signals(
     state: State<'_, Arc<AppCore>>,
-) -> Result<SignalWindowResponse, ApiError> {
+) -> CommandResult<SignalWindowResponse> {
     state.coaching_signals().await
 }
 
@@ -82,7 +82,7 @@ pub async fn coaching_signals(
 #[specta::specta]
 pub async fn coaching_patterns(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<DetectedPatternResponse>, ApiError> {
+) -> CommandResult<Vec<DetectedPatternResponse>> {
     state.coaching_patterns().await
 }
 
@@ -90,7 +90,7 @@ pub async fn coaching_patterns(
 #[specta::specta]
 pub async fn coaching_feedback_stats(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<StrategyFeedbackResponse>, ApiError> {
+) -> CommandResult<Vec<StrategyFeedbackResponse>> {
     state.coaching_feedback_stats().await
 }
 
@@ -98,7 +98,7 @@ pub async fn coaching_feedback_stats(
 #[specta::specta]
 pub async fn coaching_router_status(
     state: State<'_, Arc<AppCore>>,
-) -> Result<RouterStatusResponse, ApiError> {
+) -> CommandResult<RouterStatusResponse> {
     state.coaching_router_status().await
 }
 
@@ -106,7 +106,7 @@ pub async fn coaching_router_status(
 #[specta::specta]
 pub async fn coaching_pending_interventions(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<desktop_shared::cognitive_commands::DeliveredInterventionResponse>, ApiError> {
+) -> CommandResult<Vec<desktop_shared::cognitive_commands::DeliveredInterventionResponse>> {
     state.coaching_pending_interventions().await
 }
 
@@ -118,7 +118,7 @@ pub async fn memory_reference_detail(
     state: State<'_, Arc<AppCore>>,
     ref_type: String,
     ref_id: String,
-) -> Result<MemoryReferenceDetail, ApiError> {
+) -> CommandResult<MemoryReferenceDetail> {
     state.memory_reference_detail(&ref_type, &ref_id).await
 }
 
@@ -128,7 +128,7 @@ pub async fn memory_reference_detail(
 #[specta::specta]
 pub async fn cognitive_system_status(
     state: State<'_, Arc<AppCore>>,
-) -> Result<SystemStatusResponse, ApiError> {
+) -> CommandResult<SystemStatusResponse> {
     state.cognitive_system_status().await
 }
 
@@ -139,7 +139,7 @@ pub async fn cognitive_system_status(
 pub async fn cognitive_fact_create(
     state: State<'_, Arc<AppCore>>,
     params: FactCreateParams,
-) -> Result<SemanticFactResponse, ApiError> {
+) -> CommandResult<SemanticFactResponse> {
     state.cognitive_fact_create(params).await
 }
 
@@ -149,7 +149,7 @@ pub async fn cognitive_fact_update(
     state: State<'_, Arc<AppCore>>,
     id: String,
     params: FactUpdateParams,
-) -> Result<SemanticFactResponse, ApiError> {
+) -> CommandResult<SemanticFactResponse> {
     state.cognitive_fact_update(id, params).await
 }
 
@@ -158,7 +158,7 @@ pub async fn cognitive_fact_update(
 pub async fn cognitive_fact_delete(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     state.cognitive_fact_delete(id).await
 }
 
@@ -167,7 +167,7 @@ pub async fn cognitive_fact_delete(
 pub async fn cognitive_rule_create(
     state: State<'_, Arc<AppCore>>,
     params: RuleCreateParams,
-) -> Result<ProceduralRuleResponse, ApiError> {
+) -> CommandResult<ProceduralRuleResponse> {
     state.cognitive_rule_create(params).await
 }
 
@@ -176,7 +176,7 @@ pub async fn cognitive_rule_create(
 pub async fn cognitive_rule_deactivate(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     state.cognitive_rule_deactivate(id).await
 }
 
@@ -184,7 +184,7 @@ pub async fn cognitive_rule_deactivate(
 #[specta::specta]
 pub async fn cognitive_run_compaction(
     state: State<'_, Arc<AppCore>>,
-) -> Result<CompactionResultResponse, ApiError> {
+) -> CommandResult<CompactionResultResponse> {
     state.cognitive_run_compaction().await
 }
 
@@ -195,13 +195,13 @@ pub async fn cognitive_run_compaction(
 pub async fn coaching_reset_dismissals(
     state: State<'_, Arc<AppCore>>,
     trigger_name: Option<String>,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     state.coaching_reset_dismissals(trigger_name).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn coaching_clear_signals(state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
+pub async fn coaching_clear_signals(state: State<'_, Arc<AppCore>>) -> CommandResult<bool> {
     state.coaching_clear_signals().await
 }
 
@@ -211,7 +211,7 @@ pub async fn coaching_submit_feedback(
     state: State<'_, Arc<AppCore>>,
     intervention_id: String,
     response: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     state
         .coaching_submit_feedback(intervention_id, response)
         .await
@@ -222,7 +222,7 @@ pub async fn coaching_submit_feedback(
 pub async fn coaching_report_ignored(
     state: State<'_, Arc<AppCore>>,
     intervention_id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     state.coaching_report_ignored(intervention_id).await
 }
 
@@ -231,13 +231,13 @@ pub async fn coaching_report_ignored(
 pub async fn coaching_intervention_log(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
-) -> Result<Vec<desktop_shared::cognitive_commands::InterventionLogResponse>, ApiError> {
+) -> CommandResult<Vec<desktop_shared::cognitive_commands::InterventionLogResponse>> {
     state.coaching_intervention_log(limit).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn coaching_seed_patterns(state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
+pub async fn coaching_seed_patterns(state: State<'_, Arc<AppCore>>) -> CommandResult<bool> {
     state.coaching_seed_patterns().await
 }
 
@@ -247,7 +247,7 @@ pub async fn cognitive_inject_event(
     state: State<'_, Arc<AppCore>>,
     event_type: String,
     payload: desktop_shared::specta_helpers::JsonValueWrapper,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     state.cognitive_inject_event(event_type, payload.0).await
 }
 
@@ -256,7 +256,7 @@ pub async fn cognitive_inject_event(
 pub async fn cognitive_event_log(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
-) -> Result<Vec<cognitive::DomainEventRow>, ApiError> {
+) -> CommandResult<Vec<cognitive::DomainEventRow>> {
     state.cognitive_event_log(limit).await
 }
 
@@ -265,7 +265,7 @@ pub async fn cognitive_event_log(
 pub async fn cognitive_pipeline_log(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
-) -> Result<Vec<cognitive::PipelineEventRow>, ApiError> {
+) -> CommandResult<Vec<cognitive::PipelineEventRow>> {
     state.cognitive_pipeline_log(limit).await
 }
 
@@ -275,7 +275,7 @@ pub async fn cognitive_pipeline_log(
 #[specta::specta]
 pub async fn cognitive_graph_data(
     state: State<'_, Arc<AppCore>>,
-) -> Result<desktop_shared::commands::cognitive_graph::CognitiveGraphData, ApiError> {
+) -> CommandResult<desktop_shared::commands::cognitive_graph::CognitiveGraphData> {
     state.cognitive_graph_data().await
 }
 
@@ -284,7 +284,7 @@ pub async fn cognitive_graph_data(
 pub async fn cognitive_graph_expand_topic(
     state: State<'_, Arc<AppCore>>,
     params: desktop_shared::commands::cognitive_graph::TopicExpandParams,
-) -> Result<desktop_shared::commands::cognitive_graph::TopicDetail, ApiError> {
+) -> CommandResult<desktop_shared::commands::cognitive_graph::TopicDetail> {
     state.cognitive_graph_expand_topic(params).await
 }
 
@@ -330,7 +330,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "cognitive_user_model" => dev::val(core.cognitive_user_model().await),

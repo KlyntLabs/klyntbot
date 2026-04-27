@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::LearnedRuleResponse;
-use desktop_shared::errors::ApiError;
+use desktop_shared::CommandResult;
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -14,7 +14,7 @@ use crate::focus_timer::FocusTimer;
 pub async fn distraction_dismiss(
     state: State<'_, Arc<AppCore>>,
     app_name: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.distraction_dismiss(app_name).await
 }
 
@@ -24,7 +24,7 @@ pub async fn distraction_allow_temp(
     state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
     pattern: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     // Pause the focus timer so the user doesn't lose focus time during their break
     use crate::focus_timer::SessionCommand;
     timer.send_command(SessionCommand::Pause).await;
@@ -38,7 +38,7 @@ pub async fn distraction_allow_session(
     app_name: String,
     window_title: Option<String>,
     classification: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state
         .distraction_allow_session(app_name, window_title, classification)
         .await
@@ -48,7 +48,7 @@ pub async fn distraction_allow_session(
 #[specta::specta]
 pub async fn distraction_learned_rules(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<LearnedRuleResponse>, ApiError> {
+) -> CommandResult<Vec<LearnedRuleResponse>> {
     state.distraction_learned_rules().await
 }
 
@@ -57,7 +57,7 @@ pub async fn distraction_learned_rules(
 pub async fn distraction_delete_rule(
     state: State<'_, Arc<AppCore>>,
     id: i64,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.distraction_delete_rule(id).await
 }
 
@@ -77,7 +77,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "distraction_dismiss" => {
