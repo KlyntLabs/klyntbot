@@ -389,6 +389,20 @@ impl AppCore {
 
         let launcher::LauncherResult { launcher_engine } = launcher_result;
 
+        // Register calendar source if productivity repos are available
+        if let (Some(engine), Some(prod_repos)) = (launcher_engine.as_ref(), productivity_repos.as_ref()) {
+            if config.launcher.sources.calendar.enabled {
+                let fetcher = Arc::new(crate::handlers::launcher::calendar_fetcher_impl::AppCalendarFetcher::new(
+                    Arc::clone(prod_repos),
+                ));
+                engine.registry.register(Arc::new(feature_launcher::CalendarSource::new(
+                    fetcher,
+                    config.launcher.sources.calendar.lookback_days,
+                    config.launcher.sources.calendar.lookahead_days,
+                )));
+            }
+        }
+
         // ── Phase 6: Coaching ────────────────────────────────────────────
         let coaching::CoachingResult {
             intervention_rx,
