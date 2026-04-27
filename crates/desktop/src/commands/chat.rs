@@ -85,7 +85,6 @@ pub async fn chat_delete_thread(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn chat_respond_interaction(
     state: State<'_, Arc<AppCore>>,
     session_key: String,

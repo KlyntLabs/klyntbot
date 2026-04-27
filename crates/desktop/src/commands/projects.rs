@@ -65,7 +65,6 @@ pub async fn project_archive(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn project_update_instructions(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,

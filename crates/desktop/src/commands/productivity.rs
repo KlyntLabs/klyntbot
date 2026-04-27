@@ -283,7 +283,6 @@ pub async fn productivity_auto_focus_start(
 }
 
 #[tauri::command(rename_all = "snake_case")]
-#[specta::specta]
 pub async fn productivity_auto_focus_end(
     state: State<'_, Arc<AppCore>>,
     event: AutoFocusEvent,
@@ -376,7 +375,6 @@ pub async fn productivity_weekly_assessment(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn productivity_calendar_events(
     state: State<'_, Arc<AppCore>>,
     date: String,
@@ -385,7 +383,6 @@ pub async fn productivity_calendar_events(
 }
 
 #[tauri::command(rename_all = "snake_case")]
-#[specta::specta]
 pub async fn calendar_sync_events(
     state: State<'_, Arc<AppCore>>,
     events: Vec<desktop_shared::commands::CalendarEventInput>,
@@ -400,7 +397,6 @@ use desktop_shared::commands::FocusSessionStatusResponse;
 
 #[allow(clippy::too_many_arguments)]
 #[tauri::command(rename_all = "snake_case")]
-#[specta::specta]
 pub async fn focus_session_start(
     state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
@@ -503,7 +499,6 @@ pub async fn focus_session_extend(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn focus_session_start_break(
     timer: State<'_, Arc<FocusTimer>>,
 ) -> Result<bool, ApiError> {

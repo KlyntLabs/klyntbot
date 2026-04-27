@@ -40,7 +40,6 @@ pub async fn launcher_dashboard(state: State<'_, Arc<AppCore>>) -> Result<Dashbo
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn launcher_clipboard_paste(
     state: State<'_, Arc<AppCore>>,
     id: i64,

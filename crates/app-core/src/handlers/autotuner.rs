@@ -7,7 +7,7 @@ use tracing::info;
 
 use crate::state::AppCore;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct BrainGrowth {
     pub corrections_captured_7d: i64,
@@ -16,7 +16,7 @@ pub struct BrainGrowth {
     pub status: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct MetricsHealth {
     pub correction_rate_available: bool,

@@ -21,7 +21,6 @@ pub async fn voice_stop_dictation(state: State<'_, Arc<AppCore>>) -> Result<Stri
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn voice_simulate_event(
     state: State<'_, Arc<AppCore>>,
     event: serde_json::Value,

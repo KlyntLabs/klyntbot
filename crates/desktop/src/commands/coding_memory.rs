@@ -134,7 +134,6 @@ pub async fn coding_memory_sensitivity(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn coding_memory_distill_now(
     state: State<'_, Arc<AppCore>>,
     session_id: String,
@@ -144,7 +143,6 @@ pub async fn coding_memory_distill_now(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn coding_memory_recall_index(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -156,7 +154,6 @@ pub async fn coding_memory_recall_index(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn coding_memory_recall_timeline(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -168,7 +165,6 @@ pub async fn coding_memory_recall_timeline(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn coding_memory_recall_fetch(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -180,7 +176,6 @@ pub async fn coding_memory_recall_fetch(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn coding_memory_check_dead_ends(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -192,7 +187,6 @@ pub async fn coding_memory_check_dead_ends(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn coding_memory_recall_facts_as_of(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -204,7 +198,6 @@ pub async fn coding_memory_recall_facts_as_of(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn coding_memory_recall_change_history(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -216,7 +209,6 @@ pub async fn coding_memory_recall_change_history(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn coding_memory_recall_decision_points(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -228,7 +220,6 @@ pub async fn coding_memory_recall_decision_points(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn coding_memory_recall_log(
     state: State<'_, Arc<AppCore>>,
     args: RecallLogArgs,
@@ -240,7 +231,6 @@ pub async fn coding_memory_recall_log(
 }
 
 #[tauri::command]
-#[specta::specta]
 pub async fn coding_memory_session_replay_recall_overlay(
     state: State<'_, Arc<AppCore>>,
     args: SessionRecallOverlayArgs,

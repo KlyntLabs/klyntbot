@@ -31,7 +31,6 @@ impl From<cognitive::repos::PendingMemoryRow> for PendingMemoryResponse {
 // ── Commands ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
-#[specta::specta]
 pub async fn list_pending_memories(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
