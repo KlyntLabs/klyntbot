@@ -54,7 +54,9 @@ import { lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import errorSoundUrl from "@/assets/error-notification.mp3";
 import successSoundUrl from "@/assets/success-notification.mp3";
 import { useApps } from "@/features/apps/hooks/useApps";
+import { ChatErrorBanner } from "@/features/chat/components/ChatErrorBanner";
 import { useChatThreads } from "@/features/chat/hooks/useChatThreads";
+import { useKlyntbotSurfaceProps } from "@/features/chat/hooks/useKlyntbotSurfaceProps";
 import { useCollaborationModeSelection } from "@/features/collaboration/hooks/useCollaborationModeSelection";
 import { useCollaborationModes } from "@/features/collaboration/hooks/useCollaborationModes";
 import { useComposerEditorState } from "@/features/composer/hooks/useComposerEditorState";
@@ -1728,6 +1730,29 @@ export default function MainApp() {
     },
   });
 
+  const klyntbotSurface = useKlyntbotSurfaceProps(
+    appView === "chat" ? selectedSessionKey : null,
+  );
+
+  const finalLayoutSurfaces = klyntbotSurface
+    ? {
+        ...layoutSurfaces,
+        primary: {
+          ...layoutSurfaces.primary,
+          messagesProps: {
+            ...layoutSurfaces.primary.messagesProps,
+            ...klyntbotSurface.messagesProps,
+          },
+          composerProps: layoutSurfaces.primary.composerProps
+            ? {
+                ...layoutSurfaces.primary.composerProps,
+                ...klyntbotSurface.composerProps,
+              }
+            : layoutSurfaces.primary.composerProps,
+        },
+      }
+    : layoutSurfaces;
+
   const {
     sidebarNode,
     messagesNode,
@@ -1742,10 +1767,21 @@ export default function MainApp() {
     planPanelNode,
     debugPanelNode,
     terminalDockNode,
-  } = useMainAppLayoutNodes(layoutSurfaces);
+  } = useMainAppLayoutNodes(finalLayoutSurfaces);
 
+  const chatMessagesNode = klyntbotSurface ? (
+    <>
+      <ChatErrorBanner
+        error={klyntbotSurface.error}
+        onDismiss={klyntbotSurface.onDismissError}
+      />
+      {messagesNode}
+    </>
+  ) : (
+    messagesNode
+  );
   const mainMessagesNode =
-    showWorkspaceHome && appView !== "chat" ? workspaceHomeNode : messagesNode;
+    showWorkspaceHome && appView !== "chat" ? workspaceHomeNode : chatMessagesNode;
   const compactThreadConnectionState: "live" | "polling" | "disconnected" =
     !activeWorkspace?.connected ? "disconnected" : remoteThreadConnectionState;
   const mainAppShellProps = useMainAppShellProps({

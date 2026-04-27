@@ -2,7 +2,6 @@ import { ApprovalToasts } from "@app/components/ApprovalToasts";
 import { MainHeader } from "@app/components/MainHeader";
 import { SidebarChatLayout } from "@app/components/SidebarChatLayout";
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left";
-import { ChatPanel } from "@/features/chat/components/ChatPanel";
 import { Composer } from "@/features/composer/components/Composer";
 import { Home } from "@/features/home/components/Home";
 import { Messages } from "@/features/messages/components/Messages";
@@ -26,9 +25,6 @@ type PrimaryLayoutNodes = Pick<
 >;
 
 export function buildPrimaryNodes(options: PrimaryLayoutNodesOptions): PrimaryLayoutNodes {
-  const { chatViewProps } = options;
-  const chatActive = chatViewProps.active && chatViewProps.sessionKey !== null;
-
   const sidebarNode = (
     <SidebarChatLayout
       onOpenSettings={options.sidebarProps.onOpenSettings}
@@ -39,27 +35,16 @@ export function buildPrimaryNodes(options: PrimaryLayoutNodesOptions): PrimaryLa
     />
   );
 
-  const messagesNode = chatActive ? (
-    <ChatPanel
-      sessionKey={chatViewProps.sessionKey as string}
-      onThreadsChanged={chatViewProps.onThreadsChanged}
-    />
-  ) : (
-    <Messages {...options.messagesProps} />
-  );
+  const messagesNode = <Messages {...options.messagesProps} />;
 
-  const composerNode = chatActive ? null : options.composerProps ? (
+  const composerNode = options.composerProps ? (
     <Composer {...options.composerProps} />
   ) : null;
 
   const approvalToastsNode = <ApprovalToasts {...options.approvalToastsProps} />;
-
   const updateToastNode = <UpdateToast {...options.updateToastProps} />;
-
   const errorToastsNode = <ErrorToasts {...options.errorToastsProps} />;
-
   const homeNode = <Home {...options.homeProps} />;
-
   const mainHeaderNode = options.mainHeaderProps ? (
     <MainHeader {...options.mainHeaderProps} />
   ) : null;
