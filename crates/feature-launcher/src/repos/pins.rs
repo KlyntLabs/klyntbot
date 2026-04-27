@@ -20,10 +20,14 @@ impl PinsRepo {
     }
 
     pub async fn pin(&self, item_id: &str, kind: &str) -> Result<()> {
+        // Idempotent: if already pinned, preserve existing position.
+        if self.is_pinned(item_id, kind).await? {
+            return Ok(());
+        }
         let max_pos: Option<i64> = sqlx::query_scalar("SELECT MAX(position) FROM launcher_pins")
             .fetch_one(&self.pool).await.map_err(storage::StorageError::from)?;
         let next_pos = max_pos.map_or(0, |p| p + 1);
-        sqlx::query("INSERT OR REPLACE INTO launcher_pins (item_id, kind, position) VALUES (?, ?, ?)")
+        sqlx::query("INSERT INTO launcher_pins (item_id, kind, position) VALUES (?, ?, ?)")
             .bind(item_id).bind(kind).bind(next_pos)
             .execute(&self.pool).await.map_err(storage::StorageError::from)?;
         Ok(())
@@ -102,7 +106,8 @@ mod tests {
         let repo = PinsRepo::new(&pool);
         repo.pin("a", "k").await.unwrap();
         repo.pin("a", "k").await.unwrap();
-        // INSERT OR REPLACE keeps row count at 1
-        assert_eq!(repo.list_pinned().await.unwrap().len(), 1);
+        let pins = repo.list_pinned().await.unwrap();
+        assert_eq!(pins.len(), 1);
+        assert_eq!(pins[0].position, 0); // position preserved, not bumped
     }
 }

@@ -7,6 +7,8 @@
   --fs-md: 13.5px; /* emphasized body */
   --fs-lg: 15px; /* section headings */
   --fs-xl: 17px; /* page titles */
+  --fs-display-sm: 28px; /* large icons, empty-state glyphs */
+  --fs-display-md: 36px; /* voice orb, hero icons */
   --fs-base: var(--fs-sm);
 
   --ds-surface-overlay: var(--surface-context-core);

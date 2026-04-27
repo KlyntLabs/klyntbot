@@ -156,7 +156,7 @@
   animation: lc-result-in 0.2s ease-out both;
 }
 .lc-empty-icon {
-  font-size: 28px;
+  font-size: var(--fs-display-sm);
   opacity: 0.7;
 }
 .lc-empty-title {
@@ -877,7 +877,7 @@
   height: 80px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 36px;
+  font-size: var(--fs-display-md);
   background: radial-gradient(circle, var(--brand, #6ea8fe) 0%, transparent 70%);
   transition: transform 60ms linear;
   will-change: transform;
