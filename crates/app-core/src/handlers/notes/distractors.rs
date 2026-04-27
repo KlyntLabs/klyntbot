@@ -14,6 +14,7 @@ impl AppCore {
     ///
     /// Results are cached in `card_distractors` on the first call; subsequent calls for
     /// the same card return immediately with `cached: true`.
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_generate_distractors(
         &self,
         params: FlashcardDistractorParams,

@@ -15,6 +15,7 @@ use crate::errors::{map_storage_err, parse_naive_date};
 use crate::state::{AppCore, HandlerResult};
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_goals(&self) -> Result<Vec<FinanceGoalRow>, ApiError> {
         self.repos
             .finance
@@ -24,6 +25,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_liabilities(&self) -> Result<Vec<FinanceLiabilityRow>, ApiError> {
         self.repos
             .finance
@@ -33,6 +35,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_net_worth(&self) -> Result<FinanceNetWorthResponse, ApiError> {
         let (account_totals, investment_totals, liability_totals) = tokio::try_join!(
             self.repos.finance.accounts.total_balance_by_currency(),
@@ -73,11 +76,13 @@ impl AppCore {
         Ok(FinanceNetWorthResponse { totals_by_currency })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_exchange_rates(&self) -> Result<HashMap<String, f64>, ApiError> {
         let config = self.config.read().await;
         Ok(config.finance.exchange_rates.clone().unwrap_or_default())
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_goal_create(
         &self,
         params: FinanceGoalCreateParams,
@@ -123,6 +128,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(id)))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_goal_update(
         &self,
         params: FinanceGoalUpdateParams,
@@ -180,6 +186,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(params.id)))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_goal_delete(&self, id: String) -> HandlerResult<bool> {
         self.repos
             .finance
@@ -190,6 +197,7 @@ impl AppCore {
         Ok((true, Self::finance_updates(id)))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_liability_create(
         &self,
         params: FinanceLiabilityCreateParams,
@@ -233,6 +241,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(id)))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_liability_update(
         &self,
         params: FinanceLiabilityUpdateParams,
@@ -258,6 +267,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(params.id)))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_liability_delete(&self, id: String) -> HandlerResult<bool> {
         self.repos
             .finance
@@ -268,6 +278,7 @@ impl AppCore {
         Ok((true, Self::finance_updates(id)))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_report_spending(
         &self,
         date_from: Option<String>,
@@ -277,6 +288,7 @@ impl AppCore {
             .await
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_report_income(
         &self,
         date_from: Option<String>,
@@ -323,6 +335,7 @@ impl AppCore {
         Ok(FinanceCategoryReportResponse { total, breakdown })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_report_trends(
         &self,
         metric: String,
@@ -366,6 +379,7 @@ impl AppCore {
         Ok(points)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_daily_spending(
         &self,
         date_from: String,
@@ -398,6 +412,7 @@ impl AppCore {
         Ok(FinanceDailySpendingResponse { days })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_period_summary(
         &self,
         date_from: String,
@@ -429,6 +444,7 @@ impl AppCore {
         Ok(FinancePeriodSummaryResponse { income, spending })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_monthly_summary(&self) -> Result<FinanceMonthlySummaryResponse, ApiError> {
         let currency = self.default_currency().await;
         let now = jiff::Zoned::now();

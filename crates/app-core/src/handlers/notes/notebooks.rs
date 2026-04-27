@@ -11,6 +11,7 @@ use crate::state::{AppCore, EntityUpdate, HandlerResult};
 // ── Notebook handlers ───────────────────────────────────────────
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn notebook_list(&self) -> Result<Vec<NotebookResponse>, ApiError> {
         let rows = self
             .note_repo
@@ -30,6 +31,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn notebook_create(
         &self,
         params: NotebookCreateParams,
@@ -68,6 +70,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn notebook_update(
         &self,
         params: NotebookUpdateParams,
@@ -115,6 +118,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn notebook_delete(&self, id: String) -> HandlerResult<bool> {
         let deleted = self
             .note_repo

@@ -12,6 +12,7 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Squad repo not available"))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn list_squads(&self) -> Result<Vec<SquadResponse>, ApiError> {
         let repo = self.squad_repo()?;
         let squads = repo
@@ -27,6 +28,7 @@ impl AppCore {
         Ok(responses)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn get_squad(&self, id: &str) -> Result<SquadResponse, ApiError> {
         let repo = self.squad_repo()?;
         let resolved = repo
@@ -37,6 +39,7 @@ impl AppCore {
         Ok(resolved_to_response(resolved))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn create_squad(&self, params: CreateSquadParams) -> Result<SquadResponse, ApiError> {
         let repo = self.squad_repo()?;
         let squad = repo
@@ -65,6 +68,7 @@ impl AppCore {
         Ok(resolved_to_response(resolved))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn update_squad(&self, params: UpdateSquadParams) -> Result<SquadResponse, ApiError> {
         let repo = self.squad_repo()?;
         let domains_ref: Option<Vec<String>> = params.domains;
@@ -89,6 +93,7 @@ impl AppCore {
         Ok(resolved_to_response(resolved))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn delete_squad(&self, id: &str) -> Result<(), ApiError> {
         let repo = self.squad_repo()?;
         repo.delete(id)
@@ -97,6 +102,7 @@ impl AppCore {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn add_squad_member(&self, params: SquadMemberParams) -> Result<(), ApiError> {
         let repo = self.squad_repo()?;
         repo.add_member(
@@ -110,6 +116,7 @@ impl AppCore {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn remove_squad_member(
         &self,
         squad_id: &str,

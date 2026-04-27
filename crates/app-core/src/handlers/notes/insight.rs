@@ -40,6 +40,7 @@ fn row_to_insight_response(row: feature_insights::InsightReviewRow) -> InsightRe
 }
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_review(
         &self,
         note_id: &str,
@@ -262,6 +263,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_cache_get(
         &self,
         note_id: &str,
@@ -307,6 +309,7 @@ impl AppCore {
     }
 
     /// Knowledge growth metrics from the cognitive fact store.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_knowledge_growth(
         &self,
         days: u32,
@@ -336,6 +339,7 @@ impl AppCore {
     }
 
     /// Generate a "What's Changed" summary comparing current note context to the last insight.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_changes_summary(
         &self,
         note_id: &str,
@@ -409,6 +413,7 @@ impl AppCore {
     }
 
     /// Save quiz questions as flashcards with FSRS init.
+    #[tracing::instrument(skip(self), err)]
     pub async fn insight_save_flashcards(
         &self,
         params: InsightSaveFlashcardsParams,
@@ -478,6 +483,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_submit_quiz(
         &self,
         params: &InsightQuizSubmitParams,
@@ -535,6 +541,7 @@ impl AppCore {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_generate_scenario(
         &self,
         note_id: &str,
@@ -619,6 +626,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_regenerate_tab(
         &self,
         note_id: &str,
@@ -845,6 +853,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_get_evolution(
         &self,
         note_id: &str,
@@ -901,6 +910,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_get_version(
         &self,
         insight_id: &str,
@@ -919,6 +929,7 @@ impl AppCore {
         Ok(row_to_insight_response(row))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_list_versions(
         &self,
         note_id: &str,
@@ -943,6 +954,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_preview_scope(
         &self,
         params: ScopePreviewParams,
@@ -1100,6 +1112,7 @@ impl AppCore {
 
     /// Run a multi-round debate on the note content using the squad's personas.
     /// Emits debate events through the insight SSE channel.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_debate(
         &self,
         note_id: &str,

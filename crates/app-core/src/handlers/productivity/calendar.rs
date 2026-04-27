@@ -8,6 +8,7 @@ use crate::errors::{map_prod_err, parse_date_or_err};
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_calendar_events(
         &self,
         date: String,
@@ -21,6 +22,7 @@ impl AppCore {
             .map_err(map_prod_err)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn calendar_sync_events(
         &self,
         events: Vec<desktop_shared::commands::CalendarEventInput>,
@@ -61,6 +63,7 @@ impl AppCore {
     }
 
     /// Get the next upcoming calendar event (for tray countdown).
+    #[tracing::instrument(skip(self))]
     pub async fn next_upcoming_event(&self) -> Option<feature_productivity::types::CalendarEvent> {
         let repos = self.productivity_repos().ok()?;
         let now = jiff::Timestamp::now().to_string();
@@ -74,6 +77,7 @@ impl AppCore {
 
     // ── Weekly Assessment ───────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_weekly_assessment(
         &self,
         week_start: String,

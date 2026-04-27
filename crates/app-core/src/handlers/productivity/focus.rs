@@ -11,6 +11,7 @@ use crate::errors::{map_prod_err, parse_date_or_err, parse_local_day_range, pars
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_focus_start(
         &self,
         action_id: Option<String>,
@@ -25,6 +26,7 @@ impl AppCore {
         Ok(session_to_response(session))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_focus_end(
         &self,
         notes: Option<String>,
@@ -41,6 +43,7 @@ impl AppCore {
         Ok(session.map(session_to_response))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_focus_status(
         &self,
     ) -> Result<Option<FocusSessionResponse>, ApiError> {
@@ -49,6 +52,7 @@ impl AppCore {
         Ok(session.map(session_to_response))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_sessions(
         &self,
         date: String,
@@ -66,6 +70,7 @@ impl AppCore {
         Ok(sessions.into_iter().map(session_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_intelligence_sessions(
         &self,
         date: String,
@@ -119,6 +124,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_pomodoro_start(
         &self,
         work_mins: Option<i64>,
@@ -128,6 +134,7 @@ impl AppCore {
             .await
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_pomodoro_start_with_action(
         &self,
         action_id: Option<String>,
@@ -143,6 +150,7 @@ impl AppCore {
         Ok(session_to_response(session))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_break_start(
         &self,
         break_mins: i64,
@@ -155,6 +163,7 @@ impl AppCore {
         Ok(session_to_response(session))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_break_end(&self) -> Result<Option<FocusSessionResponse>, ApiError> {
         let focus_mgr = self.focus_manager()?;
         let session = focus_mgr.end_break_session().await.map_err(map_prod_err)?;
@@ -162,6 +171,7 @@ impl AppCore {
     }
 
     /// Create or get an active auto-detected focus session (called when auto-focus starts).
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_auto_focus_start(&self) -> Result<FocusSessionResponse, ApiError> {
         let repos = self.productivity_repos()?;
 
@@ -200,6 +210,7 @@ impl AppCore {
     }
 
     /// End the active auto-detected session with final stats (called when auto-focus ends).
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_auto_focus_end(
         &self,
         event: AutoFocusEvent,
@@ -259,6 +270,7 @@ impl AppCore {
 
     /// Confirm and persist a completed auto-detected focus session.
     /// Called from the UI toast after the FSM has already ended the session.
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_auto_focus_confirm(
         &self,
         payload: AutoFocusPayload,

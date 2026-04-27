@@ -7,6 +7,7 @@ use crate::state::AppCore;
 
 impl AppCore {
     /// List all personas (including inactive) for the management UI.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_list_personas(&self) -> Result<Vec<PersonaResponse>, ApiError> {
         let repo = self
             .persona_repo
@@ -22,6 +23,7 @@ impl AppCore {
     }
 
     /// Create a new user-defined persona.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_create_persona(
         &self,
         params: CreatePersonaParams,
@@ -51,6 +53,7 @@ impl AppCore {
     }
 
     /// Update a non-builtin persona.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_update_persona(
         &self,
         params: UpdatePersonaParams,
@@ -81,6 +84,7 @@ impl AppCore {
     }
 
     /// Delete a non-builtin persona.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_delete_persona(&self, id: &str) -> Result<(), ApiError> {
         let repo = self
             .persona_repo
@@ -94,6 +98,7 @@ impl AppCore {
     }
 
     /// Toggle a persona's active state.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_toggle_persona(
         &self,
         id: &str,
@@ -111,6 +116,7 @@ impl AppCore {
     }
 
     /// Set pinned personas for a note (overrides auto-selection).
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_set_pins(
         &self,
         params: SetPersonaPinsParams,
@@ -127,6 +133,7 @@ impl AppCore {
     }
 
     /// Rate a persona (thumbs up/down) — adjusts relevance score.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_rate_persona(
         &self,
         params: RatePersonaParams,
@@ -146,6 +153,7 @@ impl AppCore {
 
 impl AppCore {
     /// Auto-generate a persona based on a note's content via LLM.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_auto_generate_persona(
         &self,
         note_id: &str,

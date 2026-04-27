@@ -8,6 +8,7 @@ use crate::state::AppCore;
 
 impl AppCore {
     /// List all conversations (sessions) associated with a project.
+    #[tracing::instrument(skip(self), err)]
     pub async fn project_conversations_list(
         &self,
         project_id: String,

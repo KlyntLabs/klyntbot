@@ -89,6 +89,7 @@ pub async fn chat_delete_stale_sessions(repos: &Repos, before_days: u32) -> Resu
 // ── AppCore convenience methods ─────────────────────────────────────────
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn chat_get_session(
         &self,
         session_key: String,
@@ -96,6 +97,7 @@ impl AppCore {
         chat_get_session(&self.repos, session_key).await
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn chat_list_sessions_by_project(
         &self,
         project_id: String,
@@ -139,6 +141,7 @@ impl AppCore {
         Ok(threads)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn chat_delete_stale_sessions(&self, before_days: u32) -> Result<u64, ApiError> {
         chat_delete_stale_sessions(&self.repos, before_days).await
     }

@@ -14,6 +14,7 @@ use crate::errors::{map_storage_err, parse_naive_date};
 use crate::state::{AppCore, HandlerResult};
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_portfolios(&self) -> Result<Vec<FinancePortfolioResponse>, ApiError> {
         let portfolios = self
             .repos
@@ -48,6 +49,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_investments(&self) -> Result<Vec<FinanceInvestmentRow>, ApiError> {
         self.repos
             .finance
@@ -57,6 +59,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_portfolio_create(
         &self,
         params: FinancePortfolioCreateParams,
@@ -84,6 +87,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(id)))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_investment_create(
         &self,
         params: FinanceInvestmentCreateParams,
@@ -131,6 +135,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(id)))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_investment_update(
         &self,
         params: FinanceInvestmentUpdateParams,
@@ -153,6 +158,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(params.id)))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_investments_filtered(
         &self,
         portfolio_id: Option<String>,
@@ -171,6 +177,7 @@ impl AppCore {
 
     // ── Allocation Targets ────────────────────────────────────────
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_allocation_target_upsert(
         &self,
         params: FinanceAllocationTargetUpsertParams,
@@ -190,6 +197,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(params.portfolio_id)))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_allocation_targets(
         &self,
         portfolio_id: String,
@@ -204,6 +212,7 @@ impl AppCore {
 
     // ── Investment Transactions ────────────────────────────────────
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_investment_tx_create(
         &self,
         params: FinanceInvestmentTxCreateParams,
@@ -238,6 +247,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(id)))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_investment_txs(
         &self,
         investment_id: String,

@@ -8,6 +8,7 @@ use crate::errors::map_cognitive_err;
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_run_compaction(&self) -> Result<CompactionResultResponse, ApiError> {
         let pool = self.repos.pool();
         let fact_repo = SemanticFactRepo::new(pool.clone());
@@ -35,6 +36,7 @@ impl AppCore {
     }
 
     /// Fetch recent domain events from the persistent log.
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_event_log(
         &self,
         limit: Option<i64>,
@@ -49,6 +51,7 @@ impl AppCore {
     }
 
     /// Fetch recent pipeline events from the persistent log.
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_pipeline_log(
         &self,
         limit: Option<i64>,
@@ -62,6 +65,7 @@ impl AppCore {
             .map_err(map_cognitive_err)
     }
 
+    #[tracing::instrument(skip(self, payload), err)]
     pub async fn cognitive_inject_event(
         &self,
         event_type: String,

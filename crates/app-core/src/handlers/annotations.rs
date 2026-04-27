@@ -10,6 +10,7 @@ use crate::errors::map_cognitive_err;
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn annotation_create(
         &self,
         params: AnnotationCreateParams,
@@ -38,6 +39,7 @@ impl AppCore {
         Ok(annotation_to_response(&annotation))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn annotation_update(
         &self,
         params: AnnotationUpdateParams,
@@ -63,12 +65,14 @@ impl AppCore {
         Ok(annotation_to_response(&annotation))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn annotation_delete(&self, id: String) -> Result<(), ApiError> {
         let repo = AnnotationRepo::new(self.storage_pool.inner().clone());
         repo.delete(&id).await.map_err(map_cognitive_err)?;
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn annotation_list_for_note(
         &self,
         note_id: String,
@@ -82,6 +86,7 @@ impl AppCore {
         Ok(annotations.iter().map(annotation_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn annotation_get_ai_suggestion(
         &self,
         _note_id: String,
@@ -111,6 +116,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_get_linked_context(
         &self,
         params: LinkedContextParams,

@@ -9,6 +9,7 @@ use super::converters::note_row_to_response;
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_suggestions(
         &self,
         note_id: &str,

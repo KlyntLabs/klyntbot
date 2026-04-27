@@ -54,6 +54,7 @@ pub(crate) fn tts_params_for_persona(
 }
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_start_dictation(&self) -> Result<(), ApiError> {
         let service = self.voice_service()?;
         service
@@ -63,6 +64,7 @@ impl AppCore {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_stop_dictation(&self) -> Result<String, ApiError> {
         let service = self.voice_service()?;
         let result = service
@@ -75,6 +77,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self, event_json), err)]
     pub async fn voice_simulate_event(
         &self,
         event_json: serde_json::Value,
@@ -89,6 +92,7 @@ impl AppCore {
     }
 
     /// Preview a voice persona by synthesizing a short sample.
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_test_persona(&self, persona_key: String) -> Result<(), ApiError> {
         let svc = self.voice_service()?.clone();
         let cfg = self.config.read().await;
@@ -124,6 +128,7 @@ impl AppCore {
 
     // ── Voice settings ─────────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub fn voice_list_devices(&self) -> Result<AudioDevicesResponse, ApiError> {
         let (input, output, default_input, default_output) = AudioCapture::enumerate_devices();
         Ok(AudioDevicesResponse {
@@ -134,6 +139,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub fn voice_model_status(&self) -> Result<VoiceModelStatusResponse, ApiError> {
         let svc = self.voice_service()?;
         let mm = svc.model_manager();
@@ -159,6 +165,7 @@ impl AppCore {
     }
 
     /// Download a voice model and hot-swap the engine after completion.
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_download_model(&self, model_name: String) -> Result<(), ApiError> {
         let model = parse_model(&model_name)?;
         let svc = self.voice_service()?.clone();
@@ -241,6 +248,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_delete_model(&self, model_name: String) -> Result<(), ApiError> {
         let model = parse_model(&model_name)?;
         let svc = self.voice_service()?;

@@ -14,6 +14,7 @@ const WORKSPACE_FILES: &[(&str, &str)] = &[
 ];
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn workspace_list_files(&self) -> Result<Vec<WorkspaceFile>, ApiError> {
         let workspace = self.config.read().await.workspace_path();
         let mut files = Vec::with_capacity(WORKSPACE_FILES.len());
@@ -28,6 +29,7 @@ impl AppCore {
         Ok(files)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn workspace_read_file(
         &self,
         filename: &str,
@@ -54,6 +56,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self, content), err)]
     pub async fn workspace_write_file(
         &self,
         filename: &str,

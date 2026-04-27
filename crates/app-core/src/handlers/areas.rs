@@ -24,6 +24,7 @@ pub async fn build_area_response(state: &AppCore, row: &AreaRow) -> Result<AreaR
 }
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn area_list(&self) -> Result<Vec<AreaResponse>, ApiError> {
         let areas = self
             .repos
@@ -39,6 +40,7 @@ impl AppCore {
         Ok(results)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn area_create(&self, params: AreaCreateParams) -> HandlerResult<AreaResponse> {
         let id = uuid::Uuid::new_v4().to_string();
         let now: storage::SqlTs = jiff::Timestamp::now().into();
@@ -78,6 +80,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn area_update(&self, params: AreaUpdateParams) -> HandlerResult<AreaResponse> {
         let updated = self
             .repos
@@ -102,6 +105,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn area_delete(&self, id: String) -> HandlerResult<bool> {
         let deleted = self
             .repos
@@ -122,6 +126,7 @@ impl AppCore {
         Ok((deleted, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn area_reorder(&self, id: String, position: i32) -> HandlerResult<AreaResponse> {
         let updated = self
             .repos

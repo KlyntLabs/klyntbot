@@ -105,6 +105,7 @@ struct LlmGradeResult {
 
 impl AppCore {
     /// Full three-stage grading pipeline: exact match → semantic pre-filter → LLM.
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_submit_answer(
         &self,
         params: FlashcardSubmitAnswerParams,
@@ -316,6 +317,7 @@ impl AppCore {
     }
 
     /// Socratic follow-up: explain a grading result using LLM.
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_explain_answer(
         &self,
         params: FlashcardExplainParams,
@@ -427,6 +429,7 @@ Be concise — 2-4 sentences max."#
     ///
     /// Delegates to the graph propagation module which finds cards linked via
     /// `note_links` that are due within 7 days.
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_get_prerequisites(
         &self,
         card_id: &str,

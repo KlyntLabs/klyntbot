@@ -8,6 +8,7 @@ use crate::errors::map_prod_err;
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn distraction_dismiss(&self, app_name: String) -> Result<(), ApiError> {
         let focus_mgr = self.focus_manager()?;
         focus_mgr
@@ -17,6 +18,7 @@ impl AppCore {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn distraction_allow_temp(&self, pattern: String) -> Result<(), ApiError> {
         let interceptor = self.distraction_interceptor()?;
         let mut guard = interceptor.lock().await;
@@ -24,6 +26,7 @@ impl AppCore {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn distraction_allow_session(
         &self,
         app_name: String,
@@ -60,6 +63,7 @@ impl AppCore {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn distraction_learned_rules(&self) -> Result<Vec<LearnedRuleResponse>, ApiError> {
         let repos = self.productivity_repos()?;
         let rules = repos.learned_rules.list_all().await.map_err(map_prod_err)?;
@@ -78,6 +82,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn distraction_delete_rule(&self, id: i64) -> Result<(), ApiError> {
         let repos = self.productivity_repos()?;
         repos.learned_rules.delete(id).await.map_err(map_prod_err)?;

@@ -9,6 +9,7 @@ use crate::errors::parse_local_day_range;
 use crate::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn timeline_query(
         &self,
         params: TimelineQuery,

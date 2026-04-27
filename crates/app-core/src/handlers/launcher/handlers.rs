@@ -8,12 +8,14 @@ use crate::state::AppCore;
 
 impl AppCore {
     /// Search across all providers.
+    #[tracing::instrument(skip(self), err)]
     pub async fn launcher_search(&self, query: String) -> Result<Vec<LauncherItem>, ApiError> {
         let engine = self.launcher_engine()?;
         engine.search(&query, &self.repos, &self.note_repo).await
     }
 
     /// Record execution of a launcher item for frequency boosting.
+    #[tracing::instrument(skip(self), err)]
     pub async fn launcher_execute(
         &self,
         item_id: String,
@@ -25,11 +27,13 @@ impl AppCore {
     }
 
     /// Build dashboard data for the launcher.
+    #[tracing::instrument(skip(self), err)]
     pub async fn launcher_dashboard(&self) -> Result<DashboardData, ApiError> {
         super::dashboard::build_dashboard_data(&self.repos, self.productivity_repos.as_ref()).await
     }
 
     /// Paste clipboard entry (retrieve content).
+    #[tracing::instrument(skip(self), err)]
     pub async fn launcher_clipboard_paste(
         &self,
         id: i64,
@@ -39,12 +43,14 @@ impl AppCore {
     }
 
     /// Delete clipboard entry.
+    #[tracing::instrument(skip(self), err)]
     pub async fn launcher_clipboard_delete(&self, id: i64) -> Result<(), ApiError> {
         let repo = self.launcher_clipboard_repo()?;
         repo.delete(id).await.map_err(map_storage_err)
     }
 
     /// Pin/unpin clipboard entry.
+    #[tracing::instrument(skip(self), err)]
     pub async fn launcher_clipboard_pin(&self, id: i64, pinned: bool) -> Result<(), ApiError> {
         let repo = self.launcher_clipboard_repo()?;
         repo.pin(id, pinned).await.map_err(map_storage_err)

@@ -105,6 +105,7 @@ impl AppCore {
     ///
     /// Finds cards linked via `note_links` to this card's source note that are
     /// due within 7 days. Returns up to 3 prerequisite cards.
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_get_prerequisites_impl(
         &self,
         card_id: &str,

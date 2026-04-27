@@ -6,6 +6,7 @@ use crate::state::AppCore;
 use super::insight_context;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_persona_chat(
         &self,
         params: &PersonaChatParams,

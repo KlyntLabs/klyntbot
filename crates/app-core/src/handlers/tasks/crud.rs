@@ -10,6 +10,7 @@ use crate::state::{AppCore, EntityUpdate, HandlerResult};
 use super::converters::{resolve_status_label, row_to_task, row_to_task_response, rows_to_tasks};
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn task_get(&self, id: String) -> Result<Option<TaskResponse>, ApiError> {
         match self.repos.tasks.get(&id).await.map_err(map_storage_err)? {
             Some(row) => Ok(Some(row_to_task(&self.repos, &row).await?)),
@@ -17,6 +18,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn task_list(
         &self,
         area_id: Option<String>,
@@ -40,6 +42,7 @@ impl AppCore {
         rows_to_tasks(&self.repos, &rows).await
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn task_create(&self, params: TaskCreateParams) -> HandlerResult<TaskResponse> {
         let id = uuid::Uuid::new_v4().to_string();
         let now: storage::SqlTs = jiff::Timestamp::now().into();
@@ -163,6 +166,7 @@ impl AppCore {
         Ok((task, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn task_update(
         &self,
         params: TaskUpdateParams,
@@ -247,6 +251,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn task_delete(&self, id: String) -> HandlerResult<bool> {
         let deleted = self
             .repos
@@ -267,6 +272,7 @@ impl AppCore {
         Ok((deleted, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn task_toggle_complete(&self, id: String) -> HandlerResult<TaskResponse> {
         let row = self
             .repos
@@ -340,6 +346,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn task_list_children(
         &self,
         parent_id: String,
@@ -356,6 +363,7 @@ impl AppCore {
 
     // ── Dependencies ────────────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn task_add_dependency(
         &self,
         task_id: String,
@@ -368,6 +376,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn task_list_dependencies(
         &self,
         task_id: String,
@@ -384,6 +393,7 @@ impl AppCore {
 
     // ── Attachments ─────────────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn task_add_attachment(
         &self,
         task_id: String,
@@ -405,6 +415,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn task_list_attachments(
         &self,
         task_id: String,
@@ -418,6 +429,7 @@ impl AppCore {
 
     // ── Time entries ────────────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn task_add_time_entry(
         &self,
         task_id: String,
@@ -439,6 +451,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn task_list_time_entries(
         &self,
         task_id: String,

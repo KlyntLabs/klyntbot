@@ -28,6 +28,7 @@ fn deep_merge(base: &mut Value, patch: Value) {
 // ── AppCore methods ───────────────────────────────────────────────────
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn app_info(&self) -> Result<AppInfoResponse, ApiError> {
         let cfg = self.config.read().await;
         Ok(AppInfoResponse {
@@ -37,6 +38,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn config_get_section(&self, section: String) -> Result<Value, ApiError> {
         let cfg = self.config.read().await;
         let full = serde_json::to_value(&*cfg).map_err(map_serialization_err)?;
@@ -49,6 +51,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self, patch), err)]
     pub async fn config_update_section(
         &self,
         section: String,
@@ -89,6 +92,7 @@ impl AppCore {
         Ok(section_result)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn config_mark_setup_completed(&self) -> Result<(), ApiError> {
         let mut cfg = self.config.write().await;
         cfg.setup_completed = true;

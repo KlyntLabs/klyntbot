@@ -6,6 +6,7 @@ use crate::errors::{map_storage_err, parse_naive_date};
 use crate::state::{AppCore, HandlerResult};
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_budget_usage(&self) -> Result<Vec<BudgetUsageRow>, ApiError> {
         self.repos
             .finance
@@ -15,6 +16,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_budget_create(
         &self,
         params: FinanceBudgetCreateParams,
@@ -65,6 +67,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(id)))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_budget_update(
         &self,
         params: FinanceBudgetUpdateParams,
@@ -89,6 +92,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(params.id)))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_budget_delete(&self, id: String) -> HandlerResult<bool> {
         self.repos
             .finance

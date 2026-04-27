@@ -36,6 +36,7 @@ pub struct AutoTunerStatus {
 }
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn autotuner_status(&self) -> Result<AutoTunerStatus, ApiError> {
         if let Some(orch) = self.autotuner_orchestrator() {
             let champion = orch.champion_summary().await;
@@ -138,6 +139,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn autotuner_history(
         &self,
         limit: u32,
@@ -154,6 +156,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn autotuner_revert(&self) -> Result<autotuner::ChampionSummary, ApiError> {
         if let Some(orch) = self.autotuner_orchestrator() {
             let learning_state = orch.learning_state_repo();
@@ -200,6 +203,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn autotuner_pause(&self) -> Result<(), ApiError> {
         if let Some(orch) = self.autotuner_orchestrator() {
             orch.learning_state_repo()
@@ -218,6 +222,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn autotuner_resume(&self) -> Result<(), ApiError> {
         if let Some(orch) = self.autotuner_orchestrator() {
             orch.learning_state_repo()
@@ -236,6 +241,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn autotuner_get_toast_count(&self) -> Result<i64, ApiError> {
         let orch = self
             .autotuner_orchestrator()
@@ -247,6 +253,7 @@ impl AppCore {
         Ok(count)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn autotuner_increment_toast_count(&self) -> Result<i64, ApiError> {
         let orch = self
             .autotuner_orchestrator()
@@ -271,6 +278,7 @@ impl AppCore {
         Ok(new_count)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn autotuner_set_pace(&self, pace: &str) -> Result<(), ApiError> {
         let orch = self
             .autotuner_orchestrator()

@@ -11,6 +11,7 @@ use crate::state::AppCore;
 
 impl AppCore {
     /// Get the current reforge cycle state (last run time, stats, run count).
+    #[tracing::instrument(skip(self), err)]
     pub async fn reforge_state(&self) -> Result<ReforgeStateResponse, ApiError> {
         let repo = ReforgeStateRepo::new(self.repos.pool().clone());
         let row = repo.get().await.map_err(map_storage_err)?;
@@ -28,6 +29,7 @@ impl AppCore {
     }
 
     /// List all versions of a skill (newest first), omitting full content.
+    #[tracing::instrument(skip(self), err)]
     pub async fn skill_version_list(
         &self,
         skill_name: &str,
@@ -41,6 +43,7 @@ impl AppCore {
     }
 
     /// Get full detail (including content) for a specific skill version.
+    #[tracing::instrument(skip(self), err)]
     pub async fn skill_version_detail(
         &self,
         skill_name: &str,
@@ -55,6 +58,7 @@ impl AppCore {
     }
 
     /// List all distinct skill names that have version history.
+    #[tracing::instrument(skip(self), err)]
     pub async fn skill_names(&self) -> Result<SkillListResponse, ApiError> {
         let repo = SkillVersionRepo::new(self.repos.pool().clone());
         let names = repo.list_skill_names().await.map_err(map_storage_err)?;
@@ -63,6 +67,7 @@ impl AppCore {
 
     /// Reset a skill file to a previous version by reading that version's content
     /// from DB, writing it to disk, and recording a new version with source="User".
+    #[tracing::instrument(skip(self), err)]
     pub async fn skill_version_reset(
         &self,
         skill_name: &str,

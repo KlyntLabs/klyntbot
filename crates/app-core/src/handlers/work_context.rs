@@ -16,6 +16,7 @@ use crate::state::AppCore;
 impl AppCore {
     // ── List / Get ───────────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn list_work_contexts(
         &self,
         status: Option<String>,
@@ -34,6 +35,7 @@ impl AppCore {
         Ok(contexts.into_iter().map(Into::into).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn get_work_context(
         &self,
         id: String,
@@ -44,6 +46,7 @@ impl AppCore {
         Ok(ctx.map(Into::into))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn get_work_context_detail(
         &self,
         id: String,
@@ -81,6 +84,7 @@ impl AppCore {
 
     // ── Mutations ────────────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn update_work_context(
         &self,
         params: WorkContextUpdateParams,
@@ -118,6 +122,7 @@ impl AppCore {
         Ok(ctx.into())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn archive_work_context(&self, id: String) -> Result<WorkContextResponse, ApiError> {
         let mut ctx = activity_log::WorkContextRepo::get(&self.storage_pool, &id)
             .await
@@ -133,6 +138,7 @@ impl AppCore {
         Ok(ctx.into())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn merge_work_contexts(
         &self,
         keep_id: String,
@@ -149,6 +155,7 @@ impl AppCore {
 
     // ── Search ───────────────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn search_work_contexts(
         &self,
         query: String,
@@ -161,6 +168,7 @@ impl AppCore {
 
     // ── Context Timeline ─────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn get_context_timeline(
         &self,
         date: String,
@@ -232,6 +240,7 @@ impl AppCore {
 
     // ── Context Resume ───────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn get_context_resume_data(
         &self,
         context_id: String,
@@ -283,6 +292,7 @@ impl AppCore {
 
     // ── Inference Stats ───────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn get_inference_stats(&self) -> Result<InferenceStatsResponse, ApiError> {
         let one_hour_ago = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1);
         let one_day_ago = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24);
@@ -361,6 +371,7 @@ impl AppCore {
 
     // ── Dashboard Intelligence ────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn get_dashboard_intelligence(
         &self,
         date: &str,
@@ -575,6 +586,7 @@ impl AppCore {
 
     // ── Inference Config ──────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn update_inference_config(
         &self,
         update: InferenceConfigUpdate,

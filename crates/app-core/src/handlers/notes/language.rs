@@ -17,6 +17,7 @@ use crate::state::AppCore;
 
 impl AppCore {
     /// Translate text and return sentence breakdown with word-by-word analysis.
+    #[tracing::instrument(skip(self), err)]
     pub async fn language_translate_breakdown(
         &self,
         params: TranslateBreakdownParams,
@@ -84,6 +85,7 @@ impl AppCore {
     }
 
     /// Evaluate a user's translation attempt across 4 dimensions.
+    #[tracing::instrument(skip(self), err)]
     pub async fn language_evaluate_translation(
         &self,
         params: EvaluateTranslationParams,
@@ -125,6 +127,7 @@ impl AppCore {
     }
 
     /// Save vocabulary words as flashcards + semantic facts.
+    #[tracing::instrument(skip(self), err)]
     pub async fn language_save_vocabulary(
         &self,
         params: VocabularySaveParams,
@@ -291,6 +294,7 @@ impl AppCore {
     }
 
     /// Detect confusable words by checking existing vocabulary.
+    #[tracing::instrument(skip(self), err)]
     pub async fn language_detect_confusables(
         &self,
         params: DetectConfusablesParams,
@@ -365,6 +369,7 @@ impl AppCore {
     }
 
     /// Enrich an annotation with language data (translation + word breakdown).
+    #[tracing::instrument(skip(self), err)]
     pub async fn language_enrich_annotation(
         &self,
         params: EnrichAnnotationParams,
@@ -414,6 +419,7 @@ impl AppCore {
     }
 
     /// Quick-translate a short text selection (translation only, no vocabulary).
+    #[tracing::instrument(skip(self), err)]
     pub async fn language_quick_translate(
         &self,
         params: QuickTranslateParams,

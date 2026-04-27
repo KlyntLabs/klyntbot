@@ -11,6 +11,7 @@ use crate::state::AppCore;
 use super::memory::{fact_to_response, rule_to_response};
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_fact_create(
         &self,
         params: FactCreateParams,
@@ -49,6 +50,7 @@ impl AppCore {
         Ok(fact_to_response(&fact))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_fact_update(
         &self,
         id: String,
@@ -75,6 +77,7 @@ impl AppCore {
         Ok(fact_to_response(&fact))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_fact_delete(&self, id: String) -> Result<bool, ApiError> {
         let pool = self.repos.pool();
         let fact_repo = SemanticFactRepo::new(pool.clone());
@@ -87,6 +90,7 @@ impl AppCore {
         Ok(true)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_rule_create(
         &self,
         params: RuleCreateParams,
@@ -121,6 +125,7 @@ impl AppCore {
         Ok(rule_to_response(&rule))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_rule_deactivate(&self, id: String) -> Result<bool, ApiError> {
         let pool = self.repos.pool();
         let repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());

@@ -21,6 +21,7 @@ fn topic_id(subject: &str, domain: &str) -> String {
 
 impl AppCore {
     /// Build the full cognitive graph: topics, edges, communities, rules, stats.
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_graph_data(&self) -> Result<CognitiveGraphData, ApiError> {
         let pool = self.repos.pool();
         let fact_repo = SemanticFactRepo::new(pool.clone());
@@ -246,6 +247,7 @@ impl AppCore {
     }
 
     /// Expand a topic into its constituent facts.
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_graph_expand_topic(
         &self,
         params: TopicExpandParams,

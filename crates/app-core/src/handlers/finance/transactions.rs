@@ -6,6 +6,7 @@ use crate::errors::{map_storage_err, parse_naive_date};
 use crate::state::{AppCore, HandlerResult};
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_transactions(
         &self,
         limit: Option<i64>,
@@ -22,6 +23,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_transaction_create(
         &self,
         params: FinanceTransactionCreateParams,
@@ -126,6 +128,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(id)))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_transaction_delete(&self, id: String) -> HandlerResult<bool> {
         let tx = self
             .repos
@@ -155,6 +158,7 @@ impl AppCore {
         Ok((true, Self::finance_updates(id)))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_transactions_filtered(
         &self,
         params: FinanceTransactionFilterParams,

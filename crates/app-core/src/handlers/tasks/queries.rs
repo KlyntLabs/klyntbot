@@ -8,6 +8,7 @@ use crate::state::AppCore;
 use super::converters::{action_to_today_task, kr_to_response, objective_to_response};
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn today_tasks(&self) -> Result<Vec<TodayTaskResponse>, ApiError> {
         let now = jiff::Timestamp::now();
         let today_date = now.to_zoned(jiff::tz::TimeZone::UTC).date();
@@ -65,6 +66,7 @@ impl AppCore {
 
     /// Get the next upcoming task (earliest `due_date > now`, not completed).
     /// Used by the tray countdown to show a task deadline timer.
+    #[tracing::instrument(skip(self))]
     pub async fn next_upcoming_task(&self) -> Option<TaskRow> {
         let filter = TaskFilter {
             due_after: Some(jiff::Timestamp::now()),
@@ -75,6 +77,7 @@ impl AppCore {
         tasks.into_iter().find(|t| !t.completed)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn project_list_for_tasks(
         &self,
         area_id: Option<String>,
@@ -99,6 +102,7 @@ impl AppCore {
         Ok(results)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn objective_list_for_tasks(
         &self,
         project_id: Option<String>,

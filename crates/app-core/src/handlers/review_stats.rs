@@ -5,6 +5,7 @@ use super::atoms::map_db;
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn review_stats_summary(&self) -> Result<ReviewStatsSummaryResponse, ApiError> {
         let repo = cognitive::ReviewStatsRepo::new(self.storage_pool.inner().clone());
 

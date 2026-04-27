@@ -237,10 +237,12 @@ pub async fn chat_delete_thread(
 // ── AppCore convenience methods ─────────────────────────────────────────
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn chat_threads(&self) -> Result<Vec<ChatThreadResponse>, ApiError> {
         chat_threads(&self.repos, self.squad_repo.as_ref()).await
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn chat_messages(
         &self,
         session_key: String,
@@ -249,12 +251,14 @@ impl AppCore {
         chat_messages(&self.repos, self.persona_repo.as_ref(), session_key, limit).await
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn chat_pin_thread(&self, session_key: String) -> Result<(), ApiError> {
         chat_pin_thread(&self.repos, session_key.clone()).await?;
         self.event_emitter.emit_chat_thread(false, &session_key);
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn chat_rename_thread(
         &self,
         session_key: String,
@@ -265,6 +269,7 @@ impl AppCore {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn chat_delete_thread(&self, session_key: String) -> Result<(), ApiError> {
         chat_delete_thread(
             &self.repos,

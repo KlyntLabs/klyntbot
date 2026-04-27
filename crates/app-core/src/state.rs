@@ -183,6 +183,7 @@ pub struct AppCore {
 
 impl AppCore {
     /// Return productivity repos or a "feature disabled" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn productivity_repos(&self) -> Result<&ProductivityRepos, ApiError> {
         self.productivity_repos
             .as_ref()
@@ -190,6 +191,7 @@ impl AppCore {
     }
 
     /// Return focus manager or a "feature disabled" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn focus_manager(&self) -> Result<&Arc<FocusManager>, ApiError> {
         self.focus_manager
             .as_ref()
@@ -197,6 +199,7 @@ impl AppCore {
     }
 
     /// Return DND manager or a "feature disabled" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn dnd_manager(&self) -> Result<&Arc<DndManager>, ApiError> {
         self.dnd_manager
             .as_ref()
@@ -204,6 +207,7 @@ impl AppCore {
     }
 
     /// Return daily aggregator or a "feature disabled" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn aggregator(&self) -> Result<&Arc<DailyAggregator>, ApiError> {
         self.aggregator
             .as_ref()
@@ -211,6 +215,7 @@ impl AppCore {
     }
 
     /// Return distraction interceptor or a "not available" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn distraction_interceptor(
         &self,
     ) -> Result<&Arc<Mutex<feature_productivity::distraction::DistractionInterceptor>>, ApiError>
@@ -220,42 +225,49 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub fn signal_accumulator(&self) -> Result<&Arc<Mutex<SignalAccumulator>>, ApiError> {
         self.signal_accumulator
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub fn pattern_detector(&self) -> Result<&Arc<Mutex<PatternDetector>>, ApiError> {
         self.pattern_detector
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub fn intervention_router(&self) -> Result<&Arc<Mutex<InterventionRouter>>, ApiError> {
         self.intervention_router
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub fn feedback_tracker(&self) -> Result<&Arc<Mutex<FeedbackTracker>>, ApiError> {
         self.feedback_tracker
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub fn coaching_log_repo(&self) -> Result<&storage::CoachingInterventionLogRepo, ApiError> {
         self.coaching_intervention_log_repo
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub fn user_situation(&self) -> Result<&Arc<Mutex<UserSituation>>, ApiError> {
         self.user_situation
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub fn domain_event_bus(&self) -> Result<&Arc<DomainEventBus>, ApiError> {
         self.domain_event_bus
             .as_ref()
@@ -263,6 +275,7 @@ impl AppCore {
     }
 
     /// Return persona repo or a "not available" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn persona_repo(&self) -> Result<&cognitive::PersonaRepo, ApiError> {
         self.persona_repo
             .as_ref()
@@ -270,6 +283,7 @@ impl AppCore {
     }
 
     /// Return flashcard repo or a "not available" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn flashcard_repo(&self) -> Result<&cognitive::FlashcardRepo, ApiError> {
         self.flashcard_repo
             .as_ref()
@@ -277,6 +291,7 @@ impl AppCore {
     }
 
     /// Return knowledge atom repo or a "not available" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn knowledge_atom_repo(&self) -> Result<&cognitive::KnowledgeAtomRepo, ApiError> {
         self.knowledge_atom_repo
             .as_ref()
@@ -284,11 +299,13 @@ impl AppCore {
     }
 
     /// Return practice session repo.
+    #[tracing::instrument(skip(self))]
     pub fn practice_repo(&self) -> &PracticeSessionRepo {
         &self.practice_repo
     }
 
     /// Return review session repo or a "not available" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn review_session_repo(&self) -> Result<&cognitive::ReviewSessionRepo, ApiError> {
         self.review_session_repo
             .as_ref()
@@ -296,6 +313,7 @@ impl AppCore {
     }
 
     /// Return deck preference repo or a "not available" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn deck_preference_repo(&self) -> Result<&cognitive::DeckPreferenceRepo, ApiError> {
         self.deck_preference_repo
             .as_ref()
@@ -303,6 +321,7 @@ impl AppCore {
     }
 
     /// Return launcher search engine or a "feature disabled" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn launcher_engine(&self) -> Result<&Arc<LauncherSearchEngine>, ApiError> {
         self.launcher_engine
             .as_ref()
@@ -310,6 +329,7 @@ impl AppCore {
     }
 
     /// Return launcher clipboard repo or a "feature disabled" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn launcher_clipboard_repo(&self) -> Result<&feature_launcher::ClipboardRepo, ApiError> {
         self.launcher_engine
             .as_ref()
@@ -318,11 +338,13 @@ impl AppCore {
     }
 
     /// Return autotuner orchestrator or `None` when disabled.
+    #[tracing::instrument(skip(self))]
     pub fn autotuner_orchestrator(&self) -> Option<&agent::autotuner::AutoTunerOrchestrator> {
         self.autotuner.as_deref()
     }
 
     /// Return mirror facade or a "not available" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn mirror_facade(&self) -> Result<&cognitive::mirror::MirrorFacade, ApiError> {
         self.mirror_facade
             .as_deref()
@@ -330,6 +352,7 @@ impl AppCore {
     }
 
     /// Return pending memory repo or a "not available" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn pending_memory_repo(&self) -> Result<&cognitive::repos::PendingMemoryRepo, ApiError> {
         self.pending_memory_repo
             .as_ref()
@@ -337,6 +360,7 @@ impl AppCore {
     }
 
     /// Approve a pending memory: deserialize fact, upsert to semantic_facts, remove from pending.
+    #[tracing::instrument(skip(self), err)]
     pub async fn approve_pending_memory(&self, id: &str) -> Result<(), ApiError> {
         let repo = self.pending_memory_repo()?;
         let row = repo
@@ -366,6 +390,7 @@ impl AppCore {
     }
 
     /// Dismiss a pending memory (discard without persisting the fact).
+    #[tracing::instrument(skip(self), err)]
     pub async fn dismiss_pending_memory(&self, id: &str) -> Result<(), ApiError> {
         let repo = self.pending_memory_repo()?;
         repo.remove(id).await.map_err(|e| {
@@ -375,6 +400,7 @@ impl AppCore {
     }
 
     /// Return voice service or a "feature disabled" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn voice_service(&self) -> Result<&Arc<VoiceService>, ApiError> {
         self.voice_service
             .as_ref()
@@ -382,6 +408,7 @@ impl AppCore {
     }
 
     /// Return voice conversation manager or a "not available" error.
+    #[tracing::instrument(skip(self), err)]
     pub fn voice_conversation_manager(
         &self,
     ) -> Result<&Arc<crate::handlers::voice_conversation::VoiceConversationManager>, ApiError> {
@@ -391,6 +418,7 @@ impl AppCore {
     }
 
     /// Cross-domain check from string domain name (used by Tauri commands).
+    #[tracing::instrument(skip(self))]
     pub async fn check_cross_domain_str(
         &self,
         domain: &str,
@@ -410,6 +438,7 @@ impl AppCore {
     }
 
     /// Fire-and-forget cross-domain check when viewing any entity detail.
+    #[tracing::instrument(skip(self))]
     pub async fn check_cross_domain(
         &self,
         domain: feature_insights::cross_domain::EntityDomain,
@@ -427,6 +456,7 @@ impl AppCore {
     }
 
     /// Graceful shutdown.
+    #[tracing::instrument(skip(self))]
     pub async fn shutdown(&self) {
         info!("shutting down app core");
         // Stop productivity engine first to flush pending events.

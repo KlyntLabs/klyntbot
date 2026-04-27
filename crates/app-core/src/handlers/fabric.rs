@@ -19,6 +19,7 @@ const COMMUNITY_COLORS: &[&str] = &[
 ];
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn fabric_graph_base(&self) -> Result<FabricGraphBase, ApiError> {
         let pool = self.storage_pool.inner().clone();
 
@@ -248,6 +249,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn fabric_graph_expand(
         &self,
         params: FabricExpandParams,
@@ -415,6 +417,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn fabric_graph_action(
         &self,
         params: FabricActionParams,

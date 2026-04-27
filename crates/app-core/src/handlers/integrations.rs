@@ -667,6 +667,7 @@ fn install_gemini_cli() -> Result<Vec<String>, String> {
 
 impl AppCore {
     /// Detect which AI coding tools are installed on this machine.
+    #[tracing::instrument(skip(self), err)]
     pub async fn ai_tools_detect(&self) -> Result<Vec<AiToolInfo>, ApiError> {
         Ok(TOOLS
             .iter()
@@ -684,6 +685,7 @@ impl AppCore {
     }
 
     /// Install klyntbot skills and MCP config for the selected AI tools.
+    #[tracing::instrument(skip(self), err)]
     pub async fn ai_tools_install(
         &self,
         params: AiToolsInstallParams,

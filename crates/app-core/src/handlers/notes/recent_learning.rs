@@ -6,6 +6,7 @@ use crate::handlers::chat::extract_title;
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_recent_learning_sessions(
         &self,
         limit: usize,

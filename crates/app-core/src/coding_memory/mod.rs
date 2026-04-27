@@ -17,6 +17,7 @@ use desktop_shared::errors::ApiError;
 
 impl crate::AppCore {
     /// Return coding-memory status (daemon liveness, buffer size, unprocessed count).
+    #[tracing::instrument(skip(self), err)]
     pub async fn coding_memory_status(
         self: &std::sync::Arc<Self>,
     ) -> Result<desktop_shared::commands::coding_memory::CodingMemoryStatusResponse, ApiError> {
@@ -28,6 +29,7 @@ impl crate::AppCore {
     }
 
     /// Return per-CLI health rows. Fills `enabled` from `config.codingMemory.cli`.
+    #[tracing::instrument(skip(self), err)]
     pub async fn coding_memory_cli_health(
         self: &std::sync::Arc<Self>,
     ) -> Result<Vec<desktop_shared::commands::coding_memory::CliHealthRow>, ApiError> {
@@ -49,6 +51,7 @@ impl crate::AppCore {
     }
 
     /// Return paginated session replay entries.
+    #[tracing::instrument(skip(self), err)]
     pub async fn coding_memory_session_replay(
         self: &std::sync::Arc<Self>,
         session_id: Option<String>,
@@ -61,11 +64,13 @@ impl crate::AppCore {
     }
 
     /// Enable a coding CLI (currently only claude-code is supported).
+    #[tracing::instrument(skip(self), err)]
     pub async fn coding_memory_enable_cli(&self, cli: String) -> Result<(), ApiError> {
         self.set_cli_enabled(&cli, true).await
     }
 
     /// Disable a coding CLI (currently only claude-code is supported).
+    #[tracing::instrument(skip(self), err)]
     pub async fn coding_memory_disable_cli(&self, cli: String) -> Result<(), ApiError> {
         self.set_cli_enabled(&cli, false).await
     }
@@ -101,6 +106,7 @@ impl crate::AppCore {
     }
 
     /// Memory Browser — paginated list of active coding-domain facts.
+    #[tracing::instrument(skip(self), err)]
     pub async fn coding_memory_browser(
         self: &std::sync::Arc<Self>,
         limit: Option<i64>,
@@ -116,6 +122,7 @@ impl crate::AppCore {
     }
 
     /// Activity Timeline — daily ingest event counts.
+    #[tracing::instrument(skip(self), err)]
     pub async fn coding_memory_activity(
         self: &std::sync::Arc<Self>,
         days: Option<i64>,
@@ -126,6 +133,7 @@ impl crate::AppCore {
     }
 
     /// Cost Tracker — rich per-(date × model) breakdown with aggregate totals.
+    #[tracing::instrument(skip(self), err)]
     pub async fn coding_memory_cost(
         self: &std::sync::Arc<Self>,
         days: Option<i64>,
@@ -137,6 +145,7 @@ impl crate::AppCore {
 
     /// Debug — force one Phase A+B+C distillation pass for an unprocessed turn.
     /// Returns a JSON summary of the `DistillationReport`.
+    #[tracing::instrument(skip(self), err)]
     pub async fn coding_memory_distill_now(
         self: &std::sync::Arc<Self>,
         session_id: String,
@@ -159,6 +168,7 @@ impl crate::AppCore {
     }
 
     /// Sensitivity Inspector — facts annotated with a sensitivity tier.
+    #[tracing::instrument(skip(self), err)]
     pub async fn coding_memory_sensitivity(
         self: &std::sync::Arc<Self>,
         limit: Option<i64>,
@@ -174,6 +184,7 @@ impl crate::AppCore {
     }
 
     /// Diagnose a coding CLI hook binary.
+    #[tracing::instrument(skip(self), err)]
     pub async fn coding_memory_diagnose_cli(
         &self,
         cli: String,

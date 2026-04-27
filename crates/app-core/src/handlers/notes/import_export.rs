@@ -21,6 +21,7 @@ struct CollectedFile {
 }
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_import_files(
         &self,
         params: NoteImportParams,
@@ -429,6 +430,7 @@ impl AppCore {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_export(
         &self,
         params: desktop_shared::commands::NoteExportParams,

@@ -7,6 +7,7 @@ use crate::errors::map_storage_err;
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn agent_status(&self) -> Result<AgentStatusResponse, ApiError> {
         let focused = self
             .repos

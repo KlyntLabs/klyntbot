@@ -88,6 +88,7 @@ impl AppCore {
     ///
     /// Calls the LLM with the note content + existing cards context.
     /// Returns preview cards for the user to approve/edit before saving.
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_generate(
         &self,
         params: FlashcardGenerateParams,
@@ -198,6 +199,7 @@ impl AppCore {
     }
 
     /// Save user-approved generated cards as real flashcards.
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_save_generated(
         &self,
         params: FlashcardSaveGeneratedParams,

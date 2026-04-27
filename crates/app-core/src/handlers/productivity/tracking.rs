@@ -13,6 +13,7 @@ use crate::errors::{map_prod_err, parse_date_or_err};
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_categories(&self) -> Result<Vec<ActivityCategoryResponse>, ApiError> {
         let repos = self.productivity_repos()?;
         let categories = repos.categories.list_all().await.map_err(map_prod_err)?;
@@ -30,6 +31,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_tracked_apps(&self) -> Result<Vec<TrackedAppResponse>, ApiError> {
         let repos = self.productivity_repos()?;
         let rows = repos.events.tracked_apps().await.map_err(map_prod_err)?;
@@ -47,6 +49,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_goals(&self) -> Result<Vec<GoalProgressResponse>, ApiError> {
         let aggregator = self.aggregator()?;
         let today = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
@@ -65,6 +68,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_time_entries(
         &self,
         date: String,
@@ -93,6 +97,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_goal_create(
         &self,
         goal_type: String,
@@ -130,12 +135,14 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_goal_delete(&self, id: i64) -> Result<(), ApiError> {
         let repos = self.productivity_repos()?;
         repos.goals.delete(id).await.map_err(map_prod_err)?;
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_goal_toggle(&self, id: i64, enabled: bool) -> Result<(), ApiError> {
         let repos = self.productivity_repos()?;
         repos
@@ -146,6 +153,7 @@ impl AppCore {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_time_entry_create(
         &self,
         description: String,
@@ -185,12 +193,14 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_time_entry_delete(&self, id: i64) -> Result<(), ApiError> {
         let repos = self.productivity_repos()?;
         repos.time_entries.delete(id).await.map_err(map_prod_err)?;
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_category_upsert(
         &self,
         id: String,
@@ -232,6 +242,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_category_delete(&self, id: String) -> Result<bool, ApiError> {
         let repos = self.productivity_repos()?;
         let result = repos.categories.delete(&id).await.map_err(map_prod_err)?;
@@ -241,6 +252,7 @@ impl AppCore {
     }
 
     /// Re-assign all historical events for a given app/site to a new category.
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_recategorize_app(
         &self,
         app_name: String,
@@ -258,6 +270,7 @@ impl AppCore {
 
     // ── V2: Insights & Auto-Focus ─────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_insights(
         &self,
         date: Option<String>,
@@ -279,6 +292,7 @@ impl AppCore {
         Ok(cards.into_iter().map(insight_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_insight_dismiss(&self, id: String) -> Result<(), ApiError> {
         let repos = self.productivity_repos()?;
         repos.insights.dismiss(&id).await.map_err(map_prod_err)?;
@@ -287,6 +301,7 @@ impl AppCore {
 
     // ── V3: Project Tracking ──────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_projects_list(
         &self,
     ) -> Result<Vec<ProductivityProjectResponse>, ApiError> {
@@ -295,6 +310,7 @@ impl AppCore {
         Ok(projects.into_iter().map(project_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_project_upsert(
         &self,
         id: String,
@@ -321,6 +337,7 @@ impl AppCore {
         Ok(project_to_response(project))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_project_delete(&self, id: String) -> Result<(), ApiError> {
         let repos = self.productivity_repos()?;
         repos.projects.delete(&id).await.map_err(map_prod_err)?;

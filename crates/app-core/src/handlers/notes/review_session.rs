@@ -4,6 +4,7 @@ use desktop_shared::errors::ApiError;
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_save_session(
         &self,
         params: ReviewSessionSaveParams,

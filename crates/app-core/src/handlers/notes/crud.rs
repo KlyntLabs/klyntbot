@@ -22,6 +22,7 @@ use crate::state::{AppCore, EntityUpdate, HandlerResult};
 impl AppCore {
     // ── Read-only note handlers ─────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_list(
         &self,
         notebook_id: Option<String>,
@@ -35,6 +36,7 @@ impl AppCore {
         notes_list_items_batch(self, &rows).await
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_get(&self, id: String) -> Result<NoteResponse, ApiError> {
         let row = self
             .note_repo
@@ -45,6 +47,7 @@ impl AppCore {
         note_with_tags(self, &row).await
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_search(&self, query: String) -> Result<Vec<NoteListItem>, ApiError> {
         let rows = self
             .note_repo
@@ -55,6 +58,7 @@ impl AppCore {
         notes_list_items_batch(self, &rows).await
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_links_all(&self) -> Result<Vec<NoteLinkResponse>, ApiError> {
         let rows = self
             .note_repo
@@ -71,6 +75,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_list_by_entity(
         &self,
         entity_type: String,
@@ -85,6 +90,7 @@ impl AppCore {
         notes_list_items_batch(self, &rows).await
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_version_list(
         &self,
         note_id: String,
@@ -100,6 +106,7 @@ impl AppCore {
 
     // ── Mutating note handlers ──────────────────────────────────────
 
+    #[tracing::instrument(skip(self))]
     pub async fn note_create(&self, params: NoteCreateParams) -> HandlerResult<NoteResponse> {
         if params.title.trim().is_empty() {
             return Err(ApiError::new("VALIDATION", "title must not be empty"));
@@ -187,6 +194,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn note_update(&self, params: NoteUpdateParams) -> HandlerResult<NoteResponse> {
         let updated = self
             .note_repo
@@ -260,6 +268,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn note_delete(&self, id: String) -> HandlerResult<bool> {
         let deleted = self
             .note_repo
@@ -289,6 +298,7 @@ impl AppCore {
         Ok((deleted, updates))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_version_create(
         &self,
         note_id: String,
@@ -328,6 +338,7 @@ impl AppCore {
         Ok(version_row_to_response(&created))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn note_version_restore(
         &self,
         version_id: String,
@@ -393,6 +404,7 @@ impl AppCore {
     // ── Hybrid search (FTS5 + semantic) ────────────────────────────
 
     /// Hybrid search: FTS5 keyword search + semantic vector search, merged by RRF-like scoring.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_search_hybrid(&self, query: &str) -> Result<HybridSearchResponse, ApiError> {
         // 1. FTS5 keyword search (always available)
         let keyword_results = self.note_repo.search_notes(query).await.unwrap_or_default();
@@ -437,6 +449,7 @@ impl AppCore {
 
     // ── Semantic search ─────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_search_semantic(&self, query: &str) -> Result<Vec<NoteListItem>, ApiError> {
         use super::converters::note_row_to_list_item;
 
@@ -467,6 +480,7 @@ impl AppCore {
 
     // ── Archive handlers ─────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self))]
     pub async fn note_archive(&self, id: &str) -> HandlerResult<()> {
         self.note_repo
             .archive_note(id)
@@ -480,6 +494,7 @@ impl AppCore {
         Ok(((), updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn note_unarchive(&self, id: &str) -> HandlerResult<()> {
         self.note_repo
             .unarchive_note(id)
@@ -493,6 +508,7 @@ impl AppCore {
         Ok(((), updates))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_list_archived(&self) -> Result<Vec<NoteListItem>, ApiError> {
         let rows = self
             .note_repo
@@ -505,6 +521,7 @@ impl AppCore {
 
     // ── Unlinked mentions handler ────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_unlinked_mentions(
         &self,
         note_id: &str,
@@ -520,6 +537,7 @@ impl AppCore {
 
     // ── Backlinks handler ───────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_backlinks(&self, note_id: &str) -> Result<Vec<BacklinkResponse>, ApiError> {
         let rows = self
             .note_repo
@@ -542,6 +560,7 @@ impl AppCore {
 
     /// Signal that the user has finished editing a note (blur/close/idle).
     /// Fires NoteEditingFinished so background services can process the final content.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_editing_finished(
         &self,
         params: NoteEditingFinishedParams,
@@ -570,6 +589,7 @@ impl AppCore {
 
     // ── Attachment handler ──────────────────────────────────────────
 
+    #[tracing::instrument(skip(self, data), err)]
     pub async fn note_save_attachment(
         &self,
         data: String,

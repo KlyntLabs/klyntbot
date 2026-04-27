@@ -5,6 +5,7 @@ use crate::errors::map_storage_err;
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self, content), err)]
     pub async fn inbox_create(&self, content: &str) -> Result<InboxItemResponse, ApiError> {
         let item = self
             .note_repo
@@ -20,6 +21,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn inbox_list(&self) -> Result<Vec<InboxItemResponse>, ApiError> {
         let items = self
             .note_repo
@@ -38,6 +40,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn inbox_delete(&self, id: &str) -> Result<(), ApiError> {
         self.note_repo
             .delete_inbox_item(id)

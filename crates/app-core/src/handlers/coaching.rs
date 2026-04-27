@@ -17,6 +17,7 @@ use crate::state::AppCore;
 const MAX_CONSECUTIVE_IGNORES: i32 = 2;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn coaching_situation(&self) -> Result<UserSituationResponse, ApiError> {
         let sit = self.user_situation()?.lock().await;
         Ok(UserSituationResponse {
@@ -33,6 +34,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn coaching_signals(&self) -> Result<SignalWindowResponse, ApiError> {
         let acc = self.signal_accumulator()?.lock().await;
         let last_fired = acc.last_fired();
@@ -75,6 +77,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn coaching_patterns(&self) -> Result<Vec<DetectedPatternResponse>, ApiError> {
         let detector = self.pattern_detector()?.lock().await;
         let patterns = detector.detect_patterns();
@@ -91,6 +94,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn coaching_feedback_stats(&self) -> Result<Vec<StrategyFeedbackResponse>, ApiError> {
         let tracker = self.feedback_tracker()?.lock().await;
 
@@ -109,6 +113,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn coaching_router_status(&self) -> Result<RouterStatusResponse, ApiError> {
         let router = self.intervention_router()?.lock().await;
         let (hourly_limit, daily_limit) = router.limits();
@@ -124,6 +129,7 @@ impl AppCore {
     /// Returns pending coaching interventions, gated by delivery rules:
     /// - Returns empty while AI is actively streaming (streaming block)
     /// - Returns empty after [`MAX_CONSECUTIVE_IGNORES`] consecutive ignored nudges
+    #[tracing::instrument(skip(self), err)]
     pub async fn coaching_pending_interventions(
         &self,
     ) -> Result<Vec<DeliveredInterventionResponse>, ApiError> {
@@ -153,6 +159,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn coaching_intervention_log(
         &self,
         limit: Option<i64>,
@@ -178,6 +185,7 @@ impl AppCore {
 
     // ── Coaching Mutations ──────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn coaching_reset_dismissals(
         &self,
         trigger_name: Option<String>,
@@ -191,6 +199,7 @@ impl AppCore {
         Ok(true)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn coaching_clear_signals(&self) -> Result<bool, ApiError> {
         let mut acc = self.signal_accumulator()?.lock().await;
         *acc = feature_coaching::SignalAccumulator::new();
@@ -198,6 +207,7 @@ impl AppCore {
     }
 
     /// Seed test trigger data into the pattern detector for debugging.
+    #[tracing::instrument(skip(self), err)]
     pub async fn coaching_seed_patterns(&self) -> Result<bool, ApiError> {
         let mut detector = self.pattern_detector()?.lock().await;
         detector.seed_test_triggers("distraction_streak", 5);
@@ -211,6 +221,7 @@ impl AppCore {
     /// Records explicit feedback in the FeedbackTracker and, if dismissed,
     /// increases the backoff in InterventionRouter. Any explicit feedback
     /// resets the consecutive ignore counter.
+    #[tracing::instrument(skip(self), err)]
     pub async fn coaching_submit_feedback(
         &self,
         intervention_id: String,
@@ -300,6 +311,7 @@ impl AppCore {
     /// Report that a coaching nudge was ignored (auto-collapsed without interaction).
     /// Increments the consecutive ignore counter; after [`MAX_CONSECUTIVE_IGNORES`]
     /// in a row, delivery is skipped.
+    #[tracing::instrument(skip(self), err)]
     pub async fn coaching_report_ignored(&self, intervention_id: String) -> Result<bool, ApiError> {
         let count = self
             .consecutive_coaching_ignores

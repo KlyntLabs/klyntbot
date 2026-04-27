@@ -37,6 +37,7 @@ fn label_to_response(l: StatusLabelRow) -> StatusLabelResponse {
 // ── Handler methods ─────────────────────────────────────────────────────
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn workflow_list(&self) -> Result<Vec<StatusWorkflowResponse>, ApiError> {
         let workflows = self
             .repos
@@ -58,6 +59,7 @@ impl AppCore {
         Ok(results)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn workflow_get(
         &self,
         id: String,
@@ -83,6 +85,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn workflow_get_effective(
         &self,
         project_id: Option<String>,
@@ -110,6 +113,7 @@ impl AppCore {
         Ok(labels.into_iter().map(label_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn workflow_create(
         &self,
         params: WorkflowCreateParams,
@@ -139,6 +143,7 @@ impl AppCore {
         Ok(workflow_to_response(wf, labels))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn workflow_delete(&self, id: String) -> Result<bool, ApiError> {
         self.repos
             .status_workflows
@@ -147,6 +152,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn label_create(
         &self,
         params: LabelCreateParams,
@@ -169,6 +175,7 @@ impl AppCore {
         Ok(label_to_response(label))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn label_update(
         &self,
         params: LabelUpdateParams,
@@ -189,6 +196,7 @@ impl AppCore {
         Ok(label_to_response(label))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn label_delete(&self, id: String) -> Result<bool, ApiError> {
         self.repos
             .status_workflows
@@ -197,6 +205,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn label_reorder(&self, params: LabelReorderParams) -> Result<(), ApiError> {
         self.repos
             .status_workflows

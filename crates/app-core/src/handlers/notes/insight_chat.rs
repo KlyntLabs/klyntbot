@@ -159,6 +159,7 @@ impl AppCore {
     /// When `squad_id` is set, makes parallel per-persona LLM calls and stores
     /// each response as a separate message with `persona_id`. Otherwise, streams
     /// a single AI response.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_tab_chat(
         &self,
         params: &InsightChatParams,
@@ -416,6 +417,7 @@ impl AppCore {
     }
 
     /// Clear all chat sessions for a note's insight tabs.
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_insight_clear_tab_chats(&self, note_id: &str) -> Result<(), ApiError> {
         let prefix = format!("insight-chat:{note_id}:");
         self.repos

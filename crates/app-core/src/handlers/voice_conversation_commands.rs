@@ -18,6 +18,7 @@ impl From<StartResponse> for VoiceConversationStartResponse {
 
 impl AppCore {
     /// Start a voice conversation (resolves/creates session).
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_conversation_start(
         &self,
         session_key: Option<String>,
@@ -31,6 +32,7 @@ impl AppCore {
     }
 
     /// Pause the voice conversation.
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_conversation_pause(&self) -> Result<(), ApiError> {
         let manager = self.voice_conversation_manager()?;
         manager
@@ -40,6 +42,7 @@ impl AppCore {
     }
 
     /// Resume the voice conversation.
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_conversation_resume(&self) -> Result<(), ApiError> {
         let manager = self.voice_conversation_manager()?;
         manager
@@ -49,6 +52,7 @@ impl AppCore {
     }
 
     /// Interrupt TTS playback (user started speaking).
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_conversation_interrupt(&self) -> Result<(), ApiError> {
         let manager = self.voice_conversation_manager()?;
         manager
@@ -58,6 +62,7 @@ impl AppCore {
     }
 
     /// Continue TTS from where it was interrupted.
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_conversation_continue(&self) -> Result<(), ApiError> {
         let manager = self.voice_conversation_manager()?;
         manager
@@ -67,6 +72,7 @@ impl AppCore {
     }
 
     /// Start a brand new session (discards current context).
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_conversation_new_session(
         &self,
     ) -> Result<VoiceConversationStartResponse, ApiError> {
@@ -79,6 +85,7 @@ impl AppCore {
     }
 
     /// End the voice conversation entirely.
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_conversation_end(&self) -> Result<(), ApiError> {
         let manager = self.voice_conversation_manager()?;
         manager
@@ -88,6 +95,7 @@ impl AppCore {
     }
 
     /// Get the current voice conversation status.
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_conversation_status(
         &self,
     ) -> Result<VoiceConversationStatusResponse, ApiError> {
@@ -111,6 +119,7 @@ impl AppCore {
     }
 
     /// Get status with session title resolved from DB.
+    #[tracing::instrument(skip(self), err)]
     pub async fn voice_conversation_status_with_title(
         &self,
     ) -> Result<VoiceConversationStatusResponse, ApiError> {

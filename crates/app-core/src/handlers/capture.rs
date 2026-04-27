@@ -10,6 +10,7 @@ use crate::state::AppCore;
 // ── Ingestion handlers ──────────────────────────────────────────────
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn ingest_event(
         &self,
         token: &str,
@@ -39,6 +40,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn ingest_batch(
         &self,
         token: &str,
@@ -89,6 +91,7 @@ impl AppCore {
 
     // ── Shell hook management ───────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn install_shell_hook(&self) -> Result<String, ApiError> {
         let cfg = self.config.read().await;
         let shell = crate::infrastructure::shell_hook::detect_shell();
@@ -104,12 +107,14 @@ impl AppCore {
             .map_err(|e| ApiError::new("INTERNAL", format!("{e}")))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn uninstall_shell_hook(&self) -> Result<String, ApiError> {
         let shell = crate::infrastructure::shell_hook::detect_shell();
         crate::infrastructure::shell_hook::uninstall(&shell)
             .map_err(|e| ApiError::new("INTERNAL", format!("{e}")))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn get_shell_hook_status(&self) -> Result<ShellHookStatusResponse, ApiError> {
         let shell = crate::infrastructure::shell_hook::detect_shell();
         let rc_file = crate::infrastructure::shell_hook::rc_file_for_shell(&shell)
@@ -127,6 +132,7 @@ impl AppCore {
 
     // ── Capture status ──────────────────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn get_capture_status(&self) -> Result<CaptureStatusResponse, ApiError> {
         // Read config and release lock before async I/O
         let (
@@ -166,11 +172,13 @@ impl AppCore {
 
     // ── Ingestion token management ──────────────────────────────────
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn get_ingestion_token(&self) -> Result<String, ApiError> {
         let cfg = self.config.read().await;
         Ok(cfg.capture.ingestion_api.token.clone().unwrap_or_default())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn regenerate_ingestion_token(&self) -> Result<String, ApiError> {
         let mut cfg = self.config.write().await;
         let new_token = uuid::Uuid::new_v4().to_string();

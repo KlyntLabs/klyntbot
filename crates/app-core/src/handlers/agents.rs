@@ -32,6 +32,7 @@ Reference instructions here.
 
 impl AppCore {
     /// List all skill profiles (built-in + workspace) with their files.
+    #[tracing::instrument(skip(self), err)]
     pub async fn agent_list_profiles(&self) -> Result<Vec<AgentProfileSummary>, ApiError> {
         let workspace = self.config.read().await.workspace_path();
         let skills_dir = workspace.join("skills");
@@ -180,6 +181,7 @@ impl AppCore {
 
     /// Read a skill file (SKILL.md or references/foo.md).
     /// Returns workspace override if present, falls back to built-in.
+    #[tracing::instrument(skip(self), err)]
     pub async fn agent_read_file(
         &self,
         agent_name: &str,
@@ -237,6 +239,7 @@ impl AppCore {
     }
 
     /// Write a skill file to the workspace directory and trigger hot-reload.
+    #[tracing::instrument(skip(self, content), err)]
     pub async fn agent_write_file(
         &self,
         agent_name: &str,
@@ -272,6 +275,7 @@ impl AppCore {
     }
 
     /// Create a new custom skill profile.
+    #[tracing::instrument(skip(self), err)]
     pub async fn agent_create_profile(&self, name: &str) -> Result<AgentProfileSummary, ApiError> {
         let workspace = self.config.read().await.workspace_path();
         let skill_dir = workspace.join("skills").join(name);
@@ -316,6 +320,7 @@ impl AppCore {
     }
 
     /// Create a new reference file for a skill.
+    #[tracing::instrument(skip(self), err)]
     pub async fn agent_create_skill(
         &self,
         agent_name: &str,
@@ -364,6 +369,7 @@ impl AppCore {
     }
 
     /// Delete a workspace skill file (reference only — cannot delete SKILL.md of built-in skills).
+    #[tracing::instrument(skip(self), err)]
     pub async fn agent_delete_file(
         &self,
         agent_name: &str,

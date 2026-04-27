@@ -7,6 +7,7 @@ use crate::errors::{map_storage_err, parse_date};
 use crate::state::{AppCore, EntityUpdate, HandlerResult};
 
 impl AppCore {
+    #[tracing::instrument(skip(self))]
     pub async fn key_result_create(
         &self,
         params: KeyResultCreateParams,
@@ -62,6 +63,7 @@ impl AppCore {
         Ok((kr_to_response(&created), updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn key_result_update(
         &self,
         params: KeyResultUpdateParams,
@@ -105,6 +107,7 @@ impl AppCore {
         Ok((kr_to_response(&updated), updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn key_result_update_metric(
         &self,
         id: String,
@@ -141,6 +144,7 @@ impl AppCore {
         Ok((kr_to_response(&updated), updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn key_result_delete(&self, id: String) -> HandlerResult<bool> {
         // Get the KR first to know the parent objective
         let kr = self

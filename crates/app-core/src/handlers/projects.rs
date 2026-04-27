@@ -73,6 +73,7 @@ pub async fn build_project_response(
 }
 
 impl AppCore {
+    #[tracing::instrument(skip(self))]
     pub async fn project_create(
         &self,
         params: ProjectCreateParams,
@@ -114,6 +115,7 @@ impl AppCore {
         Ok((project_to_response(&created, 0, 0, vec![]), updates))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn project_get(&self, id: String) -> Result<ProjectResponse, ApiError> {
         let row = self
             .repos
@@ -125,6 +127,7 @@ impl AppCore {
         build_project_response(self, &row).await
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn project_update(
         &self,
         params: ProjectUpdateParams,
@@ -166,6 +169,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn project_delete(&self, id: String) -> HandlerResult<bool> {
         let deleted = self
             .repos
@@ -186,6 +190,7 @@ impl AppCore {
         Ok((deleted, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn project_archive(&self, id: String) -> HandlerResult<ProjectResponse> {
         let archived = self
             .repos
@@ -203,6 +208,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self, instructions))]
     pub async fn project_update_instructions(
         &self,
         id: String,
@@ -230,6 +236,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn project_update_role(
         &self,
         id: String,
@@ -256,6 +263,7 @@ impl AppCore {
     }
 
     /// Compute focus quality and insight freshness metrics for a project.
+    #[tracing::instrument(skip(self), err)]
     pub async fn project_health_metrics(
         &self,
         project_id: String,

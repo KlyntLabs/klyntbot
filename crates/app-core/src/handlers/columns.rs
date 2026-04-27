@@ -58,6 +58,7 @@ fn value_to_response(
 // ── Handler methods ─────────────────────────────────────────────────────
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn custom_column_list(
         &self,
         project_id: String,
@@ -72,6 +73,7 @@ impl AppCore {
         Ok(rows.iter().map(column_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn custom_column_create(
         &self,
         params: ColumnCreateParams,
@@ -115,6 +117,7 @@ impl AppCore {
         Ok(column_to_response(&created))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn custom_column_update(
         &self,
         params: ColumnUpdateParams,
@@ -146,6 +149,7 @@ impl AppCore {
         Ok(column_to_response(&updated))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn custom_column_delete(&self, id: String) -> Result<bool, ApiError> {
         self.repos
             .custom_columns
@@ -154,6 +158,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn custom_column_reorder(&self, params: ColumnReorderParams) -> Result<(), ApiError> {
         self.repos
             .custom_columns
@@ -162,6 +167,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn custom_column_values(
         &self,
         task_id: String,
@@ -176,6 +182,7 @@ impl AppCore {
         Ok(rows.iter().map(value_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn custom_column_value_set(
         &self,
         params: ColumnValueSetParams,
@@ -190,6 +197,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn custom_column_value_delete(
         &self,
         task_id: String,

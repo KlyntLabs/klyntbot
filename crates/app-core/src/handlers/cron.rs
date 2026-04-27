@@ -55,6 +55,7 @@ fn to_response(row: &storage::CronJobRow) -> CronJobResponse {
 }
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn cron_list(
         &self,
         include_disabled: bool,
@@ -75,6 +76,7 @@ impl AppCore {
         Ok(rows.iter().map(to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn cron_status(&self) -> Result<CronStatusResponse, ApiError> {
         let rows = self
             .cron_repo
@@ -99,6 +101,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn cron_enable(&self, id: String, enabled: bool) -> HandlerResult<CronJobResponse> {
         self.cron_repo
             .set_enabled(&id, enabled)
@@ -126,6 +129,7 @@ impl AppCore {
 
     /// Manually trigger a cron job: set `next_run_at_ms` to now and reconcile
     /// so the TemporalScheduler fires it within the next loop iteration (≤30 s).
+    #[tracing::instrument(skip(self), err)]
     pub async fn cron_run(&self, id: String) -> Result<bool, ApiError> {
         let mut row = self
             .cron_repo
@@ -156,6 +160,7 @@ impl AppCore {
         Ok(true)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn cron_delete(&self, id: String) -> Result<bool, ApiError> {
         // Guard: system jobs cannot be deleted.
         if let Some(row) = self
@@ -185,6 +190,7 @@ impl AppCore {
         Ok(deleted)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn cron_create(&self, params: CronJobCreateParams) -> HandlerResult<CronJobResponse> {
         let schedule: scheduling::CronSchedule = serde_json::from_value(params.schedule)
             .map_err(|e| ApiError::new("INVALID_PARAMS", format!("invalid schedule: {e}")))?;
@@ -231,6 +237,7 @@ impl AppCore {
         Ok((to_response(&saved), vec![]))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn cron_update(&self, params: CronJobUpdateParams) -> HandlerResult<CronJobResponse> {
         // TODO(4.4c): update semantics will simplify once CronService is removed —
         // this handler currently inserts a new row and deletes the old to preserve

@@ -103,11 +103,13 @@ pub fn build_transport(
 // ── AppCore methods ───────────────────────────────────────────────────
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn mcp_get_config(&self) -> Result<McpConfigResponse, ApiError> {
         let cfg = self.config.read().await;
         Ok(build_mcp_response(&cfg))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn mcp_add_server(
         &self,
         params: McpAddServerParams,
@@ -157,6 +159,7 @@ impl AppCore {
         Ok(response)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn mcp_remove_server(
         &self,
         params: McpRemoveParams,
@@ -185,6 +188,7 @@ impl AppCore {
         Ok(response)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn mcp_toggle_server(
         &self,
         params: McpToggleParams,
@@ -221,6 +225,7 @@ impl AppCore {
         Ok(response)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn mcp_update_server(
         &self,
         params: McpUpdateServerParams,

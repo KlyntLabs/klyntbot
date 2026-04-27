@@ -25,6 +25,7 @@ pub(crate) fn source_row_to_response(row: &storage::ProjectSourceRow) -> Project
 }
 
 impl AppCore {
+    #[tracing::instrument(skip(self))]
     pub async fn project_source_create(
         &self,
         params: ProjectSourceCreateParams,
@@ -51,6 +52,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn project_source_delete(&self, id: String) -> HandlerResult<bool> {
         let deleted = self
             .repos
@@ -70,6 +72,7 @@ impl AppCore {
         Ok((deleted, updates))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn project_source_list(
         &self,
         project_id: String,

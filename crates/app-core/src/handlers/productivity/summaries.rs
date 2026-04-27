@@ -11,6 +11,7 @@ use crate::errors::{map_prod_err, parse_local_day_range};
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_today(
         &self,
     ) -> Result<Option<ProductivitySummaryResponse>, ApiError> {
@@ -37,6 +38,7 @@ impl AppCore {
         Ok(Some(resp))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_timeline(
         &self,
         date: String,
@@ -55,6 +57,7 @@ impl AppCore {
         Ok(events.into_iter().map(event_to_timeline).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_weekly(&self) -> Result<Vec<ProductivitySummaryResponse>, ApiError> {
         let repos = self.productivity_repos()?;
         let now = jiff::Timestamp::now();
@@ -84,6 +87,7 @@ impl AppCore {
         Ok(summaries.into_iter().map(summary_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_summary_range(
         &self,
         start_date: String,
@@ -134,6 +138,7 @@ impl AppCore {
         Ok(responses)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_patterns(
         &self,
         days: Option<u32>,
@@ -154,6 +159,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_hourly_breakdown(
         &self,
         start_date: String,
@@ -184,6 +190,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn productivity_activity_feed(
         &self,
         limit: Option<i64>,

@@ -10,6 +10,7 @@ use crate::state::AppCore;
 
 impl AppCore {
     /// List all active memories for a project.
+    #[tracing::instrument(skip(self), err)]
     pub async fn project_memories_list(
         &self,
         project_id: String,
@@ -23,6 +24,7 @@ impl AppCore {
     }
 
     /// List active memories for a project filtered by memory type.
+    #[tracing::instrument(skip(self), err)]
     pub async fn project_memories_by_type(
         &self,
         project_id: String,

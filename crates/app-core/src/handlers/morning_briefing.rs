@@ -5,6 +5,7 @@ use super::atoms::map_db;
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn morning_briefing(&self) -> Result<MorningBriefingResponse, ApiError> {
         let atom_repo = self.knowledge_atom_repo()?;
         let fc_repo = self.flashcard_repo()?;

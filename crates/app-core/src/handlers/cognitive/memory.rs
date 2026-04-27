@@ -71,6 +71,7 @@ pub(crate) fn fact_preview(fact: &SemanticFact) -> String {
 // -- Memory Reads -------------------------------------------------------------
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_user_model(&self) -> Result<UserModelSummaryResponse, ApiError> {
         let pool = self.repos.pool();
         let fact_repo = SemanticFactRepo::new(pool.clone());
@@ -92,6 +93,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_facts_list(
         &self,
         domain: Option<String>,
@@ -110,6 +112,7 @@ impl AppCore {
         Ok(all_facts.iter().map(fact_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_episodic_list(
         &self,
         domain: Option<String>,
@@ -143,6 +146,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_rules_list(
         &self,
         domain: Option<String>,
@@ -164,6 +168,7 @@ impl AppCore {
         Ok(all_rules.iter().map(rule_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_memory_stats(&self) -> Result<MemoryStatsResponse, ApiError> {
         let pool = self.repos.pool();
         let fact_repo = SemanticFactRepo::new(pool.clone());
@@ -190,6 +195,7 @@ impl AppCore {
 
     // -- Knowledge Trust ------------------------------------------------------
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn memory_health(&self) -> Result<MemoryHealthResponse, ApiError> {
         use agent::autotuner::KNOWLEDGE_TRUST_SNAPSHOT_KEY;
         use cognitive::DomainHealthRow;
@@ -246,6 +252,7 @@ impl AppCore {
 
     // -- System Status --------------------------------------------------------
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn cognitive_system_status(&self) -> Result<SystemStatusResponse, ApiError> {
         let pool = self.repos.pool();
         let fact_repo = SemanticFactRepo::new(pool.clone());
@@ -396,6 +403,7 @@ impl AppCore {
 
     // -- Memory Reference Detail -------------------------------------------------
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn memory_reference_detail(
         &self,
         ref_type: &str,

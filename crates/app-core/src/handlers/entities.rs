@@ -11,6 +11,7 @@ use crate::state::AppCore;
 
 impl AppCore {
     #[allow(clippy::unnecessary_map_or)] // is_none_or requires Rust 1.82, MSRV is 1.75
+    #[tracing::instrument(skip(self), err)]
     pub async fn entity_search(
         &self,
         params: &EntitySearchParams,
@@ -35,6 +36,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn entity_merge(
         &self,
         params: &EntityMergeParams,
@@ -49,6 +51,7 @@ impl AppCore {
         Ok(entity_row_to_response(merged))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn entity_get_neighborhood(
         &self,
         entity_id: &str,

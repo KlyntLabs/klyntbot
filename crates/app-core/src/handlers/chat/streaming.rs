@@ -1613,6 +1613,7 @@ pub async fn relay_chat_stream(
 // ── AppCore convenience methods ─────────────────────────────────────────
 
 impl AppCore {
+    #[tracing::instrument(skip(self, content), err)]
     pub async fn chat_send(
         &self,
         content: String,
@@ -1661,6 +1662,7 @@ impl AppCore {
 
     /// Voice-specific chat_send: no session context, `is_voice` flag set to true
     /// so the session metadata includes `"is_voice_session": true`.
+    #[tracing::instrument(skip(self, content), err)]
     pub async fn chat_send_voice(
         &self,
         content: String,
@@ -1821,6 +1823,7 @@ impl AppCore {
         Ok((user_msg, stream_info))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn chat_cancel(&self, session_key: String) -> Result<(), ApiError> {
         chat_cancel(
             &self.active_streams,
@@ -1830,6 +1833,7 @@ impl AppCore {
         .await
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn chat_respond_interaction(
         &self,
         session_key: String,
@@ -1848,6 +1852,7 @@ impl AppCore {
     }
 
     /// Spawn the streaming relay as a background task with the given emitter.
+    #[tracing::instrument(skip(self))]
     pub fn spawn_chat_relay(
         &self,
         stream_info: ChatStreamInfo,

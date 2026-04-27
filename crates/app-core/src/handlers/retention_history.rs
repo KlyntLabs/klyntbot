@@ -15,6 +15,7 @@ fn point_to_ipc(p: cognitive::DailyRetentionPoint) -> RetentionPoint {
 }
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn retention_history(
         &self,
         params: RetentionHistoryParams,

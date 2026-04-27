@@ -114,6 +114,7 @@ impl AppCore {
     /// Segment a note into practice-sized translation units.
     ///
     /// Splits deterministically by line boundaries — no LLM call needed.
+    #[tracing::instrument(skip(self), err)]
     pub async fn practice_segment_note(
         &self,
         params: PracticeSegmentParams,
@@ -136,6 +137,7 @@ impl AppCore {
     }
 
     /// Create a new practice session.
+    #[tracing::instrument(skip(self), err)]
     pub async fn practice_start_session(
         &self,
         params: PracticeStartParams,
@@ -173,6 +175,7 @@ impl AppCore {
     }
 
     /// Evaluate a user's translation of a practice unit via LLM.
+    #[tracing::instrument(skip(self), err)]
     pub async fn practice_submit_unit(
         &self,
         params: PracticeSubmitParams,
@@ -269,6 +272,7 @@ impl AppCore {
     }
 
     /// Confirm a completed unit, record the result, and advance the session.
+    #[tracing::instrument(skip(self), err)]
     pub async fn practice_confirm_unit(
         &self,
         params: PracticeConfirmParams,
@@ -414,6 +418,7 @@ impl AppCore {
     }
 
     /// Retrieve a practice session by ID or find the active one for a note.
+    #[tracing::instrument(skip(self), err)]
     pub async fn practice_get_session(
         &self,
         params: PracticeGetParams,
@@ -445,6 +450,7 @@ impl AppCore {
     }
 
     /// Complete a practice session — compute scores, optionally create flashcards.
+    #[tracing::instrument(skip(self), err)]
     pub async fn practice_complete_session(
         &self,
         params: PracticeCompleteParams,
@@ -600,6 +606,7 @@ impl AppCore {
     }
 
     /// List all practice sessions for a note.
+    #[tracing::instrument(skip(self), err)]
     pub async fn practice_list_sessions(
         &self,
         params: PracticeListParams,

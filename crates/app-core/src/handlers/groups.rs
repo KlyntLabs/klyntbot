@@ -18,6 +18,7 @@ fn group_row_to_response(row: &storage::TaskGroupRow, task_count: u32) -> TaskGr
 }
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn group_list(
         &self,
         project_id: Option<String>,
@@ -46,6 +47,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn group_create(
         &self,
         params: TaskGroupCreateParams,
@@ -73,6 +75,7 @@ impl AppCore {
         Ok(group_row_to_response(&row, 0))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn group_update(
         &self,
         params: TaskGroupUpdateParams,
@@ -99,6 +102,7 @@ impl AppCore {
         Ok(group_row_to_response(&row, count))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn group_delete(&self, id: String) -> Result<bool, ApiError> {
         self.repos
             .task_groups
@@ -107,6 +111,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn group_reorder(&self, params: TaskGroupReorderParams) -> Result<(), ApiError> {
         self.repos
             .task_groups

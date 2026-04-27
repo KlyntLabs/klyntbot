@@ -7,6 +7,7 @@ use super::atoms::{atom_row_to_response, map_db};
 use crate::state::AppCore;
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn knowledge_health_summary(&self) -> Result<KnowledgeHealthSummary, ApiError> {
         let repo = self.knowledge_atom_repo()?;
         let topics = repo.list_topics_with_atoms().await.map_err(map_db)?;
@@ -39,6 +40,7 @@ impl AppCore {
         })
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn knowledge_topic_detail(
         &self,
         params: TopicDetailParams,

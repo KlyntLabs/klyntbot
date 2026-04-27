@@ -27,6 +27,7 @@ fn row_to_response(row: &EntityLinkRow) -> EntityLinkResponse {
 }
 
 impl AppCore {
+    #[tracing::instrument(skip(self))]
     pub async fn entity_link_create(
         &self,
         params: EntityLinkCreateParams,
@@ -50,6 +51,7 @@ impl AppCore {
         Ok((row_to_response(&row), vec![]))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn entity_link_delete(&self, id: String) -> HandlerResult<bool> {
         let deleted = self
             .repos
@@ -61,6 +63,7 @@ impl AppCore {
         Ok((deleted, vec![]))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn entity_links_for_entity(
         &self,
         kind: String,

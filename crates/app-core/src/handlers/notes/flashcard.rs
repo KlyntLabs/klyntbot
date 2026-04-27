@@ -65,6 +65,7 @@ impl AppCore {
         }
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_list_decks(&self) -> Result<Vec<DeckSummaryResponse>, ApiError> {
         let repo = self.flashcard_repo()?;
         let decks = repo
@@ -81,6 +82,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_get_due(
         &self,
         deck: &str,
@@ -94,6 +96,7 @@ impl AppCore {
         Ok(cards.into_iter().map(flashcard_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_record_review(
         &self,
         params: FlashcardReviewParams,
@@ -179,6 +182,7 @@ impl AppCore {
         Ok(flashcard_to_response(card))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_get(&self, id: &str) -> Result<FlashcardResponse, ApiError> {
         let repo = self.flashcard_repo()?;
         let card = repo
@@ -189,6 +193,7 @@ impl AppCore {
         Ok(flashcard_to_response(card))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_create(
         &self,
         params: FlashcardCreateParams,
@@ -222,6 +227,7 @@ impl AppCore {
         Ok(flashcard_to_response(row))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_update(
         &self,
         params: FlashcardUpdateParams,
@@ -246,6 +252,7 @@ impl AppCore {
         Ok(flashcard_to_response(row))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_list_cards(
         &self,
         params: FlashcardListParams,
@@ -262,6 +269,7 @@ impl AppCore {
         Ok(cards.into_iter().map(flashcard_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_delete(&self, id: &str) -> Result<bool, ApiError> {
         let repo = self.flashcard_repo()?;
         repo.delete_card(id)
@@ -269,6 +277,7 @@ impl AppCore {
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_get_all_due(
         &self,
         limit: i64,
@@ -281,6 +290,7 @@ impl AppCore {
         Ok(cards.into_iter().map(flashcard_to_response).collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_total_due(&self) -> Result<i64, ApiError> {
         let repo = self.flashcard_repo()?;
         repo.total_due_count()
@@ -288,6 +298,7 @@ impl AppCore {
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn flashcard_list_struggling(
         &self,
         limit: i64,
@@ -311,6 +322,7 @@ impl AppCore {
             .collect())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn note_retention_health(
         &self,
         note_id: String,
@@ -340,6 +352,7 @@ impl AppCore {
     /// - No vector store is available
     /// - The card has no stored embedding
     /// - Embedding the user answer fails
+    #[tracing::instrument(skip(self))]
     pub async fn compute_answer_similarity(&self, card_id: &str, user_answer: &str) -> f64 {
         let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
         else {

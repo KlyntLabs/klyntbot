@@ -28,6 +28,7 @@ pub(crate) async fn build_objective_response(
 }
 
 impl AppCore {
+    #[tracing::instrument(skip(self))]
     pub async fn objective_create(
         &self,
         params: ObjectiveCreateParams,
@@ -69,6 +70,7 @@ impl AppCore {
         Ok((objective_to_response(&created, None), updates))
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn objective_get(&self, id: String) -> Result<ObjectiveResponse, ApiError> {
         let row = self
             .repos
@@ -80,6 +82,7 @@ impl AppCore {
         build_objective_response(self, &row).await
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn objective_update(
         &self,
         params: ObjectiveUpdateParams,
@@ -109,6 +112,7 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn objective_delete(&self, id: String) -> HandlerResult<bool> {
         let deleted = self
             .repos

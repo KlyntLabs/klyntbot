@@ -6,6 +6,7 @@ use crate::errors::map_storage_err;
 use crate::state::{AppCore, HandlerResult};
 
 impl AppCore {
+    #[tracing::instrument(skip(self), err)]
     pub async fn finance_accounts(&self) -> Result<Vec<FinanceAccountRow>, ApiError> {
         self.repos
             .finance
@@ -15,6 +16,7 @@ impl AppCore {
             .map_err(map_storage_err)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_account_create(
         &self,
         params: FinanceAccountCreateParams,
@@ -51,6 +53,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(id)))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_account_update(
         &self,
         params: FinanceAccountUpdateParams,
@@ -76,6 +79,7 @@ impl AppCore {
         Ok((row, Self::finance_updates(params.id)))
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn finance_account_delete(&self, id: String) -> HandlerResult<bool> {
         self.repos
             .finance
