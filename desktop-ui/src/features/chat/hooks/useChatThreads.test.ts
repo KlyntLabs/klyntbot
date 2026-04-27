@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatThreads } from "./useChatThreads";
 
 const invokeMock = vi.mocked(invoke);
-const listeners = new Map<string, (event: { payload: unknown }) => void>();
+const listeners = new Map<string, unknown>();
 
 vi.mock("@tauri-apps/api/core");
 vi.mock("@tauri-apps/api/event");
@@ -15,9 +16,9 @@ beforeEach(() => {
   invokeMock.mockReset();
   vi.mocked(listen)
     .mockClear()
-    .mockImplementation(async (event: string, cb: (e: { payload: unknown }) => void) => {
-      listeners.set(event, cb);
-      return () => listeners.delete(event);
+    .mockImplementation(async (event, cb) => {
+      listeners.set(event as string, cb);
+      return () => listeners.delete(event as string);
     });
   listeners.clear();
 });
@@ -47,7 +48,7 @@ describe("useChatThreads", () => {
 
     await act(async () => {
       const cb = listeners.get("chat:thread_created");
-      cb?.({ payload: {} });
+      (cb as ((e: { payload: unknown }) => void) | undefined)?.({ payload: {} });
     });
 
     await waitFor(() => expect(result.current.threads).toHaveLength(1));
