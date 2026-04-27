@@ -17,7 +17,7 @@ import { FocusActiveChip } from "./FocusActiveChip";
 import { LauncherChatStub } from "./LauncherChatStub";
 import { LauncherInput } from "./LauncherInput";
 import { ResultsList } from "./ResultsList";
-import { VoiceRecorderStub } from "./VoiceRecorderStub";
+import { VoiceRecorder } from "./VoiceRecorder";
 
 import "../launcher.css";
 
@@ -39,7 +39,7 @@ function LauncherShell() {
   const mode = useLauncherState((s) => s.mode);
   const argModeItem = useLauncherState((s) => s.argModeItem);
   const store = useLauncherApi();
-  const { setMode, setArgModeItem, reset } = store;
+  const { setMode, setQuery, setArgModeItem, reset } = store;
   const dndActive = useDndActive();
 
   const [chatSessionKey, setChatSessionKey] = useState("");
@@ -161,7 +161,13 @@ function LauncherShell() {
           <div className="lc-drag-grip" />
         </div>
         {mode === "recording" ? (
-          <VoiceRecorderStub onTranscriptReady={enterChat} onCancel={cancelRecording} />
+          <VoiceRecorder
+            onTranscriptReady={(t) => {
+              setMode("search");
+              setQuery(t);
+            }}
+            onCancel={() => setMode("dashboard")}
+          />
         ) : mode === "chat" && chatSessionKey ? (
           <LauncherChatStub
             initialQuery={chatInitialQuery}
