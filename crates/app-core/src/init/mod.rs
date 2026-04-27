@@ -982,6 +982,23 @@ impl AppCore {
             info!("Coding-memory recall tools registered in MCP registry");
         }
 
+        // ── Register launcher tools in agent's tool registry ──
+        if let Some(ref engine) = launcher_engine {
+            let reg = agent.tool_registry();
+            let mut registry = reg.write().await;
+            let launcher = feature_launcher::LauncherFeature::with_tool_deps(
+                feature_launcher::LauncherToolDeps {
+                    registry: Arc::clone(&engine.registry),
+                    frequency: Arc::new(engine.frequency_repo.clone()),
+                    pins: Arc::new(engine.pins_repo.clone()),
+                },
+            );
+            for tool in launcher.tools() {
+                registry.register_dyn(tool);
+            }
+            info!("Launcher tools registered in MCP registry");
+        }
+
         // ── Spawn coding-ingest daemon (with real-time event forwarding) ─
         let ingest_daemon_handle = {
             let data_dir = config.data_dir_path();

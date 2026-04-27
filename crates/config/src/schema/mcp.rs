@@ -196,6 +196,7 @@ pub const EXPLICIT_TOOL_ALLOWLIST: &[&str] = &[
     "alarm",
     "mirror",
     "temporal",
+    "launcher",
     // coding-memory tools
     "recall_index",
     "recall_timeline",

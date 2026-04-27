@@ -2,26 +2,42 @@ pub mod clipboard;
 pub mod repos;
 pub mod search;
 pub mod template;
+pub mod tool;
 pub mod types;
 pub mod window_mgmt;
 
 use async_trait::async_trait;
 use common::Result;
+use std::sync::Arc;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
 pub use clipboard::ClipboardMonitor;
 pub use repos::*;
 pub use search::*;
+pub use tool::LauncherTool;
 pub use types::WindowAction;
 pub use types::*;
 pub use window_mgmt::global as window_manager;
 pub use window_mgmt::WindowManager;
 
-pub struct LauncherFeature;
+#[derive(Clone)]
+pub struct LauncherToolDeps {
+    pub registry: Arc<SourceRegistry>,
+    pub frequency: Arc<FrequencyRepo>,
+    pub pins: Arc<PinsRepo>,
+}
+
+pub struct LauncherFeature {
+    tool_deps: Option<LauncherToolDeps>,
+}
 
 impl LauncherFeature {
     pub fn new() -> Self {
-        Self
+        Self { tool_deps: None }
+    }
+
+    pub fn with_tool_deps(deps: LauncherToolDeps) -> Self {
+        Self { tool_deps: Some(deps) }
     }
 }
 
@@ -49,7 +65,15 @@ impl FeaturePackage for LauncherFeature {
     }
 
     fn tools(&self) -> Vec<DynTool> {
-        vec![]
+        if let Some(deps) = &self.tool_deps {
+            vec![Box::new(LauncherTool::new(
+                deps.registry.clone(),
+                deps.frequency.clone(),
+                deps.pins.clone(),
+            ))]
+        } else {
+            vec![]
+        }
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {
