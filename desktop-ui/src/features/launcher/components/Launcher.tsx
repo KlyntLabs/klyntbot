@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTransparentBackground } from "@/hooks/window/useTransparentBackground";
 import { useWindowAutoResize } from "@/hooks/window/useWindowAutoResize";
-import { emit, getCurrentWindow, isTauri, listen } from "@/utils/tauri-bridge";
+import { emit, getCurrentWindow, ipc, isTauri, listen } from "@/utils/tauri-bridge";
+import { showError } from "../lib/showError";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { useDndActive } from "../hooks/useDndActive";
 import { executeItem } from "../hooks/useExecuteItem";
@@ -201,7 +202,11 @@ function LauncherShell() {
                 {mode === "dashboard" && (
                   <>
                     <ShortcutHints />
-                    <Dashboard />
+                    <Dashboard onOpenTask={(taskId: string) => {
+                      ipc("launcher_open_app", { path: `klyntbot://task/${taskId}` })
+                        .catch((err) => showError("Couldn't open task:", err));
+                      getCurrentWindow().hide();
+                    }} />
                     <ResultsList onExecute={handleExecute} />
                   </>
                 )}
@@ -209,7 +214,7 @@ function LauncherShell() {
                 {mode === "detail" && <DetailPanel />}
               </>
             )}
-            <ActionMenu />
+            <ActionMenu onExecute={handleExecute} />
           </div>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTauriMutation } from "@/lib/query";
+import { showError } from "../lib/showError";
 import { useLauncherApi, useLauncherState } from "../store";
 import type { LauncherItem, LauncherItemKind } from "../types";
 
@@ -9,7 +10,11 @@ interface Action {
   handler: () => void;
 }
 
-export function ActionMenu() {
+interface ActionMenuProps {
+  onExecute?: (index: number) => void;
+}
+
+export function ActionMenu({ onExecute }: ActionMenuProps) {
   const actionMenuOpen = useLauncherState((s) => s.actionMenuOpen);
   const results = useLauncherState((s) => s.results);
   const selectedIndex = useLauncherState((s) => s.selectedIndex);
@@ -24,13 +29,13 @@ export function ActionMenu() {
 
   const openPath = useCallback(
     (path: string) => {
-      launcherOpenApp.mutate({ path }).catch((err) => console.error("Failed to open:", err));
+      launcherOpenApp.mutate({ path }).catch((err) => showError("Couldn't open:", err));
     },
     [launcherOpenApp],
   );
 
   const item = results[selectedIndex] ?? null;
-  const actions = item ? getActionsForItem(item, openPath) : [];
+  const actions = item ? getActionsForItem(item, openPath, onExecute, selectedIndex) : [];
 
   const close = useCallback(() => setActionMenuOpen(false), [setActionMenuOpen]);
 
@@ -126,10 +131,15 @@ export function ActionMenu() {
 }
 
 function copyText(text: string) {
-  navigator.clipboard.writeText(text).catch((err) => console.error("Failed to copy:", err));
+  navigator.clipboard.writeText(text).catch((err) => showError("Couldn't copy:", err));
 }
 
-function getActionsForItem(item: LauncherItem, openPath: (path: string) => void): Action[] {
+function getActionsForItem(
+  item: LauncherItem,
+  openPath: (path: string) => void,
+  onExecute?: (index: number) => void,
+  selectedIndex?: number,
+): Action[] {
   const { kind } = item;
   switch (kind.type) {
     case "application":
@@ -154,13 +164,13 @@ function getActionsForItem(item: LauncherItem, openPath: (path: string) => void)
       return contactActions(kind, openPath);
     case "systemCommand":
     case "script":
-      return executeActions(item);
+      return executeActions(item, onExecute, selectedIndex);
     case "sshHost":
       return sshActions(kind, openPath);
     case "brewPackage":
       return brewActions(kind);
     default:
-      return defaultActions(item);
+      return defaultActions(item, onExecute, selectedIndex);
   }
 }
 
@@ -281,9 +291,11 @@ function contactActions(kind: KindOf<"contact">, openPath: (path: string) => voi
   return actions;
 }
 
-function executeActions(item: LauncherItem): Action[] {
+function executeActions(item: LauncherItem, onExecute?: (index: number) => void, selectedIndex?: number): Action[] {
   return [
-    { label: "Execute", shortcut: "Enter", handler: () => {} },
+    { label: "Execute", shortcut: "Enter", handler: () => {
+      if (onExecute && selectedIndex !== undefined) onExecute(selectedIndex);
+    } },
     { label: "Copy Title", handler: () => copyText(item.title) },
   ];
 }
@@ -309,9 +321,11 @@ function brewActions(kind: KindOf<"brewPackage">): Action[] {
   ];
 }
 
-function defaultActions(item: LauncherItem): Action[] {
+function defaultActions(item: LauncherItem, onExecute?: (index: number) => void, selectedIndex?: number): Action[] {
   return [
-    { label: "Execute", shortcut: "Enter", handler: () => {} },
+    { label: "Execute", shortcut: "Enter", handler: () => {
+      if (onExecute && selectedIndex !== undefined) onExecute(selectedIndex);
+    } },
     { label: "Copy Title", handler: () => copyText(item.title) },
   ];
 }

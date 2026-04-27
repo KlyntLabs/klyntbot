@@ -5,6 +5,7 @@
 
 import { ipc } from "@/utils/tauri-bridge";
 import { parseDurationToEndsAt } from "../lib/parseDuration";
+import { showError } from "../lib/showError";
 import type { LauncherStoreApi } from "../store";
 import type { LauncherExecuteResult, LauncherItem } from "../types";
 
@@ -52,7 +53,7 @@ export function executeItem(
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
-        .catch((err) => console.error("Failed to open app:", err));
+        .catch((err) => showError("Couldn't open app:", err));
       break;
     case "systemCommand":
       if (item.kind.action === "toggleDoNotDisturb") {
@@ -74,11 +75,11 @@ export function executeItem(
                   )
                   .then((result) => hideAndBadge(item, result, onHide))
                   .catch((err) => {
-                    console.error("focus_activate failed:", err);
+                    showError("Couldn't activate focus:", err);
                     options.onNeedsOnboarding?.(() => activate(resolvedEndsAt));
                   });
               })
-              .catch((err) => console.error("focus_shortcuts_installed failed:", err));
+              .catch((err) => showError("Couldn't check focus shortcuts:", err));
           };
           activate(endsAt);
         } else {
@@ -90,7 +91,7 @@ export function executeItem(
               }),
             )
             .then((result) => hideAndBadge(item, result, onHide))
-            .catch((err) => console.error("Failed to execute system command:", err));
+            .catch((err) => showError("Couldn't run command:", err));
         }
       } else {
         ipc("launcher_system_command", { action: item.kind.action, args })
@@ -114,7 +115,7 @@ export function executeItem(
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
-        .catch((err) => console.error("Failed to run script:", err));
+        .catch((err) => showError("Couldn't run script:", err));
       break;
     case "clipboardEntry":
       ipc("launcher_clipboard_paste", { id: item.kind.entryId })
@@ -125,13 +126,13 @@ export function executeItem(
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
-        .catch((err) => console.error("Failed to paste clipboard:", err));
+        .catch((err) => showError("Couldn't paste:", err));
       break;
     case "calculator":
       navigator.clipboard
         .writeText(String(item.kind.result))
         .then(() => onHide())
-        .catch((err) => console.error("Failed to copy:", err));
+        .catch((err) => showError("Couldn't copy:", err));
       break;
     case "file":
     case "contentMatch":
@@ -144,7 +145,7 @@ export function executeItem(
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
-        .catch((err) => console.error("Failed to open:", err));
+        .catch((err) => showError("Couldn't open:", err));
       break;
     case "bookmark":
     case "browserHistory":
@@ -158,7 +159,7 @@ export function executeItem(
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
-        .catch((err) => console.error("Failed to open URL:", err));
+        .catch((err) => showError("Couldn't open URL:", err));
       break;
     case "systemPref":
       ipc("launcher_open_app", {
@@ -171,7 +172,7 @@ export function executeItem(
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
-        .catch((err) => console.error("Failed to open pref:", err));
+        .catch((err) => showError("Couldn't open setting:", err));
       break;
     case "runningApp":
       ipc("launcher_open_app", { path: item.kind.path })
@@ -182,7 +183,7 @@ export function executeItem(
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
-        .catch((err) => console.error("Failed to focus app:", err));
+        .catch((err) => showError("Couldn't focus app:", err));
       break;
     case "sshHost": {
       const sshCmd = item.kind.user
@@ -196,7 +197,7 @@ export function executeItem(
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
-        .catch((err) => console.error("Failed to open SSH:", err));
+        .catch((err) => showError("Couldn't open SSH:", err));
       break;
     }
     case "contact": {
@@ -215,7 +216,7 @@ export function executeItem(
             }),
           )
           .then((result) => hideAndBadge(item, result, onHide))
-          .catch((err) => console.error("Failed to open contact:", err));
+          .catch((err) => showError("Couldn't open contact:", err));
       }
       break;
     }
@@ -228,18 +229,18 @@ export function executeItem(
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
-        .catch((err) => console.error("Failed to apply window action:", err));
+        .catch((err) => showError("Couldn't apply layout:", err));
       break;
     case "brewPackage":
       navigator.clipboard
         .writeText(item.kind.name)
         .then(() => onHide())
-        .catch((err) => console.error("Failed to copy package name:", err));
+        .catch((err) => showError("Couldn't copy package name:", err));
       break;
     default:
       ipc("launcher_execute", { itemId: item.id, kind: item.kind.type })
         .then(() => onExpandToMain())
-        .catch((err) => console.error("Failed to execute:", err));
+        .catch((err) => showError("Couldn't execute:", err));
       break;
   }
 }

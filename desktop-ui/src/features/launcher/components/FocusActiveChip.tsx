@@ -1,4 +1,5 @@
 import { useTauriMutation } from "@/lib/query";
+import { showError } from "../lib/showError";
 import { formatRemaining } from "../lib/formatRemaining";
 
 interface Props {
@@ -20,14 +21,14 @@ export function FocusActiveChip({ endsAt, onDone }: Props) {
     focusExtend
       .mutate({ mode: "dnd", newEndsAt })
       .then(() => onDone())
-      .catch((err) => console.error("focus_extend failed:", err));
+      .catch((err) => showError("Couldn't extend focus:", err));
   };
 
   const handleTurnOff = () => {
     focusDeactivate
       .mutate({ mode: "dnd" })
       .then(() => onDone())
-      .catch((err) => console.error("focus_deactivate failed:", err));
+      .catch((err) => showError("Couldn't end focus:", err));
   };
 
   return (
