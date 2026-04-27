@@ -32,6 +32,10 @@ impl std::fmt::Display for ApiError {
 
 impl std::error::Error for ApiError {}
 
+/// Convenience alias used by every `#[tauri::command]` in `crates/desktop`.
+/// Identical to `Result<T, ApiError>` but shorter at every call site.
+pub type CommandResult<T> = Result<T, ApiError>;
+
 /// Convert KlyntbotError to ApiError
 impl From<KlyntbotError> for ApiError {
     fn from(err: KlyntbotError) -> Self {
@@ -181,5 +185,23 @@ mod tests {
     fn test_api_error_display() {
         let err = ApiError::new("TEST_CODE", "test message");
         assert_eq!(err.to_string(), "TEST_CODE: test message");
+    }
+}
+
+#[cfg(test)]
+mod alias_tests {
+    use super::*;
+
+    #[test]
+    fn command_result_is_alias_for_result_apierror() {
+        // Trivial — proves the alias resolves at compile time.
+        let v: CommandResult<i32> = Ok(42);
+        assert_eq!(v.unwrap(), 42);
+
+        let e: CommandResult<()> = Err(ApiError {
+            code: "TestKind".into(),
+            message: "test".into(),
+        });
+        assert!(e.is_err());
     }
 }

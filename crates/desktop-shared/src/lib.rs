@@ -8,6 +8,7 @@ pub mod specta_helpers;
 pub mod types;
 
 pub use entity_link_types::*;
+pub use errors::{ApiError, CommandResult};
 
 #[cfg(test)]
 mod phase5_helper_tests {
