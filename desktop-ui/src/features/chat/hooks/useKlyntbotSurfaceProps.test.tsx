@@ -9,9 +9,10 @@ vi.mock("./useChatSession", () => ({
   useChatSession: vi.fn(),
 }));
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-}));
+vi.mock("@tauri-apps/api/core", async () => {
+  const { mockTauriCore } = await import("@/test/mockTauri");
+  return mockTauriCore();
+});
 
 import { useChatSession } from "./useChatSession";
 import { invoke } from "@tauri-apps/api/core";

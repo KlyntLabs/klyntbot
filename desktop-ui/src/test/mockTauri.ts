@@ -35,12 +35,3 @@ export function mockTauriEvent(overrides: {
     };
 }
 
-/**
- * Convenience: install both core + event mocks at once.
- * Use inside a `vi.mock(...)` factory if more mocks are needed than the
- * defaults; otherwise prefer the typed `mockTauriCore` / `mockTauriEvent`.
- */
-export function installTauriMocks() {
-    vi.mock("@tauri-apps/api/core", () => mockTauriCore());
-    vi.mock("@tauri-apps/api/event", () => mockTauriEvent());
-}

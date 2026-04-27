@@ -10,9 +10,10 @@ import {
   subscribeTerminalOutput,
 } from "./events";
 
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn(),
-}));
+vi.mock("@tauri-apps/api/event", async () => {
+  const { mockTauriEvent } = await import("@/test/mockTauri");
+  return mockTauriEvent();
+});
 
 describe("events subscriptions", () => {
   beforeEach(() => {
