@@ -61,3 +61,6 @@ qwen3 = ["voice-engine/qwen3"]
 
 [dev-dependencies]
 tempfile = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["session"]

@@ -16,3 +16,6 @@ tracing.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "macros", "test-util"] }
+
+[package.metadata.cargo-machete]
+ignored = ["serde_json"]

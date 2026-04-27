@@ -35,3 +35,6 @@ http = "1"
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["serde"]

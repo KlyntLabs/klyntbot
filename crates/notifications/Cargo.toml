@@ -28,3 +28,6 @@ email = ["channels/email"]
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
 sqlx = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["serde"]

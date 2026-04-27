@@ -23,3 +23,6 @@ tokio-util = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
+
+[package.metadata.cargo-machete]
+ignored = ["serde_json"]

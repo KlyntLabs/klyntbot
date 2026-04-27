@@ -29,3 +29,6 @@ tempfile.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "test-util"] }
+
+[package.metadata.cargo-machete]
+ignored = ["tracing"]

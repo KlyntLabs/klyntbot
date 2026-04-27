@@ -1,25 +1,24 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useChatThreads } from "./useChatThreads";
 
-const invokeMock = vi.fn();
+const invokeMock = vi.mocked(invoke);
 const listeners = new Map<string, (event: { payload: unknown }) => void>();
-const listenMock = vi.fn(async (event: string, cb: (e: { payload: unknown }) => void) => {
-  listeners.set(event, cb);
-  return () => listeners.delete(event);
-});
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (...args: unknown[]) => invokeMock(...args),
-}));
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: (...args: unknown[]) => listenMock(...(args as Parameters<typeof listenMock>)),
-}));
+vi.mock("@tauri-apps/api/core");
+vi.mock("@tauri-apps/api/event");
 
 beforeEach(() => {
   invokeMock.mockReset();
-  listenMock.mockClear();
+  vi.mocked(listen)
+    .mockClear()
+    .mockImplementation(async (event: string, cb: (e: { payload: unknown }) => void) => {
+      listeners.set(event, cb);
+      return () => listeners.delete(event);
+    });
   listeners.clear();
 });
 
