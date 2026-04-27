@@ -190,121 +190,16 @@ mod tests {
         "mcp_oauth_disconnect",
     ];
 
-    /// Parse Tauri command function names from `main.rs` source text.
-    ///
-    /// This captures *all* commands (typed + untyped) because it reads the
-    /// `tauri::generate_handler![]` invocation directly. The specta builder
-    /// only knows about the typed subset — see `specta_command_names()`.
+    /// All runtime-registered commands from the linkme slice.
     fn tauri_command_names() -> BTreeSet<String> {
-        let src = include_str!("../main.rs");
-        src.lines()
-            .map(str::trim)
-            .filter(|l| l.starts_with("commands::") || l.starts_with("oauth::commands::"))
-            .filter_map(|l| {
-                l.rsplit("::")
-                    .next()
-                    .map(|s| s.trim_end_matches(',').to_string())
-            })
+        crate::specta_builder::KLYNT_COMMANDS
+            .iter()
+            .map(|c| c.name.to_string())
             .collect()
     }
 
-    /// Collect all dev command names from module `DEV_COMMANDS` arrays.
-    fn dev_command_names() -> BTreeSet<String> {
-        use crate::commands;
-        let modules: &[&[&str]] = &[
-            commands::tasks::DEV_COMMANDS,
-            commands::projects::DEV_COMMANDS,
-            commands::areas::DEV_COMMANDS,
-            commands::objectives::DEV_COMMANDS,
-            commands::key_results::DEV_COMMANDS,
-            commands::status::DEV_COMMANDS,
-            commands::finance::DEV_COMMANDS,
-            commands::notes::DEV_COMMANDS,
-            commands::productivity::DEV_COMMANDS,
-            commands::distraction::DEV_COMMANDS,
-            commands::settings::DEV_COMMANDS,
-            commands::chat::DEV_COMMANDS,
-            commands::groups::DEV_COMMANDS,
-            commands::workflows::DEV_COMMANDS,
-            commands::columns::DEV_COMMANDS,
-            commands::coding_memory::DEV_COMMANDS,
-            commands::cognitive::DEV_COMMANDS,
-            commands::timeline::DEV_COMMANDS,
-            commands::cron::DEV_COMMANDS,
-            commands::capture::DEV_COMMANDS,
-            commands::work_context::DEV_COMMANDS,
-            commands::entities::DEV_COMMANDS,
-            commands::entity_links::DEV_COMMANDS,
-            commands::project_sources::DEV_COMMANDS,
-            commands::project_memories::DEV_COMMANDS,
-            commands::project_conversations::DEV_COMMANDS,
-            commands::agents::DEV_COMMANDS,
-            commands::autotuner::DEV_COMMANDS,
-            commands::workspace::DEV_COMMANDS,
-            commands::integrations::DEV_COMMANDS,
-            commands::launcher::DEV_COMMANDS,
-            commands::shortcuts::DEV_COMMANDS,
-            commands::squads::DEV_COMMANDS,
-            commands::annotations::DEV_COMMANDS,
-            commands::language::DEV_COMMANDS,
-            commands::practice::DEV_COMMANDS,
-            commands::knowledge_health::DEV_COMMANDS,
-            commands::mirror::DEV_COMMANDS,
-            commands::pending_memory::DEV_COMMANDS,
-            commands::reforge::DEV_COMMANDS,
-            commands::morning_briefing::DEV_COMMANDS,
-            commands::retention_history::DEV_COMMANDS,
-            commands::review_stats::DEV_COMMANDS,
-            commands::view::DEV_COMMANDS,
-            commands::fabric::DEV_COMMANDS,
-            commands::voice::DEV_COMMANDS,
-            commands::voice_conversation::DEV_COMMANDS,
-            commands::journey::DEV_COMMANDS,
-            commands::status_badge::DEV_COMMANDS,
-            commands::focus::DEV_COMMANDS,
-        ];
-        // chat_send is handled inline in dev_server.rs
-        let mut set: BTreeSet<String> = modules
-            .iter()
-            .flat_map(|m| m.iter().map(|s| s.to_string()))
-            .collect();
-        set.insert("chat_send".to_string());
-        set.insert("note_insight_tab_chat".to_string());
-        set
-    }
-
-    #[test]
-    fn dev_server_covers_all_tauri_commands() {
-        let tauri = tauri_command_names();
-        let dev = dev_command_names();
-        let tauri_only: BTreeSet<String> = TAURI_ONLY.iter().map(|s| s.to_string()).collect();
-
-        let expected: BTreeSet<String> = tauri.difference(&tauri_only).cloned().collect();
-        let missing: Vec<&String> = expected.difference(&dev).collect();
-
-        assert!(
-            missing.is_empty(),
-            "Tauri commands missing from dev server dispatch: {missing:?}\n\
-             Add dispatch_dev entries in the corresponding commands/*.rs module."
-        );
-    }
-
-    #[test]
-    fn dev_server_has_no_orphan_commands() {
-        let tauri = tauri_command_names();
-        let dev = dev_command_names();
-
-        let orphans: Vec<&String> = dev.difference(&tauri).collect();
-
-        assert!(
-            orphans.is_empty(),
-            "Dev server dispatches commands not registered in Tauri: {orphans:?}\n\
-             Remove orphan entries from the corresponding DEV_COMMANDS array."
-        );
-    }
-
     /// Every command registered in the tauri-specta builder must also be
-    /// registered in `tauri::generate_handler![]` (main.rs).
+    /// registered in the runtime linkme slice.
     #[test]
     fn specta_commands_are_real_tauri_commands() {
         let specta = crate::specta_builder::specta_command_names();

@@ -5,168 +5,139 @@ use desktop_shared::commands::{
 use desktop_shared::{errors::ApiError, CommandResult};
 use std::sync::Arc;
 use storage::{TaskAttachmentRow, TaskTimeEntryRow};
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_get(
-    state: State<'_, Arc<AppCore>>,
     id: String,
-) -> CommandResult<Option<TaskResponse>> {
+) -> Option<TaskResponse> {
     state.task_get(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_list(
-    state: State<'_, Arc<AppCore>>,
     area_id: Option<String>,
     project_id: Option<String>,
     status: Option<String>,
-) -> CommandResult<Vec<TaskResponse>> {
+) -> Vec<TaskResponse> {
     state.task_list(area_id, project_id, status).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: TaskCreateParams,
-) -> CommandResult<TaskResponse> {
+) -> TaskResponse {
     let (result, updates) = state.task_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_update(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: TaskUpdateParams,
-) -> CommandResult<TaskResponse> {
+) -> TaskResponse {
     let (result, updates) = state.task_update(params, Some("user".into())).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_delete(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> CommandResult<bool> {
+) -> bool {
     let (result, updates) = state.task_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_toggle_complete(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> CommandResult<TaskResponse> {
+) -> TaskResponse {
     let (result, updates) = state.task_toggle_complete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_list_children(
-    state: State<'_, Arc<AppCore>>,
     parent_id: String,
-) -> CommandResult<Vec<TaskResponse>> {
+) -> Vec<TaskResponse> {
     state.task_list_children(parent_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn today_tasks(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<TodayTaskResponse>> {
+#[klynt_command]
+pub async fn today_tasks() -> Vec<TodayTaskResponse> {
     state.today_tasks().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_list(
-    state: State<'_, Arc<AppCore>>,
     area_id: Option<String>,
-) -> CommandResult<Vec<ProjectResponse>> {
+) -> Vec<ProjectResponse> {
     state.project_list_for_tasks(area_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn objective_list(
-    state: State<'_, Arc<AppCore>>,
     project_id: Option<String>,
-) -> CommandResult<Vec<ObjectiveResponse>> {
+) -> Vec<ObjectiveResponse> {
     state.objective_list_for_tasks(project_id).await
 }
 
 // ── Dependencies ────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_add_dependency(
-    state: State<'_, Arc<AppCore>>,
     task_id: String,
     blocker_id: String,
-) -> CommandResult<()> {
+) -> () {
     state.task_add_dependency(task_id, blocker_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_list_dependencies(
-    state: State<'_, Arc<AppCore>>,
     task_id: String,
-) -> CommandResult<Vec<TaskResponse>> {
+) -> Vec<TaskResponse> {
     state.task_list_dependencies(task_id).await
 }
 
 // ── Attachments ─────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_add_attachment(
-    state: State<'_, Arc<AppCore>>,
     task_id: String,
     attachment_type: String,
     value: String,
     title: Option<String>,
-) -> CommandResult<TaskAttachmentRow> {
+) -> TaskAttachmentRow {
     state
         .task_add_attachment(task_id, attachment_type, value, title)
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_list_attachments(
-    state: State<'_, Arc<AppCore>>,
     task_id: String,
-) -> CommandResult<Vec<TaskAttachmentRow>> {
+) -> Vec<TaskAttachmentRow> {
     state.task_list_attachments(task_id).await
 }
 
 // ── Time entries ────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_add_time_entry(
-    state: State<'_, Arc<AppCore>>,
     task_id: String,
     started_at: String,
     duration_secs: Option<i64>,
     note: Option<String>,
-) -> CommandResult<TaskTimeEntryRow> {
+) -> TaskTimeEntryRow {
     let started_at = started_at
         .parse::<jiff::Timestamp>()
         .map_err(|e| ApiError::new("VALIDATION", format!("invalid started_at: {e}")))?;
@@ -175,25 +146,21 @@ pub async fn task_add_time_entry(
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn task_list_time_entries(
-    state: State<'_, Arc<AppCore>>,
     task_id: String,
-) -> CommandResult<Vec<TaskTimeEntryRow>> {
+) -> Vec<TaskTimeEntryRow> {
     state.task_list_time_entries(task_id).await
 }
 
 /// Fire-and-forget cross-domain check. Called by frontend when a detail view mounts.
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cross_domain_check(
-    state: State<'_, Arc<AppCore>>,
     domain: String,
     id: String,
     title: String,
     created_at: Option<String>,
-) -> CommandResult<()> {
+) -> () {
     let core = Arc::clone(&*state);
     tokio::spawn(async move {
         core.check_cross_domain_str(&domain, &id, &title, created_at.as_deref())
@@ -203,27 +170,6 @@ pub async fn cross_domain_check(
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "task_list",
-    "task_get",
-    "task_create",
-    "task_update",
-    "task_delete",
-    "task_toggle_complete",
-    "task_list_children",
-    "today_tasks",
-    "project_list",
-    "objective_list",
-    "task_add_dependency",
-    "task_list_dependencies",
-    "task_add_attachment",
-    "task_list_attachments",
-    "task_add_time_entry",
-    "task_list_time_entries",
-    "cross_domain_check",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

@@ -1,68 +1,51 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{KeyResultCreateParams, KeyResultResponse, KeyResultUpdateParams};
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn key_result_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: KeyResultCreateParams,
-) -> CommandResult<KeyResultResponse> {
+) -> KeyResultResponse {
     let (result, updates) = state.key_result_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn key_result_update(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: KeyResultUpdateParams,
-) -> CommandResult<KeyResultResponse> {
+) -> KeyResultResponse {
     let (result, updates) = state.key_result_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn key_result_update_metric(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
     current_value: f64,
-) -> CommandResult<KeyResultResponse> {
+) -> KeyResultResponse {
     let (result, updates) = state.key_result_update_metric(id, current_value).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn key_result_delete(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> CommandResult<bool> {
+) -> bool {
     let (result, updates) = state.key_result_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "key_result_create",
-    "key_result_update",
-    "key_result_update_metric",
-    "key_result_delete",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

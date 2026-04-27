@@ -1,46 +1,32 @@
-use std::sync::Arc;
-
+use desktop_macros::klynt_command;
 use desktop_shared::commands::fabric::{
     FabricActionParams, FabricActionResponse, FabricExpandParams, FabricExpandResponse,
     FabricGraphBase,
 };
 use desktop_shared::CommandResult;
-use tauri::State;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn fabric_graph_base(state: State<'_, Arc<AppCore>>) -> CommandResult<FabricGraphBase> {
+#[klynt_command]
+pub async fn fabric_graph_base() -> FabricGraphBase {
     state.fabric_graph_base().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn fabric_graph_expand(
-    state: State<'_, Arc<AppCore>>,
     params: FabricExpandParams,
-) -> CommandResult<FabricExpandResponse> {
+) -> FabricExpandResponse {
     state.fabric_graph_expand(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn fabric_graph_action(
-    state: State<'_, Arc<AppCore>>,
     params: FabricActionParams,
-) -> CommandResult<FabricActionResponse> {
+) -> FabricActionResponse {
     state.fabric_graph_action(params).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "fabric_graph_base",
-    "fabric_graph_expand",
-    "fabric_graph_action",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

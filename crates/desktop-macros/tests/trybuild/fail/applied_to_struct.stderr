@@ -1,0 +1,7 @@
+error: klynt_command can only be applied to functions
+ --> tests/trybuild/fail/applied_to_struct.rs:4:1
+  |
+4 | / pub struct Foo {
+5 | |     bar: i32,
+6 | | }
+  | |_^

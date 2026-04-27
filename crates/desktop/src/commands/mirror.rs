@@ -1,163 +1,108 @@
-use std::sync::Arc;
-
 use cognitive::mirror::{
     BrainVersion, FeedbackTarget, MirrorResponse, MirrorState, NarrativeSnippet, RoutingSnapshot,
     TrendNarrative, UserFeedback,
 };
 use desktop_shared::types::EntityKind;
 use desktop_shared::{errors::ApiError, CommandResult};
-use tauri::State;
+use desktop_macros::klynt_command;
 use uuid::Uuid;
 
 use crate::app_core::AppCore;
 
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "get_mirror_state",
-    "get_routing_history",
-    "get_mirror_narratives",
-    "get_pending_snippets",
-    "submit_mirror_feedback",
-    "generate_mirror_response",
-    "approve_meta_rule",
-    "dismiss_meta_rule",
-    "get_brain_versions",
-    "revert_brain_version",
-    "kill_trial",
-    "continue_trial",
-];
-
-#[tauri::command]
-#[specta::specta]
-pub async fn get_mirror_state(state: State<'_, Arc<AppCore>>) -> CommandResult<MirrorState> {
-    let facade = state.mirror_facade()?;
-    Ok(facade.get_state().await?)
+#[klynt_command]
+pub async fn get_mirror_state() -> MirrorState {
+    Ok(state.mirror_facade()?.get_state().await?)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn get_routing_history(
-    state: State<'_, Arc<AppCore>>,
     days: Option<u32>,
-) -> CommandResult<Vec<RoutingSnapshot>> {
-    let facade = state.mirror_facade()?;
-    Ok(facade.get_routing_history(days.unwrap_or(7)).await?)
+) -> Vec<RoutingSnapshot> {
+    Ok(state.mirror_facade()?.get_routing_history(days.unwrap_or(7)).await?)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn get_mirror_narratives(
-    state: State<'_, Arc<AppCore>>,
     limit: Option<u32>,
-) -> CommandResult<Vec<TrendNarrative>> {
-    let facade = state.mirror_facade()?;
-    Ok(facade.get_narratives(limit.unwrap_or(10)).await?)
+) -> Vec<TrendNarrative> {
+    Ok(state.mirror_facade()?.get_narratives(limit.unwrap_or(10)).await?)
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn get_pending_snippets(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<NarrativeSnippet>> {
-    let facade = state.mirror_facade()?;
-    Ok(facade.get_pending_snippets().await?)
+#[klynt_command]
+pub async fn get_pending_snippets() -> Vec<NarrativeSnippet> {
+    Ok(state.mirror_facade()?.get_pending_snippets().await?)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn submit_mirror_feedback(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     item_id: Uuid,
     target: FeedbackTarget,
     feedback: UserFeedback,
-) -> CommandResult<()> {
-    let facade = state.mirror_facade()?;
-    facade.submit_feedback(item_id, target, feedback).await?;
+) -> () {
+    state.mirror_facade()?.submit_feedback(item_id, target, feedback).await?;
     super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &item_id.to_string());
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn generate_mirror_response(
-    state: State<'_, Arc<AppCore>>,
     query: String,
-) -> CommandResult<MirrorResponse> {
-    let facade = state.mirror_facade()?;
-    Ok(facade.generate_mirror_response(query, None).await?)
+) -> MirrorResponse {
+    Ok(state.mirror_facade()?.generate_mirror_response(query, None).await?)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn approve_meta_rule(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     rule_id: Uuid,
-) -> CommandResult<()> {
-    let facade = state.mirror_facade()?;
-    facade.approve_meta_rule(rule_id).await?;
+) -> () {
+    state.mirror_facade()?.approve_meta_rule(rule_id).await?;
     super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &rule_id.to_string());
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn dismiss_meta_rule(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     rule_id: Uuid,
-) -> CommandResult<()> {
-    let facade = state.mirror_facade()?;
-    facade.dismiss_meta_rule(rule_id).await?;
+) -> () {
+    state.mirror_facade()?.dismiss_meta_rule(rule_id).await?;
     super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &rule_id.to_string());
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn get_brain_versions(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<BrainVersion>> {
-    let facade = state.mirror_facade()?;
-    Ok(facade.get_brain_versions().await?)
+#[klynt_command]
+pub async fn get_brain_versions() -> Vec<BrainVersion> {
+    Ok(state.mirror_facade()?.get_brain_versions().await?)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn revert_brain_version(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     version: u32,
-) -> CommandResult<BrainVersion> {
-    let facade = state.mirror_facade()?;
-    let result = facade.revert_to_version(version).await?;
+) -> BrainVersion {
+    let result = state.mirror_facade()?.revert_to_version(version).await?;
     super::emit_entity_updated(&app, EntityKind::BrainVersion, &version.to_string());
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn kill_trial(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     trial_id: String,
-) -> CommandResult<()> {
-    let facade = state.mirror_facade()?;
-    facade.kill_trial(&trial_id).await?;
+) -> () {
+    state.mirror_facade()?.kill_trial(&trial_id).await?;
     super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &trial_id);
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn continue_trial(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     trial_id: String,
-) -> CommandResult<()> {
-    let facade = state.mirror_facade()?;
-    facade.continue_trial(&trial_id).await?;
+) -> () {
+    state.mirror_facade()?.continue_trial(&trial_id).await?;
     super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &trial_id);
     Ok(())
 }

@@ -3,77 +3,55 @@ use desktop_shared::commands::{
     LinkedContextParams, LinkedContextResponse,
 };
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn annotation_create(
-    state: State<'_, Arc<AppCore>>,
     params: AnnotationCreateParams,
-) -> CommandResult<AnnotationResponse> {
+) -> AnnotationResponse {
     state.annotation_create(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn annotation_update(
-    state: State<'_, Arc<AppCore>>,
     params: AnnotationUpdateParams,
-) -> CommandResult<AnnotationResponse> {
+) -> AnnotationResponse {
     state.annotation_update(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn annotation_delete(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<()> {
+#[klynt_command]
+pub async fn annotation_delete(id: String) -> () {
     state.annotation_delete(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn annotation_list_for_note(
-    state: State<'_, Arc<AppCore>>,
     note_id: String,
     limit: Option<i64>,
-) -> CommandResult<Vec<AnnotationResponse>> {
+) -> Vec<AnnotationResponse> {
     state.annotation_list_for_note(note_id, limit).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn annotation_get_ai_suggestion(
-    state: State<'_, Arc<AppCore>>,
     note_id: String,
     selected_text: String,
-) -> CommandResult<AiSuggestionResponse> {
+) -> AiSuggestionResponse {
     state
         .annotation_get_ai_suggestion(note_id, selected_text)
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn note_get_linked_context(
-    state: State<'_, Arc<AppCore>>,
     params: LinkedContextParams,
-) -> CommandResult<LinkedContextResponse> {
+) -> LinkedContextResponse {
     state.note_get_linked_context(params).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "annotation_create",
-    "annotation_update",
-    "annotation_delete",
-    "annotation_list_for_note",
-    "annotation_get_ai_suggestion",
-    "note_get_linked_context",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

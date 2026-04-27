@@ -1,0 +1,5 @@
+error: klynt_command requires `pub`
+ --> tests/trybuild/fail/missing_pub.rs:4:7
+  |
+4 | async fn ping() -> i32 {
+  |       ^^

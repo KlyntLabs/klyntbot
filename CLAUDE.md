@@ -187,7 +187,11 @@ Transform vague tasks into verifiable goals — "fix the bug" → "write a test 
 ## Gotchas
 
 - **MSRV 1.93** — Rust stable 1.93. APIs like `is_some_and`, `is_none_or` are available. Clippy catches MSRV violations.
-- **New Tauri command modules need `DEV_COMMANDS`** — every `crates/desktop/src/commands/*.rs` module with `#[tauri::command]` functions must export `pub const DEV_COMMANDS: &[&str]` and be added to `dev_server/mod.rs` test coverage list. The `dev_server_covers_all_tauri_commands` test enforces this.
+- **Adding a Tauri command (Plan 6)** — The IPC surface is gated behind two attribute macros in `crates/desktop-macros/`. Direct `#[tauri::command]` is forbidden in `crates/desktop/src/commands/` and `crates/desktop/src/oauth/` (enforced by `no_raw_tauri_command_outside_macros` test).
+  - Use `#[klynt_command]` for the happy path (`pub async fn`, no `state` param, bare `T` return).
+  - Use `#[klynt_raw_command]` otherwise (sync, non-AppCore state, `rename_all`, etc.).
+  - After adding a command, list its path in `collect_commands![...]` in `specta_builder.rs`. The `registration_drift` test fails until you do.
+  - Run `cargo tauri dev` once to regenerate `desktop-ui/src/bindings.ts`. The `bindings_are_current` test fails until you do.
 - **`StoragePool::from_existing()` skips migrations** — only for already-migrated pools. Tests must use `connect_in_memory()`.
 - **Config hot-reload**: Model, temperature, max_tokens, max_iterations, pipeline_timeout, and monthly_budget changes take effect within 5 seconds (file watcher) or immediately (via settings UI). Structural changes (channels, provider init, feature enable/disable) still require restart.
 - **Dependency inversion** — new tools needing agent context must inject via `Arc<dyn Trait>` to avoid circular deps.

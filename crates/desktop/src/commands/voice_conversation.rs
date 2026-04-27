@@ -1,10 +1,9 @@
 //! Voice conversation Tauri command handlers — thin adapter layer.
 
-use std::sync::Arc;
-
 use desktop_shared::commands::voice_conversation::*;
 use desktop_shared::CommandResult;
-use tauri::State;
+
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
@@ -14,84 +13,59 @@ fn set_tray_voice(active: bool, phase: u8) {
     crate::tray_countdown::wake();
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn voice_conversation_start(
-    state: State<'_, Arc<AppCore>>,
     session_key: Option<String>,
-) -> CommandResult<VoiceConversationStartResponse> {
+) -> VoiceConversationStartResponse {
     let result = state.voice_conversation_start(session_key).await?;
     set_tray_voice(true, 1);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_conversation_pause(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
+#[klynt_command]
+pub async fn voice_conversation_pause() -> () {
     let result = state.voice_conversation_pause().await;
     set_tray_voice(false, 0);
     result
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_conversation_resume(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
+#[klynt_command]
+pub async fn voice_conversation_resume() -> () {
     let result = state.voice_conversation_resume().await;
     set_tray_voice(true, 1);
     result
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_conversation_interrupt(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
+#[klynt_command]
+pub async fn voice_conversation_interrupt() -> () {
     state.voice_conversation_interrupt().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_conversation_continue(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
+#[klynt_command]
+pub async fn voice_conversation_continue() -> () {
     state.voice_conversation_continue().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_conversation_new_session(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<VoiceConversationStartResponse> {
+#[klynt_command]
+pub async fn voice_conversation_new_session() -> VoiceConversationStartResponse {
     let result = state.voice_conversation_new_session().await?;
     set_tray_voice(true, 1);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_conversation_end(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
+#[klynt_command]
+pub async fn voice_conversation_end() -> () {
     let result = state.voice_conversation_end().await;
     set_tray_voice(false, 0);
     result
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_conversation_status(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<VoiceConversationStatusResponse> {
+#[klynt_command]
+pub async fn voice_conversation_status() -> VoiceConversationStatusResponse {
     state.voice_conversation_status_with_title().await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "voice_conversation_start",
-    "voice_conversation_pause",
-    "voice_conversation_resume",
-    "voice_conversation_interrupt",
-    "voice_conversation_continue",
-    "voice_conversation_new_session",
-    "voice_conversation_end",
-    "voice_conversation_status",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

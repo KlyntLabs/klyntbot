@@ -1,0 +1,5 @@
+error: klynt_command requires an explicit return type
+ --> tests/trybuild/fail/missing_return_type.rs:4:5
+  |
+4 | pub async fn ping() {
+  |     ^^^^^^^^^^^^^^^

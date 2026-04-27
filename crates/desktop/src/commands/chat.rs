@@ -6,7 +6,9 @@ use desktop_shared::commands::{
     ChatMessageResponse, ChatSessionResponse, ChatThreadResponse, SessionContextInput,
 };
 use desktop_shared::{errors::ApiError, CommandResult};
-use tauri::{Emitter, State};
+use tauri::Emitter;
+
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
@@ -19,33 +21,26 @@ impl ::app_core::events::AppEventEmitter for TauriEmitter {
     }
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn chat_threads(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<ChatThreadResponse>> {
+#[klynt_command]
+pub async fn chat_threads() -> Vec<ChatThreadResponse> {
     state.chat_threads().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn chat_messages(
-    state: State<'_, Arc<AppCore>>,
     session_key: String,
     limit: Option<i64>,
-) -> CommandResult<Vec<ChatMessageResponse>> {
+) -> Vec<ChatMessageResponse> {
     state.chat_messages(session_key, limit).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn chat_send(
     app: tauri::AppHandle,
-    state: State<'_, Arc<AppCore>>,
     content: String,
     session_key: String,
     context: Option<SessionContextInput>,
-) -> CommandResult<ChatMessageResponse> {
+) -> ChatMessageResponse {
     let (user_msg, stream_info) = state.chat_send(content, session_key, context).await?;
 
     // Spawn background task to relay streaming events via Tauri emitter
@@ -56,42 +51,34 @@ pub async fn chat_send(
     Ok(user_msg)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn chat_pin_thread(
-    state: State<'_, Arc<AppCore>>,
     session_key: String,
-) -> CommandResult<()> {
+) -> () {
     state.chat_pin_thread(session_key).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn chat_rename_thread(
-    state: State<'_, Arc<AppCore>>,
     session_key: String,
     title: String,
-) -> CommandResult<()> {
+) -> () {
     state.chat_rename_thread(session_key, title).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn chat_delete_thread(
-    state: State<'_, Arc<AppCore>>,
     session_key: String,
-) -> CommandResult<()> {
+) -> () {
     state.chat_delete_thread(session_key).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn chat_respond_interaction(
-    state: State<'_, Arc<AppCore>>,
     session_key: String,
     request_id: String,
     response: desktop_shared::specta_helpers::JsonValueWrapper,
-) -> CommandResult<()> {
+) -> () {
     let response: common::FormResponse = serde_json::from_value(response.0)
         .map_err(|e| ApiError::new("BAD_REQUEST", e.to_string()))?;
     state
@@ -99,57 +86,35 @@ pub async fn chat_respond_interaction(
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn chat_get_session(
-    state: State<'_, Arc<AppCore>>,
     session_key: String,
-) -> CommandResult<ChatSessionResponse> {
+) -> ChatSessionResponse {
     state.chat_get_session(session_key).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn chat_list_sessions_by_project(
-    state: State<'_, Arc<AppCore>>,
     project_id: String,
-) -> CommandResult<Vec<ChatThreadResponse>> {
+) -> Vec<ChatThreadResponse> {
     state.chat_list_sessions_by_project(project_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn chat_delete_stale_sessions(
-    state: State<'_, Arc<AppCore>>,
     before_days: u32,
-) -> CommandResult<u64> {
+) -> u64 {
     state.chat_delete_stale_sessions(before_days).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn chat_cancel(state: State<'_, Arc<AppCore>>, session_key: String) -> CommandResult<()> {
+#[klynt_command]
+pub async fn chat_cancel(session_key: String) -> () {
     state.chat_cancel(session_key).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
 // Note: `chat_send` is dispatched directly in `dev_server.rs` because it needs
 // SSE channel state. All other chat commands are handled here.
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "chat_threads",
-    "chat_messages",
-    "chat_get_session",
-    "chat_list_sessions_by_project",
-    "chat_delete_stale_sessions",
-    "chat_pin_thread",
-    "chat_rename_thread",
-    "chat_delete_thread",
-    "chat_cancel",
-    "chat_respond_interaction",
-    // chat_send handled in dev_server.rs (needs SSE channels)
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

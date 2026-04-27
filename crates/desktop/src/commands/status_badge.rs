@@ -5,6 +5,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::app_core::AppCore;
+use desktop_macros::klynt_command;
 use desktop_shared::{errors::ApiError, CommandResult};
 use feature_launcher::BadgeKind;
 
@@ -12,14 +13,13 @@ const WIN_LABEL: &str = "status_badge";
 const WIDTH: f64 = 280.0;
 const HEIGHT: f64 = 40.0;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn show_status_badge(
     app: AppHandle,
     text: String,
     kind: BadgeKind,
     duration_ms: Option<u32>,
-) -> CommandResult<()> {
+) -> () {
     let dur = duration_ms.unwrap_or(2000);
 
     if let Some(existing) = app.get_webview_window(WIN_LABEL) {
@@ -67,9 +67,6 @@ pub async fn show_status_badge(
 
     Ok(())
 }
-
-#[allow(dead_code)] // Consumed only by `dev_server_covers_all_tauri_commands` test.
-pub(crate) const DEV_COMMANDS: &[&str] = &["show_status_badge"];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

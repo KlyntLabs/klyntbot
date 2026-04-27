@@ -1,88 +1,52 @@
 //! Voice dictation and settings Tauri command handlers.
 
-use std::sync::Arc;
-
+use desktop_macros::klynt_command;
 use desktop_shared::commands::voice::{AudioDevicesResponse, VoiceModelStatusResponse};
 use desktop_shared::CommandResult;
-use tauri::State;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_start_dictation(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
+#[klynt_command]
+pub async fn voice_start_dictation() -> () {
     state.voice_start_dictation().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_stop_dictation(state: State<'_, Arc<AppCore>>) -> CommandResult<String> {
+#[klynt_command]
+pub async fn voice_stop_dictation() -> String {
     state.voice_stop_dictation().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn voice_simulate_event(
-    state: State<'_, Arc<AppCore>>,
     event: desktop_shared::specta_helpers::JsonValueWrapper,
-) -> CommandResult<()> {
+) -> () {
     state.voice_simulate_event(event.0).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_list_devices(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<AudioDevicesResponse> {
+#[klynt_command]
+pub async fn voice_list_devices() -> AudioDevicesResponse {
     state.voice_list_devices()
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_model_status(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<VoiceModelStatusResponse> {
+#[klynt_command]
+pub async fn voice_model_status() -> VoiceModelStatusResponse {
     state.voice_model_status()
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_download_model(
-    state: State<'_, Arc<AppCore>>,
-    model: String,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn voice_download_model(model: String) -> () {
     state.voice_download_model(model).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_delete_model(
-    state: State<'_, Arc<AppCore>>,
-    model: String,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn voice_delete_model(model: String) -> () {
     state.voice_delete_model(model).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn voice_test_persona(
-    state: State<'_, Arc<AppCore>>,
-    persona: String,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn voice_test_persona(persona: String) -> () {
     state.voice_test_persona(persona).await
 }
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "voice_start_dictation",
-    "voice_stop_dictation",
-    "voice_simulate_event",
-    "voice_list_devices",
-    "voice_model_status",
-    "voice_download_model",
-    "voice_delete_model",
-    "voice_test_persona",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

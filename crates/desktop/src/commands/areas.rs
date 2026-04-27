@@ -1,75 +1,56 @@
 use desktop_shared::commands::{AreaCreateParams, AreaResponse, AreaUpdateParams};
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn area_list(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<AreaResponse>> {
+#[klynt_command]
+pub async fn area_list() -> Vec<AreaResponse> {
     state.area_list().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn area_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: AreaCreateParams,
-) -> CommandResult<AreaResponse> {
+) -> AreaResponse {
     let (result, updates) = state.area_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn area_update(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: AreaUpdateParams,
-) -> CommandResult<AreaResponse> {
+) -> AreaResponse {
     let (result, updates) = state.area_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn area_delete(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> CommandResult<bool> {
+) -> bool {
     let (result, updates) = state.area_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn area_reorder(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
     position: i32,
-) -> CommandResult<AreaResponse> {
+) -> AreaResponse {
     let (result, updates) = state.area_reorder(id, position).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "area_list",
-    "area_create",
-    "area_update",
-    "area_delete",
-    "area_reorder",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

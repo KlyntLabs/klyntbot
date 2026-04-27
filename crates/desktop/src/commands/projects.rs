@@ -2,76 +2,63 @@ use desktop_shared::commands::{
     ProjectCreateParams, ProjectHealthMetricsResponse, ProjectResponse, ProjectUpdateParams,
 };
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ProjectCreateParams,
-) -> CommandResult<ProjectResponse> {
+) -> ProjectResponse {
     let (result, updates) = state.project_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_get(
-    state: State<'_, Arc<AppCore>>,
     id: String,
-) -> CommandResult<ProjectResponse> {
+) -> ProjectResponse {
     state.project_get(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_update(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ProjectUpdateParams,
-) -> CommandResult<ProjectResponse> {
+) -> ProjectResponse {
     let (result, updates) = state.project_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_delete(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> CommandResult<bool> {
+) -> bool {
     let (result, updates) = state.project_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_archive(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> CommandResult<ProjectResponse> {
+) -> ProjectResponse {
     let (result, updates) = state.project_archive(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_update_instructions(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
     instructions: desktop_shared::specta_helpers::JsonValueWrapper,
-) -> CommandResult<ProjectResponse> {
+) -> ProjectResponse {
     let (result, updates) = state
         .project_update_instructions(id, instructions.0)
         .await?;
@@ -79,41 +66,25 @@ pub async fn project_update_instructions(
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_update_role(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
     role: String,
-) -> CommandResult<ProjectResponse> {
+) -> ProjectResponse {
     let (result, updates) = state.project_update_role(id, role).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_health_metrics(
-    state: State<'_, Arc<AppCore>>,
     project_id: String,
-) -> CommandResult<ProjectHealthMetricsResponse> {
+) -> ProjectHealthMetricsResponse {
     state.project_health_metrics(project_id).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "project_create",
-    "project_get",
-    "project_update",
-    "project_delete",
-    "project_archive",
-    "project_update_instructions",
-    "project_update_role",
-    "project_health_metrics",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

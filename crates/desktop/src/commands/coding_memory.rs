@@ -3,149 +3,96 @@
 use std::sync::Arc;
 use tauri::State;
 
+use desktop_macros::{klynt_command, klynt_raw_command};
 use desktop_shared::commands::coding_memory::*;
 use desktop_shared::{errors::ApiError, CommandResult};
 
 use crate::app_core::AppCore;
 
-/// dev_server command coverage.
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "coding_memory_status",
-    "coding_memory_enable_cli",
-    "coding_memory_disable_cli",
-    "coding_memory_diagnose_cli",
-    "coding_memory_session_replay",
-    "coding_memory_cli_health",
-    "coding_memory_browser",
-    "coding_memory_activity",
-    "coding_memory_cost",
-    "coding_memory_sensitivity",
-    "coding_memory_distill_now",
-    "coding_memory_recall_index",
-    "coding_memory_recall_timeline",
-    "coding_memory_recall_fetch",
-    "coding_memory_check_dead_ends",
-    "coding_memory_recall_facts_as_of",
-    "coding_memory_recall_change_history",
-    "coding_memory_recall_decision_points",
-    "coding_memory_recall_log",
-    "coding_memory_session_replay_recall_overlay",
-    "coding_memory_mirror_alerts_feed",
-    "coding_memory_mirror_alert_action",
-    "coding_memory_effectiveness_trends",
-    "coding_memory_reforge_cycle_list",
-    "coding_memory_reforge_cycle_diff",
-    "coding_memory_project_skills_for_repo",
-];
-
-#[tauri::command]
-#[specta::specta]
-pub async fn coding_memory_status(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<CodingMemoryStatusResponse> {
+#[klynt_command]
+pub async fn coding_memory_status() -> CodingMemoryStatusResponse {
     state.coding_memory_status().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn coding_memory_cli_health(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<CliHealthRow>> {
+#[klynt_command]
+pub async fn coding_memory_cli_health() -> Vec<CliHealthRow> {
     state.coding_memory_cli_health().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_session_replay(
-    state: State<'_, Arc<AppCore>>,
     session_id: Option<String>,
     limit: Option<i64>,
     offset: Option<i64>,
-) -> CommandResult<Vec<SessionReplayEntry>> {
+) -> Vec<SessionReplayEntry> {
     state
         .coding_memory_session_replay(session_id, limit.unwrap_or(500), offset.unwrap_or(0))
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_enable_cli(
-    state: State<'_, Arc<AppCore>>,
     cli: String,
-) -> CommandResult<()> {
+) -> () {
     state.coding_memory_enable_cli(cli).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_disable_cli(
-    state: State<'_, Arc<AppCore>>,
     cli: String,
-) -> CommandResult<()> {
+) -> () {
     state.coding_memory_disable_cli(cli).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_diagnose_cli(
-    state: State<'_, Arc<AppCore>>,
     cli: String,
-) -> CommandResult<DiagnoseResult> {
+) -> DiagnoseResult {
     state.coding_memory_diagnose_cli(cli).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_browser(
-    state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
     offset: Option<i64>,
-) -> CommandResult<Vec<MemoryBrowserRow>> {
+) -> Vec<MemoryBrowserRow> {
     state.coding_memory_browser(limit, offset).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_activity(
-    state: State<'_, Arc<AppCore>>,
     days: Option<i64>,
-) -> CommandResult<Vec<ActivityBucket>> {
+) -> Vec<ActivityBucket> {
     state.coding_memory_activity(days).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_cost(
-    state: State<'_, Arc<AppCore>>,
     days: Option<i64>,
-) -> CommandResult<CostBreakdown> {
+) -> CostBreakdown {
     state.coding_memory_cost(days).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_sensitivity(
-    state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
     offset: Option<i64>,
-) -> CommandResult<Vec<SensitivityRow>> {
+) -> Vec<SensitivityRow> {
     state.coding_memory_sensitivity(limit, offset).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_distill_now(
-    state: State<'_, Arc<AppCore>>,
     session_id: String,
     turn_id: Option<String>,
-) -> CommandResult<desktop_shared::specta_helpers::JsonValueWrapper> {
+) -> desktop_shared::specta_helpers::JsonValueWrapper {
     state
         .coding_memory_distill_now(session_id, turn_id)
         .await
         .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn coding_memory_recall_index(
@@ -159,6 +106,7 @@ pub async fn coding_memory_recall_index(
         .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn coding_memory_recall_timeline(
@@ -172,6 +120,7 @@ pub async fn coding_memory_recall_timeline(
         .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn coding_memory_recall_fetch(
@@ -185,6 +134,7 @@ pub async fn coding_memory_recall_fetch(
         .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn coding_memory_check_dead_ends(
@@ -198,6 +148,7 @@ pub async fn coding_memory_check_dead_ends(
         .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn coding_memory_recall_facts_as_of(
@@ -211,6 +162,7 @@ pub async fn coding_memory_recall_facts_as_of(
         .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn coding_memory_recall_change_history(
@@ -224,6 +176,7 @@ pub async fn coding_memory_recall_change_history(
         .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn coding_memory_recall_decision_points(
@@ -237,6 +190,7 @@ pub async fn coding_memory_recall_decision_points(
         .map(desktop_shared::specta_helpers::JsonValueWrapper)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn coding_memory_recall_log(
@@ -257,6 +211,7 @@ pub async fn coding_memory_recall_log(
         .map_err(|e| e.to_string())
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn coding_memory_session_replay_recall_overlay(
@@ -277,34 +232,28 @@ pub async fn coding_memory_session_replay_recall_overlay(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_mirror_alerts_feed(
-    state: State<'_, Arc<AppCore>>,
     args: MirrorAlertsFeedArgs,
-) -> CommandResult<Vec<MirrorAlertRow>> {
+) -> Vec<MirrorAlertRow> {
     app_core::coding_memory::panels_phase5::mirror_alerts_feed(state.storage_pool.clone(), args)
         .await
         .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_mirror_alert_action(
-    state: State<'_, Arc<AppCore>>,
     args: MirrorAlertActionArgs,
-) -> CommandResult<()> {
+) -> () {
     app_core::coding_memory::panels_phase5::mirror_alert_action(state.storage_pool.clone(), args)
         .await
         .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_effectiveness_trends(
-    state: State<'_, Arc<AppCore>>,
     pattern_id: String,
-) -> CommandResult<EffectivenessTrendsResponse> {
+) -> EffectivenessTrendsResponse {
     app_core::coding_memory::panels_phase5::effectiveness_trends(
         state.storage_pool.clone(),
         pattern_id,
@@ -313,33 +262,26 @@ pub async fn coding_memory_effectiveness_trends(
     .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn coding_memory_reforge_cycle_list(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<ReforgeCycleSummary>> {
+#[klynt_command]
+pub async fn coding_memory_reforge_cycle_list() -> Vec<ReforgeCycleSummary> {
     app_core::coding_memory::panels_phase5::reforge_cycle_list(state.storage_pool.clone())
         .await
         .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_reforge_cycle_diff(
-    state: State<'_, Arc<AppCore>>,
     args: ReforgeCycleDiffArgs,
-) -> CommandResult<ReforgeCycleDiffResponse> {
+) -> ReforgeCycleDiffResponse {
     app_core::coding_memory::panels_phase5::reforge_cycle_diff(state.storage_pool.clone(), args)
         .await
         .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coding_memory_project_skills_for_repo(
-    state: State<'_, Arc<AppCore>>,
     repo_id: String,
-) -> CommandResult<Vec<ProjectSkillRow>> {
+) -> Vec<ProjectSkillRow> {
     app_core::coding_memory::panels_phase5::project_skills_for_repo(
         state.storage_pool.clone(),
         repo_id,

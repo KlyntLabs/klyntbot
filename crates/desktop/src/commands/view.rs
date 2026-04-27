@@ -1,37 +1,27 @@
-use std::sync::Arc;
-
+use desktop_macros::klynt_command;
 use desktop_shared::commands::view::{ActiveViewResponse, SetActiveViewParams};
 use desktop_shared::CommandResult;
-use tauri::State;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn view_set_active(
-    state: State<'_, Arc<AppCore>>,
     params: SetActiveViewParams,
-) -> CommandResult<()> {
+) -> () {
     state.view_set_active(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn view_clear_active(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
+#[klynt_command]
+pub async fn view_clear_active() -> () {
     state.view_clear_active().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn view_get_active(state: State<'_, Arc<AppCore>>) -> CommandResult<ActiveViewResponse> {
+#[klynt_command]
+pub async fn view_get_active() -> ActiveViewResponse {
     state.view_get_active().await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] =
-    &["view_set_active", "view_clear_active", "view_get_active"];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

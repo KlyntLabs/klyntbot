@@ -1,23 +1,17 @@
 use desktop_shared::entity_link_types::SessionSummaryResponse;
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_conversations_list(
-    state: State<'_, Arc<AppCore>>,
     project_id: String,
-) -> CommandResult<Vec<SessionSummaryResponse>> {
+) -> Vec<SessionSummaryResponse> {
     state.project_conversations_list(project_id).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &["project_conversations_list"];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+use desktop_macros::{klynt_command, klynt_raw_command};
+
 use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, CategoryRulesResponse, DistractionResponse,
     FocusSessionResponse, GoalProgressResponse, HourlyBreakdownResponse, InsightCardResponse,
@@ -15,28 +17,25 @@ use tauri::State;
 use crate::app_core::AppCore;
 use crate::focus_timer::FocusTimer;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_today(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Option<ProductivitySummaryResponse>> {
+) -> Option<ProductivitySummaryResponse> {
     state.productivity_today().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_timeline(
-    state: State<'_, Arc<AppCore>>,
     date: String,
     limit: Option<i64>,
     offset: Option<i64>,
     tz_offset_mins: Option<i32>,
-) -> CommandResult<Vec<ActivityTimelineResponse>> {
+) -> Vec<ActivityTimelineResponse> {
     state
         .productivity_timeline(date, limit, offset, tz_offset_mins)
         .await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_focus_start(
@@ -50,68 +49,55 @@ pub async fn productivity_focus_start(
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_focus_end(
-    state: State<'_, Arc<AppCore>>,
     notes: Option<String>,
-) -> CommandResult<Option<FocusSessionResponse>> {
+) -> Option<FocusSessionResponse> {
     state.productivity_focus_end(notes).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_focus_status(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Option<FocusSessionResponse>> {
+) -> Option<FocusSessionResponse> {
     state.productivity_focus_status().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_sessions(
-    state: State<'_, Arc<AppCore>>,
     date: String,
-) -> CommandResult<Vec<FocusSessionResponse>> {
+) -> Vec<FocusSessionResponse> {
     state.productivity_sessions(date).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_intelligence_sessions(
-    state: State<'_, Arc<AppCore>>,
     date: String,
     tz_offset_mins: Option<i32>,
-) -> CommandResult<Vec<IntelligenceSessionResponse>> {
+) -> Vec<IntelligenceSessionResponse> {
     state
         .productivity_intelligence_sessions(date, tz_offset_mins)
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_weekly(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<ProductivitySummaryResponse>> {
+) -> Vec<ProductivitySummaryResponse> {
     state.productivity_weekly().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_categories(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<ActivityCategoryResponse>> {
+) -> Vec<ActivityCategoryResponse> {
     state.productivity_categories().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_tracked_apps(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<TrackedAppResponse>> {
+) -> Vec<TrackedAppResponse> {
     state.productivity_tracked_apps().await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_summary_range(
@@ -122,23 +108,20 @@ pub async fn productivity_summary_range(
     state.productivity_summary_range(start_date, end_date).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_activity_feed(
-    state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
-) -> CommandResult<Vec<ActivityTimelineResponse>> {
+) -> Vec<ActivityTimelineResponse> {
     state.productivity_activity_feed(limit).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_goals(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<GoalProgressResponse>> {
+) -> Vec<GoalProgressResponse> {
     state.productivity_goals().await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_pomodoro_start(
@@ -151,15 +134,14 @@ pub async fn productivity_pomodoro_start(
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_time_entries(
-    state: State<'_, Arc<AppCore>>,
     date: String,
-) -> CommandResult<Vec<TimeEntryResponse>> {
+) -> Vec<TimeEntryResponse> {
     state.productivity_time_entries(date).await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_goal_create(
@@ -173,25 +155,22 @@ pub async fn productivity_goal_create(
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_goal_delete(
-    state: State<'_, Arc<AppCore>>,
     id: i64,
-) -> CommandResult<()> {
+) -> () {
     state.productivity_goal_delete(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_goal_toggle(
-    state: State<'_, Arc<AppCore>>,
     id: i64,
     enabled: bool,
-) -> CommandResult<()> {
+) -> () {
     state.productivity_goal_toggle(id, enabled).await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_time_entry_create(
@@ -206,15 +185,14 @@ pub async fn productivity_time_entry_create(
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_time_entry_delete(
-    state: State<'_, Arc<AppCore>>,
     id: i64,
-) -> CommandResult<()> {
+) -> () {
     state.productivity_time_entry_delete(id).await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_category_upsert(
@@ -231,6 +209,7 @@ pub async fn productivity_category_upsert(
         .await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_category_delete(
@@ -240,6 +219,7 @@ pub async fn productivity_category_delete(
     state.productivity_category_delete(id).await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_recategorize_app(
@@ -255,24 +235,21 @@ pub async fn productivity_recategorize_app(
 
 // ── V2: Insights & Auto-Focus ─────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_insights(
-    state: State<'_, Arc<AppCore>>,
     date: Option<String>,
-) -> CommandResult<Vec<InsightCardResponse>> {
+) -> Vec<InsightCardResponse> {
     state.productivity_insights(date).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_insight_dismiss(
-    state: State<'_, Arc<AppCore>>,
     id: String,
-) -> CommandResult<()> {
+) -> () {
     state.productivity_insight_dismiss(id).await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_auto_focus_start(
@@ -281,6 +258,7 @@ pub async fn productivity_auto_focus_start(
     state.productivity_auto_focus_start().await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_auto_focus_end(
@@ -292,6 +270,7 @@ pub async fn productivity_auto_focus_end(
     state.productivity_auto_focus_end(event).await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_auto_focus_confirm(
@@ -301,6 +280,7 @@ pub async fn productivity_auto_focus_confirm(
     state.productivity_auto_focus_confirm(payload).await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn distraction_respond(
@@ -335,14 +315,13 @@ pub async fn distraction_respond(
 
 // ── V3: Project Tracking ─────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_projects_list(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<ProductivityProjectResponse>> {
+) -> Vec<ProductivityProjectResponse> {
     state.productivity_projects_list().await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_project_upsert(
@@ -358,15 +337,14 @@ pub async fn productivity_project_upsert(
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_project_delete(
-    state: State<'_, Arc<AppCore>>,
     id: String,
-) -> CommandResult<()> {
+) -> () {
     state.productivity_project_delete(id).await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_weekly_assessment(
@@ -376,15 +354,14 @@ pub async fn productivity_weekly_assessment(
     state.productivity_weekly_assessment(week_start).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_calendar_events(
-    state: State<'_, Arc<AppCore>>,
     date: String,
-) -> CommandResult<Vec<feature_productivity::types::CalendarEvent>> {
+) -> Vec<feature_productivity::types::CalendarEvent> {
     state.productivity_calendar_events(date).await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn calendar_sync_events(
@@ -399,6 +376,7 @@ pub async fn calendar_sync_events(
 use crate::focus_timer::{FocusSessionConfig, SessionCommand};
 use desktop_shared::commands::FocusSessionStatusResponse;
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn focus_session_start(
@@ -444,6 +422,7 @@ pub async fn focus_session_start(
     Ok(session)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn focus_session_stop(
@@ -461,6 +440,7 @@ pub async fn focus_session_stop(
     Ok(state.productivity_break_end().await.unwrap_or(None))
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn focus_session_status(
@@ -477,18 +457,21 @@ pub async fn focus_session_status(
     })
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn focus_session_pause(timer: State<'_, Arc<FocusTimer>>) -> CommandResult<bool> {
     Ok(timer.send_command(SessionCommand::Pause).await)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn focus_session_resume(timer: State<'_, Arc<FocusTimer>>) -> CommandResult<bool> {
     Ok(timer.send_command(SessionCommand::Resume).await)
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn focus_session_extend(
@@ -498,12 +481,14 @@ pub async fn focus_session_extend(
     Ok(timer.send_command(SessionCommand::Extend(extra_secs)).await)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn focus_session_start_break(timer: State<'_, Arc<FocusTimer>>) -> CommandResult<bool> {
     Ok(timer.send_command(SessionCommand::StartBreak).await)
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn focus_session_extend_work(
@@ -515,12 +500,14 @@ pub async fn focus_session_extend_work(
         .await)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn focus_session_skip_break(timer: State<'_, Arc<FocusTimer>>) -> CommandResult<bool> {
     Ok(timer.send_command(SessionCommand::SkipBreak).await)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn focus_session_take_break(timer: State<'_, Arc<FocusTimer>>) -> CommandResult<bool> {
@@ -529,15 +516,14 @@ pub async fn focus_session_take_break(timer: State<'_, Arc<FocusTimer>>) -> Comm
 
 // ── Patterns & Hourly Breakdown ─────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn productivity_patterns(
-    state: State<'_, Arc<AppCore>>,
     days: Option<u32>,
-) -> CommandResult<ProductivityPatternsResponse> {
+) -> ProductivityPatternsResponse {
     state.productivity_patterns(days).await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "snake_case")]
 #[specta::specta]
 pub async fn productivity_hourly_breakdown(
@@ -552,47 +538,6 @@ pub async fn productivity_hourly_breakdown(
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "productivity_today",
-    "productivity_timeline",
-    "productivity_focus_start",
-    "productivity_focus_end",
-    "productivity_focus_status",
-    "productivity_sessions",
-    "productivity_intelligence_sessions",
-    "productivity_weekly",
-    "productivity_categories",
-    "productivity_summary_range",
-    "productivity_activity_feed",
-    "productivity_goals",
-    "productivity_pomodoro_start",
-    "productivity_time_entries",
-    "productivity_goal_create",
-    "productivity_goal_delete",
-    "productivity_goal_toggle",
-    "productivity_time_entry_create",
-    "productivity_time_entry_delete",
-    "productivity_category_upsert",
-    "productivity_tracked_apps",
-    "productivity_category_delete",
-    "productivity_recategorize_app",
-    "productivity_insights",
-    "productivity_insight_dismiss",
-    "productivity_projects_list",
-    "productivity_project_upsert",
-    "productivity_project_delete",
-    "productivity_weekly_assessment",
-    "productivity_calendar_events",
-    "calendar_sync_events",
-    "productivity_auto_focus_start",
-    "productivity_auto_focus_end",
-    "productivity_auto_focus_confirm",
-    "distraction_respond",
-    "productivity_patterns",
-    "productivity_hourly_breakdown",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

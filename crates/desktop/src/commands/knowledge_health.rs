@@ -1,31 +1,22 @@
 use desktop_shared::commands::{KnowledgeHealthSummary, TopicDetailParams, TopicDetailResponse};
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn knowledge_health_summary(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<KnowledgeHealthSummary> {
+#[klynt_command]
+pub async fn knowledge_health_summary() -> KnowledgeHealthSummary {
     state.knowledge_health_summary().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn knowledge_topic_detail(
-    state: State<'_, Arc<AppCore>>,
     params: TopicDetailParams,
-) -> CommandResult<TopicDetailResponse> {
+) -> TopicDetailResponse {
     state.knowledge_topic_detail(params).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &["knowledge_health_summary", "knowledge_topic_detail"];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

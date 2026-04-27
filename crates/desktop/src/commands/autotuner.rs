@@ -1,72 +1,49 @@
-use std::sync::Arc;
-
 use app_core::handlers::autotuner::AutoTunerStatus;
 use autotuner::{ChampionSummary, ExperimentSummary};
 use desktop_shared::CommandResult;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "autotuner_status",
-    "autotuner_history",
-    "autotuner_revert",
-    "autotuner_pause",
-    "autotuner_resume",
-    "autotuner_set_pace",
-    "autotuner_get_toast_count",
-    "autotuner_increment_toast_count",
-];
-
-#[tauri::command]
-#[specta::specta]
-pub async fn autotuner_status(state: State<'_, Arc<AppCore>>) -> CommandResult<AutoTunerStatus> {
+#[klynt_command]
+pub async fn autotuner_status() -> AutoTunerStatus {
     state.autotuner_status().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn autotuner_history(
-    state: State<'_, Arc<AppCore>>,
     limit: Option<u32>,
-) -> CommandResult<Vec<ExperimentSummary>> {
+) -> Vec<ExperimentSummary> {
     state.autotuner_history(limit.unwrap_or(20)).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn autotuner_revert(state: State<'_, Arc<AppCore>>) -> CommandResult<ChampionSummary> {
+#[klynt_command]
+pub async fn autotuner_revert() -> ChampionSummary {
     state.autotuner_revert().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn autotuner_pause(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
+#[klynt_command]
+pub async fn autotuner_pause() -> () {
     state.autotuner_pause().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn autotuner_resume(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
+#[klynt_command]
+pub async fn autotuner_resume() -> () {
     state.autotuner_resume().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn autotuner_set_pace(state: State<'_, Arc<AppCore>>, pace: String) -> CommandResult<()> {
+#[klynt_command]
+pub async fn autotuner_set_pace(pace: String) -> () {
     state.autotuner_set_pace(&pace).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn autotuner_get_toast_count(state: State<'_, Arc<AppCore>>) -> CommandResult<i64> {
+#[klynt_command]
+pub async fn autotuner_get_toast_count() -> i64 {
     state.autotuner_get_toast_count().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn autotuner_increment_toast_count(state: State<'_, Arc<AppCore>>) -> CommandResult<i64> {
+#[klynt_command]
+pub async fn autotuner_increment_toast_count() -> i64 {
     state.autotuner_increment_toast_count().await
 }
 

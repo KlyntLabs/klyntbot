@@ -5,76 +5,53 @@ use desktop_shared::commands::{
     TranslationEvalResponse, VocabularySaveParams,
 };
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn language_translate_breakdown(
-    state: State<'_, Arc<AppCore>>,
     params: TranslateBreakdownParams,
-) -> CommandResult<TranslateBreakdownResponse> {
+) -> TranslateBreakdownResponse {
     state.language_translate_breakdown(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn language_evaluate_translation(
-    state: State<'_, Arc<AppCore>>,
     params: EvaluateTranslationParams,
-) -> CommandResult<TranslationEvalResponse> {
+) -> TranslationEvalResponse {
     state.language_evaluate_translation(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn language_save_vocabulary(
-    state: State<'_, Arc<AppCore>>,
     params: VocabularySaveParams,
-) -> CommandResult<Vec<desktop_shared::commands::FlashcardResponse>> {
+) -> Vec<desktop_shared::commands::FlashcardResponse> {
     state.language_save_vocabulary(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn language_detect_confusables(
-    state: State<'_, Arc<AppCore>>,
     params: DetectConfusablesParams,
-) -> CommandResult<ConfusableResponse> {
+) -> ConfusableResponse {
     state.language_detect_confusables(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn language_enrich_annotation(
-    state: State<'_, Arc<AppCore>>,
     params: EnrichAnnotationParams,
-) -> CommandResult<AnnotationEnrichmentResponse> {
+) -> AnnotationEnrichmentResponse {
     state.language_enrich_annotation(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn language_quick_translate(
-    state: State<'_, Arc<AppCore>>,
     params: QuickTranslateParams,
-) -> CommandResult<QuickTranslateResponse> {
+) -> QuickTranslateResponse {
     state.language_quick_translate(params).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "language_translate_breakdown",
-    "language_evaluate_translation",
-    "language_save_vocabulary",
-    "language_detect_confusables",
-    "language_enrich_annotation",
-    "language_quick_translate",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

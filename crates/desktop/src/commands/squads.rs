@@ -1,79 +1,46 @@
-use std::sync::Arc;
-
 use app_core::AppCore;
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{
     CreateSquadParams, SquadMemberParams, SquadResponse, UpdateSquadParams,
 };
 use desktop_shared::CommandResult;
-use tauri::State;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn list_squads(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<SquadResponse>> {
+#[klynt_command]
+pub async fn list_squads() -> Vec<SquadResponse> {
     state.list_squads().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn get_squad(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<SquadResponse> {
+#[klynt_command]
+pub async fn get_squad(id: String) -> SquadResponse {
     state.get_squad(&id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn create_squad(
-    state: State<'_, Arc<AppCore>>,
-    params: CreateSquadParams,
-) -> CommandResult<SquadResponse> {
+#[klynt_command]
+pub async fn create_squad(params: CreateSquadParams) -> SquadResponse {
     state.create_squad(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn update_squad(
-    state: State<'_, Arc<AppCore>>,
-    params: UpdateSquadParams,
-) -> CommandResult<SquadResponse> {
+#[klynt_command]
+pub async fn update_squad(params: UpdateSquadParams) -> SquadResponse {
     state.update_squad(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn delete_squad(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<()> {
+#[klynt_command]
+pub async fn delete_squad(id: String) -> () {
     state.delete_squad(&id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn add_squad_member(
-    state: State<'_, Arc<AppCore>>,
-    params: SquadMemberParams,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn add_squad_member(params: SquadMemberParams) -> () {
     state.add_squad_member(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn remove_squad_member(
-    state: State<'_, Arc<AppCore>>,
-    squad_id: String,
-    persona_id: String,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn remove_squad_member(squad_id: String, persona_id: String) -> () {
     state.remove_squad_member(&squad_id, &persona_id).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "list_squads",
-    "get_squad",
-    "create_squad",
-    "update_squad",
-    "delete_squad",
-    "add_squad_member",
-    "remove_squad_member",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

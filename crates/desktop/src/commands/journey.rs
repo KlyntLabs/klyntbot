@@ -1,14 +1,11 @@
-use std::sync::Arc;
-
 use app_core::journey::Milestone;
+use desktop_macros::klynt_command;
 use desktop_shared::{errors::ApiError, CommandResult};
-use tauri::State;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn journey_milestones(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<String>> {
+#[klynt_command]
+pub async fn journey_milestones() -> Vec<String> {
     let tracker = state
         .journey_tracker
         .as_ref()
@@ -16,12 +13,10 @@ pub async fn journey_milestones(state: State<'_, Arc<AppCore>>) -> CommandResult
     Ok(tracker.completed_names().await)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn journey_mark_complete(
-    state: State<'_, Arc<AppCore>>,
     milestone: String,
-) -> CommandResult<()> {
+) -> () {
     let tracker = state
         .journey_tracker
         .as_ref()
@@ -32,9 +27,8 @@ pub async fn journey_mark_complete(
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn journey_item_count(state: State<'_, Arc<AppCore>>) -> CommandResult<i64> {
+#[klynt_command]
+pub async fn journey_item_count() -> i64 {
     if let Some(ref tracker) = state.journey_tracker {
         Ok(tracker.total_item_count().await)
     } else {
@@ -43,13 +37,6 @@ pub async fn journey_item_count(state: State<'_, Arc<AppCore>>) -> CommandResult
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "journey_milestones",
-    "journey_mark_complete",
-    "journey_item_count",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

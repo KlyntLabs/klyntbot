@@ -1,327 +1,221 @@
-use std::sync::Arc;
-
 use desktop_shared::cognitive_commands::*;
 use desktop_shared::CommandResult;
-use tauri::State;
 
 use crate::app_core::AppCore;
 
+use desktop_macros::klynt_command;
+
 // ── Memory Reads ────────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn cognitive_user_model(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<UserModelSummaryResponse> {
+#[klynt_command]
+pub async fn cognitive_user_model() -> UserModelSummaryResponse {
     state.cognitive_user_model().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cognitive_facts_list(
-    state: State<'_, Arc<AppCore>>,
     domain: Option<String>,
-) -> CommandResult<Vec<SemanticFactResponse>> {
+) -> Vec<SemanticFactResponse> {
     state.cognitive_facts_list(domain).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cognitive_episodic_list(
-    state: State<'_, Arc<AppCore>>,
     domain: Option<String>,
     limit: Option<i64>,
-) -> CommandResult<Vec<EpisodicMemoryResponse>> {
+) -> Vec<EpisodicMemoryResponse> {
     state.cognitive_episodic_list(domain, limit).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cognitive_rules_list(
-    state: State<'_, Arc<AppCore>>,
     domain: Option<String>,
-) -> CommandResult<Vec<ProceduralRuleResponse>> {
+) -> Vec<ProceduralRuleResponse> {
     state.cognitive_rules_list(domain).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn cognitive_memory_stats(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<MemoryStatsResponse> {
+#[klynt_command]
+pub async fn cognitive_memory_stats() -> MemoryStatsResponse {
     state.cognitive_memory_stats().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn memory_health(state: State<'_, Arc<AppCore>>) -> CommandResult<MemoryHealthResponse> {
+#[klynt_command]
+pub async fn memory_health() -> MemoryHealthResponse {
     state.memory_health().await
 }
 
 // ── Coaching Reads ──────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn coaching_situation(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<UserSituationResponse> {
+#[klynt_command]
+pub async fn coaching_situation() -> UserSituationResponse {
     state.coaching_situation().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn coaching_signals(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<SignalWindowResponse> {
+#[klynt_command]
+pub async fn coaching_signals() -> SignalWindowResponse {
     state.coaching_signals().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn coaching_patterns(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<DetectedPatternResponse>> {
+#[klynt_command]
+pub async fn coaching_patterns() -> Vec<DetectedPatternResponse> {
     state.coaching_patterns().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn coaching_feedback_stats(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<StrategyFeedbackResponse>> {
+#[klynt_command]
+pub async fn coaching_feedback_stats() -> Vec<StrategyFeedbackResponse> {
     state.coaching_feedback_stats().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn coaching_router_status(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<RouterStatusResponse> {
+#[klynt_command]
+pub async fn coaching_router_status() -> RouterStatusResponse {
     state.coaching_router_status().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn coaching_pending_interventions(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<desktop_shared::cognitive_commands::DeliveredInterventionResponse>> {
+#[klynt_command]
+pub async fn coaching_pending_interventions() -> Vec<desktop_shared::cognitive_commands::DeliveredInterventionResponse> {
     state.coaching_pending_interventions().await
 }
 
 // ── Memory Reference Detail ─────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn memory_reference_detail(
-    state: State<'_, Arc<AppCore>>,
     ref_type: String,
     ref_id: String,
-) -> CommandResult<MemoryReferenceDetail> {
+) -> MemoryReferenceDetail {
     state.memory_reference_detail(&ref_type, &ref_id).await
 }
 
 // ── System Status ───────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn cognitive_system_status(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<SystemStatusResponse> {
+#[klynt_command]
+pub async fn cognitive_system_status() -> SystemStatusResponse {
     state.cognitive_system_status().await
 }
 
 // ── Mutations ───────────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cognitive_fact_create(
-    state: State<'_, Arc<AppCore>>,
     params: FactCreateParams,
-) -> CommandResult<SemanticFactResponse> {
+) -> SemanticFactResponse {
     state.cognitive_fact_create(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cognitive_fact_update(
-    state: State<'_, Arc<AppCore>>,
     id: String,
     params: FactUpdateParams,
-) -> CommandResult<SemanticFactResponse> {
+) -> SemanticFactResponse {
     state.cognitive_fact_update(id, params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cognitive_fact_delete(
-    state: State<'_, Arc<AppCore>>,
     id: String,
-) -> CommandResult<bool> {
+) -> bool {
     state.cognitive_fact_delete(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cognitive_rule_create(
-    state: State<'_, Arc<AppCore>>,
     params: RuleCreateParams,
-) -> CommandResult<ProceduralRuleResponse> {
+) -> ProceduralRuleResponse {
     state.cognitive_rule_create(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cognitive_rule_deactivate(
-    state: State<'_, Arc<AppCore>>,
     id: String,
-) -> CommandResult<bool> {
+) -> bool {
     state.cognitive_rule_deactivate(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn cognitive_run_compaction(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<CompactionResultResponse> {
+#[klynt_command]
+pub async fn cognitive_run_compaction() -> CompactionResultResponse {
     state.cognitive_run_compaction().await
 }
 
 // ── Coaching Mutations ──────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coaching_reset_dismissals(
-    state: State<'_, Arc<AppCore>>,
     trigger_name: Option<String>,
-) -> CommandResult<bool> {
+) -> bool {
     state.coaching_reset_dismissals(trigger_name).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn coaching_clear_signals(state: State<'_, Arc<AppCore>>) -> CommandResult<bool> {
+#[klynt_command]
+pub async fn coaching_clear_signals() -> bool {
     state.coaching_clear_signals().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coaching_submit_feedback(
-    state: State<'_, Arc<AppCore>>,
     intervention_id: String,
     response: String,
-) -> CommandResult<bool> {
+) -> bool {
     state
         .coaching_submit_feedback(intervention_id, response)
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coaching_report_ignored(
-    state: State<'_, Arc<AppCore>>,
     intervention_id: String,
-) -> CommandResult<bool> {
+) -> bool {
     state.coaching_report_ignored(intervention_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn coaching_intervention_log(
-    state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
-) -> CommandResult<Vec<desktop_shared::cognitive_commands::InterventionLogResponse>> {
+) -> Vec<desktop_shared::cognitive_commands::InterventionLogResponse> {
     state.coaching_intervention_log(limit).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn coaching_seed_patterns(state: State<'_, Arc<AppCore>>) -> CommandResult<bool> {
+#[klynt_command]
+pub async fn coaching_seed_patterns() -> bool {
     state.coaching_seed_patterns().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cognitive_inject_event(
-    state: State<'_, Arc<AppCore>>,
     event_type: String,
     payload: desktop_shared::specta_helpers::JsonValueWrapper,
-) -> CommandResult<bool> {
+) -> bool {
     state.cognitive_inject_event(event_type, payload.0).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cognitive_event_log(
-    state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
-) -> CommandResult<Vec<cognitive::DomainEventRow>> {
+) -> Vec<cognitive::DomainEventRow> {
     state.cognitive_event_log(limit).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cognitive_pipeline_log(
-    state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
-) -> CommandResult<Vec<cognitive::PipelineEventRow>> {
+) -> Vec<cognitive::PipelineEventRow> {
     state.cognitive_pipeline_log(limit).await
 }
 
 // ── Cognitive Graph ─────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn cognitive_graph_data(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<desktop_shared::commands::cognitive_graph::CognitiveGraphData> {
+#[klynt_command]
+pub async fn cognitive_graph_data() -> desktop_shared::commands::cognitive_graph::CognitiveGraphData {
     state.cognitive_graph_data().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cognitive_graph_expand_topic(
-    state: State<'_, Arc<AppCore>>,
     params: desktop_shared::commands::cognitive_graph::TopicExpandParams,
-) -> CommandResult<desktop_shared::commands::cognitive_graph::TopicDetail> {
+) -> desktop_shared::commands::cognitive_graph::TopicDetail {
     state.cognitive_graph_expand_topic(params).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "cognitive_user_model",
-    "cognitive_facts_list",
-    "cognitive_episodic_list",
-    "cognitive_rules_list",
-    "cognitive_memory_stats",
-    "cognitive_system_status",
-    "memory_reference_detail",
-    "cognitive_fact_create",
-    "cognitive_fact_update",
-    "cognitive_fact_delete",
-    "cognitive_rule_create",
-    "cognitive_rule_deactivate",
-    "cognitive_run_compaction",
-    "cognitive_inject_event",
-    "cognitive_event_log",
-    "cognitive_pipeline_log",
-    "coaching_situation",
-    "coaching_signals",
-    "coaching_patterns",
-    "coaching_feedback_stats",
-    "coaching_intervention_log",
-    "coaching_router_status",
-    "coaching_seed_patterns",
-    "coaching_pending_interventions",
-    "coaching_reset_dismissals",
-    "coaching_clear_signals",
-    "coaching_submit_feedback",
-    "coaching_report_ignored",
-    "memory_health",
-    "cognitive_graph_data",
-    "cognitive_graph_expand_topic",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

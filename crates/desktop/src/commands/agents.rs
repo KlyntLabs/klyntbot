@@ -1,77 +1,52 @@
-use std::sync::Arc;
-
 use app_core::AppCore;
 use desktop_shared::commands::{AgentFileContent, AgentFileSummary, AgentProfileSummary};
 use desktop_shared::CommandResult;
+use desktop_macros::klynt_command;
 
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "agent_list_profiles",
-    "agent_read_file",
-    "agent_write_file",
-    "agent_create_profile",
-    "agent_create_skill",
-    "agent_delete_file",
-];
-use tauri::State;
-
-#[tauri::command]
-#[specta::specta]
-pub async fn agent_list_profiles(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<AgentProfileSummary>> {
+#[klynt_command]
+pub async fn agent_list_profiles() -> Vec<AgentProfileSummary> {
     state.agent_list_profiles().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn agent_read_file(
-    state: State<'_, Arc<AppCore>>,
     agent_name: String,
     filename: String,
-) -> CommandResult<AgentFileContent> {
+) -> AgentFileContent {
     state.agent_read_file(&agent_name, &filename).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn agent_write_file(
-    state: State<'_, Arc<AppCore>>,
     agent_name: String,
     filename: String,
     content: String,
-) -> CommandResult<AgentFileContent> {
+) -> AgentFileContent {
     state
         .agent_write_file(&agent_name, &filename, &content)
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn agent_create_profile(
-    state: State<'_, Arc<AppCore>>,
     name: String,
-) -> CommandResult<AgentProfileSummary> {
+) -> AgentProfileSummary {
     state.agent_create_profile(&name).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn agent_create_skill(
-    state: State<'_, Arc<AppCore>>,
     agent_name: String,
     skill_name: String,
-) -> CommandResult<AgentFileSummary> {
+) -> AgentFileSummary {
     state.agent_create_skill(&agent_name, &skill_name).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn agent_delete_file(
-    state: State<'_, Arc<AppCore>>,
     agent_name: String,
     filename: String,
-) -> CommandResult<bool> {
+) -> bool {
     state.agent_delete_file(&agent_name, &filename).await
 }
 

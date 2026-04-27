@@ -1,88 +1,64 @@
-use std::sync::Arc;
-
 use app_core::AppCore;
 use desktop_shared::types::{
     CronJobCreateParams, CronJobResponse, CronJobUpdateParams, CronStatusResponse,
 };
 use desktop_shared::CommandResult;
-use tauri::State;
+use desktop_macros::klynt_command;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cron_list(
-    state: State<'_, Arc<AppCore>>,
     include_disabled: Option<bool>,
-) -> CommandResult<Vec<CronJobResponse>> {
+) -> Vec<CronJobResponse> {
     state.cron_list(include_disabled.unwrap_or(true)).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn cron_status(state: State<'_, Arc<AppCore>>) -> CommandResult<CronStatusResponse> {
+#[klynt_command]
+pub async fn cron_status() -> CronStatusResponse {
     state.cron_status().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cron_enable(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
     enabled: bool,
-) -> CommandResult<CronJobResponse> {
+) -> CronJobResponse {
     let (result, updates) = state.cron_enable(id, enabled).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn cron_run(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<bool> {
+#[klynt_command]
+pub async fn cron_run(id: String) -> bool {
     state.cron_run(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn cron_delete(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<bool> {
+#[klynt_command]
+pub async fn cron_delete(id: String) -> bool {
     state.cron_delete(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cron_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: CronJobCreateParams,
-) -> CommandResult<CronJobResponse> {
+) -> CronJobResponse {
     let (result, updates) = state.cron_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn cron_update(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: CronJobUpdateParams,
-) -> CommandResult<CronJobResponse> {
+) -> CronJobResponse {
     let (result, updates) = state.cron_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
 // ── Dev server dispatch ──
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "cron_list",
-    "cron_status",
-    "cron_enable",
-    "cron_run",
-    "cron_delete",
-    "cron_create",
-    "cron_update",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

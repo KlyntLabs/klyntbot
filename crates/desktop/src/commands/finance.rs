@@ -19,300 +19,240 @@ use storage::rows::finance::{
 };
 use tauri::State;
 
+use desktop_macros::{klynt_command, klynt_raw_command};
+
 use crate::app_core::AppCore;
 
 // ── Read-only queries ───────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn finance_accounts(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<FinanceAccountRow>> {
+#[klynt_command]
+pub async fn finance_accounts() -> Vec<FinanceAccountRow> {
     state.finance_accounts().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_transactions(
-    state: State<'_, Arc<AppCore>>,
-    limit: Option<i64>,
-) -> CommandResult<Vec<FinanceTransactionRow>> {
+    limit: Option<i64>
+) -> Vec<FinanceTransactionRow> {
     state.finance_transactions(limit).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_transactions_filtered(
-    state: State<'_, Arc<AppCore>>,
-    params: FinanceTransactionFilterParams,
-) -> CommandResult<Vec<FinanceTransactionRow>> {
+    params: FinanceTransactionFilterParams
+) -> Vec<FinanceTransactionRow> {
     state.finance_transactions_filtered(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn finance_budget_usage(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<BudgetUsageRow>> {
+#[klynt_command]
+pub async fn finance_budget_usage() -> Vec<BudgetUsageRow> {
     state.finance_budget_usage().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn finance_portfolios(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<FinancePortfolioResponse>> {
+#[klynt_command]
+pub async fn finance_portfolios() -> Vec<FinancePortfolioResponse> {
     state.finance_portfolios().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn finance_investments(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<FinanceInvestmentRow>> {
+#[klynt_command]
+pub async fn finance_investments() -> Vec<FinanceInvestmentRow> {
     state.finance_investments().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_investments_filtered(
-    state: State<'_, Arc<AppCore>>,
-    portfolio_id: Option<String>,
-) -> CommandResult<Vec<FinanceInvestmentRow>> {
+    portfolio_id: Option<String>
+) -> Vec<FinanceInvestmentRow> {
     state.finance_investments_filtered(portfolio_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn finance_goals(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<FinanceGoalRow>> {
+#[klynt_command]
+pub async fn finance_goals() -> Vec<FinanceGoalRow> {
     state.finance_goals().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn finance_liabilities(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<FinanceLiabilityRow>> {
+#[klynt_command]
+pub async fn finance_liabilities() -> Vec<FinanceLiabilityRow> {
     state.finance_liabilities().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn finance_net_worth(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<FinanceNetWorthResponse> {
+#[klynt_command]
+pub async fn finance_net_worth() -> FinanceNetWorthResponse {
     state.finance_net_worth().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn finance_exchange_rates(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<HashMap<String, f64>> {
+#[klynt_command]
+pub async fn finance_exchange_rates() -> HashMap<String, f64> {
     state.finance_exchange_rates().await
 }
 
 // ── Mutations ───────────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_account_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceAccountCreateParams,
-) -> CommandResult<FinanceAccountRow> {
+    params: FinanceAccountCreateParams
+) -> FinanceAccountRow {
     let (result, updates) = state.finance_account_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_account_update(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceAccountUpdateParams,
-) -> CommandResult<FinanceAccountRow> {
+    params: FinanceAccountUpdateParams
+) -> FinanceAccountRow {
     let (result, updates) = state.finance_account_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_account_delete(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    id: String,
-) -> CommandResult<bool> {
+    id: String
+) -> bool {
     let (result, updates) = state.finance_account_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_transaction_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceTransactionCreateParams,
-) -> CommandResult<FinanceTransactionRow> {
+    params: FinanceTransactionCreateParams
+) -> FinanceTransactionRow {
     let (result, updates) = state.finance_transaction_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_transaction_delete(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    id: String,
-) -> CommandResult<bool> {
+    id: String
+) -> bool {
     let (result, updates) = state.finance_transaction_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_budget_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceBudgetCreateParams,
-) -> CommandResult<FinanceBudgetRow> {
+    params: FinanceBudgetCreateParams
+) -> FinanceBudgetRow {
     let (result, updates) = state.finance_budget_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_budget_update(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceBudgetUpdateParams,
-) -> CommandResult<FinanceBudgetRow> {
+    params: FinanceBudgetUpdateParams
+) -> FinanceBudgetRow {
     let (result, updates) = state.finance_budget_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_budget_delete(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    id: String,
-) -> CommandResult<bool> {
+    id: String
+) -> bool {
     let (result, updates) = state.finance_budget_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_goal_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceGoalCreateParams,
-) -> CommandResult<FinanceGoalRow> {
+    params: FinanceGoalCreateParams
+) -> FinanceGoalRow {
     let (result, updates) = state.finance_goal_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_goal_update(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceGoalUpdateParams,
-) -> CommandResult<FinanceGoalRow> {
+    params: FinanceGoalUpdateParams
+) -> FinanceGoalRow {
     let (result, updates) = state.finance_goal_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_goal_delete(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    id: String,
-) -> CommandResult<bool> {
+    id: String
+) -> bool {
     let (result, updates) = state.finance_goal_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_liability_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceLiabilityCreateParams,
-) -> CommandResult<FinanceLiabilityRow> {
+    params: FinanceLiabilityCreateParams
+) -> FinanceLiabilityRow {
     let (result, updates) = state.finance_liability_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_liability_update(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceLiabilityUpdateParams,
-) -> CommandResult<FinanceLiabilityRow> {
+    params: FinanceLiabilityUpdateParams
+) -> FinanceLiabilityRow {
     let (result, updates) = state.finance_liability_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_liability_delete(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    id: String,
-) -> CommandResult<bool> {
+    id: String
+) -> bool {
     let (result, updates) = state.finance_liability_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_portfolio_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinancePortfolioCreateParams,
-) -> CommandResult<FinancePortfolioRow> {
+    params: FinancePortfolioCreateParams
+) -> FinancePortfolioRow {
     let (result, updates) = state.finance_portfolio_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_investment_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceInvestmentCreateParams,
-) -> CommandResult<FinanceInvestmentRow> {
+    params: FinanceInvestmentCreateParams
+) -> FinanceInvestmentRow {
     let (result, updates) = state.finance_investment_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_investment_update(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceInvestmentUpdateParams,
-) -> CommandResult<FinanceInvestmentRow> {
+    params: FinanceInvestmentUpdateParams
+) -> FinanceInvestmentRow {
     let (result, updates) = state.finance_investment_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -320,18 +260,17 @@ pub async fn finance_investment_update(
 
 // ── Allocation Targets ──────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_allocation_target_upsert(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceAllocationTargetUpsertParams,
-) -> CommandResult<FinanceAllocationTargetRow> {
+    params: FinanceAllocationTargetUpsertParams
+) -> FinanceAllocationTargetRow {
     let (result, updates) = state.finance_allocation_target_upsert(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "camelCase")]
 #[specta::specta]
 pub async fn finance_allocation_targets(
@@ -343,18 +282,17 @@ pub async fn finance_allocation_targets(
 
 // ── Investment Transactions ─────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_investment_tx_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    params: FinanceInvestmentTxCreateParams,
-) -> CommandResult<FinanceInvestmentTxRow> {
+    params: FinanceInvestmentTxCreateParams
+) -> FinanceInvestmentTxRow {
     let (result, updates) = state.finance_investment_tx_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "camelCase")]
 #[specta::specta]
 pub async fn finance_investment_txs(
@@ -366,6 +304,7 @@ pub async fn finance_investment_txs(
 
 // ── Reports ─────────────────────────────────────────────────────────────
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "camelCase")]
 #[specta::specta]
 pub async fn finance_report_spending(
@@ -376,34 +315,28 @@ pub async fn finance_report_spending(
     state.finance_report_spending(date_from, date_to).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_report_income(
-    state: State<'_, Arc<AppCore>>,
     date_from: Option<String>,
-    date_to: Option<String>,
-) -> CommandResult<FinanceCategoryReportResponse> {
+    date_to: Option<String>
+) -> FinanceCategoryReportResponse {
     state.finance_report_income(date_from, date_to).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn finance_report_trends(
-    state: State<'_, Arc<AppCore>>,
     metric: String,
-    periods: Option<i64>,
-) -> CommandResult<Vec<FinanceTrendPoint>> {
+    periods: Option<i64>
+) -> Vec<FinanceTrendPoint> {
     state.finance_report_trends(metric, periods).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn finance_monthly_summary(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<FinanceMonthlySummaryResponse> {
+#[klynt_command]
+pub async fn finance_monthly_summary() -> FinanceMonthlySummaryResponse {
     state.finance_monthly_summary().await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "camelCase")]
 #[specta::specta]
 pub async fn finance_daily_spending(
@@ -414,6 +347,7 @@ pub async fn finance_daily_spending(
     state.finance_daily_spending(date_from, date_to).await
 }
 
+#[klynt_raw_command]
 #[tauri::command(rename_all = "camelCase")]
 #[specta::specta]
 pub async fn finance_period_summary(
@@ -425,48 +359,6 @@ pub async fn finance_period_summary(
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "finance_accounts",
-    "finance_transactions",
-    "finance_transactions_filtered",
-    "finance_budget_usage",
-    "finance_portfolios",
-    "finance_investments",
-    "finance_investments_filtered",
-    "finance_goals",
-    "finance_liabilities",
-    "finance_net_worth",
-    "finance_exchange_rates",
-    "finance_account_create",
-    "finance_account_update",
-    "finance_account_delete",
-    "finance_transaction_create",
-    "finance_transaction_delete",
-    "finance_budget_create",
-    "finance_budget_update",
-    "finance_budget_delete",
-    "finance_goal_create",
-    "finance_goal_update",
-    "finance_goal_delete",
-    "finance_liability_create",
-    "finance_liability_update",
-    "finance_liability_delete",
-    "finance_portfolio_create",
-    "finance_investment_create",
-    "finance_investment_update",
-    "finance_allocation_target_upsert",
-    "finance_allocation_targets",
-    "finance_investment_tx_create",
-    "finance_investment_txs",
-    "finance_report_spending",
-    "finance_report_income",
-    "finance_report_trends",
-    "finance_monthly_summary",
-    "finance_daily_spending",
-    "finance_period_summary",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
