@@ -7,6 +7,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn view_set_active(
     state: State<'_, Arc<AppCore>>,
     params: SetActiveViewParams,
@@ -15,11 +16,13 @@ pub async fn view_set_active(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn view_clear_active(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     state.view_clear_active().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn view_get_active(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<ActiveViewResponse, ApiError> {

@@ -6,6 +6,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn retention_history(
     state: State<'_, Arc<AppCore>>,
     days: i64,

@@ -8,11 +8,13 @@ use desktop_shared::errors::ApiError;
 use tauri::State;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn list_squads(state: State<'_, Arc<AppCore>>) -> Result<Vec<SquadResponse>, ApiError> {
     state.list_squads().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_squad(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -21,6 +23,7 @@ pub async fn get_squad(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn create_squad(
     state: State<'_, Arc<AppCore>>,
     params: CreateSquadParams,
@@ -29,6 +32,7 @@ pub async fn create_squad(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn update_squad(
     state: State<'_, Arc<AppCore>>,
     params: UpdateSquadParams,
@@ -37,11 +41,13 @@ pub async fn update_squad(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn delete_squad(state: State<'_, Arc<AppCore>>, id: String) -> Result<(), ApiError> {
     state.delete_squad(&id).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn add_squad_member(
     state: State<'_, Arc<AppCore>>,
     params: SquadMemberParams,
@@ -50,6 +56,7 @@ pub async fn add_squad_member(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn remove_squad_member(
     state: State<'_, Arc<AppCore>>,
     squad_id: String,

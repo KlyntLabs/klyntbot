@@ -6,6 +6,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn entity_link_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -17,6 +18,7 @@ pub async fn entity_link_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn entity_link_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -28,6 +30,7 @@ pub async fn entity_link_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn entity_links_for_entity(
     state: State<'_, Arc<AppCore>>,
     kind: String,

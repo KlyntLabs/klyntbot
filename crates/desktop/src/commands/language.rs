@@ -11,6 +11,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn language_translate_breakdown(
     state: State<'_, Arc<AppCore>>,
     params: TranslateBreakdownParams,
@@ -19,6 +20,7 @@ pub async fn language_translate_breakdown(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn language_evaluate_translation(
     state: State<'_, Arc<AppCore>>,
     params: EvaluateTranslationParams,
@@ -27,6 +29,7 @@ pub async fn language_evaluate_translation(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn language_save_vocabulary(
     state: State<'_, Arc<AppCore>>,
     params: VocabularySaveParams,
@@ -35,6 +38,7 @@ pub async fn language_save_vocabulary(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn language_detect_confusables(
     state: State<'_, Arc<AppCore>>,
     params: DetectConfusablesParams,
@@ -43,6 +47,7 @@ pub async fn language_detect_confusables(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn language_enrich_annotation(
     state: State<'_, Arc<AppCore>>,
     params: EnrichAnnotationParams,
@@ -51,6 +56,7 @@ pub async fn language_enrich_annotation(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn language_quick_translate(
     state: State<'_, Arc<AppCore>>,
     params: QuickTranslateParams,

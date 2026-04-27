@@ -24,6 +24,7 @@ use crate::app_core::AppCore;
 // ── Read-only queries ───────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_accounts(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<FinanceAccountRow>, ApiError> {
@@ -31,6 +32,7 @@ pub async fn finance_accounts(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_transactions(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
@@ -39,6 +41,7 @@ pub async fn finance_transactions(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_transactions_filtered(
     state: State<'_, Arc<AppCore>>,
     params: FinanceTransactionFilterParams,
@@ -47,6 +50,7 @@ pub async fn finance_transactions_filtered(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_budget_usage(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<BudgetUsageRow>, ApiError> {
@@ -54,6 +58,7 @@ pub async fn finance_budget_usage(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_portfolios(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<FinancePortfolioResponse>, ApiError> {
@@ -61,6 +66,7 @@ pub async fn finance_portfolios(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_investments(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<FinanceInvestmentRow>, ApiError> {
@@ -68,6 +74,7 @@ pub async fn finance_investments(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_investments_filtered(
     state: State<'_, Arc<AppCore>>,
     portfolio_id: Option<String>,
@@ -76,6 +83,7 @@ pub async fn finance_investments_filtered(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_goals(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<FinanceGoalRow>, ApiError> {
@@ -83,6 +91,7 @@ pub async fn finance_goals(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_liabilities(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<FinanceLiabilityRow>, ApiError> {
@@ -90,6 +99,7 @@ pub async fn finance_liabilities(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_net_worth(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<FinanceNetWorthResponse, ApiError> {
@@ -97,6 +107,7 @@ pub async fn finance_net_worth(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_exchange_rates(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<HashMap<String, f64>, ApiError> {
@@ -106,6 +117,7 @@ pub async fn finance_exchange_rates(
 // ── Mutations ───────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_account_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -117,6 +129,7 @@ pub async fn finance_account_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_account_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -128,6 +141,7 @@ pub async fn finance_account_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_account_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -139,6 +153,7 @@ pub async fn finance_account_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_transaction_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -150,6 +165,7 @@ pub async fn finance_transaction_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_transaction_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -161,6 +177,7 @@ pub async fn finance_transaction_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_budget_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -172,6 +189,7 @@ pub async fn finance_budget_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_budget_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -183,6 +201,7 @@ pub async fn finance_budget_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_budget_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -194,6 +213,7 @@ pub async fn finance_budget_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_goal_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -205,6 +225,7 @@ pub async fn finance_goal_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_goal_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -216,6 +237,7 @@ pub async fn finance_goal_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_goal_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -227,6 +249,7 @@ pub async fn finance_goal_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_liability_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -238,6 +261,7 @@ pub async fn finance_liability_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_liability_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -249,6 +273,7 @@ pub async fn finance_liability_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_liability_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -260,6 +285,7 @@ pub async fn finance_liability_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_portfolio_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -271,6 +297,7 @@ pub async fn finance_portfolio_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_investment_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -282,6 +309,7 @@ pub async fn finance_investment_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_investment_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -295,6 +323,7 @@ pub async fn finance_investment_update(
 // ── Allocation Targets ──────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_allocation_target_upsert(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -306,6 +335,7 @@ pub async fn finance_allocation_target_upsert(
 }
 
 #[tauri::command(rename_all = "camelCase")]
+#[specta::specta]
 pub async fn finance_allocation_targets(
     state: State<'_, Arc<AppCore>>,
     portfolio_id: String,
@@ -316,6 +346,7 @@ pub async fn finance_allocation_targets(
 // ── Investment Transactions ─────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_investment_tx_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -327,6 +358,7 @@ pub async fn finance_investment_tx_create(
 }
 
 #[tauri::command(rename_all = "camelCase")]
+#[specta::specta]
 pub async fn finance_investment_txs(
     state: State<'_, Arc<AppCore>>,
     investment_id: String,
@@ -337,6 +369,7 @@ pub async fn finance_investment_txs(
 // ── Reports ─────────────────────────────────────────────────────────────
 
 #[tauri::command(rename_all = "camelCase")]
+#[specta::specta]
 pub async fn finance_report_spending(
     state: State<'_, Arc<AppCore>>,
     date_from: Option<String>,
@@ -346,6 +379,7 @@ pub async fn finance_report_spending(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_report_income(
     state: State<'_, Arc<AppCore>>,
     date_from: Option<String>,
@@ -355,6 +389,7 @@ pub async fn finance_report_income(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_report_trends(
     state: State<'_, Arc<AppCore>>,
     metric: String,
@@ -364,6 +399,7 @@ pub async fn finance_report_trends(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn finance_monthly_summary(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<FinanceMonthlySummaryResponse, ApiError> {
@@ -371,6 +407,7 @@ pub async fn finance_monthly_summary(
 }
 
 #[tauri::command(rename_all = "camelCase")]
+#[specta::specta]
 pub async fn finance_daily_spending(
     state: State<'_, Arc<AppCore>>,
     date_from: String,
@@ -380,6 +417,7 @@ pub async fn finance_daily_spending(
 }
 
 #[tauri::command(rename_all = "camelCase")]
+#[specta::specta]
 pub async fn finance_period_summary(
     state: State<'_, Arc<AppCore>>,
     date_from: String,

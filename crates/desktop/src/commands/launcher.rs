@@ -12,6 +12,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn launcher_search(
     state: State<'_, Arc<AppCore>>,
     query: String,
@@ -20,6 +21,7 @@ pub async fn launcher_search(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn launcher_execute(
     state: State<'_, Arc<AppCore>>,
     item_id: String,
@@ -32,11 +34,13 @@ pub async fn launcher_execute(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn launcher_dashboard(state: State<'_, Arc<AppCore>>) -> Result<DashboardData, ApiError> {
     state.launcher_dashboard().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn launcher_clipboard_paste(
     state: State<'_, Arc<AppCore>>,
     id: i64,
@@ -45,6 +49,7 @@ pub async fn launcher_clipboard_paste(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn launcher_clipboard_delete(
     state: State<'_, Arc<AppCore>>,
     id: i64,
@@ -53,6 +58,7 @@ pub async fn launcher_clipboard_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn launcher_clipboard_pin(
     state: State<'_, Arc<AppCore>>,
     id: i64,
@@ -62,6 +68,7 @@ pub async fn launcher_clipboard_pin(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn launcher_run_script(
     path: String,
     args: Option<std::collections::HashMap<String, String>>,
@@ -74,6 +81,7 @@ pub async fn launcher_run_script(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn launcher_system_command(
     action: SystemAction,
     args: Option<std::collections::HashMap<String, String>>,
@@ -87,6 +95,7 @@ pub async fn launcher_system_command(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn launcher_window_action(action: WindowAction) -> Result<(), ApiError> {
     feature_launcher::window_manager()
         .execute(&action)
@@ -94,6 +103,7 @@ pub async fn launcher_window_action(action: WindowAction) -> Result<(), ApiError
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn launcher_open_app(path: String) -> Result<(), ApiError> {
     #[cfg(target_os = "macos")]
     {

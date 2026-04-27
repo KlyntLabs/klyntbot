@@ -8,6 +8,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -19,6 +20,7 @@ pub async fn project_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -27,6 +29,7 @@ pub async fn project_get(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -38,6 +41,7 @@ pub async fn project_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -49,6 +53,7 @@ pub async fn project_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_archive(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -60,6 +65,7 @@ pub async fn project_archive(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_update_instructions(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -72,6 +78,7 @@ pub async fn project_update_instructions(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_update_role(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -84,6 +91,7 @@ pub async fn project_update_role(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_health_metrics(
     state: State<'_, Arc<AppCore>>,
     project_id: String,

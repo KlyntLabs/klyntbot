@@ -8,6 +8,7 @@ pub mod pipeline;
 pub mod repos;
 pub mod search;
 pub mod services;
+pub mod specta_helpers;
 pub mod types;
 
 // ── Module re-exports (backward-compatible paths) ──────────

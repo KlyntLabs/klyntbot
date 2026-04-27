@@ -8,12 +8,14 @@ use tauri::{AppHandle, State};
 use crate::shortcuts::register_shortcuts;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn shortcuts_get(state: State<'_, Arc<AppCore>>) -> Result<ShortcutsConfig, ApiError> {
     let cfg = state.config.read().await;
     Ok(cfg.shortcuts.clone())
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn shortcuts_update(
     app: AppHandle,
     state: State<'_, Arc<AppCore>>,

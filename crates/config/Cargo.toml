@@ -9,6 +9,7 @@ license.workspace = true
 common.workspace = true
 serde = { workspace = true }
 serde_json = { workspace = true }
+specta = { workspace = true }
 dirs.workspace = true
 tokio.workspace = true
 iana-time-zone = { workspace = true }

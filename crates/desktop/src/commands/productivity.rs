@@ -17,6 +17,7 @@ use crate::app_core::AppCore;
 use crate::focus_timer::FocusTimer;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_today(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Option<ProductivitySummaryResponse>, ApiError> {
@@ -24,6 +25,7 @@ pub async fn productivity_today(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_timeline(
     state: State<'_, Arc<AppCore>>,
     date: String,
@@ -37,6 +39,7 @@ pub async fn productivity_timeline(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_focus_start(
     state: State<'_, Arc<AppCore>>,
     action_id: Option<String>,
@@ -49,6 +52,7 @@ pub async fn productivity_focus_start(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_focus_end(
     state: State<'_, Arc<AppCore>>,
     notes: Option<String>,
@@ -57,6 +61,7 @@ pub async fn productivity_focus_end(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_focus_status(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Option<FocusSessionResponse>, ApiError> {
@@ -64,6 +69,7 @@ pub async fn productivity_focus_status(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_sessions(
     state: State<'_, Arc<AppCore>>,
     date: String,
@@ -72,6 +78,7 @@ pub async fn productivity_sessions(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_intelligence_sessions(
     state: State<'_, Arc<AppCore>>,
     date: String,
@@ -83,6 +90,7 @@ pub async fn productivity_intelligence_sessions(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_weekly(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<ProductivitySummaryResponse>, ApiError> {
@@ -90,6 +98,7 @@ pub async fn productivity_weekly(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_categories(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<ActivityCategoryResponse>, ApiError> {
@@ -97,6 +106,7 @@ pub async fn productivity_categories(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_tracked_apps(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<TrackedAppResponse>, ApiError> {
@@ -104,6 +114,7 @@ pub async fn productivity_tracked_apps(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_summary_range(
     state: State<'_, Arc<AppCore>>,
     start_date: String,
@@ -113,6 +124,7 @@ pub async fn productivity_summary_range(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_activity_feed(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
@@ -121,6 +133,7 @@ pub async fn productivity_activity_feed(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_goals(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<GoalProgressResponse>, ApiError> {
@@ -128,6 +141,7 @@ pub async fn productivity_goals(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_pomodoro_start(
     state: State<'_, Arc<AppCore>>,
     work_mins: Option<i64>,
@@ -139,6 +153,7 @@ pub async fn productivity_pomodoro_start(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_time_entries(
     state: State<'_, Arc<AppCore>>,
     date: String,
@@ -147,6 +162,7 @@ pub async fn productivity_time_entries(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_goal_create(
     state: State<'_, Arc<AppCore>>,
     goal_type: String,
@@ -159,6 +175,7 @@ pub async fn productivity_goal_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_goal_delete(
     state: State<'_, Arc<AppCore>>,
     id: i64,
@@ -167,6 +184,7 @@ pub async fn productivity_goal_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_goal_toggle(
     state: State<'_, Arc<AppCore>>,
     id: i64,
@@ -176,6 +194,7 @@ pub async fn productivity_goal_toggle(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_time_entry_create(
     state: State<'_, Arc<AppCore>>,
     description: String,
@@ -189,6 +208,7 @@ pub async fn productivity_time_entry_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_time_entry_delete(
     state: State<'_, Arc<AppCore>>,
     id: i64,
@@ -197,6 +217,7 @@ pub async fn productivity_time_entry_delete(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_category_upsert(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -212,6 +233,7 @@ pub async fn productivity_category_upsert(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_category_delete(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -220,6 +242,7 @@ pub async fn productivity_category_delete(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_recategorize_app(
     state: State<'_, Arc<AppCore>>,
     app_name: String,
@@ -234,6 +257,7 @@ pub async fn productivity_recategorize_app(
 // ── V2: Insights & Auto-Focus ─────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_insights(
     state: State<'_, Arc<AppCore>>,
     date: Option<String>,
@@ -242,6 +266,7 @@ pub async fn productivity_insights(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_insight_dismiss(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -250,6 +275,7 @@ pub async fn productivity_insight_dismiss(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_auto_focus_start(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<FocusSessionResponse, ApiError> {
@@ -257,6 +283,7 @@ pub async fn productivity_auto_focus_start(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_auto_focus_end(
     state: State<'_, Arc<AppCore>>,
     event: AutoFocusEvent,
@@ -265,6 +292,7 @@ pub async fn productivity_auto_focus_end(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_auto_focus_confirm(
     state: State<'_, Arc<AppCore>>,
     payload: AutoFocusPayload,
@@ -273,6 +301,7 @@ pub async fn productivity_auto_focus_confirm(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn distraction_respond(
     state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
@@ -306,6 +335,7 @@ pub async fn distraction_respond(
 // ── V3: Project Tracking ─────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_projects_list(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<ProductivityProjectResponse>, ApiError> {
@@ -313,6 +343,7 @@ pub async fn productivity_projects_list(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_project_upsert(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -327,6 +358,7 @@ pub async fn productivity_project_upsert(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_project_delete(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -335,6 +367,7 @@ pub async fn productivity_project_delete(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_weekly_assessment(
     state: State<'_, Arc<AppCore>>,
     week_start: String,
@@ -343,6 +376,7 @@ pub async fn productivity_weekly_assessment(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_calendar_events(
     state: State<'_, Arc<AppCore>>,
     date: String,
@@ -351,6 +385,7 @@ pub async fn productivity_calendar_events(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn calendar_sync_events(
     state: State<'_, Arc<AppCore>>,
     events: Vec<desktop_shared::commands::CalendarEventInput>,
@@ -365,6 +400,7 @@ use desktop_shared::commands::FocusSessionStatusResponse;
 
 #[allow(clippy::too_many_arguments)]
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn focus_session_start(
     state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
@@ -413,6 +449,7 @@ pub async fn focus_session_start(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn focus_session_stop(
     state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
@@ -429,6 +466,7 @@ pub async fn focus_session_stop(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn focus_session_status(
     state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
@@ -444,16 +482,19 @@ pub async fn focus_session_status(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn focus_session_pause(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
     Ok(timer.send_command(SessionCommand::Pause).await)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn focus_session_resume(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
     Ok(timer.send_command(SessionCommand::Resume).await)
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn focus_session_extend(
     timer: State<'_, Arc<FocusTimer>>,
     extra_secs: u64,
@@ -462,6 +503,7 @@ pub async fn focus_session_extend(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn focus_session_start_break(
     timer: State<'_, Arc<FocusTimer>>,
 ) -> Result<bool, ApiError> {
@@ -469,6 +511,7 @@ pub async fn focus_session_start_break(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn focus_session_extend_work(
     timer: State<'_, Arc<FocusTimer>>,
     extra_mins: u64,
@@ -479,11 +522,13 @@ pub async fn focus_session_extend_work(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn focus_session_skip_break(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
     Ok(timer.send_command(SessionCommand::SkipBreak).await)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn focus_session_take_break(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
     Ok(timer.send_command(SessionCommand::TakeBreak).await)
 }
@@ -491,6 +536,7 @@ pub async fn focus_session_take_break(timer: State<'_, Arc<FocusTimer>>) -> Resu
 // ── Patterns & Hourly Breakdown ─────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn productivity_patterns(
     state: State<'_, Arc<AppCore>>,
     days: Option<u32>,
@@ -499,6 +545,7 @@ pub async fn productivity_patterns(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn productivity_hourly_breakdown(
     state: State<'_, Arc<AppCore>>,
     start_date: String,

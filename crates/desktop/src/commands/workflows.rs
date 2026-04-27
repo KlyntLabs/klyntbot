@@ -9,6 +9,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn workflow_list(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<StatusWorkflowResponse>, ApiError> {
@@ -16,6 +17,7 @@ pub async fn workflow_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn workflow_get(
     id: String,
     state: State<'_, Arc<AppCore>>,
@@ -24,6 +26,7 @@ pub async fn workflow_get(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn workflow_get_effective(
     project_id: Option<String>,
     state: State<'_, Arc<AppCore>>,
@@ -32,6 +35,7 @@ pub async fn workflow_get_effective(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn workflow_create(
     params: WorkflowCreateParams,
     state: State<'_, Arc<AppCore>>,
@@ -40,11 +44,13 @@ pub async fn workflow_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn workflow_delete(id: String, state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
     state.workflow_delete(id).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn label_create(
     params: LabelCreateParams,
     state: State<'_, Arc<AppCore>>,
@@ -53,6 +59,7 @@ pub async fn label_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn label_update(
     params: LabelUpdateParams,
     state: State<'_, Arc<AppCore>>,
@@ -61,11 +68,13 @@ pub async fn label_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn label_delete(id: String, state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
     state.label_delete(id).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn label_reorder(
     params: LabelReorderParams,
     state: State<'_, Arc<AppCore>>,

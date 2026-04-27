@@ -6,6 +6,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_conversations_list(
     state: State<'_, Arc<AppCore>>,
     project_id: String,

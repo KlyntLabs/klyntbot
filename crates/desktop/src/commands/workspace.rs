@@ -13,6 +13,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
 ];
 
 #[tauri::command]
+#[specta::specta]
 pub async fn workspace_list_files(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<WorkspaceFile>, ApiError> {
@@ -20,6 +21,7 @@ pub async fn workspace_list_files(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn workspace_read_file(
     state: State<'_, Arc<AppCore>>,
     filename: String,
@@ -28,6 +30,7 @@ pub async fn workspace_read_file(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn workspace_write_file(
     state: State<'_, Arc<AppCore>>,
     filename: String,

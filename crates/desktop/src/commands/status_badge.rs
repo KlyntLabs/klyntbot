@@ -13,6 +13,7 @@ const WIDTH: f64 = 280.0;
 const HEIGHT: f64 = 40.0;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn show_status_badge(
     app: AppHandle,
     text: String,

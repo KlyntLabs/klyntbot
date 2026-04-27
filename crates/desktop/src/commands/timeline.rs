@@ -7,6 +7,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn timeline_query(
     state: State<'_, Arc<AppCore>>,
     start_date: String,

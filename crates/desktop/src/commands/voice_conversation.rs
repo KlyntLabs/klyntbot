@@ -15,6 +15,7 @@ fn set_tray_voice(active: bool, phase: u8) {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_conversation_start(
     state: State<'_, Arc<AppCore>>,
     session_key: Option<String>,
@@ -25,6 +26,7 @@ pub async fn voice_conversation_start(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_conversation_pause(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     let result = state.voice_conversation_pause().await;
     set_tray_voice(false, 0);
@@ -32,6 +34,7 @@ pub async fn voice_conversation_pause(state: State<'_, Arc<AppCore>>) -> Result<
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_conversation_resume(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     let result = state.voice_conversation_resume().await;
     set_tray_voice(true, 1);
@@ -39,16 +42,19 @@ pub async fn voice_conversation_resume(state: State<'_, Arc<AppCore>>) -> Result
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_conversation_interrupt(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     state.voice_conversation_interrupt().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_conversation_continue(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     state.voice_conversation_continue().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_conversation_new_session(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<VoiceConversationStartResponse, ApiError> {
@@ -58,6 +64,7 @@ pub async fn voice_conversation_new_session(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_conversation_end(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     let result = state.voice_conversation_end().await;
     set_tray_voice(false, 0);
@@ -65,6 +72,7 @@ pub async fn voice_conversation_end(state: State<'_, Arc<AppCore>>) -> Result<()
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_conversation_status(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<VoiceConversationStatusResponse, ApiError> {

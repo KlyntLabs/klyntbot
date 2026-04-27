@@ -6,11 +6,13 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn ai_tools_detect(state: State<'_, Arc<AppCore>>) -> Result<Vec<AiToolInfo>, ApiError> {
     state.ai_tools_detect().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn ai_tools_install(
     state: State<'_, Arc<AppCore>>,
     params: AiToolsInstallParams,

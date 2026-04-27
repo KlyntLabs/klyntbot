@@ -6,6 +6,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_memories_list(
     state: State<'_, Arc<AppCore>>,
     project_id: String,
@@ -14,6 +15,7 @@ pub async fn project_memories_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_memories_by_type(
     state: State<'_, Arc<AppCore>>,
     project_id: String,

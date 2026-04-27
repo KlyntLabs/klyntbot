@@ -9,6 +9,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn custom_column_list(
     state: State<'_, Arc<AppCore>>,
     project_id: String,
@@ -17,6 +18,7 @@ pub async fn custom_column_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn custom_column_create(
     state: State<'_, Arc<AppCore>>,
     params: ColumnCreateParams,
@@ -25,6 +27,7 @@ pub async fn custom_column_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn custom_column_update(
     state: State<'_, Arc<AppCore>>,
     params: ColumnUpdateParams,
@@ -33,6 +36,7 @@ pub async fn custom_column_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn custom_column_delete(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -41,6 +45,7 @@ pub async fn custom_column_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn custom_column_reorder(
     state: State<'_, Arc<AppCore>>,
     params: ColumnReorderParams,
@@ -49,6 +54,7 @@ pub async fn custom_column_reorder(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn custom_column_values(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
@@ -57,6 +63,7 @@ pub async fn custom_column_values(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn custom_column_value_set(
     state: State<'_, Arc<AppCore>>,
     params: ColumnValueSetParams,
@@ -65,6 +72,7 @@ pub async fn custom_column_value_set(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn custom_column_value_delete(
     state: State<'_, Arc<AppCore>>,
     task_id: String,

@@ -15,6 +15,7 @@ const RESIZABLE_WINDOWS: &[&str] = &[WINDOW_LAUNCHER, WINDOW_TRAY];
 pub static QUIT_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
+#[specta::specta]
 pub fn resize_window(app: tauri::AppHandle, label: String, height: f64) {
     if !RESIZABLE_WINDOWS.contains(&label.as_str()) {
         return;
@@ -32,11 +33,13 @@ pub fn resize_window(app: tauri::AppHandle, label: String, height: f64) {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn open_url(url: String) {
     let _ = open::that(&url);
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn show_dashboard(app: tauri::AppHandle) {
     // Restore Dock icon before showing the window
     #[cfg(target_os = "macos")]
@@ -49,6 +52,7 @@ pub fn show_dashboard(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn quit_app(app: tauri::AppHandle) {
     QUIT_REQUESTED.store(true, Ordering::SeqCst);
     if let Some(core) = app.try_state::<Arc<AppCore>>() {

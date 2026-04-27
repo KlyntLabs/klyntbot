@@ -10,6 +10,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -18,6 +19,7 @@ pub async fn task_get(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_list(
     state: State<'_, Arc<AppCore>>,
     area_id: Option<String>,
@@ -28,6 +30,7 @@ pub async fn task_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -39,6 +42,7 @@ pub async fn task_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -50,6 +54,7 @@ pub async fn task_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -61,6 +66,7 @@ pub async fn task_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_toggle_complete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -72,6 +78,7 @@ pub async fn task_toggle_complete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_list_children(
     state: State<'_, Arc<AppCore>>,
     parent_id: String,
@@ -80,6 +87,7 @@ pub async fn task_list_children(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn today_tasks(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<TodayTaskResponse>, ApiError> {
@@ -87,6 +95,7 @@ pub async fn today_tasks(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_list(
     state: State<'_, Arc<AppCore>>,
     area_id: Option<String>,
@@ -95,6 +104,7 @@ pub async fn project_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn objective_list(
     state: State<'_, Arc<AppCore>>,
     project_id: Option<String>,
@@ -105,6 +115,7 @@ pub async fn objective_list(
 // ── Dependencies ────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_add_dependency(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
@@ -114,6 +125,7 @@ pub async fn task_add_dependency(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_list_dependencies(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
@@ -124,6 +136,7 @@ pub async fn task_list_dependencies(
 // ── Attachments ─────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_add_attachment(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
@@ -137,6 +150,7 @@ pub async fn task_add_attachment(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_list_attachments(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
@@ -147,6 +161,7 @@ pub async fn task_list_attachments(
 // ── Time entries ────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_add_time_entry(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
@@ -163,6 +178,7 @@ pub async fn task_add_time_entry(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn task_list_time_entries(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
@@ -172,6 +188,7 @@ pub async fn task_list_time_entries(
 
 /// Fire-and-forget cross-domain check. Called by frontend when a detail view mounts.
 #[tauri::command]
+#[specta::specta]
 pub async fn cross_domain_check(
     state: State<'_, Arc<AppCore>>,
     domain: String,

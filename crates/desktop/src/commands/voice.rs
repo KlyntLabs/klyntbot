@@ -9,16 +9,19 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_start_dictation(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     state.voice_start_dictation().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_stop_dictation(state: State<'_, Arc<AppCore>>) -> Result<String, ApiError> {
     state.voice_stop_dictation().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_simulate_event(
     state: State<'_, Arc<AppCore>>,
     event: serde_json::Value,
@@ -27,6 +30,7 @@ pub async fn voice_simulate_event(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_list_devices(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<AudioDevicesResponse, ApiError> {
@@ -34,6 +38,7 @@ pub async fn voice_list_devices(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_model_status(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<VoiceModelStatusResponse, ApiError> {
@@ -41,6 +46,7 @@ pub async fn voice_model_status(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_download_model(
     state: State<'_, Arc<AppCore>>,
     model: String,
@@ -49,6 +55,7 @@ pub async fn voice_download_model(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_delete_model(
     state: State<'_, Arc<AppCore>>,
     model: String,
@@ -57,6 +64,7 @@ pub async fn voice_delete_model(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn voice_test_persona(
     state: State<'_, Arc<AppCore>>,
     persona: String,

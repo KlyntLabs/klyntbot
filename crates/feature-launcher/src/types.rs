@@ -2,7 +2,7 @@ use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ArgSpec {
     pub name: String,
@@ -12,7 +12,7 @@ pub struct ArgSpec {
     pub required: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "type", content = "values", rename_all = "camelCase")]
 pub enum ArgKind {
     Text,
@@ -24,7 +24,7 @@ fn default_true() -> bool {
     true
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct LauncherItem {
     pub id: String,
     pub title: String,
@@ -38,7 +38,7 @@ pub struct LauncherItem {
     pub arguments: Vec<ArgSpec>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum FileKind {
     File,
@@ -49,7 +49,7 @@ pub enum FileKind {
     Archive,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum LauncherItemKind {
     Application {
@@ -81,6 +81,7 @@ pub enum LauncherItemKind {
     },
     Calendar {
         event_id: String,
+        #[specta(type = String)]
         starts_at: Timestamp,
     },
     AiChat {
@@ -134,7 +135,7 @@ pub enum LauncherItemKind {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ClipboardContentType {
     Text,
@@ -142,7 +143,7 @@ pub enum ClipboardContentType {
     File,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum SystemAction {
     LockScreen,
@@ -155,7 +156,7 @@ pub enum SystemAction {
     EjectAll,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum WindowAction {
     LeftHalf,
@@ -171,7 +172,7 @@ pub enum WindowAction {
     Preset(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardData {
     pub focus: Option<FocusDashboard>,
@@ -180,7 +181,7 @@ pub struct DashboardData {
     pub productivity: ProductivityDashboard,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct FocusDashboard {
     pub task_name: Option<String>,
@@ -189,17 +190,19 @@ pub struct FocusDashboard {
     pub session_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CalendarDashboard {
     pub event_id: String,
     pub title: String,
+    #[specta(type = String)]
     pub starts_at: Timestamp,
+    #[specta(type = String)]
     pub ends_at: Timestamp,
     pub minutes_until: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskDashboard {
     pub id: String,
@@ -209,7 +212,7 @@ pub struct TaskDashboard {
     pub due_date: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProductivityDashboard {
     pub total_minutes: i64,
@@ -219,13 +222,13 @@ pub struct ProductivityDashboard {
 }
 
 /// Result from a search provider before ranking
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct SearchResult {
     pub item: LauncherItem,
     pub base_score: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct LauncherExecuteResult {
     pub status: ExecStatus,
@@ -233,14 +236,14 @@ pub struct LauncherExecuteResult {
     pub badge: BadgeKind,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "kind", content = "message", rename_all = "camelCase")]
 pub enum ExecStatus {
     Ok,
     Err(String),
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum BadgeKind {
     Success,

@@ -10,6 +10,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn fabric_graph_base(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<FabricGraphBase, ApiError> {
@@ -17,6 +18,7 @@ pub async fn fabric_graph_base(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn fabric_graph_expand(
     state: State<'_, Arc<AppCore>>,
     params: FabricExpandParams,
@@ -25,6 +27,7 @@ pub async fn fabric_graph_expand(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn fabric_graph_action(
     state: State<'_, Arc<AppCore>>,
     params: FabricActionParams,

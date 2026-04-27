@@ -9,6 +9,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn entity_search(
     state: State<'_, Arc<AppCore>>,
     params: EntitySearchParams,
@@ -17,6 +18,7 @@ pub async fn entity_search(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn entity_merge(
     state: State<'_, Arc<AppCore>>,
     params: EntityMergeParams,
@@ -25,6 +27,7 @@ pub async fn entity_merge(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn entity_get_neighborhood(
     state: State<'_, Arc<AppCore>>,
     entity_id: String,

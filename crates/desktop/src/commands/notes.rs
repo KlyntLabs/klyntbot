@@ -34,6 +34,7 @@ impl ::app_core::events::AppEventEmitter for TauriEmitter {
 // ── Note commands ───────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_list(
     state: State<'_, Arc<AppCore>>,
     notebook_id: Option<String>,
@@ -42,6 +43,7 @@ pub async fn note_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -50,6 +52,7 @@ pub async fn note_get(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -61,6 +64,7 @@ pub async fn note_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -72,6 +76,7 @@ pub async fn note_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -83,6 +88,7 @@ pub async fn note_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_search(
     state: State<'_, Arc<AppCore>>,
     query: String,
@@ -91,6 +97,7 @@ pub async fn note_search(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_search_semantic(
     state: State<'_, Arc<AppCore>>,
     query: String,
@@ -99,6 +106,7 @@ pub async fn note_search_semantic(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_search_hybrid(
     state: State<'_, Arc<AppCore>>,
     query: String,
@@ -107,6 +115,7 @@ pub async fn note_search_hybrid(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_links_all(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<NoteLinkResponse>, ApiError> {
@@ -114,6 +123,7 @@ pub async fn note_links_all(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_list_by_entity(
     state: State<'_, Arc<AppCore>>,
     entity_type: String,
@@ -125,6 +135,7 @@ pub async fn note_list_by_entity(
 // ── Version commands ────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_version_list(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -133,6 +144,7 @@ pub async fn note_version_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_version_create(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -141,6 +153,7 @@ pub async fn note_version_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_version_restore(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -155,6 +168,7 @@ pub async fn note_version_restore(
 // ── Attachment commands ─────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_save_attachment(
     state: State<'_, Arc<AppCore>>,
     data: String,
@@ -166,6 +180,7 @@ pub async fn note_save_attachment(
 // ── Notebook commands ───────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn notebook_list(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<NotebookResponse>, ApiError> {
@@ -173,6 +188,7 @@ pub async fn notebook_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn notebook_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -184,6 +200,7 @@ pub async fn notebook_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn notebook_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -195,6 +212,7 @@ pub async fn notebook_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn notebook_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -208,6 +226,7 @@ pub async fn notebook_delete(
 // ── Archive commands ───────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_archive(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -219,6 +238,7 @@ pub async fn note_archive(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_unarchive(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -230,6 +250,7 @@ pub async fn note_unarchive(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_list_archived(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<NoteListItem>, ApiError> {
@@ -239,6 +260,7 @@ pub async fn note_list_archived(
 // ── Backlink commands ─────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_backlinks(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -249,6 +271,7 @@ pub async fn note_backlinks(
 // ── Suggestion commands ───────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_suggestions(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -259,6 +282,7 @@ pub async fn note_suggestions(
 // ── Tag commands ──────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_tags_all(state: State<'_, Arc<AppCore>>) -> Result<Vec<(String, i64)>, ApiError> {
     state
         .note_repo
@@ -270,6 +294,7 @@ pub async fn note_tags_all(state: State<'_, Arc<AppCore>>) -> Result<Vec<(String
 // ── Unlinked mentions ─────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_unlinked_mentions(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -280,6 +305,7 @@ pub async fn note_unlinked_mentions(
 // ── Inbox commands ────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn inbox_create(
     state: State<'_, Arc<AppCore>>,
     params: InboxCreateParams,
@@ -288,6 +314,7 @@ pub async fn inbox_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn inbox_list(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<InboxItemResponse>, ApiError> {
@@ -295,6 +322,7 @@ pub async fn inbox_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn inbox_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<(), ApiError> {
     state.inbox_delete(&id).await
 }
@@ -302,6 +330,7 @@ pub async fn inbox_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<
 // ── Insight Review commands ─────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_review(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -314,6 +343,7 @@ pub async fn note_insight_review(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_cache_get(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -322,6 +352,7 @@ pub async fn note_insight_cache_get(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_save_flashcards(
     state: State<'_, Arc<AppCore>>,
     params: InsightSaveFlashcardsParams,
@@ -330,6 +361,7 @@ pub async fn note_insight_save_flashcards(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_submit_quiz(
     state: State<'_, Arc<AppCore>>,
     params: InsightQuizSubmitParams,
@@ -338,6 +370,7 @@ pub async fn note_insight_submit_quiz(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_regenerate_tab(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -347,6 +380,7 @@ pub async fn note_insight_regenerate_tab(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_debate(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -358,6 +392,7 @@ pub async fn note_insight_debate(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_list_versions(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -366,6 +401,7 @@ pub async fn note_insight_list_versions(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_get_evolution(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -374,6 +410,7 @@ pub async fn note_insight_get_evolution(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_get_version(
     state: State<'_, Arc<AppCore>>,
     insight_id: String,
@@ -382,6 +419,7 @@ pub async fn note_insight_get_version(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_generate_scenario(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -390,6 +428,7 @@ pub async fn note_insight_generate_scenario(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_changes_summary(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -398,6 +437,7 @@ pub async fn note_insight_changes_summary(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_knowledge_growth(
     state: State<'_, Arc<AppCore>>,
     days: Option<u32>,
@@ -408,6 +448,7 @@ pub async fn note_insight_knowledge_growth(
 // ── Persona Management commands ───────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_list_personas(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<PersonaResponse>, ApiError> {
@@ -415,6 +456,7 @@ pub async fn note_insight_list_personas(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_create_persona(
     state: State<'_, Arc<AppCore>>,
     params: CreatePersonaParams,
@@ -423,6 +465,7 @@ pub async fn note_insight_create_persona(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_update_persona(
     state: State<'_, Arc<AppCore>>,
     params: UpdatePersonaParams,
@@ -431,6 +474,7 @@ pub async fn note_insight_update_persona(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_delete_persona(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -439,6 +483,7 @@ pub async fn note_insight_delete_persona(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_toggle_persona(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -448,6 +493,7 @@ pub async fn note_insight_toggle_persona(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_set_pins(
     state: State<'_, Arc<AppCore>>,
     params: SetPersonaPinsParams,
@@ -456,6 +502,7 @@ pub async fn note_insight_set_pins(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_rate_persona(
     state: State<'_, Arc<AppCore>>,
     params: RatePersonaParams,
@@ -464,6 +511,7 @@ pub async fn note_insight_rate_persona(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_auto_generate_persona(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -472,6 +520,7 @@ pub async fn note_insight_auto_generate_persona(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_persona_chat(
     state: State<'_, Arc<AppCore>>,
     params: PersonaChatParams,
@@ -480,6 +529,7 @@ pub async fn note_insight_persona_chat(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_preview_scope(
     state: State<'_, Arc<AppCore>>,
     params: ScopePreviewParams,
@@ -490,6 +540,7 @@ pub async fn note_insight_preview_scope(
 // ── Flashcard Review commands ───────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_list_decks(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<DeckSummaryResponse>, ApiError> {
@@ -497,6 +548,7 @@ pub async fn flashcard_list_decks(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_get_due(
     state: State<'_, Arc<AppCore>>,
     deck: String,
@@ -506,6 +558,7 @@ pub async fn flashcard_get_due(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_record_review(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardReviewParams,
@@ -514,6 +567,7 @@ pub async fn flashcard_record_review(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -522,6 +576,7 @@ pub async fn flashcard_get(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_create(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardCreateParams,
@@ -530,6 +585,7 @@ pub async fn flashcard_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_update(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardUpdateParams,
@@ -538,6 +594,7 @@ pub async fn flashcard_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_list_cards(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardListParams,
@@ -546,6 +603,7 @@ pub async fn flashcard_list_cards(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_delete(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -554,6 +612,7 @@ pub async fn flashcard_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_get_all_due(
     state: State<'_, Arc<AppCore>>,
     limit: i64,
@@ -562,11 +621,13 @@ pub async fn flashcard_get_all_due(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_total_due(state: State<'_, Arc<AppCore>>) -> Result<i64, ApiError> {
     state.flashcard_total_due().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_list_struggling(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
@@ -575,6 +636,7 @@ pub async fn flashcard_list_struggling(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_generate(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardGenerateParams,
@@ -583,6 +645,7 @@ pub async fn flashcard_generate(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_save_generated(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardSaveGeneratedParams,
@@ -593,6 +656,7 @@ pub async fn flashcard_save_generated(
 // ── Active Recall commands ──────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_submit_answer(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardSubmitAnswerParams,
@@ -601,6 +665,7 @@ pub async fn flashcard_submit_answer(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_explain_answer(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardExplainParams,
@@ -609,6 +674,7 @@ pub async fn flashcard_explain_answer(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_generate_distractors(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardDistractorParams,
@@ -617,6 +683,7 @@ pub async fn flashcard_generate_distractors(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_save_mode_preference(
     state: State<'_, Arc<AppCore>>,
     deck: String,
@@ -631,6 +698,7 @@ pub async fn flashcard_save_mode_preference(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_get_mode_preference(
     state: State<'_, Arc<AppCore>>,
     deck: String,
@@ -647,6 +715,7 @@ pub async fn flashcard_get_mode_preference(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_get_prerequisites(
     state: State<'_, Arc<AppCore>>,
     card_id: String,
@@ -655,6 +724,7 @@ pub async fn flashcard_get_prerequisites(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_save_session(
     state: State<'_, Arc<AppCore>>,
     params: desktop_shared::commands::ReviewSessionSaveParams,
@@ -663,6 +733,7 @@ pub async fn flashcard_save_session(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn flashcard_recent_learning_sessions(
     state: State<'_, Arc<AppCore>>,
     limit: Option<usize>,
@@ -675,6 +746,7 @@ pub async fn flashcard_recent_learning_sessions(
 // ── Retention Health ────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_retention_health(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -685,6 +757,7 @@ pub async fn note_retention_health(
 // ── Editing finished command ─────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_editing_finished(
     state: State<'_, Arc<AppCore>>,
     params: NoteEditingFinishedParams,
@@ -695,6 +768,7 @@ pub async fn note_editing_finished(
 // ── Insight Tab Chat commands ─────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_tab_chat(
     app: tauri::AppHandle,
     state: State<'_, Arc<AppCore>>,
@@ -705,6 +779,7 @@ pub async fn note_insight_tab_chat(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_insight_clear_tab_chats(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -715,6 +790,7 @@ pub async fn note_insight_clear_tab_chats(
 // ── Import / Export ──────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_import_files(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -732,6 +808,7 @@ pub async fn note_import_files(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_export(
     state: State<'_, Arc<AppCore>>,
     _app: tauri::AppHandle,

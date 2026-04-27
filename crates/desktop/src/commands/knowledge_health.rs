@@ -6,6 +6,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn knowledge_health_summary(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<KnowledgeHealthSummary, ApiError> {
@@ -13,6 +14,7 @@ pub async fn knowledge_health_summary(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn knowledge_topic_detail(
     state: State<'_, Arc<AppCore>>,
     params: TopicDetailParams,

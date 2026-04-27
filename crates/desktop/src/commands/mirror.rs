@@ -28,12 +28,14 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
 ];
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_mirror_state(state: State<'_, Arc<AppCore>>) -> Result<MirrorState, ApiError> {
     let facade = state.mirror_facade()?;
     Ok(facade.get_state().await?)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_routing_history(
     state: State<'_, Arc<AppCore>>,
     days: Option<u32>,
@@ -43,6 +45,7 @@ pub async fn get_routing_history(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_mirror_narratives(
     state: State<'_, Arc<AppCore>>,
     limit: Option<u32>,
@@ -52,6 +55,7 @@ pub async fn get_mirror_narratives(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_pending_snippets(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<NarrativeSnippet>, ApiError> {
@@ -60,6 +64,7 @@ pub async fn get_pending_snippets(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn submit_mirror_feedback(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -74,6 +79,7 @@ pub async fn submit_mirror_feedback(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn generate_mirror_response(
     state: State<'_, Arc<AppCore>>,
     query: String,
@@ -83,6 +89,7 @@ pub async fn generate_mirror_response(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn approve_meta_rule(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -95,6 +102,7 @@ pub async fn approve_meta_rule(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn dismiss_meta_rule(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -107,6 +115,7 @@ pub async fn dismiss_meta_rule(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_brain_versions(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<BrainVersion>, ApiError> {
@@ -115,6 +124,7 @@ pub async fn get_brain_versions(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn revert_brain_version(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -127,6 +137,7 @@ pub async fn revert_brain_version(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn kill_trial(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -139,6 +150,7 @@ pub async fn kill_trial(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn continue_trial(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,

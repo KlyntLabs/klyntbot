@@ -10,11 +10,13 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn mcp_get_config(state: State<'_, Arc<AppCore>>) -> Result<McpConfigResponse, ApiError> {
     state.mcp_get_config().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn mcp_add_server(
     state: State<'_, Arc<AppCore>>,
     params: McpAddServerParams,
@@ -23,6 +25,7 @@ pub async fn mcp_add_server(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn mcp_remove_server(
     state: State<'_, Arc<AppCore>>,
     params: McpRemoveParams,
@@ -31,6 +34,7 @@ pub async fn mcp_remove_server(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn mcp_toggle_server(
     state: State<'_, Arc<AppCore>>,
     params: McpToggleParams,
@@ -39,6 +43,7 @@ pub async fn mcp_toggle_server(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn mcp_update_server(
     state: State<'_, Arc<AppCore>>,
     params: McpUpdateServerParams,
@@ -47,11 +52,13 @@ pub async fn mcp_update_server(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn app_info(state: State<'_, Arc<AppCore>>) -> Result<AppInfoResponse, ApiError> {
     state.app_info().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn config_get_section(
     state: State<'_, Arc<AppCore>>,
     section: String,
@@ -60,6 +67,7 @@ pub async fn config_get_section(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn config_update_section(
     state: State<'_, Arc<AppCore>>,
     section: String,
@@ -69,6 +77,7 @@ pub async fn config_update_section(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn config_mark_setup_completed(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     state.config_mark_setup_completed().await
 }

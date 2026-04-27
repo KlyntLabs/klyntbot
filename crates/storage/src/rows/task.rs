@@ -3,7 +3,7 @@
 //! and `task_dependencies` tables.
 
 use crate::sqlite_types::SqlTs;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 /// Row struct for the `tasks` table.
@@ -84,7 +84,7 @@ pub struct TaskEstimationRow {
 }
 
 /// Row struct for the `task_attachments` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskAttachmentRow {
     pub id: uuid::Uuid,
@@ -99,7 +99,7 @@ pub struct TaskAttachmentRow {
 }
 
 /// Row struct for the `task_time_entries` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskTimeEntryRow {
     pub id: uuid::Uuid,

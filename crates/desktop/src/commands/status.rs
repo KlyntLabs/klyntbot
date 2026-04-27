@@ -6,6 +6,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn agent_status(state: State<'_, Arc<AppCore>>) -> Result<AgentStatusResponse, ApiError> {
     state.agent_status().await
 }

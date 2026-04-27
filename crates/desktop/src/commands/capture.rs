@@ -6,6 +6,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn capture_status(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<CaptureStatusResponse, ApiError> {
@@ -13,6 +14,7 @@ pub async fn capture_status(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn capture_shell_hook_status(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<ShellHookStatusResponse, ApiError> {
@@ -20,6 +22,7 @@ pub async fn capture_shell_hook_status(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn capture_install_shell_hook(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<String, ApiError> {
@@ -27,6 +30,7 @@ pub async fn capture_install_shell_hook(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn capture_uninstall_shell_hook(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<String, ApiError> {
@@ -34,6 +38,7 @@ pub async fn capture_uninstall_shell_hook(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn capture_get_ingestion_token(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<String, ApiError> {
@@ -41,6 +46,7 @@ pub async fn capture_get_ingestion_token(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn capture_regenerate_ingestion_token(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<String, ApiError> {

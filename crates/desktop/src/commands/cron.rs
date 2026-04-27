@@ -8,6 +8,7 @@ use desktop_shared::types::{
 use tauri::State;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cron_list(
     state: State<'_, Arc<AppCore>>,
     include_disabled: Option<bool>,
@@ -16,11 +17,13 @@ pub async fn cron_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cron_status(state: State<'_, Arc<AppCore>>) -> Result<CronStatusResponse, ApiError> {
     state.cron_status().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cron_enable(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -33,16 +36,19 @@ pub async fn cron_enable(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cron_run(state: State<'_, Arc<AppCore>>, id: String) -> Result<bool, ApiError> {
     state.cron_run(id).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cron_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<bool, ApiError> {
     state.cron_delete(id).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cron_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -54,6 +60,7 @@ pub async fn cron_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cron_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,

@@ -6,6 +6,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn key_result_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -17,6 +18,7 @@ pub async fn key_result_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn key_result_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -28,6 +30,7 @@ pub async fn key_result_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn key_result_update_metric(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -40,6 +43,7 @@ pub async fn key_result_update_metric(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn key_result_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,

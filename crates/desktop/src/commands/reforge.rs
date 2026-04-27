@@ -7,6 +7,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn reforge_state(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<ReforgeStateResponse, ApiError> {
@@ -14,6 +15,7 @@ pub async fn reforge_state(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn reforge_skill_names(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<SkillListResponse, ApiError> {
@@ -21,6 +23,7 @@ pub async fn reforge_skill_names(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn reforge_skill_versions(
     skill_name: String,
     state: State<'_, Arc<AppCore>>,
@@ -29,6 +32,7 @@ pub async fn reforge_skill_versions(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn reforge_skill_version_detail(
     skill_name: String,
     version: i64,
@@ -38,6 +42,7 @@ pub async fn reforge_skill_version_detail(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn reforge_skill_reset(
     skill_name: String,
     file_path: String,

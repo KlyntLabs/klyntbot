@@ -19,6 +19,7 @@ use super::registry;
 
 /// Start an OAuth flow: opens the browser and waits for the callback.
 #[tauri::command]
+#[specta::specta]
 pub async fn mcp_oauth_start(
     app: AppHandle,
     state: State<'_, Arc<AppCore>>,
@@ -240,6 +241,7 @@ pub async fn mcp_oauth_start(
 
 /// Disconnect OAuth for a server (clear credentials).
 #[tauri::command]
+#[specta::specta]
 pub async fn mcp_oauth_disconnect(
     state: State<'_, Arc<AppCore>>,
     server_name: String,

@@ -24,7 +24,7 @@ pub struct MetricsHealth {
     pub stability_available: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AutoTunerStatus {
     pub champion: autotuner::ChampionSummary,

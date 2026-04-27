@@ -6,6 +6,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn morning_briefing_summary(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<MorningBriefingResponse, ApiError> {

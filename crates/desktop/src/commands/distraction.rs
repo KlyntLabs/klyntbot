@@ -10,6 +10,7 @@ use crate::app_core::AppCore;
 use crate::focus_timer::FocusTimer;
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn distraction_dismiss(
     state: State<'_, Arc<AppCore>>,
     app_name: String,
@@ -18,6 +19,7 @@ pub async fn distraction_dismiss(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn distraction_allow_temp(
     state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
@@ -30,6 +32,7 @@ pub async fn distraction_allow_temp(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+#[specta::specta]
 pub async fn distraction_allow_session(
     state: State<'_, Arc<AppCore>>,
     app_name: String,
@@ -42,6 +45,7 @@ pub async fn distraction_allow_session(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn distraction_learned_rules(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<LearnedRuleResponse>, ApiError> {
@@ -49,6 +53,7 @@ pub async fn distraction_learned_rules(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn distraction_delete_rule(
     state: State<'_, Arc<AppCore>>,
     id: i64,

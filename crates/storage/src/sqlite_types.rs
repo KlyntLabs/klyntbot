@@ -24,6 +24,24 @@ use sqlx::{
     Decode, Encode, Sqlite, Type,
 };
 
+impl specta::Type for SqlTs {
+    fn inline(
+        _type_map: &mut specta::TypeMap,
+        _generics: specta::Generics,
+    ) -> specta::datatype::DataType {
+        specta::datatype::DataType::Primitive(specta::datatype::PrimitiveType::String)
+    }
+}
+
+impl specta::Type for SqlDate {
+    fn inline(
+        _type_map: &mut specta::TypeMap,
+        _generics: specta::Generics,
+    ) -> specta::datatype::DataType {
+        specta::datatype::DataType::Primitive(specta::datatype::PrimitiveType::String)
+    }
+}
+
 // ── SqlTs — Timestamp as INTEGER (epoch ms) ──────────────────────────────────
 
 /// Newtype wrapper: encodes/decodes `jiff::Timestamp` as an `INTEGER` column

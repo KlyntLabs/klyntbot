@@ -10,6 +10,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn list_work_contexts(
     state: State<'_, Arc<AppCore>>,
     status: Option<String>,
@@ -18,6 +19,7 @@ pub async fn list_work_contexts(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_work_context(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -26,6 +28,7 @@ pub async fn get_work_context(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_work_context_detail(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -34,6 +37,7 @@ pub async fn get_work_context_detail(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn update_work_context(
     state: State<'_, Arc<AppCore>>,
     params: WorkContextUpdateParams,
@@ -42,6 +46,7 @@ pub async fn update_work_context(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn archive_work_context(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -50,6 +55,7 @@ pub async fn archive_work_context(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn merge_work_contexts(
     state: State<'_, Arc<AppCore>>,
     keep_id: String,
@@ -59,6 +65,7 @@ pub async fn merge_work_contexts(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn search_work_contexts(
     state: State<'_, Arc<AppCore>>,
     query: String,
@@ -67,6 +74,7 @@ pub async fn search_work_contexts(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_context_timeline(
     state: State<'_, Arc<AppCore>>,
     date: String,
@@ -76,6 +84,7 @@ pub async fn get_context_timeline(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_context_resume_data(
     state: State<'_, Arc<AppCore>>,
     context_id: String,
@@ -84,6 +93,7 @@ pub async fn get_context_resume_data(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_inference_stats(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<InferenceStatsResponse, ApiError> {
@@ -91,6 +101,7 @@ pub async fn get_inference_stats(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_dashboard_intelligence(
     state: State<'_, Arc<AppCore>>,
     date: String,
@@ -102,6 +113,7 @@ pub async fn get_dashboard_intelligence(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn update_inference_config(
     state: State<'_, Arc<AppCore>>,
     config: InferenceConfigUpdate,

@@ -6,11 +6,13 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn area_list(state: State<'_, Arc<AppCore>>) -> Result<Vec<AreaResponse>, ApiError> {
     state.area_list().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn area_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -22,6 +24,7 @@ pub async fn area_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn area_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -33,6 +36,7 @@ pub async fn area_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn area_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -44,6 +48,7 @@ pub async fn area_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn area_reorder(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,

@@ -40,6 +40,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
 ];
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_status(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<CodingMemoryStatusResponse, ApiError> {
@@ -47,6 +48,7 @@ pub async fn coding_memory_status(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_cli_health(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<CliHealthRow>, ApiError> {
@@ -54,6 +56,7 @@ pub async fn coding_memory_cli_health(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_session_replay(
     state: State<'_, Arc<AppCore>>,
     session_id: Option<String>,
@@ -66,6 +69,7 @@ pub async fn coding_memory_session_replay(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_enable_cli(
     state: State<'_, Arc<AppCore>>,
     cli: String,
@@ -74,6 +78,7 @@ pub async fn coding_memory_enable_cli(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_disable_cli(
     state: State<'_, Arc<AppCore>>,
     cli: String,
@@ -82,6 +87,7 @@ pub async fn coding_memory_disable_cli(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_diagnose_cli(
     state: State<'_, Arc<AppCore>>,
     cli: String,
@@ -90,6 +96,7 @@ pub async fn coding_memory_diagnose_cli(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_browser(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
@@ -99,6 +106,7 @@ pub async fn coding_memory_browser(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_activity(
     state: State<'_, Arc<AppCore>>,
     days: Option<i64>,
@@ -107,6 +115,7 @@ pub async fn coding_memory_activity(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_cost(
     state: State<'_, Arc<AppCore>>,
     days: Option<i64>,
@@ -115,6 +124,7 @@ pub async fn coding_memory_cost(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_sensitivity(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
@@ -124,6 +134,7 @@ pub async fn coding_memory_sensitivity(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_distill_now(
     state: State<'_, Arc<AppCore>>,
     session_id: String,
@@ -133,6 +144,7 @@ pub async fn coding_memory_distill_now(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_index(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -144,6 +156,7 @@ pub async fn coding_memory_recall_index(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_timeline(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -155,6 +168,7 @@ pub async fn coding_memory_recall_timeline(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_fetch(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -166,6 +180,7 @@ pub async fn coding_memory_recall_fetch(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_check_dead_ends(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -177,6 +192,7 @@ pub async fn coding_memory_check_dead_ends(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_facts_as_of(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -188,6 +204,7 @@ pub async fn coding_memory_recall_facts_as_of(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_change_history(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -199,6 +216,7 @@ pub async fn coding_memory_recall_change_history(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_decision_points(
     state: State<'_, Arc<AppCore>>,
     args: serde_json::Value,
@@ -210,6 +228,7 @@ pub async fn coding_memory_recall_decision_points(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_recall_log(
     state: State<'_, Arc<AppCore>>,
     args: RecallLogArgs,
@@ -221,6 +240,7 @@ pub async fn coding_memory_recall_log(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_session_replay_recall_overlay(
     state: State<'_, Arc<AppCore>>,
     args: SessionRecallOverlayArgs,
@@ -237,6 +257,7 @@ pub async fn coding_memory_session_replay_recall_overlay(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_mirror_alerts_feed(
     state: State<'_, Arc<AppCore>>,
     args: MirrorAlertsFeedArgs,
@@ -247,6 +268,7 @@ pub async fn coding_memory_mirror_alerts_feed(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_mirror_alert_action(
     state: State<'_, Arc<AppCore>>,
     args: MirrorAlertActionArgs,
@@ -257,6 +279,7 @@ pub async fn coding_memory_mirror_alert_action(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_effectiveness_trends(
     state: State<'_, Arc<AppCore>>,
     pattern_id: String,
@@ -270,6 +293,7 @@ pub async fn coding_memory_effectiveness_trends(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_reforge_cycle_list(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<ReforgeCycleSummary>, ApiError> {
@@ -279,6 +303,7 @@ pub async fn coding_memory_reforge_cycle_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_reforge_cycle_diff(
     state: State<'_, Arc<AppCore>>,
     args: ReforgeCycleDiffArgs,
@@ -289,6 +314,7 @@ pub async fn coding_memory_reforge_cycle_diff(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coding_memory_project_skills_for_repo(
     state: State<'_, Arc<AppCore>>,
     repo_id: String,

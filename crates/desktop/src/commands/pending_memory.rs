@@ -31,6 +31,7 @@ impl From<cognitive::repos::PendingMemoryRow> for PendingMemoryResponse {
 // ── Commands ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn list_pending_memories(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
@@ -41,6 +42,7 @@ pub async fn list_pending_memories(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn approve_pending_memory(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -52,6 +54,7 @@ pub async fn approve_pending_memory(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn dismiss_pending_memory(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,

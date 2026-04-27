@@ -20,6 +20,7 @@ impl ::app_core::events::AppEventEmitter for TauriEmitter {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn chat_threads(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<ChatThreadResponse>, ApiError> {
@@ -27,6 +28,7 @@ pub async fn chat_threads(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn chat_messages(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
@@ -36,6 +38,7 @@ pub async fn chat_messages(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn chat_send(
     app: tauri::AppHandle,
     state: State<'_, Arc<AppCore>>,
@@ -54,6 +57,7 @@ pub async fn chat_send(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn chat_pin_thread(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
@@ -62,6 +66,7 @@ pub async fn chat_pin_thread(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn chat_rename_thread(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
@@ -71,6 +76,7 @@ pub async fn chat_rename_thread(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn chat_delete_thread(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
@@ -79,6 +85,7 @@ pub async fn chat_delete_thread(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn chat_respond_interaction(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
@@ -91,6 +98,7 @@ pub async fn chat_respond_interaction(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn chat_get_session(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
@@ -99,6 +107,7 @@ pub async fn chat_get_session(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn chat_list_sessions_by_project(
     state: State<'_, Arc<AppCore>>,
     project_id: String,
@@ -107,6 +116,7 @@ pub async fn chat_list_sessions_by_project(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn chat_delete_stale_sessions(
     state: State<'_, Arc<AppCore>>,
     before_days: u32,
@@ -115,6 +125,7 @@ pub async fn chat_delete_stale_sessions(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn chat_cancel(
     state: State<'_, Arc<AppCore>>,
     session_key: String,

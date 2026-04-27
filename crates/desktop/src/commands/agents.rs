@@ -16,6 +16,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
 use tauri::State;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn agent_list_profiles(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<AgentProfileSummary>, ApiError> {
@@ -23,6 +24,7 @@ pub async fn agent_list_profiles(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn agent_read_file(
     state: State<'_, Arc<AppCore>>,
     agent_name: String,
@@ -32,6 +34,7 @@ pub async fn agent_read_file(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn agent_write_file(
     state: State<'_, Arc<AppCore>>,
     agent_name: String,
@@ -44,6 +47,7 @@ pub async fn agent_write_file(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn agent_create_profile(
     state: State<'_, Arc<AppCore>>,
     name: String,
@@ -52,6 +56,7 @@ pub async fn agent_create_profile(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn agent_create_skill(
     state: State<'_, Arc<AppCore>>,
     agent_name: String,
@@ -61,6 +66,7 @@ pub async fn agent_create_skill(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn agent_delete_file(
     state: State<'_, Arc<AppCore>>,
     agent_name: String,

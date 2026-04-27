@@ -7,6 +7,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn journey_milestones(state: State<'_, Arc<AppCore>>) -> Result<Vec<String>, ApiError> {
     let tracker = state
         .journey_tracker
@@ -16,6 +17,7 @@ pub async fn journey_milestones(state: State<'_, Arc<AppCore>>) -> Result<Vec<St
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn journey_mark_complete(
     state: State<'_, Arc<AppCore>>,
     milestone: String,
@@ -31,6 +33,7 @@ pub async fn journey_mark_complete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn journey_item_count(state: State<'_, Arc<AppCore>>) -> Result<i64, ApiError> {
     if let Some(ref tracker) = state.journey_tracker {
         Ok(tracker.total_item_count().await)

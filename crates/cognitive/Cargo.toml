@@ -17,6 +17,7 @@ jiff = { workspace = true }
 dashmap = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+specta = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }

@@ -6,6 +6,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_source_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -17,6 +18,7 @@ pub async fn project_source_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_source_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -28,6 +30,7 @@ pub async fn project_source_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn project_source_list(
     state: State<'_, Arc<AppCore>>,
     project_id: String,

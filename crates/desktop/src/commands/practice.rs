@@ -11,6 +11,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn practice_segment_note(
     state: State<'_, Arc<AppCore>>,
     params: PracticeSegmentParams,
@@ -19,6 +20,7 @@ pub async fn practice_segment_note(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn practice_start_session(
     state: State<'_, Arc<AppCore>>,
     params: PracticeStartParams,
@@ -27,6 +29,7 @@ pub async fn practice_start_session(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn practice_submit_unit(
     state: State<'_, Arc<AppCore>>,
     params: PracticeSubmitParams,
@@ -35,6 +38,7 @@ pub async fn practice_submit_unit(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn practice_confirm_unit(
     state: State<'_, Arc<AppCore>>,
     params: PracticeConfirmParams,
@@ -43,6 +47,7 @@ pub async fn practice_confirm_unit(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn practice_get_session(
     state: State<'_, Arc<AppCore>>,
     params: PracticeGetParams,
@@ -51,6 +56,7 @@ pub async fn practice_get_session(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn practice_complete_session(
     state: State<'_, Arc<AppCore>>,
     params: PracticeCompleteParams,
@@ -59,6 +65,7 @@ pub async fn practice_complete_session(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn practice_list_sessions(
     state: State<'_, Arc<AppCore>>,
     params: PracticeListParams,

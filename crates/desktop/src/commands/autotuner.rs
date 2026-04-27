@@ -20,11 +20,13 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
 ];
 
 #[tauri::command]
+#[specta::specta]
 pub async fn autotuner_status(state: State<'_, Arc<AppCore>>) -> Result<AutoTunerStatus, ApiError> {
     state.autotuner_status().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn autotuner_history(
     state: State<'_, Arc<AppCore>>,
     limit: Option<u32>,
@@ -33,21 +35,25 @@ pub async fn autotuner_history(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn autotuner_revert(state: State<'_, Arc<AppCore>>) -> Result<ChampionSummary, ApiError> {
     state.autotuner_revert().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn autotuner_pause(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     state.autotuner_pause().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn autotuner_resume(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     state.autotuner_resume().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn autotuner_set_pace(
     state: State<'_, Arc<AppCore>>,
     pace: String,
@@ -56,11 +62,13 @@ pub async fn autotuner_set_pace(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn autotuner_get_toast_count(state: State<'_, Arc<AppCore>>) -> Result<i64, ApiError> {
     state.autotuner_get_toast_count().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn autotuner_increment_toast_count(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<i64, ApiError> {

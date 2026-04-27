@@ -9,6 +9,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn annotation_create(
     state: State<'_, Arc<AppCore>>,
     params: AnnotationCreateParams,
@@ -17,6 +18,7 @@ pub async fn annotation_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn annotation_update(
     state: State<'_, Arc<AppCore>>,
     params: AnnotationUpdateParams,
@@ -25,11 +27,13 @@ pub async fn annotation_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn annotation_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<(), ApiError> {
     state.annotation_delete(id).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn annotation_list_for_note(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -39,6 +43,7 @@ pub async fn annotation_list_for_note(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn annotation_get_ai_suggestion(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -50,6 +55,7 @@ pub async fn annotation_get_ai_suggestion(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn note_get_linked_context(
     state: State<'_, Arc<AppCore>>,
     params: LinkedContextParams,

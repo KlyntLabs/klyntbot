@@ -8,6 +8,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn group_list(
     state: State<'_, Arc<AppCore>>,
     project_id: Option<String>,
@@ -16,6 +17,7 @@ pub async fn group_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn group_create(
     state: State<'_, Arc<AppCore>>,
     params: TaskGroupCreateParams,
@@ -24,6 +26,7 @@ pub async fn group_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn group_update(
     state: State<'_, Arc<AppCore>>,
     params: TaskGroupUpdateParams,
@@ -32,11 +35,13 @@ pub async fn group_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn group_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<bool, ApiError> {
     state.group_delete(id).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn group_reorder(
     state: State<'_, Arc<AppCore>>,
     params: TaskGroupReorderParams,

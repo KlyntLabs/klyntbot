@@ -6,6 +6,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn objective_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -17,6 +18,7 @@ pub async fn objective_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn objective_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -25,6 +27,7 @@ pub async fn objective_get(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn objective_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
@@ -36,6 +39,7 @@ pub async fn objective_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn objective_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,

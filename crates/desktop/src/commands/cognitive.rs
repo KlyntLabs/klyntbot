@@ -9,6 +9,7 @@ use crate::app_core::AppCore;
 // ── Memory Reads ────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_user_model(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<UserModelSummaryResponse, ApiError> {
@@ -16,6 +17,7 @@ pub async fn cognitive_user_model(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_facts_list(
     state: State<'_, Arc<AppCore>>,
     domain: Option<String>,
@@ -24,6 +26,7 @@ pub async fn cognitive_facts_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_episodic_list(
     state: State<'_, Arc<AppCore>>,
     domain: Option<String>,
@@ -33,6 +36,7 @@ pub async fn cognitive_episodic_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_rules_list(
     state: State<'_, Arc<AppCore>>,
     domain: Option<String>,
@@ -41,6 +45,7 @@ pub async fn cognitive_rules_list(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_memory_stats(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<MemoryStatsResponse, ApiError> {
@@ -48,6 +53,7 @@ pub async fn cognitive_memory_stats(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn memory_health(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<MemoryHealthResponse, ApiError> {
@@ -57,6 +63,7 @@ pub async fn memory_health(
 // ── Coaching Reads ──────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coaching_situation(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<UserSituationResponse, ApiError> {
@@ -64,6 +71,7 @@ pub async fn coaching_situation(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coaching_signals(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<SignalWindowResponse, ApiError> {
@@ -71,6 +79,7 @@ pub async fn coaching_signals(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coaching_patterns(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<DetectedPatternResponse>, ApiError> {
@@ -78,6 +87,7 @@ pub async fn coaching_patterns(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coaching_feedback_stats(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<StrategyFeedbackResponse>, ApiError> {
@@ -85,6 +95,7 @@ pub async fn coaching_feedback_stats(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coaching_router_status(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<RouterStatusResponse, ApiError> {
@@ -92,6 +103,7 @@ pub async fn coaching_router_status(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coaching_pending_interventions(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<desktop_shared::cognitive_commands::DeliveredInterventionResponse>, ApiError> {
@@ -101,6 +113,7 @@ pub async fn coaching_pending_interventions(
 // ── Memory Reference Detail ─────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn memory_reference_detail(
     state: State<'_, Arc<AppCore>>,
     ref_type: String,
@@ -112,6 +125,7 @@ pub async fn memory_reference_detail(
 // ── System Status ───────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_system_status(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<SystemStatusResponse, ApiError> {
@@ -121,6 +135,7 @@ pub async fn cognitive_system_status(
 // ── Mutations ───────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_fact_create(
     state: State<'_, Arc<AppCore>>,
     params: FactCreateParams,
@@ -129,6 +144,7 @@ pub async fn cognitive_fact_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_fact_update(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -138,6 +154,7 @@ pub async fn cognitive_fact_update(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_fact_delete(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -146,6 +163,7 @@ pub async fn cognitive_fact_delete(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_rule_create(
     state: State<'_, Arc<AppCore>>,
     params: RuleCreateParams,
@@ -154,6 +172,7 @@ pub async fn cognitive_rule_create(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_rule_deactivate(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -162,6 +181,7 @@ pub async fn cognitive_rule_deactivate(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_run_compaction(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<CompactionResultResponse, ApiError> {
@@ -171,6 +191,7 @@ pub async fn cognitive_run_compaction(
 // ── Coaching Mutations ──────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coaching_reset_dismissals(
     state: State<'_, Arc<AppCore>>,
     trigger_name: Option<String>,
@@ -179,11 +200,13 @@ pub async fn coaching_reset_dismissals(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coaching_clear_signals(state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
     state.coaching_clear_signals().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coaching_submit_feedback(
     state: State<'_, Arc<AppCore>>,
     intervention_id: String,
@@ -195,6 +218,7 @@ pub async fn coaching_submit_feedback(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coaching_report_ignored(
     state: State<'_, Arc<AppCore>>,
     intervention_id: String,
@@ -203,6 +227,7 @@ pub async fn coaching_report_ignored(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coaching_intervention_log(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
@@ -211,11 +236,13 @@ pub async fn coaching_intervention_log(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn coaching_seed_patterns(state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
     state.coaching_seed_patterns().await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_inject_event(
     state: State<'_, Arc<AppCore>>,
     event_type: String,
@@ -225,6 +252,7 @@ pub async fn cognitive_inject_event(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_event_log(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
@@ -233,6 +261,7 @@ pub async fn cognitive_event_log(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_pipeline_log(
     state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
@@ -243,6 +272,7 @@ pub async fn cognitive_pipeline_log(
 // ── Cognitive Graph ─────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_graph_data(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<desktop_shared::commands::cognitive_graph::CognitiveGraphData, ApiError> {
@@ -250,6 +280,7 @@ pub async fn cognitive_graph_data(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn cognitive_graph_expand_topic(
     state: State<'_, Arc<AppCore>>,
     params: desktop_shared::commands::cognitive_graph::TopicExpandParams,
