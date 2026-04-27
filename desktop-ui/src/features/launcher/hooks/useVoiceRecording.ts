@@ -35,6 +35,7 @@ export function useVoiceRecording(onTranscript: (t: string) => void) {
   }, [onTranscript]);
 
   const cancel = useCallback(async () => {
+    if (stoppedRef.current) return;
     stoppedRef.current = true;
     try {
       await ipc("voice_stop_dictation", {});

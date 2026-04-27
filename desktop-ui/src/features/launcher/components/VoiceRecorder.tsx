@@ -6,6 +6,13 @@ interface Props {
   onCancel: () => void;
 }
 
+const PHASE_LABEL: Record<"idle" | "recording" | "processing" | "error", string> = {
+  recording: "Listening… press Enter to send",
+  processing: "Transcribing…",
+  error: "Something went wrong",
+  idle: "Press to start",
+};
+
 export function VoiceRecorder({ onTranscriptReady, onCancel }: Props) {
   const { phase, level, start, stop, cancel } = useVoiceRecording(onTranscriptReady);
 
@@ -26,12 +33,7 @@ export function VoiceRecorder({ onTranscriptReady, onCancel }: Props) {
            style={{ transform: `scale(${1 + level * 0.4})` }}>
         🎙
       </div>
-      <p className="lc-muted-sm">
-        {phase === "recording" && "Listening… press Enter to send"}
-        {phase === "processing" && "Transcribing…"}
-        {phase === "error" && "Something went wrong"}
-        {phase === "idle" && "Press to start"}
-      </p>
+      <p className="lc-muted-sm">{PHASE_LABEL[phase]}</p>
       <p className="lc-hint-sm">Esc to cancel</p>
     </div>
   );

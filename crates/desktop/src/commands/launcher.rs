@@ -121,17 +121,20 @@ pub async fn launcher_system_command(
 
 fn parse_human_duration(s: &str) -> Option<std::time::Duration> {
     let s = s.trim();
-    let (num_str, unit) = s.split_at(s.len().saturating_sub(1));
+    let last = s.chars().last()?;
+    let (num_str, secs_per_unit) = if last.is_ascii_alphabetic() {
+        let mult = match last.to_ascii_lowercase() {
+            'm' => 60,
+            'h' => 3600,
+            'd' => 86400,
+            _ => return None,
+        };
+        (&s[..s.len() - last.len_utf8()], mult)
+    } else {
+        (s, 60)
+    };
     let num: u64 = num_str.parse().ok()?;
-    match unit {
-        "m" | "M" => Some(std::time::Duration::from_secs(num * 60)),
-        "h" | "H" => Some(std::time::Duration::from_secs(num * 3600)),
-        "d" | "D" => Some(std::time::Duration::from_secs(num * 86400)),
-        _ => {
-            // Try parsing as bare minutes if no unit
-            num_str.parse::<u64>().ok().map(|n| std::time::Duration::from_secs(n * 60))
-        }
-    }
+    Some(std::time::Duration::from_secs(num * secs_per_unit))
 }
 
 #[klynt_raw_command]

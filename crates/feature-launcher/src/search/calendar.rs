@@ -51,7 +51,12 @@ impl SearchSource for CalendarSource {
 }
 
 fn event_to_item(e: &CalendarEvent, score: f64) -> LauncherItem {
-    let subtitle = format!("{} → {}", e.starts_at, e.ends_at);
+    let tz = jiff::tz::TimeZone::system();
+    let subtitle = format!(
+        "{} → {}",
+        e.starts_at.to_zoned(tz.clone()).strftime("%-I:%M %p"),
+        e.ends_at.to_zoned(tz).strftime("%-I:%M %p"),
+    );
     LauncherItem {
         id: format!("cal:{}", e.event_id),
         title: e.title.clone(),

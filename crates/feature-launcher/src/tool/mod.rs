@@ -32,8 +32,7 @@ impl LauncherTool {
     async fn search(&self, params: SearchParams, _ctx: &RoutingContext) -> Result<String> {
         let limit = params.limit.unwrap_or(10) as usize;
         let results = self.registry.search(&params.query, limit).await;
-        let items: Vec<crate::LauncherItem> = results.into_iter().map(|r| r).collect();
-        Ok(serde_json::to_string(&items)?)
+        Ok(serde_json::to_string(&results)?)
     }
 
     #[action(name = "execute")]

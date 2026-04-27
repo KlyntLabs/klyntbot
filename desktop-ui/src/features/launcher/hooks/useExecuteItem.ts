@@ -103,7 +103,7 @@ export function executeItem(
             }),
           )
           .then((result) => hideAndBadge(item, result, onHide))
-          .catch((err) => console.error("Failed to execute system command:", err));
+          .catch((err) => showError("Couldn't run command:", err));
       }
       break;
     case "script":

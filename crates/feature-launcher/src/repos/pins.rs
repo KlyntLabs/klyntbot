@@ -20,16 +20,13 @@ impl PinsRepo {
     }
 
     pub async fn pin(&self, item_id: &str, kind: &str) -> Result<()> {
-        // Idempotent: if already pinned, preserve existing position.
-        if self.is_pinned(item_id, kind).await? {
-            return Ok(());
-        }
-        let max_pos: Option<i64> = sqlx::query_scalar("SELECT MAX(position) FROM launcher_pins")
-            .fetch_one(&self.pool).await.map_err(storage::StorageError::from)?;
-        let next_pos = max_pos.map_or(0, |p| p + 1);
-        sqlx::query("INSERT INTO launcher_pins (item_id, kind, position) VALUES (?, ?, ?)")
-            .bind(item_id).bind(kind).bind(next_pos)
-            .execute(&self.pool).await.map_err(storage::StorageError::from)?;
+        sqlx::query(
+            "INSERT INTO launcher_pins (item_id, kind, position) \
+             SELECT ?, ?, COALESCE(MAX(position), -1) + 1 FROM launcher_pins \
+             WHERE NOT EXISTS (SELECT 1 FROM launcher_pins WHERE item_id = ? AND kind = ?)",
+        )
+        .bind(item_id).bind(kind).bind(item_id).bind(kind)
+        .execute(&self.pool).await.map_err(storage::StorageError::from)?;
         Ok(())
     }
 

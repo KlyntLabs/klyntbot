@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTauriMutation } from "@/lib/query";
 import { ipc } from "@/utils/tauri-bridge";
@@ -40,7 +40,10 @@ export function ActionMenu({ onExecute }: ActionMenuProps) {
   );
 
   const item = results[selectedIndex] ?? null;
-  const actions = item ? getActionsForItem(item, openPath, onExecute, selectedIndex, queryClient, query) : [];
+  const actions = useMemo(
+    () => (item ? getActionsForItem(item, openPath, onExecute, selectedIndex, queryClient, query) : []),
+    [item, openPath, onExecute, selectedIndex, queryClient, query],
+  );
 
   const close = useCallback(() => setActionMenuOpen(false), [setActionMenuOpen]);
 
@@ -139,10 +142,6 @@ function copyText(text: string) {
   navigator.clipboard.writeText(text).catch((err) => showError("Couldn't copy:", err));
 }
 
-function kindTag(kind: LauncherItemKind): string {
-  return kind.type;
-}
-
 function getActionsForItem(
   item: LauncherItem,
   openPath: (path: string) => void,
@@ -176,7 +175,7 @@ function getActionsForItem(
         return contactActions(kind, openPath);
       case "systemCommand":
       case "script":
-        return executeActions(item, onExecute, selectedIndex);
+        return defaultActions(item, onExecute, selectedIndex);
       case "sshHost":
         return sshActions(kind, openPath);
       case "brewPackage":
@@ -192,11 +191,10 @@ function getActionsForItem(
       shortcut: "⌘P",
       handler: async () => {
         try {
-          const kindStr = kindTag(kind);
           if (item.pinned) {
-            await ipc("launcher_unpin", { itemId: item.id, kind: kindStr });
+            await ipc("launcher_unpin", { itemId: item.id, kind: kind.type });
           } else {
-            await ipc("launcher_pin", { itemId: item.id, kind: kindStr });
+            await ipc("launcher_pin", { itemId: item.id, kind: kind.type });
           }
           queryClient.invalidateQueries({ queryKey: qk.launcher.search(query ?? "") });
           queryClient.invalidateQueries({ queryKey: qk.launcher.pinned() });
@@ -325,15 +323,6 @@ function contactActions(kind: KindOf<"contact">, openPath: (path: string) => voi
   if (email) actions.push({ label: "Copy Email", handler: () => copyText(email) });
   if (phone) actions.push({ label: "Copy Phone", handler: () => copyText(phone) });
   return actions;
-}
-
-function executeActions(item: LauncherItem, onExecute?: (index: number) => void, selectedIndex?: number): Action[] {
-  return [
-    { label: "Execute", shortcut: "Enter", handler: () => {
-      if (onExecute && selectedIndex !== undefined) onExecute(selectedIndex);
-    } },
-    { label: "Copy Title", handler: () => copyText(item.title) },
-  ];
 }
 
 function sshActions(kind: KindOf<"sshHost">, openPath: (path: string) => void): Action[] {
