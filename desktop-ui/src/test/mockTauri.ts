@@ -12,11 +12,13 @@ import { vi } from "vitest";
 export function mockTauriCore(overrides: {
     invoke?: ReturnType<typeof vi.fn>;
     convertFileSrc?: (path: string) => string;
+    isTauri?: ReturnType<typeof vi.fn>;
 } = {}) {
     return {
         invoke: overrides.invoke ?? vi.fn(),
         convertFileSrc:
             overrides.convertFileSrc ?? ((path: string) => `tauri://${path}`),
+        isTauri: overrides.isTauri ?? vi.fn(() => true),
     };
 }
 

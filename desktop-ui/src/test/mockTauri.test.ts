@@ -13,6 +13,13 @@ describe("mockTauriCore", () => {
         const mocks = mockTauriCore({ invoke: customInvoke });
         expect(mocks.invoke).toBe(customInvoke);
     });
+
+    it("respects override isTauri", () => {
+        const customIsTauri = vi.fn(() => false);
+        const mocks = mockTauriCore({ isTauri: customIsTauri });
+        expect(mocks.isTauri).toBe(customIsTauri);
+        expect(mocks.isTauri()).toBe(false);
+    });
 });
 
 describe("mockTauriEvent", () => {
