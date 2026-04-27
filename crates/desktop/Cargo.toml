@@ -22,21 +22,16 @@ channels = { workspace = true }
 cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }
-feature-coaching = { workspace = true }
 feature-focus = { workspace = true }
 feature-launcher = { workspace = true }
 klyntbot-server = { workspace = true }
 dashmap = { workspace = true }
-context_engine = { workspace = true }
-feature-notes = { workspace = true }
 feature-productivity = { workspace = true }
 platform-macos = { workspace = true }
 providers = { workspace = true }
-scheduling = { workspace = true }
 session = { workspace = true }
 storage = { workspace = true }
 tools = { workspace = true }
-tools-core = { workspace = true }
 voice-engine = { workspace = true }
 tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
 tauri-plugin-global-shortcut = "2"
@@ -50,7 +45,6 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 jiff = { workspace = true }
 uuid = { workspace = true }
-dirs = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -61,7 +55,6 @@ tower-http = { workspace = true }
 open = { workspace = true }
 rand = { workspace = true }
 url = { workspace = true }
-base64 = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rmcp = { workspace = true, features = ["server", "transport-io", "transport-streamable-http-server"] }
