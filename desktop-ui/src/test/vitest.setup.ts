@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
 if (!("IS_REACT_ACT_ENVIRONMENT" in globalThis)) {
   Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
