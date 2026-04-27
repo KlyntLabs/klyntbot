@@ -191,6 +191,10 @@ mod tests {
     ];
 
     /// Parse Tauri command function names from `main.rs` source text.
+    ///
+    /// This captures *all* commands (typed + untyped) because it reads the
+    /// `tauri::generate_handler![]` invocation directly. The specta builder
+    /// only knows about the typed subset — see `specta_command_names()`.
     fn tauri_command_names() -> BTreeSet<String> {
         let src = include_str!("../main.rs");
         src.lines()
@@ -296,6 +300,22 @@ mod tests {
             orphans.is_empty(),
             "Dev server dispatches commands not registered in Tauri: {orphans:?}\n\
              Remove orphan entries from the corresponding DEV_COMMANDS array."
+        );
+    }
+
+    /// Every command registered in the tauri-specta builder must also be
+    /// registered in `tauri::generate_handler![]` (main.rs).
+    #[test]
+    fn specta_commands_are_real_tauri_commands() {
+        let specta = crate::specta_builder::specta_command_names();
+        let tauri = tauri_command_names();
+
+        let missing: Vec<&String> = specta.difference(&tauri).collect();
+
+        assert!(
+            missing.is_empty(),
+            "Specta-typed commands missing from Tauri handler: {missing:?}\n\
+             Add them to `tauri::generate_handler![]` in main.rs."
         );
     }
 }

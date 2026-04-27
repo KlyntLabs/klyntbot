@@ -539,3 +539,30 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             desktop_shared::events::VerdictPayload,
         ])
 }
+
+/// Returns the set of command names registered in the tauri-specta builder.
+///
+/// This is the typed subset of all Tauri commands (≈415). The remaining
+/// ~50 commands use raw `serde_json::Value` and are handled by
+/// `tauri::generate_handler![]` directly.
+pub fn specta_command_names() -> std::collections::BTreeSet<String> {
+    let builder = build_specta();
+    let ts = builder
+        .export_str(
+            specta_typescript::Typescript::default()
+                .header("//")
+                .bigint(specta_typescript::BigIntExportBehavior::String),
+        )
+        .expect("specta export_str failed");
+
+    let mut names = std::collections::BTreeSet::new();
+    for line in ts.lines() {
+        if let Some(start) = line.find(r#"TAURI_INVOKE(""#) {
+            let rest = &line[start + 14..];
+            if let Some(end) = rest.find('"') {
+                names.insert(rest[..end].to_string());
+            }
+        }
+    }
+    names
+}
