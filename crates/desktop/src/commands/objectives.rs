@@ -1,64 +1,47 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{ObjectiveCreateParams, ObjectiveResponse, ObjectiveUpdateParams};
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn objective_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ObjectiveCreateParams,
-) -> CommandResult<ObjectiveResponse> {
+) -> ObjectiveResponse {
     let (result, updates) = state.objective_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn objective_get(
-    state: State<'_, Arc<AppCore>>,
     id: String,
-) -> CommandResult<ObjectiveResponse> {
+) -> ObjectiveResponse {
     state.objective_get(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn objective_update(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ObjectiveUpdateParams,
-) -> CommandResult<ObjectiveResponse> {
+) -> ObjectiveResponse {
     let (result, updates) = state.objective_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn objective_delete(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> CommandResult<bool> {
+) -> bool {
     let (result, updates) = state.objective_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "objective_create",
-    "objective_get",
-    "objective_update",
-    "objective_delete",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

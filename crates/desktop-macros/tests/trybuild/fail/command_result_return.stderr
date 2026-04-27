@@ -1,0 +1,5 @@
+error: klynt_command wraps return type for you — declare bare `T` instead of `Result<T, ApiError>` or `CommandResult<T>`
+ --> tests/trybuild/fail/command_result_return.rs:4:24
+  |
+4 | pub async fn ping() -> desktop_shared::CommandResult<i32> {
+  |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

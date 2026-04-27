@@ -1,29 +1,22 @@
 use desktop_shared::commands::{AiToolInfo, AiToolInstallResult, AiToolsInstallParams};
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn ai_tools_detect(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<AiToolInfo>> {
+#[klynt_command]
+pub async fn ai_tools_detect() -> Vec<AiToolInfo> {
     state.ai_tools_detect().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn ai_tools_install(
-    state: State<'_, Arc<AppCore>>,
     params: AiToolsInstallParams,
-) -> CommandResult<Vec<AiToolInstallResult>> {
+) -> Vec<AiToolInstallResult> {
     state.ai_tools_install(params).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &["ai_tools_detect", "ai_tools_install"];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

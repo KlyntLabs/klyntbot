@@ -46,6 +46,7 @@ members = [
     "crates/coding-ingest",
     "crates/coding-memory",
     "crates/mcp-bridge",
+    "crates/desktop-macros",
 ]
 
 [workspace.package]
@@ -105,6 +106,7 @@ rmcp = { version = "0.17", default-features = false }
 syn = { version = "2", features = ["full", "extra-traits"] }
 quote = "1"
 proc-macro2 = "1"
+linkme = "0.3"
 
 # Shared external dependencies (version pinned at workspace level)
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "time", "sync", "io-util", "net", "signal", "fs", "process"] }

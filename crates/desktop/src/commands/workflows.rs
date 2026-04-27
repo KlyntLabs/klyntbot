@@ -3,99 +3,64 @@ use desktop_shared::commands::{
     StatusWorkflowResponse, WorkflowCreateParams,
 };
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn workflow_list(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<StatusWorkflowResponse>> {
+#[klynt_command]
+pub async fn workflow_list() -> Vec<StatusWorkflowResponse> {
     state.workflow_list().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn workflow_get(
-    id: String,
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Option<StatusWorkflowResponse>> {
+#[klynt_command]
+pub async fn workflow_get(id: String) -> Option<StatusWorkflowResponse> {
     state.workflow_get(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn workflow_get_effective(
     project_id: Option<String>,
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<StatusLabelResponse>> {
+) -> Vec<StatusLabelResponse> {
     state.workflow_get_effective(project_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn workflow_create(
     params: WorkflowCreateParams,
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<StatusWorkflowResponse> {
+) -> StatusWorkflowResponse {
     state.workflow_create(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn workflow_delete(id: String, state: State<'_, Arc<AppCore>>) -> CommandResult<bool> {
+#[klynt_command]
+pub async fn workflow_delete(id: String) -> bool {
     state.workflow_delete(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn label_create(
     params: LabelCreateParams,
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<StatusLabelResponse> {
+) -> StatusLabelResponse {
     state.label_create(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn label_update(
     params: LabelUpdateParams,
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<StatusLabelResponse> {
+) -> StatusLabelResponse {
     state.label_update(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn label_delete(id: String, state: State<'_, Arc<AppCore>>) -> CommandResult<bool> {
+#[klynt_command]
+pub async fn label_delete(id: String) -> bool {
     state.label_delete(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn label_reorder(
-    params: LabelReorderParams,
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn label_reorder(params: LabelReorderParams) -> () {
     state.label_reorder(params).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "workflow_list",
-    "workflow_get",
-    "workflow_get_effective",
-    "workflow_create",
-    "workflow_delete",
-    "label_create",
-    "label_update",
-    "label_delete",
-    "label_reorder",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

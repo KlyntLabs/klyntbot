@@ -1,64 +1,45 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{
     TaskGroupCreateParams, TaskGroupReorderParams, TaskGroupResponse, TaskGroupUpdateParams,
 };
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn group_list(
-    state: State<'_, Arc<AppCore>>,
     project_id: Option<String>,
-) -> CommandResult<Vec<TaskGroupResponse>> {
+) -> Vec<TaskGroupResponse> {
     state.group_list(project_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn group_create(
-    state: State<'_, Arc<AppCore>>,
     params: TaskGroupCreateParams,
-) -> CommandResult<TaskGroupResponse> {
+) -> TaskGroupResponse {
     state.group_create(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn group_update(
-    state: State<'_, Arc<AppCore>>,
     params: TaskGroupUpdateParams,
-) -> CommandResult<TaskGroupResponse> {
+) -> TaskGroupResponse {
     state.group_update(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn group_delete(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<bool> {
+#[klynt_command]
+pub async fn group_delete(id: String) -> bool {
     state.group_delete(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn group_reorder(
-    state: State<'_, Arc<AppCore>>,
     params: TaskGroupReorderParams,
-) -> CommandResult<()> {
+) -> () {
     state.group_reorder(params).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "group_list",
-    "group_create",
-    "group_update",
-    "group_delete",
-    "group_reorder",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

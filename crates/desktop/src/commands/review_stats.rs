@@ -1,22 +1,15 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::ReviewStatsSummaryResponse;
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn review_stats_summary(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<ReviewStatsSummaryResponse> {
+#[klynt_command]
+pub async fn review_stats_summary() -> ReviewStatsSummaryResponse {
     state.review_stats_summary().await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &["review_stats_summary"];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

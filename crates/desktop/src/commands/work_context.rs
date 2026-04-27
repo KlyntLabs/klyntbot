@@ -3,141 +3,100 @@ use desktop_shared::commands::{
     InferenceConfigUpdate, InferenceStatsResponse, WorkContextDetailResponse, WorkContextResponse,
     WorkContextUpdateParams,
 };
+use desktop_macros::klynt_command;
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn list_work_contexts(
-    state: State<'_, Arc<AppCore>>,
     status: Option<String>,
-) -> CommandResult<Vec<WorkContextResponse>> {
+) -> Vec<WorkContextResponse> {
     state.list_work_contexts(status).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn get_work_context(
-    state: State<'_, Arc<AppCore>>,
     id: String,
-) -> CommandResult<Option<WorkContextResponse>> {
+) -> Option<WorkContextResponse> {
     state.get_work_context(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn get_work_context_detail(
-    state: State<'_, Arc<AppCore>>,
     id: String,
-) -> CommandResult<WorkContextDetailResponse> {
+) -> WorkContextDetailResponse {
     state.get_work_context_detail(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn update_work_context(
-    state: State<'_, Arc<AppCore>>,
     params: WorkContextUpdateParams,
-) -> CommandResult<WorkContextResponse> {
+) -> WorkContextResponse {
     state.update_work_context(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn archive_work_context(
-    state: State<'_, Arc<AppCore>>,
     id: String,
-) -> CommandResult<WorkContextResponse> {
+) -> WorkContextResponse {
     state.archive_work_context(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn merge_work_contexts(
-    state: State<'_, Arc<AppCore>>,
     keep_id: String,
     remove_id: String,
-) -> CommandResult<WorkContextResponse> {
+) -> WorkContextResponse {
     state.merge_work_contexts(keep_id, remove_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn search_work_contexts(
-    state: State<'_, Arc<AppCore>>,
     query: String,
-) -> CommandResult<Vec<WorkContextResponse>> {
+) -> Vec<WorkContextResponse> {
     state.search_work_contexts(query).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn get_context_timeline(
-    state: State<'_, Arc<AppCore>>,
     date: String,
     tz_offset_mins: Option<i32>,
-) -> CommandResult<Vec<ContextTimelineBlockResponse>> {
+) -> Vec<ContextTimelineBlockResponse> {
     state.get_context_timeline(date, tz_offset_mins).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn get_context_resume_data(
-    state: State<'_, Arc<AppCore>>,
     context_id: String,
-) -> CommandResult<ContextResumeResponse> {
+) -> ContextResumeResponse {
     state.get_context_resume_data(context_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn get_inference_stats(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<InferenceStatsResponse> {
+) -> InferenceStatsResponse {
     state.get_inference_stats().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn get_dashboard_intelligence(
-    state: State<'_, Arc<AppCore>>,
     date: String,
     tz_offset_mins: Option<i32>,
-) -> CommandResult<DashboardIntelligenceResponse> {
+) -> DashboardIntelligenceResponse {
     state
         .get_dashboard_intelligence(&date, tz_offset_mins)
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn update_inference_config(
-    state: State<'_, Arc<AppCore>>,
     config: InferenceConfigUpdate,
-) -> CommandResult<()> {
+) -> () {
     state.update_inference_config(config).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "list_work_contexts",
-    "get_work_context",
-    "get_work_context_detail",
-    "update_work_context",
-    "archive_work_context",
-    "merge_work_contexts",
-    "search_work_contexts",
-    "get_context_timeline",
-    "get_context_resume_data",
-    "get_inference_stats",
-    "get_dashboard_intelligence",
-    "update_inference_config",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

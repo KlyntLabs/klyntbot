@@ -4,104 +4,75 @@ use desktop_shared::commands::{
 };
 use desktop_shared::specta_helpers::JsonValueWrapper;
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn mcp_get_config(state: State<'_, Arc<AppCore>>) -> CommandResult<McpConfigResponse> {
+#[klynt_command]
+pub async fn mcp_get_config() -> McpConfigResponse {
     state.mcp_get_config().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn mcp_add_server(
-    state: State<'_, Arc<AppCore>>,
     params: McpAddServerParams,
-) -> CommandResult<McpConfigResponse> {
+) -> McpConfigResponse {
     state.mcp_add_server(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn mcp_remove_server(
-    state: State<'_, Arc<AppCore>>,
     params: McpRemoveParams,
-) -> CommandResult<McpConfigResponse> {
+) -> McpConfigResponse {
     state.mcp_remove_server(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn mcp_toggle_server(
-    state: State<'_, Arc<AppCore>>,
     params: McpToggleParams,
-) -> CommandResult<McpConfigResponse> {
+) -> McpConfigResponse {
     state.mcp_toggle_server(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn mcp_update_server(
-    state: State<'_, Arc<AppCore>>,
     params: McpUpdateServerParams,
-) -> CommandResult<McpConfigResponse> {
+) -> McpConfigResponse {
     state.mcp_update_server(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn app_info(state: State<'_, Arc<AppCore>>) -> CommandResult<AppInfoResponse> {
+#[klynt_command]
+pub async fn app_info() -> AppInfoResponse {
     state.app_info().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn config_get_section(
-    state: State<'_, Arc<AppCore>>,
     section: String,
-) -> CommandResult<JsonValueWrapper> {
+) -> JsonValueWrapper {
     state
         .config_get_section(section)
         .await
         .map(JsonValueWrapper)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn config_update_section(
-    state: State<'_, Arc<AppCore>>,
     section: String,
     patch: JsonValueWrapper,
-) -> CommandResult<JsonValueWrapper> {
+) -> JsonValueWrapper {
     state
         .config_update_section(section, patch.0)
         .await
         .map(JsonValueWrapper)
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn config_mark_setup_completed(state: State<'_, Arc<AppCore>>) -> CommandResult<()> {
+#[klynt_command]
+pub async fn config_mark_setup_completed() -> () {
     state.config_mark_setup_completed().await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "mcp_get_config",
-    "mcp_add_server",
-    "mcp_remove_server",
-    "mcp_toggle_server",
-    "mcp_update_server",
-    "app_info",
-    "config_get_section",
-    "config_update_section",
-    "config_mark_setup_completed",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

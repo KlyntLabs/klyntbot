@@ -1,17 +1,14 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{RetentionHistoryParams, RetentionHistoryResponse};
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn retention_history(
-    state: State<'_, Arc<AppCore>>,
     days: i64,
     by_domain: Option<bool>,
-) -> CommandResult<RetentionHistoryResponse> {
+) -> RetentionHistoryResponse {
     state
         .retention_history(RetentionHistoryParams {
             days,
@@ -21,9 +18,6 @@ pub async fn retention_history(
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &["retention_history"];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

@@ -1,67 +1,47 @@
-use std::sync::Arc;
-
 use desktop_shared::commands::reforge::*;
 use desktop_shared::{errors::ApiError, CommandResult};
-use tauri::State;
+
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn reforge_state(state: State<'_, Arc<AppCore>>) -> CommandResult<ReforgeStateResponse> {
+#[klynt_command]
+pub async fn reforge_state() -> ReforgeStateResponse {
     state.reforge_state().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn reforge_skill_names(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<SkillListResponse> {
+#[klynt_command]
+pub async fn reforge_skill_names() -> SkillListResponse {
     state.skill_names().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn reforge_skill_versions(
     skill_name: String,
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<SkillVersionResponse>> {
+) -> Vec<SkillVersionResponse> {
     state.skill_version_list(&skill_name).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn reforge_skill_version_detail(
     skill_name: String,
     version: i64,
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<SkillVersionDetailResponse>> {
+) -> Vec<SkillVersionDetailResponse> {
     state.skill_version_detail(&skill_name, version).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn reforge_skill_reset(
     skill_name: String,
     file_path: String,
     version: i64,
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<()> {
+) -> () {
     state
         .skill_version_reset(&skill_name, &file_path, version)
         .await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "reforge_state",
-    "reforge_skill_names",
-    "reforge_skill_versions",
-    "reforge_skill_version_detail",
-    "reforge_skill_reset",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

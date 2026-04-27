@@ -1,0 +1,5 @@
+error: klynt_command injects `state` automatically — remove this parameter
+ --> tests/trybuild/fail/declared_state.rs:4:19
+  |
+4 | pub async fn ping(state: tauri::State<'_, std::sync::Arc<app_core::AppCore>>) -> i32 {
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

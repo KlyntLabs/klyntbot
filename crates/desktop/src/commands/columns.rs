@@ -1,99 +1,70 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{
     ColumnCreateParams, ColumnReorderParams, ColumnUpdateParams, ColumnValueSetParams,
     CustomColumnResponse, CustomColumnValueResponse,
 };
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn custom_column_list(
-    state: State<'_, Arc<AppCore>>,
     project_id: String,
-) -> CommandResult<Vec<CustomColumnResponse>> {
+) -> Vec<CustomColumnResponse> {
     state.custom_column_list(project_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn custom_column_create(
-    state: State<'_, Arc<AppCore>>,
     params: ColumnCreateParams,
-) -> CommandResult<CustomColumnResponse> {
+) -> CustomColumnResponse {
     state.custom_column_create(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn custom_column_update(
-    state: State<'_, Arc<AppCore>>,
     params: ColumnUpdateParams,
-) -> CommandResult<CustomColumnResponse> {
+) -> CustomColumnResponse {
     state.custom_column_update(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn custom_column_delete(
-    state: State<'_, Arc<AppCore>>,
     id: String,
-) -> CommandResult<bool> {
+) -> bool {
     state.custom_column_delete(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn custom_column_reorder(
-    state: State<'_, Arc<AppCore>>,
     params: ColumnReorderParams,
-) -> CommandResult<()> {
+) -> () {
     state.custom_column_reorder(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn custom_column_values(
-    state: State<'_, Arc<AppCore>>,
     task_id: String,
-) -> CommandResult<Vec<CustomColumnValueResponse>> {
+) -> Vec<CustomColumnValueResponse> {
     state.custom_column_values(task_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn custom_column_value_set(
-    state: State<'_, Arc<AppCore>>,
     params: ColumnValueSetParams,
-) -> CommandResult<()> {
+) -> () {
     state.custom_column_value_set(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn custom_column_value_delete(
-    state: State<'_, Arc<AppCore>>,
     task_id: String,
     column_id: String,
-) -> CommandResult<bool> {
+) -> bool {
     state.custom_column_value_delete(task_id, column_id).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "custom_column_list",
-    "custom_column_create",
-    "custom_column_update",
-    "custom_column_delete",
-    "custom_column_reorder",
-    "custom_column_values",
-    "custom_column_value_set",
-    "custom_column_value_delete",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

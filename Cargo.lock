@@ -4111,6 +4111,7 @@ dependencies = [
  "common",
  "config",
  "dashmap",
+ "desktop-macros",
  "desktop-shared",
  "feature-focus",
  "feature-launcher",
@@ -4118,6 +4119,7 @@ dependencies = [
  "futures-util",
  "jiff",
  "klyntbot-server",
+ "linkme",
  "mcp-bridge",
  "mimalloc",
  "open",
@@ -4147,6 +4149,16 @@ dependencies = [
  "url",
  "uuid",
  "voice-engine",
+]
+
+[[package]]
+name = "desktop-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+ "trybuild",
 ]
 
 [[package]]
@@ -8228,6 +8240,26 @@ dependencies = [
  "cc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "linkme"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e83272d46373fb8decca684579ac3e7c8f3d71d4cc3aa693df8759e260ae41cf"
+dependencies = [
+ "linkme-impl",
+]
+
+[[package]]
+name = "linkme-impl"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32d59e20403c7d08fe62b4376edfe5c7fb2ef1e6b1465379686d0f21c8df444b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]

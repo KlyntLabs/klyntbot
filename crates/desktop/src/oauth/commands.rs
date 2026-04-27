@@ -1,14 +1,14 @@
 //! Tauri commands for OAuth flows.
 
-use std::sync::Arc;
-
 use desktop_shared::commands::{McpConfigResponse, OAuthStartParams};
 use desktop_shared::events::{McpOAuthCompletePayload, MCP_OAUTH_ERROR};
-use desktop_shared::{errors::ApiError, CommandResult};
+use desktop_shared::errors::ApiError;
 use rand::distr::Alphanumeric;
 use rand::Rng;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager};
 use tracing::{info, warn};
+
+use desktop_macros::klynt_command;
 
 use ::app_core::handlers::settings::build_mcp_response;
 
@@ -18,13 +18,11 @@ use super::flow;
 use super::registry;
 
 /// Start an OAuth flow: opens the browser and waits for the callback.
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn mcp_oauth_start(
     app: AppHandle,
-    state: State<'_, Arc<AppCore>>,
     params: OAuthStartParams,
-) -> CommandResult<()> {
+) -> () {
     info!(
         provider = %params.provider,
         server = %params.server_name,
@@ -239,12 +237,10 @@ pub async fn mcp_oauth_start(
 }
 
 /// Disconnect OAuth for a server (clear credentials).
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn mcp_oauth_disconnect(
-    state: State<'_, Arc<AppCore>>,
     server_name: String,
-) -> CommandResult<McpConfigResponse> {
+) -> McpConfigResponse {
     let mut cfg = state.config.write().await;
 
     let server =

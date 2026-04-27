@@ -1,48 +1,36 @@
-use std::sync::Arc;
-
 use desktop_shared::commands::{
     EntityMergeParams, EntityNeighborhoodResponse, EntityResponse, EntitySearchParams,
 };
 use desktop_shared::CommandResult;
-use tauri::State;
 
 use crate::app_core::AppCore;
+use desktop_macros::klynt_command;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn entity_search(
-    state: State<'_, Arc<AppCore>>,
     params: EntitySearchParams,
-) -> CommandResult<Vec<EntityResponse>> {
+) -> Vec<EntityResponse> {
     state.entity_search(&params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn entity_merge(
-    state: State<'_, Arc<AppCore>>,
     params: EntityMergeParams,
-) -> CommandResult<EntityResponse> {
+) -> EntityResponse {
     state.entity_merge(&params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn entity_get_neighborhood(
-    state: State<'_, Arc<AppCore>>,
     entity_id: String,
     depth: Option<u32>,
-) -> CommandResult<EntityNeighborhoodResponse> {
+) -> EntityNeighborhoodResponse {
     state
         .entity_get_neighborhood(&entity_id, depth.unwrap_or(1))
         .await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] =
-    &["entity_search", "entity_merge", "entity_get_neighborhood"];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

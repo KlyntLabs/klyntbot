@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
 use desktop_shared::types::EntityKind;
 use desktop_shared::{errors::ApiError, CommandResult};
-use tauri::State;
+
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
@@ -31,49 +30,36 @@ impl From<cognitive::repos::PendingMemoryRow> for PendingMemoryResponse {
 
 // ── Commands ─────────────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn list_pending_memories(
-    state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
-) -> CommandResult<Vec<PendingMemoryResponse>> {
+) -> Vec<PendingMemoryResponse> {
     let repo = state.pending_memory_repo()?;
     let rows = repo.list_pending(limit.unwrap_or(20)).await;
     Ok(rows.into_iter().map(PendingMemoryResponse::from).collect())
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn approve_pending_memory(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> CommandResult<()> {
+) -> () {
     state.approve_pending_memory(&id).await?;
     super::emit_entity_updated(&app, EntityKind::PendingMemory, &id);
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn dismiss_pending_memory(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> CommandResult<()> {
+) -> () {
     state.dismiss_pending_memory(&id).await?;
     super::emit_entity_updated(&app, EntityKind::PendingMemory, &id);
     Ok(())
 }
 
 // ── Dev server dispatch ──────────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "list_pending_memories",
-    "approve_pending_memory",
-    "dismiss_pending_memory",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

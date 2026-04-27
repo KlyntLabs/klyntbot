@@ -56,6 +56,8 @@ rmcp = { workspace = true, features = ["server", "transport-io", "transport-stre
 mcp-bridge = { path = "../mcp-bridge" }
 mimalloc = { workspace = true }
 specta = { workspace = true }
+linkme = { workspace = true }
+desktop-macros = { path = "../desktop-macros" }
 specta-typescript = { workspace = true }
 tauri-specta = { workspace = true }
 

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use desktop_macros::{klynt_command, klynt_raw_command};
 use desktop_shared::commands::{
     BacklinkResponse, ChangesSummaryResponse, CreatePersonaParams, DeckPreferenceResponse,
     DeckSummaryResponse, FlashcardCreateParams, FlashcardDistractorParams,
@@ -33,21 +34,17 @@ impl ::app_core::events::AppEventEmitter for TauriEmitter {
 
 // ── Note commands ───────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_list(
-    state: State<'_, Arc<AppCore>>,
-    notebook_id: Option<String>,
-) -> CommandResult<Vec<NoteListItem>> {
+#[klynt_command]
+pub async fn note_list(notebook_id: Option<String>) -> Vec<NoteListItem> {
     state.note_list(notebook_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_get(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<NoteResponse> {
+#[klynt_command]
+pub async fn note_get(id: String) -> NoteResponse {
     state.note_get(id).await
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn note_create(
@@ -60,6 +57,7 @@ pub async fn note_create(
     Ok(result)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn note_update(
@@ -72,6 +70,7 @@ pub async fn note_update(
     Ok(result)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn note_delete(
@@ -84,71 +83,47 @@ pub async fn note_delete(
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_search(
-    state: State<'_, Arc<AppCore>>,
-    query: String,
-) -> CommandResult<Vec<NoteListItem>> {
+#[klynt_command]
+pub async fn note_search(query: String) -> Vec<NoteListItem> {
     state.note_search(query).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_search_semantic(
-    state: State<'_, Arc<AppCore>>,
-    query: String,
-) -> CommandResult<Vec<NoteListItem>> {
+#[klynt_command]
+pub async fn note_search_semantic(query: String) -> Vec<NoteListItem> {
     state.note_search_semantic(&query).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_search_hybrid(
-    state: State<'_, Arc<AppCore>>,
-    query: String,
-) -> CommandResult<HybridSearchResponse> {
+#[klynt_command]
+pub async fn note_search_hybrid(query: String) -> HybridSearchResponse {
     state.note_search_hybrid(&query).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_links_all(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<NoteLinkResponse>> {
+#[klynt_command]
+pub async fn note_links_all() -> Vec<NoteLinkResponse> {
     state.note_links_all().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn note_list_by_entity(
-    state: State<'_, Arc<AppCore>>,
     entity_type: String,
     entity_id: String,
-) -> CommandResult<Vec<NoteListItem>> {
+) -> Vec<NoteListItem> {
     state.note_list_by_entity(entity_type, entity_id).await
 }
 
 // ── Version commands ────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_version_list(
-    state: State<'_, Arc<AppCore>>,
-    note_id: String,
-) -> CommandResult<Vec<NoteVersionResponse>> {
+#[klynt_command]
+pub async fn note_version_list(note_id: String) -> Vec<NoteVersionResponse> {
     state.note_version_list(note_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_version_create(
-    state: State<'_, Arc<AppCore>>,
-    note_id: String,
-) -> CommandResult<NoteVersionResponse> {
+#[klynt_command]
+pub async fn note_version_create(note_id: String) -> NoteVersionResponse {
     state.note_version_create(note_id).await
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn note_version_restore(
@@ -164,24 +139,22 @@ pub async fn note_version_restore(
 
 // ── Attachment commands ─────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn note_save_attachment(
-    state: State<'_, Arc<AppCore>>,
     data: String,
     filename: String,
-) -> CommandResult<String> {
+) -> String {
     state.note_save_attachment(data, filename).await
 }
 
 // ── Notebook commands ───────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn notebook_list(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<NotebookResponse>> {
+#[klynt_command]
+pub async fn notebook_list() -> Vec<NotebookResponse> {
     state.notebook_list().await
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn notebook_create(
@@ -194,6 +167,7 @@ pub async fn notebook_create(
     Ok(result)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn notebook_update(
@@ -206,6 +180,7 @@ pub async fn notebook_update(
     Ok(result)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn notebook_delete(
@@ -220,6 +195,7 @@ pub async fn notebook_delete(
 
 // ── Archive commands ───────────────────────────────────────────────────
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn note_archive(
@@ -232,6 +208,7 @@ pub async fn note_archive(
     Ok(())
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn note_unarchive(
@@ -244,41 +221,29 @@ pub async fn note_unarchive(
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_list_archived(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<NoteListItem>> {
+#[klynt_command]
+pub async fn note_list_archived() -> Vec<NoteListItem> {
     state.note_list_archived().await
 }
 
 // ── Backlink commands ─────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_backlinks(
-    state: State<'_, Arc<AppCore>>,
-    id: String,
-) -> CommandResult<Vec<BacklinkResponse>> {
+#[klynt_command]
+pub async fn note_backlinks(id: String) -> Vec<BacklinkResponse> {
     state.note_backlinks(&id).await
 }
 
 // ── Suggestion commands ───────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_suggestions(
-    state: State<'_, Arc<AppCore>>,
-    id: String,
-) -> CommandResult<NoteSuggestionsResponse> {
+#[klynt_command]
+pub async fn note_suggestions(id: String) -> NoteSuggestionsResponse {
     state.note_suggestions(&id).await
 }
 
 // ── Tag commands ──────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_tags_all(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<(String, i64)>> {
+#[klynt_command]
+pub async fn note_tags_all() -> Vec<(String, i64)> {
     state
         .note_repo
         .get_all_tags()
@@ -288,397 +253,254 @@ pub async fn note_tags_all(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<
 
 // ── Unlinked mentions ─────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_unlinked_mentions(
-    state: State<'_, Arc<AppCore>>,
-    id: String,
-) -> CommandResult<Vec<NoteResponse>> {
+#[klynt_command]
+pub async fn note_unlinked_mentions(id: String) -> Vec<NoteResponse> {
     state.note_unlinked_mentions(&id).await
 }
 
 // ── Inbox commands ────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn inbox_create(
-    state: State<'_, Arc<AppCore>>,
-    params: InboxCreateParams,
-) -> CommandResult<InboxItemResponse> {
+#[klynt_command]
+pub async fn inbox_create(params: InboxCreateParams) -> InboxItemResponse {
     state.inbox_create(&params.content).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn inbox_list(state: State<'_, Arc<AppCore>>) -> CommandResult<Vec<InboxItemResponse>> {
+#[klynt_command]
+pub async fn inbox_list() -> Vec<InboxItemResponse> {
     state.inbox_list().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn inbox_delete(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<()> {
+#[klynt_command]
+pub async fn inbox_delete(id: String) -> () {
     state.inbox_delete(&id).await
 }
 
 // ── Insight Review commands ─────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn note_insight_review(
-    state: State<'_, Arc<AppCore>>,
     note_id: String,
     scope_config: Option<desktop_shared::commands::InsightScopeConfigParams>,
     squad_id: Option<String>,
-) -> CommandResult<InsightReviewStarted> {
+) -> InsightReviewStarted {
     state
         .note_insight_review(&note_id, scope_config.as_ref(), squad_id.as_deref(), None)
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn note_insight_cache_get(
-    state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> CommandResult<Option<InsightReviewResponse>> {
+) -> Option<InsightReviewResponse> {
     state.note_insight_cache_get(&note_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn note_insight_save_flashcards(
-    state: State<'_, Arc<AppCore>>,
     params: InsightSaveFlashcardsParams,
-) -> CommandResult<Vec<FlashcardResponse>> {
+) -> Vec<FlashcardResponse> {
     state.insight_save_flashcards(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_submit_quiz(
-    state: State<'_, Arc<AppCore>>,
-    params: InsightQuizSubmitParams,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn note_insight_submit_quiz(params: InsightQuizSubmitParams) -> () {
     state.note_insight_submit_quiz(&params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_regenerate_tab(
-    state: State<'_, Arc<AppCore>>,
-    note_id: String,
-    tab: String,
-) -> CommandResult<TabContent> {
+#[klynt_command]
+pub async fn note_insight_regenerate_tab(note_id: String, tab: String) -> TabContent {
     state.note_insight_regenerate_tab(&note_id, &tab).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_debate(
-    state: State<'_, Arc<AppCore>>,
-    note_id: String,
-    squad_id: Option<String>,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn note_insight_debate(note_id: String, squad_id: Option<String>) -> () {
     state
         .note_insight_debate(&note_id, squad_id.as_deref())
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_list_versions(
-    state: State<'_, Arc<AppCore>>,
-    note_id: String,
-) -> CommandResult<Vec<InsightVersionResponse>> {
+#[klynt_command]
+pub async fn note_insight_list_versions(note_id: String) -> Vec<InsightVersionResponse> {
     state.note_insight_list_versions(&note_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_get_evolution(
-    state: State<'_, Arc<AppCore>>,
-    note_id: String,
-) -> CommandResult<InsightEvolutionResponse> {
+#[klynt_command]
+pub async fn note_insight_get_evolution(note_id: String) -> InsightEvolutionResponse {
     state.note_insight_get_evolution(&note_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_get_version(
-    state: State<'_, Arc<AppCore>>,
-    insight_id: String,
-) -> CommandResult<InsightReviewResponse> {
+#[klynt_command]
+pub async fn note_insight_get_version(insight_id: String) -> InsightReviewResponse {
     state.note_insight_get_version(&insight_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_generate_scenario(
-    state: State<'_, Arc<AppCore>>,
-    note_id: String,
-) -> CommandResult<ScenarioChallengeResponse> {
+#[klynt_command]
+pub async fn note_insight_generate_scenario(note_id: String) -> ScenarioChallengeResponse {
     state.note_insight_generate_scenario(&note_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn note_insight_changes_summary(
-    state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> CommandResult<Option<ChangesSummaryResponse>> {
+) -> Option<ChangesSummaryResponse> {
     state.note_insight_changes_summary(&note_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_knowledge_growth(
-    state: State<'_, Arc<AppCore>>,
-    days: Option<u32>,
-) -> CommandResult<KnowledgeGrowthResponse> {
+#[klynt_command]
+pub async fn note_insight_knowledge_growth(days: Option<u32>) -> KnowledgeGrowthResponse {
     state.note_insight_knowledge_growth(days.unwrap_or(7)).await
 }
 
 // ── Persona Management commands ───────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_list_personas(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<PersonaResponse>> {
+#[klynt_command]
+pub async fn note_insight_list_personas() -> Vec<PersonaResponse> {
     state.note_insight_list_personas().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_create_persona(
-    state: State<'_, Arc<AppCore>>,
-    params: CreatePersonaParams,
-) -> CommandResult<PersonaResponse> {
+#[klynt_command]
+pub async fn note_insight_create_persona(params: CreatePersonaParams) -> PersonaResponse {
     state.note_insight_create_persona(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_update_persona(
-    state: State<'_, Arc<AppCore>>,
-    params: UpdatePersonaParams,
-) -> CommandResult<PersonaResponse> {
+#[klynt_command]
+pub async fn note_insight_update_persona(params: UpdatePersonaParams) -> PersonaResponse {
     state.note_insight_update_persona(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_delete_persona(
-    state: State<'_, Arc<AppCore>>,
-    id: String,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn note_insight_delete_persona(id: String) -> () {
     state.note_insight_delete_persona(&id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_toggle_persona(
-    state: State<'_, Arc<AppCore>>,
-    id: String,
-    active: bool,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn note_insight_toggle_persona(id: String, active: bool) -> () {
     state.note_insight_toggle_persona(&id, active).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_set_pins(
-    state: State<'_, Arc<AppCore>>,
-    params: SetPersonaPinsParams,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn note_insight_set_pins(params: SetPersonaPinsParams) -> () {
     state.note_insight_set_pins(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_rate_persona(
-    state: State<'_, Arc<AppCore>>,
-    params: RatePersonaParams,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn note_insight_rate_persona(params: RatePersonaParams) -> () {
     state.note_insight_rate_persona(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_auto_generate_persona(
-    state: State<'_, Arc<AppCore>>,
-    note_id: String,
-) -> CommandResult<PersonaResponse> {
+#[klynt_command]
+pub async fn note_insight_auto_generate_persona(note_id: String) -> PersonaResponse {
     state.note_insight_auto_generate_persona(&note_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_persona_chat(
-    state: State<'_, Arc<AppCore>>,
-    params: PersonaChatParams,
-) -> CommandResult<PersonaChatResponse> {
+#[klynt_command]
+pub async fn note_insight_persona_chat(params: PersonaChatParams) -> PersonaChatResponse {
     state.note_insight_persona_chat(&params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_preview_scope(
-    state: State<'_, Arc<AppCore>>,
-    params: ScopePreviewParams,
-) -> CommandResult<ScopePreviewResponse> {
+#[klynt_command]
+pub async fn note_insight_preview_scope(params: ScopePreviewParams) -> ScopePreviewResponse {
     state.note_insight_preview_scope(params).await
 }
 
 // ── Flashcard Review commands ───────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn flashcard_list_decks(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<DeckSummaryResponse>> {
+#[klynt_command]
+pub async fn flashcard_list_decks() -> Vec<DeckSummaryResponse> {
     state.flashcard_list_decks().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn flashcard_get_due(
-    state: State<'_, Arc<AppCore>>,
-    deck: String,
-    limit: Option<i64>,
-) -> CommandResult<Vec<FlashcardResponse>> {
+#[klynt_command]
+pub async fn flashcard_get_due(deck: String, limit: Option<i64>) -> Vec<FlashcardResponse> {
     state.flashcard_get_due(&deck, limit.unwrap_or(10)).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn flashcard_record_review(
-    state: State<'_, Arc<AppCore>>,
-    params: FlashcardReviewParams,
-) -> CommandResult<FlashcardResponse> {
+#[klynt_command]
+pub async fn flashcard_record_review(params: FlashcardReviewParams) -> FlashcardResponse {
     state.flashcard_record_review(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn flashcard_get(
-    state: State<'_, Arc<AppCore>>,
-    id: String,
-) -> CommandResult<FlashcardResponse> {
+#[klynt_command]
+pub async fn flashcard_get(id: String) -> FlashcardResponse {
     state.flashcard_get(&id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn flashcard_create(
-    state: State<'_, Arc<AppCore>>,
-    params: FlashcardCreateParams,
-) -> CommandResult<FlashcardResponse> {
+#[klynt_command]
+pub async fn flashcard_create(params: FlashcardCreateParams) -> FlashcardResponse {
     state.flashcard_create(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn flashcard_update(
-    state: State<'_, Arc<AppCore>>,
-    params: FlashcardUpdateParams,
-) -> CommandResult<FlashcardResponse> {
+#[klynt_command]
+pub async fn flashcard_update(params: FlashcardUpdateParams) -> FlashcardResponse {
     state.flashcard_update(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn flashcard_list_cards(
-    state: State<'_, Arc<AppCore>>,
-    params: FlashcardListParams,
-) -> CommandResult<Vec<FlashcardResponse>> {
+#[klynt_command]
+pub async fn flashcard_list_cards(params: FlashcardListParams) -> Vec<FlashcardResponse> {
     state.flashcard_list_cards(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn flashcard_delete(state: State<'_, Arc<AppCore>>, id: String) -> CommandResult<bool> {
+#[klynt_command]
+pub async fn flashcard_delete(id: String) -> bool {
     state.flashcard_delete(&id).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn flashcard_get_all_due(
-    state: State<'_, Arc<AppCore>>,
-    limit: i64,
-) -> CommandResult<Vec<FlashcardResponse>> {
+#[klynt_command]
+pub async fn flashcard_get_all_due(limit: i64) -> Vec<FlashcardResponse> {
     state.flashcard_get_all_due(limit).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn flashcard_total_due(state: State<'_, Arc<AppCore>>) -> CommandResult<i64> {
+#[klynt_command]
+pub async fn flashcard_total_due() -> i64 {
     state.flashcard_total_due().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn flashcard_list_struggling(
-    state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
-) -> CommandResult<Vec<StrugglingCardResponse>> {
+) -> Vec<StrugglingCardResponse> {
     state.flashcard_list_struggling(limit.unwrap_or(5)).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn flashcard_generate(
-    state: State<'_, Arc<AppCore>>,
     params: FlashcardGenerateParams,
-) -> CommandResult<FlashcardGenerateResponse> {
+) -> FlashcardGenerateResponse {
     state.flashcard_generate(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn flashcard_save_generated(
-    state: State<'_, Arc<AppCore>>,
     params: FlashcardSaveGeneratedParams,
-) -> CommandResult<Vec<FlashcardResponse>> {
+) -> Vec<FlashcardResponse> {
     state.flashcard_save_generated(params).await
 }
 
 // ── Active Recall commands ──────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn flashcard_submit_answer(
-    state: State<'_, Arc<AppCore>>,
     params: FlashcardSubmitAnswerParams,
-) -> CommandResult<GradeResultResponse> {
+) -> GradeResultResponse {
     state.flashcard_submit_answer(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn flashcard_explain_answer(
-    state: State<'_, Arc<AppCore>>,
     params: FlashcardExplainParams,
-) -> CommandResult<FlashcardExplainResponse> {
+) -> FlashcardExplainResponse {
     state.flashcard_explain_answer(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn flashcard_generate_distractors(
-    state: State<'_, Arc<AppCore>>,
     params: FlashcardDistractorParams,
-) -> CommandResult<FlashcardDistractorResponse> {
+) -> FlashcardDistractorResponse {
     state.flashcard_generate_distractors(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn flashcard_save_mode_preference(
-    state: State<'_, Arc<AppCore>>,
-    deck: String,
-    mode: String,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn flashcard_save_mode_preference(deck: String, mode: String) -> () {
     state
         .deck_preference_repo()?
         .set(&deck, &mode)
@@ -687,12 +509,10 @@ pub async fn flashcard_save_mode_preference(
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn flashcard_get_mode_preference(
-    state: State<'_, Arc<AppCore>>,
     deck: String,
-) -> CommandResult<Option<DeckPreferenceResponse>> {
+) -> Option<DeckPreferenceResponse> {
     let row = state
         .deck_preference_repo()?
         .get(&deck)
@@ -704,30 +524,22 @@ pub async fn flashcard_get_mode_preference(
     }))
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn flashcard_get_prerequisites(
-    state: State<'_, Arc<AppCore>>,
-    card_id: String,
-) -> CommandResult<Vec<FlashcardResponse>> {
+#[klynt_command]
+pub async fn flashcard_get_prerequisites(card_id: String) -> Vec<FlashcardResponse> {
     state.flashcard_get_prerequisites(&card_id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn flashcard_save_session(
-    state: State<'_, Arc<AppCore>>,
     params: desktop_shared::commands::ReviewSessionSaveParams,
-) -> CommandResult<()> {
+) -> () {
     state.flashcard_save_session(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn flashcard_recent_learning_sessions(
-    state: State<'_, Arc<AppCore>>,
     limit: Option<usize>,
-) -> CommandResult<Vec<RecentLearningSession>> {
+) -> Vec<RecentLearningSession> {
     state
         .flashcard_recent_learning_sessions(limit.unwrap_or(3))
         .await
@@ -735,28 +547,23 @@ pub async fn flashcard_recent_learning_sessions(
 
 // ── Retention Health ────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn note_retention_health(
-    state: State<'_, Arc<AppCore>>,
     note_id: String,
-) -> CommandResult<Option<NoteRetentionHealthResponse>> {
+) -> Option<NoteRetentionHealthResponse> {
     state.note_retention_health(note_id).await
 }
 
 // ── Editing finished command ─────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_editing_finished(
-    state: State<'_, Arc<AppCore>>,
-    params: NoteEditingFinishedParams,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn note_editing_finished(params: NoteEditingFinishedParams) -> () {
     state.note_editing_finished(params).await
 }
 
 // ── Insight Tab Chat commands ─────────────────────────────────────────
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn note_insight_tab_chat(
@@ -768,17 +575,14 @@ pub async fn note_insight_tab_chat(
     state.note_insight_tab_chat(&params, emitter).await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn note_insight_clear_tab_chats(
-    state: State<'_, Arc<AppCore>>,
-    note_id: String,
-) -> CommandResult<()> {
+#[klynt_command]
+pub async fn note_insight_clear_tab_chats(note_id: String) -> () {
     state.note_insight_clear_tab_chats(&note_id).await
 }
 
 // ── Import / Export ──────────────────────────────────────────────
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn note_import_files(
@@ -797,6 +601,7 @@ pub async fn note_import_files(
     Ok(result)
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn note_export(
@@ -808,87 +613,6 @@ pub async fn note_export(
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "note_list",
-    "note_get",
-    "note_create",
-    "note_update",
-    "note_delete",
-    "note_search",
-    "note_search_semantic",
-    "note_search_hybrid",
-    "note_links_all",
-    "note_list_by_entity",
-    "note_version_list",
-    "note_version_create",
-    "note_version_restore",
-    "note_save_attachment",
-    "notebook_list",
-    "notebook_create",
-    "notebook_update",
-    "notebook_delete",
-    "note_archive",
-    "note_unarchive",
-    "note_list_archived",
-    "note_backlinks",
-    "note_suggestions",
-    "note_tags_all",
-    "note_unlinked_mentions",
-    "inbox_create",
-    "inbox_list",
-    "inbox_delete",
-    "note_insight_review",
-    "note_insight_cache_get",
-    "note_insight_save_flashcards",
-    "note_insight_submit_quiz",
-    "note_insight_regenerate_tab",
-    "note_insight_debate",
-    "note_insight_list_versions",
-    "note_insight_get_evolution",
-    "note_insight_get_version",
-    "note_insight_generate_scenario",
-    "note_insight_changes_summary",
-    "note_insight_knowledge_growth",
-    "note_insight_list_personas",
-    "note_insight_create_persona",
-    "note_insight_update_persona",
-    "note_insight_delete_persona",
-    "note_insight_toggle_persona",
-    "note_insight_set_pins",
-    "note_insight_rate_persona",
-    "note_insight_auto_generate_persona",
-    "note_insight_persona_chat",
-    "note_insight_preview_scope",
-    "flashcard_list_decks",
-    "flashcard_get_due",
-    "flashcard_record_review",
-    "flashcard_get",
-    "flashcard_create",
-    "flashcard_update",
-    "flashcard_list_cards",
-    "flashcard_delete",
-    "flashcard_get_all_due",
-    "flashcard_total_due",
-    "flashcard_list_struggling",
-    "flashcard_generate",
-    "flashcard_save_generated",
-    "flashcard_submit_answer",
-    "flashcard_explain_answer",
-    "flashcard_generate_distractors",
-    "flashcard_save_mode_preference",
-    "flashcard_get_mode_preference",
-    "flashcard_get_prerequisites",
-    "flashcard_save_session",
-    "flashcard_recent_learning_sessions",
-    "note_retention_health",
-    "note_editing_finished",
-    "note_import_files",
-    "note_export",
-    // note_insight_tab_chat handled in dev_server/dispatch.rs (needs SSE channels)
-    "note_insight_clear_tab_chats",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

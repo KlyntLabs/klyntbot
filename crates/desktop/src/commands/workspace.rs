@@ -1,41 +1,25 @@
-use std::sync::Arc;
-
 use app_core::AppCore;
 use desktop_shared::commands::{WorkspaceFile, WorkspaceFileContent};
 use desktop_shared::CommandResult;
-use tauri::State;
+use desktop_macros::klynt_command;
 
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "workspace_list_files",
-    "workspace_read_file",
-    "workspace_write_file",
-];
-
-#[tauri::command]
-#[specta::specta]
-pub async fn workspace_list_files(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<WorkspaceFile>> {
+#[klynt_command]
+pub async fn workspace_list_files() -> Vec<WorkspaceFile> {
     state.workspace_list_files().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn workspace_read_file(
-    state: State<'_, Arc<AppCore>>,
     filename: String,
-) -> CommandResult<WorkspaceFileContent> {
+) -> WorkspaceFileContent {
     state.workspace_read_file(&filename).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn workspace_write_file(
-    state: State<'_, Arc<AppCore>>,
     filename: String,
     content: String,
-) -> CommandResult<WorkspaceFileContent> {
+) -> WorkspaceFileContent {
     state.workspace_write_file(&filename, &content).await
 }
 

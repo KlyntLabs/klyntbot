@@ -1,22 +1,15 @@
 use desktop_shared::commands::MorningBriefingResponse;
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn morning_briefing_summary(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<MorningBriefingResponse> {
+#[klynt_command]
+pub async fn morning_briefing_summary() -> MorningBriefingResponse {
     state.morning_briefing().await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &["morning_briefing_summary"];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

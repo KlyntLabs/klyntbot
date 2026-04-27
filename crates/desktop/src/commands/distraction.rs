@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use desktop_macros::{klynt_command, klynt_raw_command};
 use desktop_shared::commands::LearnedRuleResponse;
 use desktop_shared::CommandResult;
 use tauri::State;
@@ -9,15 +10,14 @@ use tauri::State;
 use crate::app_core::AppCore;
 use crate::focus_timer::FocusTimer;
 
-#[tauri::command(rename_all = "snake_case")]
-#[specta::specta]
+#[klynt_command]
 pub async fn distraction_dismiss(
-    state: State<'_, Arc<AppCore>>,
     app_name: String,
-) -> CommandResult<()> {
+) -> () {
     state.distraction_dismiss(app_name).await
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn distraction_allow_temp(
@@ -31,43 +31,29 @@ pub async fn distraction_allow_temp(
     state.distraction_allow_temp(pattern).await
 }
 
-#[tauri::command(rename_all = "snake_case")]
-#[specta::specta]
+#[klynt_command]
 pub async fn distraction_allow_session(
-    state: State<'_, Arc<AppCore>>,
     app_name: String,
     window_title: Option<String>,
     classification: String,
-) -> CommandResult<()> {
+) -> () {
     state
         .distraction_allow_session(app_name, window_title, classification)
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn distraction_learned_rules(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<Vec<LearnedRuleResponse>> {
+) -> Vec<LearnedRuleResponse> {
     state.distraction_learned_rules().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn distraction_delete_rule(state: State<'_, Arc<AppCore>>, id: i64) -> CommandResult<()> {
+#[klynt_command]
+pub async fn distraction_delete_rule(id: i64) -> () {
     state.distraction_delete_rule(id).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "distraction_dismiss",
-    "distraction_allow_temp",
-    "distraction_allow_session",
-    "distraction_learned_rules",
-    "distraction_delete_rule",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

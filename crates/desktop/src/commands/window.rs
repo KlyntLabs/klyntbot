@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use app_core::AppCore;
+use desktop_macros::klynt_raw_command;
 use tauri::Manager;
 
 pub const WINDOW_TRAY: &str = "tray";
@@ -14,6 +15,7 @@ const RESIZABLE_WINDOWS: &[&str] = &[WINDOW_LAUNCHER, WINDOW_TRAY];
 /// real quit intent from close-button presses (which should only hide windows).
 pub static QUIT_REQUESTED: AtomicBool = AtomicBool::new(false);
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub fn resize_window(app: tauri::AppHandle, label: String, height: f64) {
@@ -32,12 +34,14 @@ pub fn resize_window(app: tauri::AppHandle, label: String, height: f64) {
     }
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub fn open_url(url: String) {
     let _ = open::that(&url);
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub fn show_dashboard(app: tauri::AppHandle) {
@@ -51,6 +55,7 @@ pub fn show_dashboard(app: tauri::AppHandle) {
     }
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn quit_app(app: tauri::AppHandle) {

@@ -5,86 +5,60 @@ use desktop_shared::commands::{
     PracticeSubmitParams,
 };
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn practice_segment_note(
-    state: State<'_, Arc<AppCore>>,
     params: PracticeSegmentParams,
-) -> CommandResult<PracticeSegmentResponse> {
+) -> PracticeSegmentResponse {
     state.practice_segment_note(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn practice_start_session(
-    state: State<'_, Arc<AppCore>>,
     params: PracticeStartParams,
-) -> CommandResult<PracticeSessionResponse> {
+) -> PracticeSessionResponse {
     state.practice_start_session(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn practice_submit_unit(
-    state: State<'_, Arc<AppCore>>,
     params: PracticeSubmitParams,
-) -> CommandResult<PracticeEvalResponse> {
+) -> PracticeEvalResponse {
     state.practice_submit_unit(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn practice_confirm_unit(
-    state: State<'_, Arc<AppCore>>,
     params: PracticeConfirmParams,
-) -> CommandResult<PracticeConfirmResponse> {
+) -> PracticeConfirmResponse {
     state.practice_confirm_unit(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn practice_get_session(
-    state: State<'_, Arc<AppCore>>,
     params: PracticeGetParams,
-) -> CommandResult<Option<PracticeSessionResponse>> {
+) -> Option<PracticeSessionResponse> {
     state.practice_get_session(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn practice_complete_session(
-    state: State<'_, Arc<AppCore>>,
     params: PracticeCompleteParams,
-) -> CommandResult<PracticeCompleteResponse> {
+) -> PracticeCompleteResponse {
     state.practice_complete_session(params).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn practice_list_sessions(
-    state: State<'_, Arc<AppCore>>,
     params: PracticeListParams,
-) -> CommandResult<Vec<PracticeSessionResponse>> {
+) -> Vec<PracticeSessionResponse> {
     state.practice_list_sessions(params).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "practice_segment_note",
-    "practice_start_session",
-    "practice_submit_unit",
-    "practice_confirm_unit",
-    "practice_get_session",
-    "practice_complete_session",
-    "practice_list_sessions",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

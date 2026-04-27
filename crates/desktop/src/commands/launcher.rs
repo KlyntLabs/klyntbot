@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use desktop_macros::{klynt_command, klynt_raw_command};
 use desktop_shared::{errors::ApiError, CommandResult};
 use feature_launcher::{
     ClipboardEntry, DashboardData, LauncherExecuteResult, LauncherItem, ScriptRunner, SystemAction,
@@ -11,62 +12,52 @@ use tauri::State;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn launcher_search(
-    state: State<'_, Arc<AppCore>>,
     query: String,
-) -> CommandResult<Vec<LauncherItem>> {
+) -> Vec<LauncherItem> {
     state.launcher_search(query).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn launcher_execute(
-    state: State<'_, Arc<AppCore>>,
     item_id: String,
     kind: String,
     args: Option<std::collections::HashMap<String, String>>,
-) -> CommandResult<LauncherExecuteResult> {
+) -> LauncherExecuteResult {
     state
         .launcher_execute(item_id, kind, args.unwrap_or_default())
         .await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn launcher_dashboard(state: State<'_, Arc<AppCore>>) -> CommandResult<DashboardData> {
+#[klynt_command]
+pub async fn launcher_dashboard() -> DashboardData {
     state.launcher_dashboard().await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn launcher_clipboard_paste(
-    state: State<'_, Arc<AppCore>>,
     id: i64,
-) -> CommandResult<Option<ClipboardEntry>> {
+) -> Option<ClipboardEntry> {
     state.launcher_clipboard_paste(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn launcher_clipboard_delete(
-    state: State<'_, Arc<AppCore>>,
     id: i64,
-) -> CommandResult<()> {
+) -> () {
     state.launcher_clipboard_delete(id).await
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn launcher_clipboard_pin(
-    state: State<'_, Arc<AppCore>>,
     id: i64,
     pinned: bool,
-) -> CommandResult<()> {
+) -> () {
     state.launcher_clipboard_pin(id, pinned).await
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn launcher_run_script(
@@ -80,6 +71,7 @@ pub async fn launcher_run_script(
         .map_err(|e| ApiError::new("SCRIPT_ERROR", e.to_string()))
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn launcher_system_command(
@@ -94,6 +86,7 @@ pub async fn launcher_system_command(
         .map_err(|e| ApiError::new("SYSTEM_COMMAND_ERROR", e.to_string()))
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn launcher_window_action(action: WindowAction) -> CommandResult<()> {
@@ -102,6 +95,7 @@ pub async fn launcher_window_action(action: WindowAction) -> CommandResult<()> {
         .map_err(|e| ApiError::new("WINDOW_ACTION_ERROR", e.to_string()))
 }
 
+#[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]
 pub async fn launcher_open_app(path: String) -> CommandResult<()> {
@@ -122,20 +116,6 @@ pub async fn launcher_open_app(path: String) -> CommandResult<()> {
     }
     Ok(())
 }
-
-#[allow(dead_code)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "launcher_search",
-    "launcher_execute",
-    "launcher_dashboard",
-    "launcher_clipboard_paste",
-    "launcher_clipboard_delete",
-    "launcher_clipboard_pin",
-    "launcher_run_script",
-    "launcher_system_command",
-    "launcher_window_action",
-    "launcher_open_app",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

@@ -1,63 +1,41 @@
 use desktop_shared::commands::{CaptureStatusResponse, ShellHookStatusResponse};
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
-pub async fn capture_status(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<CaptureStatusResponse> {
+#[klynt_command]
+pub async fn capture_status() -> CaptureStatusResponse {
     state.get_capture_status().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn capture_shell_hook_status(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<ShellHookStatusResponse> {
+#[klynt_command]
+pub async fn capture_shell_hook_status() -> ShellHookStatusResponse {
     state.get_shell_hook_status().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn capture_install_shell_hook(state: State<'_, Arc<AppCore>>) -> CommandResult<String> {
+#[klynt_command]
+pub async fn capture_install_shell_hook() -> String {
     state.install_shell_hook().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn capture_uninstall_shell_hook(state: State<'_, Arc<AppCore>>) -> CommandResult<String> {
+#[klynt_command]
+pub async fn capture_uninstall_shell_hook() -> String {
     state.uninstall_shell_hook().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn capture_get_ingestion_token(state: State<'_, Arc<AppCore>>) -> CommandResult<String> {
+#[klynt_command]
+pub async fn capture_get_ingestion_token() -> String {
     state.get_ingestion_token().await
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn capture_regenerate_ingestion_token(
-    state: State<'_, Arc<AppCore>>,
-) -> CommandResult<String> {
+#[klynt_command]
+pub async fn capture_regenerate_ingestion_token() -> String {
     state.regenerate_ingestion_token().await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "capture_status",
-    "capture_shell_hook_status",
-    "capture_install_shell_hook",
-    "capture_uninstall_shell_hook",
-    "capture_get_ingestion_token",
-    "capture_regenerate_ingestion_token",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

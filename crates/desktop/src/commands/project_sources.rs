@@ -1,51 +1,37 @@
 use desktop_shared::entity_link_types::*;
 use desktop_shared::CommandResult;
-use std::sync::Arc;
-use tauri::State;
+use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_source_create(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ProjectSourceCreateParams,
-) -> CommandResult<ProjectSourceResponse> {
+) -> ProjectSourceResponse {
     let (result, updates) = state.project_source_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_source_delete(
-    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> CommandResult<bool> {
+) -> bool {
     let (result, updates) = state.project_source_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[klynt_command]
 pub async fn project_source_list(
-    state: State<'_, Arc<AppCore>>,
     project_id: String,
-) -> CommandResult<Vec<ProjectSourceResponse>> {
+) -> Vec<ProjectSourceResponse> {
     state.project_source_list(project_id).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
-
-#[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "project_source_create",
-    "project_source_delete",
-    "project_source_list",
-];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
