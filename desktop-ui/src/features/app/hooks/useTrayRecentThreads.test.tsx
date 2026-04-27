@@ -1,15 +1,14 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { isTauri } from "@tauri-apps/api/core";
 import type { ThreadSummary, WorkspaceInfo } from "@/types";
 import { buildTrayRecentThreadEntries, useTrayRecentThreads } from "./useTrayRecentThreads";
 
-const isTauriMock = vi.hoisted(() => vi.fn(() => true));
+const isTauriMock = vi.mocked(isTauri);
 const setTrayRecentThreadsMock = vi.fn();
 
-vi.mock("@tauri-apps/api/core", () => ({
-  isTauri: isTauriMock,
-}));
+vi.mock("@tauri-apps/api/core");
 
 vi.mock("@services/tauri", () => ({
   setTrayRecentThreads: (...args: unknown[]) => setTrayRecentThreadsMock(...args),
