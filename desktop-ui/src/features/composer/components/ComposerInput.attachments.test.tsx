@@ -9,9 +9,7 @@ vi.mock("../../../services/dragDrop", () => ({
   subscribeWindowDragDrop: vi.fn(() => () => {}),
 }));
 
-vi.mock("@tauri-apps/api/core", () => ({
-  convertFileSrc: (path: string) => `tauri://${path}`,
-}));
+vi.mock("@tauri-apps/api/core");
 
 type HarnessProps = {
   activeThreadId: string | null;
