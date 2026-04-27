@@ -22,7 +22,19 @@ impl AppCore {
         kind: String,
     ) -> Result<LauncherExecuteResult, ApiError> {
         let engine = self.launcher_engine()?;
-        engine.execute(&item_id, &kind).await
+        let result = engine.execute(&item_id, &kind).await?;
+
+        // Best-effort publish; non-fatal if bus is absent
+        if let Some(bus) = self.domain_event_bus.as_ref() {
+            let event = bus::DomainEvent::LauncherItemExecuted {
+                item_id,
+                kind,
+                query: None,
+            };
+            let _ = bus.publish(event).await;
+        }
+
+        Ok(result)
     }
 
     /// Build dashboard data for the launcher.
