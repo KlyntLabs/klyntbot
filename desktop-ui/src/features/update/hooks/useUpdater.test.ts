@@ -8,9 +8,7 @@ import type { DebugEntry } from "@/types";
 import { STORAGE_KEY_PENDING_POST_UPDATE_VERSION } from "../utils/postUpdateRelease";
 import { useUpdater } from "./useUpdater";
 
-vi.mock("@tauri-apps/api/core", () => ({
-  isTauri: vi.fn(() => true),
-}));
+vi.mock("@tauri-apps/api/core");
 
 vi.mock("@tauri-apps/plugin-updater", () => ({
   check: vi.fn(),
