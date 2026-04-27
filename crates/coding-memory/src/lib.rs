@@ -34,6 +34,8 @@ pub mod recall;
 pub mod reforge;
 /// Reforge coding phases (2.5, 3.5) stubs.
 pub mod reforge_phase;
+/// Causal edge repo + auto-detection (Phase 6).
+pub mod causal;
 /// C3 retrieval-skill registry stubs.
 pub mod retrieval_skills;
 /// Scope partitioning, provenance, anchored symbols, causal edges.
@@ -65,6 +67,7 @@ pub use retrieval_skills::{
     BudgetTier, EscalationContext, EscalationOutcome, RetrievalSkill, RetrievalSkillRegistry,
 };
 pub use symbols::{Language, SymbolExtractor, TreeSitterExtractor};
+pub use causal::{CausalEdgeDetector, CausalEdgeRepo, ProblemHashGroup};
 
 use tools_core::FeatureMigration;
 
