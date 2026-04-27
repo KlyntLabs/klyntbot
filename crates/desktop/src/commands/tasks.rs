@@ -2,7 +2,7 @@ use desktop_shared::commands::{
     ObjectiveResponse, ProjectResponse, TaskCreateParams, TaskResponse, TaskUpdateParams,
     TodayTaskResponse,
 };
-use desktop_shared::errors::ApiError;
+use desktop_shared::{errors::ApiError, CommandResult};
 use std::sync::Arc;
 use storage::{TaskAttachmentRow, TaskTimeEntryRow};
 use tauri::State;
@@ -14,7 +14,7 @@ use crate::app_core::AppCore;
 pub async fn task_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
-) -> Result<Option<TaskResponse>, ApiError> {
+) -> CommandResult<Option<TaskResponse>> {
     state.task_get(id).await
 }
 
@@ -25,7 +25,7 @@ pub async fn task_list(
     area_id: Option<String>,
     project_id: Option<String>,
     status: Option<String>,
-) -> Result<Vec<TaskResponse>, ApiError> {
+) -> CommandResult<Vec<TaskResponse>> {
     state.task_list(area_id, project_id, status).await
 }
 
@@ -35,7 +35,7 @@ pub async fn task_create(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: TaskCreateParams,
-) -> Result<TaskResponse, ApiError> {
+) -> CommandResult<TaskResponse> {
     let (result, updates) = state.task_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -47,7 +47,7 @@ pub async fn task_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: TaskUpdateParams,
-) -> Result<TaskResponse, ApiError> {
+) -> CommandResult<TaskResponse> {
     let (result, updates) = state.task_update(params, Some("user".into())).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -59,7 +59,7 @@ pub async fn task_delete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, ApiError> {
+) -> CommandResult<bool> {
     let (result, updates) = state.task_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -71,7 +71,7 @@ pub async fn task_toggle_complete(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<TaskResponse, ApiError> {
+) -> CommandResult<TaskResponse> {
     let (result, updates) = state.task_toggle_complete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -82,7 +82,7 @@ pub async fn task_toggle_complete(
 pub async fn task_list_children(
     state: State<'_, Arc<AppCore>>,
     parent_id: String,
-) -> Result<Vec<TaskResponse>, ApiError> {
+) -> CommandResult<Vec<TaskResponse>> {
     state.task_list_children(parent_id).await
 }
 
@@ -90,7 +90,7 @@ pub async fn task_list_children(
 #[specta::specta]
 pub async fn today_tasks(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<TodayTaskResponse>, ApiError> {
+) -> CommandResult<Vec<TodayTaskResponse>> {
     state.today_tasks().await
 }
 
@@ -99,7 +99,7 @@ pub async fn today_tasks(
 pub async fn project_list(
     state: State<'_, Arc<AppCore>>,
     area_id: Option<String>,
-) -> Result<Vec<ProjectResponse>, ApiError> {
+) -> CommandResult<Vec<ProjectResponse>> {
     state.project_list_for_tasks(area_id).await
 }
 
@@ -108,7 +108,7 @@ pub async fn project_list(
 pub async fn objective_list(
     state: State<'_, Arc<AppCore>>,
     project_id: Option<String>,
-) -> Result<Vec<ObjectiveResponse>, ApiError> {
+) -> CommandResult<Vec<ObjectiveResponse>> {
     state.objective_list_for_tasks(project_id).await
 }
 
@@ -120,7 +120,7 @@ pub async fn task_add_dependency(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
     blocker_id: String,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     state.task_add_dependency(task_id, blocker_id).await
 }
 
@@ -129,7 +129,7 @@ pub async fn task_add_dependency(
 pub async fn task_list_dependencies(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
-) -> Result<Vec<TaskResponse>, ApiError> {
+) -> CommandResult<Vec<TaskResponse>> {
     state.task_list_dependencies(task_id).await
 }
 
@@ -143,7 +143,7 @@ pub async fn task_add_attachment(
     attachment_type: String,
     value: String,
     title: Option<String>,
-) -> Result<TaskAttachmentRow, ApiError> {
+) -> CommandResult<TaskAttachmentRow> {
     state
         .task_add_attachment(task_id, attachment_type, value, title)
         .await
@@ -154,7 +154,7 @@ pub async fn task_add_attachment(
 pub async fn task_list_attachments(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
-) -> Result<Vec<TaskAttachmentRow>, ApiError> {
+) -> CommandResult<Vec<TaskAttachmentRow>> {
     state.task_list_attachments(task_id).await
 }
 
@@ -168,7 +168,7 @@ pub async fn task_add_time_entry(
     started_at: String,
     duration_secs: Option<i64>,
     note: Option<String>,
-) -> Result<TaskTimeEntryRow, ApiError> {
+) -> CommandResult<TaskTimeEntryRow> {
     let started_at = started_at
         .parse::<jiff::Timestamp>()
         .map_err(|e| ApiError::new("VALIDATION", format!("invalid started_at: {e}")))?;
@@ -182,7 +182,7 @@ pub async fn task_add_time_entry(
 pub async fn task_list_time_entries(
     state: State<'_, Arc<AppCore>>,
     task_id: String,
-) -> Result<Vec<TaskTimeEntryRow>, ApiError> {
+) -> CommandResult<Vec<TaskTimeEntryRow>> {
     state.task_list_time_entries(task_id).await
 }
 
@@ -195,7 +195,7 @@ pub async fn cross_domain_check(
     id: String,
     title: String,
     created_at: Option<String>,
-) -> Result<(), ApiError> {
+) -> CommandResult<()> {
     let core = Arc::clone(&*state);
     tokio::spawn(async move {
         core.check_cross_domain_str(&domain, &id, &title, created_at.as_deref())
@@ -232,7 +232,7 @@ pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
     body: &serde_json::Value,
-) -> Option<Result<serde_json::Value, ApiError>> {
+) -> Option<CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "task_list" => dev::val(
