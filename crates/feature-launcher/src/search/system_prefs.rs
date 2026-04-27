@@ -46,8 +46,7 @@ impl SystemPrefsSource {
             };
             for entry in entries.flatten() {
                 let path = entry.path();
-                #[allow(clippy::unnecessary_map_or)]
-                if path.extension().map_or(true, |e| e != "prefPane") {
+                if path.extension().is_none_or(|e| e != "prefPane") {
                     continue;
                 }
                 let plist = path.join("Contents/Info.plist");

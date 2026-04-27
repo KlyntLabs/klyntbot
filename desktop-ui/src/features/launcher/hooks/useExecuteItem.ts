@@ -49,7 +49,6 @@ export function executeItem(
           ipc<LauncherExecuteResult>("launcher_execute", {
             itemId: item.id,
             kind: "app",
-            args,
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
@@ -71,7 +70,6 @@ export function executeItem(
                     ipc<LauncherExecuteResult>("launcher_execute", {
                       itemId: item.id,
                       kind: "system",
-                      args,
                     }),
                   )
                   .then((result) => hideAndBadge(item, result, onHide))
@@ -89,7 +87,6 @@ export function executeItem(
               ipc<LauncherExecuteResult>("launcher_execute", {
                 itemId: item.id,
                 kind: "system",
-                args,
               }),
             )
             .then((result) => hideAndBadge(item, result, onHide))
@@ -114,7 +111,6 @@ export function executeItem(
           ipc<LauncherExecuteResult>("launcher_execute", {
             itemId: item.id,
             kind: "script",
-            args,
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
@@ -126,7 +122,6 @@ export function executeItem(
           ipc<LauncherExecuteResult>("launcher_execute", {
             itemId: item.id,
             kind: "clipboard",
-            args,
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
@@ -146,7 +141,6 @@ export function executeItem(
           ipc<LauncherExecuteResult>("launcher_execute", {
             itemId: item.id,
             kind: item.kind.type,
-            args,
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
@@ -174,7 +168,6 @@ export function executeItem(
           ipc<LauncherExecuteResult>("launcher_execute", {
             itemId: item.id,
             kind: "pref",
-            args,
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
@@ -186,7 +179,6 @@ export function executeItem(
           ipc<LauncherExecuteResult>("launcher_execute", {
             itemId: item.id,
             kind: "running_app",
-            args,
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
@@ -201,7 +193,6 @@ export function executeItem(
           ipc<LauncherExecuteResult>("launcher_execute", {
             itemId: item.id,
             kind: "ssh",
-            args,
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
@@ -234,7 +225,6 @@ export function executeItem(
           ipc<LauncherExecuteResult>("launcher_execute", {
             itemId: item.id,
             kind: "window",
-            args,
           }),
         )
         .then((result) => hideAndBadge(item, result, onHide))
@@ -247,7 +237,7 @@ export function executeItem(
         .catch((err) => console.error("Failed to copy package name:", err));
       break;
     default:
-      ipc("launcher_execute", { itemId: item.id, kind: item.kind.type, args })
+      ipc("launcher_execute", { itemId: item.id, kind: item.kind.type })
         .then(() => onExpandToMain())
         .catch((err) => console.error("Failed to execute:", err));
       break;

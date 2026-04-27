@@ -47,12 +47,11 @@ impl Calculator {
                 return None;
             }
         }
-        #[allow(clippy::unnecessary_map_or)] // is_none_or requires Rust 1.82, MSRV is 1.75
         if first == '-'
             && expr
                 .chars()
                 .nth(1)
-                .map_or(true, |c| !c.is_ascii_digit() && c != '(')
+                .is_none_or(|c| !c.is_ascii_digit() && c != '(')
         {
             return None;
         }

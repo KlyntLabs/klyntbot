@@ -315,16 +315,11 @@ impl LauncherSearchEngine {
     }
 
     /// Execute a launcher item: record execution and return a result envelope.
-    ///
-    /// `args` are threaded through here for API stability but applied at the actual
-    /// dispatch boundary (`launcher_run_script` / `launcher_system_command` Tauri commands).
     pub async fn execute(
         &self,
         item_id: &str,
         kind: &str,
-        args: &std::collections::HashMap<String, String>,
     ) -> Result<feature_launcher::LauncherExecuteResult, ApiError> {
-        let _ = args; // Applied at dispatch boundary; see launcher_run_script / launcher_system_command
         self.record_execution(item_id, kind).await?;
         Ok(feature_launcher::LauncherExecuteResult::default())
     }

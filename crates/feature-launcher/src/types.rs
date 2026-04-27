@@ -175,19 +175,9 @@ pub enum WindowAction {
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardData {
-    pub focus: Option<FocusDashboard>,
     pub calendar: Vec<CalendarDashboard>,
     pub tasks: Vec<TaskDashboard>,
     pub productivity: ProductivityDashboard,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct FocusDashboard {
-    pub task_name: Option<String>,
-    pub elapsed_secs: i64,
-    pub target_secs: Option<i64>,
-    pub session_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]

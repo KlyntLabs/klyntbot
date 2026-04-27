@@ -23,10 +23,9 @@ pub async fn launcher_search(
 pub async fn launcher_execute(
     item_id: String,
     kind: String,
-    args: Option<std::collections::HashMap<String, String>>,
 ) -> LauncherExecuteResult {
     state
-        .launcher_execute(item_id, kind, args.unwrap_or_default())
+        .launcher_execute(item_id, kind)
         .await
 }
 
@@ -133,9 +132,7 @@ pub(crate) async fn dispatch_dev(
         "launcher_execute" => {
             let item_id = dev::get(body, "itemId").unwrap_or_default();
             let kind = dev::get(body, "kind").unwrap_or_default();
-            let args: std::collections::HashMap<String, String> =
-                dev::get(body, "args").unwrap_or_default();
-            dev::val(core.launcher_execute(item_id, kind, args).await)
+            dev::val(core.launcher_execute(item_id, kind).await)
         }
         "launcher_dashboard" => dev::val(core.launcher_dashboard().await),
         "launcher_clipboard_paste" => {
