@@ -3,9 +3,9 @@
 //! Opt-in only. The daemon spawns an `OpencodePoller` task that diffs
 //! the messages table every 500 ms.
 
-mod normalize;
+pub mod normalize;
 pub mod poller;
-mod schema;
+pub mod schema;
 
 use super::IngestAdapter;
 use crate::event::AgentEvent;
