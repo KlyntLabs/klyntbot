@@ -109,8 +109,15 @@ impl AppIndex {
         scored
             .into_iter()
             .map(|(score, app)| {
-                // Convert cached PNG to base64 data URI at search time.
-                // Icons are 64x64 (~5KB each) — tiny compared to the old 1024x1024.
+                let bid = app.bundle_id.as_ref();
+
+                let running = bid.and_then(|b| {
+                    self.running_signals.get(b).map(|r| r.value().clone())
+                });
+                let attention = bid.and_then(|b| {
+                    self.attention_signals.get(b).map(|s| s.value().clone())
+                });
+
                 let icon = app
                     .icon_path
                     .as_ref()
@@ -122,16 +129,24 @@ impl AppIndex {
                     })
                     .or_else(|| Some("app-window".to_string()));
 
+                let id = match bid {
+                    Some(b) => format!("app:{b}"),
+                    None => format!("app:{}", app.path.display()),
+                };
+
+                let subtitle = compose_subtitle(&app.path, running.as_ref(), attention.as_ref());
+                let boost = score_boost(running.as_ref(), attention.as_ref());
+
                 LauncherItem {
-                    id: format!("app:{}", app.path.display()),
+                    id,
                     title: app.name.clone(),
-                    subtitle: Some(app.path.display().to_string()),
+                    subtitle: Some(subtitle),
                     icon,
                     kind: LauncherItemKind::Application {
                         path: app.path.clone(),
-                        running: false,
+                        running: running.is_some(),
                     },
-                    score: (score as f64) / 1000.0,
+                    score: (score as f64 / 1000.0) * boost,
                     no_view: false,
                     arguments: vec![],
                     pinned: false,
@@ -229,6 +244,57 @@ impl AppIndex {
     pub async fn index_applications(&self) {
         // No-op on non-macOS
     }
+}
+
+fn compose_subtitle(
+    path: &Path,
+    running: Option<&crate::search::signals::RunningSignal>,
+    attention: Option<&crate::search::signals::AttentionStat>,
+) -> String {
+    let mut parts: Vec<String> = Vec::with_capacity(3);
+    if running.is_some() {
+        parts.push("Running".to_string());
+    }
+    if let Some(a) = attention {
+        parts.push(format_attention(a.attention_secs));
+        if let Some(cat) = a.category.as_ref() {
+            parts.push(cat.to_string());
+        }
+    }
+    if parts.is_empty() {
+        path.display().to_string()
+    } else {
+        // "Running · 1h 23m · browsing"
+        parts.join(" · ")
+    }
+}
+
+fn format_attention(secs: i64) -> String {
+    let secs = secs.max(0);
+    let hours = secs / 3600;
+    let minutes = (secs % 3600) / 60;
+    if hours > 0 {
+        format!("{hours}h {minutes}m")
+    } else {
+        format!("{minutes}m")
+    }
+}
+
+/// Multiplicative score boost. Baseline 1.0 (no signals), +0.4 if running,
+/// +0.0..=0.6 from attention (logistic on 0..=10800s = 0..=3h).
+fn score_boost(
+    running: Option<&crate::search::signals::RunningSignal>,
+    attention: Option<&crate::search::signals::AttentionStat>,
+) -> f64 {
+    let mut boost = 1.0;
+    if running.is_some() {
+        boost += 0.4;
+    }
+    if let Some(a) = attention {
+        let saturated = (a.attention_secs as f64 / 10_800.0).clamp(0.0, 1.0);
+        boost += 0.6 * saturated;
+    }
+    boost
 }
 
 impl Default for AppIndex {
@@ -385,5 +451,107 @@ mod tests {
 
         assert!(Arc::ptr_eq(&running, &idx.running_signals_for_test()));
         assert!(Arc::ptr_eq(&attention, &idx.attention_signals_for_test()));
+    }
+
+    #[test]
+    fn search_joins_running_signal_and_marks_running() {
+        use crate::search::signals::RunningSignal;
+        let idx = AppIndex::new();
+        idx.set_apps(vec![AppEntry {
+            name: "Safari".into(),
+            path: "/Applications/Safari.app".into(),
+            bundle_id: Some(SmolStr::new("com.apple.Safari")),
+            icon_path: None,
+        }]);
+        idx.running_signals_for_test().insert(
+            SmolStr::new("com.apple.Safari"),
+            RunningSignal { pid: 99, path: "/Applications/Safari.app".into() },
+        );
+
+        let results = idx.search("safari", 5);
+        assert_eq!(results.len(), 1);
+        match &results[0].kind {
+            LauncherItemKind::Application { running, .. } => assert!(*running),
+            other => panic!("expected Application kind, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn search_emits_bundle_id_keyed_id_when_present() {
+        let idx = AppIndex::new();
+        idx.set_apps(vec![AppEntry {
+            name: "Safari".into(),
+            path: "/Applications/Safari.app".into(),
+            bundle_id: Some(SmolStr::new("com.apple.Safari")),
+            icon_path: None,
+        }]);
+        let results = idx.search("safari", 5);
+        assert_eq!(results[0].id, "app:com.apple.Safari");
+    }
+
+    #[test]
+    fn search_falls_back_to_path_id_when_bundle_id_missing() {
+        let idx = AppIndex::new();
+        idx.set_apps(vec![AppEntry {
+            name: "WeirdCli".into(),
+            path: "/Applications/WeirdCli.app".into(),
+            bundle_id: None,
+            icon_path: None,
+        }]);
+        let results = idx.search("weird", 5);
+        assert_eq!(results[0].id, "app:/Applications/WeirdCli.app");
+    }
+
+    #[test]
+    fn search_boost_compounds_when_both_signals_present() {
+        use crate::search::signals::{AttentionStat, RunningSignal};
+        let idx = AppIndex::new();
+        idx.set_apps(vec![AppEntry {
+            name: "Safari".into(),
+            path: "/Applications/Safari.app".into(),
+            bundle_id: Some(SmolStr::new("com.apple.Safari")),
+            icon_path: None,
+        }]);
+
+        let baseline = idx.search("safari", 5)[0].score;
+
+        idx.running_signals_for_test().insert(
+            SmolStr::new("com.apple.Safari"),
+            RunningSignal { pid: 1, path: PathBuf::new() },
+        );
+        let with_running = idx.search("safari", 5)[0].score;
+
+        idx.attention_signals_for_test().insert(
+            SmolStr::new("com.apple.Safari"),
+            AttentionStat {
+                attention_secs: 3600,
+                category: Some(SmolStr::new("browsing")),
+                last_used_at: jiff::Timestamp::now(),
+            },
+        );
+        let with_both = idx.search("safari", 5)[0].score;
+
+        assert!(with_running > baseline, "running signal must boost score");
+        assert!(with_both > with_running, "attention signal must compound");
+    }
+
+    #[test]
+    fn search_subtitle_includes_running_marker() {
+        use crate::search::signals::RunningSignal;
+        let idx = AppIndex::new();
+        idx.set_apps(vec![AppEntry {
+            name: "Safari".into(),
+            path: "/Applications/Safari.app".into(),
+            bundle_id: Some(SmolStr::new("com.apple.Safari")),
+            icon_path: None,
+        }]);
+        idx.running_signals_for_test().insert(
+            SmolStr::new("com.apple.Safari"),
+            RunningSignal { pid: 1, path: PathBuf::new() },
+        );
+
+        let results = idx.search("safari", 5);
+        let subtitle = results[0].subtitle.as_deref().unwrap();
+        assert!(subtitle.contains("Running"), "subtitle must contain 'Running', got: {subtitle:?}");
     }
 }
