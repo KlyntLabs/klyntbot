@@ -18,6 +18,7 @@ fn arb_agent_source() -> impl Strategy<Value = AgentSource> {
 }
 
 fn arb_event_kind() -> impl Strategy<Value = EventKind> {
+    use coding_ingest::event::FileOp;
     prop::sample::select(vec![
         EventKind::SessionStart {
             model: Some("test-model".into()),
@@ -41,6 +42,27 @@ fn arb_event_kind() -> impl Strategy<Value = EventKind> {
             ok: true,
             duration_ms: 100,
             result_preview: "ok".into(),
+        },
+        EventKind::FileEdit {
+            path: PathBuf::from("/tmp/x.rs"),
+            op: FileOp::Modify,
+            bytes: 42,
+            diff_preview: Some("-old\n+new".into()),
+        },
+        EventKind::TestRun {
+            command: "cargo test".into(),
+            framework: Some("cargo".into()),
+            passed: 10,
+            failed: 0,
+            duration_ms: 5000,
+        },
+        EventKind::CompactEvent {
+            trigger: "manual".into(),
+            token_count: 4096,
+        },
+        EventKind::Error {
+            tool: Some("bash".into()),
+            message: "exit 1".into(),
         },
     ])
 }
