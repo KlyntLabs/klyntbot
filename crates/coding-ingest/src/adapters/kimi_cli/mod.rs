@@ -4,9 +4,6 @@
 //! Tier-2: Wire client connects to kimi-cli's local streaming socket.
 
 mod payload;
-#[cfg(feature = "kimi-wire")]
-pub mod wire;
-
 use super::IngestAdapter;
 use crate::event::{AgentEvent, AgentEventV1, AgentSource, EventKind, TokenUsage};
 use common::{KlyntbotError, Result};
@@ -60,8 +57,7 @@ fn base(common: payload::CommonEnvelope, kind: EventKind) -> AgentEventV1 {
 }
 
 fn decode<T: for<'de> serde::Deserialize<'de>>(raw: &[u8]) -> Result<T> {
-    serde_json::from_slice(raw)
-        .map_err(|e| KlyntbotError::Storage(format!("kimi-cli decode: {e}")))
+    serde_json::from_slice(raw).map_err(|e| KlyntbotError::Storage(format!("kimi-cli decode: {e}")))
 }
 
 fn decode_generic(raw: &[u8]) -> Result<Option<AgentEventV1>> {

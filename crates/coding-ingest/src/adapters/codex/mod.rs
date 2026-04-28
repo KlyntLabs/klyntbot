@@ -50,8 +50,7 @@ fn base(common: payload::CommonEnvelope, kind: EventKind) -> AgentEventV1 {
 }
 
 fn decode<T: for<'de> serde::Deserialize<'de>>(raw: &[u8]) -> Result<T> {
-    serde_json::from_slice(raw)
-        .map_err(|e| KlyntbotError::Storage(format!("codex decode: {e}")))
+    serde_json::from_slice(raw).map_err(|e| KlyntbotError::Storage(format!("codex decode: {e}")))
 }
 
 fn parse_session_start(raw: &[u8]) -> Result<AgentEventV1> {

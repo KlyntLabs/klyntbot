@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
-    Calculator, ClipboardRepo, FileKind, FrequencyRepo, LauncherItem, LauncherItemKind,
-    PinsRepo, SourceRegistry, UrlNavigation,
+    Calculator, ClipboardRepo, FileKind, FrequencyRepo, LauncherItem, LauncherItemKind, PinsRepo,
+    SourceRegistry, UrlNavigation,
 };
 use feature_notes::repo::NoteRepo;
 use storage::Repos;

@@ -99,8 +99,8 @@ impl super::SearchSource for RunningAppsSource {
                     score: (score as f64) / 1000.0 * 1.2,
                     no_view: false,
                     arguments: vec![],
-                                    pinned: false,
-                    }
+                    pinned: false,
+                }
             })
             .collect()
     }

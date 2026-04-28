@@ -440,7 +440,10 @@ impl Distiller {
         if let Some(ceiling) = self.inner.config.cost_ceiling_usd {
             let spent = *self.inner.cost_spent.lock().unwrap();
             if spent >= ceiling {
-                return Err(DistillerError::CostCeiling { spent_usd: spent, ceiling_usd: ceiling });
+                return Err(DistillerError::CostCeiling {
+                    spent_usd: spent,
+                    ceiling_usd: ceiling,
+                });
             }
         }
 
@@ -611,7 +614,9 @@ impl Distiller {
                         })
                         .collect();
                     similar_scored.sort_by(|a, b| {
-                        b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal)
+                        b.similarity
+                            .partial_cmp(&a.similarity)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     });
                     similar_scored.truncate(5);
                     match reconcile(&pf.fact, &similar_scored) {

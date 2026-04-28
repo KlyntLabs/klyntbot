@@ -9,7 +9,9 @@ mod common;
 async fn phase_b_halts_at_ceiling() {
     let pool = common::pool_with_migrations().await;
     let writer = common::writer_for_pool(&pool);
-    let ingest = Arc::new(coding_ingest::store::IngestEventLogRepo::new(pool.inner().clone()));
+    let ingest = Arc::new(coding_ingest::store::IngestEventLogRepo::new(
+        pool.inner().clone(),
+    ));
     let retriever = Arc::new(cognitive::UnifiedMemoryService::new(
         cognitive::SemanticFactRepo::new(pool.inner().clone()),
     )) as Arc<dyn context_engine::MemoryRetriever>;

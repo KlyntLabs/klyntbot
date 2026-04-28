@@ -101,12 +101,20 @@ pub struct CalendarSourceConfig {
     pub lookahead_days: u32,
 }
 
-fn default_lookback() -> u32 { 1 }
-fn default_lookahead() -> u32 { 7 }
+fn default_lookback() -> u32 {
+    1
+}
+fn default_lookahead() -> u32 {
+    7
+}
 
 impl Default for CalendarSourceConfig {
     fn default() -> Self {
-        Self { enabled: true, lookback_days: 1, lookahead_days: 7 }
+        Self {
+            enabled: true,
+            lookback_days: 1,
+            lookahead_days: 7,
+        }
     }
 }
 

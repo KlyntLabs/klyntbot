@@ -1,7 +1,7 @@
 //! Convert opencode `MessageRow` into `AgentEventV1`.
 
-use crate::event::{AgentEventV1, AgentSource, EventKind, TokenUsage};
 use crate::event::FileOp;
+use crate::event::{AgentEventV1, AgentSource, EventKind, TokenUsage};
 use common::Result;
 use jiff::Timestamp;
 use std::path::PathBuf;
@@ -67,8 +67,9 @@ fn parse_assistant_content(content: &str) -> (String, Option<ParsedToolCall>) {
     if trimmed.starts_with('{') {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {
             if let Some(name) = v.get("name").and_then(|n| n.as_str()) {
-                let args = serde_json::to_string(&v.get("arguments").unwrap_or(&serde_json::Value::Null))
-                    .unwrap_or_default();
+                let args =
+                    serde_json::to_string(&v.get("arguments").unwrap_or(&serde_json::Value::Null))
+                        .unwrap_or_default();
                 return (
                     String::new(),
                     Some(ParsedToolCall {

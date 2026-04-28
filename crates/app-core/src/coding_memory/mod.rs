@@ -82,7 +82,9 @@ impl crate::AppCore {
                 if enabled {
                     let binary = hook_binary_path()?;
                     tokio::task::spawn_blocking(move || {
-                        crate::coding_memory::installer::ClaudeCodeInstaller::install(&settings, &binary)
+                        crate::coding_memory::installer::ClaudeCodeInstaller::install(
+                            &settings, &binary,
+                        )
                     })
                 } else {
                     tokio::task::spawn_blocking(move || {
@@ -230,10 +232,12 @@ impl crate::AppCore {
                     }),
                 }
             }
-            "codex" | "kimi-cli" | "opencode" => Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
-                ok: true,
-                message: format!("{cli} hook ready"),
-            }),
+            "codex" | "kimi-cli" | "opencode" => {
+                Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
+                    ok: true,
+                    message: format!("{cli} hook ready"),
+                })
+            }
             _ => Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
                 ok: false,
                 message: format!("unsupported cli: {cli}"),

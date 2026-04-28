@@ -886,9 +886,9 @@ impl SemanticFactRepo {
             scope_repo_id: scope_repo_id.map(str::to_string),
             metadata: None,
         };
-        self.upsert(&fact).await.map_err(|e| {
-            common::KlyntbotError::Storage(format!("semantic_fact upsert: {e}"))
-        })?;
+        self.upsert(&fact)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("semantic_fact upsert: {e}")))?;
         Ok(fact)
     }
 

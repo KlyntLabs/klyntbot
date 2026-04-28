@@ -21,9 +21,9 @@ fn insight_forge_searcher_names_works() {
         Arc::new(context_engine::HeuristicDecomposer),
         Arc::new(context_engine::NoopMemoryRetriever),
     );
-    let pool = tokio::runtime::Runtime::new().unwrap().block_on(async {
-        StoragePool::connect_in_memory().await.unwrap()
-    });
+    let pool = tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(async { StoragePool::connect_in_memory().await.unwrap() });
     let facts = SemanticFactRepo::new(pool.inner().clone());
     let episodes = EpisodicMemoryRepo::new(pool.inner().clone());
     let searcher = CodeDomainSearcher::new(facts, episodes);

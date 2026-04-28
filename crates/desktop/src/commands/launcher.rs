@@ -19,13 +19,8 @@ pub async fn launcher_search(query: String) -> Vec<LauncherItem> {
 }
 
 #[klynt_command]
-pub async fn launcher_execute(
-    item_id: String,
-    kind: String,
-) -> LauncherExecuteResult {
-    state
-        .launcher_execute(item_id, kind)
-        .await
+pub async fn launcher_execute(item_id: String, kind: String) -> LauncherExecuteResult {
+    state.launcher_execute(item_id, kind).await
 }
 
 #[klynt_command]
@@ -92,7 +87,9 @@ pub async fn launcher_system_command(
         let ends_at = jiff::Timestamp::now()
             .checked_add(duration.unwrap())
             .map_err(|e| ApiError::new("BAD_DURATION", e.to_string()))?;
-        let mgr = state.dnd_manager().map_err(|e| ApiError::new("DND_ERROR", e.to_string()))?;
+        let mgr = state
+            .dnd_manager()
+            .map_err(|e| ApiError::new("DND_ERROR", e.to_string()))?;
         mgr.activate(FocusMode::Dnd, ends_at)
             .await
             .map_err(|e| ApiError::new("FOCUS_ACTIVATE_ERROR", e.to_string()))?;
@@ -159,15 +156,24 @@ mod tests {
 
     #[test]
     fn parses_minutes() {
-        assert_eq!(parse_human_duration("30m"), Some(std::time::Duration::from_secs(1800)));
+        assert_eq!(
+            parse_human_duration("30m"),
+            Some(std::time::Duration::from_secs(1800))
+        );
     }
     #[test]
     fn parses_hours() {
-        assert_eq!(parse_human_duration("2h"), Some(std::time::Duration::from_secs(7200)));
+        assert_eq!(
+            parse_human_duration("2h"),
+            Some(std::time::Duration::from_secs(7200))
+        );
     }
     #[test]
     fn parses_days() {
-        assert_eq!(parse_human_duration("1d"), Some(std::time::Duration::from_secs(86400)));
+        assert_eq!(
+            parse_human_duration("1d"),
+            Some(std::time::Duration::from_secs(86400))
+        );
     }
     #[test]
     fn rejects_garbage() {

@@ -29,7 +29,9 @@ pub fn uuid_vec(n: usize) -> Vec<Uuid> {
 }
 
 /// Build a minimal `PreparedFact` with the given provenance.
-pub fn prepared_fact_with_prov(provenance: coding_memory::scope::ProvenanceMetadata) -> PreparedFact {
+pub fn prepared_fact_with_prov(
+    provenance: coding_memory::scope::ProvenanceMetadata,
+) -> PreparedFact {
     PreparedFact {
         fact: cognitive::types::SemanticFact {
             id: Uuid::new_v4().to_string(),

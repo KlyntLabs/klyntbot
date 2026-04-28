@@ -14,8 +14,16 @@ pub struct LauncherTool {
 }
 
 impl LauncherTool {
-    pub fn new(registry: Arc<SourceRegistry>, frequency: Arc<FrequencyRepo>, pins: Arc<PinsRepo>) -> Self {
-        Self { registry, frequency, pins }
+    pub fn new(
+        registry: Arc<SourceRegistry>,
+        frequency: Arc<FrequencyRepo>,
+        pins: Arc<PinsRepo>,
+    ) -> Self {
+        Self {
+            registry,
+            frequency,
+            pins,
+        }
     }
 }
 
@@ -36,12 +44,18 @@ impl LauncherTool {
 
     #[action(name = "execute")]
     async fn execute(&self, params: ExecuteParams, _ctx: &RoutingContext) -> Result<String> {
-        self.frequency.record_usage(&params.item_id, &params.kind).await?;
+        self.frequency
+            .record_usage(&params.item_id, &params.kind)
+            .await?;
         Ok("{\"status\":\"recorded\"}".to_string())
     }
 
     #[action(name = "apply_window")]
-    async fn apply_window(&self, params: ApplyWindowParams, _ctx: &RoutingContext) -> Result<String> {
+    async fn apply_window(
+        &self,
+        params: ApplyWindowParams,
+        _ctx: &RoutingContext,
+    ) -> Result<String> {
         let action = parse_window_action(&params.action)?;
         crate::window_manager().execute(&action)?;
         Ok("{\"status\":\"ok\"}".to_string())
@@ -75,7 +89,11 @@ fn parse_window_action(s: &str) -> Result<WindowAction> {
         "maximize" => WindowAction::Maximize,
         "center" => WindowAction::Center,
         "restore" => WindowAction::Restore,
-        other => return Err(common::ToolError::InvalidParams(format!("unknown window action: {other}")).into()),
+        other => {
+            return Err(
+                common::ToolError::InvalidParams(format!("unknown window action: {other}")).into(),
+            )
+        }
     })
 }
 
@@ -85,8 +103,14 @@ mod tests {
 
     #[test]
     fn parse_basic_actions() {
-        assert!(matches!(parse_window_action("leftHalf").unwrap(), WindowAction::LeftHalf));
-        assert!(matches!(parse_window_action("preset:left-third").unwrap(), WindowAction::Preset(_)));
+        assert!(matches!(
+            parse_window_action("leftHalf").unwrap(),
+            WindowAction::LeftHalf
+        ));
+        assert!(matches!(
+            parse_window_action("preset:left-third").unwrap(),
+            WindowAction::Preset(_)
+        ));
         assert!(parse_window_action("garbage").is_err());
     }
 }

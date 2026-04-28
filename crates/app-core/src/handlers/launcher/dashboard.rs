@@ -1,7 +1,5 @@
 use desktop_shared::errors::ApiError;
-use feature_launcher::{
-    CalendarDashboard, DashboardData, ProductivityDashboard, TaskDashboard,
-};
+use feature_launcher::{CalendarDashboard, DashboardData, ProductivityDashboard, TaskDashboard};
 use feature_productivity::repos::ProductivityRepos;
 use storage::Repos;
 

@@ -16,8 +16,8 @@ impl UrlNavigation {
             score: 2.5,
             no_view: false,
             arguments: vec![],
-                    pinned: false,
-            })
+            pinned: false,
+        })
     }
 }
 
