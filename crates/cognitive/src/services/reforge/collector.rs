@@ -373,7 +373,6 @@ pub async fn collect(
         } else {
             None
         },
-        distraction_rules_to_promote: 0,
     })
 }
 

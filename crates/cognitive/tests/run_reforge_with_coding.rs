@@ -21,6 +21,10 @@ impl CodingPhaseRunner for CountingRunner {
         self.0.fetch_add(1000, Ordering::Relaxed);
         Ok(CodingPhaseRunnerOutcome::default())
     }
+    async fn run_symbol_validation(&self) -> common::Result<CodingPhaseRunnerOutcome> {
+        self.0.fetch_add(10000, Ordering::Relaxed);
+        Ok(CodingPhaseRunnerOutcome::default())
+    }
 }
 
 #[tokio::test]
@@ -31,6 +35,6 @@ async fn run_reforge_invokes_all_4_coding_phases_in_order() {
     let total = cognitive::services::reforge::dispatch_coding_phases_for_test(&runner)
         .await
         .expect("dispatch");
-    assert_eq!(total, 4);
-    assert_eq!(counter.load(Ordering::Relaxed), 1111);
+    assert_eq!(total, 5);
+    assert_eq!(counter.load(Ordering::Relaxed), 11111);
 }

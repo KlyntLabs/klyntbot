@@ -55,6 +55,8 @@ pub struct CodingPhaseRunnerImpl {
     rule_artifacts_handler: Option<Arc<dyn RuleArtifactsHandler>>,
     enabled_artifacts: Vec<String>,
     bus: Option<Arc<bus::DomainEventBus>>,
+    cross_session_dedup_threshold: f32,
+    selective_delete_threshold: u32,
     #[allow(dead_code)]
     symbol_extractor: Option<Arc<dyn coding_memory::symbols::SymbolExtractor>>,
     #[allow(dead_code)]
@@ -72,6 +74,8 @@ impl CodingPhaseRunnerImpl {
         rule_artifacts_handler: Option<Arc<dyn RuleArtifactsHandler>>,
         enabled_artifacts: Vec<String>,
         bus: Option<Arc<bus::DomainEventBus>>,
+        cross_session_dedup_threshold: f32,
+        selective_delete_threshold: u32,
     ) -> Self {
         let db = pool.inner().clone();
         let fact_repo = cognitive::SemanticFactRepo::new(db.clone());
@@ -101,6 +105,8 @@ impl CodingPhaseRunnerImpl {
             rule_artifacts_handler,
             enabled_artifacts,
             bus,
+            cross_session_dedup_threshold,
+            selective_delete_threshold,
             symbol_extractor: None,
             repo_roots: Default::default(),
             causal_repo: None,
@@ -109,7 +115,7 @@ impl CodingPhaseRunnerImpl {
 
     /// Test constructor — no LLM handlers, no enabled artifacts.
     pub fn new_for_test(pool: storage::StoragePool) -> Self {
-        Self::new(pool, None, None, vec![], None)
+        Self::new(pool, None, None, vec![], None, 0.92, 5)
     }
 
     /// Attach a symbol extractor (Phase-6 wiring).
@@ -187,7 +193,7 @@ impl cognitive::services::reforge::CodingPhaseRunner for CodingPhaseRunnerImpl {
     }
 
     async fn run_cross_session_dedup(&self) -> common::Result<CodingPhaseRunnerOutcome> {
-        let applied = CrossSessionDedup::run(&self.fact_repo, 0.92, None).await?;
+        let applied = CrossSessionDedup::run(&self.fact_repo, self.cross_session_dedup_threshold, None).await?;
         Ok(CodingPhaseRunnerOutcome {
             applied,
             narrative: None,
@@ -195,7 +201,7 @@ impl cognitive::services::reforge::CodingPhaseRunner for CodingPhaseRunnerImpl {
     }
 
     async fn run_selective_delete(&self) -> common::Result<CodingPhaseRunnerOutcome> {
-        let applied = SelectiveDeleteSignal::apply(&self.pool, &self.selective_delete_log).await?;
+        let applied = SelectiveDeleteSignal::apply_with_threshold(&self.pool, &self.selective_delete_log, self.selective_delete_threshold).await?;
         Ok(CodingPhaseRunnerOutcome {
             applied,
             narrative: None,

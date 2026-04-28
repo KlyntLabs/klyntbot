@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bus::{DomainEventBus, MessageBus};
 use scheduling::temporal::cron_executor::CronExecutor;
 use storage::Repos;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 /// Publish an `AlarmFired` event routed through `NotificationDispatcher`.
 ///
@@ -170,6 +170,7 @@ pub(super) const JOB_CROSS_DOMAIN_NIGHTLY: &str = "__klyntbot_cross_domain_night
 const JOB_LAUNCHER_USAGE_PRUNE: &str = "__klyntbot_launcher_usage_prune";
 const JOB_LAUNCHER_ATTENTION_REBUILD: &str = "__klyntbot_launcher_attention_rebuild";
 const JOB_REFORGE_NIGHTLY: &str = "__klyntbot_reforge_nightly";
+const JOB_FSRS_OPTIMIZE: &str = "__klyntbot_fsrs_optimize_weekly";
 
 /// Register individual cron handlers.
 #[allow(clippy::too_many_arguments)]
@@ -406,6 +407,67 @@ fn register_cron_callbacks(
         );
     }
 
+    // ── fsrs_optimize_weekly ────────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let rt = rt.clone();
+        cron_executor.register(
+            JOB_FSRS_OPTIMIZE,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async {
+                        let storage_pool = storage::StoragePool::from_existing(pool.clone());
+                        let repo = cognitive::FsrsParamsRepo::new(storage_pool.clone());
+                        match agent::adapters::fsrs_writeback::train_fsrs_weights(&storage_pool, &repo)
+                            .await
+                        {
+                            Ok(true) => info!("FSRS weekly optimization: weights improved and persisted"),
+                            Ok(false) => info!("FSRS weekly optimization: no improvement or insufficient data"),
+                            Err(e) => warn!("FSRS weekly optimization failed: {e}"),
+                        }
+                        Ok(None)
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── autotuner_nightly ────────────────────────────────────────────
+    {
+        let bridge = autotuner_bridge.clone();
+        let rt = rt.clone();
+        cron_executor.register(
+            agent::autotuner::JOB_AUTOTUNER_NIGHTLY,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let bridge = bridge.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async {
+                        if let Some(ref b) = bridge {
+                            match cognitive::services::reforge::service::run_phase6_autotuner(b.as_ref()).await
+                            {
+                                Ok(eval) => {
+                                    info!(
+                                        evaluated = eval.evaluated_count,
+                                        promoted = eval.promoted,
+                                        regression = eval.regression,
+                                        "Autotuner nightly evaluation complete"
+                                    );
+                                }
+                                Err(e) => {
+                                    warn!("Autotuner nightly evaluation failed: {e}");
+                                }
+                            }
+                        } else {
+                            debug!("Autotuner nightly: skipped (no bridge)");
+                        }
+                        Ok(None)
+                    })
+                })
+            }),
+        );
+    }
+
     // ── reforge_nightly ─────────────────────────────────────────────
     {
         let pool = repos.pool().clone();
@@ -614,6 +676,8 @@ fn register_cron_callbacks(
                                 rules_handler,
                                 enabled_artifacts,
                                 Some(domain_event_bus.clone()),
+                                cog_config.coding_memory.reforge.cross_session_dedup_threshold,
+                                cog_config.coding_memory.reforge.selective_delete_threshold,
                             )
                             .with_symbol_extractor(symbol_extractor)
                             .with_causal_repo(causal_edge_repo);
@@ -1145,13 +1209,14 @@ async fn ensure_cron_jobs(
         );
     }
 
-    // Disabled: autotuner nightly subsumed by Reforge (Phase 6 deferred).
-    // TODO(Task 12): integrate autotuner evaluation into Reforge Phase 6.
-    // agent::autotuner::AutoTunerOrchestrator::ensure_nightly_job(
-    //     cron_service,
-    //     &config.autotuner.schedule,
-    // )
-    // .await?;
+    // Autotuner nightly — now delegated to run_phase6_autotuner via the
+    // Reforge Phase 6 bridge (Task 12 complete). The cron row is kept so
+    // the callback below fires on schedule.
+    agent::autotuner::AutoTunerOrchestrator::ensure_nightly_job(
+        cron_repo,
+        &config.autotuner.schedule,
+    )
+    .await?;
 
     // ── Reforge nightly ─────────────────────────────────────────────────
     ensure_job!(
@@ -1170,6 +1235,15 @@ async fn ensure_cron_jobs(
             tz: Some(config.timezone.clone()),
         },
         "Daily knowledge atom decay",
+        "system"
+    );
+    ensure_job!(
+        JOB_FSRS_OPTIMIZE,
+        scheduling::CronSchedule::Cron {
+            expr: "0 0 4 * * 0".to_string(),
+            tz: Some(config.timezone.clone()),
+        },
+        "Weekly FSRS-5 weight optimisation",
         "system"
     );
     ensure_job!(
@@ -1261,20 +1335,27 @@ async fn set_default_intent_windows(cron_repo: &storage::repos::cron::CronRepo) 
     use std::time::Duration;
 
     let windows: &[(&str, IntentWindow)] = &[
-        // Disabled: autotuner nightly subsumed by Reforge (Phase 6 deferred).
-        // (
-        //     agent::autotuner::JOB_AUTOTUNER_NIGHTLY,
-        //     IntentWindow {
-        //         trigger: IntentTrigger::UserIdle { min_idle_secs: 300 },
-        //         tolerance: Duration::from_secs(14400),
-        //         catch_up: CatchUpPriority::WhenIdle,
-        //     },
-        // ),
+        (
+            agent::autotuner::JOB_AUTOTUNER_NIGHTLY,
+            IntentWindow {
+                trigger: IntentTrigger::UserIdle { min_idle_secs: 300 },
+                tolerance: Duration::from_secs(14400),
+                catch_up: CatchUpPriority::WhenIdle,
+            },
+        ),
         (
             JOB_REFORGE_NIGHTLY,
             IntentWindow {
                 trigger: IntentTrigger::UserIdle { min_idle_secs: 300 },
                 tolerance: Duration::from_secs(14400),
+                catch_up: CatchUpPriority::WhenIdle,
+            },
+        ),
+        (
+            JOB_FSRS_OPTIMIZE,
+            IntentWindow {
+                trigger: IntentTrigger::UserIdle { min_idle_secs: 600 },
+                tolerance: Duration::from_secs(86400),
                 catch_up: CatchUpPriority::WhenIdle,
             },
         ),

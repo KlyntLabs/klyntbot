@@ -430,7 +430,6 @@ impl AgentLoopBuilder {
                         )
                     };
                     let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
-                    let accum_repo = cognitive::AccumulatedObservationRepo::new(pool.clone());
                     let failed_obs_repo = cognitive::FailedObservationRepo::new(pool.clone());
                     let cancel = CancellationToken::new();
                     let (signal_tx, signal_rx) = cognitive::pipeline::signal_queue(256);
@@ -444,25 +443,7 @@ impl AgentLoopBuilder {
                             embedder: cognitive_embedder_local,
                             cancel: cancel.clone(),
                             pipeline_tx: self.pipeline_tx.take(),
-                            accum_repo: Some(accum_repo),
                             failed_obs_repo: Some(failed_obs_repo),
-                            promote_threshold: config.cognitive.accumulate_promote_threshold,
-                            promote_overrides: {
-                                let mut m: std::collections::HashMap<ai_core::RecallDomain, usize> =
-                                    std::collections::HashMap::new();
-                                if let Some(n) =
-                                    feature_tasks::TasksFeature::PROMOTE_THRESHOLD_OVERRIDE
-                                {
-                                    m.insert(ai_core::RecallDomain::Tasks, n);
-                                }
-                                if let Some(n) =
-                                    feature_finance::FinanceFeature::PROMOTE_THRESHOLD_OVERRIDE
-                                {
-                                    m.insert(ai_core::RecallDomain::Finance, n);
-                                }
-                                m
-                            },
-                            min_days: config.cognitive.accumulate_min_days,
                             domain_bus: self.domain_event_bus.clone(),
                             context_update_queue: self.context_update_queue.clone(),
                             session_repo: Some(storage::SessionRepo::new(pool.clone())),

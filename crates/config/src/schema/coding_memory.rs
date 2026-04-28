@@ -131,6 +131,12 @@ pub struct CodingReforgeConfig {
     pub synth_model: Option<String>,
     /// Optional override model for Phase 3.5 rule artifacts.
     pub rules_model: Option<String>,
+    /// Vector-similarity threshold for cross-session fact dedup (Phase 6.5).
+    #[serde(default = "default_cross_session_dedup_threshold")]
+    pub cross_session_dedup_threshold: f32,
+    /// Minimum never-cited retrieval count before selective-delete signal (Phase 6).
+    #[serde(default = "default_selective_delete_threshold")]
+    pub selective_delete_threshold: u32,
 }
 
 impl Default for CodingReforgeConfig {
@@ -140,8 +146,18 @@ impl Default for CodingReforgeConfig {
             rule_artifacts: CodingRuleArtifactsConfig::default(),
             synth_model: None,
             rules_model: None,
+            cross_session_dedup_threshold: default_cross_session_dedup_threshold(),
+            selective_delete_threshold: default_selective_delete_threshold(),
         }
     }
+}
+
+fn default_cross_session_dedup_threshold() -> f32 {
+    0.92
+}
+
+fn default_selective_delete_threshold() -> u32 {
+    5
 }
 
 /// Which rule artifacts Reforge should write.
@@ -239,5 +255,13 @@ mod tests {
         assert_eq!(parsed.recall.session_start_budget, 800);
         assert_eq!(parsed.recall.user_prompt_budget, 1500);
         assert!(parsed.ingest.exclude_paths.contains(&"**/.env".to_string()));
+    }
+
+    #[test]
+    fn coding_memory_defaults_match_legacy_hardcoded_values() {
+        let cfg = CodingMemoryConfig::default();
+        assert_eq!(cfg.distiller.model, "claude-haiku-4-5-20251001");
+        assert!((cfg.reforge.cross_session_dedup_threshold - 0.92).abs() < 1e-6);
+        assert_eq!(cfg.reforge.selective_delete_threshold, 5);
     }
 }

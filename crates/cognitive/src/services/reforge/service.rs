@@ -15,7 +15,7 @@ use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
 use crate::services::reforge::skill_files::{
     compute_diff, content_hash, SkillFile, SkillFileManager,
 };
-use crate::services::reforge::types::*;
+use crate::services::reforge::{types::*, AutotunerBridge, Phase6Result};
 use crate::types::{EpisodicMemory, ProceduralRule, SemanticFact, DEFAULT_MEMORY_TYPE};
 
 use common::helpers::truncate_chars;
@@ -309,7 +309,7 @@ pub async fn run_reforge(
     info!("Reforge Phase 6: Optimize");
     if let Some(bridge) = autotuner_bridge {
         // Step 1: Evaluate existing trials
-        match bridge.run_evaluation().await {
+        match run_phase6_autotuner(bridge).await {
             Ok(eval) => {
                 result.champion_promoted = eval.promoted;
                 result.regression_detected = eval.regression;
@@ -650,6 +650,20 @@ pub async fn run_reforge(
     );
 
     Some(result)
+}
+
+// ---------------------------------------------------------------------------
+// Standalone Phase 6 autotuner evaluation (also called by cron)
+// ---------------------------------------------------------------------------
+
+/// Run Phase 6 autotuner evaluation through the bridge.
+///
+/// Exported so the nightly cron callback can invoke it independently of
+/// the full Reforge cycle.
+pub async fn run_phase6_autotuner(
+    bridge: &dyn AutotunerBridge,
+) -> common::Result<Phase6Result> {
+    bridge.run_evaluation().await
 }
 
 // ---------------------------------------------------------------------------

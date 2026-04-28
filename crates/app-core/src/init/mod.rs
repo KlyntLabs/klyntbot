@@ -931,10 +931,8 @@ impl AppCore {
             let retriever = Arc::new(::cognitive::UnifiedMemoryService::new(fact_repo))
                 as Arc<dyn context_engine::MemoryRetriever>;
             let mut distiller_cfg = coding_memory::distiller::DistillerConfig::default();
-            // Respect app config model if set.
-            if let Some(ref m) = config.cognitive.model {
-                distiller_cfg.model.clone_from(m);
-            }
+            // Respect coding-memory config model if set.
+            distiller_cfg.model = config.coding_memory.distiller.model.clone();
             let mut d = coding_memory::distiller::Distiller::with_extractor(
                 distiller_cfg,
                 ingest_repo,
@@ -1081,6 +1079,7 @@ impl AppCore {
                 git_invalidation_handler: Some(git_handler),
                 opencode_db_path,
                 opencode_poll_interval: None,
+                kimi_wire_socket: None,
             };
             match coding_ingest::daemon::spawn(daemon_cfg).await {
                 Ok(h) => Some(h),

@@ -4,7 +4,6 @@
 //! emerge. The old salience-based event classification has been removed;
 //! SignalRouter now handles event-to-signal translation upstream.
 
-use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use jiff::Timestamp;
@@ -21,7 +20,7 @@ use futures_util::future::join_all;
 use crate::consolidation::ConsolidationHandler;
 use crate::embedder::SemanticFactEmbedder;
 use crate::extraction::ExtractionHandler;
-use crate::repos::accumulated_observation::AccumulatedObservationRepo;
+
 use crate::repos::failed_observation::FailedObservationRepo;
 use crate::repos::{EpisodicMemoryRepo, SemanticFactRepo};
 use crate::types::{EpisodicMemory, Observation};
@@ -57,59 +56,6 @@ pub enum PipelineEvent {
         #[serde(rename = "factsExtracted")]
         facts_extracted: usize,
     },
-}
-
-/// Maximum observations kept per accumulator key. Once reached, the oldest
-/// observations are dropped (FIFO). This prevents a single high-frequency
-/// event type (e.g. `NoteContentChanged`) from consuming unbounded memory
-/// between promotion cycles.
-const MAX_OBSERVATIONS_PER_KEY: usize = 50;
-
-/// Tracks accumulated events for pattern promotion.
-#[derive(Debug, Clone)]
-struct AccumulatedEntry {
-    observations: Vec<Observation>,
-    days_seen: HashSet<String>,
-}
-
-impl AccumulatedEntry {
-    fn new() -> Self {
-        Self {
-            observations: Vec::new(),
-            days_seen: HashSet::new(),
-        }
-    }
-
-    fn add(&mut self, obs: Observation) {
-        let day = obs.timestamp.strftime("%Y-%m-%d").to_string();
-        self.days_seen.insert(day);
-        self.observations.push(obs);
-        // Cap per-key observations to prevent unbounded growth
-        if self.observations.len() > MAX_OBSERVATIONS_PER_KEY {
-            self.observations
-                .drain(..self.observations.len() - MAX_OBSERVATIONS_PER_KEY);
-        }
-    }
-
-    /// Returns the effective promotion threshold for a given `RecallDomain`.
-    pub fn effective_threshold(
-        domain: &ai_core::RecallDomain,
-        overrides: &std::collections::HashMap<ai_core::RecallDomain, usize>,
-        global: usize,
-    ) -> usize {
-        overrides.get(domain).copied().unwrap_or(global)
-    }
-
-    pub fn should_promote_for_domain(
-        &self,
-        domain: &ai_core::RecallDomain,
-        overrides: &std::collections::HashMap<ai_core::RecallDomain, usize>,
-        global_threshold: usize,
-        min_days: usize,
-    ) -> bool {
-        let t = Self::effective_threshold(domain, overrides, global_threshold);
-        self.observations.len() >= t && self.days_seen.len() >= min_days
-    }
 }
 
 /// Collect domain events into a batch.
@@ -202,11 +148,7 @@ pub struct BackgroundServiceConfig {
     pub embedder: Option<Arc<dyn SemanticFactEmbedder>>,
     pub cancel: CancellationToken,
     pub pipeline_tx: Option<tokio::sync::broadcast::Sender<PipelineEvent>>,
-    pub accum_repo: Option<AccumulatedObservationRepo>,
     pub failed_obs_repo: Option<FailedObservationRepo>,
-    pub promote_threshold: usize,
-    pub promote_overrides: std::collections::HashMap<ai_core::RecallDomain, usize>,
-    pub min_days: usize,
     pub domain_bus: Option<Arc<bus::DomainEventBus>>,
     pub context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     pub session_repo: Option<storage::SessionRepo>,
@@ -246,11 +188,7 @@ impl BackgroundConsolidationService {
             embedder,
             cancel,
             pipeline_tx,
-            accum_repo,
             failed_obs_repo,
-            promote_threshold,
-            promote_overrides,
-            min_days,
             domain_bus,
             context_update_queue,
             session_repo: _session_repo,
@@ -265,35 +203,10 @@ impl BackgroundConsolidationService {
         } = config;
         // Cognitive collectors are SignalConsumers wired by the app-core init
         // layer; the legacy broadcast-collector startup that lived here is
-        // gone. `signal_rx` / `domain_bus` are still consumed by the downstream
-        // accumulator and rule-evolution paths below.
+        // gone. `signal_rx` / `domain_bus` are consumed by the downstream
+        // rule-evolution paths below.
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
-            // Restore accumulated entries from previous session
-            let mut accumulator: HashMap<String, AccumulatedEntry> =
-                if let Some(ref ar) = accum_repo {
-                    let persisted = ar.load_all().await;
-                    let mut map = HashMap::new();
-                    for (key, entry) in persisted {
-                        map.insert(
-                            key,
-                            AccumulatedEntry {
-                                observations: entry.observations,
-                                days_seen: entry.days_seen,
-                            },
-                        );
-                    }
-                    if !map.is_empty() {
-                        info!(
-                            "Restored {} accumulated event type(s) from previous session",
-                            map.len()
-                        );
-                    }
-                    map
-                } else {
-                    HashMap::new()
-                };
-
             // DLQ retries — paired vecs (observation + row ID at same index)
             let mut dlq_reprocess_queue: Vec<Observation> = Vec::new();
             let mut dlq_reprocess_ids: Vec<String> = Vec::new();
@@ -345,10 +258,9 @@ impl BackgroundConsolidationService {
                 }
 
                 // SignalRouter now produces AiSignals upstream; this service only
-                // handles accumulated-observation promotion and periodic compaction.
+                // handles observation extraction and periodic compaction.
                 // The old classify_batch + event_to_observation path has been removed.
                 let mut to_extract: Vec<Observation> = Vec::new();
-                let to_accumulate: Vec<(String, Observation)> = Vec::new();
 
                 // Prepend DLQ retries and promotions (kept for backward compat)
                 let dlq_ids_this_batch = std::mem::take(&mut dlq_reprocess_ids);
@@ -739,57 +651,6 @@ impl BackgroundConsolidationService {
                     }
                 }
 
-                // Handle accumulation (legacy path — now fed only by DLQ/promotions)
-                for (key, obs) in to_accumulate {
-                    if let Some(ref ar) = accum_repo {
-                        ar.insert(&key, &obs).await;
-                    }
-
-                    let entry = accumulator
-                        .entry(key.clone())
-                        .or_insert_with(AccumulatedEntry::new);
-                    entry.add(obs);
-
-                    // Use General domain as default since accumulator doesn't track per-domain
-                    if entry.should_promote_for_domain(
-                        &ai_core::RecallDomain::General,
-                        &promote_overrides,
-                        promote_threshold,
-                        min_days,
-                    ) {
-                        debug!(
-                            "Promoting accumulated events for '{key}' ({} events, {} days)",
-                            entry.observations.len(),
-                            entry.days_seen.len()
-                        );
-                        let summary = summarize_accumulated(&key, &entry.observations);
-                        promotion_queue.push(summary);
-                        accumulator.remove(&key);
-                        if let Some(ref ar) = accum_repo {
-                            ar.delete_by_key(&key).await;
-                        }
-                    }
-                }
-
-                // Prevent unbounded accumulator growth — evict oldest entries
-                const MAX_ACCUMULATOR_ENTRIES: usize = 500;
-                if accumulator.len() > MAX_ACCUMULATOR_ENTRIES {
-                    // Keep entries with the most observations (most interesting patterns)
-                    let mut entries: Vec<(String, usize)> = accumulator
-                        .iter()
-                        .map(|(k, v)| (k.clone(), v.observations.len()))
-                        .collect();
-                    entries.sort_by(|a, b| a.1.cmp(&b.1)); // ascending by count
-                    let to_remove = accumulator.len() - MAX_ACCUMULATOR_ENTRIES;
-                    for (key, _) in entries.into_iter().take(to_remove) {
-                        accumulator.remove(&key);
-                        if let Some(ref ar) = accum_repo {
-                            ar.delete_by_key(&key).await;
-                        }
-                    }
-                    info!("Accumulator pruned: removed {to_remove} low-count entries");
-                }
-
                 // ── Drain unified pipeline signals ─────────────────────
                 if let (Some(ref mut rx), Some(ref rr)) = (&mut signal_rx, &rule_repo) {
                     let mut signals = Vec::new();
@@ -979,30 +840,6 @@ fn op_to_string(op: &crate::types::MemoryOp) -> String {
     }
 }
 
-/// Summarize accumulated observations into a single observation for extraction.
-fn summarize_accumulated(event_type: &str, observations: &[Observation]) -> Observation {
-    let contents: Vec<&str> = observations.iter().map(|o| o.content.as_str()).collect();
-    let domain = observations
-        .first()
-        .map(|o| o.domain.clone())
-        .unwrap_or_else(|| "general".into());
-    let avg_importance =
-        observations.iter().map(|o| o.importance).sum::<f64>() / observations.len().max(1) as f64;
-
-    Observation {
-        domain,
-        content: format!(
-            "Pattern from {} accumulated {} events:\n{}",
-            observations.len(),
-            event_type,
-            contents.join("\n")
-        ),
-        importance: avg_importance,
-        source_event: format!("accumulated:{event_type}"),
-        timestamp: Timestamp::now(),
-    }
-}
-
 /// Generate a concise one-line summary from observation content.
 /// For enriched multi-turn context, extracts just the last user message.
 fn summarize_observation(content: &str) -> String {
@@ -1034,90 +871,6 @@ fn summarize_observation(content: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_accumulated_entry_promotion() {
-        let mut entry = AccumulatedEntry::new();
-
-        // Add 5 observations across 3 days
-        for (i, day) in [
-            "2026-03-01",
-            "2026-03-02",
-            "2026-03-03",
-            "2026-03-03",
-            "2026-03-01",
-        ]
-        .iter()
-        .enumerate()
-        {
-            let ts = format!("{day}T10:00:00Z");
-            entry.add(Observation {
-                domain: "productivity".into(),
-                content: format!("event {i}"),
-                importance: 0.5,
-                source_event: "test".into(),
-                timestamp: ts.parse::<jiff::Timestamp>().unwrap(),
-            });
-        }
-
-        assert!(entry.should_promote_for_domain(
-            &ai_core::RecallDomain::General,
-            &std::collections::HashMap::new(),
-            5,
-            3,
-        ));
-        assert_eq!(entry.observations.len(), 5);
-        assert_eq!(entry.days_seen.len(), 3);
-    }
-
-    #[test]
-    fn test_accumulated_entry_not_enough_days() {
-        let mut entry = AccumulatedEntry::new();
-
-        // 5 events but only 1 day
-        for i in 0..5 {
-            entry.add(Observation {
-                domain: "productivity".into(),
-                content: format!("event {i}"),
-                importance: 0.5,
-                source_event: "test".into(),
-                timestamp: "2026-03-01T10:00:00Z".parse().unwrap(),
-            });
-        }
-
-        assert!(!entry.should_promote_for_domain(
-            &ai_core::RecallDomain::General,
-            &std::collections::HashMap::new(),
-            5,
-            3,
-        )); // Not enough days
-    }
-
-    #[test]
-    fn test_summarize_accumulated() {
-        let observations = vec![
-            Observation {
-                domain: "productivity".into(),
-                content: "Score: 72".into(),
-                importance: 0.5,
-                source_event: "ProductivityScoreComputed".into(),
-                timestamp: Timestamp::now(),
-            },
-            Observation {
-                domain: "productivity".into(),
-                content: "Score: 78".into(),
-                importance: 0.6,
-                source_event: "ProductivityScoreComputed".into(),
-                timestamp: Timestamp::now(),
-            },
-        ];
-
-        let summary = summarize_accumulated("ProductivityScoreComputed", &observations);
-        assert_eq!(summary.domain, "productivity");
-        assert!(summary.content.contains("Score: 72"));
-        assert!(summary.content.contains("Score: 78"));
-        assert!(summary.content.contains("2 accumulated"));
-    }
 
     #[test]
     fn test_event_type_key() {

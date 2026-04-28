@@ -92,7 +92,7 @@ impl CrossSessionDedup {
                  older.subject = newer.subject AND \
                  older.predicate = newer.predicate AND \
                  older.object = newer.object AND \
-                 (older.scope_repo_id IS NEWER.scope_repo_id OR \
+                 (older.scope_repo_id IS newer.scope_repo_id OR \
                   older.scope_repo_id = newer.scope_repo_id) AND \
                  older.id != newer.id AND \
                  older.valid_from < newer.valid_from \

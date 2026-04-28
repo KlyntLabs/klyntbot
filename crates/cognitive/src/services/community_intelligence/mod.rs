@@ -59,8 +59,6 @@ pub struct CommunitySplit {
 const MAX_MERGES_PER_CYCLE: usize = 2;
 const MAX_SPLITS_PER_CYCLE: usize = 1;
 /// Minimum age (days) before a community can be merged or split.
-/// Used in `build_intelligence_input` to annotate age for the LLM.
-#[allow(dead_code)]
 const MIN_AGE_FOR_RESTRUCTURE: u32 = 3;
 
 /// Apply community intelligence output: renames, merges, splits.
@@ -103,9 +101,22 @@ pub async fn apply_intelligence(
         }
     }
 
-    // 2. Apply merges (capped)
+    // 2. Apply merges (capped + age-gated)
     for merge in output.merges.iter().take(MAX_MERGES_PER_CYCLE) {
         if merge.reason.is_empty() {
+            continue;
+        }
+        // Skip if either community is too young.
+        let absorb_age = community_age_days(community_repo, &merge.absorb_id).await;
+        let into_age = community_age_days(community_repo, &merge.into_id).await;
+        if absorb_age < MIN_AGE_FOR_RESTRUCTURE || into_age < MIN_AGE_FOR_RESTRUCTURE {
+            tracing::debug!(
+                absorb_id = %merge.absorb_id,
+                into_id = %merge.into_id,
+                absorb_age,
+                into_age,
+                "skipping merge: community too young"
+            );
             continue;
         }
         if let Err(e) = community_repo
@@ -137,9 +148,18 @@ pub async fn apply_intelligence(
         }
     }
 
-    // 3. Apply splits (capped) — re-run Louvain on sub-graph
+    // 3. Apply splits (capped + age-gated) — re-run Louvain on sub-graph
     for split_req in output.splits.iter().take(MAX_SPLITS_PER_CYCLE) {
         if split_req.reason.is_empty() {
+            continue;
+        }
+        let age = community_age_days(community_repo, &split_req.community_id).await;
+        if age < MIN_AGE_FOR_RESTRUCTURE {
+            tracing::debug!(
+                community_id = %split_req.community_id,
+                age,
+                "skipping split: community too young"
+            );
             continue;
         }
         match execute_split(split_req, community_repo, co_activation_repo).await {
@@ -174,6 +194,18 @@ pub async fn apply_intelligence(
     }
 
     (renamed, merged, split)
+}
+
+/// Compute community age in days, returning 0 if the community is missing.
+async fn community_age_days(repo: &CommunityRepo, id: &str) -> u32 {
+    match repo.get_community(id).await {
+        Ok(Some(row)) => {
+            let created: jiff::Timestamp = row.created_at.parse().unwrap_or_else(|_| jiff::Timestamp::now());
+            let now = jiff::Timestamp::now();
+            ((now.as_millisecond() - created.as_millisecond()).max(0) / 86_400_000) as u32
+        }
+        _ => 0,
+    }
 }
 
 /// Execute a community split by re-running Louvain on the sub-graph.

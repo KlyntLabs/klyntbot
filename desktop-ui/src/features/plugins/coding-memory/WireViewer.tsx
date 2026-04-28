@@ -53,7 +53,9 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
 
   const allTypes = useMemo(() => {
     const types = new Set<string>();
-    for (const e of events) types.add(e.kind);
+    for (const e of events) {
+      types.add(e.kind);
+    }
     return Array.from(types).sort();
   }, [events]);
 
@@ -106,7 +108,9 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
   const expandAll = useCallback(() => {
     setExpandedSet((prev) => {
       const next = new Set(prev);
-      for (const { index } of filtered) next.add(index);
+      for (const { index } of filtered) {
+        next.add(index);
+      }
       return next;
     }));
   }, [filtered]);
@@ -114,7 +118,9 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
   const collapseAll = useCallback(() => {
     setExpandedSet((prev) => {
       const next = new Set(prev);
-      for (const { index } of filtered) next.delete(index);
+      for (const { index } of filtered) {
+        next.delete(index);
+      }
       return next;
     });
   }, [filtered]);

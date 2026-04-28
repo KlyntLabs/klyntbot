@@ -7689,6 +7689,8 @@ dependencies = [
  "agent",
  "anyhow",
  "app-core",
+ "async-trait",
+ "bus",
  "common",
  "config",
  "desktop-shared",

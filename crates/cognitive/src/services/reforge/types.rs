@@ -60,7 +60,6 @@ pub struct ReforgeCollected {
     pub validation_warning_counts: Vec<(String, i64)>,
     pub near_miss_patterns: u32,
     pub coaching_behavioral: Option<CoachingBehavioralSummary>,
-    pub distraction_rules_to_promote: u32,
 }
 
 // ---------------------------------------------------------------------------
