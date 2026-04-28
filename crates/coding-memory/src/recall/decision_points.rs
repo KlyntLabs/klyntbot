@@ -23,6 +23,7 @@ impl DecisionPointsService {
     /// List decision points within the optional repo scope.
     pub async fn list(
         &self,
+        domain: Option<&str>,
         repo: Option<&str>,
         limit: i64,
     ) -> common::Result<DecisionPointsResponse> {
@@ -31,6 +32,13 @@ impl DecisionPointsService {
             .list_by_kinds(DECISION_KINDS, repo, limit)
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("list_by_kinds: {e}")))?;
+        let eps: Vec<_> = eps
+            .into_iter()
+            .filter(|e| match domain {
+                Some(d) => e.domain == d,
+                None => true,
+            })
+            .collect();
         Ok(DecisionPointsResponse {
             domain: "code".to_string(),
             rows: eps

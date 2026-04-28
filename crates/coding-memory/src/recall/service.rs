@@ -133,15 +133,26 @@ impl CodingRecallService {
             .ums
             .retrieve_with_overrides(query, limit as usize, 0.0, default_weights())
             .await?;
-        let _ = (kinds, days); // Phase-4 minimum: filters left to caller-side.
-        let sims: Vec<f32> = scored.iter().map(|s| s.score as f32).collect();
-        let mut coverage = self.probe.score(&sims);
-        let verdict = self.probe.verdict(&sims);
-
         let entries: Vec<IndexEntry> = scored
             .iter()
             .map(|s| self.index_builder.from_scored_fact(s))
+            .filter(|e| match &kinds {
+                Some(allowed) if !allowed.is_empty() => allowed.iter().any(|k| k == &e.kind),
+                _ => true,
+            })
+            .filter(|e| match days {
+                Some(d) => {
+                    let cutoff = jiff::Timestamp::now()
+                        .checked_sub(jiff::ToSpan::days(d as i64))
+                        .unwrap_or_else(|_| jiff::Timestamp::MIN);
+                    e.when >= cutoff
+                }
+                None => true,
+            })
             .collect();
+        let sims: Vec<f32> = scored.iter().map(|s| s.score as f32).collect();
+        let mut coverage = self.probe.score(&sims);
+        let verdict = self.probe.verdict(&sims);
 
         // Optional escalation.
         let mut skill_used: Option<String> = None;
@@ -305,10 +316,11 @@ impl CodingRecallService {
     /// `recall_decision_points`.
     pub async fn recall_decision_points(
         &self,
+        domain: Option<&str>,
         repo: Option<&str>,
         limit: i64,
     ) -> common::Result<DecisionPointsResponse> {
-        self.decision_points.list(repo, limit).await
+        self.decision_points.list(domain, repo, limit).await
     }
 
     /// Walk the causal graph from `subject` up to `depth` levels.

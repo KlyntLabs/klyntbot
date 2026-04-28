@@ -395,9 +395,8 @@ impl CodingMemoryToolset {
         let a: A = serde_json::from_value(args).map_err(decode_err)?;
         let resp = self
             .svc
-            .recall_decision_points(a.repo.as_deref(), a.limit)
+            .recall_decision_points(a.domain.as_deref(), a.repo.as_deref(), a.limit)
             .await?;
-        let _ = a.domain;
         serde_json::to_value(resp).map_err(encode_err)
     }
 

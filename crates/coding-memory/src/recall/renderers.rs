@@ -88,7 +88,7 @@ pub async fn render_user_prompt_block(
 
     // Dead-end check first — placed at top if matches found.
     let dead_ends = svc.check_dead_ends(query, repo).await?;
-    let warn = if dead_ends.aggregate_confidence > 0.5 && !dead_ends.matches.is_empty() {
+    let warn = if dead_ends.aggregate_confidence > 0.7 && !dead_ends.matches.is_empty() {
         let m = &dead_ends.matches[0];
         format!(
             "### ⚠️ Heads-up\nYou previously tried **{}** ({}) — abandoned because {}.\n\n",
