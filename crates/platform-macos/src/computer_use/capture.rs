@@ -30,8 +30,75 @@ impl MacCapture {
 #[async_trait]
 impl PlatformCapture for MacCapture {
     async fn capture_screen(&self, _region: Option<Rect>) -> Result<Frame> {
-        // Phase 1 stub — full impl in Task 17.
-        Err(CaptureError::NotImplemented)
+        use screencapturekit::{
+            shareable_content::SCShareableContent,
+            stream::configuration::SCStreamConfiguration,
+            stream::configuration::pixel_format::PixelFormat as SckPixelFormat,
+            stream::content_filter::SCContentFilter,
+            stream::screenshot_manager::capture,
+        };
+        use core_media_rs::cm_sample_buffer::CMSampleBuffer;
+        use core_video_rs::cv_pixel_buffer::{CVPixelBuffer, lock::LockTrait};
+        use tokio::task;
+
+        let display_id = self.default_display_id;
+        let frame = task::spawn_blocking(move || -> Result<Frame> {
+            let content = SCShareableContent::get()
+                .map_err(|e| CaptureError::CaptureFailed(format!("SCShareableContent: {e:?}")))?;
+            let display = content
+                .displays()
+                .into_iter()
+                .find(|d| d.display_id() == display_id)
+                .ok_or(CaptureError::DisplayNotFound(display_id))?;
+
+            let filter = SCContentFilter::new()
+                .with_display_excluding_windows(&display, &[]);
+            let cfg = SCStreamConfiguration::default()
+                .set_width(display.width())
+                .map_err(|e| CaptureError::CaptureFailed(format!("set_width: {e:?}")))?
+                .set_height(display.height())
+                .map_err(|e| CaptureError::CaptureFailed(format!("set_height: {e:?}")))?
+                .set_pixel_format(SckPixelFormat::BGRA)
+                .map_err(|e| CaptureError::CaptureFailed(format!("set_pixel_format: {e:?}")))?
+                .set_scales_to_fit(false)
+                .map_err(|e| CaptureError::CaptureFailed(format!("set_scales_to_fit: {e:?}")))?;
+
+            let sample_buffer: CMSampleBuffer = capture(&filter, &cfg)
+                .map_err(|e| CaptureError::CaptureFailed(format!("capture: {e:?}")))?;
+
+            let pixel_buffer: CVPixelBuffer = sample_buffer.get_pixel_buffer()
+                .map_err(|e| CaptureError::CaptureFailed(format!("get_pixel_buffer: {e:?}")))?;
+
+            let width = pixel_buffer.get_width();
+            let height = pixel_buffer.get_height();
+            let bytes_per_row = pixel_buffer.get_bytes_per_row() as usize;
+            let expected_len = height as usize * bytes_per_row;
+
+            let data = {
+                let lock = pixel_buffer.lock()
+                    .map_err(|e| CaptureError::CaptureFailed(format!("lock: {e:?}")))?;
+                let slice = lock.as_slice();
+                // slice lifetime is tied to lock; copy out.
+                if slice.len() < expected_len {
+                    return Err(CaptureError::CaptureFailed(
+                        format!("pixel buffer too small: {} < {}", slice.len(), expected_len)
+                    ));
+                }
+                slice[..expected_len].to_vec()
+            };
+
+            Ok(Frame {
+                width,
+                height,
+                scale: 2.0, // TODO: replace with NSScreen.backingScaleFactor in Phase 2
+                format: PixelFormat::Bgra8,
+                data,
+            })
+        })
+        .await
+        .map_err(|e| CaptureError::CaptureFailed(format!("join error: {e}")))??;
+
+        Ok(frame)
     }
 
     async fn capture_window(&self, _window_id: WindowId) -> Result<Frame> {

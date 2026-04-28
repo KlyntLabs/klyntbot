@@ -24,6 +24,8 @@ objc2-foundation = { version = "0.3", features = ["NSString", "NSArray", "NSData
 core-graphics = { version = "0.24", features = ["highsierra"] }
 core-foundation = "0.10"
 screencapturekit = "0.3"
+core-media-rs = "0.3"
+core-video-rs = "0.3"
 async-trait = { workspace = true }
 platform-input = { path = "../platform-input" }
 platform-capture = { path = "../platform-capture" }
