@@ -409,6 +409,43 @@
 }
 .cm-tool-detail__json-copy:hover { color: var(--ds-text-strong); }
 
+/* ProviderChips */
+.cm-provider-chips { display: flex; gap: 6px; padding: 12px 20px; border-bottom: 1px solid var(--ds-border-subtle); }
+.cm-provider-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; font-size: var(--fs-xs);
+  border-radius: 999px; border: 1px solid var(--ds-border-subtle);
+  background: transparent; color: var(--ds-text-subtle);
+  cursor: pointer; transition: all var(--ds-dur-fast) var(--ds-ease-out);
+}
+.cm-provider-chip:hover { color: var(--ds-text-strong); border-color: var(--ds-border-strong); }
+.cm-provider-chip--active { background: var(--ds-surface-muted); color: var(--ds-text-strong); border-color: var(--ds-border-accent-soft); }
+.cm-provider-chip__count { font-size: var(--fs-2xs); color: var(--ds-text-faint); }
+
+/* SessionList */
+.cm-session-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.cm-session-list__item {
+  display: flex; flex-direction: column; gap: 4px;
+  width: 100%; padding: 10px 16px;
+  background: transparent; border: 0; border-bottom: 1px solid var(--ds-border-subtle);
+  text-align: left; cursor: pointer;
+  transition: background var(--ds-dur-fast) var(--ds-ease-out);
+}
+.cm-session-list__item:hover { background: var(--ds-surface-muted); }
+.cm-session-list__item--active { background: var(--ds-surface-muted); box-shadow: inset 2px 0 0 var(--ds-border-accent-soft); }
+.cm-session-list__top { display: flex; align-items: center; gap: 8px; }
+.cm-session-list__id { font-family: ui-monospace, monospace; font-size: var(--fs-2xs); color: var(--ds-text-faint); }
+.cm-session-list__when { margin-left: auto; font-size: var(--fs-2xs); color: var(--ds-text-faint); }
+.cm-session-list__cwd { font-size: var(--fs-2xs); color: var(--ds-text-subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cm-session-list__stats { font-size: var(--fs-2xs); color: var(--ds-text-faint); }
+.cm-session-list__errors { color: var(--cm-color-danger-fg); }
+
+/* CodingMemoryPlugin layout */
+.cm-plugin { display: flex; flex-direction: column; height: 100%; }
+.cm-plugin__body { display: flex; flex: 1; overflow: hidden; }
+.cm-plugin__sidebar { width: 320px; border-right: 1px solid var(--ds-border-subtle); display: flex; flex-direction: column; }
+.cm-plugin__main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
 /* States */
 .cm-state { padding: 24px; color: var(--ds-text-faint); font-size: var(--fs-xs); text-align: center; }
 .cm-state--loading { color: var(--ds-text-subtle); }
