@@ -24,6 +24,6 @@ pub mod codex;
 /// Git post-commit adapter.
 pub mod git_post_commit;
 /// kimi-cli adapter (tier-1 hook + tier-2 Wire path).
-pub mod kimi_wire;
+pub mod kimi_cli;
 /// opencode adapter (SQLite WAL polling).
 pub mod opencode;

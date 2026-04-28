@@ -60,19 +60,41 @@ pub fn run(args: Vec<String>) -> i32 {
         return 1;
     }
 
-    if source != "claude-code" {
-        eprintln!("klyntbot-hook: source `{source}` not yet wired (Phase 7)");
-        return 0;
-    }
-
-    let event = match ClaudeCodeAdapter.parse(&hook_event, &raw) {
-        Ok(Some(e)) => e,
-        Ok(None) => return 0,
-        Err(e) => {
-            eprintln!("klyntbot-hook: parse: {e}");
-            return 1;
+    let event = match source.as_str() {
+        "claude-code" => match ClaudeCodeAdapter.parse(&hook_event, &raw) {
+            Ok(Some(e)) => e,
+            Ok(None) => return 0,
+            Err(e) => {
+                eprintln!("klyntbot-hook: parse: {e}");
+                return 1;
+            }
+        },
+        "codex" => match crate::adapters::codex::CodexAdapter.parse(&hook_event, &raw) {
+            Ok(Some(e)) => e,
+            Ok(None) => return 0,
+            Err(e) => {
+                eprintln!("klyntbot-hook: parse: {e}");
+                return 1;
+            }
+        },
+        "kimi-cli" => match crate::adapters::kimi_cli::KimiAdapter.parse(&hook_event, &raw) {
+            Ok(Some(e)) => e,
+            Ok(None) => return 0,
+            Err(e) => {
+                eprintln!("klyntbot-hook: parse: {e}");
+                return 1;
+            }
+        },
+        "opencode" => {
+            eprintln!("klyntbot-hook: opencode is poll-only (Phase 7); no hook dispatch");
+            return 0;
+        }
+        _ => {
+            eprintln!("unknown source `{source}`\n{USAGE}");
+            return 2;
         }
     };
+
     let event = enrich_with_scope(event);
 
     let excludes = ExcludeSet::compile(&default_exclude_globs())
