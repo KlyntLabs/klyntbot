@@ -5,6 +5,7 @@
 //! similarity > threshold. When found, the older row's `valid_until` and the
 //! newer row's `superseded_by` are set bi-temporally — both rows remain queryable.
 
+use crate::reforge::writer::ReforgeWriter;
 use cognitive::SemanticFactRepo;
 use common::{KlyntbotError, Result};
 use jiff::Timestamp;
@@ -47,6 +48,8 @@ impl CrossSessionDedup {
         .await
         .map_err(|e| KlyntbotError::Storage(format!("dedup query: {e}")))?;
 
+        let writer = ReforgeWriter::new();
+        let now = Timestamp::now();
         let mut applied = 0_u32;
         let mut processed = std::collections::HashSet::new();
 
@@ -64,16 +67,7 @@ impl CrossSessionDedup {
                 let emb_b = embedder.embed(&text_b).await?;
                 let sim = cosine(&emb_a, &emb_b);
                 if sim > threshold {
-                    let now = Timestamp::now().to_string();
-                    sqlx::query(
-                        "UPDATE semantic_facts SET valid_until = ?1, superseded_by = ?2 WHERE id = ?3",
-                    )
-                    .bind(&now)
-                    .bind(id_b)
-                    .bind(id_a)
-                    .execute(&pool)
-                    .await
-                    .map_err(|e| KlyntbotError::Storage(format!("dedup update: {e}")))?;
+                    writer.set_superseded_by(repo, id_b, id_a, now).await?;
                     processed.insert(id_a.clone());
                     processed.insert(id_b.clone());
                     applied += 1;
@@ -108,19 +102,19 @@ impl CrossSessionDedup {
         .await
         .map_err(|e| KlyntbotError::Storage(format!("dedup query: {e}")))?;
 
+        let writer = ReforgeWriter::new();
         let mut applied = 0_u32;
         for (older_id, _older_vf, newer_id, newer_vf) in pairs {
-            let now = Timestamp::now().to_string();
-            let cutoff = if newer_vf.is_empty() { now } else { newer_vf };
-            sqlx::query(
-                "UPDATE semantic_facts SET valid_until = ?1, superseded_by = ?2 WHERE id = ?3",
-            )
-            .bind(&cutoff)
-            .bind(&newer_id)
-            .bind(&older_id)
-            .execute(&pool)
-            .await
-            .map_err(|e| KlyntbotError::Storage(format!("dedup older update: {e}")))?;
+            let cutoff = if newer_vf.is_empty() {
+                Timestamp::now()
+            } else {
+                newer_vf
+                    .parse::<Timestamp>()
+                    .unwrap_or_else(|_| Timestamp::now())
+            };
+            writer
+                .set_superseded_by(repo, &older_id, &newer_id, cutoff)
+                .await?;
             applied += 1;
         }
         Ok(applied)

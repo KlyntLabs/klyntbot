@@ -97,6 +97,7 @@ desktop_macros::klynt_collect_commands![
     crate::commands::coding_memory::coding_memory_enable_cli,
     crate::commands::coding_memory::coding_memory_disable_cli,
     crate::commands::coding_memory::coding_memory_diagnose_cli,
+    crate::commands::coding_memory::coding_memory_install_git_hook,
     crate::commands::coding_memory::coding_memory_browser,
     crate::commands::coding_memory::coding_memory_activity,
     crate::commands::coding_memory::coding_memory_cost,

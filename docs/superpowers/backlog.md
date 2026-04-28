@@ -107,3 +107,57 @@ Non-blocking issues deferred for later. Not part of any active plan; pick up onc
 3. Plumb the value from `launcher_system_command(args: HashMap<String,String>)` by parsing `args.get("duration_secs").and_then(|s| s.parse().ok())`.
 4. Once stable, drop the frontend-side `focus_activate` workaround in `useExecuteItem.ts:86-97`.
 
+
+---
+
+## 8. Plugins page — Coding Memory viewer (kimi-cli/vis port, internal-plugins host)
+
+**Observed (2026-04-28):** Phases 1–7 of `docs/superpowers/specs/2026-04-22-coding-memory-design.md` are merged. Backend exposes ~25 Tauri commands (all in `bindings.ts`) for session replay, recall, mirror alerts, reforge cycles, effectiveness trends, and per-CLI health across 4 adapters (Claude Code, Codex, Kimi, opencode — Kimi is richest with 13 hook event types + tier-2 wire socket support). The sidebar `"plugins"` nav item exists in `SidebarChatLayout.tsx` as a placeholder with no `onClick` and no page. Reference UI to port: `/Users/jayden/Projects/Klynt/kimi-cli/vis/` (Vite SPA, Tailwind v4 + shadcn/Radix, react-virtuoso, `/api/vis/*` REST).
+
+**Scope:** Frontend-heavy port + small Rust DTO touch-ups. The Plugins page becomes the host for **internal first-party plugins** (Coding Memory first; future tabs: Skills, MCP servers, klynt-cli sessions). Not a third-party plugin marketplace — no sandbox/permissions design needed.
+
+**Constraints (locked):**
+1. **Use our `--ds-*` token system, not Tailwind.** Translate kimi-vis's `bg-purple-500/15 text-purple-700 …` event-type chips into `--ds-event-{kind}-{bg|fg|border}` vars in `src/styles/ds-tokens.css`, themed per `themes.{dark,light,dim,system}.css`. Drop the duplicate `TYPE_COLORS` maps (kimi-vis duplicates them between `wire-event-card.tsx:50` and `wire-filters.tsx:73`).
+2. **Design for our richer internal event taxonomy, not Kimi's wire shape.** Our `AgentEventV1` (`crates/coding-ingest/src/event.rs`) already has 20 `EventKind` variants and supersets Kimi. When the future klynt-cli (`docs/superpowers/specs/2026-04-23-klynt-cli-design.md` §8 + §9) lands, its `AgentEvent` extensions and Wire protocol v0 should slot in as the 5th source with no UI rework. The viewer renders our internal taxonomy; per-source adapters fold their events into it.
+3. **Internal-plugins framing.** Plugins page = a tab shell hosting first-party views. Coding Memory is plugin #1; the architecture must allow adding "Skills", "MCP", "klynt-cli sessions" tabs later without restructuring.
+4. **Make it richer than klynt-cli/vis** — our backend exposes recall telemetry, mirror alerts, reforge cycle diffs, effectiveness trends, causal edges, and per-fact provenance that Kimi never had. The viewer should expose these in dedicated panels (e.g. `RecallOverlay` on the timeline; `MirrorAlertSidecar`; `CausalGraphInspector` on a tool-call result).
+
+**Plan (5 phases):**
+
+A. **Plugins shell.** Wire `appView === "plugins"` in `MainApp.tsx`; add `onSelectPlugins` to the existing sidebar item; create `src/features/plugins/components/PluginsView.tsx` with a `PanelTabs` tab bar; create `src/styles/plugins.css` and `@import` it in `src/styles/index.css`.
+
+B. **Backend DTO touch-ups.**
+   - Add `coding_memory_session_list(filters) -> Vec<SessionSummaryDto>` (currently only counts via `coding_memory_cli_health`).
+   - Convert `SessionReplayEntry.payload: String` → typed `WireEventDto` with decoded `EventKind` + structured payload + `rawJson` sidecar.
+   - Convert `recall_*` commands' `JsonValueWrapper` returns to Specta-typed structs (also clears phase 7 debt).
+   - Regenerate `desktop-ui/src/bindings.ts` via `cargo tauri dev`.
+
+C. **Wire Events tab (the meat).**
+   - Mirror `vis/src/features/wire-viewer/` under `src/features/plugins/coding-memory/`: `WireViewer`, `WireFilters`, `TurnTree`, `WireEventCard`, `ToolCallDetail`.
+   - Add `react-virtuoso` (one new dep — no existing virtualization primitive).
+   - Replace kimi-vis `fetchJSON` with `src/api/endpoints/codingMemory.ts` wrapping the typed `commands.codingMemorySessionReplay(...)` etc.
+   - Drop kimi-vis `streamdown` — reuse `@/features/messages/components/Markdown`.
+   - Drop kimi-vis `window.history.pushState` URL routing — single-page React state.
+   - All chip/badge/timeline-gutter colors via `--ds-event-*` tokens.
+
+D. **Provider switcher + session list.**
+   - Top-row chips: All / Claude Code / Codex / Kimi / opencode (+ klynt-cli when it lands).
+   - Left-rail session list (sessionId, cwd, last activity, event count, source badge).
+   - When source = Kimi, the rich event-type chips (`SkillActivated`, `RecallInjected`, `ApprovalDecision`, `ProviderCall`) become active filters; for thinner sources they grey out.
+
+E. **Klynt-platform-only richness panels** (no kimi-vis equivalent — these are why we beat klynt-cli/vis).
+   - `RecallOverlay`: render `coding_memory_session_replay_recall_overlay` events on the timeline gutter.
+   - `MirrorAlertSidecar`: feed from `coding_memory_mirror_alerts_feed` filtered to current session/repo; approve/reject inline.
+   - `CausalGraphInspector`: pop-up on a `ToolResult` showing the causal edges + provenance from `coding_memory_recall_fetch`.
+   - `ReforgeCycleDiff` panel: list cycles via `coding_memory_reforge_cycle_list`, expand to before/after diff via `coding_memory_reforge_cycle_diff`.
+   - `EffectivenessTrends` mini-chart per pattern, sourced from `coding_memory_effectiveness_trends`.
+
+**Cut from v1 (separate backlog item if needed):**
+- Context Messages, State, Dual, Agents tabs from kimi-vis. They require new backend endpoints (LLM context window per session, sub-agent tracking) that don't exist in our schema. Wire Events + the richness panels above already exceed kimi-vis's value.
+
+**Open decisions:**
+- Should the Plugins page also host non-coding-memory plugins (Skills viewer, MCP server inspector) in v1, or ship v1 with only the Coding Memory tab and add others incrementally?
+- Persisted view preferences (last-selected tab, filter state, source filter): localStorage vs. a small `plugins_ui_state` table?
+
+**Does NOT affect:** Existing chat/threads UI, the launcher, or any backend ingestion path. All changes are additive (new feature folder + new endpoints).
+

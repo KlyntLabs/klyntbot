@@ -115,7 +115,7 @@ impl CodingMemoryToolset {
                     "required": ["query"],
                     "properties": {
                         "query": { "type": "string", "description": "Search query" },
-                        "repo": { "type": "string", "description": "Optional repo scope filter" },
+                        "repo": { "type": "string", "description": "Optional repo scope filter — pass \"*\" to match all repos" },
                         "kinds": { "type": "array", "items": { "type": "string" }, "description": "Optional memory kind filter" },
                         "days": { "type": "integer", "description": "Lookback window in days" },
                         "limit": { "type": "integer", "description": "Max results (default 10)" }
@@ -131,7 +131,7 @@ impl CodingMemoryToolset {
                     "properties": {
                         "ids": { "type": "array", "items": { "type": "string" }, "description": "Explicit memory ids" },
                         "query": { "type": "string", "description": "Free-text query" },
-                        "repo": { "type": "string", "description": "Optional repo scope filter" },
+                        "repo": { "type": "string", "description": "Optional repo scope filter — pass \"*\" to match all repos" },
                         "days": { "type": "integer", "description": "Lookback window in days (default 30)" }
                     }
                 }),
@@ -159,7 +159,7 @@ impl CodingMemoryToolset {
                     "required": ["approach"],
                     "properties": {
                         "approach": { "type": "string", "description": "Proposed approach text" },
-                        "repo": { "type": "string", "description": "Optional repo scope filter" }
+                        "repo": { "type": "string", "description": "Optional repo scope filter — pass \"*\" to match all repos" }
                     }
                 }),
                 self.clone(),
@@ -187,7 +187,7 @@ impl CodingMemoryToolset {
                     "properties": {
                         "subject": { "type": "string", "description": "Fact subject" },
                         "predicate": { "type": "string", "description": "Fact predicate" },
-                        "repo": { "type": "string", "description": "Optional repo scope filter" }
+                        "repo": { "type": "string", "description": "Optional repo scope filter — pass \"*\" to match all repos" }
                     }
                 }),
                 self.clone(),
@@ -199,7 +199,7 @@ impl CodingMemoryToolset {
                     "type": "object",
                     "properties": {
                         "domain": { "type": "string", "description": "Domain filter" },
-                        "repo": { "type": "string", "description": "Optional repo scope filter" },
+                        "repo": { "type": "string", "description": "Optional repo scope filter — pass \"*\" to match all repos" },
                         "limit": { "type": "integer", "description": "Max results (default 50)" }
                     }
                 }),
@@ -267,7 +267,7 @@ impl CodingMemoryToolset {
         };
         let resp = self
             .svc
-            .recall_index(&a.query, a.repo.as_deref(), kinds_opt, a.days, a.limit)
+            .recall_index(&a.query, normalize_repo_arg(a.repo.as_deref()), kinds_opt, a.days, a.limit)
             .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }
@@ -297,7 +297,7 @@ impl CodingMemoryToolset {
         };
         let resp = self
             .svc
-            .recall_timeline(q, a.repo.as_deref(), a.days)
+            .recall_timeline(q, normalize_repo_arg(a.repo.as_deref()), a.days)
             .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }
@@ -333,7 +333,7 @@ impl CodingMemoryToolset {
         let a: A = serde_json::from_value(args).map_err(decode_err)?;
         let resp = self
             .svc
-            .check_dead_ends(&a.approach, a.repo.as_deref())
+            .check_dead_ends(&a.approach, normalize_repo_arg(a.repo.as_deref()))
             .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }
@@ -371,7 +371,7 @@ impl CodingMemoryToolset {
         let a: A = serde_json::from_value(args).map_err(decode_err)?;
         let resp = self
             .svc
-            .recall_change_history(&a.subject, &a.predicate, a.repo.as_deref())
+            .recall_change_history(&a.subject, &a.predicate, normalize_repo_arg(a.repo.as_deref()))
             .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }
@@ -395,7 +395,7 @@ impl CodingMemoryToolset {
         let a: A = serde_json::from_value(args).map_err(decode_err)?;
         let resp = self
             .svc
-            .recall_decision_points(a.domain.as_deref(), a.repo.as_deref(), a.limit)
+            .recall_decision_points(a.domain.as_deref(), normalize_repo_arg(a.repo.as_deref()), a.limit)
             .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }
@@ -417,9 +417,22 @@ impl CodingMemoryToolset {
             .map_err(|e| common::KlyntbotError::Storage(format!("subject uuid: {e}")))?;
         let resp = self
             .svc
-            .trace_causes(subject, a.repo.as_deref(), a.depth)
+            .trace_causes(subject, normalize_repo_arg(a.repo.as_deref()), a.depth)
             .await?;
         serde_json::to_value(resp).map_err(encode_err)
+    }
+}
+
+/// Normalize a `repo` argument before forwarding it downstream.
+///
+/// MCP callers may pass `"*"` to mean "all repos" — the recall service
+/// handles the wildcard explicitly (see `recall::service` repo branch).
+/// Empty/whitespace strings are treated as `None` (no filter). Any other
+/// value, including `"*"`, is forwarded verbatim.
+fn normalize_repo_arg(repo: Option<&str>) -> Option<&str> {
+    match repo.map(str::trim) {
+        None | Some("") => None,
+        Some(other) => Some(other),
     }
 }
 

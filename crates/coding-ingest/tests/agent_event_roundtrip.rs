@@ -243,3 +243,79 @@ fn no_repo_no_turn_roundtrip() {
     });
     assert_roundtrip(event);
 }
+
+fn wrap_with_source(source: AgentSource, kind: EventKind) -> AgentEvent {
+    AgentEvent::V1(AgentEventV1 {
+        id: Uuid::nil(),
+        source,
+        session_id: "sess-x".into(),
+        turn_id: Some("turn-x".into()),
+        cwd: PathBuf::from("/tmp/repo"),
+        repo: None,
+        occurred_at: Timestamp::from_second(1_700_000_000).unwrap(),
+        kind,
+    })
+}
+
+#[test]
+fn kimi_cli_source_roundtrip() {
+    assert_roundtrip(wrap_with_source(
+        AgentSource::KimiCli,
+        EventKind::SessionStart {
+            model: Some("kimi-k1.5".into()),
+            source_reason: "hook".into(),
+        },
+    ));
+    assert_roundtrip(wrap_with_source(
+        AgentSource::KimiCli,
+        EventKind::ToolCall {
+            tool: "shell".into(),
+            args_preview: "ls".into(),
+            ok: true,
+            duration_ms: 5,
+            result_preview: "...".into(),
+        },
+    ));
+}
+
+#[test]
+fn opencode_source_roundtrip() {
+    assert_roundtrip(wrap_with_source(
+        AgentSource::OpenCode,
+        EventKind::UserPrompt {
+            text: "fix it".into(),
+            attachments: vec![],
+        },
+    ));
+    assert_roundtrip(wrap_with_source(
+        AgentSource::OpenCode,
+        EventKind::AssistantMsg {
+            text: "ok".into(),
+            truncated: false,
+            token_usage: None,
+        },
+    ));
+}
+
+#[test]
+fn klynt_cli_source_roundtrip() {
+    assert_roundtrip(wrap_with_source(
+        AgentSource::KlyntCli,
+        EventKind::SkillRoutingTrace {
+            considered: vec![SkillScore {
+                skill_id: "task-management".into(),
+                score: 0.5,
+                components: vec![("kw".into(), 0.5)],
+            }],
+            chosen: vec!["task-management".into()],
+        },
+    ));
+    assert_roundtrip(wrap_with_source(
+        AgentSource::KlyntCli,
+        EventKind::CompressionApplied {
+            before_tokens: 10_000,
+            after_tokens: 4_000,
+            messages_condensed: 3,
+        },
+    ));
+}

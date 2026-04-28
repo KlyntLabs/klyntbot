@@ -32,7 +32,11 @@ pub mod transport;
 /// Touch-file rate-limited stderr warnings.
 pub mod warn;
 
+pub use adapters::codex::CodexAdapter;
 pub use adapters::git_post_commit::GitPostCommitAdapter;
+pub use adapters::kimi_cli::KimiAdapter;
+pub use adapters::opencode::poller::OpencodePoller;
+pub use adapters::opencode::OpencodeAdapter;
 pub use daemon::OpHandler;
 
 pub use event::{

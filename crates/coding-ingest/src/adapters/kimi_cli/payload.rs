@@ -122,3 +122,52 @@ pub struct ErrorBody {
     #[serde(default)]
     pub message: Option<String>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct SkillActivatedBody {
+    #[serde(flatten)]
+    pub common: CommonEnvelope,
+    pub skill_id: String,
+    pub source_path: PathBuf,
+    #[serde(default)]
+    pub trigger: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RecallInjectedBody {
+    #[serde(flatten)]
+    pub common: CommonEnvelope,
+    #[serde(default)]
+    pub memory_ids: Vec<String>,
+    #[serde(default)]
+    pub coverage_score: f32,
+    #[serde(default)]
+    pub dead_end_warning: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ApprovalDecisionBody {
+    #[serde(flatten)]
+    pub common: CommonEnvelope,
+    pub tool: String,
+    pub decision: String,
+    #[serde(default)]
+    pub layer: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProviderCallBody {
+    #[serde(flatten)]
+    pub common: CommonEnvelope,
+    pub model: String,
+    #[serde(default)]
+    pub prompt_tokens: u32,
+    #[serde(default)]
+    pub completion_tokens: u32,
+    #[serde(default)]
+    pub cost_usd: f64,
+    #[serde(default)]
+    pub latency_ms: u64,
+    #[serde(default)]
+    pub retries: u32,
+}

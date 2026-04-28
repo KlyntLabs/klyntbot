@@ -46,6 +46,11 @@ pub async fn coding_memory_diagnose_cli(cli: String) -> DiagnoseResult {
 }
 
 #[klynt_command]
+pub async fn coding_memory_install_git_hook(repo_root: String) -> () {
+    state.coding_memory_install_git_hook(repo_root).await
+}
+
+#[klynt_command]
 pub async fn coding_memory_browser(
     limit: Option<i64>,
     offset: Option<i64>,

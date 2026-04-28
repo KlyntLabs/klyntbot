@@ -10,6 +10,8 @@ pub mod codex_installer;
 pub mod kimi_installer;
 /// Opencode opt-in marker (poll-only, no hook install).
 pub mod opencode_installer;
+/// Git post-commit hook installer (writes `.git/hooks/post-commit`).
+pub mod git_hook_installer;
 /// Phase-5 mirror source wiring.
 pub mod mirror;
 /// Phase-5 panel handlers.
@@ -263,28 +265,71 @@ impl crate::AppCore {
                 })
                 .await
                 .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
-                match outcome {
-                    Ok(()) => Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
-                        ok: true,
-                        message: "hook exited 0".into(),
-                    }),
-                    Err(e) => Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
-                        ok: false,
-                        message: e.to_string(),
-                    }),
-                }
+                Ok(diagnose_to_result(outcome))
             }
-            "codex" | "kimi-cli" | "opencode" => {
-                Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
-                    ok: true,
-                    message: format!("{cli} hook ready"),
+            "codex" => {
+                let outcome = tokio::task::spawn_blocking(move || {
+                    crate::coding_memory::codex_installer::CodexInstaller::diagnose(&binary)
                 })
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+                Ok(diagnose_to_result(outcome))
+            }
+            "kimi-cli" => {
+                let outcome = tokio::task::spawn_blocking(move || {
+                    crate::coding_memory::kimi_installer::KimiInstaller::diagnose(&binary)
+                })
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+                Ok(diagnose_to_result(outcome))
+            }
+            "opencode" => {
+                let db = dirs::home_dir()
+                    .ok_or_else(|| ApiError::new("INTERNAL_ERROR", "no home dir"))?
+                    .join(".local/share/opencode/opencode.sqlite");
+                let outcome = tokio::task::spawn_blocking(move || {
+                    crate::coding_memory::opencode_installer::OpencodeInstaller::diagnose(&db)
+                })
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+                Ok(diagnose_to_result(outcome))
             }
             _ => Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
                 ok: false,
                 message: format!("unsupported cli: {cli}"),
             }),
         }
+    }
+
+    /// Install the `.git/hooks/post-commit` hook for a repository root.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_memory_install_git_hook(
+        &self,
+        repo_root: String,
+    ) -> Result<(), ApiError> {
+        let path = std::path::PathBuf::from(repo_root);
+        tokio::task::spawn_blocking(move || {
+            crate::coding_memory::git_hook_installer::install(&path)
+        })
+        .await
+        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
+        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+        Ok(())
+    }
+}
+
+fn diagnose_to_result(
+    outcome: common::Result<()>,
+) -> desktop_shared::commands::coding_memory::DiagnoseResult {
+    match outcome {
+        Ok(()) => desktop_shared::commands::coding_memory::DiagnoseResult {
+            ok: true,
+            message: "hook exited 0".into(),
+        },
+        Err(e) => desktop_shared::commands::coding_memory::DiagnoseResult {
+            ok: false,
+            message: e.to_string(),
+        },
     }
 }
 
