@@ -72,63 +72,18 @@ pub fn get_frontmost_app_name() -> Option<String> {
 /// Extract the focused window title using the Accessibility API.
 #[cfg(target_os = "macos")]
 fn get_window_title_ax(pid: i32) -> Option<String> {
-    use core_foundation::base::TCFType;
-    use core_foundation::string::CFString;
-    use std::ptr;
+    use crate::ax::AXUIElement;
 
-    #[link(name = "ApplicationServices", kind = "framework")]
-    extern "C" {
-        fn AXUIElementCreateApplication(pid: i32) -> *mut std::ffi::c_void;
-        fn AXUIElementCopyAttributeValue(
-            element: *mut std::ffi::c_void,
-            attribute: *const std::ffi::c_void,
-            value: *mut *mut std::ffi::c_void,
-        ) -> i32;
-    }
-
-    const AX_ERROR_SUCCESS: i32 = 0;
-
-    unsafe {
-        let app_element = AXUIElementCreateApplication(pid);
-        if app_element.is_null() {
-            return None;
-        }
-
-        // Get the focused window
-        let focused_window_attr = CFString::new("AXFocusedWindow");
-        let mut focused_window: *mut std::ffi::c_void = ptr::null_mut();
-        let err = AXUIElementCopyAttributeValue(
-            app_element,
-            focused_window_attr.as_CFTypeRef() as *const _,
-            &mut focused_window,
-        );
-        core_foundation::base::CFRelease(app_element as _);
-
-        if err != AX_ERROR_SUCCESS || focused_window.is_null() {
-            return None;
-        }
-
-        // Get AXTitle from the focused window
-        let title_attr = CFString::new("AXTitle");
-        let mut title_value: *mut std::ffi::c_void = ptr::null_mut();
-        let err = AXUIElementCopyAttributeValue(
-            focused_window,
-            title_attr.as_CFTypeRef() as *const _,
-            &mut title_value,
-        );
-        core_foundation::base::CFRelease(focused_window as _);
-
-        if err != AX_ERROR_SUCCESS || title_value.is_null() {
-            return None;
-        }
-
-        let cf_title: CFString = CFString::wrap_under_create_rule(title_value as _);
-        let title = cf_title.to_string();
-        if title.is_empty() {
-            None
-        } else {
-            Some(title)
-        }
+    let app = AXUIElement::create_application(pid)?;
+    let focused: AXUIElement = app
+        .copy_attribute("AXFocusedWindow")
+        .ok()?
+        .downcast_into()?;
+    let title = focused.copy_string_attribute("AXTitle").ok()?;
+    if title.is_empty() {
+        None
+    } else {
+        Some(title)
     }
 }
 
@@ -246,185 +201,75 @@ pub fn get_screen_frame() -> (f64, f64, f64, f64) {
 #[cfg(target_os = "macos")]
 pub fn set_window_frame(pid: i32, x: f64, y: f64, w: f64, h: f64) -> bool {
     use core_foundation::base::TCFType;
-    use core_foundation::string::CFString;
+    use crate::ax::{AXUIElement, AXValue};
     use core_graphics::geometry::{CGPoint, CGSize};
-    use std::ptr;
 
-    const AX_VALUE_TYPE_CGPOINT: u32 = 1;
-    const AX_VALUE_TYPE_CGSIZE: u32 = 2;
-    const AX_ERROR_SUCCESS: i32 = 0;
+    let app = match AXUIElement::create_application(pid) {
+        Some(a) => a,
+        None => return false,
+    };
 
-    #[link(name = "ApplicationServices", kind = "framework")]
-    extern "C" {
-        fn AXUIElementCreateApplication(pid: i32) -> *mut std::ffi::c_void;
-        fn AXUIElementCopyAttributeValue(
-            element: *mut std::ffi::c_void,
-            attribute: *const std::ffi::c_void,
-            value: *mut *mut std::ffi::c_void,
-        ) -> i32;
-        fn AXUIElementSetAttributeValue(
-            element: *mut std::ffi::c_void,
-            attribute: *const std::ffi::c_void,
-            value: *const std::ffi::c_void,
-        ) -> i32;
-        fn AXValueCreate(value_type: u32, value: *const std::ffi::c_void) -> *mut std::ffi::c_void;
+    let focused: AXUIElement = match app
+        .copy_attribute("AXFocusedWindow")
+        .ok()
+        .and_then(|v| v.downcast_into())
+    {
+        Some(f) => f,
+        None => return false,
+    };
+
+    let position = CGPoint::new(x, y);
+    let position_value = match AXValue::from_point(position) {
+        Some(v) => v,
+        None => return false,
+    };
+    if focused
+        .set_attribute("AXPosition", position_value.as_CFTypeRef())
+        .is_err()
+    {
+        return false;
     }
 
-    unsafe {
-        let app_element = AXUIElementCreateApplication(pid);
-        if app_element.is_null() {
-            return false;
-        }
-
-        // Get the focused window
-        let focused_window_attr = CFString::new("AXFocusedWindow");
-        let mut focused_window: *mut std::ffi::c_void = ptr::null_mut();
-        let err = AXUIElementCopyAttributeValue(
-            app_element,
-            focused_window_attr.as_CFTypeRef() as *const _,
-            &mut focused_window,
-        );
-        core_foundation::base::CFRelease(app_element as _);
-
-        if err != AX_ERROR_SUCCESS || focused_window.is_null() {
-            return false;
-        }
-
-        // Set position
-        let position = CGPoint::new(x, y);
-        let position_value = AXValueCreate(
-            AX_VALUE_TYPE_CGPOINT,
-            &position as *const CGPoint as *const std::ffi::c_void,
-        );
-        if position_value.is_null() {
-            core_foundation::base::CFRelease(focused_window as _);
-            return false;
-        }
-        let position_attr = CFString::new("AXPosition");
-        let err = AXUIElementSetAttributeValue(
-            focused_window,
-            position_attr.as_CFTypeRef() as *const _,
-            position_value as *const _,
-        );
-        core_foundation::base::CFRelease(position_value as _);
-        if err != AX_ERROR_SUCCESS {
-            core_foundation::base::CFRelease(focused_window as _);
-            return false;
-        }
-
-        // Set size
-        let size = CGSize::new(w, h);
-        let size_value = AXValueCreate(
-            AX_VALUE_TYPE_CGSIZE,
-            &size as *const CGSize as *const std::ffi::c_void,
-        );
-        if size_value.is_null() {
-            core_foundation::base::CFRelease(focused_window as _);
-            return false;
-        }
-        let size_attr = CFString::new("AXSize");
-        let err = AXUIElementSetAttributeValue(
-            focused_window,
-            size_attr.as_CFTypeRef() as *const _,
-            size_value as *const _,
-        );
-        core_foundation::base::CFRelease(size_value as _);
-        core_foundation::base::CFRelease(focused_window as _);
-
-        err == AX_ERROR_SUCCESS
+    let size = CGSize::new(w, h);
+    let size_value = match AXValue::from_size(size) {
+        Some(v) => v,
+        None => return false,
+    };
+    if focused
+        .set_attribute("AXSize", size_value.as_CFTypeRef())
+        .is_err()
+    {
+        return false;
     }
+
+    true
 }
 
 /// Read the current position and size of the focused window for the given PID.
 /// Returns (x, y, w, h) on success, or None if the operation failed.
 #[cfg(target_os = "macos")]
 pub fn get_frontmost_window_frame(pid: i32) -> Option<(f64, f64, f64, f64)> {
-    use core_foundation::base::TCFType;
-    use core_foundation::string::CFString;
-    use core_graphics::geometry::{CGPoint, CGSize};
-    use std::ptr;
+    use crate::ax::{AXUIElement, AXValue};
 
-    const AX_VALUE_TYPE_CGPOINT: u32 = 1;
-    const AX_VALUE_TYPE_CGSIZE: u32 = 2;
-    const AX_ERROR_SUCCESS: i32 = 0;
+    let app = AXUIElement::create_application(pid)?;
+    let focused: AXUIElement = app
+        .copy_attribute("AXFocusedWindow")
+        .ok()?
+        .downcast_into()?;
 
-    #[link(name = "ApplicationServices", kind = "framework")]
-    extern "C" {
-        fn AXUIElementCreateApplication(pid: i32) -> *mut std::ffi::c_void;
-        fn AXUIElementCopyAttributeValue(
-            element: *mut std::ffi::c_void,
-            attribute: *const std::ffi::c_void,
-            value: *mut *mut std::ffi::c_void,
-        ) -> i32;
-        fn AXValueGetValue(
-            value: *mut std::ffi::c_void,
-            value_type: u32,
-            out: *mut std::ffi::c_void,
-        ) -> i32;
-    }
+    let position: AXValue = focused
+        .copy_attribute("AXPosition")
+        .ok()?
+        .downcast_into()?;
+    let size: AXValue = focused
+        .copy_attribute("AXSize")
+        .ok()?
+        .downcast_into()?;
 
-    unsafe {
-        let app_element = AXUIElementCreateApplication(pid);
-        if app_element.is_null() {
-            return None;
-        }
+    let position = position.to_point()?;
+    let size = size.to_size()?;
 
-        let focused_window_attr = CFString::new("AXFocusedWindow");
-        let mut focused_window: *mut std::ffi::c_void = ptr::null_mut();
-        let err = AXUIElementCopyAttributeValue(
-            app_element,
-            focused_window_attr.as_CFTypeRef() as *const _,
-            &mut focused_window,
-        );
-        core_foundation::base::CFRelease(app_element as _);
-
-        if err != AX_ERROR_SUCCESS || focused_window.is_null() {
-            return None;
-        }
-
-        // Read position
-        let position_attr = CFString::new("AXPosition");
-        let mut position_value: *mut std::ffi::c_void = ptr::null_mut();
-        let err = AXUIElementCopyAttributeValue(
-            focused_window,
-            position_attr.as_CFTypeRef() as *const _,
-            &mut position_value,
-        );
-        if err != AX_ERROR_SUCCESS || position_value.is_null() {
-            core_foundation::base::CFRelease(focused_window as _);
-            return None;
-        }
-        let mut position = CGPoint::new(0.0, 0.0);
-        AXValueGetValue(
-            position_value,
-            AX_VALUE_TYPE_CGPOINT,
-            &mut position as *mut CGPoint as *mut std::ffi::c_void,
-        );
-        core_foundation::base::CFRelease(position_value as _);
-
-        // Read size
-        let size_attr = CFString::new("AXSize");
-        let mut size_value: *mut std::ffi::c_void = ptr::null_mut();
-        let err = AXUIElementCopyAttributeValue(
-            focused_window,
-            size_attr.as_CFTypeRef() as *const _,
-            &mut size_value,
-        );
-        if err != AX_ERROR_SUCCESS || size_value.is_null() {
-            core_foundation::base::CFRelease(focused_window as _);
-            return None;
-        }
-        let mut size = CGSize::new(0.0, 0.0);
-        AXValueGetValue(
-            size_value,
-            AX_VALUE_TYPE_CGSIZE,
-            &mut size as *mut CGSize as *mut std::ffi::c_void,
-        );
-        core_foundation::base::CFRelease(size_value as _);
-        core_foundation::base::CFRelease(focused_window as _);
-
-        Some((position.x, position.y, size.width, size.height))
-    }
+    Some((position.x, position.y, size.width, size.height))
 }
 
 #[cfg(not(target_os = "macos"))]

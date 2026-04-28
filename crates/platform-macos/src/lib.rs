@@ -6,3 +6,9 @@ pub mod lifecycle;
 pub mod pasteboard;
 pub mod speech;
 pub mod window;
+
+#[cfg(target_os = "macos")]
+#[cfg(target_os = "macos")]
+pub mod ax;
+
+pub mod computer_use;
