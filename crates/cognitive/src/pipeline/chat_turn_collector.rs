@@ -35,6 +35,20 @@ impl SignalConsumer for ChatTurnCollector {
         if signal.event_kind != "ChatTurnCompleted" {
             return Ok(());
         }
+
+        // Explicitly guard the legacy None case so we don't emit empty signals.
+        if let Some(bus::DomainEvent::ChatTurnCompleted {
+            user_message: None,
+            session_key,
+        }) = signal.raw_event.as_ref()
+        {
+            tracing::debug!(
+                session_key = %session_key,
+                "ChatTurnCollector: dropping ChatTurnCompleted with user_message=None"
+            );
+            return Ok(());
+        }
+
         if signal.content.len() < MIN_MESSAGE_LEN {
             return Ok(());
         }
@@ -112,5 +126,28 @@ mod tests {
         };
         collector.consume(&sig).await.unwrap();
         assert!(rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn skips_when_user_message_is_none() {
+        use ai_core::SignalConsumer;
+        let (tx, mut rx) = super::super::signal_queue(8);
+        let collector = ChatTurnCollector::new(tx);
+
+        let sig = AiSignal {
+            event_kind: "ChatTurnCompleted",
+            content: String::new(), // set upstream when user_message is None
+            raw_event: Some(bus::DomainEvent::ChatTurnCompleted {
+                session_key: "s1".into(),
+                user_message: None,
+            }),
+            ..dummy_ai_signal()
+        };
+        collector.consume(&sig).await.unwrap();
+        assert!(
+            rx.try_recv().is_err(),
+            "ChatTurnCollector must drop events with user_message=None instead of \
+             emitting an empty-content signal"
+        );
     }
 }
