@@ -1,20 +1,23 @@
-//! kimi-cli adapter — 13 hook events (tier 1) + Wire streaming (tier 2).
+//! kimi-cli adapter — delegates to the Claude Code parser since kimi-cli's
+//! hook system is a 1:1 clone (same 9 events, same JSON payload shapes,
+//! same `~/.kimi/config.toml` `[[hooks]]` configuration model).
 //!
-//! Tier-1 dispatch lives in [`dispatch`]; tier-2 streaming surface in [`wire`].
-//! `mod.rs` is the thin `IngestAdapter` impl wrapping both.
+//! Tier-2 Wire streaming surface lives in [`wire`] and is independent.
 
-pub mod dispatch;
-mod payload;
 pub mod wire;
+// Legacy modules kept on disk to avoid churn in tests/imports; not re-exported.
+#[allow(dead_code)]
+pub mod dispatch;
+#[allow(dead_code)]
+mod payload;
 
+use super::claude_code::ClaudeCodeAdapter;
 use super::IngestAdapter;
-use crate::event::AgentEvent;
+use crate::event::{AgentEvent, AgentSource};
 use common::Result;
 
 /// Spawn the Tier-2 Wire streaming loop. Returns a JoinHandle the caller
-/// (typically the daemon) can drop to cancel. If the socket is unavailable
-/// the future returns immediately with an Io error — tier-1 hooks remain
-/// the fallback.
+/// (typically the daemon) can drop to cancel.
 pub fn spawn_wire(
     socket_path: std::path::PathBuf,
     tx: tokio::sync::mpsc::UnboundedSender<crate::event::AgentEvent>,
@@ -36,6 +39,12 @@ impl IngestAdapter for KimiAdapter {
     }
 
     fn parse(&self, hook_event: &str, raw: &[u8]) -> Result<Option<AgentEvent>> {
-        Ok(dispatch::dispatch(hook_event, raw)?.map(AgentEvent::V1))
+        match ClaudeCodeAdapter.parse(hook_event, raw)? {
+            Some(AgentEvent::V1(mut v1)) => {
+                v1.source = AgentSource::KimiCli;
+                Ok(Some(AgentEvent::V1(v1)))
+            }
+            None => Ok(None),
+        }
     }
 }

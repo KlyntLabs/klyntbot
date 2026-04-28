@@ -1,11 +1,14 @@
 //! Long-lived task that polls an opencode SQLite DB at a configured interval.
 //!
-//! Diffs the `messages` table per session, emitting `AgentEvent`s into the
-//! daemon's event channel. Persists `last_seen_id` in memory only (resets on
-//! restart — acceptable for best-effort ingestion).
+//! Diffs the singular `message` and `part` tables by `time_created`,
+//! emitting `AgentEvent`s into the daemon's event channel. Persists
+//! `last_seen_ms` in memory only (resets on restart — acceptable for
+//! best-effort ingestion).
 
 use crate::adapters::opencode::normalize;
 use crate::event::AgentEvent;
+use crate::store::IngestEventLogRepo;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
@@ -16,7 +19,9 @@ pub struct OpencodePoller {
     db_path: PathBuf,
     interval: std::time::Duration,
     event_tx: mpsc::UnboundedSender<AgentEvent>,
-    last_seen: Arc<AtomicI64>,
+    /// Repo for inserting events into `ingest_event_log`.
+    repo: Arc<IngestEventLogRepo>,
+    last_seen_ms: Arc<AtomicI64>,
 }
 
 impl OpencodePoller {
@@ -24,13 +29,15 @@ impl OpencodePoller {
     pub fn new(
         db_path: PathBuf,
         event_tx: mpsc::UnboundedSender<AgentEvent>,
+        repo: Arc<IngestEventLogRepo>,
         interval: std::time::Duration,
     ) -> Self {
         Self {
             db_path,
             interval,
             event_tx,
-            last_seen: Arc::new(AtomicI64::new(0)),
+            repo,
+            last_seen_ms: Arc::new(AtomicI64::new(jiff::Timestamp::now().as_millisecond())),
         }
     }
 
@@ -61,31 +68,68 @@ impl OpencodePoller {
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("opencode connect: {e}")))?;
 
-        let last = self.last_seen.load(Ordering::SeqCst);
-        let rows: Vec<super::schema::MessageRow> = sqlx::query_as(
-            "SELECT id, session_id, role, content, tool_calls, tool_call_id, metadata, created_at \
-             FROM messages WHERE id > ?1 ORDER BY id ASC",
+        let last = self.last_seen_ms.load(Ordering::SeqCst);
+
+        // Pull every new message since the watermark.
+        let messages: Vec<super::schema::MessageRow> = sqlx::query_as(
+            "SELECT id, session_id, time_created, time_updated, data \
+             FROM message WHERE time_created > ?1 ORDER BY time_created ASC",
         )
         .bind(last)
         .fetch_all(&pool)
         .await
-        .map_err(|e| common::KlyntbotError::Storage(format!("opencode query: {e}")))?;
+        .map_err(|e| common::KlyntbotError::Storage(format!("opencode message query: {e}")))?;
 
-        let mut max_id = last;
-        for row in rows {
-            if row.id > max_id {
-                max_id = row.id;
+        if messages.is_empty() {
+            return Ok(());
+        }
+
+        // Pull all parts for those messages in one query.
+        let message_ids: Vec<String> = messages.iter().map(|m| m.id.clone()).collect();
+        let placeholders = vec!["?"; message_ids.len()].join(",");
+        let parts_sql = format!(
+            "SELECT id, message_id, session_id, time_created, time_updated, data \
+             FROM part WHERE message_id IN ({placeholders}) ORDER BY time_created ASC",
+        );
+        let mut q = sqlx::query_as::<_, super::schema::PartRow>(&parts_sql);
+        for id in &message_ids {
+            q = q.bind(id);
+        }
+        let parts = q
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("opencode part query: {e}")))?;
+
+        // Bucket parts by message_id.
+        let mut parts_by_msg: HashMap<String, Vec<super::schema::PartRow>> = HashMap::new();
+        for p in parts {
+            parts_by_msg.entry(p.message_id.clone()).or_default().push(p);
+        }
+
+        let mut max_ms = last;
+        for msg in messages {
+            if msg.time_created > max_ms {
+                max_ms = msg.time_created;
             }
-            match normalize::row_to_event(row) {
-                Ok(Some(v1)) => {
-                    let _ = self.event_tx.send(AgentEvent::V1(v1));
+            let parts = parts_by_msg.remove(&msg.id).unwrap_or_default();
+            match normalize::message_to_events(msg, parts) {
+                Ok(events) => {
+                    if !events.is_empty() {
+                        tracing::info!(count = events.len(), "opencode emitting events");
+                    }
+                    for e in events {
+                        let event = AgentEvent::V1(e);
+                        if let Err(err) = self.repo.insert(&event).await {
+                            tracing::warn!(error = %err, "opencode repo.insert failed");
+                        }
+                        let _ = self.event_tx.send(event);
+                    }
                 }
-                Ok(None) => {}
                 Err(e) => tracing::warn!(error = %e, "opencode normalize failed"),
             }
         }
 
-        self.last_seen.store(max_id, Ordering::SeqCst);
+        self.last_seen_ms.store(max_ms, Ordering::SeqCst);
         Ok(())
     }
 }

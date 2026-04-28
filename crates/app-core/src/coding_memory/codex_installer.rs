@@ -1,4 +1,19 @@
-//! Manage `[[hooks]]` block in Codex's `config.toml`.
+//! Codex installer — **no hooks installed**.
+//!
+//! Codex CLI does not have a general-purpose hook system. Real codex only
+//! supports a single `[notify]` block (one-shot fire when the agent finishes)
+//! and would reject any other `hooks` keys with a TOML deserialisation error.
+//!
+//! Instead, codex writes rich session rollout JSONL files at
+//! `~/.codex/sessions/<YYYY>/<MM>/<DD>/rollout-<ts>-<sessionId>.jsonl`. The
+//! ingestion daemon polls those files via [`crate::coding_memory::adapters::codex::poller`].
+//!
+//! `install` and `uninstall` here only remove any leftover
+//! `# klyntbot-managed:start ... :end` block from `~/.codex/config.toml` —
+//! such a block would have been written by an older buggy version of this
+//! code and would cause codex to refuse to start. Diagnose pings the desktop
+//! binary directly to confirm it can be invoked as a hook (since the codex
+//! adapter still parses for legacy reasons, even though no hooks are wired).
 
 use common::{KlyntbotError, Result};
 use std::path::Path;
@@ -6,58 +21,43 @@ use std::path::Path;
 const START: &str = "# klyntbot-managed:start";
 const END: &str = "# klyntbot-managed:end";
 
-const EVENTS: &[&str] = &["session.start", "user.prompt", "tool.pre", "tool.post", "session.end"];
-
-/// Codex config.toml installer.
+/// Codex installer — strips any legacy hook block but writes nothing new.
 pub struct CodexInstaller;
 
 impl CodexInstaller {
-    /// Install klyntbot-managed hooks block.
-    pub fn install(config_path: &Path, hook_binary: &Path) -> Result<()> {
-        let existing = if config_path.exists() {
-            std::fs::read_to_string(config_path)
-                .map_err(|e| KlyntbotError::Storage(e.to_string()))?
-        } else {
-            String::new()
-        };
-        if config_path.exists() {
-            backup(config_path)?;
-        }
-        let user = strip_managed(&existing);
-        let mut block = String::from(START);
-        block.push('\n');
-        for ev in EVENTS {
-            block.push_str(&format!(
-                "[[hooks]]\nevent = \"{ev}\"\ncommand = \"{} codex {ev}\"\n\n",
-                hook_binary.display()
-            ));
-        }
-        block.push_str(END);
-        block.push('\n');
-        let body = if user.trim().is_empty() {
-            block
-        } else {
-            format!("{user}\n{block}")
-        };
-        atomic_write(config_path, &body)
-    }
-
-    /// Remove klyntbot-managed block. Leaves user config intact.
-    pub fn uninstall(config_path: &Path) -> Result<()> {
+    /// Strip any leftover klyntbot-managed `[[hooks]]` block from
+    /// `~/.codex/config.toml`. Codex hook installation is intentionally
+    /// disabled; codex ingestion is driven by the JSONL session-log poller.
+    pub fn install(config_path: &Path, _hook_binary: &Path) -> Result<()> {
         if !config_path.exists() {
             return Ok(());
         }
         let body = std::fs::read_to_string(config_path)
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
-        atomic_write(config_path, &strip_managed(&body))
+        let cleaned = strip_managed(&body);
+        if cleaned != body {
+            backup(config_path)?;
+            atomic_write(config_path, &cleaned)?;
+        }
+        Ok(())
     }
 
-    /// Run the binary with a synthetic payload to verify exit code 0.
+    /// Same as `install` — codex never has a managed block to remove beyond
+    /// what `strip_managed` finds.
+    pub fn uninstall(config_path: &Path) -> Result<()> {
+        Self::install(config_path, Path::new(""))
+    }
+
+    /// Verify the desktop binary is invokable. Codex doesn't actually run our
+    /// hooks (we don't install any), but if the user clicks "Diagnose" we
+    /// still want to confirm the binary works.
     pub fn diagnose(hook_binary: &Path) -> Result<()> {
         use std::io::Write;
         let mut child = std::process::Command::new(hook_binary)
-            .args(["codex", "session.start"])
+            .args(["--hook", "codex", "SessionStart"])
             .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .spawn()
             .map_err(|e| KlyntbotError::Storage(format!("spawn: {e}")))?;
         let body = br#"{"session_id":"diagnose","cwd":"/tmp","model":"diagnose"}"#;
@@ -101,8 +101,7 @@ fn strip_managed(s: &str) -> String {
 fn atomic_write(p: &Path, body: &str) -> Result<()> {
     let tmp = p.with_extension("tmp");
     if let Some(parent) = p.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
+        std::fs::create_dir_all(parent).map_err(|e| KlyntbotError::Storage(e.to_string()))?;
     }
     std::fs::write(&tmp, body).map_err(|e| KlyntbotError::Storage(e.to_string()))?;
     std::fs::rename(&tmp, p).map_err(|e| KlyntbotError::Storage(e.to_string()))?;

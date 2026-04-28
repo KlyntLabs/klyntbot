@@ -86,7 +86,7 @@ impl ClaudeCodeInstaller {
     pub fn diagnose(hook_binary: &Path) -> Result<()> {
         use std::io::Write;
         let mut child = std::process::Command::new(hook_binary)
-            .args(["claude-code", "SessionStart"])
+            .args(["--hook", "claude-code", "SessionStart"])
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())

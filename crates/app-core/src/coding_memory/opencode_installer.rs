@@ -46,7 +46,7 @@ impl OpencodeInstaller {
                 .map_err(|e| {
                     common::KlyntbotError::Storage(format!("opencode DB open: {e}"))
                 })?;
-            let _count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM messages")
+            let _count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM message")
                 .fetch_one(&pool)
                 .await
                 .map_err(|e| {
