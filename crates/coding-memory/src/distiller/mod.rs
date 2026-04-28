@@ -50,6 +50,8 @@ pub mod retry_queue;
 /// Phase C — reconciliation (ADD/SUPERSEDE/NOOP).
 pub mod phase_c;
 
+pub mod test_helpers;
+
 /// Which distiller phase produced a write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DistillerPhase {

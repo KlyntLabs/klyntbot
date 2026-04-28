@@ -11,6 +11,8 @@ use cognitive::types::{EpisodicMemory, SemanticFact};
 use cognitive::{EpisodicMemoryRepo, SemanticFactRepo};
 use serde_json::json;
 
+use cognitive::repos::entity::EntityRepo;
+
 /// A fact prepared for writing — carries the row plus coding-memory metadata.
 #[derive(Debug, Clone)]
 pub struct PreparedFact {
@@ -45,13 +47,21 @@ pub struct PreparedEpisode {
 pub struct DistillerWriter {
     facts: SemanticFactRepo,
     episodes: EpisodicMemoryRepo,
+    entity_repo: Option<EntityRepo>,
 }
 
 impl DistillerWriter {
     /// Construct a writer around existing cognitive repos.
     #[must_use]
     pub fn new(facts: SemanticFactRepo, episodes: EpisodicMemoryRepo) -> Self {
-        Self { facts, episodes }
+        Self { facts, episodes, entity_repo: None }
+    }
+
+    /// Attach an entity repo for graph-edge writes (KCA Track 3).
+    #[must_use]
+    pub fn with_entity_repo(mut self, repo: EntityRepo) -> Self {
+        self.entity_repo = Some(repo);
+        self
     }
 
     /// Write a semantic fact. Returns `ProvenanceMissing` when source_events is empty.
@@ -76,6 +86,12 @@ impl DistillerWriter {
             .map_err(|e| DistillerError::Storage {
                 detail: format!("upsert_with_metadata: {e}"),
             })?;
+
+        // KCA Track 3: write entity edges for distilled facts.
+        if let Some(ref er) = self.entity_repo {
+            crate::distiller::phase_c::write_entity_edges_for_distiller_fact(&prepared.fact, er).await;
+        }
+
         Ok(())
     }
 

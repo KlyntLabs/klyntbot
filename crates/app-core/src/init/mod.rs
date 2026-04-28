@@ -919,8 +919,10 @@ impl AppCore {
             ));
             let fact_repo = ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone());
             let episode_repo = ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
+            let entity_repo = ::cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
             let writer =
-                coding_memory::distiller::DistillerWriter::new(fact_repo.clone(), episode_repo);
+                coding_memory::distiller::DistillerWriter::new(fact_repo.clone(), episode_repo)
+                    .with_entity_repo(entity_repo);
             let distiller_provider = provider_manager.clone().unwrap_or_else(|| {
                 Arc::new(providers::ProviderManager::new(
                     provider_for_distiller.clone(),
