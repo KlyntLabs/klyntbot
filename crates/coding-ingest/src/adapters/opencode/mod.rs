@@ -26,8 +26,11 @@ impl IngestAdapter for OpencodeAdapter {
     fn parse(&self, hook_event: &str, raw: &[u8]) -> Result<Option<AgentEvent>> {
         // hook_event is the table row id or "unknown" when replaying.
         let _ = hook_event;
-        let row: schema::MessageRow = serde_json::from_slice(raw)
-            .map_err(|e| KlyntbotError::Storage(format!("opencode decode: {e}")))?;
+        let row: schema::MessageRow = match serde_json::from_slice(raw) {
+            Ok(r) => r,
+            // Opencode is poll-only; the hook surface is a no-op fallback.
+            Err(_) => return Ok(None),
+        };
         normalize::row_to_event(row).map(|o| o.map(AgentEvent::V1))
     }
 }

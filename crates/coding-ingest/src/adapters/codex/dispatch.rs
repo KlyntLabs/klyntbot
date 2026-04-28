@@ -74,12 +74,43 @@ fn file_edit(b: &payload::ToolUseBody, op: FileOp) -> EventKind {
         .get("bytes")
         .and_then(|v| v.as_u64())
         .unwrap_or(0);
+    let diff_preview = build_diff_preview(&b.tool_name, &b.tool_input);
     EventKind::FileEdit {
         path,
         op,
         bytes,
-        diff_preview: None,
+        diff_preview,
     }
+}
+
+fn build_diff_preview(tool: &str, input: &serde_json::Value) -> Option<String> {
+    match tool {
+        "edit" => {
+            let old = input.get("old_string")?.as_str()?;
+            let new = input.get("new_string")?.as_str()?;
+            Some(format_unified_two_strings(old, new, 512))
+        }
+        "write" => {
+            let new = input.get("content").and_then(|v| v.as_str()).unwrap_or("");
+            Some(format!("+{}", new.chars().take(512).collect::<String>()))
+        }
+        _ => None,
+    }
+}
+
+fn format_unified_two_strings(old: &str, new: &str, max: usize) -> String {
+    let mut s = String::new();
+    for line in old.lines().take(8) {
+        s.push('-');
+        s.push_str(line);
+        s.push('\n');
+    }
+    for line in new.lines().take(8) {
+        s.push('+');
+        s.push_str(line);
+        s.push('\n');
+    }
+    s.chars().take(max).collect()
 }
 
 fn detect_framework(cmd: &str) -> Option<&'static str> {
