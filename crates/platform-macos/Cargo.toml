@@ -21,7 +21,7 @@ objc2-app-kit = { version = "0.3", features = [
     "NSScreen",
 ] }
 objc2-foundation = { version = "0.3", features = ["NSString", "NSArray", "NSData"] }
-core-graphics = "0.24"
+core-graphics = { version = "0.24", features = ["highsierra"] }
 core-foundation = "0.10"
 screencapturekit = "0.3"
 async-trait = { workspace = true }

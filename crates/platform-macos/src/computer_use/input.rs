@@ -123,6 +123,20 @@ impl MacInput {
         }
         Ok(())
     }
+
+    fn move_cursor(&self, x: i32, y: i32) -> Result<()> {
+        use core_graphics::event::{CGEvent, CGEventTapLocation, CGEventType, CGMouseButton};
+        use core_graphics::geometry::CGPoint;
+        let event = CGEvent::new_mouse_event(
+            self.source.clone(),
+            CGEventType::MouseMoved,
+            CGPoint { x: x as f64, y: y as f64 },
+            CGMouseButton::Left,
+        )
+        .map_err(|()| PlatformError::PlatformCallFailed("MouseMoved failed".into()))?;
+        event.post(CGEventTapLocation::HID);
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -246,7 +260,108 @@ impl PlatformInput for MacInput {
                 tokio::time::sleep(std::time::Duration::from_millis(duration_ms as u64)).await;
                 Ok(())
             }
-            _ => Err(PlatformError::NotImplemented),
+            ComputerUseAction::Scroll { x, y, direction, amount } => {
+                use core_graphics::event::{CGEvent, CGEventTapLocation, ScrollEventUnit};
+                use platform_input::ScrollDir;
+                // Move cursor first so the scroll lands at the right place.
+                self.move_cursor(x, y)?;
+                let (dy, dx) = match direction {
+                    ScrollDir::Up => (amount as i32, 0),
+                    ScrollDir::Down => (-(amount as i32), 0),
+                    ScrollDir::Left => (0, amount as i32),
+                    ScrollDir::Right => (0, -(amount as i32)),
+                };
+                let event = CGEvent::new_scroll_event(
+                    self.source.clone(),
+                    ScrollEventUnit::LINE,
+                    2,
+                    dy,
+                    dx,
+                    0,
+                )
+                .map_err(|()| PlatformError::PlatformCallFailed(
+                    "CGEventCreateScrollWheelEvent failed".into(),
+                ))?;
+                event.post(CGEventTapLocation::HID);
+                Ok(())
+            }
+            ComputerUseAction::LeftMouseDown { x, y } => {
+                use core_graphics::event::{CGEvent, CGEventTapLocation, CGEventType, CGMouseButton};
+                use core_graphics::geometry::CGPoint;
+                let event = CGEvent::new_mouse_event(
+                    self.source.clone(),
+                    CGEventType::LeftMouseDown,
+                    CGPoint { x: x as f64, y: y as f64 },
+                    CGMouseButton::Left,
+                )
+                .map_err(|()| PlatformError::PlatformCallFailed("LeftMouseDown failed".into()))?;
+                event.post(CGEventTapLocation::HID);
+                Ok(())
+            }
+            ComputerUseAction::LeftMouseUp { x, y } => {
+                use core_graphics::event::{CGEvent, CGEventTapLocation, CGEventType, CGMouseButton};
+                use core_graphics::geometry::CGPoint;
+                let event = CGEvent::new_mouse_event(
+                    self.source.clone(),
+                    CGEventType::LeftMouseUp,
+                    CGPoint { x: x as f64, y: y as f64 },
+                    CGMouseButton::Left,
+                )
+                .map_err(|()| PlatformError::PlatformCallFailed("LeftMouseUp failed".into()))?;
+                event.post(CGEventTapLocation::HID);
+                Ok(())
+            }
+            ComputerUseAction::LeftClickDrag { from, to, .. } => {
+                use core_graphics::event::{CGEvent, CGEventTapLocation, CGEventType, CGMouseButton};
+                use core_graphics::geometry::CGPoint;
+                // Press at `from`.
+                {
+                    let down = CGEvent::new_mouse_event(
+                        self.source.clone(),
+                        CGEventType::LeftMouseDown,
+                        CGPoint { x: from.x, y: from.y },
+                        CGMouseButton::Left,
+                    )
+                    .map_err(|()| PlatformError::PlatformCallFailed("drag down failed".into()))?;
+                    down.post(CGEventTapLocation::HID);
+                }
+                // Drag through several intermediate points (more reliable than
+                // a single jump for apps that watch dragged events).
+                let steps = 16;
+                for i in 1..=steps {
+                    let t = (i as f64) / (steps as f64);
+                    let p = CGPoint {
+                        x: from.x + (to.x - from.x) * t,
+                        y: from.y + (to.y - from.y) * t,
+                    };
+                    {
+                        let drag = CGEvent::new_mouse_event(
+                            self.source.clone(),
+                            CGEventType::LeftMouseDragged,
+                            p,
+                            CGMouseButton::Left,
+                        )
+                        .map_err(|()| PlatformError::PlatformCallFailed("drag step failed".into()))?;
+                        drag.post(CGEventTapLocation::HID);
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(8)).await;
+                }
+                // Release at `to`.
+                {
+                    let up = CGEvent::new_mouse_event(
+                        self.source.clone(),
+                        CGEventType::LeftMouseUp,
+                        CGPoint { x: to.x, y: to.y },
+                        CGMouseButton::Left,
+                    )
+                    .map_err(|()| PlatformError::PlatformCallFailed("drag up failed".into()))?;
+                    up.post(CGEventTapLocation::HID);
+                }
+                Ok(())
+            }
+            ComputerUseAction::Screenshot { .. } | ComputerUseAction::Zoom { .. } => {
+                Err(PlatformError::NotImplemented)
+            }
         }
     }
 
@@ -260,6 +375,25 @@ impl PlatformInput for MacInput {
     }
 
     async fn release_all(&self) -> Result<()> {
-        Err(PlatformError::NotImplemented)
+        use core_graphics::event::{CGEvent, CGEventTapLocation, CGEventType, CGMouseButton};
+        use core_graphics::geometry::CGPoint;
+        // Force-release all mouse buttons at current position.
+        let pos = self.get_cursor_position().await?;
+        for btn in [CGMouseButton::Left, CGMouseButton::Right, CGMouseButton::Center] {
+            let up_type = match btn {
+                CGMouseButton::Left => CGEventType::LeftMouseUp,
+                CGMouseButton::Right => CGEventType::RightMouseUp,
+                _ => CGEventType::OtherMouseUp,
+            };
+            if let Ok(event) = CGEvent::new_mouse_event(
+                self.source.clone(),
+                up_type,
+                CGPoint { x: pos.x, y: pos.y },
+                btn,
+            ) {
+                event.post(CGEventTapLocation::HID);
+            }
+        }
+        Ok(())
     }
 }
