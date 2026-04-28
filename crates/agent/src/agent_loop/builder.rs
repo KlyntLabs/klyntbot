@@ -468,6 +468,21 @@ impl AgentLoopBuilder {
                                 )
                                     as Arc<dyn cognitive::pipeline::DeepConsolidationHandler>
                             }),
+                            graph_link_handler: self.cognitive_provider.as_ref().map(|cp| {
+                                let model = config.cognitive.graph_linker_model.clone()
+                                    .unwrap_or_else(|| config.cognitive.model.clone().unwrap_or_else(|| "default".into()));
+                                let params = providers::ChatParams::new(&model)
+                                    .with_max_tokens(2048)
+                                    .with_temperature(0.1)
+                                    .with_response_format(providers::ResponseFormat::JsonObject);
+                                Arc::new(
+                                    crate::adapters::cognitive_handlers::LlmGraphLinkHandler::new(
+                                        cp.clone(),
+                                        params,
+                                    ),
+                                )
+                                    as Arc<dyn cognitive::services::graph_linker::GraphLinkHandler>
+                            }),
                         },
                     );
                     info!("Cognitive background consolidation service started");

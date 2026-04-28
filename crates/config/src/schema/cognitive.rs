@@ -33,6 +33,11 @@ pub struct CognitiveConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
 
+    /// Model used for the per-turn graph linker (KCA Track 2). Defaults to `model` when absent.
+    /// Override to a cheaper model (Haiku 4.5, Kimi K2) for cost; the linker is fire-and-forget.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub graph_linker_model: Option<String>,
+
     /// Enable dynamic fact retrieval using vector search (default: true).
     #[serde(default = "default_dynamic_facts_enabled")]
     pub dynamic_facts_enabled: bool,
@@ -152,6 +157,7 @@ impl Default for CognitiveConfig {
             provider: None,
             temperature: None,
             max_tokens: None,
+            graph_linker_model: None,
             dynamic_facts_enabled: default_dynamic_facts_enabled(),
             static_fact_limit: default_static_fact_limit(),
             dynamic_fact_limit: default_dynamic_fact_limit(),
@@ -507,4 +513,27 @@ fn default_multi_query_variants() -> usize {
 }
 fn default_rerank_top_n() -> usize {
     10
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cognitive_config_accepts_graph_linker_model_override() {
+        let json = r#"{
+            "intelligenceMode": "deep",
+            "model": "claude-sonnet-4-6",
+            "graphLinkerModel": "kimi-k2"
+        }"#;
+        let cfg: CognitiveConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(cfg.graph_linker_model.as_deref(), Some("kimi-k2"));
+    }
+
+    #[test]
+    fn cognitive_config_graph_linker_model_optional() {
+        let json = r#"{"model": "claude-haiku-4-5-20251001"}"#;
+        let cfg: CognitiveConfig = serde_json::from_str(json).unwrap();
+        assert!(cfg.graph_linker_model.is_none());
+    }
 }
