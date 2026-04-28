@@ -494,7 +494,7 @@ mod dto_tests {
         };
         let dto = WireEventDto::from_replay_entry(&entry).expect("falls back to raw");
         assert_eq!(dto.kind, "toolCall");
-        assert!(dto.payload_decoded.is_none());
+        assert!(dto.payload_decoded.is_empty());
         assert_eq!(dto.raw_json, "not json");
     }
 }

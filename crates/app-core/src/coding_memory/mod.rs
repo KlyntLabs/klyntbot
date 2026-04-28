@@ -156,7 +156,7 @@ impl crate::AppCore {
             "kimi-cli" => {
                 let cfg = dirs::home_dir()
                     .ok_or_else(|| ApiError::new("INTERNAL_ERROR", "no home dir"))?
-                    .join(".config/kimi-cli/hooks.json");
+                    .join(".kimi/config.toml");
                 let binary = hook_binary_path()?;
                 if enabled {
                     tokio::task::spawn_blocking(move || {
@@ -174,7 +174,7 @@ impl crate::AppCore {
             "opencode" => {
                 let db = dirs::home_dir()
                     .ok_or_else(|| ApiError::new("INTERNAL_ERROR", "no home dir"))?
-                    .join(".local/share/opencode/opencode.sqlite");
+                    .join(".local/share/opencode/opencode.db");
                 if enabled {
                     if let Err(e) =
                         crate::coding_memory::opencode_installer::OpencodeInstaller::install(&db)
@@ -321,7 +321,7 @@ impl crate::AppCore {
             "opencode" => {
                 let db = dirs::home_dir()
                     .ok_or_else(|| ApiError::new("INTERNAL_ERROR", "no home dir"))?
-                    .join(".local/share/opencode/opencode.sqlite");
+                    .join(".local/share/opencode/opencode.db");
                 let outcome = tokio::task::spawn_blocking(move || {
                     crate::coding_memory::opencode_installer::OpencodeInstaller::diagnose(&db)
                 })

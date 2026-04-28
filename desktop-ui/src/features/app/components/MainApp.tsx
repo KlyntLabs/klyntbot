@@ -1370,6 +1370,7 @@ export default function MainApp() {
       shouldReduceTransparency,
       isWorkspaceDropActive,
       centerMode,
+      appView,
       selectedDiffPath,
       showComposer,
       activeThreadId,

@@ -29,3 +29,6 @@ core-video-rs = "0.3"
 async-trait = { workspace = true }
 platform-input = { path = "../platform-input" }
 platform-capture = { path = "../platform-capture" }
+
+[dev-dependencies]
+tempfile.workspace = true

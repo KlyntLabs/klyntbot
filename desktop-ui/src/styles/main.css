@@ -35,6 +35,13 @@
   box-shadow: none;
 }
 
+.app.is-plugins .main {
+  grid-template-columns: 1fr;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  box-shadow: none;
+}
+
 .app.reduced-transparency .main {
   background: var(--surface-messages);
 }

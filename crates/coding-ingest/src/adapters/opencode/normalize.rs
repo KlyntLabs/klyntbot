@@ -1,108 +1,88 @@
-//! Convert opencode `MessageRow` into `AgentEventV1`.
+//! Convert opencode `MessageRow` (joined with its parts) into `AgentEventV1`.
 
-use crate::event::{AgentEventV1, AgentSource, EventKind};
+use crate::event::{AgentEventV1, AgentSource, EventKind, TokenUsage};
 use crate::scope_resolver::resolve_scope;
 use common::Result;
 use jiff::Timestamp;
 use std::path::PathBuf;
 use uuid::Uuid;
 
-use super::schema::MessageRow;
+use super::schema::{MessageData, MessageRow, PartData, PartRow};
 
-/// Convert one opencode `MessageRow` into an `AgentEventV1`.
-pub fn row_to_event(row: MessageRow) -> Result<Option<AgentEventV1>> {
-    let metadata: Option<serde_json::Value> = row
-        .metadata
-        .as_deref()
-        .and_then(|s| serde_json::from_str(s).ok());
-
-    let cwd = metadata
-        .as_ref()
-        .and_then(|m| m.get("cwd").and_then(|v| v.as_str()))
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/"));
-
-    let repo = resolve_scope(&cwd);
-    let turn_id = Some(format!("{}-{}", row.session_id, turn_bucket(row.id)));
-
-    let kind = match row.role.as_str() {
-        "system" => return Ok(None),
-        "user" => EventKind::UserPrompt {
-            text: row.content,
-            attachments: vec![],
-        },
-        "assistant" => {
-            // Use the structured tool_calls column, NOT a content-prefix heuristic.
-            if let Some(tc_json) = row.tool_calls.as_deref() {
-                if let Ok(tc_arr) = serde_json::from_str::<Vec<serde_json::Value>>(tc_json) {
-                    if let Some(first) = tc_arr.first() {
-                        let tool = first
-                            .get("name")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("unknown")
-                            .to_string();
-                        let args_preview = first
-                            .get("arguments")
-                            .and_then(|a| serde_json::to_string(a).ok())
-                            .unwrap_or_default();
-                        return Ok(Some(AgentEventV1 {
-                            id: Uuid::new_v4(),
-                            source: AgentSource::OpenCode,
-                            session_id: row.session_id,
-                            turn_id,
-                            cwd,
-                            repo,
-                            occurred_at: parse_timestamp(&row.created_at),
-                            kind: EventKind::ToolCall {
-                                tool,
-                                args_preview: args_preview.chars().take(512).collect(),
-                                ok: true,
-                                duration_ms: 0,
-                                result_preview: String::new(),
-                            },
-                        }));
-                    }
-                }
-            }
-            EventKind::AssistantMsg {
-                text: row.content,
-                truncated: false,
-                token_usage: None,
-            }
+/// Convert one opencode message (envelope + its parts) into a stream of
+/// `AgentEventV1`s. A message can produce multiple events: e.g. an assistant
+/// message with text + a tool call yields a `ToolCall` event AND an
+/// `AssistantMsg` event.
+pub fn message_to_events(message: MessageRow, parts: Vec<PartRow>) -> Result<Vec<AgentEventV1>> {
+    let envelope: MessageData = match serde_json::from_str(&message.data) {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(error = %e, message_id = %message.id, "opencode message JSON parse failed");
+            return Ok(vec![]);
         }
-        "tool" => EventKind::ToolCall {
-            tool: row.tool_call_id.unwrap_or_else(|| "opencode_tool".into()),
-            args_preview: String::new(),
-            ok: true,
-            duration_ms: 0,
-            result_preview: row.content,
-        },
-        _ => return Ok(None),
     };
 
-    Ok(Some(AgentEventV1 {
-        id: Uuid::new_v4(),
-        source: AgentSource::OpenCode,
-        session_id: row.session_id,
-        turn_id,
-        cwd,
-        repo,
-        occurred_at: parse_timestamp(&row.created_at),
-        kind,
-    }))
-}
+    let cwd = envelope
+        .path
+        .as_ref()
+        .map(|p| PathBuf::from(&p.cwd))
+        .unwrap_or_else(|| PathBuf::from("/"));
+    let repo = resolve_scope(&cwd);
+    let occurred_at = Timestamp::from_millisecond(message.time_created).unwrap_or_else(|_| Timestamp::now());
 
-/// Group consecutive messages into the same logical turn. Naive: every block
-/// of N messages = one turn. Use the row id as the bucket source so that
-/// (user, assistant) pairs land together. The 1000-id stride is conservative;
-/// turn boundaries are refined post-ingest by the distiller.
-fn turn_bucket(id: i64) -> i64 {
-    id / 2 // user + assistant pair = bucket
-}
+    let mut events: Vec<AgentEventV1> = Vec::new();
+    for part in parts {
+        let body: PartData = match serde_json::from_str(&part.data) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let kind = match (envelope.role.as_str(), body) {
+            ("user", PartData::Text { text }) if !text.is_empty() => EventKind::UserPrompt {
+                text,
+                attachments: vec![],
+            },
+            ("assistant", PartData::Text { text }) if !text.is_empty() => EventKind::AssistantMsg {
+                text,
+                truncated: false,
+                token_usage: envelope.tokens.as_ref().map(|t| TokenUsage {
+                    prompt_tokens: t.input,
+                    completion_tokens: t.output,
+                    cached_tokens: t.cache.as_ref().map(|c| c.read),
+                }),
+            },
+            (_, PartData::Tool { tool, state }) => {
+                let args_preview = serde_json::to_string(&state).unwrap_or_default();
+                let args_preview = args_preview.chars().take(512).collect();
+                EventKind::ToolCall {
+                    tool: if tool.is_empty() { "opencode_tool".into() } else { tool },
+                    args_preview,
+                    ok: true,
+                    duration_ms: 0,
+                    result_preview: String::new(),
+                }
+            }
+            ("assistant", PartData::StepFinish { reason: _ }) => EventKind::AssistantMsg {
+                text: String::new(),
+                truncated: false,
+                token_usage: envelope.tokens.as_ref().map(|t| TokenUsage {
+                    prompt_tokens: t.input,
+                    completion_tokens: t.output,
+                    cached_tokens: t.cache.as_ref().map(|c| c.read),
+                }),
+            },
+            _ => continue,
+        };
+        events.push(AgentEventV1 {
+            id: Uuid::new_v4(),
+            source: AgentSource::OpenCode,
+            session_id: message.session_id.clone(),
+            turn_id: Some(message.id.clone()),
+            cwd: cwd.clone(),
+            repo: repo.clone(),
+            occurred_at,
+            kind,
+        });
+    }
 
-fn parse_timestamp(raw: &str) -> Timestamp {
-    raw.parse::<i64>()
-        .ok()
-        .and_then(|s| Timestamp::from_second(s).ok())
-        .unwrap_or_else(Timestamp::now)
+    Ok(events)
 }

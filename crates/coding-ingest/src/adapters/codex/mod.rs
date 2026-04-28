@@ -1,9 +1,21 @@
-//! Codex adapter — 5 hook events from OpenAI's Codex CLI.
+//! Codex adapter — JSONL session-log poller.
 //!
-//! Codex emits JSON via shell hooks configured in its TOML settings.
+//! Codex CLI has no general-purpose hook system (only a single-fire `[notify]`
+//! command). Instead, codex writes rich per-session rollout JSONL files at
+//! `~/.codex/sessions/<YYYY>/<MM>/<DD>/rollout-<ts>-<sessionId>.jsonl`. We
+//! tail those files in [`poller`] and emit `AgentEvent`s.
+//!
+//! The legacy `dispatch` and `payload` modules below are retained as dead
+//! code — the `IngestAdapter::parse` impl on `CodexAdapter` is preserved so
+//! `klyntbot-hook codex <event>` invocations still type-check, but those
+//! paths are unused at runtime since the installer no longer writes any
+//! hook entries to codex's `config.toml`.
 
+#[allow(dead_code)]
 mod dispatch;
+#[allow(dead_code)]
 mod payload;
+pub mod poller;
 
 use super::IngestAdapter;
 use crate::event::{AgentEvent, AgentEventV1, AgentSource, EventKind, TokenUsage};

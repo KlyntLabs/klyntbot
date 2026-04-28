@@ -3,15 +3,11 @@
 use app_core::coding_memory::codex_installer::CodexInstaller;
 
 #[test]
-fn install_writes_managed_hooks_block_to_toml() {
+fn install_is_noop_when_no_config_exists() {
     let tmp = tempfile::tempdir().unwrap();
     let cfg = tmp.path().join("config.toml");
     CodexInstaller::install(&cfg, std::path::Path::new("/usr/local/bin/hook")).unwrap();
-    let body = std::fs::read_to_string(&cfg).unwrap();
-    assert!(body.contains("klyntbot-managed:start"));
-    assert!(body.contains("klyntbot-managed:end"));
-    assert!(body.contains("event = \"session.start\""));
-    assert!(body.contains("event = \"session.end\""));
+    assert!(!cfg.exists(), "codex install must not create config; it is poll-only");
 }
 
 #[test]

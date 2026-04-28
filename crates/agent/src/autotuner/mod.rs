@@ -635,7 +635,30 @@ impl AutoTunerOrchestrator {
             .list()
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("cron list failed: {e}")))?;
-        if existing.iter().any(|r| r.name == JOB_AUTOTUNER_NIGHTLY) {
+        if let Some(row) = existing.iter().find(|r| r.name == JOB_AUTOTUNER_NIGHTLY) {
+            // If the schedule changed (e.g. 5-field → 6-field fix), update the row.
+            let current_expr = row
+                .schedule
+                .get("expr")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if current_expr == schedule_expr {
+                return Ok(());
+            }
+            let mut updated = row.clone();
+            updated.schedule = serde_json::to_value(&CronSchedule::Cron {
+                expr: schedule_expr.to_string(),
+                tz: None,
+            })
+            .expect("CronSchedule serialization is infallible");
+            updated.updated_at_ms = Timestamp::now().as_millisecond();
+            cron_repo
+                .upsert(&updated)
+                .await
+                .map_err(|e| {
+                    common::KlyntbotError::Storage(format!("cron upsert failed: {e}"))
+                })?;
+            info!("updated autotuner nightly cron schedule to {schedule_expr}");
             return Ok(());
         }
 

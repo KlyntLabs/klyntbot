@@ -112,7 +112,7 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
         next.add(index);
       }
       return next;
-    }));
+    });
   }, [filtered]);
 
   const collapseAll = useCallback(() => {

@@ -1058,7 +1058,12 @@ impl AppCore {
                     ),
                 );
             let opencode_db_path = if config.coding_memory.cli.opencode.enabled {
-                dirs::home_dir().map(|h| h.join(".local/share/opencode/opencode.sqlite"))
+                dirs::home_dir().map(|h| h.join(".local/share/opencode/opencode.db"))
+            } else {
+                None
+            };
+            let codex_sessions_dir = if config.coding_memory.cli.codex.enabled {
+                dirs::home_dir().map(|h| h.join(".codex/sessions"))
             } else {
                 None
             };
@@ -1077,6 +1082,8 @@ impl AppCore {
                 opencode_db_path,
                 opencode_poll_interval: None,
                 kimi_wire_socket: None,
+                codex_sessions_dir,
+                codex_poll_interval: None,
             };
             match coding_ingest::daemon::spawn(daemon_cfg).await {
                 Ok(h) => Some(h),

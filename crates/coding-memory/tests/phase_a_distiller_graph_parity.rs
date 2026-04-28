@@ -20,7 +20,7 @@ async fn distiller_writes_typed_correlational_edges_by_default() {
     let fact_repo = SemanticFactRepo::new(pool.inner().clone());
     let entity_repo = EntityRepo::new(pool.inner().clone());
 
-    let _fixture = FixtureBuilder::new()
+    let fixture = FixtureBuilder::new()
         .with_user_prompt("what testing tool do we use?")
         .with_assistant_msg("We use cargo-nextest for Rust tests in klyntbot.")
         .build();
@@ -57,7 +57,7 @@ async fn distiller_linker_handler_can_be_wired() {
     let fact_repo = SemanticFactRepo::new(pool.inner().clone());
     let entity_repo = EntityRepo::new(pool.inner().clone());
 
-    let fixture = FixtureBuilder::new()
+    let _fixture = FixtureBuilder::new()
         .with_user_prompt("what language is klyntbot written in?")
         .with_assistant_msg("klyntbot is written in Rust.")
         .build();

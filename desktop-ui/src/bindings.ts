@@ -383,6 +383,22 @@ async codingMemorySessionReplay(sessionId: string | null, limit: number | null, 
     else return { status: "error", error: e  as any };
 }
 },
+async codingMemorySessionList(args: SessionListArgs) : Promise<Result<SessionSummaryDto[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_session_list", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemorySessionReplayTyped(sessionId: string, limit: number | null, offset: number | null) : Promise<Result<WireEventDto[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_session_replay_typed", { sessionId, limit, offset }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async codingMemoryEnableCli(cli: string) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_memory_enable_cli", { cli }) };
@@ -402,6 +418,14 @@ async codingMemoryDisableCli(cli: string) : Promise<Result<null, ApiError>> {
 async codingMemoryDiagnoseCli(cli: string) : Promise<Result<DiagnoseResult, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_memory_diagnose_cli", { cli }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryInstallGitHook(repoRoot: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_install_git_hook", { repoRoot }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1600,6 +1624,14 @@ async launcherPin(itemId: string, kind: string) : Promise<Result<null, ApiError>
 async launcherUnpin(itemId: string, kind: string) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("launcher_unpin", { itemId, kind }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherRebuildAttention() : Promise<Result<number, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_rebuild_attention") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -4796,10 +4828,30 @@ export type SessionBlock = { contextType: string; totalDurationMins: number; ses
  */
 export type SessionContextInput = { entityKind: string | null; entityId: string | null; contextType: string | null; isEphemeral: boolean | null; squadId: string | null }
 /**
+ * Filters for `coding_memory_session_list`.
+ */
+export type SessionListArgs = { 
+/**
+ * Optional source filter (`"claudeCode" | "codex" | "kimiCli" | "openCode"`).
+ */
+source: string | null; 
+/**
+ * Optional repo id.
+ */
+repoId: string | null; 
+/**
+ * Look back N days. Defaults to 14.
+ */
+sinceDays?: number; limit?: number; offset?: number }
+/**
  * Args for `coding_memory_session_replay_recall_overlay`.
  */
 export type SessionRecallOverlayArgs = { sessionId: string; limit?: number; offset?: number }
 export type SessionReplayEntry = { id: string; source: string; sessionId: string; kind: string; occurredAt: string; payload: string }
+/**
+ * One row in the Plugins → Coding Memory session list.
+ */
+export type SessionSummaryDto = { sessionId: string; source: string; cwd: string | null; repoId: string | null; startedAt: string; lastEventAt: string; eventCount: number; turnCount: number; toolCallCount: number; errorCount: number; totalInputTokens: number; totalOutputTokens: number; totalCostUsd: number }
 export type SessionSummaryResponse = { key: string; title: string | null; conversationType: string | null; updatedAt: string }
 /**
  * Parameters for setting the active desktop view.
@@ -4937,6 +4989,20 @@ ttsLoaded: boolean }
 export type WeeklyAssessmentResponse = { id: string; weekStart: string; weekEnd: string; avgScore: number | null; totalFocusMins: number | null; totalProductiveSecs: number | null; totalDistractingSecs: number | null; topApps: string | null; summary: string | null }
 export type WeeklyStatPoint = { date: string; reviews: number; atomsCreated: number }
 export type WindowAction = "leftHalf" | "rightHalf" | "topHalf" | "bottomHalf" | "leftThird" | "centerThird" | "rightThird" | "maximize" | "center" | "restore" | { preset: string }
+/**
+ * Decoded form of `SessionReplayEntry` for the FE viewer. The original
+ * `payload` is kept as `raw_json` for the detail panel; `payload_decoded`
+ * is the parsed structured value when valid JSON.
+ */
+export type WireEventDto = { id: string; source: string; sessionId: string; kind: string; occurredAt: string; 
+/**
+ * Structured payload when `payload` parsed as JSON; empty string otherwise.
+ */
+payloadDecoded: string; 
+/**
+ * Raw JSON string (always present, exactly as stored in `ingest_event_log`).
+ */
+rawJson: string }
 export type WordBreakdown = { word: string; reading: string | null; meaning: string; partOfSpeech: string; proficiencyLevel: string | null; exampleSentence: string | null; isNew?: boolean }
 export type WorkContextDetailResponse = { context: WorkContextResponse; resources: WorkResourceResponse[]; linkedTaskIds: string[]; recentEvents: ActivityEventResponse[] }
 export type WorkContextResponse = { id: string; title: string; description: string | null; status: string; contextType: string; linkedProjectId: string | null; color: string | null; tags: string[]; confidence: number; firstSeenAt: string; lastActiveAt: string; totalDurationSecs: number; eventCount: number }
