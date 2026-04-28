@@ -8,7 +8,11 @@ use std::path::PathBuf;
 use storage::StoragePool;
 
 async fn setup_pool() -> sqlx::SqlitePool {
-    let pool = StoragePool::connect_in_memory().await.unwrap().inner().clone();
+    let pool = StoragePool::connect_in_memory()
+        .await
+        .unwrap()
+        .inner()
+        .clone();
     StoragePool::run_feature_migrations(&pool, &launcher_migrations())
         .await
         .unwrap();
@@ -20,26 +24,22 @@ async fn migrates_pins_and_frequency_to_bundle_ids() {
     let pool = setup_pool().await;
 
     // Seed: pin Safari by path (pre-migration shape).
-    sqlx::query(
-        "INSERT INTO launcher_pins (item_id, kind, position) VALUES (?1, ?2, ?3)",
-    )
-    .bind("app:/Applications/Safari.app")
-    .bind("application")
-    .bind(0)
-    .execute(&pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO launcher_pins (item_id, kind, position) VALUES (?1, ?2, ?3)")
+        .bind("app:/Applications/Safari.app")
+        .bind("application")
+        .bind(0)
+        .execute(&pool)
+        .await
+        .unwrap();
 
     // Seed: usage log entry by path.
-    sqlx::query(
-        "INSERT INTO launcher_usage_log (item_id, kind, used_at) VALUES (?1, ?2, ?3)",
-    )
-    .bind("app:/Applications/Safari.app")
-    .bind("application")
-    .bind("2026-04-28T12:00:00Z")
-    .execute(&pool)
-    .await
-    .unwrap();
+    sqlx::query("INSERT INTO launcher_usage_log (item_id, kind, used_at) VALUES (?1, ?2, ?3)")
+        .bind("app:/Applications/Safari.app")
+        .bind("application")
+        .bind("2026-04-28T12:00:00Z")
+        .execute(&pool)
+        .await
+        .unwrap();
 
     let apps = vec![AppEntry {
         name: "Safari".into(),
@@ -73,7 +73,7 @@ async fn idempotent_when_already_migrated() {
     let pool = setup_pool().await;
 
     sqlx::query("INSERT INTO launcher_pins (item_id, kind, position) VALUES (?1, ?2, ?3)")
-        .bind("app:com.apple.Safari")  // already migrated
+        .bind("app:com.apple.Safari") // already migrated
         .bind("application")
         .bind(0)
         .execute(&pool)

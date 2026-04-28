@@ -76,11 +76,17 @@ mod tests {
         let signals = new_running_signals();
         signals.insert(
             SmolStr::new("com.apple.Safari"),
-            RunningSignal { pid: 1, path: PathBuf::new() },
+            RunningSignal {
+                pid: 1,
+                path: PathBuf::new(),
+            },
         );
         signals.insert(
             SmolStr::new("com.apple.Mail"),
-            RunningSignal { pid: 2, path: PathBuf::new() },
+            RunningSignal {
+                pid: 2,
+                path: PathBuf::new(),
+            },
         );
 
         let live: std::collections::HashSet<SmolStr> =

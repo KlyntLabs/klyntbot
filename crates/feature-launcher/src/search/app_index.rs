@@ -117,12 +117,10 @@ impl AppIndex {
             .map(|(score, app)| {
                 let bid = app.bundle_id.as_ref();
 
-                let running = bid.and_then(|b| {
-                    self.running_signals.get(b).map(|r| r.value().clone())
-                });
-                let attention = bid.and_then(|b| {
-                    self.attention_signals.get(b).map(|s| s.value().clone())
-                });
+                let running =
+                    bid.and_then(|b| self.running_signals.get(b).map(|r| r.value().clone()));
+                let attention =
+                    bid.and_then(|b| self.attention_signals.get(b).map(|s| s.value().clone()));
 
                 let icon = app
                     .icon_path
@@ -392,14 +390,21 @@ mod tests {
              <plist version=\"1.0\"><dict>\n\
              <key>CFBundleIdentifier</key><string>com.example.Foo</string>\n\
              </dict></plist>\n",
-        ).unwrap();
+        )
+        .unwrap();
 
         let apps = AppIndex::walk_apps(dir.path(), 3).unwrap();
-        let apps_with_bid: Vec<_> = apps.iter().filter_map(|a| {
-            let bid = platform_macos::apps::read_bundle_id(&a.path)?;
-            Some((a.name.clone(), bid))
-        }).collect();
-        assert_eq!(apps_with_bid, vec![("Foo".to_string(), "com.example.Foo".to_string())]);
+        let apps_with_bid: Vec<_> = apps
+            .iter()
+            .filter_map(|a| {
+                let bid = platform_macos::apps::read_bundle_id(&a.path)?;
+                Some((a.name.clone(), bid))
+            })
+            .collect();
+        assert_eq!(
+            apps_with_bid,
+            vec![("Foo".to_string(), "com.example.Foo".to_string())]
+        );
     }
 
     #[test]
@@ -471,7 +476,10 @@ mod tests {
         }]);
         idx.running_signals_for_test().insert(
             SmolStr::new("com.apple.Safari"),
-            RunningSignal { pid: 99, path: "/Applications/Safari.app".into() },
+            RunningSignal {
+                pid: 99,
+                path: "/Applications/Safari.app".into(),
+            },
         );
 
         let results = idx.search("safari", 5);
@@ -523,7 +531,10 @@ mod tests {
 
         idx.running_signals_for_test().insert(
             SmolStr::new("com.apple.Safari"),
-            RunningSignal { pid: 1, path: PathBuf::new() },
+            RunningSignal {
+                pid: 1,
+                path: PathBuf::new(),
+            },
         );
         let with_running = idx.search("safari", 5)[0].score;
 
@@ -553,11 +564,17 @@ mod tests {
         }]);
         idx.running_signals_for_test().insert(
             SmolStr::new("com.apple.Safari"),
-            RunningSignal { pid: 1, path: PathBuf::new() },
+            RunningSignal {
+                pid: 1,
+                path: PathBuf::new(),
+            },
         );
 
         let results = idx.search("safari", 5);
         let subtitle = results[0].subtitle.as_deref().unwrap();
-        assert!(subtitle.contains("Running"), "subtitle must contain 'Running', got: {subtitle:?}");
+        assert!(
+            subtitle.contains("Running"),
+            "subtitle must contain 'Running', got: {subtitle:?}"
+        );
     }
 }

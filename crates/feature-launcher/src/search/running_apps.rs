@@ -29,11 +29,9 @@ impl super::SearchSource for RunningAppsSource {
     }
 
     async fn refresh(&self) {
-        let snapshot = tokio::task::spawn_blocking(|| {
-            platform_macos::apps::running_applications()
-        })
-        .await
-        .unwrap_or_default();
+        let snapshot = tokio::task::spawn_blocking(|| platform_macos::apps::running_applications())
+            .await
+            .unwrap_or_default();
 
         tracing::debug!("Running apps snapshot: {} entries", snapshot.len());
         apply_snapshot(&self.signals, &snapshot);
@@ -92,7 +90,10 @@ mod tests {
         // Pre-populate with a stale entry that the next snapshot omits.
         signals.insert(
             smol_str::SmolStr::new("com.stale.App"),
-            RunningSignal { pid: 1, path: std::path::PathBuf::new() },
+            RunningSignal {
+                pid: 1,
+                path: std::path::PathBuf::new(),
+            },
         );
 
         let snapshot = vec![
@@ -104,7 +105,7 @@ mod tests {
             },
             RunningApp {
                 name: "NoBundle".into(),
-                bundle_id: None,    // must be ignored
+                bundle_id: None, // must be ignored
                 pid: 100,
                 path: None,
             },
@@ -112,8 +113,14 @@ mod tests {
 
         apply_snapshot(&signals, &snapshot);
 
-        assert_eq!(signals.len(), 1, "stale entry dropped, no-bundle entry skipped");
-        let safari = signals.get(&smol_str::SmolStr::new("com.apple.Safari")).unwrap();
+        assert_eq!(
+            signals.len(),
+            1,
+            "stale entry dropped, no-bundle entry skipped"
+        );
+        let safari = signals
+            .get(&smol_str::SmolStr::new("com.apple.Safari"))
+            .unwrap();
         assert_eq!(safari.pid, 99);
     }
 }

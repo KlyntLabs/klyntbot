@@ -14,12 +14,12 @@ use std::sync::Arc;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
 pub use clipboard::ClipboardMonitor;
-pub use repos::*;
-pub use search::*;
-pub use services::*;
 pub use migration::migrate_app_ids_to_bundle_ids;
+pub use repos::*;
 #[doc(hidden)]
 pub use search::running_apps::apply_snapshot as apply_running_snapshot_for_bench;
+pub use search::*;
+pub use services::*;
 pub use tool::LauncherTool;
 pub use types::WindowAction;
 pub use types::*;
@@ -68,7 +68,8 @@ pub fn launcher_migrations() -> Vec<FeatureMigration> {
         FeatureMigration {
             feature_name: "launcher".to_string(),
             version: 2,
-            description: "Entity attention: decay-weighted attention seconds from activity_events".to_string(),
+            description: "Entity attention: decay-weighted attention seconds from activity_events"
+                .to_string(),
             sql: include_str!("../migrations/002_entity_attention.sql").to_string(),
         },
     ]

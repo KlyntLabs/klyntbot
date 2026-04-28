@@ -14,7 +14,11 @@ use std::sync::Arc;
 use storage::StoragePool;
 
 async fn fresh_pool() -> sqlx::SqlitePool {
-    let pool = StoragePool::connect_in_memory().await.unwrap().inner().clone();
+    let pool = StoragePool::connect_in_memory()
+        .await
+        .unwrap()
+        .inner()
+        .clone();
     StoragePool::run_feature_migrations(&pool, &launcher_migrations())
         .await
         .unwrap();
@@ -87,8 +91,14 @@ async fn safari_appears_once_with_running_and_attention_layers() {
     }
 
     let subtitle = safari[0].subtitle.as_deref().unwrap();
-    assert!(subtitle.contains("Running"), "subtitle missing 'Running': {subtitle:?}");
-    assert!(subtitle.contains("1h"), "subtitle missing '1h' (3600s): {subtitle:?}");
+    assert!(
+        subtitle.contains("Running"),
+        "subtitle missing 'Running': {subtitle:?}"
+    );
+    assert!(
+        subtitle.contains("1h"),
+        "subtitle missing '1h' (3600s): {subtitle:?}"
+    );
 
     assert_eq!(safari[0].id, "app:com.apple.Safari");
 }
@@ -145,8 +155,7 @@ async fn site_attention_still_emits_url_navigation() {
         .await
         .unwrap();
 
-    let attention =
-        AttentionSource::new(Arc::clone(&attention_repo), attention_signals);
+    let attention = AttentionSource::new(Arc::clone(&attention_repo), attention_signals);
 
     let items = attention.search("github", 10).await;
     assert_eq!(items.len(), 1);
