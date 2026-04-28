@@ -19,6 +19,49 @@ pub struct CommunityAssignment {
 /// Input: `edges` is a list of (node_a_id, node_b_id, weight).
 /// Returns community assignments for each node.
 pub fn detect_communities(edges: &[(String, String, f64)]) -> CommunityAssignment {
+    if edges.is_empty() {
+        return CommunityAssignment {
+            assignments: HashMap::new(),
+            modularity: 0.0,
+            community_count: 0,
+        };
+    }
+
+    // Outer loop: alternate Phase 1 (local moves) and Phase 2 (contraction)
+    // until no improvement.
+    let mut active_edges: Vec<(String, String, f64)> = edges.to_vec();
+    let mut node_to_origin: HashMap<String, Vec<String>> = active_edges
+        .iter()
+        .flat_map(|(a, b, _)| [a.clone(), b.clone()])
+        .map(|n| (n.clone(), vec![n]))
+        .collect();
+    let mut last_modularity = f64::NEG_INFINITY;
+
+    loop {
+        let phase1 = phase1_local_moves(&active_edges);
+        if phase1.modularity <= last_modularity + 1e-6 {
+            // Map back to original node ids.
+            return finalize(phase1, &node_to_origin);
+        }
+        last_modularity = phase1.modularity;
+
+        // Phase 2: contract — each community becomes a super-node.
+        let (contracted_edges, new_node_to_origin) =
+            contract(&active_edges, &phase1.assignments, &node_to_origin);
+        // If everything collapsed to one community, we're done.
+        if new_node_to_origin.len() <= 1 {
+            return finalize(phase1, &node_to_origin);
+        }
+        if contracted_edges.len() == active_edges.len() {
+            // No reduction — fixed point reached.
+            return finalize(phase1, &node_to_origin);
+        }
+        active_edges = contracted_edges;
+        node_to_origin = new_node_to_origin;
+    }
+}
+
+fn phase1_local_moves(edges: &[(String, String, f64)]) -> CommunityAssignment {
     let mut graph = UnGraph::<String, f64>::new_undirected();
     let mut node_map: HashMap<String, NodeIndex> = HashMap::new();
     let mut id_map: HashMap<NodeIndex, String> = HashMap::new();
@@ -185,6 +228,55 @@ pub fn detect_communities(edges: &[(String, String, f64)]) -> CommunityAssignmen
     }
 }
 
+fn contract(
+    edges: &[(String, String, f64)],
+    assignments: &HashMap<String, usize>,
+    node_to_origin: &HashMap<String, Vec<String>>,
+) -> (Vec<(String, String, f64)>, HashMap<String, Vec<String>>) {
+    let mut acc: HashMap<(String, String), f64> = HashMap::new();
+    for (a, b, w) in edges {
+        let ca = assignments.get(a).unwrap_or(&0).to_string();
+        let cb = assignments.get(b).unwrap_or(&0).to_string();
+        let (lo, hi) = if ca <= cb { (ca, cb) } else { (cb, ca) };
+        *acc.entry((lo, hi)).or_insert(0.0) += w;
+    }
+    // Keep self-loops — they contribute to super-node degrees in the next Phase 1.
+    let new_edges: Vec<(String, String, f64)> = acc
+        .into_iter()
+        .map(|((a, b), w)| (a, b, w))
+        .collect();
+
+    // Each super-node tracks which original nodes it represents.
+    let mut new_origin: HashMap<String, Vec<String>> = HashMap::new();
+    for (super_node, comm) in assignments {
+        let comm_str = comm.to_string();
+        new_origin
+            .entry(comm_str)
+            .or_default()
+            .extend(node_to_origin.get(super_node).cloned().unwrap_or_default());
+    }
+    (new_edges, new_origin)
+}
+
+fn finalize(
+    contracted: CommunityAssignment,
+    node_to_origin: &HashMap<String, Vec<String>>,
+) -> CommunityAssignment {
+    let mut out: HashMap<String, usize> = HashMap::new();
+    for (super_node, comm) in contracted.assignments {
+        if let Some(originals) = node_to_origin.get(&super_node) {
+            for orig in originals {
+                out.insert(orig.clone(), comm);
+            }
+        }
+    }
+    CommunityAssignment {
+        assignments: out,
+        modularity: contracted.modularity,
+        community_count: contracted.community_count,
+    }
+}
+
 fn calculate_modularity(
     graph: &UnGraph<String, f64>,
     community: &HashMap<NodeIndex, usize>,
@@ -255,5 +347,36 @@ mod tests {
         ];
         let result = detect_communities(&edges);
         assert!(result.modularity >= 0.0);
+    }
+
+    #[test]
+    fn phase2_contraction_finds_two_communities_in_barbell() {
+        // Two K4 cliques connected by a weak bridge edge.
+        let edges = vec![
+            // Left clique
+            ("a".into(), "b".into(), 1.0),
+            ("a".into(), "c".into(), 1.0),
+            ("a".into(), "d".into(), 1.0),
+            ("b".into(), "c".into(), 1.0),
+            ("b".into(), "d".into(), 1.0),
+            ("c".into(), "d".into(), 1.0),
+            // Bridge — weak so the two-clique partition is optimal
+            ("d".into(), "e".into(), 0.1),
+            // Right clique
+            ("e".into(), "f".into(), 1.0),
+            ("e".into(), "g".into(), 1.0),
+            ("e".into(), "h".into(), 1.0),
+            ("f".into(), "g".into(), 1.0),
+            ("f".into(), "h".into(), 1.0),
+            ("g".into(), "h".into(), 1.0),
+        ];
+        let result = detect_communities(&edges);
+        let unique: std::collections::HashSet<_> = result.assignments.values().collect();
+        assert_eq!(unique.len(), 2, "expected exactly 2 communities, got {}: {:?}", unique.len(), result.assignments);
+        // Same-clique nodes share community.
+        assert_eq!(result.assignments["a"], result.assignments["b"]);
+        assert_eq!(result.assignments["e"], result.assignments["f"]);
+        assert_ne!(result.assignments["a"], result.assignments["e"]);
+        assert!(result.modularity > 0.30, "expected modularity > 0.30, got {}", result.modularity);
     }
 }
