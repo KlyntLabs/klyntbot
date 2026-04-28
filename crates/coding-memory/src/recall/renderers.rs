@@ -65,8 +65,22 @@ pub async fn render_session_start_block(
     }
     s3.push('\n');
 
-    // Section 4 — open threads. Phase 4 stub: empty list with caveat.
-    let s4 = "### Open threads\n_(none captured this phase)_\n\n";
+    // Section 4 — open threads.
+    let threads = svc.open_threads(repo, 7, 5).await.unwrap_or_default();
+    let mut s4 = String::from("### Open threads\n");
+    if threads.is_empty() {
+        s4.push_str("_(none captured this phase)_\n");
+    } else {
+        for t in threads {
+            s4.push_str(&format!(
+                "- `{}` {}: {}\n",
+                short_id(&t.episode_id),
+                t.when,
+                crop(&t.last_user_prompt, 80)
+            ));
+        }
+    }
+    s4.push('\n');
 
     // Concatenate + global truncate.
     let full = format!("{header}{s1}{s2}{s3}{s4}*Call `recall_fetch(ids=[...])` for details.*\n");

@@ -13,6 +13,7 @@ pub mod selective_delete;
 pub mod sensitivity_filter;
 pub mod session_end;
 pub mod session_summary_repo;
+pub mod writer;
 pub mod symbol_validation;
 pub mod synth_handler;
 pub mod types;

@@ -1,10 +1,41 @@
 //! Resolve a working directory to a canonical `repo_id` string for scope
 //! filtering in the recall builders.
 
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
-/// Returns `None` when `cwd` doesn't exist; falls back to `local:<basename>`
-/// for non-git directories.
+/// Per-session scope resolver with an in-memory cache.
+pub struct ScopeResolver {
+    cache: Mutex<HashMap<PathBuf, Option<String>>>,
+}
+
+impl Default for ScopeResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ScopeResolver {
+    pub fn new() -> Self {
+        Self {
+            cache: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Resolve `cwd` to a canonical `repo_id`, caching the result.
+    pub fn resolve(&self, cwd: &Path) -> Option<String> {
+        let mut cache = self.cache.lock().unwrap();
+        if let Some(hit) = cache.get(cwd) {
+            return hit.clone();
+        }
+        let result = coding_ingest::scope_resolver::resolve_scope(cwd).map(|s| s.repo_id);
+        cache.insert(cwd.to_path_buf(), result.clone());
+        result
+    }
+}
+
+/// Stateless fallback for one-shot resolution.
 #[must_use]
 pub fn repo_id_for_cwd(cwd: &Path) -> Option<String> {
     coding_ingest::scope_resolver::resolve_scope(cwd).map(|s| s.repo_id)
@@ -26,5 +57,15 @@ mod tests {
         let out = repo_id_for_cwd(&cwd);
         assert!(out.is_some());
         assert!(out.unwrap().starts_with("local:") || !cwd.to_string_lossy().is_empty());
+    }
+
+    #[test]
+    fn resolver_caches_result() {
+        let resolver = ScopeResolver::new();
+        let cwd = std::env::temp_dir();
+        let a = resolver.resolve(&cwd);
+        let b = resolver.resolve(&cwd);
+        assert_eq!(a, b);
+        assert_eq!(resolver.cache.lock().unwrap().len(), 1);
     }
 }

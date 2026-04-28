@@ -14,6 +14,7 @@ pub mod change_history;
 pub mod dead_end;
 pub mod decision_points;
 pub mod facts_as_of;
+pub mod open_threads;
 pub mod fetch_builder;
 pub mod index_builder;
 pub mod probe;

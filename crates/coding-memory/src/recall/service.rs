@@ -127,7 +127,13 @@ impl CodingRecallService {
             limit
         };
         let scope = repo
-            .map(|r| vec![("repo".to_string(), Some(r.to_string()))])
+            .map(|r| {
+                if r == "*" {
+                    vec![("repo".to_string(), Some("*".to_string()))]
+                } else {
+                    vec![("repo".to_string(), Some(r.to_string()))]
+                }
+            })
             .unwrap_or_default();
         let scored = self
             .ums
@@ -321,6 +327,22 @@ impl CodingRecallService {
         limit: i64,
     ) -> common::Result<DecisionPointsResponse> {
         self.decision_points.list(domain, repo, limit).await
+    }
+
+    /// List open (unfinished) turn traces for the given repo and time window.
+    pub async fn open_threads(
+        &self,
+        repo: Option<&str>,
+        since_days: u32,
+        limit: usize,
+    ) -> common::Result<Vec<crate::recall::open_threads::OpenThread>> {
+        crate::recall::open_threads::list_open_threads(
+            &self.ep_repo,
+            repo,
+            since_days,
+            limit,
+        )
+        .await
     }
 
     /// Walk the causal graph from `subject` up to `depth` levels.
