@@ -8,6 +8,7 @@ type UseAppShellOrchestrationOptions = {
   shouldReduceTransparency: boolean;
   isWorkspaceDropActive: boolean;
   centerMode: "chat" | "diff";
+  appView: "home" | "chat" | "plugins";
   selectedDiffPath: string | null;
   showComposer: boolean;
   activeThreadId: string | null;
@@ -26,6 +27,7 @@ export function useAppShellOrchestration({
   shouldReduceTransparency,
   isWorkspaceDropActive,
   centerMode,
+  appView,
   selectedDiffPath,
   showComposer,
   activeThreadId,
@@ -45,7 +47,7 @@ export function useAppShellOrchestration({
     shouldReduceTransparency ? " reduced-transparency" : ""
   }${sidebarCollapsed ? " sidebar-collapsed" : ""}${
     rightPanelCollapsed ? " right-panel-collapsed" : ""
-  }${isWindows ? " is-windows" : ""}`;
+  }${appView === "plugins" ? " is-plugins" : ""}${isWindows ? " is-windows" : ""}`;
 
   const appStyle = useMemo<CSSProperties>(
     () =>
