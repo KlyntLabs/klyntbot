@@ -179,3 +179,103 @@ pub fn activate_app(pid: i32) -> bool {
 pub fn activate_app(_pid: i32) -> bool {
     false
 }
+
+/// Read `CFBundleIdentifier` from an app bundle's `Info.plist` via PlistBuddy.
+///
+/// Returns `None` if:
+/// - The app bundle has no `Contents/Info.plist`
+/// - The plist exists but has no `CFBundleIdentifier` key
+/// - PlistBuddy fails for any other reason (malformed plist, permission, …)
+///
+/// This mirrors the PlistBuddy approach used by `AppIconCache::resolve_icon_path`
+/// — keeps the call out of NSWorkspace / CFBundle Objective-C bridges, so it
+/// will not contribute to the IconServices mmap leak.
+#[cfg(target_os = "macos")]
+pub fn read_bundle_id(app_path: &Path) -> Option<String> {
+    use std::process::Command;
+
+    let plist_path = app_path.join("Contents/Info.plist");
+    if !plist_path.exists() {
+        return None;
+    }
+
+    let output = Command::new("/usr/libexec/PlistBuddy")
+        .args([
+            "-c",
+            "Print :CFBundleIdentifier",
+            &plist_path.to_string_lossy(),
+        ])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let bid = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if bid.is_empty() {
+        None
+    } else {
+        Some(bid)
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn read_bundle_id(_app_path: &Path) -> Option<String> {
+    None
+}
+
+#[cfg(test)]
+mod bundle_id_tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn make_fake_app(dir: &Path, name: &str, bundle_id: Option<&str>) -> PathBuf {
+        let app_path = dir.join(format!("{name}.app"));
+        let contents = app_path.join("Contents");
+        fs::create_dir_all(&contents).unwrap();
+        let plist = match bundle_id {
+            Some(bid) => format!(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+                 <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
+                 <plist version=\"1.0\">\n\
+                 <dict>\n\
+                 \t<key>CFBundleIdentifier</key>\n\
+                 \t<string>{bid}</string>\n\
+                 </dict>\n\
+                 </plist>\n"
+            ),
+            None => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+                     <plist version=\"1.0\"><dict></dict></plist>\n".to_string(),
+        };
+        fs::write(contents.join("Info.plist"), plist).unwrap();
+        app_path
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn reads_bundle_id_from_plist() {
+        let dir = TempDir::new().unwrap();
+        let app = make_fake_app(dir.path(), "Foo", Some("com.example.Foo"));
+        assert_eq!(read_bundle_id(&app), Some("com.example.Foo".to_string()));
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn returns_none_when_plist_lacks_identifier() {
+        let dir = TempDir::new().unwrap();
+        let app = make_fake_app(dir.path(), "NoBundle", None);
+        assert_eq!(read_bundle_id(&app), None);
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn returns_none_when_plist_missing() {
+        let dir = TempDir::new().unwrap();
+        let app = dir.path().join("Empty.app");
+        std::fs::create_dir_all(app.join("Contents")).unwrap();
+        // No Info.plist written
+        assert_eq!(read_bundle_id(&app), None);
+    }
+}
