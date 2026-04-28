@@ -65,8 +65,22 @@ pub async fn render_session_start_block(
     }
     s3.push('\n');
 
-    // Section 4 — open threads. Phase 4 stub: empty list with caveat.
-    let s4 = "### Open threads\n_(none captured this phase)_\n\n";
+    // Section 4 — open threads.
+    let threads = svc.open_threads(repo, 7, 5).await.unwrap_or_default();
+    let mut s4 = String::from("### Open threads\n");
+    if threads.is_empty() {
+        s4.push_str("_(none captured this phase)_\n");
+    } else {
+        for t in threads {
+            s4.push_str(&format!(
+                "- `{}` {}: {}\n",
+                short_id(&t.episode_id),
+                t.when,
+                crop(&t.last_user_prompt, 80)
+            ));
+        }
+    }
+    s4.push('\n');
 
     // Concatenate + global truncate.
     let full = format!("{header}{s1}{s2}{s3}{s4}*Call `recall_fetch(ids=[...])` for details.*\n");
@@ -86,9 +100,26 @@ pub async fn render_user_prompt_block(
 ) -> common::Result<String> {
     let budgeter: Arc<dyn TokenBudgeter> = default_budgeter();
 
+    // QueryPipeline enrichment — if configured, run the prompt through PRF + expansion.
+    let enhanced_query = if let Some(ref pipeline) = svc.query_pipeline() {
+        let ctx = context_engine::RetrievalContext {
+            active_skill: None,
+            active_task: None,
+            recent_user_messages: vec![query.to_string()],
+            situation: None,
+            active_view: None,
+            recent_correction: None,
+        };
+        let budget = context_engine::EnhancementBudget::normal();
+        let out = pipeline.enhance(query, &ctx, &budget).await;
+        out.query.primary
+    } else {
+        query.to_string()
+    };
+
     // Dead-end check first — placed at top if matches found.
-    let dead_ends = svc.check_dead_ends(query, repo).await?;
-    let warn = if dead_ends.aggregate_confidence > 0.5 && !dead_ends.matches.is_empty() {
+    let dead_ends = svc.check_dead_ends(&enhanced_query, repo).await?;
+    let warn = if dead_ends.aggregate_confidence > 0.7 && !dead_ends.matches.is_empty() {
         let m = &dead_ends.matches[0];
         format!(
             "### ⚠️ Heads-up\nYou previously tried **{}** ({}) — abandoned because {}.\n\n",
@@ -99,7 +130,7 @@ pub async fn render_user_prompt_block(
     };
 
     // Likely-relevant memories.
-    let idx = svc.recall_index(query, repo, None, None, 6).await?;
+    let idx = svc.recall_index(&enhanced_query, repo, None, None, 6).await?;
     let mut likely = String::from("### Likely relevant\n");
     for r in idx.results.iter().take(6) {
         likely.push_str(&format!(

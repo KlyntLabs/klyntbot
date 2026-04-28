@@ -59,6 +59,7 @@ pub struct CodingRecallService {
     #[allow(dead_code)]
     budgeter: Arc<dyn TokenBudgeter>,
     causal_repo: Option<Arc<crate::causal::CausalEdgeRepo>>,
+    query_pipeline: Option<Arc<context_engine::QueryPipeline>>,
 }
 
 impl std::fmt::Debug for CodingRecallService {
@@ -94,6 +95,7 @@ impl CodingRecallService {
             budgeter,
             config,
             causal_repo: None,
+            query_pipeline: None,
         }
     }
 
@@ -109,6 +111,18 @@ impl CodingRecallService {
     pub fn with_causal_repo(mut self, repo: Arc<crate::causal::CausalEdgeRepo>) -> Self {
         self.causal_repo = Some(repo);
         self
+    }
+
+    /// Attach a query enhancement pipeline (Phase-4 wiring).
+    #[must_use]
+    pub fn with_query_pipeline(mut self, pipeline: Arc<context_engine::QueryPipeline>) -> Self {
+        self.query_pipeline = Some(pipeline);
+        self
+    }
+
+    /// Access the optional query pipeline.
+    pub fn query_pipeline(&self) -> &Option<Arc<context_engine::QueryPipeline>> {
+        &self.query_pipeline
     }
 
     /// Layer-1 — compact index with C3 escalation.
@@ -127,21 +141,38 @@ impl CodingRecallService {
             limit
         };
         let scope = repo
-            .map(|r| vec![("repo".to_string(), Some(r.to_string()))])
+            .map(|r| {
+                if r == "*" {
+                    vec![("repo".to_string(), Some("*".to_string()))]
+                } else {
+                    vec![("repo".to_string(), Some(r.to_string()))]
+                }
+            })
             .unwrap_or_default();
         let scored = self
             .ums
             .retrieve_with_overrides(query, limit as usize, 0.0, default_weights())
             .await?;
-        let _ = (kinds, days); // Phase-4 minimum: filters left to caller-side.
-        let sims: Vec<f32> = scored.iter().map(|s| s.score as f32).collect();
-        let mut coverage = self.probe.score(&sims);
-        let verdict = self.probe.verdict(&sims);
-
         let entries: Vec<IndexEntry> = scored
             .iter()
             .map(|s| self.index_builder.from_scored_fact(s))
+            .filter(|e| match &kinds {
+                Some(allowed) if !allowed.is_empty() => allowed.iter().any(|k| k == &e.kind),
+                _ => true,
+            })
+            .filter(|e| match days {
+                Some(d) => {
+                    let cutoff = jiff::Timestamp::now()
+                        .checked_sub(jiff::ToSpan::days(d as i64))
+                        .unwrap_or_else(|_| jiff::Timestamp::MIN);
+                    e.when >= cutoff
+                }
+                None => true,
+            })
             .collect();
+        let sims: Vec<f32> = scored.iter().map(|s| s.score as f32).collect();
+        let mut coverage = self.probe.score(&sims);
+        let verdict = self.probe.verdict(&sims);
 
         // Optional escalation.
         let mut skill_used: Option<String> = None;
@@ -305,10 +336,21 @@ impl CodingRecallService {
     /// `recall_decision_points`.
     pub async fn recall_decision_points(
         &self,
+        domain: Option<&str>,
         repo: Option<&str>,
         limit: i64,
     ) -> common::Result<DecisionPointsResponse> {
-        self.decision_points.list(repo, limit).await
+        self.decision_points.list(domain, repo, limit).await
+    }
+
+    /// List open (unfinished) turn traces for the given repo and time window.
+    pub async fn open_threads(
+        &self,
+        repo: Option<&str>,
+        since_days: u32,
+        limit: usize,
+    ) -> common::Result<Vec<crate::recall::open_threads::OpenThread>> {
+        crate::recall::open_threads::list_open_threads(&self.ep_repo, repo, since_days, limit).await
     }
 
     /// Walk the causal graph from `subject` up to `depth` levels.

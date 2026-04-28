@@ -13,6 +13,6 @@ async fn empty_returns_empty_rows() {
     let svc = DecisionPointsService::new(std::sync::Arc::new(cognitive::EpisodicMemoryRepo::new(
         pool.inner().clone(),
     )));
-    let r = svc.list(Some("repo:x"), 50).await.unwrap();
+    let r = svc.list(None, Some("repo:x"), 50).await.unwrap();
     assert!(r.rows.is_empty());
 }

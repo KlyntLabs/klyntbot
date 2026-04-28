@@ -121,6 +121,8 @@ pub struct DistillerConfig {
     pub timeout: std::time::Duration,
     /// Idle-turn sweep period.
     pub idle_timeout: std::time::Duration,
+    /// Optional daily cost ceiling in USD. When set, Phase B halts if already exceeded.
+    pub cost_ceiling_usd: Option<f64>,
 }
 
 impl Default for DistillerConfig {
@@ -130,6 +132,7 @@ impl Default for DistillerConfig {
             max_input_tokens: 8000,
             timeout: std::time::Duration::from_secs(30),
             idle_timeout: std::time::Duration::from_secs(120),
+            cost_ceiling_usd: None,
         }
     }
 }
@@ -155,6 +158,8 @@ struct DistillerInner {
     event_bus: Option<Arc<bus::DomainEventBus>>,
     /// Symbol extractor for anchored_symbols population (Phase 6).
     extractor: Arc<dyn SymbolExtractor>,
+    /// Accumulated LLM cost for today (USD). Used for cost-ceiling enforcement.
+    cost_spent: std::sync::Mutex<f64>,
 }
 
 impl std::fmt::Debug for DistillerInner {
@@ -211,6 +216,7 @@ impl Distiller {
                 buffer: Mutex::new(TurnBuffer::new()),
                 event_bus: None,
                 extractor,
+                cost_spent: std::sync::Mutex::new(0.0),
             }),
         }
     }
@@ -430,6 +436,17 @@ impl Distiller {
             report.episodic_writes += 1;
         }
 
+        // Cost-ceiling guard.
+        if let Some(ceiling) = self.inner.config.cost_ceiling_usd {
+            let spent = *self.inner.cost_spent.lock().unwrap();
+            if spent >= ceiling {
+                return Err(DistillerError::CostCeiling {
+                    spent_usd: spent,
+                    ceiling_usd: ceiling,
+                }.into());
+            }
+        }
+
         // Phase B — LLM synthesis. Failures are non-fatal — Phase A already lands.
         let user_prompt_text = events
             .iter()
@@ -536,19 +553,31 @@ impl Distiller {
                                 | Some(crate::facts::FixOutcome::Abandoned)
                         )
                     {
+                        let files: Vec<std::path::PathBuf> = obs.files.clone();
+                        let anchors = if files.is_empty() {
+                            vec![]
+                        } else {
+                            let pairs: Vec<(std::path::PathBuf, i64)> =
+                                files.iter().map(|p| (p.clone(), 0i64)).collect();
+                            crate::distiller::phase_a::extract_refactor_anchors(
+                                &*self.inner.extractor,
+                                &pairs,
+                                "unknown",
+                            )
+                        };
                         let synthetic = crate::facts::FixAttempt {
                             problem_hash: crate::problem_hash::ProblemHash::of(&obs.subject)
                                 .as_str()
                                 .to_string(),
                             problem: obs.subject.clone(),
-                            files: vec![],
+                            files,
                             approach: obs.object.clone(),
                             outcome: obs.outcome.unwrap(),
                             insight: Some(obs.reasoning.clone()),
                             duration_ms: 0,
                             test_before: None,
                             test_after: None,
-                            anchored_symbols: vec![],
+                            anchored_symbols: anchors,
                             provenance: prov_llm.clone(),
                             sensitivity: crate::scope::Sensitivity::Normal,
                         };
@@ -585,7 +614,7 @@ impl Distiller {
                         .await
                         .ok()
                         .unwrap_or_default();
-                    let similar_scored: Vec<phase_c::SimilarFact> = similar
+                    let mut similar_scored: Vec<phase_c::SimilarFact> = similar
                         .into_iter()
                         .map(|f| {
                             // Simple similarity: exact object match = 1.0, else 0.5
@@ -596,6 +625,12 @@ impl Distiller {
                             }
                         })
                         .collect();
+                    similar_scored.sort_by(|a, b| {
+                        b.similarity
+                            .partial_cmp(&a.similarity)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                    similar_scored.truncate(5);
                     match reconcile(&pf.fact, &similar_scored) {
                         ReconcileDecision::Noop { predecessor_id } => {
                             let _ = self.inner.writer.bump_access(&predecessor_id).await;

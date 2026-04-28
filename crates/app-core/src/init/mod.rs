@@ -399,16 +399,22 @@ impl AppCore {
         let launcher::LauncherResult { launcher_engine } = launcher_result;
 
         // Register calendar source if productivity repos are available
-        if let (Some(engine), Some(prod_repos)) = (launcher_engine.as_ref(), productivity_repos.as_ref()) {
+        if let (Some(engine), Some(prod_repos)) =
+            (launcher_engine.as_ref(), productivity_repos.as_ref())
+        {
             if config.launcher.sources.calendar.enabled {
-                let fetcher = Arc::new(crate::handlers::launcher::calendar_fetcher_impl::AppCalendarFetcher::new(
-                    Arc::new(prod_repos.clone()),
-                ));
-                engine.registry.register(Arc::new(feature_launcher::CalendarSource::new(
-                    fetcher,
-                    config.launcher.sources.calendar.lookback_days,
-                    config.launcher.sources.calendar.lookahead_days,
-                )));
+                let fetcher = Arc::new(
+                    crate::handlers::launcher::calendar_fetcher_impl::AppCalendarFetcher::new(
+                        Arc::new(prod_repos.clone()),
+                    ),
+                );
+                engine
+                    .registry
+                    .register(Arc::new(feature_launcher::CalendarSource::new(
+                        fetcher,
+                        config.launcher.sources.calendar.lookback_days,
+                        config.launcher.sources.calendar.lookahead_days,
+                    )));
             }
         }
 
@@ -1044,6 +1050,11 @@ impl AppCore {
                         symbol_extractor.clone(),
                     ),
                 );
+            let opencode_db_path = if config.coding_memory.cli.opencode.enabled {
+                dirs::home_dir().map(|h| h.join(".local/share/opencode/opencode.sqlite"))
+            } else {
+                None
+            };
             let daemon_cfg = coding_ingest::daemon::IngestDaemonConfig {
                 socket_path: data_dir.join("ingest.sock"),
                 buffer_path: data_dir.join("ingest-buffer.jsonl"),
@@ -1056,6 +1067,8 @@ impl AppCore {
                     crate::coding_memory::recall::RecallOpHandler::new(recall.clone()),
                 )),
                 git_invalidation_handler: Some(git_handler),
+                opencode_db_path,
+                opencode_poll_interval: None,
             };
             match coding_ingest::daemon::spawn(daemon_cfg).await {
                 Ok(h) => Some(h),

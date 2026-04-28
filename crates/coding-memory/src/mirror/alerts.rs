@@ -26,6 +26,8 @@ pub enum CodingMirrorAlertKind {
     ProvenanceMissing,
     /// > 50 pending distillations — LLM provider probably down.
     DistillerQueueBacklog,
+    /// Retrieval skill effectiveness dropped below threshold.
+    RetrievalSkillIneffective,
 }
 
 impl CodingMirrorAlertKind {
@@ -44,6 +46,7 @@ impl CodingMirrorAlertKind {
             Self::StaleFactDetected => "stale_fact_detected",
             Self::ProvenanceMissing => "provenance_missing",
             Self::DistillerQueueBacklog => "distiller_queue_backlog",
+            Self::RetrievalSkillIneffective => "retrieval_skill_ineffective",
         }
     }
 }

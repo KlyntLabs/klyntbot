@@ -41,6 +41,10 @@ pub enum DistillerError {
     /// A transient failure — caller should retry on next cycle.
     #[error("transient: {detail}")]
     Transient { detail: String },
+
+    /// Daily cost ceiling exceeded.
+    #[error("cost ceiling exceeded: spent {spent_usd} of {ceiling_usd}")]
+    CostCeiling { spent_usd: f64, ceiling_usd: f64 },
 }
 
 impl From<DistillerError> for common::KlyntbotError {

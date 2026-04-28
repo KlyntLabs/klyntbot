@@ -16,6 +16,7 @@ pub mod decision_points;
 pub mod facts_as_of;
 pub mod fetch_builder;
 pub mod index_builder;
+pub mod open_threads;
 pub mod probe;
 pub mod renderers;
 pub mod scope_resolve;

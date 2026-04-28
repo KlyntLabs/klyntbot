@@ -118,8 +118,8 @@ impl super::SearchSource for ContentGrepSource {
                 score: 0.7,
                 no_view: false,
                 arguments: vec![],
-                            pinned: false,
-                });
+                pinned: false,
+            });
         }
 
         results

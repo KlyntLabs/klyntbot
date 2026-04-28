@@ -116,7 +116,7 @@ impl SymbolValidationPhase {
                 self.invalidate_fact(&id).await?;
                 outcome.invalidated += 1;
             } else if any_modified {
-                self.mark_stale(&id, &meta_str).await?;
+                self.mark_needs_review(&id, &meta_str).await?;
                 outcome.marked_stale += 1;
             } else {
                 outcome.untouched += 1;
@@ -139,12 +139,12 @@ impl SymbolValidationPhase {
         Ok(())
     }
 
-    async fn mark_stale(&self, id: &str, meta: &str) -> common::Result<()> {
+    async fn mark_needs_review(&self, id: &str, meta: &str) -> common::Result<()> {
         let mut parsed: serde_json::Value = meta.parse().unwrap_or(serde_json::json!({}));
         if let Some(obj) = parsed.as_object_mut() {
             obj.insert(
                 "status".into(),
-                serde_json::Value::String("stale_candidate".into()),
+                serde_json::Value::String("needs_review".into()),
             );
         }
         sqlx::query("UPDATE semantic_facts SET metadata = ?1 WHERE id = ?2")
@@ -152,7 +152,7 @@ impl SymbolValidationPhase {
             .bind(id)
             .execute(self.fact_repo.pool())
             .await
-            .map_err(|e| common::KlyntbotError::Storage(format!("mark stale: {e}")))?;
+            .map_err(|e| common::KlyntbotError::Storage(format!("mark needs_review: {e}")))?;
         Ok(())
     }
 }

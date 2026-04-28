@@ -16,6 +16,7 @@ pub mod session_summary_repo;
 pub mod symbol_validation;
 pub mod synth_handler;
 pub mod types;
+pub mod writer;
 
 pub use coding_synthesis::CodingSynthesisPhase;
 pub use cross_session_dedup::CrossSessionDedup;

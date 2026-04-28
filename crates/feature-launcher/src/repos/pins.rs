@@ -1,7 +1,7 @@
+use common::Result;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use storage::StoragePool;
-use common::Result;
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, specta::Type)]
 pub struct Pin {
@@ -16,7 +16,9 @@ pub struct PinsRepo {
 
 impl PinsRepo {
     pub fn new(pool: &StoragePool) -> Self {
-        Self { pool: pool.inner().clone() }
+        Self {
+            pool: pool.inner().clone(),
+        }
     }
 
     pub async fn pin(&self, item_id: &str, kind: &str) -> Result<()> {
@@ -24,28 +26,42 @@ impl PinsRepo {
             "INSERT OR IGNORE INTO launcher_pins (item_id, kind, position) \
              VALUES (?, ?, COALESCE((SELECT MAX(position) FROM launcher_pins), -1) + 1)",
         )
-        .bind(item_id).bind(kind)
-        .execute(&self.pool).await.map_err(storage::StorageError::from)?;
+        .bind(item_id)
+        .bind(kind)
+        .execute(&self.pool)
+        .await
+        .map_err(storage::StorageError::from)?;
         Ok(())
     }
 
     pub async fn unpin(&self, item_id: &str, kind: &str) -> Result<()> {
         sqlx::query("DELETE FROM launcher_pins WHERE item_id = ? AND kind = ?")
-            .bind(item_id).bind(kind)
-            .execute(&self.pool).await.map_err(storage::StorageError::from)?;
+            .bind(item_id)
+            .bind(kind)
+            .execute(&self.pool)
+            .await
+            .map_err(storage::StorageError::from)?;
         Ok(())
     }
 
     pub async fn list_pinned(&self) -> Result<Vec<Pin>> {
-        let pins = sqlx::query_as::<_, Pin>("SELECT item_id, kind, position FROM launcher_pins ORDER BY position ASC")
-            .fetch_all(&self.pool).await.map_err(storage::StorageError::from)?;
+        let pins = sqlx::query_as::<_, Pin>(
+            "SELECT item_id, kind, position FROM launcher_pins ORDER BY position ASC",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage::StorageError::from)?;
         Ok(pins)
     }
 
     pub async fn is_pinned(&self, item_id: &str, kind: &str) -> Result<bool> {
-        let row: Option<(i64,)> = sqlx::query_as("SELECT 1 FROM launcher_pins WHERE item_id = ? AND kind = ? LIMIT 1")
-            .bind(item_id).bind(kind)
-            .fetch_optional(&self.pool).await.map_err(storage::StorageError::from)?;
+        let row: Option<(i64,)> =
+            sqlx::query_as("SELECT 1 FROM launcher_pins WHERE item_id = ? AND kind = ? LIMIT 1")
+                .bind(item_id)
+                .bind(kind)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(storage::StorageError::from)?;
         Ok(row.is_some())
     }
 
@@ -62,7 +78,9 @@ mod tests {
 
     async fn setup() -> StoragePool {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        StoragePool::run_feature_migrations(pool.inner(), &crate::launcher_migrations()).await.unwrap();
+        StoragePool::run_feature_migrations(pool.inner(), &crate::launcher_migrations())
+            .await
+            .unwrap();
         pool
     }
 
@@ -70,8 +88,12 @@ mod tests {
     async fn pin_and_list() {
         let pool = setup().await;
         let repo = PinsRepo::new(&pool);
-        repo.pin("app:/Applications/Slack.app", "application").await.unwrap();
-        repo.pin("app:/Applications/VSCode.app", "application").await.unwrap();
+        repo.pin("app:/Applications/Slack.app", "application")
+            .await
+            .unwrap();
+        repo.pin("app:/Applications/VSCode.app", "application")
+            .await
+            .unwrap();
         let pins = repo.list_pinned().await.unwrap();
         assert_eq!(pins.len(), 2);
         assert_eq!(pins[0].position, 0);

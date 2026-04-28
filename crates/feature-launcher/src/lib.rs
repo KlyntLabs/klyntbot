@@ -39,7 +39,9 @@ impl LauncherFeature {
     }
 
     pub fn with_tool_deps(deps: LauncherToolDeps) -> Self {
-        Self { tool_deps: Some(deps) }
+        Self {
+            tool_deps: Some(deps),
+        }
     }
 }
 

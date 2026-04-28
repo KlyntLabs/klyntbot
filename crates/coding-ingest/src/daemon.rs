@@ -28,6 +28,10 @@ pub struct IngestDaemonConfig {
     pub op_handler: Option<Arc<dyn OpHandler>>,
     /// Optional Phase-6 git-invalidation handler.
     pub git_invalidation_handler: Option<Arc<dyn crate::git_invalidation::GitInvalidationHandler>>,
+    /// Optional opencode SQLite DB path. When set, a poller task is spawned.
+    pub opencode_db_path: Option<PathBuf>,
+    /// Polling interval for opencode. Defaults to 500 ms.
+    pub opencode_poll_interval: Option<std::time::Duration>,
 }
 
 impl std::fmt::Debug for IngestDaemonConfig {
@@ -53,6 +57,8 @@ pub struct IngestDaemonHandle {
     heartbeat_task: tokio::task::JoinHandle<()>,
     #[allow(dead_code)]
     drain_task: tokio::task::JoinHandle<()>,
+    #[allow(dead_code)]
+    opencode_task: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl IngestDaemonHandle {
@@ -66,6 +72,10 @@ impl IngestDaemonHandle {
         let _ = self.heartbeat_task.await;
         self.drain_task.abort();
         let _ = self.drain_task.await;
+        if let Some(t) = self.opencode_task {
+            t.abort();
+            let _ = t.await;
+        }
     }
 }
 
@@ -149,11 +159,26 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
         }
     });
 
+    // Opencode poller task — optional, spawned when db path is configured.
+    let opencode_task = if let Some(db_path) = cfg.opencode_db_path {
+        let interval = cfg.opencode_poll_interval.unwrap_or(std::time::Duration::from_millis(500));
+        if let Some(tx) = cfg.event_tx {
+            let poller = crate::adapters::opencode::poller::OpencodePoller::new(db_path, tx, interval);
+            Some(poller.spawn())
+        } else {
+            tracing::warn!("opencode db path set but no event_tx — poller not spawned");
+            None
+        }
+    } else {
+        None
+    };
+
     Ok(IngestDaemonHandle {
         shutdown_tx: Some(shutdown_tx),
         accept_task,
         heartbeat_task,
         drain_task,
+        opencode_task,
     })
 }
 

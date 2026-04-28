@@ -7,8 +7,8 @@ use tempfile::TempDir;
 
 fn seed_tree(root: &std::path::Path, files: usize) {
     let words = [
-        "report", "notes", "todo", "design", "spec", "draft", "image", "video",
-        "config", "main", "lib", "test", "bench", "data", "log", "readme",
+        "report", "notes", "todo", "design", "spec", "draft", "image", "video", "config", "main",
+        "lib", "test", "bench", "data", "log", "readme",
     ];
     let exts = ["md", "rs", "ts", "json", "txt", "py"];
     for i in 0..files {

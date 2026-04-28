@@ -222,6 +222,12 @@ impl AutoTunerHook for AutoTunerHookImpl {
     }
 }
 
+/// Derive session_type tag from scope information.
+pub fn derive_session_type(_scope_repo_id: Option<&str>) -> Option<String> {
+    // When scope_repo_id is present, the session is coding-scoped.
+    _scope_repo_id.map(|_| "coding".to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

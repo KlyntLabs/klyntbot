@@ -1,0 +1,6 @@
+{"event":"SessionStart","session_id":"codex-s1","cwd":"/tmp/test-repo","model":"gpt-4.1","source":"cli-arg"}
+{"event":"UserPromptSubmit","session_id":"codex-s1","turn_id":"t1","cwd":"/tmp/test-repo","prompt":"fix the auth bug"}
+{"event":"ToolUse","session_id":"codex-s1","turn_id":"t1","cwd":"/tmp/test-repo","tool_name":"read","tool_input":{"file_path":"src/auth.rs"},"tool_response":{"content":"..."},"duration_ms":120}
+{"event":"ToolUse","session_id":"codex-s1","turn_id":"t1","cwd":"/tmp/test-repo","tool_name":"edit","tool_input":{"file_path":"src/auth.rs","old_string":"fn login() {","new_string":"fn login() -> Result<()> {"},"tool_response":{"ok":true},"duration_ms":200}
+{"event":"AssistantResponse","session_id":"codex-s1","turn_id":"t1","cwd":"/tmp/test-repo","text":"Fixed the auth bug by adding proper error handling.","token_usage":{"prompt_tokens":150,"completion_tokens":80}}
+{"event":"SessionEnd","session_id":"codex-s1","cwd":"/tmp/test-repo","reason":"success"}

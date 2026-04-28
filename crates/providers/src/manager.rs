@@ -304,6 +304,24 @@ impl ProviderManager {
     }
 }
 
+impl ProviderManager {
+    /// Call `chat` with an explicit provider role.
+    ///
+    /// Currently routes to the default provider; future work can resolve
+    /// role-specific providers via a registry.
+    pub async fn chat_with_role(
+        &self,
+        role: crate::ProviderRole,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+        params: &ChatParams,
+    ) -> Result<LlmResponse> {
+        let mut params = params.clone();
+        params.role = Some(role);
+        self.chat(messages, tools, &params).await
+    }
+}
+
 #[async_trait]
 impl LlmProvider for ProviderManager {
     async fn chat(

@@ -186,8 +186,12 @@ pub async fn invoke_llm(inv: LlmInvocation<'_>) -> Result<Vec<Observation>, Dist
         .with_temperature(0.2)
         .with_max_tokens(1024);
 
-    use providers::LlmProvider;
-    let fut = inv.provider.chat(&messages, tools.as_deref(), &params);
+    let fut = inv.provider.chat_with_role(
+        providers::ProviderRole::Distiller,
+        &messages,
+        tools.as_deref(),
+        &params,
+    );
     let resp = tokio::time::timeout(inv.timeout, fut)
         .await
         .map_err(|_| DistillerError::LlmTimeout {

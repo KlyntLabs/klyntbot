@@ -105,8 +105,8 @@ impl SystemCommands {
                     score: 0.5,
                     no_view: cmd.no_view,
                     arguments: arg_specs(cmd.arguments),
-                                    pinned: false,
-                    })
+                    pinned: false,
+                })
                 .collect();
         }
 
@@ -156,13 +156,16 @@ impl SystemCommands {
                 score: (score as f64) / 1000.0 * 1.0,
                 no_view: cmd.no_view,
                 arguments: arg_specs(cmd.arguments),
-                            pinned: false,
-                })
+                pinned: false,
+            })
             .collect()
     }
 
     #[cfg(target_os = "macos")]
-    pub async fn execute(action: &SystemAction, _duration: Option<std::time::Duration>) -> common::Result<()> {
+    pub async fn execute(
+        action: &SystemAction,
+        _duration: Option<std::time::Duration>,
+    ) -> common::Result<()> {
         use std::process::Command;
         match action {
             SystemAction::LockScreen => {
@@ -209,7 +212,10 @@ impl SystemCommands {
     }
 
     #[cfg(not(target_os = "macos"))]
-    pub async fn execute(_action: &SystemAction, _duration: Option<std::time::Duration>) -> common::Result<()> {
+    pub async fn execute(
+        _action: &SystemAction,
+        _duration: Option<std::time::Duration>,
+    ) -> common::Result<()> {
         Err(common::KlyntbotError::Io(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
             "System commands only supported on macOS",

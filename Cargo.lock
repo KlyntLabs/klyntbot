@@ -2452,6 +2452,7 @@ dependencies = [
  "globset",
  "jiff",
  "once_cell",
+ "proptest",
  "serde",
  "serde_json",
  "sqlx",

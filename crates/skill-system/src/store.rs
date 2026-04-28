@@ -50,6 +50,12 @@ pub struct SkillFrontmatter {
     pub when_to_use: Option<String>,
     #[serde(default)]
     pub references: Vec<String>,
+    /// Optional scope filter — e.g. `"coding"` or `"finance"`.
+    #[serde(default)]
+    pub scope: Option<String>,
+    /// Optional repository ID for scope-aware filtering.
+    #[serde(default, rename = "scope_repo_id")]
+    pub scope_repo_id: Option<String>,
 }
 
 /// A loaded skill — frontmatter + body.
@@ -151,6 +157,20 @@ impl SkillStore {
     /// Get the full body of a skill (for skill_reference tool).
     pub fn get_body(&self, name: &str) -> Option<&str> {
         self.entries.get(name).map(|e| e.body.as_str())
+    }
+
+    /// List skills filtered by scope or repo. Pass `None` to get global skills.
+    pub fn list_for_scope(&self, scope: Option<&str>) -> Vec<&SkillEntry> {
+        self.entries
+            .values()
+            .filter(|e| match scope {
+                Some(s) => {
+                    e.frontmatter.scope.as_deref() == Some(s)
+                        || e.frontmatter.scope_repo_id.as_deref() == Some(s)
+                }
+                None => e.frontmatter.scope.is_none() && e.frontmatter.scope_repo_id.is_none(),
+            })
+            .collect()
     }
 
     /// Format the skill listing for the system prompt.
@@ -300,6 +320,8 @@ mod tests {
                     description: "Test skill".to_string(),
                     when_to_use: Some("When testing".to_string()),
                     references: vec![],
+                    scope: None,
+                    scope_repo_id: None,
                 },
                 body: "Body".to_string(),
                 path: PathBuf::from("test.md"),

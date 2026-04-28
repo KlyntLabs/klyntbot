@@ -9,7 +9,9 @@ use crate::skill_evolver::{
 };
 use async_trait::async_trait;
 use common::{KlyntbotError, Result};
+use providers::{ProviderManager, ProviderRole};
 use std::path::PathBuf;
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// Where a project skill is stored.
@@ -59,18 +61,40 @@ pub struct SkillSynthesisResult {
 }
 
 /// Real Phase-5 implementation of [`ProjectSkillEvolver`].
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ProjectSkillEvolverImpl {
     /// Storage pool for DB queries.
     pool: storage::StoragePool,
     /// Base directory for private skill storage.
     base_dir: PathBuf,
+    /// Optional provider manager for LLM-drafted SKILL.md content.
+    provider_manager: Option<Arc<ProviderManager>>,
+}
+
+impl std::fmt::Debug for ProjectSkillEvolverImpl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProjectSkillEvolverImpl")
+            .field("base_dir", &self.base_dir)
+            .field("has_provider", &self.provider_manager.is_some())
+            .finish()
+    }
 }
 
 impl ProjectSkillEvolverImpl {
-    /// Create a new evolver.
+    /// Create a new evolver without LLM drafting (tests, offline mode).
     pub fn new(pool: storage::StoragePool, base_dir: PathBuf) -> Self {
-        Self { pool, base_dir }
+        Self {
+            pool,
+            base_dir,
+            provider_manager: None,
+        }
+    }
+
+    /// Attach a provider manager for LLM-drafted skills.
+    #[must_use]
+    pub fn with_provider_manager(mut self, pm: Arc<ProviderManager>) -> Self {
+        self.provider_manager = Some(pm);
+        self
     }
 }
 
@@ -82,16 +106,34 @@ impl ProjectSkillEvolver for ProjectSkillEvolverImpl {
 
         for candidate in candidates {
             let skill_id = crate::skill_evolver::write::sanitize(&candidate.rule_text);
+
+            // LLM-draft the SKILL.md body when a provider is available.
+            let drafted_body = if let Some(ref pm) = self.provider_manager {
+                draft_skill_md(pm, &candidate.rule_text).await.ok()
+            } else {
+                None
+            };
+
+            let (name, description, procedure) = if let Some(ref body) = drafted_body {
+                parse_skill_frontmatter(body, &candidate.rule_text)
+            } else {
+                (
+                    candidate.rule_text.clone(),
+                    format!(
+                        "Auto-detected workflow pattern (confidence {:.0}%)",
+                        candidate.confidence * 100.0
+                    ),
+                    candidate.rule_text.clone(),
+                )
+            };
+
             let spec = ProjectSkillSpec {
                 skill_id: skill_id.clone(),
                 repo_id: repo_id.to_string(),
-                name: candidate.rule_text.clone(),
-                description: format!(
-                    "Auto-detected workflow pattern (confidence {:.0}%)",
-                    candidate.confidence * 100.0
-                ),
+                name,
+                description,
                 when_to_use: vec![],
-                procedure: candidate.rule_text.clone(),
+                procedure,
                 references: vec![],
                 anchored_symbols: vec![],
                 effectiveness: candidate.effectiveness,
@@ -154,4 +196,58 @@ impl ProjectSkillEvolver for ProjectSkillEvolverImpl {
 
         Ok(results)
     }
+}
+
+async fn draft_skill_md(pm: &ProviderManager, rule_text: &str) -> Result<String> {
+    let prompt = format!(
+        "Draft an Agent Skills SKILL.md (with YAML frontmatter: name, description, whenToUse) \
+         for this observed workflow pattern. Use crisp procedural language.\n\nPattern:\n{}",
+        rule_text
+    );
+    let messages = vec![providers::types::Message::User {
+        content: providers::types::UserContent::Text(prompt),
+    }];
+    let params = providers::types::ChatParams::new("default".to_string());
+    let resp = pm
+        .chat_with_role(ProviderRole::ReforgeRules, &messages, None, &params)
+        .await
+        .map_err(|e| KlyntbotError::Storage(format!("skill draft: {e}")))?;
+    Ok(resp.content.unwrap_or_else(|| rule_text.to_string()))
+}
+
+fn parse_skill_frontmatter(body: &str, fallback: &str) -> (String, String, String) {
+    // Simple heuristic: split on first "---" to extract frontmatter.
+    let mut lines = body.lines();
+    let first = lines.next().unwrap_or("").trim();
+    if first != "---" {
+        return (fallback.to_string(), "Auto-detected workflow pattern".into(), body.to_string());
+    }
+    let mut front = String::new();
+    let mut in_front = true;
+    for line in lines {
+        if in_front && line.trim() == "---" {
+            in_front = false;
+            continue;
+        }
+        if in_front {
+            front.push_str(line);
+            front.push('\n');
+        }
+    }
+    let name = extract_yaml_field(&front, "name").unwrap_or_else(|| fallback.to_string());
+    let description = extract_yaml_field(&front, "description")
+        .unwrap_or_else(|| "Auto-detected workflow pattern".into());
+    let procedure = body.to_string();
+    (name, description, procedure)
+}
+
+fn extract_yaml_field(yaml: &str, key: &str) -> Option<String> {
+    let prefix = format!("{key}:");
+    for line in yaml.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with(&prefix) {
+            return Some(trimmed[prefix.len()..].trim().to_string());
+        }
+    }
+    None
 }

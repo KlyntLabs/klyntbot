@@ -107,6 +107,8 @@ pub struct ChatParams {
     pub temperature: Option<f32>,
     pub max_tokens: Option<u32>,
     pub response_format: Option<ResponseFormat>,
+    /// Optional provider role for role-based routing (e.g. Distiller, ReforgeRules).
+    pub role: Option<crate::ProviderRole>,
 }
 
 impl ChatParams {
@@ -116,6 +118,7 @@ impl ChatParams {
             temperature: None,
             max_tokens: None,
             response_format: None,
+            role: None,
         }
     }
 
@@ -131,6 +134,11 @@ impl ChatParams {
 
     pub fn with_response_format(mut self, format: ResponseFormat) -> Self {
         self.response_format = Some(format);
+        self
+    }
+
+    pub fn with_role(mut self, role: crate::ProviderRole) -> Self {
+        self.role = Some(role);
         self
     }
 }
