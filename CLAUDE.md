@@ -76,10 +76,10 @@ Browser-only dev: run `cd desktop-ui && bun run dev` then `cargo tauri dev` (whi
 
 Rust personal AI agent — single binary connecting 6+ chat platforms to LLMs with task/project management and persistent memory. All state in SQLite + LanceDB.
 
-### Workspace (37 crates, 9 layers)
+### Workspace (39 crates, 9 layers)
 
 ```
-L0: common, platform-macos — KlyntbotError, MessageRole, ChannelName, ChatId, SessionKey; macOS native APIs (pasteboard, window mgmt)
+L0: common, platform-macos, platform-input, platform-capture — KlyntbotError, MessageRole, ChannelName, ChatId, SessionKey; macOS native APIs (pasteboard, window mgmt, computer-use input + capture); platform-neutral input/capture trait crates
 L1: config, bus, tools-core, tools-core-macros, analytics — Config (camelCase JSON), message bus, Tool/FeaturePackage traits, derive macros, FIRE/Monte Carlo analytics
 L2: storage               — SqlitePool, migrations, *Repo structs, *Row types
 L3: providers, session, scheduling, context_engine, skill-system — LLM clients, session persistence, cron, token budgets, skill discovery/routing

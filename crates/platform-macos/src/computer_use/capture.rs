@@ -145,8 +145,7 @@ impl PlatformCapture for MacCapture {
 
         let main_id = unsafe { CGMainDisplayID() };
         let mut out = Vec::with_capacity(count as usize);
-        for i in 0..count as usize {
-            let id = ids[i];
+        for &id in ids.iter().take(count as usize) {
             let bounds = unsafe { CGDisplayBounds(id) };
             let scale = unsafe { CGDisplayBackingScaleFactor(id) };
             out.push(DisplayInfo {

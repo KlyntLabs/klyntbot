@@ -59,6 +59,7 @@ fn key_name_to_virtual_code(name: &str) -> Option<u16> {
 }
 
 /// Map a `KeyMods` to CGEvent flag bits.
+#[allow(dead_code)]
 fn mods_to_flags(m: platform_input::KeyMods) -> core_graphics::event::CGEventFlags {
     use core_graphics::event::CGEventFlags;
     let mut f = CGEventFlags::empty();
@@ -266,10 +267,10 @@ impl PlatformInput for MacInput {
                 // Move cursor first so the scroll lands at the right place.
                 self.move_cursor(x, y)?;
                 let (dy, dx) = match direction {
-                    ScrollDir::Up => (amount as i32, 0),
-                    ScrollDir::Down => (-(amount as i32), 0),
-                    ScrollDir::Left => (0, amount as i32),
-                    ScrollDir::Right => (0, -(amount as i32)),
+                    ScrollDir::Up => (amount, 0),
+                    ScrollDir::Down => (-amount, 0),
+                    ScrollDir::Left => (0, amount),
+                    ScrollDir::Right => (0, -amount),
                 };
                 let event = CGEvent::new_scroll_event(
                     self.source.clone(),
