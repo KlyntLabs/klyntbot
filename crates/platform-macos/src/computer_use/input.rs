@@ -111,15 +111,15 @@ impl MacInput {
         };
         let point = CGPoint { x: x as f64, y: y as f64 };
 
-        for _ in 0..count {
+        for i in 1..=count {
             let down = CGEvent::new_mouse_event(self.source.clone(), down_type, point, button)
                 .map_err(|()| PlatformError::PlatformCallFailed("CGEventCreate down failed".into()))?;
             // CGEventField::MouseEventClickState = 1
-            down.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, count);
+            down.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, i);
             down.post(CGEventTapLocation::HID);
             let up = CGEvent::new_mouse_event(self.source.clone(), up_type, point, button)
                 .map_err(|()| PlatformError::PlatformCallFailed("CGEventCreate up failed".into()))?;
-            up.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, count);
+            up.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, i);
             up.post(CGEventTapLocation::HID);
         }
         Ok(())
