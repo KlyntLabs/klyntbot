@@ -4,6 +4,7 @@ pub mod bookmarks;
 pub mod brew;
 pub mod browser_history;
 pub mod calculator;
+pub mod calendar;
 pub mod contacts;
 pub mod content_grep;
 pub mod file_search;
@@ -24,6 +25,7 @@ pub use bookmarks::BookmarksSource;
 pub use brew::BrewSource;
 pub use browser_history::BrowserHistorySource;
 pub use calculator::Calculator;
+pub use calendar::{CalendarEvent, CalendarFetcher, CalendarSource};
 pub use contacts::ContactsSource;
 pub use content_grep::ContentGrepSource;
 pub use file_search::{FileSearchSource, FsEventKind};
@@ -41,6 +43,7 @@ pub use window_presets::WindowPresetsSource;
 use crate::types::LauncherItem;
 use async_trait::async_trait;
 use dashmap::DashMap;
+use parking_lot::RwLock;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -81,16 +84,21 @@ pub struct CachedResult {
 
 /// Registry of enabled search sources. Handles prefix routing, fan-out, and query caching.
 pub struct SourceRegistry {
-    sources: Vec<Arc<dyn SearchSource>>,
+    sources: RwLock<Vec<Arc<dyn SearchSource>>>,
     query_cache: Arc<DashMap<(&'static str, String), CachedResult>>,
 }
 
 impl SourceRegistry {
     pub fn new(sources: Vec<Arc<dyn SearchSource>>) -> Self {
         Self {
-            sources,
+            sources: RwLock::new(sources),
             query_cache: Arc::new(DashMap::new()),
         }
+    }
+
+    /// Add a source after initialization.
+    pub fn register(&self, source: Arc<dyn SearchSource>) {
+        self.sources.write().push(source);
     }
 
     /// Get a reference to the shared query cache (for BackgroundRefresher).
@@ -105,8 +113,10 @@ impl SourceRegistry {
             return vec![];
         }
 
+        let sources = self.sources.read().clone();
+
         // Check for prefix routing (e.g., "f/ query", "? query", "> cmd")
-        for source in &self.sources {
+        for source in &sources {
             if let Some(prefix) = source.prefix() {
                 if let Some(inner_query) = query.strip_prefix(prefix) {
                     return cached_search(source, inner_query.trim(), limit, &self.query_cache)
@@ -116,8 +126,7 @@ impl SourceRegistry {
         }
 
         // No prefix match — fan out to all non-prefix sources
-        let futures: Vec<_> = self
-            .sources
+        let futures: Vec<_> = sources
             .iter()
             .filter(|s| s.prefix().is_none())
             .map(|s| cached_search(s, query, limit, &self.query_cache))
@@ -129,13 +138,14 @@ impl SourceRegistry {
 
     /// Refresh all sources that support it.
     pub async fn refresh_all(&self) {
-        let futures: Vec<_> = self.sources.iter().map(|s| s.refresh()).collect();
+        let sources = self.sources.read().clone();
+        let futures: Vec<_> = sources.iter().map(|s| s.refresh()).collect();
         futures_util::future::join_all(futures).await;
     }
 
     /// Get the number of registered sources.
     pub fn source_count(&self) -> usize {
-        self.sources.len()
+        self.sources.read().len()
     }
 }
 

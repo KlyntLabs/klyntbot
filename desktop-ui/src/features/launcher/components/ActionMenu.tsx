@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTauriMutation } from "@/lib/query";
+import { ipc } from "@/utils/tauri-bridge";
+import { qk } from "@/lib/query/queryKeys";
+import { showError } from "../lib/showError";
 import { useLauncherApi, useLauncherState } from "../store";
 import type { LauncherItem, LauncherItemKind } from "../types";
 
@@ -9,13 +13,19 @@ interface Action {
   handler: () => void;
 }
 
-export function ActionMenu() {
+interface ActionMenuProps {
+  onExecute?: (index: number) => void;
+}
+
+export function ActionMenu({ onExecute }: ActionMenuProps) {
   const actionMenuOpen = useLauncherState((s) => s.actionMenuOpen);
   const results = useLauncherState((s) => s.results);
   const selectedIndex = useLauncherState((s) => s.selectedIndex);
+  const query = useLauncherState((s) => s.query);
   const { setActionMenuOpen } = useLauncherApi();
   const [focusedIndex, setFocusedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   const launcherOpenApp = useTauriMutation<void, { path: string }>({
     command: "launcher_open_app",
@@ -24,13 +34,16 @@ export function ActionMenu() {
 
   const openPath = useCallback(
     (path: string) => {
-      launcherOpenApp.mutate({ path }).catch((err) => console.error("Failed to open:", err));
+      launcherOpenApp.mutate({ path }).catch((err) => showError("Couldn't open:", err));
     },
     [launcherOpenApp],
   );
 
   const item = results[selectedIndex] ?? null;
-  const actions = item ? getActionsForItem(item, openPath) : [];
+  const actions = useMemo(
+    () => (item ? getActionsForItem(item, openPath, onExecute, selectedIndex, queryClient, query) : []),
+    [item, openPath, onExecute, selectedIndex, queryClient, query],
+  );
 
   const close = useCallback(() => setActionMenuOpen(false), [setActionMenuOpen]);
 
@@ -126,42 +139,73 @@ export function ActionMenu() {
 }
 
 function copyText(text: string) {
-  navigator.clipboard.writeText(text).catch((err) => console.error("Failed to copy:", err));
+  navigator.clipboard.writeText(text).catch((err) => showError("Couldn't copy:", err));
 }
 
-function getActionsForItem(item: LauncherItem, openPath: (path: string) => void): Action[] {
+function getActionsForItem(
+  item: LauncherItem,
+  openPath: (path: string) => void,
+  onExecute?: (index: number) => void,
+  selectedIndex?: number,
+  queryClient?: ReturnType<typeof useQueryClient>,
+  query?: string,
+): Action[] {
   const { kind } = item;
-  switch (kind.type) {
-    case "application":
-      return applicationActions(item, kind, openPath);
-    case "file":
-      return fileActions(kind, openPath);
-    case "contentMatch":
-      return contentMatchActions(kind, openPath);
-    case "gitRepo":
-      return gitRepoActions(kind, openPath);
-    case "bookmark":
-    case "browserHistory":
-    case "urlNavigation":
-      return urlActions(kind as { url: string }, openPath);
-    case "task":
-      return taskActions(item, openPath);
-    case "note":
-      return noteActions(item, openPath);
-    case "calculator":
-      return calculatorActions(kind);
-    case "contact":
-      return contactActions(kind, openPath);
-    case "systemCommand":
-    case "script":
-      return executeActions(item);
-    case "sshHost":
-      return sshActions(kind, openPath);
-    case "brewPackage":
-      return brewActions(kind);
-    default:
-      return defaultActions(item);
+  const base = (() => {
+    switch (kind.type) {
+      case "application":
+        return applicationActions(item, kind, openPath);
+      case "file":
+        return fileActions(kind, openPath);
+      case "contentMatch":
+        return contentMatchActions(kind, openPath);
+      case "gitRepo":
+        return gitRepoActions(kind, openPath);
+      case "bookmark":
+      case "browserHistory":
+      case "urlNavigation":
+        return urlActions(kind as { url: string }, openPath);
+      case "task":
+        return taskActions(item, openPath);
+      case "note":
+        return noteActions(item, openPath);
+      case "calculator":
+        return calculatorActions(kind);
+      case "contact":
+        return contactActions(kind, openPath);
+      case "systemCommand":
+      case "script":
+        return defaultActions(item, onExecute, selectedIndex);
+      case "sshHost":
+        return sshActions(kind, openPath);
+      case "brewPackage":
+        return brewActions(kind);
+      default:
+        return defaultActions(item, onExecute, selectedIndex);
+    }
+  })();
+
+  if (queryClient) {
+    base.push({
+      label: item.pinned ? "Unpin from top" : "Pin to top",
+      shortcut: "⌘P",
+      handler: async () => {
+        try {
+          if (item.pinned) {
+            await ipc("launcher_unpin", { itemId: item.id, kind: kind.type });
+          } else {
+            await ipc("launcher_pin", { itemId: item.id, kind: kind.type });
+          }
+          queryClient.invalidateQueries({ queryKey: qk.launcher.search(query ?? "") });
+          queryClient.invalidateQueries({ queryKey: qk.launcher.pinned() });
+        } catch (err) {
+          showError("Couldn't update pin:", err);
+        }
+      },
+    });
   }
+
+  return base;
 }
 
 type KindOf<T extends LauncherItemKind["type"]> = Extract<LauncherItemKind, { type: T }>;
@@ -281,13 +325,6 @@ function contactActions(kind: KindOf<"contact">, openPath: (path: string) => voi
   return actions;
 }
 
-function executeActions(item: LauncherItem): Action[] {
-  return [
-    { label: "Execute", shortcut: "Enter", handler: () => {} },
-    { label: "Copy Title", handler: () => copyText(item.title) },
-  ];
-}
-
 function sshActions(kind: KindOf<"sshHost">, openPath: (path: string) => void): Action[] {
   const sshCmd = kind.user ? `ssh ${kind.user}@${kind.host}` : `ssh ${kind.host}`;
   const sshUri = kind.user ? `ssh://${kind.user}@${kind.host}` : `ssh://${kind.host}`;
@@ -309,9 +346,11 @@ function brewActions(kind: KindOf<"brewPackage">): Action[] {
   ];
 }
 
-function defaultActions(item: LauncherItem): Action[] {
+function defaultActions(item: LauncherItem, onExecute?: (index: number) => void, selectedIndex?: number): Action[] {
   return [
-    { label: "Execute", shortcut: "Enter", handler: () => {} },
+    { label: "Execute", shortcut: "Enter", handler: () => {
+      if (onExecute && selectedIndex !== undefined) onExecute(selectedIndex);
+    } },
     { label: "Copy Title", handler: () => copyText(item.title) },
   ];
 }

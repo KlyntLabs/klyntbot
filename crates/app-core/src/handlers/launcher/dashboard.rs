@@ -1,6 +1,6 @@
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
-    CalendarDashboard, DashboardData, FocusDashboard, ProductivityDashboard, TaskDashboard,
+    CalendarDashboard, DashboardData, ProductivityDashboard, TaskDashboard,
 };
 use feature_productivity::repos::ProductivityRepos;
 use storage::Repos;
@@ -14,38 +14,6 @@ pub async fn build_dashboard_data(
 ) -> Result<DashboardData, ApiError> {
     let now = jiff::Timestamp::now();
     let today = now.strftime("%Y-%m-%d").to_string();
-
-    // Focus session
-    let focus = match prod_repos {
-        Some(pr) => {
-            let session = pr.sessions.get_active().await.map_err(map_prod_err)?;
-            match session {
-                Some(s) => {
-                    let elapsed = now.duration_since(s.started_at).as_secs();
-                    let target_secs = s.target_mins.map(|m| m * 60);
-                    let task_name = if let Some(ref action_id) = s.action_id {
-                        repos
-                            .tasks
-                            .get(action_id)
-                            .await
-                            .ok()
-                            .flatten()
-                            .map(|t| t.title)
-                    } else {
-                        None
-                    };
-                    Some(FocusDashboard {
-                        task_name,
-                        elapsed_secs: elapsed,
-                        target_secs,
-                        session_id: s.id.clone(),
-                    })
-                }
-                None => None,
-            }
-        }
-        None => None,
-    };
 
     // Calendar events for today
     let calendar = match prod_repos {
@@ -163,7 +131,6 @@ pub async fn build_dashboard_data(
     };
 
     Ok(DashboardData {
-        focus,
         calendar,
         tasks,
         productivity,

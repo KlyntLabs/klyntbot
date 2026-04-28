@@ -4,9 +4,10 @@ use std::sync::Arc;
 
 use desktop_macros::{klynt_command, klynt_raw_command};
 use desktop_shared::{errors::ApiError, CommandResult};
+use feature_focus::FocusMode;
 use feature_launcher::{
-    ClipboardEntry, DashboardData, LauncherExecuteResult, LauncherItem, ScriptRunner, SystemAction,
-    SystemCommands, WindowAction,
+    ClipboardEntry, DashboardData, LauncherExecuteResult, LauncherItem, Pin, ScriptRunner,
+    SystemAction, SystemCommands, WindowAction,
 };
 use tauri::State;
 
@@ -21,16 +22,30 @@ pub async fn launcher_search(query: String) -> Vec<LauncherItem> {
 pub async fn launcher_execute(
     item_id: String,
     kind: String,
-    args: Option<std::collections::HashMap<String, String>>,
 ) -> LauncherExecuteResult {
     state
-        .launcher_execute(item_id, kind, args.unwrap_or_default())
+        .launcher_execute(item_id, kind)
         .await
 }
 
 #[klynt_command]
 pub async fn launcher_dashboard() -> DashboardData {
     state.launcher_dashboard().await
+}
+
+#[klynt_command]
+pub async fn launcher_pin(item_id: String, kind: String) -> () {
+    state.launcher_pin(item_id, kind).await
+}
+
+#[klynt_command]
+pub async fn launcher_unpin(item_id: String, kind: String) -> () {
+    state.launcher_unpin(item_id, kind).await
+}
+
+#[klynt_command]
+pub async fn launcher_list_pinned() -> Vec<Pin> {
+    state.launcher_list_pinned().await
 }
 
 #[klynt_command]
@@ -66,15 +81,45 @@ pub async fn launcher_run_script(
 #[tauri::command]
 #[specta::specta]
 pub async fn launcher_system_command(
+    state: State<'_, Arc<AppCore>>,
     action: SystemAction,
     args: Option<std::collections::HashMap<String, String>>,
 ) -> CommandResult<()> {
-    // args accepted here for IPC stability; DND duration threading deferred to Task 3.4
-    // when SystemCommands::execute gains a duration parameter.
-    let _ = args;
-    SystemCommands::execute(&action)
+    let args = args.unwrap_or_default();
+    let duration = args.get("duration").and_then(|s| parse_human_duration(s));
+
+    if matches!(action, SystemAction::ToggleDoNotDisturb) && duration.is_some() {
+        let ends_at = jiff::Timestamp::now()
+            .checked_add(duration.unwrap())
+            .map_err(|e| ApiError::new("BAD_DURATION", e.to_string()))?;
+        let mgr = state.dnd_manager().map_err(|e| ApiError::new("DND_ERROR", e.to_string()))?;
+        mgr.activate(FocusMode::Dnd, ends_at)
+            .await
+            .map_err(|e| ApiError::new("FOCUS_ACTIVATE_ERROR", e.to_string()))?;
+        return Ok(());
+    }
+
+    SystemCommands::execute(&action, duration)
         .await
         .map_err(|e| ApiError::new("SYSTEM_COMMAND_ERROR", e.to_string()))
+}
+
+fn parse_human_duration(s: &str) -> Option<std::time::Duration> {
+    let s = s.trim();
+    let last = s.chars().last()?;
+    let (num_str, secs_per_unit) = if last.is_ascii_alphabetic() {
+        let mult = match last.to_ascii_lowercase() {
+            'm' => 60,
+            'h' => 3600,
+            'd' => 86400,
+            _ => return None,
+        };
+        (&s[..s.len() - last.len_utf8()], mult)
+    } else {
+        (s, 60)
+    };
+    let num: u64 = num_str.parse().ok()?;
+    Some(std::time::Duration::from_secs(num * secs_per_unit))
 }
 
 #[klynt_raw_command]
@@ -108,6 +153,28 @@ pub async fn launcher_open_app(path: String) -> CommandResult<()> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_minutes() {
+        assert_eq!(parse_human_duration("30m"), Some(std::time::Duration::from_secs(1800)));
+    }
+    #[test]
+    fn parses_hours() {
+        assert_eq!(parse_human_duration("2h"), Some(std::time::Duration::from_secs(7200)));
+    }
+    #[test]
+    fn parses_days() {
+        assert_eq!(parse_human_duration("1d"), Some(std::time::Duration::from_secs(86400)));
+    }
+    #[test]
+    fn rejects_garbage() {
+        assert_eq!(parse_human_duration("xyz"), None);
+    }
+}
+
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
@@ -124,11 +191,20 @@ pub(crate) async fn dispatch_dev(
         "launcher_execute" => {
             let item_id = dev::get(body, "itemId").unwrap_or_default();
             let kind = dev::get(body, "kind").unwrap_or_default();
-            let args: std::collections::HashMap<String, String> =
-                dev::get(body, "args").unwrap_or_default();
-            dev::val(core.launcher_execute(item_id, kind, args).await)
+            dev::val(core.launcher_execute(item_id, kind).await)
         }
         "launcher_dashboard" => dev::val(core.launcher_dashboard().await),
+        "launcher_pin" => {
+            let item_id = dev::get(body, "itemId").unwrap_or_default();
+            let kind = dev::get(body, "kind").unwrap_or_default();
+            dev::val(core.launcher_pin(item_id, kind).await)
+        }
+        "launcher_unpin" => {
+            let item_id = dev::get(body, "itemId").unwrap_or_default();
+            let kind = dev::get(body, "kind").unwrap_or_default();
+            dev::val(core.launcher_unpin(item_id, kind).await)
+        }
+        "launcher_list_pinned" => dev::val(core.launcher_list_pinned().await),
         "launcher_clipboard_paste" => {
             let id: i64 = dev::get(body, "id").unwrap_or_default();
             dev::val(core.launcher_clipboard_paste(id).await)
@@ -150,7 +226,14 @@ pub(crate) async fn dispatch_dev(
         "launcher_system_command" => {
             let action: SystemAction = dev::get(body, "action").unwrap_or(SystemAction::LockScreen);
             let args: Option<std::collections::HashMap<String, String>> = dev::get(body, "args");
-            dev::val(launcher_system_command(action, args).await)
+            let _ = core;
+            let args = args.unwrap_or_default();
+            let duration = args.get("duration").and_then(|s| parse_human_duration(s));
+            dev::val(
+                SystemCommands::execute(&action, duration)
+                    .await
+                    .map_err(|e| ApiError::new("SYSTEM_COMMAND_ERROR", e.to_string())),
+            )
         }
         "launcher_window_action" => {
             let action: WindowAction = dev::get(body, "action").unwrap_or(WindowAction::Center);

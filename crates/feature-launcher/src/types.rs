@@ -36,6 +36,8 @@ pub struct LauncherItem {
     pub no_view: bool,
     #[serde(default)]
     pub arguments: Vec<ArgSpec>,
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, specta::Type)]
@@ -175,19 +177,9 @@ pub enum WindowAction {
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardData {
-    pub focus: Option<FocusDashboard>,
     pub calendar: Vec<CalendarDashboard>,
     pub tasks: Vec<TaskDashboard>,
     pub productivity: ProductivityDashboard,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct FocusDashboard {
-    pub task_name: Option<String>,
-    pub elapsed_secs: i64,
-    pub target_secs: Option<i64>,
-    pub session_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]

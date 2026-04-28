@@ -335,6 +335,103 @@ pub fn set_window_frame(pid: i32, x: f64, y: f64, w: f64, h: f64) -> bool {
     }
 }
 
+/// Read the current position and size of the focused window for the given PID.
+/// Returns (x, y, w, h) on success, or None if the operation failed.
+#[cfg(target_os = "macos")]
+pub fn get_frontmost_window_frame(pid: i32) -> Option<(f64, f64, f64, f64)> {
+    use core_foundation::base::TCFType;
+    use core_foundation::string::CFString;
+    use core_graphics::geometry::{CGPoint, CGSize};
+    use std::ptr;
+
+    const AX_VALUE_TYPE_CGPOINT: u32 = 1;
+    const AX_VALUE_TYPE_CGSIZE: u32 = 2;
+    const AX_ERROR_SUCCESS: i32 = 0;
+
+    #[link(name = "ApplicationServices", kind = "framework")]
+    extern "C" {
+        fn AXUIElementCreateApplication(pid: i32) -> *mut std::ffi::c_void;
+        fn AXUIElementCopyAttributeValue(
+            element: *mut std::ffi::c_void,
+            attribute: *const std::ffi::c_void,
+            value: *mut *mut std::ffi::c_void,
+        ) -> i32;
+        fn AXValueGetValue(
+            value: *mut std::ffi::c_void,
+            value_type: u32,
+            out: *mut std::ffi::c_void,
+        ) -> i32;
+    }
+
+    unsafe {
+        let app_element = AXUIElementCreateApplication(pid);
+        if app_element.is_null() {
+            return None;
+        }
+
+        let focused_window_attr = CFString::new("AXFocusedWindow");
+        let mut focused_window: *mut std::ffi::c_void = ptr::null_mut();
+        let err = AXUIElementCopyAttributeValue(
+            app_element,
+            focused_window_attr.as_CFTypeRef() as *const _,
+            &mut focused_window,
+        );
+        core_foundation::base::CFRelease(app_element as _);
+
+        if err != AX_ERROR_SUCCESS || focused_window.is_null() {
+            return None;
+        }
+
+        // Read position
+        let position_attr = CFString::new("AXPosition");
+        let mut position_value: *mut std::ffi::c_void = ptr::null_mut();
+        let err = AXUIElementCopyAttributeValue(
+            focused_window,
+            position_attr.as_CFTypeRef() as *const _,
+            &mut position_value,
+        );
+        if err != AX_ERROR_SUCCESS || position_value.is_null() {
+            core_foundation::base::CFRelease(focused_window as _);
+            return None;
+        }
+        let mut position = CGPoint::new(0.0, 0.0);
+        AXValueGetValue(
+            position_value,
+            AX_VALUE_TYPE_CGPOINT,
+            &mut position as *mut CGPoint as *mut std::ffi::c_void,
+        );
+        core_foundation::base::CFRelease(position_value as _);
+
+        // Read size
+        let size_attr = CFString::new("AXSize");
+        let mut size_value: *mut std::ffi::c_void = ptr::null_mut();
+        let err = AXUIElementCopyAttributeValue(
+            focused_window,
+            size_attr.as_CFTypeRef() as *const _,
+            &mut size_value,
+        );
+        if err != AX_ERROR_SUCCESS || size_value.is_null() {
+            core_foundation::base::CFRelease(focused_window as _);
+            return None;
+        }
+        let mut size = CGSize::new(0.0, 0.0);
+        AXValueGetValue(
+            size_value,
+            AX_VALUE_TYPE_CGSIZE,
+            &mut size as *mut CGSize as *mut std::ffi::c_void,
+        );
+        core_foundation::base::CFRelease(size_value as _);
+        core_foundation::base::CFRelease(focused_window as _);
+
+        Some((position.x, position.y, size.width, size.height))
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn get_frontmost_window_frame(_pid: i32) -> Option<(f64, f64, f64, f64)> {
+    None
+}
+
 #[cfg(not(target_os = "macos"))]
 pub fn set_window_frame(_pid: i32, _x: f64, _y: f64, _w: f64, _h: f64) -> bool {
     false

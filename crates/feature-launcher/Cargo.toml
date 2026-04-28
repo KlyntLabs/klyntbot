@@ -36,3 +36,8 @@ smol_str = "0.3"
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "test-util"] }
 tempfile.workspace = true
+criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
+
+[[bench]]
+name = "inverted_index"
+harness = false

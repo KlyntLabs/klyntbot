@@ -1573,9 +1573,9 @@ async launcherSearch(query: string) : Promise<Result<LauncherItem[], ApiError>> 
     else return { status: "error", error: e  as any };
 }
 },
-async launcherExecute(itemId: string, kind: string, args: Partial<{ [key in string]: string }> | null) : Promise<Result<LauncherExecuteResult, ApiError>> {
+async launcherExecute(itemId: string, kind: string) : Promise<Result<LauncherExecuteResult, ApiError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("launcher_execute", { itemId, kind, args }) };
+    return { status: "ok", data: await TAURI_INVOKE("launcher_execute", { itemId, kind }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -1584,6 +1584,30 @@ async launcherExecute(itemId: string, kind: string, args: Partial<{ [key in stri
 async launcherDashboard() : Promise<Result<DashboardData, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("launcher_dashboard") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherPin(itemId: string, kind: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_pin", { itemId, kind }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherUnpin(itemId: string, kind: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_unpin", { itemId, kind }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherListPinned() : Promise<Result<Pin[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_list_pinned") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -4143,7 +4167,7 @@ export type CurrencyNetWorth = { currency: string; accounts: number; investments
 export type CustomColumnResponse = { id: string; projectId: string; name: string; columnType: string; options: string[] | null; position: number; width: number }
 export type CustomColumnValueResponse = { taskId: string; columnId: string; value: unknown }
 export type DailySpending = { date: string; totalSpending: number; txCount: number }
-export type DashboardData = { focus: FocusDashboard | null; calendar: CalendarDashboard[]; tasks: TaskDashboard[]; productivity: ProductivityDashboard }
+export type DashboardData = { calendar: CalendarDashboard[]; tasks: TaskDashboard[]; productivity: ProductivityDashboard }
 export type DashboardIntelligenceResponse = { activeContext: WorkContextSummary | null; focusRecommendation: string | null; sessionSummary: SessionBlock[]; contextSwitches: number; switchQuality: string; productivityScore: number; scoreTrend: number; patterns: string[]; nudges: DashboardNudge[]; resourceClusters: ResourceCluster[] }
 export type DashboardNudge = { message: string; nudgeType: string; priority: string }
 export type DataVersionBumpedPayload = { previous: number; current: number }
@@ -4325,7 +4349,6 @@ export type FlashcardReviewParams = { cardId: string; quality: string; recallSpe
 export type FlashcardSaveGeneratedParams = { noteId: string | null; deck: string; cards: GeneratedCardPreview[] }
 export type FlashcardSubmitAnswerParams = { cardId: string; userAnswer: string; mode: string }
 export type FlashcardUpdateParams = { id: string; front: string; back: string; deck: string; tags: string[] | null; clozeData: unknown | null; vocabData: unknown | null }
-export type FocusDashboard = { taskName: string | null; elapsedSecs: number; targetSecs: number | null; sessionId: string }
 export type FocusDndUnavailablePayload = { message: string }
 export type FocusMode = "dnd"
 export type FocusSession = { id: number; mode: FocusMode; startedAt: string; endsAt: string; endedAt: string | null; alarmId: string | null; source: string }
@@ -4378,7 +4401,7 @@ export type LabelCreateParams = { workflowId: string; name: string; color: strin
 export type LabelReorderParams = { workflowId: string; labelIds: string[] }
 export type LabelUpdateParams = { id: string; name: string | null; color: string | null; statusGroup: string | null; position: number | null }
 export type LauncherExecuteResult = { status: ExecStatus; message: string | null; badge: BadgeKind }
-export type LauncherItem = { id: string; title: string; subtitle: string | null; icon: string | null; kind: LauncherItemKind; score: number; no_view?: boolean; arguments?: ArgSpec[] }
+export type LauncherItem = { id: string; title: string; subtitle: string | null; icon: string | null; kind: LauncherItemKind; score: number; no_view?: boolean; arguments?: ArgSpec[]; pinned?: boolean }
 export type LauncherItemKind = { type: "application"; path: string; running: boolean } | { type: "task"; task_id: string; status: string } | { type: "note"; note_id: string; preview: string } | { type: "clipboardEntry"; entry_id: number; content_type: ClipboardContentType } | { type: "systemCommand"; action: SystemAction } | { type: "script"; path: string; name: string } | { type: "calculator"; expression: string; result: number } | { type: "calendar"; event_id: string; starts_at: string } | { type: "aiChat"; query: string } | { type: "file"; path: string; kind: FileKind } | { type: "contentMatch"; path: string; line: number; preview: string } | { type: "contact"; name: string; email: string | null; phone: string | null } | { type: "systemPref"; pane_id: string } | { type: "runningApp"; pid: number; path: string } | { type: "bookmark"; url: string; browser: string } | { type: "browserHistory"; url: string; visited_at: string } | { type: "brewPackage"; name: string; is_cask: boolean } | { type: "sshHost"; host: string; user: string | null } | { type: "gitRepo"; path: string } | { type: "urlNavigation"; url: string } | { type: "windowAction"; action: WindowAction }
 export type LearnedRuleResponse = { id: number; pattern: string; patternType: string; classification: string; confidence: number; hitCount: number; lastUsedAt: string; createdAt: string }
 export type LearningEventPayload = { sessionKey: string; eventType: string; detail: string }
@@ -4559,6 +4582,7 @@ export type PersonaChatResponse = { reply: string }
 export type PersonaMetaResponse = { id: string; name: string; role: string; icon: string; tone: string }
 export type PersonaPerspectivePayload = { sessionKey: string; personaId: string; personaName: string; personaIcon: string; personaRole: string; content: string; challenge: string | null }
 export type PersonaResponse = { id: string; name: string; role: string; expertise: string; perspective: string; tone: string; icon: string; source: string; domains: string[]; isActive: boolean; relevanceScore: number; createdAt: string; updatedAt: string }
+export type Pin = { item_id: string; kind: string; position: number }
 /**
  * A persisted pipeline event row.
  */

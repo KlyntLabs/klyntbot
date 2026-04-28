@@ -1,9 +1,10 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
     Calculator, ClipboardRepo, FileKind, FrequencyRepo, LauncherItem, LauncherItemKind,
-    SourceRegistry, UrlNavigation,
+    PinsRepo, SourceRegistry, UrlNavigation,
 };
 use feature_notes::repo::NoteRepo;
 use storage::Repos;
@@ -12,9 +13,10 @@ use crate::errors::map_storage_err;
 
 /// Central search engine that fans out queries to all providers.
 pub struct LauncherSearchEngine {
-    pub registry: SourceRegistry,
-    pub frequency_repo: FrequencyRepo,
-    pub clipboard_repo: ClipboardRepo,
+    pub registry: Arc<SourceRegistry>,
+    pub frequency_repo: Arc<FrequencyRepo>,
+    pub clipboard_repo: Arc<ClipboardRepo>,
+    pub pins_repo: Arc<PinsRepo>,
     /// Stored here so the OS watcher thread is joined on drop.
     pub _file_watcher: Option<feature_launcher::SourceFileWatcher>,
 }
@@ -79,6 +81,7 @@ impl LauncherSearchEngine {
                             score: *score,
                             no_view: false,
                             arguments: vec![],
+                            pinned: false,
                         })
                     }
                     _ => None,
@@ -106,6 +109,7 @@ impl LauncherSearchEngine {
                     score: 2.0,
                     no_view: false,
                     arguments: vec![],
+                    pinned: false,
                 }]
             })
             .unwrap_or_default();
@@ -136,6 +140,9 @@ impl LauncherSearchEngine {
         // Deduplicate by canonical key (URL or path), keeping the higher-scored item
         results = Self::deduplicate(results);
 
+        // Apply pin elevation
+        self.apply_pin_elevation(&mut results).await;
+
         // Sort by score descending
         results.sort_by(|a, b| {
             b.score
@@ -156,6 +163,7 @@ impl LauncherSearchEngine {
             score: 0.0,
             no_view: false,
             arguments: vec![],
+            pinned: false,
         });
 
         Ok(results)
@@ -186,6 +194,7 @@ impl LauncherSearchEngine {
                 score: if t.status == "doing" { 0.9 } else { 0.7 },
                 no_view: false,
                 arguments: vec![],
+                pinned: false,
             })
             .collect())
     }
@@ -217,6 +226,7 @@ impl LauncherSearchEngine {
                     score: 0.6,
                     no_view: false,
                     arguments: vec![],
+                    pinned: false,
                 }
             })
             .collect())
@@ -306,6 +316,21 @@ impl LauncherSearchEngine {
         best.into_values().collect()
     }
 
+    async fn apply_pin_elevation(&self, items: &mut [LauncherItem]) {
+        let pinned = match self.pins_repo.pinned_set().await {
+            Ok(set) => set,
+            Err(_) => return,
+        };
+
+        for item in items {
+            let tag = kind_tag(&item.kind);
+            if pinned.contains(&(item.id.clone(), tag.to_string())) {
+                item.pinned = true;
+                item.score += 1000.0;
+            }
+        }
+    }
+
     /// Record that an item was executed (for frequency boosting).
     pub async fn record_execution(&self, item_id: &str, kind: &str) -> Result<(), ApiError> {
         self.frequency_repo
@@ -315,17 +340,39 @@ impl LauncherSearchEngine {
     }
 
     /// Execute a launcher item: record execution and return a result envelope.
-    ///
-    /// `args` are threaded through here for API stability but applied at the actual
-    /// dispatch boundary (`launcher_run_script` / `launcher_system_command` Tauri commands).
     pub async fn execute(
         &self,
         item_id: &str,
         kind: &str,
-        args: &std::collections::HashMap<String, String>,
     ) -> Result<feature_launcher::LauncherExecuteResult, ApiError> {
-        let _ = args; // Applied at dispatch boundary; see launcher_run_script / launcher_system_command
         self.record_execution(item_id, kind).await?;
         Ok(feature_launcher::LauncherExecuteResult::default())
+    }
+}
+
+fn kind_tag(kind: &feature_launcher::LauncherItemKind) -> &'static str {
+    use feature_launcher::LauncherItemKind as K;
+    match kind {
+        K::Application { .. } => "application",
+        K::Task { .. } => "task",
+        K::Note { .. } => "note",
+        K::ClipboardEntry { .. } => "clipboardEntry",
+        K::SystemCommand { .. } => "systemCommand",
+        K::Script { .. } => "script",
+        K::Calculator { .. } => "calculator",
+        K::Calendar { .. } => "calendar",
+        K::AiChat { .. } => "aiChat",
+        K::File { .. } => "file",
+        K::ContentMatch { .. } => "contentMatch",
+        K::Contact { .. } => "contact",
+        K::SystemPref { .. } => "systemPref",
+        K::RunningApp { .. } => "runningApp",
+        K::Bookmark { .. } => "bookmark",
+        K::BrowserHistory { .. } => "browserHistory",
+        K::BrewPackage { .. } => "brewPackage",
+        K::SshHost { .. } => "sshHost",
+        K::GitRepo { .. } => "gitRepo",
+        K::UrlNavigation { .. } => "urlNavigation",
+        K::WindowAction { .. } => "windowAction",
     }
 }

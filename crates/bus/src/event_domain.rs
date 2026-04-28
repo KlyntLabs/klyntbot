@@ -35,6 +35,7 @@ pub enum EventDomain {
     Notifications,
     Scheduler,
     CodingMemory,
+    Launcher,
     /// User-supplied tag from `DomainEvent::UserStatedFact.domain`. Not part of
     /// the fixed taxonomy — this carries payload data, not a call-site choice.
     Custom(String),
@@ -60,6 +61,7 @@ impl EventDomain {
             Self::Notifications => "notifications",
             Self::Scheduler => "scheduler",
             Self::CodingMemory => "coding_memory",
+            Self::Launcher => "launcher",
             Self::Custom(s) => s.as_str(),
         }
     }

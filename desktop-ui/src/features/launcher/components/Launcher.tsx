@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTransparentBackground } from "@/hooks/window/useTransparentBackground";
 import { useWindowAutoResize } from "@/hooks/window/useWindowAutoResize";
-import { emit, getCurrentWindow, isTauri, listen } from "@/utils/tauri-bridge";
+import { emit, getCurrentWindow, ipc, isTauri, listen } from "@/utils/tauri-bridge";
+import { showError } from "../lib/showError";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { useDndActive } from "../hooks/useDndActive";
 import { executeItem } from "../hooks/useExecuteItem";
@@ -13,10 +14,10 @@ import { ArgChipBar } from "./ArgChipBar";
 import { Dashboard } from "./Dashboard";
 import { DetailPanel } from "./DetailPanel";
 import { FocusActiveChip } from "./FocusActiveChip";
-import { LauncherChatStub } from "./LauncherChatStub";
+import { LauncherChat } from "./LauncherChat";
 import { LauncherInput } from "./LauncherInput";
 import { ResultsList } from "./ResultsList";
-import { VoiceRecorderStub } from "./VoiceRecorderStub";
+import { VoiceRecorder } from "./VoiceRecorder";
 
 import "../launcher.css";
 
@@ -38,7 +39,7 @@ function LauncherShell() {
   const mode = useLauncherState((s) => s.mode);
   const argModeItem = useLauncherState((s) => s.argModeItem);
   const store = useLauncherApi();
-  const { setMode, setArgModeItem, reset } = store;
+  const { setMode, setQuery, setArgModeItem, reset } = store;
   const dndActive = useDndActive();
 
   const [chatSessionKey, setChatSessionKey] = useState("");
@@ -73,17 +74,6 @@ function LauncherShell() {
     },
     [setMode],
   );
-
-  const cancelRecording = useCallback(async () => {
-    reset();
-    if (isTauri()) {
-      try {
-        await getCurrentWindow().hide();
-      } catch {
-        // silent
-      }
-    }
-  }, [reset]);
 
   const expandToMain = useCallback(async () => {
     if (!isTauri()) return;
@@ -160,15 +150,26 @@ function LauncherShell() {
           <div className="lc-drag-grip" />
         </div>
         {mode === "recording" ? (
-          <VoiceRecorderStub onTranscriptReady={enterChat} onCancel={cancelRecording} />
+          <VoiceRecorder
+            onTranscriptReady={(t) => {
+              setMode("search");
+              setQuery(t);
+            }}
+            onCancel={() => setMode("dashboard")}
+          />
         ) : mode === "chat" && chatSessionKey ? (
-          <LauncherChatStub
-            initialQuery={chatInitialQuery}
+          <LauncherChat
+            initialQuery={chatInitialQuery ?? ""}
+            sessionKey={chatSessionKey}
             onBack={() => {
               setMode("dashboard");
               reset();
             }}
-            onExpand={expandToMain}
+            onExpandToMain={(key) => {
+              emit("navigate", { path: "/chat" });
+              emit("open-chat", { sessionKey: key });
+              getCurrentWindow().hide();
+            }}
           />
         ) : (
           <div ref={bodyRef} className="lc-body">
@@ -201,7 +202,11 @@ function LauncherShell() {
                 {mode === "dashboard" && (
                   <>
                     <ShortcutHints />
-                    <Dashboard />
+                    <Dashboard onOpenTask={(taskId: string) => {
+                      ipc("launcher_open_app", { path: `klyntbot://task/${taskId}` })
+                        .catch((err) => showError("Couldn't open task:", err));
+                      getCurrentWindow().hide();
+                    }} />
                     <ResultsList onExecute={handleExecute} />
                   </>
                 )}
@@ -209,7 +214,7 @@ function LauncherShell() {
                 {mode === "detail" && <DetailPanel />}
               </>
             )}
-            <ActionMenu />
+            <ActionMenu onExecute={handleExecute} />
           </div>
         )}
       </div>

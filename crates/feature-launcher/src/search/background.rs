@@ -93,11 +93,11 @@ impl BackgroundRefresher {
             }
         }
 
-        // Evict expired cache entries every 60s
-        if now.duration_since(self.last_cache_eviction) >= Duration::from_secs(60) {
-            // Max TTL across all sources is 5s; use 2x as generous eviction window
+        // Evict expired cache entries every 90s (typical session length)
+        if now.duration_since(self.last_cache_eviction) >= Duration::from_secs(90) {
+            // Max TTL across all sources is 8s; use 2x as generous eviction window
             self.query_cache
-                .retain(|_, v| v.created_at.elapsed() < Duration::from_secs(10));
+                .retain(|_, v| v.created_at.elapsed() < Duration::from_secs(16));
             self.last_cache_eviction = Instant::now();
         }
     }

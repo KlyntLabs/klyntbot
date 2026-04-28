@@ -25,6 +25,7 @@ export const qk = {
     dashboard: () => ["launcher", "dashboard"] as const,
     search: (query: string) => ["launcher", "search", query] as const,
     dndActive: () => ["launcher", "dndActive"] as const,
+    pinned: () => ["launcher", "pinned"] as const,
   },
   settings: {
     all: () => ["settings"] as const,

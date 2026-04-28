@@ -608,6 +608,13 @@ pub enum DomainEvent {
         kind: CodingMemoryKind,
         id: String,
     },
+    /// Launcher item was executed (opened, run, activated).
+    LauncherItemExecuted {
+        item_id: String,
+        kind: String,
+        query: Option<String>,
+    },
+
     /// SQLite `PRAGMA data_version` advanced unexpectedly — i.e. some
     /// connection outside our process pool wrote, and we never saw the
     /// matching domain event. Listeners should perform a broad invalidate.
@@ -715,6 +722,7 @@ impl DomainEvent {
             Self::CodingSessionEnded { .. } => "CodingSessionEnded",
             Self::CodingMirrorAlert { .. } => "CodingMirrorAlert",
             Self::CodingMemoryUpdated { .. } => Self::KIND_CODING_MEMORY_UPDATED,
+            Self::LauncherItemExecuted { .. } => Self::KIND_LAUNCHER_ITEM_EXECUTED,
             Self::DataVersionBumped { .. } => Self::KIND_DATA_VERSION_BUMPED,
         }
     }
@@ -866,6 +874,8 @@ impl DomainEvent {
     pub const KIND_CODING_MIRROR_ALERT: &'static str = "CodingMirrorAlert";
     /// `event_type` value for [`DomainEvent::CodingMemoryUpdated`].
     pub const KIND_CODING_MEMORY_UPDATED: &'static str = "CodingMemoryUpdated";
+    /// `event_type` value for [`DomainEvent::LauncherItemExecuted`].
+    pub const KIND_LAUNCHER_ITEM_EXECUTED: &'static str = "LauncherItemExecuted";
     /// `event_type` value for [`DomainEvent::DataVersionBumped`].
     pub const KIND_DATA_VERSION_BUMPED: &'static str = "DataVersionBumped";
 
@@ -978,6 +988,8 @@ impl DomainEvent {
             | Self::CodingSessionEnded { .. }
             | Self::CodingMirrorAlert { .. }
             | Self::CodingMemoryUpdated { .. } => D::CodingMemory,
+
+            Self::LauncherItemExecuted { .. } => D::Launcher,
 
             Self::DataVersionBumped { .. } => D::General,
         }

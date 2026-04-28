@@ -344,7 +344,7 @@ mod tests {
         assert!(lookup("nope").is_none());
     }
     #[test]
-    fn count_is_25() {
+    fn count_is_26() {
         assert_eq!(PRESETS.len(), 26); // 25 + restore
     }
 }
