@@ -1,29 +1,61 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ParsedFileLocation } from "@utils/fileLinks";
 import { highlightLine } from "@utils/syntax";
-import {
-  type MouseEvent,
-  type ReactNode,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import "katex/dist/katex.min.css";
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 
 const { href: _droppedHrefProtocols, ...defaultProtocolsWithoutHref } =
   defaultSchema.protocols ?? {};
 
+const KATEX_MATHML_TAGS = [
+  "math",
+  "annotation",
+  "semantics",
+  "mtext",
+  "mn",
+  "mo",
+  "mi",
+  "mspace",
+  "mover",
+  "munder",
+  "munderover",
+  "msup",
+  "msub",
+  "msubsup",
+  "mfrac",
+  "mroot",
+  "msqrt",
+  "mtable",
+  "mtr",
+  "mtd",
+  "mlabeledtr",
+  "mrow",
+  "menclose",
+  "mstyle",
+  "mpadded",
+  "mphantom",
+  "mglyph",
+  "merror",
+];
+
 const markdownSanitizeSchema = {
   ...defaultSchema,
-  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
+  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary", "abbr", ...KATEX_MATHML_TAGS],
   attributes: {
     ...(defaultSchema.attributes ?? {}),
     details: [...((defaultSchema.attributes?.details as string[]) ?? []), "open"],
     summary: [...((defaultSchema.attributes?.summary as string[]) ?? [])],
+    abbr: [...((defaultSchema.attributes?.abbr as string[]) ?? []), "title"],
+    span: [...((defaultSchema.attributes?.span as string[]) ?? []), "style", "ariaHidden"],
+    div: [...((defaultSchema.attributes?.div as string[]) ?? []), "style"],
+    math: ["xmlns", "display"],
+    annotation: ["encoding"],
   },
   protocols: defaultProtocolsWithoutHref,
 };
@@ -47,6 +79,7 @@ function resolvePrismLanguage(tag: string | null) {
   const lower = tag.toLowerCase();
   return PRISM_LANG_ALIAS[lower] ?? lower;
 }
+
 import {
   describeFileTarget,
   formatParsedFileLocation,
@@ -225,6 +258,81 @@ function normalizeStructuredReviewTables(value: string) {
 
 function stripTrailingMemoryCitation(value: string) {
   return value.replace(/\n*<oai-mem-citation>[\s\S]*?<\/oai-mem-citation>\s*$/i, "").trim();
+}
+
+const ABBR_DEFINITION_LINE =
+  /^[ \t]*(?:\*\[[^\]]+\]:[ \t]+.+?[ \t]*)(?:[ \t]+\*\[[^\]]+\]:[ \t]+.+?[ \t]*)*$/;
+const ABBR_DEFINITION_PIECE = /\*\[([^\]]+)\]:[ \t]+(.+?)(?=[ \t]+\*\[|$)/g;
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function escapeHtmlAttr(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function applyAbbreviations(value: string) {
+  const definitions = new Map<string, string>();
+  const lines = value.split(/\r?\n/);
+  let inFence = false;
+  const kept: string[] = [];
+  for (const line of lines) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      kept.push(line);
+      continue;
+    }
+    if (!inFence && ABBR_DEFINITION_LINE.test(line)) {
+      ABBR_DEFINITION_PIECE.lastIndex = 0;
+      let match: RegExpExecArray | null = ABBR_DEFINITION_PIECE.exec(line);
+      while (match !== null) {
+        definitions.set(match[1].trim(), match[2].trim());
+        match = ABBR_DEFINITION_PIECE.exec(line);
+      }
+      continue;
+    }
+    kept.push(line);
+  }
+  if (definitions.size === 0) {
+    return value;
+  }
+  const pattern = new RegExp(
+    `\\b(${[...definitions.keys()].map(escapeRegex).join("|")})\\b`,
+    "g",
+  );
+  let inFenceOut = false;
+  return kept
+    .map((line) => {
+      if (/^\s*(```|~~~)/.test(line)) {
+        inFenceOut = !inFenceOut;
+        return line;
+      }
+      if (inFenceOut) {
+        return line;
+      }
+      // Skip inline code spans so abbreviations don't substitute inside backticks.
+      const segments = line.split(/(`+[^`]*`+)/);
+      return segments
+        .map((segment, index) => {
+          if (index % 2 === 1) {
+            return segment;
+          }
+          return segment.replace(pattern, (key) => {
+            const title = definitions.get(key);
+            if (!title) {
+              return key;
+            }
+            return `<abbr title="${escapeHtmlAttr(title)}">${key}</abbr>`;
+          });
+        })
+        .join("");
+    })
+    .join("\n");
 }
 
 export function isStandaloneMarkdownTable(value: string) {
@@ -527,7 +635,7 @@ export function Markdown({
 }: MarkdownProps) {
   const normalizedValue = codeBlock
     ? value
-    : normalizeStructuredReviewTables(normalizeListIndentation(value));
+    : applyAbbreviations(normalizeStructuredReviewTables(normalizeListIndentation(value)));
   const content = codeBlock ? `\`\`\`\n${normalizedValue}\n\`\`\`` : normalizedValue;
   const handleFileLinkClick = (event: React.MouseEvent, path: ParsedFileLocation) => {
     event.preventDefault();
@@ -688,8 +796,8 @@ export function Markdown({
   return (
     <div className={className}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkFileLinks]}
-        rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema]]}
+        remarkPlugins={[remarkGfm, remarkMath, remarkFileLinks]}
+        rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeSanitize, markdownSanitizeSchema]]}
         urlTransform={(url) => {
           const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url);
           // Keep file-like hrefs intact before scheme sanitization runs, otherwise

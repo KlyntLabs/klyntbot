@@ -1205,10 +1205,21 @@
   max-width: 32ch;
 }
 
+.message hr {
+  margin: 24px 0;
+  width: 70%;
+  max-width: 420px;
+  height: 1px;
+  border: 0;
+  background: var(--border-stronger);
+}
+
 .message .markdown-codeblock {
   border: 1px solid var(--cm-border-soft);
   border-radius: 12px;
-  background: var(--surface-command);
+  background:
+    linear-gradient(var(--cm-surface-panel-elevated), var(--cm-surface-panel-elevated))
+    var(--cm-surface-composer);
   overflow: hidden;
   margin: 12px 0;
   width: 100%;
@@ -1292,7 +1303,9 @@
   padding: 10px 14px;
   border: 1px solid var(--cm-border-soft);
   border-radius: 12px;
-  background: var(--surface-command);
+  background:
+    linear-gradient(var(--cm-surface-panel-elevated), var(--cm-surface-panel-elevated))
+    var(--cm-surface-composer);
   white-space: pre;
   overflow-x: auto;
   width: 100%;
@@ -1329,12 +1342,14 @@
 
 .markdown .markdown-table-wrap {
   --markdown-table-wide-col: max(18rem, 33%);
-  margin: 14px 0 18px;
+  margin: 8px 0 8px;
   width: 100%;
   overflow-x: auto;
   border: 1px solid var(--cm-border-soft);
   border-radius: 12px;
-  background: var(--cm-surface-panel-soft);
+  background:
+    linear-gradient(var(--cm-surface-panel-elevated), var(--cm-surface-panel-elevated))
+    var(--cm-surface-composer);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
@@ -1344,25 +1359,25 @@
   border-collapse: separate;
   border-spacing: 0;
   table-layout: auto;
+  font-size: var(--fs-base);
 }
 
 .markdown .markdown-table th,
 .markdown .markdown-table td {
-  padding: 10px 16px;
+  padding: 8px 16px;
   text-align: left;
   vertical-align: middle;
   white-space: normal;
   overflow-wrap: anywhere;
+  font-size: inherit;
 }
 
 .markdown .markdown-table thead th {
   background: color-mix(in srgb, var(--surface-control) 55%, transparent);
   border-bottom: 1px solid var(--cm-border-default);
-  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
-  color: var(--text-strong);
 }
 
 .markdown .markdown-table tbody td {
