@@ -18,6 +18,7 @@ use super::schema;
 pub struct ToolRegistryBridge {
     registry: Arc<RwLock<ToolRegistry>>,
     whitelist: Arc<std::sync::RwLock<HashSet<String>>>,
+    domain_bus: Option<Arc<bus::DomainEventBus>>,
 }
 
 impl ToolRegistryBridge {
@@ -25,6 +26,19 @@ impl ToolRegistryBridge {
         Self {
             registry,
             whitelist: Arc::new(std::sync::RwLock::new(whitelist.into_iter().collect())),
+            domain_bus: None,
+        }
+    }
+
+    pub fn new_with_bus(
+        registry: Arc<RwLock<ToolRegistry>>,
+        whitelist: Vec<String>,
+        domain_bus: Arc<bus::DomainEventBus>,
+    ) -> Self {
+        Self {
+            registry,
+            whitelist: Arc::new(std::sync::RwLock::new(whitelist.into_iter().collect())),
+            domain_bus: Some(domain_bus),
         }
     }
 
@@ -113,7 +127,26 @@ impl ToolRegistryBridge {
         };
         // RwLock dropped here — concurrent requests are no longer blocked.
 
-        match tool.execute(arguments, &ctx).await {
+        let started_at = std::time::Instant::now();
+        let outcome = tool.execute(arguments.clone(), &ctx).await;
+        let duration_ms = started_at.elapsed().as_millis() as u64;
+
+        if let Some(bus) = &self.domain_bus {
+            bus.publish(bus::DomainEvent::ToolCallExecuted {
+                tool_name: tool_name.to_string(),
+                args_preview: Some(
+                    arguments
+                        .to_string()
+                        .chars()
+                        .take(512)
+                        .collect::<String>(),
+                ),
+                session_key: Some(format!("mcp:{session_id}")),
+                duration_ms: Some(duration_ms as i64),
+            });
+        }
+
+        match outcome {
             Ok(result) => Ok(CallToolResult::success(vec![Content::text(result)])),
             Err(e) => Ok(CallToolResult::error(vec![Content::text(e.to_string())])),
         }

@@ -8,17 +8,21 @@ license.workspace = true
 [dependencies]
 agent.workspace = true
 app-core.workspace = true
+bus.workspace = true
 desktop-shared.workspace = true
 mcp.workspace = true
 tools-core.workspace = true
 common.workspace = true
 config.workspace = true
 rmcp = { workspace = true, features = ["server", "transport-io", "macros"] }
-tokio.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 tracing.workspace = true
 anyhow.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+async-trait.workspace = true
 
 [package.metadata.cargo-machete]
 ignored = ["mcp"]

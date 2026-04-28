@@ -31,7 +31,11 @@ impl KlyntbotServerHandler {
     pub fn new(app: Arc<AppCore>, whitelist: Vec<String>) -> Self {
         let registry = app.agent.tool_registry();
         let has_agent = whitelist.iter().any(|w| w == "agent");
-        let bridge = ToolRegistryBridge::new(registry, whitelist);
+        let bridge = if let Some(ref bus) = app.domain_event_bus {
+            ToolRegistryBridge::new_with_bus(registry, whitelist, Arc::clone(bus))
+        } else {
+            ToolRegistryBridge::new(registry, whitelist)
+        };
         let agent_bridge = AgentBridge::new(Arc::clone(&app));
 
         let status_tool = Self::build_status_tool();
