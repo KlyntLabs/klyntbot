@@ -87,6 +87,17 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --cm-color-blue-fg:    #93c5fd;
+  --cm-color-purple-fg:  #d8b4fe;
+  --cm-color-green-fg:   #86efac;
+  --cm-color-orange-fg:  #fdba74;
+  --cm-color-amber-fg:   #fcd34d;
+  --cm-color-cyan-fg:    #67e8f9;
+  --cm-color-indigo-fg:  #a5b4fc;
+  --cm-color-teal-fg:    #5eead4;
+  --cm-color-pink-fg:    #f9a8d4;
+  --cm-color-warning-fg: #fcd34d;
+  --cm-color-danger-fg:  #fca5a5;
 }
 
 :root[data-theme="dark"] .app.is-windows:not(.reduced-transparency) {

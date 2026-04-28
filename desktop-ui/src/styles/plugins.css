@@ -42,3 +42,48 @@
 }
 
 .plugins-view__pane { flex: 1; overflow: hidden; }
+
+/* Event chip — used in WireFilters and WireEventCard */
+.cm-event-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  border-radius: 999px;
+  border: 1px solid;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity var(--ds-dur-fast) var(--ds-ease-out);
+}
+.cm-event-chip[aria-pressed="false"] { opacity: 0.55; }
+.cm-event-chip:hover { opacity: 1; }
+
+.cm-event-chip--blue    { background: var(--cm-color-blue-bg);    color: var(--cm-color-blue-fg);    border-color: var(--cm-color-blue-border); }
+.cm-event-chip--purple  { background: var(--cm-color-purple-bg);  color: var(--cm-color-purple-fg);  border-color: var(--cm-color-purple-border); }
+.cm-event-chip--green   { background: var(--cm-color-green-bg);   color: var(--cm-color-green-fg);   border-color: var(--cm-color-green-border); }
+.cm-event-chip--orange  { background: var(--cm-color-orange-bg);  color: var(--cm-color-orange-fg);  border-color: var(--cm-color-orange-border); }
+.cm-event-chip--amber   { background: var(--cm-color-amber-bg);   color: var(--cm-color-amber-fg);   border-color: var(--cm-color-amber-border); }
+.cm-event-chip--cyan    { background: var(--cm-color-cyan-bg);    color: var(--cm-color-cyan-fg);    border-color: var(--cm-color-cyan-border); }
+.cm-event-chip--indigo  { background: var(--cm-color-indigo-bg);  color: var(--cm-color-indigo-fg);  border-color: var(--cm-color-indigo-border); }
+.cm-event-chip--teal    { background: var(--cm-color-teal-bg);    color: var(--cm-color-teal-fg);    border-color: var(--cm-color-teal-border); }
+.cm-event-chip--pink    { background: var(--cm-color-pink-bg);    color: var(--cm-color-pink-fg);    border-color: var(--cm-color-pink-border); }
+.cm-event-chip--neutral { background: var(--cm-color-neutral-bg); color: var(--cm-color-neutral-fg); border-color: var(--cm-color-neutral-border); }
+
+/* Timeline gap row — shown between events when delta > threshold */
+.cm-gap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 12px;
+  font-size: var(--fs-2xs);
+  color: var(--ds-text-faint);
+}
+.cm-gap__line { flex: 1; height: 1px; background: var(--ds-border-subtle); }
+.cm-gap--warn { color: var(--cm-color-warning-fg); }
+.cm-gap--warn .cm-gap__line { background: var(--cm-color-warning-line); }
+.cm-gap--danger { color: var(--cm-color-danger-fg); }
+.cm-gap--danger .cm-gap__line { background: var(--cm-color-danger-line); }
