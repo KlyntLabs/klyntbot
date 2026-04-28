@@ -2,7 +2,7 @@ import { MainTopbar } from "@app/components/MainTopbar";
 import { type MouseEvent, type ReactNode, useEffect, useRef } from "react";
 import { ChatPane } from "./ChatPane";
 
-type CenterMode = "chat" | "diff";
+type CenterMode = "chat" | "diff" | "plugins";
 
 function shouldRenderDiffViewer({
   splitChatDiffView,
@@ -60,11 +60,12 @@ type DesktopLayoutProps = {
   approvalToastsNode: ReactNode;
   errorToastsNode: ReactNode;
   homeNode: ReactNode;
+  pluginsNode?: ReactNode;
   showHome: boolean;
   showWorkspace: boolean;
   topbarLeftNode: ReactNode;
   topbarActionsNode?: ReactNode;
-  centerMode: "chat" | "diff";
+  centerMode: CenterMode;
   preloadGitDiffs: boolean;
   splitChatDiffView: boolean;
   messagesNode: ReactNode;
@@ -87,6 +88,7 @@ export function DesktopLayout({
   approvalToastsNode,
   errorToastsNode,
   homeNode,
+  pluginsNode,
   showHome,
   showWorkspace,
   topbarLeftNode,
@@ -154,6 +156,7 @@ export function DesktopLayout({
         {updateToastNode}
         {errorToastsNode}
         {showHome && homeNode}
+      {centerMode === "plugins" && pluginsNode}
 
         {showWorkspace && (
           <>

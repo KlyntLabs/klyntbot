@@ -29,6 +29,7 @@ export function buildPrimaryNodes(options: PrimaryLayoutNodesOptions): PrimaryLa
     <SidebarChatLayout
       onOpenSettings={options.sidebarProps.onOpenSettings}
       onNewChat={options.sidebarProps.onNewChat}
+      onSelectPlugins={options.sidebarProps.onSelectPlugins}
       threads={options.sidebarProps.threads}
       selectedSessionKey={options.sidebarProps.selectedSessionKey}
       onSelectThread={options.sidebarProps.onSelectThread}

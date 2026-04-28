@@ -5,6 +5,7 @@ import type { ChatThread } from "@/features/chat/types";
 type SidebarChatLayoutProps = {
   onOpenSettings: () => void;
   onNewChat: () => void;
+  onSelectPlugins: () => void;
   threads: ChatThread[];
   selectedSessionKey: string | null;
   onSelectThread: (sessionKey: string) => void;
@@ -20,6 +21,7 @@ type NavItem = {
 export const SidebarChatLayout = memo(function SidebarChatLayout({
   onOpenSettings,
   onNewChat,
+  onSelectPlugins,
   threads,
   selectedSessionKey,
   onSelectThread,
@@ -27,7 +29,7 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   const navItems: NavItem[] = [
     { id: "new-chat", label: "New chat", icon: <SquarePen aria-hidden />, onClick: onNewChat },
     { id: "search", label: "Search", icon: <Search aria-hidden /> },
-    { id: "plugins", label: "Plugins", icon: <LayoutGrid aria-hidden /> },
+    { id: "plugins", label: "Plugins", icon: <LayoutGrid aria-hidden />, onClick: onSelectPlugins },
     { id: "automations", label: "Automations", icon: <Clock aria-hidden /> },
     { id: "project", label: "Project", icon: <FolderPlus aria-hidden /> },
   ];
