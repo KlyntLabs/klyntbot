@@ -39,7 +39,63 @@ impl PlatformCapture for MacCapture {
     }
 
     async fn list_displays(&self) -> Result<Vec<DisplayInfo>> {
-        Err(CaptureError::NotImplemented)
+        use platform_input::Rect;
+
+        extern "C" {
+            fn CGGetActiveDisplayList(
+                max: u32,
+                display_array: *mut u32,
+                display_count: *mut u32,
+            ) -> i32;
+            fn CGDisplayBounds(display: u32) -> CGRect;
+            fn CGDisplayBackingScaleFactor(display: u32) -> f64;
+            fn CGMainDisplayID() -> u32;
+        }
+        #[repr(C)]
+        #[derive(Copy, Clone)]
+        struct CGRect {
+            origin: CGPoint,
+            size: CGSize,
+        }
+        #[repr(C)]
+        #[derive(Copy, Clone)]
+        struct CGPoint { x: f64, y: f64 }
+        #[repr(C)]
+        #[derive(Copy, Clone)]
+        struct CGSize { width: f64, height: f64 }
+
+        const MAX_DISPLAYS: u32 = 32;
+        let mut ids = [0u32; MAX_DISPLAYS as usize];
+        let mut count: u32 = 0;
+        // SAFETY: pointer + length passed correctly; CGGetActiveDisplayList
+        // is documented thread-safe.
+        let err = unsafe { CGGetActiveDisplayList(MAX_DISPLAYS, ids.as_mut_ptr(), &mut count) };
+        if err != 0 {
+            return Err(CaptureError::CaptureFailed(format!(
+                "CGGetActiveDisplayList failed: {}", err
+            )));
+        }
+
+        let main_id = unsafe { CGMainDisplayID() };
+        let mut out = Vec::with_capacity(count as usize);
+        for i in 0..count as usize {
+            let id = ids[i];
+            let bounds = unsafe { CGDisplayBounds(id) };
+            let scale = unsafe { CGDisplayBackingScaleFactor(id) };
+            out.push(DisplayInfo {
+                id,
+                frame: Rect {
+                    x: bounds.origin.x,
+                    y: bounds.origin.y,
+                    w: bounds.size.width,
+                    h: bounds.size.height,
+                },
+                scale,
+                name: format!("Display {}", id),
+                is_primary: id == main_id,
+            });
+        }
+        Ok(out)
     }
 
     async fn get_active_window(&self) -> Result<Option<WindowInfo>> {
