@@ -46,7 +46,13 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png"
-    ]
+    ],
+    "macOS": {
+      "infoPlist": {
+        "NSScreenCaptureUsageDescription": "Klynt needs screen recording to capture screenshots for computer-use automation.",
+        "NSAppleEventsUsageDescription": "Klynt sends Apple Events to control other applications during computer-use automation."
+      }
+    }
   },
   "plugins": {
     "updater": {
