@@ -65,3 +65,36 @@ pub fn open_accessibility_settings() {
             .spawn();
     }
 }
+
+/// Request the macOS Accessibility permission with prompt.
+///
+/// Calls `AXIsProcessTrustedWithOptions({"AXTrustedCheckOptionPrompt": true})`,
+/// which presents the system "wants to control your computer" dialog
+/// the *first* time the app needs Accessibility. Returns the current
+/// trust state. On subsequent calls (after user grants or denies),
+/// the dialog is not re-shown — the function simply returns the trust
+/// state.
+///
+/// Required for CGEvent input injection (see `MacInput`).
+#[cfg(target_os = "macos")]
+pub fn request_accessibility_for_input() -> bool {
+    use core_foundation::base::TCFType;
+    use core_foundation::boolean::CFBoolean;
+    use core_foundation::dictionary::CFDictionary;
+    use core_foundation::string::CFString;
+
+    extern "C" {
+        fn AXIsProcessTrustedWithOptions(options: core_foundation::base::CFTypeRef) -> bool;
+    }
+
+    let key = CFString::new("AXTrustedCheckOptionPrompt");
+    let value = CFBoolean::true_value();
+    let options = CFDictionary::from_CFType_pairs(&[(key, value)]);
+    // SAFETY: CFTypeRef from a CFDictionary is valid for the call.
+    unsafe { AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef() as _) }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn request_accessibility_for_input() -> bool {
+    true
+}
