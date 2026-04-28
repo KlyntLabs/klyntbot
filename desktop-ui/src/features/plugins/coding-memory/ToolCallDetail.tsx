@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { X, Copy, Check, Clock, AlertCircle } from "lucide-react";
+import { CausalGraphInspector } from "./CausalGraphInspector";
 import { formatTimestamp } from "./eventHelpers";
 import type { WireEventDto } from "./types";
 
@@ -93,6 +94,7 @@ export function ToolCallDetail({ selectedEvent, allEvents, onClose }: ToolCallDe
             Error
           </span>
         )}
+        <CausalGraphInspector factIds={getRecallIds(pair.toolResult)} />
         <button type="button" className="cm-tool-detail__close" onClick={onClose}>
           <X size={14} />
         </button>
@@ -133,6 +135,14 @@ function getResultOutput(event: WireEventDto): unknown {
   const p = event.payloadDecoded as any;
   if (p?.return_value !== undefined) return p.return_value;
   return p;
+}
+
+function getRecallIds(event: WireEventDto | null): string[] {
+  if (!event) return [];
+  const p = event.payloadDecoded as any;
+  const ids = p?.return_value?.recall_ids;
+  if (Array.isArray(ids)) return ids.filter((x): x is string => typeof x === "string");
+  return [];
 }
 
 function CopyableJson({ data }: { data: unknown }) {

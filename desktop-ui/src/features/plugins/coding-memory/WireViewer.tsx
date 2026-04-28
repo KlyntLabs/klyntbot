@@ -4,6 +4,8 @@ import { WireEventCard } from "./WireEventCard";
 import { WireFilters } from "./WireFilters";
 import { TurnTree } from "./TurnTree";
 import { ToolCallDetail } from "./ToolCallDetail";
+import { RecallOverlay } from "./RecallOverlay";
+import { MirrorAlertSidecar } from "./MirrorAlertSidecar";
 import { buildToolGrouping } from "./buildToolGrouping";
 import { isErrorEvent } from "./eventHelpers";
 import { fetchSessionWire } from "@/api/endpoints/codingMemory";
@@ -23,6 +25,8 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [errorsOnly, setErrorsOnly] = useState(false);
   const [selectedToolEvent, setSelectedToolEvent] = useState<WireEventDto | null>(null);
+  const [showRecall, setShowRecall] = useState(false);
+  const [showMirror, setShowMirror] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   useEffect(() => {
@@ -217,6 +221,22 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
         onPrevError={() => navigateError("prev")}
         onApplyPreset={applyPreset}
       />
+      <div className="cm-wire-viewer__toggles">
+        <button
+          type="button"
+          className={"cm-wire-viewer__toggle" + (showRecall ? " cm-wire-viewer__toggle--active" : "")}
+          onClick={() => setShowRecall((v) => !v)}
+        >
+          Recall
+        </button>
+        <button
+          type="button"
+          className={"cm-wire-viewer__toggle" + (showMirror ? " cm-wire-viewer__toggle--active" : "")}
+          onClick={() => setShowMirror((v) => !v)}
+        >
+          Mirror
+        </button>
+      </div>
       <div className="cm-wire-viewer__body">
         <TurnTree events={events} onScrollToIndex={scrollToEventIndex} />
         <div className="cm-wire-viewer__main">
@@ -250,6 +270,8 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
               onClose={() => setSelectedToolEvent(null)}
             />
           )}
+          {showRecall && <RecallOverlay sessionId={sessionId} />}
+          {showMirror && <MirrorAlertSidecar />}
         </div>
       </div>
     </div>
