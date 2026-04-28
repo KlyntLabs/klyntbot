@@ -6,5 +6,7 @@
     <string>Klynt needs screen recording to capture screenshots for computer-use automation.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Klynt sends Apple Events to control other applications during computer-use automation.</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Klynt uses macOS Accessibility to read UI structure and inject keyboard and mouse events for computer-use automation.</string>
 </dict>
 </plist>
