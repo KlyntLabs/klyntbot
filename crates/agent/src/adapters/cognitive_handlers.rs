@@ -613,6 +613,127 @@ impl ConsolidationHandler for LlmConsolidationHandler {
     }
 }
 
+// ── Graph Linker ──────────────────────────────────────────────────────
+
+pub(crate) const GRAPH_LINK_SYSTEM_PROMPT: &str = r#"You are a per-turn knowledge graph linker for a personal AI assistant.
+
+You receive a single newly-written fact, the 1-hop neighborhood of its subject and object entities, and up to 5 candidate facts that share an entity with the new fact. Decide:
+
+(1) MERGES — Do any pair of entities in the neighborhood refer to the same real-world thing? Only emit a merge when the names are clearly aliases (case differences, common short forms, exact synonyms). When in doubt, do not merge. Output the canonical name and a one-sentence reason.
+
+(2) DISCOVERED RELATIONSHIPS — Does the new fact reveal a relationship between its entities and any neighbor that isn't already represented? Output as (source, target, relationship_type, edge_type, strength, evidence). edge_type ∈ {"causal", "correlational", "temporal", "structural"}.
+  - causal: A causes B (e.g., "deadline approaching" causes "stress increases")
+  - correlational: A and B co-occur but no causation claimed (default for most facts)
+  - temporal: A precedes B in time (e.g., "graduated" precedes "started job")
+  - structural: A is part of / contains B (e.g., "Anthropic contains Claude team")
+  Only emit a relationship if (a) both endpoints already exist in the neighborhood or in the new fact, AND (b) the relationship is supported by either the new fact's text or the candidate facts. Do NOT invent edges.
+
+(3) SUPERSEDED — Does the new fact directly contradict or replace any candidate fact? Mark the candidate's id, the valid_until timestamp (use the new fact's valid_at), and a short reason. Conservative: only supersede on direct contradiction, not refinement.
+
+Output strict JSON exactly matching:
+{"merges": [...], "discovered_relationships": [...], "superseded": [...]}
+
+If nothing applies, output {"merges": [], "discovered_relationships": [], "superseded": []}. Never invent IDs or names not present in the input."#;
+
+/// LLM-backed graph linker handler.
+pub struct LlmGraphLinkHandler {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmGraphLinkHandler {
+    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
+        Self {
+            provider,
+            params: params.with_response_format(ResponseFormat::JsonObject),
+        }
+    }
+}
+
+#[async_trait]
+impl cognitive::services::graph_linker::GraphLinkHandler for LlmGraphLinkHandler {
+    async fn link(&self, input: cognitive::services::graph_linker_types::GraphLinkInput) -> common::Result<cognitive::services::graph_linker_types::GraphLinkOutput> {
+        if !cognitive::services::graph_linker_types::should_invoke_linker(&input) {
+            return Ok(cognitive::services::graph_linker_types::GraphLinkOutput::default());
+        }
+
+        let user_msg = build_graph_link_user_message(&input);
+
+        let messages = vec![
+            Message::system(GRAPH_LINK_SYSTEM_PROMPT.to_string()),
+            Message::user(user_msg),
+        ];
+
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("graph_link: {e}"))))?;
+
+        let text = resp.content.unwrap_or_default();
+        match serde_json::from_str::<cognitive::services::graph_linker_types::GraphLinkOutput>(&text) {
+            Ok(out) => Ok(out),
+            Err(e) => {
+                tracing::warn!(error = %e, raw = %text, "graph_link: failed to parse LLM JSON; returning empty output");
+                Ok(cognitive::services::graph_linker_types::GraphLinkOutput::default())
+            }
+        }
+    }
+}
+
+fn build_graph_link_user_message(input: &cognitive::services::graph_linker_types::GraphLinkInput) -> String {
+    use std::fmt::Write;
+    let mut s = String::new();
+    let nf = &input.new_fact;
+    let _ = writeln!(
+        s,
+        "NEW FACT (id={}): {} -- {} -- {} (confidence: {:.2}, valid_at: {})",
+        nf.fact_id, nf.subject, nf.predicate, nf.object, nf.confidence, nf.valid_at
+    );
+
+    if let Some(t) = &input.recent_user_text {
+        let _ = writeln!(s, "\nRECENT USER TEXT: {}", t);
+    }
+
+    let _ = writeln!(s, "\nSUBJECT NEIGHBORHOOD:");
+    for n in &input.subject_neighborhood {
+        let _ = writeln!(
+            s,
+            "  - id={} name={} via={} (strength {:.2})",
+            n.entity_id, n.name, n.relationship_type, n.strength
+        );
+    }
+    if input.subject_neighborhood.is_empty() {
+        let _ = writeln!(s, "  (none)");
+    }
+
+    let _ = writeln!(s, "\nOBJECT NEIGHBORHOOD:");
+    for n in &input.object_neighborhood {
+        let _ = writeln!(
+            s,
+            "  - id={} name={} via={} (strength {:.2})",
+            n.entity_id, n.name, n.relationship_type, n.strength
+        );
+    }
+    if input.object_neighborhood.is_empty() {
+        let _ = writeln!(s, "  (none)");
+    }
+
+    let _ = writeln!(s, "\nCANDIDATE FACTS:");
+    for c in &input.candidate_facts {
+        let _ = writeln!(
+            s,
+            "  - id={} {} -- {} -- {} (valid {} -> {:?})",
+            c.fact_id, c.subject, c.predicate, c.object, c.valid_at, c.valid_until
+        );
+    }
+    if input.candidate_facts.is_empty() {
+        let _ = writeln!(s, "  (none)");
+    }
+
+    s
+}
+
 // ── Deep Consolidation ────────────────────────────────────────────────
 
 const DEEP_CONSOLIDATION_PROMPT: &str = r#"You are a knowledge consolidation engine for a personal AI assistant. You receive clusters of signals from different sources about a user. Each cluster groups signals about the same topic.
@@ -1277,6 +1398,91 @@ mod tests {
             .unwrap();
         let op = ops.into_iter().next().unwrap();
         assert_eq!(op, MemoryOp::Noop);
+    }
+
+    // ── LLM graph linker tests ──
+
+    #[tokio::test]
+    async fn llm_graph_link_handler_parses_well_formed_response() {
+        use cognitive::services::graph_linker_types::*;
+        use cognitive::services::graph_linker::GraphLinkHandler;
+
+        let json_response = r#"{
+            "merges": [],
+            "discovered_relationships": [
+                {"source_entity_name": "Alice", "target_entity_name": "Rust",
+                 "relationship_type": "uses", "edge_type": "correlational",
+                 "strength": 0.7, "evidence": "Alice prefers Rust per recent fact"}
+            ],
+            "superseded": []
+        }"#;
+
+        let mock = Arc::new(MockProvider::new(mock_response(json_response)));
+        let params = ChatParams::new("test-model");
+        let handler = LlmGraphLinkHandler::new(mock, params);
+
+        let input = GraphLinkInput {
+            new_fact: NewFactRef {
+                fact_id: "f1".into(),
+                subject: "Alice".into(),
+                subject_entity_id: Some("e_alice".into()),
+                predicate: "prefers".into(),
+                object: "Rust".into(),
+                object_entity_id: None,
+                confidence: 0.8,
+                valid_at: "2026-04-29T00:00:00Z".into(),
+            },
+            subject_neighborhood: vec![NeighborRef {
+                entity_id: "e_bob".into(),
+                name: "Bob".into(),
+                relationship_type: "knows".into(),
+                strength: 0.8,
+            }],
+            object_neighborhood: vec![],
+            candidate_facts: vec![],
+            recent_user_text: None,
+        };
+
+        let out = handler.link(input).await.unwrap();
+        assert_eq!(out.discovered_relationships.len(), 1);
+        assert_eq!(out.discovered_relationships[0].edge_type, "correlational");
+    }
+
+    #[tokio::test]
+    async fn llm_graph_link_handler_returns_empty_on_malformed_response() {
+        use cognitive::services::graph_linker_types::*;
+        use cognitive::services::graph_linker::GraphLinkHandler;
+
+        let mock = Arc::new(MockProvider::new(mock_response("not json")));
+        let params = ChatParams::new("test-model");
+        let handler = LlmGraphLinkHandler::new(mock, params);
+
+        let input = GraphLinkInput {
+            new_fact: NewFactRef {
+                fact_id: "f1".into(),
+                subject: "A".into(),
+                subject_entity_id: None,
+                predicate: "p".into(),
+                object: "B".into(),
+                object_entity_id: None,
+                confidence: 0.5,
+                valid_at: "2026-04-29T00:00:00Z".into(),
+            },
+            subject_neighborhood: vec![NeighborRef {
+                entity_id: "e".into(),
+                name: "X".into(),
+                relationship_type: "r".into(),
+                strength: 0.5,
+            }],
+            object_neighborhood: vec![],
+            candidate_facts: vec![],
+            recent_user_text: None,
+        };
+
+        let out = handler.link(input).await.unwrap();
+        assert!(out.discovered_relationships.is_empty());
+        assert!(out.merges.is_empty());
+        assert!(out.superseded.is_empty());
     }
 
     // ── LLM coaching reasoner tests ──
