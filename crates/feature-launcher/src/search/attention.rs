@@ -81,7 +81,7 @@ pub(crate) fn route_rows_to_items_and_signals(
         .collect()
 }
 
-fn into_site_item(row: EntityAttentionRow) -> LauncherItem {
+pub fn into_site_item(row: EntityAttentionRow) -> LauncherItem {
     LauncherItem {
         id: format!("attention:site:{}", row.canonical_id),
         title: row.display_name.clone(),
