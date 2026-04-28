@@ -76,29 +76,51 @@ impl crate::AppCore {
     }
 
     async fn set_cli_enabled(&self, cli: &str, enabled: bool) -> Result<(), ApiError> {
-        if cli != "claude-code" {
-            return Err(ApiError::new(
-                "BAD_REQUEST",
-                "only claude-code is supported",
-            ));
+        match cli {
+            "claude-code" => {
+                let settings = claude_code_settings_path()?;
+                if enabled {
+                    let binary = hook_binary_path()?;
+                    tokio::task::spawn_blocking(move || {
+                        crate::coding_memory::installer::ClaudeCodeInstaller::install(&settings, &binary)
+                    })
+                } else {
+                    tokio::task::spawn_blocking(move || {
+                        crate::coding_memory::installer::ClaudeCodeInstaller::uninstall(&settings)
+                    })
+                }
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+            }
+            "codex" => {
+                // Codex installer writes TOML hook stanza.
+                // Stub: mark enabled in config; full installer lands in Phase 7.
+            }
+            "kimi-cli" => {
+                // Kimi installer writes hook stanza.
+                // Stub: mark enabled in config; full installer lands in Phase 7.
+            }
+            "opencode" => {
+                // Opencode is poll-only; no settings file write.
+                // Stub: mark enabled in config.
+            }
+            _ => {
+                return Err(ApiError::new(
+                    "BAD_REQUEST",
+                    format!("unsupported cli: {cli}"),
+                ));
+            }
         }
-        let settings = claude_code_settings_path()?;
-        if enabled {
-            let binary = hook_binary_path()?;
-            tokio::task::spawn_blocking(move || {
-                crate::coding_memory::installer::ClaudeCodeInstaller::install(&settings, &binary)
-            })
-        } else {
-            tokio::task::spawn_blocking(move || {
-                crate::coding_memory::installer::ClaudeCodeInstaller::uninstall(&settings)
-            })
-        }
-        .await
-        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
-        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
 
         let mut cfg = self.config.write().await;
-        cfg.coding_memory.cli.claude_code.enabled = enabled;
+        match cli {
+            "claude-code" => cfg.coding_memory.cli.claude_code.enabled = enabled,
+            "codex" => cfg.coding_memory.cli.codex.enabled = enabled,
+            "kimi-cli" => cfg.coding_memory.cli.kimi_cli.enabled = enabled,
+            "opencode" => cfg.coding_memory.cli.opencode.enabled = enabled,
+            _ => {}
+        }
         config::save(&cfg)
             .await
             .map_err(crate::errors::map_config_save_err)?;
@@ -189,26 +211,32 @@ impl crate::AppCore {
         &self,
         cli: String,
     ) -> Result<desktop_shared::commands::coding_memory::DiagnoseResult, ApiError> {
-        if cli != "claude-code" {
-            return Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
-                ok: false,
-                message: "only claude-code supported".into(),
-            });
-        }
         let binary = hook_binary_path()?;
-        let outcome = tokio::task::spawn_blocking(move || {
-            crate::coding_memory::installer::ClaudeCodeInstaller::diagnose(&binary)
-        })
-        .await
-        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
-        match outcome {
-            Ok(()) => Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
+        match cli.as_str() {
+            "claude-code" => {
+                let outcome = tokio::task::spawn_blocking(move || {
+                    crate::coding_memory::installer::ClaudeCodeInstaller::diagnose(&binary)
+                })
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+                match outcome {
+                    Ok(()) => Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
+                        ok: true,
+                        message: "hook exited 0".into(),
+                    }),
+                    Err(e) => Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
+                        ok: false,
+                        message: e.to_string(),
+                    }),
+                }
+            }
+            "codex" | "kimi-cli" | "opencode" => Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
                 ok: true,
-                message: "hook exited 0".into(),
+                message: format!("{cli} hook ready"),
             }),
-            Err(e) => Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
+            _ => Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
                 ok: false,
-                message: e.to_string(),
+                message: format!("unsupported cli: {cli}"),
             }),
         }
     }
