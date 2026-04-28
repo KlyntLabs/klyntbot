@@ -14,6 +14,61 @@ use platform_input::{
     ComputerUseAction, PlatformError, PlatformInput, Point, Result,
 };
 
+/// Map a Klynt-canonical key name to a macOS virtual key code.
+/// Returns `None` for unknown names; callers may fall back to
+/// per-character `CGEventKeyboardSetUnicodeString`.
+fn key_name_to_virtual_code(name: &str) -> Option<u16> {
+    match name.to_lowercase().as_str() {
+        "enter" | "return" => Some(0x24),
+        "tab" => Some(0x30),
+        "space" => Some(0x31),
+        "delete" | "backspace" => Some(0x33),
+        "escape" | "esc" => Some(0x35),
+        "left" => Some(0x7B),
+        "right" => Some(0x7C),
+        "down" => Some(0x7D),
+        "up" => Some(0x7E),
+        "cmd" | "command" => Some(0x37),
+        "shift" => Some(0x38),
+        "alt" | "option" => Some(0x3A),
+        "ctrl" | "control" => Some(0x3B),
+        "f1" => Some(0x7A),
+        "f2" => Some(0x78),
+        "f3" => Some(0x63),
+        "f4" => Some(0x76),
+        "f5" => Some(0x60),
+        "f6" => Some(0x61),
+        // a-z map to 0x00..0x1D in macOS QWERTY layout
+        c if c.len() == 1 => {
+            let ch = c.chars().next()?;
+            match ch {
+                'a' => Some(0x00), 'b' => Some(0x0B), 'c' => Some(0x08),
+                'd' => Some(0x02), 'e' => Some(0x0E), 'f' => Some(0x03),
+                'g' => Some(0x05), 'h' => Some(0x04), 'i' => Some(0x22),
+                'j' => Some(0x26), 'k' => Some(0x28), 'l' => Some(0x25),
+                'm' => Some(0x2E), 'n' => Some(0x2D), 'o' => Some(0x1F),
+                'p' => Some(0x23), 'q' => Some(0x0C), 'r' => Some(0x0F),
+                's' => Some(0x01), 't' => Some(0x11), 'u' => Some(0x20),
+                'v' => Some(0x09), 'w' => Some(0x0D), 'x' => Some(0x07),
+                'y' => Some(0x10), 'z' => Some(0x06),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Map a `KeyMods` to CGEvent flag bits.
+fn mods_to_flags(m: platform_input::KeyMods) -> core_graphics::event::CGEventFlags {
+    use core_graphics::event::CGEventFlags;
+    let mut f = CGEventFlags::empty();
+    if m.cmd { f |= CGEventFlags::CGEventFlagCommand; }
+    if m.shift { f |= CGEventFlags::CGEventFlagShift; }
+    if m.alt { f |= CGEventFlags::CGEventFlagAlternate; }
+    if m.ctrl { f |= CGEventFlags::CGEventFlagControl; }
+    f
+}
+
 pub struct MacInput {
     /// Cached CGEventSource. Apple states a single source can be
     /// reused across all events from the same logical actor.
@@ -104,6 +159,92 @@ impl PlatformInput for MacInput {
             }
             ComputerUseAction::MiddleClick { x, y } => {
                 self.post_click(x, y, core_graphics::event::CGMouseButton::Center, 1)
+            }
+            ComputerUseAction::Type { text } => {
+                // Per-character via CGEventKeyboardSetUnicodeString (works for
+                // any Unicode without virtual-key resolution).
+                for ch in text.chars() {
+                    let down = CGEvent::new_keyboard_event(self.source.clone(), 0, true)
+                        .map_err(|()| PlatformError::PlatformCallFailed(
+                            "CGEventCreateKeyboardEvent down failed".into(),
+                        ))?;
+                    let s = ch.to_string();
+                    let utf16: Vec<u16> = s.encode_utf16().collect();
+                    down.set_string_from_utf16_unchecked(&utf16);
+                    down.post(CGEventTapLocation::HID);
+                    let up = CGEvent::new_keyboard_event(self.source.clone(), 0, false)
+                        .map_err(|()| PlatformError::PlatformCallFailed(
+                            "CGEventCreateKeyboardEvent up failed".into(),
+                        ))?;
+                    up.set_string_from_utf16_unchecked(&utf16);
+                    up.post(CGEventTapLocation::HID);
+                }
+                Ok(())
+            }
+            ComputerUseAction::Key { keys } => {
+                use core_graphics::event::CGEventFlags;
+                // Resolve modifiers first, then the final key.
+                let mut flags = CGEventFlags::empty();
+                let mut final_key: Option<u16> = None;
+                for k in &keys {
+                    match k.to_lowercase().as_str() {
+                        "cmd" | "command" => flags |= CGEventFlags::CGEventFlagCommand,
+                        "shift"           => flags |= CGEventFlags::CGEventFlagShift,
+                        "alt" | "option"  => flags |= CGEventFlags::CGEventFlagAlternate,
+                        "ctrl" | "control"=> flags |= CGEventFlags::CGEventFlagControl,
+                        other => {
+                            final_key = key_name_to_virtual_code(other)
+                                .or(final_key); // first non-modifier wins
+                        }
+                    }
+                }
+                let vk = final_key.ok_or_else(|| {
+                    PlatformError::UnsupportedKey(format!("no terminal key in {:?}", keys))
+                })?;
+                let down = CGEvent::new_keyboard_event(self.source.clone(), vk, true)
+                    .map_err(|()| PlatformError::PlatformCallFailed("keyboard down failed".into()))?;
+                down.set_flags(flags);
+                down.post(CGEventTapLocation::HID);
+                let up = CGEvent::new_keyboard_event(self.source.clone(), vk, false)
+                    .map_err(|()| PlatformError::PlatformCallFailed("keyboard up failed".into()))?;
+                up.set_flags(flags);
+                up.post(CGEventTapLocation::HID);
+                Ok(())
+            }
+            ComputerUseAction::HoldKey { keys, duration_ms } => {
+                use core_graphics::event::CGEventFlags;
+                let mut flags = CGEventFlags::empty();
+                let mut final_key: Option<u16> = None;
+                for k in &keys {
+                    match k.to_lowercase().as_str() {
+                        "cmd" | "command" => flags |= CGEventFlags::CGEventFlagCommand,
+                        "shift"           => flags |= CGEventFlags::CGEventFlagShift,
+                        "alt" | "option"  => flags |= CGEventFlags::CGEventFlagAlternate,
+                        "ctrl" | "control"=> flags |= CGEventFlags::CGEventFlagControl,
+                        other => final_key = key_name_to_virtual_code(other).or(final_key),
+                    }
+                }
+                let vk = final_key.ok_or_else(|| {
+                    PlatformError::UnsupportedKey(format!("no terminal key in {:?}", keys))
+                })?;
+                {
+                    let down = CGEvent::new_keyboard_event(self.source.clone(), vk, true)
+                        .map_err(|()| PlatformError::PlatformCallFailed("keyboard down failed".into()))?;
+                    down.set_flags(flags);
+                    down.post(CGEventTapLocation::HID);
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(duration_ms as u64)).await;
+                {
+                    let up = CGEvent::new_keyboard_event(self.source.clone(), vk, false)
+                        .map_err(|()| PlatformError::PlatformCallFailed("keyboard up failed".into()))?;
+                    up.set_flags(flags);
+                    up.post(CGEventTapLocation::HID);
+                }
+                Ok(())
+            }
+            ComputerUseAction::Wait { duration_ms } => {
+                tokio::time::sleep(std::time::Duration::from_millis(duration_ms as u64)).await;
+                Ok(())
             }
             _ => Err(PlatformError::NotImplemented),
         }
