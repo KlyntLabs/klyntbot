@@ -414,11 +414,21 @@
 .file-preview-line-text .token.comment,
 .file-preview-line-text .token.prolog,
 .file-preview-line-text .token.doctype,
-.file-preview-line-text .token.cdata {
+.file-preview-line-text .token.cdata,
+.message .markdown-codeblock .token.comment,
+.message .markdown-codeblock .token.prolog,
+.message .markdown-codeblock .token.doctype,
+.message .markdown-codeblock .token.cdata,
+.message .markdown-codeblock-single .token.comment,
+.message .markdown-codeblock-single .token.prolog,
+.message .markdown-codeblock-single .token.doctype,
+.message .markdown-codeblock-single .token.cdata {
   color: rgba(150, 170, 200, 0.75);
 }
 
-.file-preview-line-text .token.punctuation {
+.file-preview-line-text .token.punctuation,
+.message .markdown-codeblock .token.punctuation,
+.message .markdown-codeblock-single .token.punctuation {
   color: rgba(200, 210, 220, 0.85);
 }
 
@@ -426,12 +436,26 @@
 .file-preview-line-text .token.tag,
 .file-preview-line-text .token.constant,
 .file-preview-line-text .token.symbol,
-.file-preview-line-text .token.deleted {
+.file-preview-line-text .token.deleted,
+.message .markdown-codeblock .token.property,
+.message .markdown-codeblock .token.tag,
+.message .markdown-codeblock .token.constant,
+.message .markdown-codeblock .token.symbol,
+.message .markdown-codeblock .token.deleted,
+.message .markdown-codeblock-single .token.property,
+.message .markdown-codeblock-single .token.tag,
+.message .markdown-codeblock-single .token.constant,
+.message .markdown-codeblock-single .token.symbol,
+.message .markdown-codeblock-single .token.deleted {
   color: #ff7b72;
 }
 
 .file-preview-line-text .token.boolean,
-.file-preview-line-text .token.number {
+.file-preview-line-text .token.number,
+.message .markdown-codeblock .token.boolean,
+.message .markdown-codeblock .token.number,
+.message .markdown-codeblock-single .token.boolean,
+.message .markdown-codeblock-single .token.number {
   color: #f2cc60;
 }
 
@@ -440,24 +464,54 @@
 .file-preview-line-text .token.string,
 .file-preview-line-text .token.char,
 .file-preview-line-text .token.builtin,
-.file-preview-line-text .token.inserted {
+.file-preview-line-text .token.inserted,
+.message .markdown-codeblock .token.selector,
+.message .markdown-codeblock .token.attr-name,
+.message .markdown-codeblock .token.string,
+.message .markdown-codeblock .token.char,
+.message .markdown-codeblock .token.builtin,
+.message .markdown-codeblock .token.inserted,
+.message .markdown-codeblock-single .token.selector,
+.message .markdown-codeblock-single .token.attr-name,
+.message .markdown-codeblock-single .token.string,
+.message .markdown-codeblock-single .token.char,
+.message .markdown-codeblock-single .token.builtin,
+.message .markdown-codeblock-single .token.inserted {
   color: #7ee787;
 }
 
 .file-preview-line-text .token.operator,
 .file-preview-line-text .token.entity,
 .file-preview-line-text .token.url,
-.file-preview-line-text .token.variable {
+.file-preview-line-text .token.variable,
+.message .markdown-codeblock .token.operator,
+.message .markdown-codeblock .token.entity,
+.message .markdown-codeblock .token.url,
+.message .markdown-codeblock .token.variable,
+.message .markdown-codeblock-single .token.operator,
+.message .markdown-codeblock-single .token.entity,
+.message .markdown-codeblock-single .token.url,
+.message .markdown-codeblock-single .token.variable {
   color: rgba(200, 210, 220, 0.9);
 }
 
 .file-preview-line-text .token.atrule,
 .file-preview-line-text .token.attr-value,
-.file-preview-line-text .token.keyword {
+.file-preview-line-text .token.keyword,
+.message .markdown-codeblock .token.atrule,
+.message .markdown-codeblock .token.attr-value,
+.message .markdown-codeblock .token.keyword,
+.message .markdown-codeblock-single .token.atrule,
+.message .markdown-codeblock-single .token.attr-value,
+.message .markdown-codeblock-single .token.keyword {
   color: #8bd5ff;
 }
 
 .file-preview-line-text .token.function,
-.file-preview-line-text .token.class-name {
+.file-preview-line-text .token.class-name,
+.message .markdown-codeblock .token.function,
+.message .markdown-codeblock .token.class-name,
+.message .markdown-codeblock-single .token.function,
+.message .markdown-codeblock-single .token.class-name {
   color: #d2a8ff;
 }

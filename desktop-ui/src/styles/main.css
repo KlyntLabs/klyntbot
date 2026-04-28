@@ -962,7 +962,7 @@
 .chat-pane-composer {
   position: absolute;
   left: 0;
-  right: 0;
+  right: var(--scrollbar-gutter-width, 12px);
   bottom: 0;
   z-index: 2;
   pointer-events: none;

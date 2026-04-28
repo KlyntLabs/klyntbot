@@ -1,8 +1,85 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ParsedFileLocation } from "@utils/fileLinks";
-import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { highlightLine } from "@utils/syntax";
+import "katex/dist/katex.min.css";
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+
+const { href: _droppedHrefProtocols, ...defaultProtocolsWithoutHref } =
+  defaultSchema.protocols ?? {};
+
+const KATEX_MATHML_TAGS = [
+  "math",
+  "annotation",
+  "semantics",
+  "mtext",
+  "mn",
+  "mo",
+  "mi",
+  "mspace",
+  "mover",
+  "munder",
+  "munderover",
+  "msup",
+  "msub",
+  "msubsup",
+  "mfrac",
+  "mroot",
+  "msqrt",
+  "mtable",
+  "mtr",
+  "mtd",
+  "mlabeledtr",
+  "mrow",
+  "menclose",
+  "mstyle",
+  "mpadded",
+  "mphantom",
+  "mglyph",
+  "merror",
+];
+
+const markdownSanitizeSchema = {
+  ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary", "abbr", ...KATEX_MATHML_TAGS],
+  attributes: {
+    ...(defaultSchema.attributes ?? {}),
+    details: [...((defaultSchema.attributes?.details as string[]) ?? []), "open"],
+    summary: [...((defaultSchema.attributes?.summary as string[]) ?? [])],
+    abbr: [...((defaultSchema.attributes?.abbr as string[]) ?? []), "title"],
+    span: [...((defaultSchema.attributes?.span as string[]) ?? []), "style", "ariaHidden"],
+    div: [...((defaultSchema.attributes?.div as string[]) ?? []), "style"],
+    math: ["xmlns", "display"],
+    annotation: ["encoding"],
+  },
+  protocols: defaultProtocolsWithoutHref,
+};
+
+const PRISM_LANG_ALIAS: Record<string, string> = {
+  ts: "typescript",
+  js: "javascript",
+  py: "python",
+  rb: "ruby",
+  rs: "rust",
+  sh: "bash",
+  shell: "bash",
+  yml: "yaml",
+  md: "markdown",
+};
+
+function resolvePrismLanguage(tag: string | null) {
+  if (!tag) {
+    return null;
+  }
+  const lower = tag.toLowerCase();
+  return PRISM_LANG_ALIAS[lower] ?? lower;
+}
+
 import {
   describeFileTarget,
   formatParsedFileLocation,
@@ -13,6 +90,7 @@ import {
   resolveMessageFileHref,
   toFileLink,
 } from "../utils/messageFileLinks";
+import { MermaidDiagram } from "./MermaidDiagram";
 
 type MarkdownProps = {
   value: string;
@@ -182,6 +260,81 @@ function stripTrailingMemoryCitation(value: string) {
   return value.replace(/\n*<oai-mem-citation>[\s\S]*?<\/oai-mem-citation>\s*$/i, "").trim();
 }
 
+const ABBR_DEFINITION_LINE =
+  /^[ \t]*(?:\*\[[^\]]+\]:[ \t]+.+?[ \t]*)(?:[ \t]+\*\[[^\]]+\]:[ \t]+.+?[ \t]*)*$/;
+const ABBR_DEFINITION_PIECE = /\*\[([^\]]+)\]:[ \t]+(.+?)(?=[ \t]+\*\[|$)/g;
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function escapeHtmlAttr(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function applyAbbreviations(value: string) {
+  const definitions = new Map<string, string>();
+  const lines = value.split(/\r?\n/);
+  let inFence = false;
+  const kept: string[] = [];
+  for (const line of lines) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      kept.push(line);
+      continue;
+    }
+    if (!inFence && ABBR_DEFINITION_LINE.test(line)) {
+      ABBR_DEFINITION_PIECE.lastIndex = 0;
+      let match: RegExpExecArray | null = ABBR_DEFINITION_PIECE.exec(line);
+      while (match !== null) {
+        definitions.set(match[1].trim(), match[2].trim());
+        match = ABBR_DEFINITION_PIECE.exec(line);
+      }
+      continue;
+    }
+    kept.push(line);
+  }
+  if (definitions.size === 0) {
+    return value;
+  }
+  const pattern = new RegExp(
+    `\\b(${[...definitions.keys()].map(escapeRegex).join("|")})\\b`,
+    "g",
+  );
+  let inFenceOut = false;
+  return kept
+    .map((line) => {
+      if (/^\s*(```|~~~)/.test(line)) {
+        inFenceOut = !inFenceOut;
+        return line;
+      }
+      if (inFenceOut) {
+        return line;
+      }
+      // Skip inline code spans so abbreviations don't substitute inside backticks.
+      const segments = line.split(/(`+[^`]*`+)/);
+      return segments
+        .map((segment, index) => {
+          if (index % 2 === 1) {
+            return segment;
+          }
+          return segment.replace(pattern, (key) => {
+            const title = definitions.get(key);
+            if (!title) {
+              return key;
+            }
+            return `<abbr title="${escapeHtmlAttr(title)}">${key}</abbr>`;
+          });
+        })
+        .join("");
+    })
+    .join("\n");
+}
+
 export function isStandaloneMarkdownTable(value: string) {
   const stripped = stripTrailingMemoryCitation(value);
   if (!stripped) {
@@ -340,12 +493,52 @@ function FileReferenceLink({
   );
 }
 
+function CopyGlyph({ copied }: { copied: boolean }) {
+  if (copied) {
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        width="14"
+        height="14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <polyline points="3 8 7 12 13 4" />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="5.5" y="5.5" width="8.5" height="8.5" rx="1.5" />
+      <path d="M11 5.5V4A1.5 1.5 0 0 0 9.5 2.5h-6A1.5 1.5 0 0 0 2 4v6A1.5 1.5 0 0 0 3.5 11.5H5" />
+    </svg>
+  );
+}
+
 function CodeBlock({ className, value, copyUseModifier }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
   const copyTimeoutRef = useRef<number | null>(null);
   const languageTag = extractLanguageTag(className);
-  const languageLabel = languageTag ?? "Code";
+  const languageLabel = languageTag ? languageTag.toLowerCase() : "text";
   const fencedValue = `\`\`\`${languageTag ?? ""}\n${value}\n\`\`\``;
+  const highlightedHtml = useMemo(
+    () => highlightLine(value, resolvePrismLanguage(languageTag)),
+    [value, languageTag],
+  );
 
   useEffect(() => {
     return () => {
@@ -380,14 +573,21 @@ function CodeBlock({ className, value, copyUseModifier }: CodeBlockProps) {
           type="button"
           className={`ghost markdown-codeblock-copy${copied ? " is-copied" : ""}`}
           onClick={handleCopy}
-          aria-label="Copy code block"
-          title={copied ? "Copied" : "Copy"}
+          aria-label={copied ? "Code copied to clipboard" : "Copy code block"}
+          title={copied ? "Copied" : "Copy code"}
         >
-          {copied ? "Copied" : "Copy"}
+          <CopyGlyph copied={copied} />
         </button>
       </div>
-      <pre>
-        <code className={className}>{value}</code>
+      <span className="visually-hidden" aria-live="polite" role="status">
+        {copied ? "Code copied to clipboard" : ""}
+      </span>
+      <pre tabIndex={0}>
+        <code
+          className={className}
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: highlightLine escapes input before tokenizing
+          dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+        />
       </pre>
     </div>
   );
@@ -398,15 +598,23 @@ function PreBlock({ node, children, copyUseModifier }: PreProps) {
   if (!className && !value && children) {
     return <pre>{children}</pre>;
   }
+  if (extractLanguageTag(className) === "mermaid" && value.trim()) {
+    return <MermaidDiagram source={value} />;
+  }
   const urlLines = extractUrlLines(value);
   if (urlLines) {
     return <LinkBlock urls={urlLines} />;
   }
   const isSingleLine = !value.includes("\n");
   if (isSingleLine) {
+    const singleHtml = highlightLine(value, resolvePrismLanguage(extractLanguageTag(className)));
     return (
-      <pre className="markdown-codeblock-single">
-        <code className={className}>{value}</code>
+      <pre className="markdown-codeblock-single" tabIndex={0}>
+        <code
+          className={className}
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: highlightLine escapes input before tokenizing
+          dangerouslySetInnerHTML={{ __html: singleHtml }}
+        />
       </pre>
     );
   }
@@ -427,7 +635,7 @@ export function Markdown({
 }: MarkdownProps) {
   const normalizedValue = codeBlock
     ? value
-    : normalizeStructuredReviewTables(normalizeListIndentation(value));
+    : applyAbbreviations(normalizeStructuredReviewTables(normalizeListIndentation(value)));
   const content = codeBlock ? `\`\`\`\n${normalizedValue}\n\`\`\`` : normalizedValue;
   const handleFileLinkClick = (event: React.MouseEvent, path: ParsedFileLocation) => {
     event.preventDefault();
@@ -588,7 +796,8 @@ export function Markdown({
   return (
     <div className={className}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkFileLinks]}
+        remarkPlugins={[remarkGfm, remarkMath, remarkFileLinks]}
+        rehypePlugins={[rehypeRaw, rehypeKatex, [rehypeSanitize, markdownSanitizeSchema]]}
         urlTransform={(url) => {
           const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url);
           // Keep file-like hrefs intact before scheme sanitization runs, otherwise
