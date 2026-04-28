@@ -37,6 +37,7 @@ members = [
     "crates/klyntbot-server",
     "crates/feature-learning",
     "crates/platform-input",
+    "crates/platform-capture",
     "crates/platform-macos",
     "crates/autotuner",
     "crates/simulator",
