@@ -1,5 +1,5 @@
 use crate::search::{fuzzy_match, SearchSource};
-use crate::types::{LauncherItem, LauncherItemKind, SearchResult};
+use crate::types::{LauncherItem, LauncherItemKind};
 use async_trait::async_trait;
 use jiff::Timestamp;
 use std::sync::Arc;
@@ -31,22 +31,25 @@ impl CalendarSource {
 
 #[async_trait]
 impl SearchSource for CalendarSource {
-    fn name(&self) -> &str { "calendar" }
-    fn prefix(&self) -> Option<&str> { Some("c/") }
+    fn name(&self) -> &'static str { "calendar" }
+    fn prefix(&self) -> Option<&'static str> { Some("c/") }
+    fn cache_ttl(&self) -> Option<std::time::Duration> {
+        Some(std::time::Duration::from_secs(60))
+    }
 
-    async fn search(&self, query: &str) -> Vec<SearchResult> {
+    async fn search(&self, query: &str, limit: usize) -> Vec<LauncherItem> {
         let events = self.fetcher.upcoming_events(self.lookback_days, self.lookahead_days).await;
         if query.is_empty() {
-            return events.into_iter().take(10).map(|e| SearchResult {
-                item: event_to_item(&e, 0.6),
-                base_score: 0.6,
-            }).collect();
+            return events.into_iter().take(limit).map(|e| event_to_item(&e, 0.6)).collect();
         }
-        let scored = fuzzy_match(query, events.iter().map(|e| (e.title.as_str(), e)).collect::<Vec<_>>());
-        scored.into_iter().take(15).map(|(score, e)| {
-            let normalized = (score as f64 / 1000.0) * 0.85;
-            SearchResult { item: event_to_item(e, normalized), base_score: normalized }
-        }).collect()
+        let scored = fuzzy_match(query, &events, |e| e.title.as_str(), limit);
+        scored
+            .into_iter()
+            .map(|(score, e)| {
+                let normalized = (score as f64 / 1000.0) * 0.85;
+                event_to_item(e, normalized)
+            })
+            .collect()
     }
 }
 
@@ -87,7 +90,7 @@ mod tests {
                 starts_at: Timestamp::now(), ends_at: Timestamp::now() },
         ];
         let src = CalendarSource::new(Arc::new(StubFetcher(events)), 1, 7);
-        let r = src.search("").await;
+        let r = src.search("", 10).await;
         assert_eq!(r.len(), 1);
     }
 
@@ -100,7 +103,7 @@ mod tests {
                 starts_at: Timestamp::now(), ends_at: Timestamp::now() },
         ];
         let src = CalendarSource::new(Arc::new(StubFetcher(events)), 1, 7);
-        let r = src.search("planning").await;
-        assert!(r[0].item.title.contains("Planning"));
+        let r = src.search("planning", 10).await;
+        assert!(r[0].title.contains("Planning"));
     }
 }

@@ -3,7 +3,7 @@ use sqlx::SqlitePool;
 use storage::StoragePool;
 use common::Result;
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, specta::Type)]
 pub struct Pin {
     pub item_id: String,
     pub kind: String,
@@ -21,11 +21,10 @@ impl PinsRepo {
 
     pub async fn pin(&self, item_id: &str, kind: &str) -> Result<()> {
         sqlx::query(
-            "INSERT INTO launcher_pins (item_id, kind, position) \
-             SELECT ?, ?, COALESCE(MAX(position), -1) + 1 FROM launcher_pins \
-             WHERE NOT EXISTS (SELECT 1 FROM launcher_pins WHERE item_id = ? AND kind = ?)",
+            "INSERT OR IGNORE INTO launcher_pins (item_id, kind, position) \
+             VALUES (?, ?, COALESCE((SELECT MAX(position) FROM launcher_pins), -1) + 1)",
         )
-        .bind(item_id).bind(kind).bind(item_id).bind(kind)
+        .bind(item_id).bind(kind)
         .execute(&self.pool).await.map_err(storage::StorageError::from)?;
         Ok(())
     }
@@ -63,7 +62,7 @@ mod tests {
 
     async fn setup() -> StoragePool {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        StoragePool::run_feature_migrations(&pool, &crate::launcher_migrations()).await.unwrap();
+        StoragePool::run_feature_migrations(pool.inner(), &crate::launcher_migrations()).await.unwrap();
         pool
     }
 

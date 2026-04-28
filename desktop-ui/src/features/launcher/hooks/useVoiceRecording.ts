@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ipc, listen } from "@/utils/tauri-bridge";
+import { ipc } from "@/utils/tauri-bridge";
 import { showError } from "../lib/showError";
 
 type Phase = "idle" | "recording" | "processing" | "error";

@@ -1,5 +1,10 @@
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
+import { cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+
+afterEach(() => {
+  cleanup();
+});
 
 if (!("IS_REACT_ACT_ENVIRONMENT" in globalThis)) {
   Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {

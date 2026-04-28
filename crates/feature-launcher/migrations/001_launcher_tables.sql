@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS launcher_pins (
     position INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (item_id, kind)
 );
+CREATE INDEX IF NOT EXISTS idx_launcher_pins_position ON launcher_pins(position);
 
 -- Clipboard history
 CREATE TABLE IF NOT EXISTS clipboard_history (

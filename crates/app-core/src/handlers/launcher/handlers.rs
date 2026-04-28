@@ -31,7 +31,7 @@ impl AppCore {
                 kind,
                 query: None,
             };
-            let _ = bus.publish(event).await;
+            bus.publish(event);
         }
 
         Ok(result)

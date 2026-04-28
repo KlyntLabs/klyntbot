@@ -75,17 +75,6 @@ function LauncherShell() {
     [setMode],
   );
 
-  const cancelRecording = useCallback(async () => {
-    reset();
-    if (isTauri()) {
-      try {
-        await getCurrentWindow().hide();
-      } catch {
-        // silent
-      }
-    }
-  }, [reset]);
-
   const expandToMain = useCallback(async () => {
     if (!isTauri()) return;
     try {

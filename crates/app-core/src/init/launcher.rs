@@ -268,6 +268,22 @@ pub(super) async fn init_launcher(
             });
         }
     }
+    if launcher_config.sources.git_repos.enabled {
+        if let Some(s) = find_source("git_repos") {
+            for dir_str in &launcher_config.sources.git_repos.scan_dirs {
+                let dir = std::path::PathBuf::from(shellexpand::tilde(dir_str).to_string());
+                if dir.exists() {
+                    watches.push(feature_launcher::WatchEntry {
+                        path: dir,
+                        source: Arc::clone(&s),
+                        min_interval: Some(std::time::Duration::from_secs(30)),
+                        recursive: true,
+                        on_change: None,
+                    });
+                }
+            }
+        }
+    }
     if launcher_config.sources.scripts.enabled {
         let scripts_dir = shellexpand::tilde(&launcher_config.sources.scripts.dir).to_string();
         if let Some(s) = find_source("scripts") {
@@ -367,10 +383,10 @@ pub(super) async fn init_launcher(
     };
 
     let engine = Arc::new(LauncherSearchEngine {
-        registry,
-        frequency_repo,
-        clipboard_repo,
-        pins_repo,
+        registry: Arc::new(registry),
+        frequency_repo: Arc::new(frequency_repo),
+        clipboard_repo: Arc::new(clipboard_repo),
+        pins_repo: Arc::new(pins_repo),
         _file_watcher: file_watcher,
     });
 

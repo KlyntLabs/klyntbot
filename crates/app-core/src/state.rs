@@ -333,7 +333,7 @@ impl AppCore {
     pub fn launcher_clipboard_repo(&self) -> Result<&feature_launcher::ClipboardRepo, ApiError> {
         self.launcher_engine
             .as_ref()
-            .map(|e| &e.clipboard_repo)
+            .map(|e| e.clipboard_repo.as_ref())
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "launcher feature is not enabled"))
     }
 

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
@@ -12,10 +13,10 @@ use crate::errors::map_storage_err;
 
 /// Central search engine that fans out queries to all providers.
 pub struct LauncherSearchEngine {
-    pub registry: SourceRegistry,
-    pub frequency_repo: FrequencyRepo,
-    pub clipboard_repo: ClipboardRepo,
-    pub pins_repo: PinsRepo,
+    pub registry: Arc<SourceRegistry>,
+    pub frequency_repo: Arc<FrequencyRepo>,
+    pub clipboard_repo: Arc<ClipboardRepo>,
+    pub pins_repo: Arc<PinsRepo>,
     /// Stored here so the OS watcher thread is joined on drop.
     pub _file_watcher: Option<feature_launcher::SourceFileWatcher>,
 }

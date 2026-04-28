@@ -393,7 +393,7 @@ impl AppCore {
         if let (Some(engine), Some(prod_repos)) = (launcher_engine.as_ref(), productivity_repos.as_ref()) {
             if config.launcher.sources.calendar.enabled {
                 let fetcher = Arc::new(crate::handlers::launcher::calendar_fetcher_impl::AppCalendarFetcher::new(
-                    Arc::clone(prod_repos),
+                    Arc::new(prod_repos.clone()),
                 ));
                 engine.registry.register(Arc::new(feature_launcher::CalendarSource::new(
                     fetcher,
@@ -984,13 +984,14 @@ impl AppCore {
 
         // ── Register launcher tools in agent's tool registry ──
         if let Some(ref engine) = launcher_engine {
+            use tools_core::FeaturePackage;
             let reg = agent.tool_registry();
             let mut registry = reg.write().await;
             let launcher = feature_launcher::LauncherFeature::with_tool_deps(
                 feature_launcher::LauncherToolDeps {
                     registry: Arc::clone(&engine.registry),
-                    frequency: Arc::new(engine.frequency_repo.clone()),
-                    pins: Arc::new(engine.pins_repo.clone()),
+                    frequency: Arc::clone(&engine.frequency_repo),
+                    pins: Arc::clone(&engine.pins_repo),
                 },
             );
             for tool in launcher.tools() {

@@ -43,6 +43,7 @@ pub use window_presets::WindowPresetsSource;
 use crate::types::LauncherItem;
 use async_trait::async_trait;
 use dashmap::DashMap;
+use parking_lot::RwLock;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 

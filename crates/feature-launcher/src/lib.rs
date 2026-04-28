@@ -66,7 +66,7 @@ impl FeaturePackage for LauncherFeature {
 
     fn tools(&self) -> Vec<DynTool> {
         if let Some(deps) = &self.tool_deps {
-            vec![Box::new(LauncherTool::new(
+            vec![Arc::new(LauncherTool::new(
                 deps.registry.clone(),
                 deps.frequency.clone(),
                 deps.pins.clone(),

@@ -109,9 +109,10 @@ impl WindowManager {
                 accessibility::set_window_frame(pid, x, y, w, h);
                 return Ok(());
             } else {
-                return Err(common::KlyntbotError::other(
-                    "No previous frame to restore",
-                ));
+                return Err(common::ToolError::ExecutionFailed(
+                    "No previous frame to restore".into(),
+                )
+                .into());
             }
         }
 

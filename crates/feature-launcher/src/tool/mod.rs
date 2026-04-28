@@ -1,10 +1,9 @@
 use crate::tool::actions::*;
 use crate::types::WindowAction;
 use crate::{FrequencyRepo, PinsRepo, SourceRegistry};
-use async_trait::async_trait;
 use common::Result;
 use std::sync::Arc;
-use tools_core::{tool_actions, RoutingContext, Tool};
+use tools_core::{tool_actions, RoutingContext};
 
 pub mod actions;
 
@@ -23,7 +22,7 @@ impl LauncherTool {
 #[tool_actions(
     name = "launcher",
     description = "Search and execute launcher items: apps, scripts, files, system commands, window layouts, browser bookmarks, contacts, and more.",
-    category = "Utility",
+    category = "System",
     tags = "launcher,search,apps,files,commands",
     cost = "Free"
 )]
@@ -76,7 +75,7 @@ fn parse_window_action(s: &str) -> Result<WindowAction> {
         "maximize" => WindowAction::Maximize,
         "center" => WindowAction::Center,
         "restore" => WindowAction::Restore,
-        other => return Err(common::KlyntbotError::other(format!("unknown window action: {other}"))),
+        other => return Err(common::ToolError::InvalidParams(format!("unknown window action: {other}")).into()),
     })
 }
 

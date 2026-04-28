@@ -106,7 +106,7 @@ pub async fn launcher_system_command(
     if matches!(action, SystemAction::ToggleDoNotDisturb) && duration.is_some() {
         let ends_at = jiff::Timestamp::now()
             .checked_add(duration.unwrap())
-            .ok_or_else(|| ApiError::new("BAD_DURATION", "Invalid duration".to_string()))?;
+            .map_err(|e| ApiError::new("BAD_DURATION", e.to_string()))?;
         let mgr = state.dnd_manager().map_err(|e| ApiError::new("DND_ERROR", e.to_string()))?;
         mgr.activate(FocusMode::Dnd, ends_at)
             .await
@@ -241,7 +241,14 @@ pub(crate) async fn dispatch_dev(
         "launcher_system_command" => {
             let action: SystemAction = dev::get(body, "action").unwrap_or(SystemAction::LockScreen);
             let args: Option<std::collections::HashMap<String, String>> = dev::get(body, "args");
-            dev::val(launcher_system_command(action, args).await)
+            let _ = core;
+            let args = args.unwrap_or_default();
+            let duration = args.get("duration").and_then(|s| parse_human_duration(s));
+            dev::val(
+                SystemCommands::execute(&action, duration)
+                    .await
+                    .map_err(|e| ApiError::new("SYSTEM_COMMAND_ERROR", e.to_string())),
+            )
         }
         "launcher_window_action" => {
             let action: WindowAction = dev::get(body, "action").unwrap_or(WindowAction::Center);
