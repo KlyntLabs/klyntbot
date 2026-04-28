@@ -1,4 +1,5 @@
 pub mod app_index;
+pub mod attention;
 pub mod background;
 pub mod bookmarks;
 pub mod brew;
@@ -11,6 +12,7 @@ pub mod file_search;
 pub mod file_watcher;
 pub mod git_repos;
 pub mod inverted_index;
+pub mod token_index;
 pub mod running_apps;
 pub mod script_runner;
 pub mod ssh_hosts;
@@ -20,6 +22,7 @@ pub mod url_navigation;
 pub mod window_presets;
 
 pub use app_index::{AppEntry, AppIndex};
+pub use attention::AttentionSource;
 pub use background::{BackgroundRefresher, RefreshEntry};
 pub use bookmarks::BookmarksSource;
 pub use brew::BrewSource;

@@ -1,6 +1,7 @@
 pub mod clipboard;
 pub mod repos;
 pub mod search;
+pub mod services;
 pub mod template;
 pub mod tool;
 pub mod types;
@@ -14,6 +15,7 @@ use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 pub use clipboard::ClipboardMonitor;
 pub use repos::*;
 pub use search::*;
+pub use services::*;
 pub use tool::LauncherTool;
 pub use types::WindowAction;
 pub use types::*;
@@ -52,12 +54,20 @@ impl Default for LauncherFeature {
 /// Launcher schema migrations. Free function so callers don't need to
 /// instantiate the feature just to run migrations.
 pub fn launcher_migrations() -> Vec<FeatureMigration> {
-    vec![FeatureMigration {
-        feature_name: "launcher".to_string(),
-        version: 1,
-        description: "Launcher tables: frequencies, clipboard history, FTS5".to_string(),
-        sql: include_str!("../migrations/001_launcher_tables.sql").to_string(),
-    }]
+    vec![
+        FeatureMigration {
+            feature_name: "launcher".to_string(),
+            version: 1,
+            description: "Launcher tables: frequencies, clipboard history, FTS5".to_string(),
+            sql: include_str!("../migrations/001_launcher_tables.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "launcher".to_string(),
+            version: 2,
+            description: "Entity attention: decay-weighted attention seconds from activity_events".to_string(),
+            sql: include_str!("../migrations/002_entity_attention.sql").to_string(),
+        },
+    ]
 }
 
 #[async_trait]
