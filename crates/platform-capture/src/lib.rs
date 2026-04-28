@@ -142,3 +142,5 @@ pub trait PlatformCapture: Send + Sync {
     /// rendered tree of complex apps may have thousands of nodes).
     async fn get_ax_tree(&self, scope: AxScope) -> Result<AccessibilityNode>;
 }
+
+pub mod mock;
