@@ -1,3 +1,6 @@
+use crate::search::signals::{
+    new_attention_signals, new_running_signals, AttentionSignals, RunningSignals,
+};
 use crate::types::*;
 use parking_lot::RwLock;
 use smol_str::SmolStr;
@@ -35,6 +38,10 @@ pub struct AppIndex {
     apps: Arc<RwLock<Vec<AppEntry>>>,
     /// Shared icon cache backed by `platform_macos::apps::AppIconCache`.
     icon_cache: Option<Arc<platform_macos::apps::AppIconCache>>,
+    /// Bundle-ID-keyed live "is running" map, refreshed by RunningAppsSource.
+    running_signals: RunningSignals,
+    /// Bundle-ID-keyed cumulative attention stats, written by AttentionSource.
+    attention_signals: AttentionSignals,
 }
 
 impl AppIndex {
@@ -42,6 +49,8 @@ impl AppIndex {
         Self {
             apps: Arc::new(RwLock::new(Vec::new())),
             icon_cache: None,
+            running_signals: new_running_signals(),
+            attention_signals: new_attention_signals(),
         }
     }
 
@@ -49,11 +58,44 @@ impl AppIndex {
         Self {
             apps: Arc::new(RwLock::new(Vec::new())),
             icon_cache: Some(Arc::new(platform_macos::apps::AppIconCache::new(cache_dir))),
+            running_signals: new_running_signals(),
+            attention_signals: new_attention_signals(),
         }
+    }
+
+    /// Builder: attach an externally-owned RunningSignals map (so other sources
+    /// can write into it). Without this call, `AppIndex` owns a private empty map.
+    pub fn with_running_signals(mut self, signals: RunningSignals) -> Self {
+        self.running_signals = signals;
+        self
+    }
+
+    /// Builder: attach an externally-owned AttentionSignals map.
+    pub fn with_attention_signals(mut self, signals: AttentionSignals) -> Self {
+        self.attention_signals = signals;
+        self
     }
 
     pub fn icon_cache(&self) -> Option<Arc<platform_macos::apps::AppIconCache>> {
         self.icon_cache.clone()
+    }
+
+    pub fn running_signals(&self) -> RunningSignals {
+        Arc::clone(&self.running_signals)
+    }
+
+    pub fn attention_signals(&self) -> AttentionSignals {
+        Arc::clone(&self.attention_signals)
+    }
+
+    #[cfg(test)]
+    pub fn running_signals_for_test(&self) -> RunningSignals {
+        Arc::clone(&self.running_signals)
+    }
+
+    #[cfg(test)]
+    pub fn attention_signals_for_test(&self) -> AttentionSignals {
+        Arc::clone(&self.attention_signals)
     }
 
     pub fn set_apps(&self, apps: Vec<AppEntry>) {
@@ -330,5 +372,18 @@ mod tests {
         ];
         let deduped = AppIndex::dedupe_by_bundle_id(apps);
         assert_eq!(deduped.len(), 2, "path-keyed entries cannot dupe by bundle");
+    }
+
+    #[test]
+    fn with_signals_attaches_maps() {
+        use crate::search::signals::{new_attention_signals, new_running_signals};
+        let running = new_running_signals();
+        let attention = new_attention_signals();
+        let idx = AppIndex::new()
+            .with_running_signals(running.clone())
+            .with_attention_signals(attention.clone());
+
+        assert!(Arc::ptr_eq(&running, &idx.running_signals_for_test()));
+        assert!(Arc::ptr_eq(&attention, &idx.attention_signals_for_test()));
     }
 }
