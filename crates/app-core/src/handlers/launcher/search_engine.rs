@@ -38,8 +38,9 @@ impl LauncherSearchEngine {
                     Ok(rows) => {
                         return Ok(rows
                             .into_iter()
+                            .filter(|row| row.kind == "site")
                             .map(|row| {
-                                feature_launcher::search::attention::into_launcher_item(row)
+                                feature_launcher::search::attention::into_site_item(row)
                             })
                             .collect());
                     }

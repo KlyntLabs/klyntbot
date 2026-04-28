@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use feature_launcher::{
-    AppIndex, AttentionSource, ClipboardRepo, EntityAttentionRepo, FileSearchSource, FrequencyRepo,
-    FsEventKind, ScriptRunner, SearchSource, SourceRegistry,
+    new_attention_signals, new_running_signals, AppIndex, AttentionSignals, AttentionSource,
+    ClipboardRepo, EntityAttentionRepo, FileSearchSource, FrequencyRepo, FsEventKind,
+    RunningSignals, ScriptRunner, SearchSource, SourceRegistry,
 };
 use storage::StoragePool;
 use tokio_util::sync::CancellationToken;
@@ -42,11 +43,34 @@ pub(super) async fn init_launcher(
     let mut sources: Vec<Arc<dyn feature_launcher::SearchSource>> = Vec::new();
     let icon_cache_dir = config.data_dir_path().join("cache").join("app-icons");
 
-    // Apps source
+    // Shared signal maps. AppIndex consumes both; RunningAppsSource writes the
+    // running map; AttentionSource writes the attention map.
+    let running_signals: RunningSignals = new_running_signals();
+    let attention_signals: AttentionSignals = new_attention_signals();
+
+    // Apps source — owns identity for installed apps; consumes signals.
     if launcher_config.sources.apps.enabled {
-        let app_index = Arc::new(AppIndex::with_cache_dir(icon_cache_dir.clone()));
+        let app_index = Arc::new(
+            AppIndex::with_cache_dir(icon_cache_dir.clone())
+                .with_running_signals(Arc::clone(&running_signals))
+                .with_attention_signals(Arc::clone(&attention_signals)),
+        );
         let idx = Arc::clone(&app_index);
-        tokio::spawn(async move { idx.index_applications().await });
+        let migration_pool = pool.clone();
+        tokio::spawn(async move {
+            idx.index_applications().await;
+            // After first index, rewrite any path-keyed pin/usage rows to bundle IDs.
+            let apps_snapshot = idx.snapshot_apps();
+            match feature_launcher::migrate_app_ids_to_bundle_ids(&migration_pool, &apps_snapshot)
+                .await
+            {
+                Ok(n) if n > 0 => {
+                    tracing::info!("Migrated {n} launcher item ids to bundle-id form")
+                }
+                Ok(_) => {}
+                Err(e) => tracing::warn!("launcher id migration failed: {e}"),
+            }
+        });
         sources.push(app_index);
     }
 
@@ -152,11 +176,11 @@ pub(super) async fn init_launcher(
         sources.push(Arc::new(feature_launcher::ContactsSource::new()));
     }
 
-    // Running apps — pre-loaded index refreshed by BackgroundRefresher
+    // Running apps — pure signal producer; refresh updates RunningSignals.
     if launcher_config.sources.running_apps.enabled {
-        let source = Arc::new(feature_launcher::RunningAppsSource::with_icon_cache_dir(
-            icon_cache_dir.clone(),
-        ));
+        let source = Arc::new(feature_launcher::RunningAppsSource::new(Arc::clone(
+            &running_signals,
+        )));
         sources.push(source);
     }
 
@@ -353,7 +377,10 @@ pub(super) async fn init_launcher(
     }
 
     // Attention source (queries entity_attention table populated by nightly aggregator)
-    sources.push(Arc::new(AttentionSource::new(Arc::clone(&entity_attention_repo))));
+    sources.push(Arc::new(AttentionSource::new(
+        Arc::clone(&entity_attention_repo),
+        Arc::clone(&attention_signals),
+    )));
 
     // ── Create registry and spawn background services ──
 
