@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { CodingMemoryPlugin } from "@/features/plugins/coding-memory/CodingMemoryPlugin";
 
-type PluginId = "coding-memory" | "skills" | "mcp" | "klynt-cli";
+type PluginId = "coding-memory" | "skills" | "mcp";
 
 const PLUGIN_TABS: ReadonlyArray<{ id: PluginId; label: string; available: boolean }> = [
   { id: "coding-memory", label: "Coding Memory", available: true },
   { id: "skills", label: "Skills", available: false },
   { id: "mcp", label: "MCP Servers", available: false },
-  { id: "klynt-cli", label: "Klynt CLI", available: false },
 ];
 
 export function PluginsView() {
