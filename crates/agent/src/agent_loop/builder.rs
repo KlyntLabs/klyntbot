@@ -790,7 +790,7 @@ impl AgentLoopBuilder {
             forge.add_searcher(Arc::new(crate::domain_searchers::FinanceSearcher::new(
                 repos.clone(),
             )));
-            if self.config.coding_memory.enabled {
+            if config.coding_memory.enabled {
                 let facts = cognitive::SemanticFactRepo::new(storage_pool.inner().clone());
                 let episodes = cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
                 forge.add_searcher(Arc::new(coding_memory::CodeDomainSearcher::new(
