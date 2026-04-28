@@ -169,7 +169,38 @@ impl PlatformCapture for MacCapture {
         Err(CaptureError::NotImplemented)
     }
 
-    async fn get_ax_tree(&self, _scope: AxScope) -> Result<AccessibilityNode> {
-        Err(CaptureError::NotImplemented)
+    async fn get_ax_tree(&self, scope: AxScope) -> Result<AccessibilityNode> {
+        use crate::computer_use::ax_tree;
+        use objc2::rc::Retained;
+        use objc2_app_kit::NSWorkspace;
+        use tokio::task;
+
+        let pid = match scope {
+            AxScope::ActiveApp => {
+                // Resolve current frontmost app pid via NSWorkspace.
+                // SAFETY: NSWorkspace is documented thread-safe in read-only contexts.
+                let workspace: Retained<NSWorkspace> = NSWorkspace::sharedWorkspace();
+                let app = workspace.frontmostApplication();
+                let pid: i32 = app.map(|a| a.processIdentifier()).unwrap_or(0);
+                if pid == 0 {
+                    return Err(CaptureError::AxTreeUnavailable("no frontmost app".into()));
+                }
+                pid
+            }
+            AxScope::FullDesktop => {
+                return Err(CaptureError::AxTreeUnavailable(
+                    "FullDesktop scope not supported in Phase 1; use ActiveApp".into(),
+                ))
+            }
+            AxScope::Window(_id) => {
+                return Err(CaptureError::AxTreeUnavailable(
+                    "Window scope deferred to Phase 4".into(),
+                ))
+            }
+        };
+
+        task::spawn_blocking(move || ax_tree::walk_focused_app(pid, 6))
+            .await
+            .map_err(|e| CaptureError::AxTreeUnavailable(format!("join: {e}")))?
     }
 }
