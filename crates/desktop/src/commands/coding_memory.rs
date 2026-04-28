@@ -31,6 +31,29 @@ pub async fn coding_memory_session_replay(
 }
 
 #[klynt_command]
+pub async fn coding_memory_session_list(
+    args: SessionListArgs,
+) -> Vec<SessionSummaryDto> {
+    state.coding_memory_session_list(args).await.unwrap_or_default()
+}
+
+#[klynt_command]
+pub async fn coding_memory_session_replay_typed(
+    session_id: String,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Vec<WireEventDto> {
+    state
+        .coding_memory_session_replay_typed(
+            session_id,
+            limit.unwrap_or(500),
+            offset.unwrap_or(0),
+        )
+        .await
+        .unwrap_or_default()
+}
+
+#[klynt_command]
 pub async fn coding_memory_enable_cli(cli: String) -> () {
     state.coding_memory_enable_cli(cli).await
 }
@@ -301,6 +324,33 @@ pub(crate) async fn dispatch_dev(
             };
             dev::val(
                 core.coding_memory_session_replay(
+                    a.session_id,
+                    a.limit.unwrap_or(500),
+                    a.offset.unwrap_or(0),
+                )
+                .await,
+            )
+        }
+        "coding_memory_session_list" => {
+            let a: SessionListArgs = match dev::parse_params(body) {
+                Ok(v) => v,
+                Err(e) => return Some(Err(e)),
+            };
+            dev::val(core.coding_memory_session_list(a).await)
+        }
+        "coding_memory_session_replay_typed" => {
+            #[derive(serde::Deserialize)]
+            struct A {
+                session_id: String,
+                limit: Option<i64>,
+                offset: Option<i64>,
+            }
+            let a: A = match dev::parse_params(body) {
+                Ok(v) => v,
+                Err(e) => return Some(Err(e)),
+            };
+            dev::val(
+                core.coding_memory_session_replay_typed(
                     a.session_id,
                     a.limit.unwrap_or(500),
                     a.offset.unwrap_or(0),

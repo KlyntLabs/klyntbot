@@ -43,6 +43,7 @@ export type ChatViewProps = {
 export type SidebarChatProps = {
   onOpenSettings: () => void;
   onNewChat: () => void;
+  onSelectPlugins: () => void;
   threads: import("@/features/chat/types").ChatThread[];
   selectedSessionKey: string | null;
   onSelectThread: (sessionKey: string) => void;

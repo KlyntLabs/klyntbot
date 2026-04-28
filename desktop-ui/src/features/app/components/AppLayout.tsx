@@ -16,6 +16,7 @@ type AppLayoutProps = {
   updateToastNode: ReactNode;
   errorToastsNode: ReactNode;
   homeNode: ReactNode;
+  pluginsNode?: ReactNode;
   desktopTopbarLeftNode: ReactNode;
   topbarActionsNode?: ReactNode;
   gitDiffPanelNode: ReactNode;
@@ -43,6 +44,7 @@ export const AppLayout = memo(function AppLayout({
   updateToastNode,
   errorToastsNode,
   homeNode,
+  pluginsNode,
   desktopTopbarLeftNode,
   topbarActionsNode,
   gitDiffPanelNode,
@@ -62,6 +64,7 @@ export const AppLayout = memo(function AppLayout({
       approvalToastsNode={approvalToastsNode}
       errorToastsNode={errorToastsNode}
       homeNode={homeNode}
+      pluginsNode={pluginsNode}
       showHome={showHome}
       showWorkspace={activeWorkspace && !showHome}
       topbarLeftNode={desktopTopbarLeftNode}

@@ -91,6 +91,68 @@ pub async fn session_replay(
         .collect())
 }
 
+pub async fn session_list(
+    pool: &sqlx::SqlitePool,
+    args: SessionListArgs,
+) -> Result<Vec<SessionSummaryDto>> {
+    let mut sql = String::from(
+        "SELECT session_id,
+                source,
+                MIN(cwd) AS cwd,
+                MIN(repo_id) AS repo_id,
+                MIN(occurred_at) AS started_at,
+                MAX(occurred_at) AS last_event_at,
+                COUNT(*) AS event_count,
+                SUM(CASE WHEN kind LIKE '%Turn%' THEN 1 ELSE 0 END) AS turn_count,
+                SUM(CASE WHEN kind = 'toolCall' THEN 1 ELSE 0 END) AS tool_call_count,
+                SUM(CASE WHEN kind = 'error' THEN 1 ELSE 0 END) AS error_count
+         FROM ingest_event_log
+         WHERE occurred_at >= datetime('now', ?1)",
+    );
+    let since_clause = format!("-{} days", args.since_days);
+    let mut binds: Vec<String> = vec![since_clause];
+    if let Some(src) = args.source.as_ref() {
+        sql.push_str(" AND source = ?2");
+        binds.push(provider_id_to_db_slug(src));
+    }
+    if let Some(repo) = args.repo_id.as_ref() {
+        sql.push_str(if binds.len() == 2 { " AND repo_id = ?3" } else { " AND repo_id = ?2" });
+        binds.push(repo.clone());
+    }
+    sql.push_str(" GROUP BY session_id, source ORDER BY last_event_at DESC LIMIT ? OFFSET ?");
+    binds.push(args.limit.to_string());
+    binds.push(args.offset.to_string());
+
+    let mut q = sqlx::query(&sql);
+    for b in &binds {
+        q = q.bind(b);
+    }
+    let rows = q.fetch_all(pool).await
+        .map_err(|e| common::KlyntbotError::Storage(format!("session_list: {e}")))?;
+
+    let result = rows
+        .into_iter()
+        .map(|r| {
+            SessionSummaryDto {
+                session_id: r.get("session_id"),
+                source: r.get("source"),
+                cwd: r.try_get("cwd").ok(),
+                repo_id: r.try_get("repo_id").ok(),
+                started_at: r.get("started_at"),
+                last_event_at: r.get("last_event_at"),
+                event_count: r.get("event_count"),
+                turn_count: r.get("turn_count"),
+                tool_call_count: r.get("tool_call_count"),
+                error_count: r.get("error_count"),
+                total_input_tokens: 0,
+                total_output_tokens: 0,
+                total_cost_usd: 0.0,
+            }
+        })
+        .collect();
+    Ok(result)
+}
+
 /// Memory Browser — flat list of active (non-superseded) coding-domain semantic facts.
 pub async fn memory_browser(
     pool: &sqlx::SqlitePool,
@@ -301,4 +363,16 @@ pub async fn sensitivity_inspector(
             }
         })
         .collect())
+}
+
+
+/// Translate camelCase ProviderId values from the UI to kebab-case DB slugs.
+/// `codex` is identity; the other three require translation.
+fn provider_id_to_db_slug(id: &str) -> String {
+    match id {
+        "claudeCode" => "claude-code".into(),
+        "kimiCli" => "kimi-cli".into(),
+        "openCode" => "opencode".into(),
+        _ => id.into(),
+    }
 }

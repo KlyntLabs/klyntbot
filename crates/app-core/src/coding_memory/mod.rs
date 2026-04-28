@@ -71,6 +71,32 @@ impl crate::AppCore {
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
     }
 
+    /// List sessions with rollup stats.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_memory_session_list(
+        self: &std::sync::Arc<Self>,
+        args: desktop_shared::commands::coding_memory::SessionListArgs,
+    ) -> Result<Vec<desktop_shared::commands::coding_memory::SessionSummaryDto>, ApiError> {
+        handlers::session_list(self.storage_pool.inner(), args)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
+    }
+
+    /// Typed session replay — decodes payloads into `WireEventDto`.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_memory_session_replay_typed(
+        self: &std::sync::Arc<Self>,
+        session_id: String,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<desktop_shared::commands::coding_memory::WireEventDto>, ApiError> {
+        let entries = self.coding_memory_session_replay(Some(session_id), limit, offset).await?;
+        Ok(entries
+            .iter()
+            .filter_map(|e| desktop_shared::commands::coding_memory::WireEventDto::from_replay_entry(e).ok())
+            .collect())
+    }
+
     /// Enable a coding CLI (currently only claude-code is supported).
     #[tracing::instrument(skip(self), err)]
     pub async fn coding_memory_enable_cli(&self, cli: String) -> Result<(), ApiError> {

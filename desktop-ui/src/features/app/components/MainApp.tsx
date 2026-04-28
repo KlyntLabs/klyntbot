@@ -1,3 +1,4 @@
+import { PluginsView } from "@/features/plugins/components/PluginsView";
 import { useAppBootstrapOrchestration } from "@app/bootstrap/useAppBootstrapOrchestration";
 import { MainAppShell } from "@app/components/MainAppShell";
 import { useAccountSwitching } from "@app/hooks/useAccountSwitching";
@@ -323,13 +324,17 @@ export default function MainApp() {
     setSelectedServiceTier(preferredServiceTier);
   }, [preferredServiceTier, threadCodexSelectionKey]);
 
-  const [appView, setAppView] = useState<"home" | "chat">("home");
+  const [appView, setAppView] = useState<"home" | "chat" | "plugins">("home");
   const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);
   const { threads: chatThreads, refetch: refetchChatThreads } = useChatThreads();
 
   const onNewChat = useCallback(() => {
     setSelectedSessionKey(`chat:${crypto.randomUUID()}`);
     setAppView("chat");
+  }, []);
+
+  const onSelectPlugins = useCallback(() => {
+    setAppView("plugins");
   }, []);
 
   const onSelectThread = useCallback((sessionKey: string) => {
@@ -1725,6 +1730,7 @@ export default function MainApp() {
       selectedSessionKey,
       onNewChat,
       onSelectThread,
+      onSelectPlugins,
       chatThreads,
       refetchChatThreads,
     },
@@ -1804,12 +1810,12 @@ export default function MainApp() {
       selectedPullRequestNumber: selectedPullRequest?.number ?? null,
     },
     appLayout: {
-      showHome: showHome && appView !== "chat",
-      centerMode: appView === "chat" ? "chat" : centerMode,
+      showHome: showHome && appView !== "chat" && appView !== "plugins",
+      centerMode: appView === "chat" ? "chat" : appView === "plugins" ? "plugins" : centerMode,
       preloadGitDiffs: appSettings.preloadGitDiffs,
       splitChatDiffView: appSettings.splitChatDiffView,
       hasActivePlan: hasActivePlan,
-      activeWorkspace: Boolean(activeWorkspace) || appView === "chat",
+      activeWorkspace: (Boolean(activeWorkspace) || appView === "chat") && appView !== "plugins",
       sidebarNode,
       messagesNode: mainMessagesNode,
       composerNode,
@@ -1817,6 +1823,7 @@ export default function MainApp() {
       updateToastNode,
       errorToastsNode,
       homeNode,
+      pluginsNode: appView === "plugins" ? <PluginsView /> : null,
       gitDiffPanelNode,
       gitDiffViewerNode,
       planPanelNode,
