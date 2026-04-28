@@ -47,10 +47,10 @@ impl TokenIndex {
         // Pre-compute 1-2 char prefixes that match at least one token.
         for token in &all_tokens {
             for prefix_len in 1..=2 {
-                if token.len() < prefix_len {
+                if token.chars().count() < prefix_len {
                     continue;
                 }
-                let prefix = SmolStr::new(&token[..prefix_len]);
+                let prefix = SmolStr::new(token.chars().take(prefix_len).collect::<String>());
                 if short_prefix_cache.contains_key(&prefix) {
                     continue;
                 }
@@ -229,10 +229,10 @@ impl TokenIndex {
         let mut short_prefix_cache: FxHashMap<SmolStr, (RoaringBitmap, f32)> = FxHashMap::default();
         for token in &token_strings {
             for prefix_len in 1..=2 {
-                if token.len() < prefix_len {
+                if token.chars().count() < prefix_len {
                     continue;
                 }
-                let prefix = SmolStr::new(&token[..prefix_len]);
+                let prefix = SmolStr::new(token.chars().take(prefix_len).collect::<String>());
                 if short_prefix_cache.contains_key(&prefix) {
                     continue;
                 }

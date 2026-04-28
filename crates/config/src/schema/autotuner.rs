@@ -56,7 +56,7 @@ impl Default for AutoTunerConfig {
 }
 
 fn default_schedule() -> String {
-    "0 2 * * *".to_string()
+    "0 0 2 * * *".to_string()
 }
 fn default_min_messages() -> u32 {
     50
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn default_config_values() {
         let config = AutoTunerConfig::default();
-        assert_eq!(config.schedule, "0 2 * * *");
+        assert_eq!(config.schedule, "0 0 2 * * *");
         assert_eq!(config.min_messages_for_promotion, 50);
         assert_eq!(config.rollback_after_days, 3);
     }

@@ -1240,12 +1240,28 @@ async fn ensure_cron_jobs(
     ensure_job!(
         JOB_FSRS_OPTIMIZE,
         scheduling::CronSchedule::Cron {
-            expr: "0 0 4 * * 0".to_string(),
+            expr: "0 0 4 * * 7".to_string(), // Sunday 04:00 local (7 = Sunday in this parser)
             tz: Some(config.timezone.clone()),
         },
         "Weekly FSRS-5 weight optimisation",
         "system"
     );
+    // Fixup: if the FSRS row was created with the old invalid "0" day-of-week,
+    // patch it to "7" so the scheduler doesn't panic on startup.
+    if let Ok(rows) = cron_repo.list().await {
+        if let Some(row) = rows.iter().find(|r| r.name == JOB_FSRS_OPTIMIZE) {
+            if row.schedule.get("expr").and_then(|v| v.as_str()) == Some("0 0 4 * * 0") {
+                let mut fixed = row.clone();
+                fixed.schedule = serde_json::to_value(&scheduling::CronSchedule::Cron {
+                    expr: "0 0 4 * * 7".to_string(),
+                    tz: Some(config.timezone.clone()),
+                })
+                .expect("CronSchedule serialization is infallible");
+                fixed.updated_at_ms = jiff::Timestamp::now().as_millisecond();
+                let _ = cron_repo.upsert(&fixed).await;
+            }
+        }
+    }
     ensure_job!(
         JOB_ATOM_EXTRACTION_CATCHALL,
         scheduling::CronSchedule::Cron {
