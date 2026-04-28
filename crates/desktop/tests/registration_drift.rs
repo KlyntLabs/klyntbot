@@ -14,6 +14,6 @@ fn linkme_and_specta_lists_match() {
 
     assert!(
         missing.is_empty() && extra.is_empty(),
-        "Registration drift!\n  In linkme but not specta (add to collect_commands!): {missing:?}\n  In specta but not linkme (remove from collect_commands!): {extra:?}"
+        "Registration drift!\n  In linkme but not specta (add to klynt_collect_commands!): {missing:?}\n  In specta but not linkme (remove from klynt_collect_commands!): {extra:?}"
     );
 }

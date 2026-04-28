@@ -200,7 +200,7 @@ Transform vague tasks into verifiable goals — "fix the bug" → "write a test 
 - **Adding a Tauri command (Plan 6)** — The IPC surface is gated behind two attribute macros in `crates/desktop-macros/`. Direct `#[tauri::command]` is forbidden in `crates/desktop/src/commands/` and `crates/desktop/src/oauth/` (enforced by `no_raw_tauri_command_outside_macros` test).
   - Use `#[klynt_command]` for the happy path (`pub async fn`, no `state` param, bare `T` return).
   - Use `#[klynt_raw_command]` otherwise (sync, non-AppCore state, `rename_all`, etc.).
-  - After adding a command, list its path in `collect_commands![...]` in `specta_builder.rs`. The `registration_drift` test fails until you do.
+  - After adding a command, list its path in `desktop_macros::klynt_collect_commands![...]` in `specta_builder.rs`. The macro auto-generates `KLYNT_SPECTA_COMMAND_NAMES` (aliased as `SPECTA_COMMAND_NAMES`) from the same list, so there is no second manual array to maintain. The `registration_drift` test fails until you do.
   - Run `cargo tauri dev` once to regenerate `desktop-ui/src/bindings.ts`. The `bindings_are_current` test fails until you do.
 - **`StoragePool::from_existing()` skips migrations** — only for already-migrated pools. Tests must use `connect_in_memory()`.
 - **Config hot-reload**: Model, temperature, max_tokens, max_iterations, pipeline_timeout, and monthly_budget changes take effect within 5 seconds (file watcher) or immediately (via settings UI). Structural changes (channels, provider init, feature enable/disable) still require restart.
