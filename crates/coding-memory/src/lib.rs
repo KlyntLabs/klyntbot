@@ -9,6 +9,8 @@
 
 #![deny(missing_docs)]
 
+/// Causal edge repo + auto-detection (Phase 6).
+pub mod causal;
 /// Coding-domain searcher for InsightForge (Tier B4).
 pub mod code_domain_searcher;
 /// Coding session state enum (Tier B3).
@@ -21,6 +23,8 @@ pub mod distiller;
 pub mod error;
 /// Coding fact taxonomy (`FixAttempt`, `RepoContext`, …).
 pub mod facts;
+/// Git invalidation handler impl (Phase 6).
+pub mod git_invalidation;
 /// MCP tool stubs — registered with `default_exposed_tools()`.
 pub mod mcp;
 /// Mirror integration — alerts, effectiveness, stale-memory signals.
@@ -44,7 +48,10 @@ pub mod sink;
 pub mod skill_evolver;
 /// Scope-aware skill store extension + project skill evolution.
 pub mod skills;
+/// Tree-sitter symbol extraction (Phase 6).
+pub mod symbols;
 
+pub use causal::{CausalEdgeDetector, CausalEdgeRepo, ProblemHashGroup};
 pub use error::{CodingMemoryError, NotImplementedInPhase};
 pub use mcp::{CodingMemoryToolset, CODING_MEMORY_MCP_TOOLS};
 pub use recall::telemetry::{RecallInvocationRepo, RecallInvocationRow};
@@ -62,6 +69,7 @@ pub use reforge::{
 pub use retrieval_skills::{
     BudgetTier, EscalationContext, EscalationOutcome, RetrievalSkill, RetrievalSkillRegistry,
 };
+pub use symbols::{Language, SymbolExtractor, TreeSitterExtractor};
 
 use tools_core::FeatureMigration;
 
@@ -99,6 +107,14 @@ pub fn coding_memory_migrations() -> Vec<FeatureMigration> {
                           selective_delete_log."
                 .to_string(),
             sql: include_str!("../migrations/004_phase5_reflection.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "coding_memory".to_string(),
+            version: 5,
+            description: "Phase-6: pending_invalidations queue + functional \
+                          indexes for anchored-symbol file lookup."
+                .to_string(),
+            sql: include_str!("../migrations/005_phase6_invalidation.sql").to_string(),
         },
     ]
 }

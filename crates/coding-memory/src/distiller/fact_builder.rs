@@ -21,6 +21,7 @@ use super::record_observation::{Observation, ObservationScope};
 use super::writer::{PreparedEpisode, PreparedFact};
 use crate::facts::CodingKind;
 use crate::scope::ProvenanceMetadata;
+use crate::symbols::SymbolExtractor;
 use cognitive::types::{EpisodicMemory, SemanticFact};
 use jiff::Timestamp;
 use uuid::Uuid;
@@ -38,6 +39,7 @@ pub fn build_prepared(
     obs: &Observation,
     scope_repo_id: Option<&str>,
     provenance: &ProvenanceMetadata,
+    extractor: Option<&dyn SymbolExtractor>,
 ) -> Result<Prepared, DistillerError> {
     let effective_scope_repo = match obs.scope {
         ObservationScope::Global => None,
@@ -48,6 +50,14 @@ pub fn build_prepared(
     match obs.kind {
         CodingKind::FixAttempt => {
             let id = Uuid::new_v4().to_string();
+            let mut anchors = Vec::new();
+            if let Some(ext) = extractor {
+                for path in &obs.files {
+                    if let Ok(source) = std::fs::read_to_string(path) {
+                        anchors.extend(ext.extract(path, &source, "unknown"));
+                    }
+                }
+            }
             let content = serde_json::json!({
                 "subject": obs.subject,
                 "predicate": obs.predicate,
@@ -75,7 +85,10 @@ pub fn build_prepared(
                     kind: Some("fix_attempt".into()),
                 },
                 kind: "fix_attempt".into(),
-                metadata_json: Some(serde_json::json!({ "reasoning": obs.reasoning })),
+                metadata_json: Some(serde_json::json!({
+                    "reasoning": obs.reasoning,
+                    "anchoredSymbols": anchors,
+                })),
                 scope_repo_id: effective_scope_repo,
                 provenance: provenance.clone(),
             }))

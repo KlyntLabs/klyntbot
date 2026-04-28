@@ -1,3 +1,4 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{
     AnnotationEnrichmentResponse, ConfusableResponse, DetectConfusablesParams,
     EnrichAnnotationParams, EvaluateTranslationParams, QuickTranslateParams,
@@ -5,7 +6,6 @@ use desktop_shared::commands::{
     TranslationEvalResponse, VocabularySaveParams,
 };
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
@@ -31,9 +31,7 @@ pub async fn language_save_vocabulary(
 }
 
 #[klynt_command]
-pub async fn language_detect_confusables(
-    params: DetectConfusablesParams,
-) -> ConfusableResponse {
+pub async fn language_detect_confusables(params: DetectConfusablesParams) -> ConfusableResponse {
     state.language_detect_confusables(params).await
 }
 
@@ -45,9 +43,7 @@ pub async fn language_enrich_annotation(
 }
 
 #[klynt_command]
-pub async fn language_quick_translate(
-    params: QuickTranslateParams,
-) -> QuickTranslateResponse {
+pub async fn language_quick_translate(params: QuickTranslateParams) -> QuickTranslateResponse {
     state.language_quick_translate(params).await
 }
 

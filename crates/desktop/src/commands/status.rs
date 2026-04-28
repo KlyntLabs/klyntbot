@@ -1,6 +1,6 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::AgentStatusResponse;
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 #[klynt_command]
 pub async fn agent_status() -> AgentStatusResponse {

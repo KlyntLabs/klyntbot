@@ -58,6 +58,7 @@ pub struct CodingRecallService {
     skills: Option<Arc<RetrievalSkillRegistry>>,
     #[allow(dead_code)]
     budgeter: Arc<dyn TokenBudgeter>,
+    causal_repo: Option<Arc<crate::causal::CausalEdgeRepo>>,
 }
 
 impl std::fmt::Debug for CodingRecallService {
@@ -92,6 +93,7 @@ impl CodingRecallService {
             skills: None,
             budgeter,
             config,
+            causal_repo: None,
         }
     }
 
@@ -99,6 +101,13 @@ impl CodingRecallService {
     #[must_use]
     pub fn with_skills(mut self, skills: Arc<RetrievalSkillRegistry>) -> Self {
         self.skills = Some(skills);
+        self
+    }
+
+    /// Attach the causal repo (Phase-6 wiring).
+    #[must_use]
+    pub fn with_causal_repo(mut self, repo: Arc<crate::causal::CausalEdgeRepo>) -> Self {
+        self.causal_repo = Some(repo);
         self
     }
 
@@ -302,16 +311,21 @@ impl CodingRecallService {
         self.decision_points.list(repo, limit).await
     }
 
-    /// Phase 6 — stays unimplemented.
+    /// Walk the causal graph from `subject` up to `depth` levels.
     pub async fn trace_causes(
         &self,
-        _subject: Uuid,
+        subject: Uuid,
         _repo: Option<&str>,
-        _depth: u32,
+        depth: u32,
     ) -> common::Result<crate::recall::CausalTraceResponse> {
-        Err(common::KlyntbotError::Storage(
-            "trace_causes lands in Phase 6".into(),
-        ))
+        let Some(repo) = &self.causal_repo else {
+            return Err(common::KlyntbotError::Storage(
+                "trace_causes requires causal repo wiring".into(),
+            ));
+        };
+        crate::recall::causal_walker::CausalWalker::new(repo.clone())
+            .walk(subject, depth)
+            .await
     }
 
     /// Test seam — read telemetry rows.

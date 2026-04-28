@@ -5,9 +5,7 @@ use desktop_shared::CommandResult;
 use crate::app_core::AppCore;
 
 #[klynt_command]
-pub async fn view_set_active(
-    params: SetActiveViewParams,
-) -> () {
+pub async fn view_set_active(params: SetActiveViewParams) -> () {
     state.view_set_active(params).await
 }
 

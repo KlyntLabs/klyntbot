@@ -1,13 +1,11 @@
+use desktop_macros::klynt_command;
 use desktop_shared::cognitive_commands::SemanticFactResponse;
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
 #[klynt_command]
-pub async fn project_memories_list(
-    project_id: String,
-) -> Vec<SemanticFactResponse> {
+pub async fn project_memories_list(project_id: String) -> Vec<SemanticFactResponse> {
     state.project_memories_list(project_id).await
 }
 

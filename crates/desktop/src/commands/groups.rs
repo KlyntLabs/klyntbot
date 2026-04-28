@@ -7,23 +7,17 @@ use desktop_shared::CommandResult;
 use crate::app_core::AppCore;
 
 #[klynt_command]
-pub async fn group_list(
-    project_id: Option<String>,
-) -> Vec<TaskGroupResponse> {
+pub async fn group_list(project_id: Option<String>) -> Vec<TaskGroupResponse> {
     state.group_list(project_id).await
 }
 
 #[klynt_command]
-pub async fn group_create(
-    params: TaskGroupCreateParams,
-) -> TaskGroupResponse {
+pub async fn group_create(params: TaskGroupCreateParams) -> TaskGroupResponse {
     state.group_create(params).await
 }
 
 #[klynt_command]
-pub async fn group_update(
-    params: TaskGroupUpdateParams,
-) -> TaskGroupResponse {
+pub async fn group_update(params: TaskGroupUpdateParams) -> TaskGroupResponse {
     state.group_update(params).await
 }
 
@@ -33,9 +27,7 @@ pub async fn group_delete(id: String) -> bool {
 }
 
 #[klynt_command]
-pub async fn group_reorder(
-    params: TaskGroupReorderParams,
-) -> () {
+pub async fn group_reorder(params: TaskGroupReorderParams) -> () {
     state.group_reorder(params).await
 }
 

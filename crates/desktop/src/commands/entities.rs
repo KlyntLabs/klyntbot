@@ -7,16 +7,12 @@ use crate::app_core::AppCore;
 use desktop_macros::klynt_command;
 
 #[klynt_command]
-pub async fn entity_search(
-    params: EntitySearchParams,
-) -> Vec<EntityResponse> {
+pub async fn entity_search(params: EntitySearchParams) -> Vec<EntityResponse> {
     state.entity_search(&params).await
 }
 
 #[klynt_command]
-pub async fn entity_merge(
-    params: EntityMergeParams,
-) -> EntityResponse {
+pub async fn entity_merge(params: EntityMergeParams) -> EntityResponse {
     state.entity_merge(&params).await
 }
 

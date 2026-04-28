@@ -1,14 +1,12 @@
 use app_core::AppCore;
+use desktop_macros::klynt_command;
 use desktop_shared::types::{
     CronJobCreateParams, CronJobResponse, CronJobUpdateParams, CronStatusResponse,
 };
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 #[klynt_command]
-pub async fn cron_list(
-    include_disabled: Option<bool>,
-) -> Vec<CronJobResponse> {
+pub async fn cron_list(include_disabled: Option<bool>) -> Vec<CronJobResponse> {
     state.cron_list(include_disabled.unwrap_or(true)).await
 }
 
@@ -18,11 +16,7 @@ pub async fn cron_status() -> CronStatusResponse {
 }
 
 #[klynt_command]
-pub async fn cron_enable(
-    app: tauri::AppHandle,
-    id: String,
-    enabled: bool,
-) -> CronJobResponse {
+pub async fn cron_enable(app: tauri::AppHandle, id: String, enabled: bool) -> CronJobResponse {
     let (result, updates) = state.cron_enable(id, enabled).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -39,20 +33,14 @@ pub async fn cron_delete(id: String) -> bool {
 }
 
 #[klynt_command]
-pub async fn cron_create(
-    app: tauri::AppHandle,
-    params: CronJobCreateParams,
-) -> CronJobResponse {
+pub async fn cron_create(app: tauri::AppHandle, params: CronJobCreateParams) -> CronJobResponse {
     let (result, updates) = state.cron_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
 #[klynt_command]
-pub async fn cron_update(
-    app: tauri::AppHandle,
-    params: CronJobUpdateParams,
-) -> CronJobResponse {
+pub async fn cron_update(app: tauri::AppHandle, params: CronJobUpdateParams) -> CronJobResponse {
     let (result, updates) = state.cron_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)

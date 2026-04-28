@@ -80,6 +80,7 @@ async fn daemon_start_drains_pre_existing_buffer() {
         repo: repo.clone(),
         event_tx: None,
         op_handler: None,
+        git_invalidation_handler: None,
     })
     .await
     .unwrap();

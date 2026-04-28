@@ -14,9 +14,7 @@ pub async fn journey_milestones() -> Vec<String> {
 }
 
 #[klynt_command]
-pub async fn journey_mark_complete(
-    milestone: String,
-) -> () {
+pub async fn journey_mark_complete(milestone: String) -> () {
     let tracker = state
         .journey_tracker
         .as_ref()

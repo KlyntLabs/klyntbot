@@ -15,6 +15,8 @@ use tokio::sync::Mutex;
 use turn_buffer::{TurnBoundary, TurnBuffer};
 use uuid::Uuid;
 
+use crate::symbols::{SymbolExtractor, TreeSitterExtractor};
+
 pub use retry_queue::{DistillationRetryRepo, RetryReason, RetryRow};
 
 /// Distiller-scoped error taxonomy.
@@ -151,6 +153,8 @@ struct DistillerInner {
     /// publishes a `DomainEvent::CodingMemoryUpdated` so UI panels can refresh
     /// without polling. `None` keeps standalone use (tests, CLI replays) silent.
     event_bus: Option<Arc<bus::DomainEventBus>>,
+    /// Symbol extractor for anchored_symbols population (Phase 6).
+    extractor: Arc<dyn SymbolExtractor>,
 }
 
 impl std::fmt::Debug for DistillerInner {
@@ -177,6 +181,25 @@ impl Distiller {
         provider: Arc<ProviderManager>,
         retriever: Arc<dyn context_engine::MemoryRetriever>,
     ) -> Self {
+        Self::with_extractor(
+            config,
+            ingest_repo,
+            writer,
+            provider,
+            retriever,
+            Arc::new(TreeSitterExtractor::new()),
+        )
+    }
+
+    /// Construct with a caller-supplied symbol extractor (used by tests with a mock).
+    pub fn with_extractor(
+        config: DistillerConfig,
+        ingest_repo: Arc<IngestEventLogRepo>,
+        writer: writer::DistillerWriter,
+        provider: Arc<ProviderManager>,
+        retriever: Arc<dyn context_engine::MemoryRetriever>,
+        extractor: Arc<dyn SymbolExtractor>,
+    ) -> Self {
         Self {
             inner: Arc::new(DistillerInner {
                 config,
@@ -187,6 +210,7 @@ impl Distiller {
                 retry_repo: None,
                 buffer: Mutex::new(TurnBuffer::new()),
                 event_bus: None,
+                extractor,
             }),
         }
     }
@@ -340,6 +364,72 @@ impl Distiller {
         report.episodic_writes += 1;
         report.turn_trace_id = Some(trace_id);
 
+        // Phase A.5 — Refactor episode for file edits (Phase 6 anchoring).
+        if !trace.files_modified.is_empty() {
+            let has_enriched = events.iter().any(|e| {
+                let AgentEvent::V1(v1) = e;
+                matches!(
+                    v1.kind,
+                    coding_ingest::event::EventKind::FileEditEnriched { .. }
+                )
+            });
+            let anchors = if has_enriched {
+                phase_a::anchors_from_enriched(&events)
+            } else {
+                phase_a::extract_refactor_anchors(
+                    &*self.inner.extractor,
+                    &trace.files_modified,
+                    "unknown",
+                )
+            };
+            let content = serde_json::to_string(&crate::facts::RefactorEpisode {
+                files: trace
+                    .files_modified
+                    .iter()
+                    .map(|(p, _)| p.clone())
+                    .collect(),
+                anchored_symbols: anchors,
+                summary: format!("{} file(s) modified", trace.files_modified.len()),
+                occurred_at: trace.started_at,
+                provenance: prov_ext.clone(),
+            })
+            .unwrap_or_default();
+            let episode = cognitive::types::EpisodicMemory {
+                id: Uuid::new_v4().to_string(),
+                domain: "coding".into(),
+                content,
+                summary: None,
+                importance: 0.5,
+                occurred_at: trace.started_at.to_string(),
+                recorded_at: Timestamp::now().to_string(),
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                project_id: None,
+                scope_type: if repo_id.is_some() {
+                    "project".into()
+                } else {
+                    "user".into()
+                },
+                scope_id: repo_id.clone(),
+                scope_repo_id: repo_id.clone(),
+                metadata: None,
+                kind: Some("refactor_episode".into()),
+            };
+            let _ = self
+                .inner
+                .writer
+                .write_episode(writer::PreparedEpisode {
+                    episode,
+                    kind: "refactor_episode".into(),
+                    metadata_json: None,
+                    scope_repo_id: repo_id.clone(),
+                    provenance: prov_ext.clone(),
+                })
+                .await;
+            report.episodic_writes += 1;
+        }
+
         // Phase B — LLM synthesis. Failures are non-fatal — Phase A already lands.
         let user_prompt_text = events
             .iter()
@@ -417,7 +507,12 @@ impl Distiller {
 
         // Phase C per observation.
         for obs in &observations {
-            let prepared = match fact_builder::build_prepared(obs, repo_id.as_deref(), &prov_llm) {
+            let prepared = match fact_builder::build_prepared(
+                obs,
+                repo_id.as_deref(),
+                &prov_llm,
+                Some(&*self.inner.extractor),
+            ) {
                 Ok(p) => p,
                 Err(_) => continue,
             };

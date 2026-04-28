@@ -21,6 +21,8 @@ pub trait IngestAdapter: Send + Sync {
 pub mod claude_code;
 /// Codex adapter.
 pub mod codex;
+/// Git post-commit adapter.
+pub mod git_post_commit;
 /// kimi-cli adapter (tier-1 hook + tier-2 Wire path).
 pub mod kimi_wire;
 /// opencode adapter (SQLite WAL polling).

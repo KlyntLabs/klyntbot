@@ -1,10 +1,10 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{
     AppInfoResponse, McpAddServerParams, McpConfigResponse, McpRemoveParams, McpToggleParams,
     McpUpdateServerParams,
 };
 use desktop_shared::specta_helpers::JsonValueWrapper;
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
@@ -14,30 +14,22 @@ pub async fn mcp_get_config() -> McpConfigResponse {
 }
 
 #[klynt_command]
-pub async fn mcp_add_server(
-    params: McpAddServerParams,
-) -> McpConfigResponse {
+pub async fn mcp_add_server(params: McpAddServerParams) -> McpConfigResponse {
     state.mcp_add_server(params).await
 }
 
 #[klynt_command]
-pub async fn mcp_remove_server(
-    params: McpRemoveParams,
-) -> McpConfigResponse {
+pub async fn mcp_remove_server(params: McpRemoveParams) -> McpConfigResponse {
     state.mcp_remove_server(params).await
 }
 
 #[klynt_command]
-pub async fn mcp_toggle_server(
-    params: McpToggleParams,
-) -> McpConfigResponse {
+pub async fn mcp_toggle_server(params: McpToggleParams) -> McpConfigResponse {
     state.mcp_toggle_server(params).await
 }
 
 #[klynt_command]
-pub async fn mcp_update_server(
-    params: McpUpdateServerParams,
-) -> McpConfigResponse {
+pub async fn mcp_update_server(params: McpUpdateServerParams) -> McpConfigResponse {
     state.mcp_update_server(params).await
 }
 
@@ -47,9 +39,7 @@ pub async fn app_info() -> AppInfoResponse {
 }
 
 #[klynt_command]
-pub async fn config_get_section(
-    section: String,
-) -> JsonValueWrapper {
+pub async fn config_get_section(section: String) -> JsonValueWrapper {
     state
         .config_get_section(section)
         .await
@@ -57,10 +47,7 @@ pub async fn config_get_section(
 }
 
 #[klynt_command]
-pub async fn config_update_section(
-    section: String,
-    patch: JsonValueWrapper,
-) -> JsonValueWrapper {
+pub async fn config_update_section(section: String, patch: JsonValueWrapper) -> JsonValueWrapper {
     state
         .config_update_section(section, patch.0)
         .await

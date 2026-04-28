@@ -13,10 +13,14 @@ pub mod desktop_lock;
 pub mod event;
 /// Path-based privacy exclusion filter.
 pub mod excludes;
+/// Git invalidation handler trait.
+pub mod git_invalidation;
 /// Hook CLI entry point — shared by `klyntbot-hook` binary and desktop's `--hook` mode.
 pub mod hook_cli;
 /// `HookClient` — socket-first-else-buffer dispatcher.
 pub mod hook_client;
+/// Pending invalidations queue.
+pub mod pending_invalidations;
 /// `RepoScope` — repo identity attached to events.
 pub mod scope;
 /// Cwd → `RepoScope` resolver (cached).
@@ -28,6 +32,7 @@ pub mod transport;
 /// Touch-file rate-limited stderr warnings.
 pub mod warn;
 
+pub use adapters::git_post_commit::GitPostCommitAdapter;
 pub use daemon::OpHandler;
 
 pub use event::{

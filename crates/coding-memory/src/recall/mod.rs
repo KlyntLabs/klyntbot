@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub mod budget;
+pub mod causal_walker;
 pub mod change_history;
 pub mod dead_end;
 pub mod decision_points;
@@ -20,6 +21,7 @@ pub mod renderers;
 pub mod scope_resolve;
 pub mod telemetry;
 pub mod timeline_builder;
+pub use causal_walker::CausalWalker;
 
 /// One recall "level" for progressive disclosure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

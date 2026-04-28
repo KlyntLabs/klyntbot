@@ -1,9 +1,9 @@
 //! Coexistence guard. Runs during Phase B–D (commands in legacy AND klynt is illegal).
 //! Deleted in Phase E along with `LEGACY_COMMAND_NAMES`.
 
-use std::collections::BTreeSet;
-use desktop::LEGACY_COMMAND_NAMES;
 use desktop::specta_builder::KLYNT_COMMANDS;
+use desktop::LEGACY_COMMAND_NAMES;
+use std::collections::BTreeSet;
 
 #[test]
 fn no_command_double_registered() {

@@ -31,23 +31,17 @@ pub async fn coding_memory_session_replay(
 }
 
 #[klynt_command]
-pub async fn coding_memory_enable_cli(
-    cli: String,
-) -> () {
+pub async fn coding_memory_enable_cli(cli: String) -> () {
     state.coding_memory_enable_cli(cli).await
 }
 
 #[klynt_command]
-pub async fn coding_memory_disable_cli(
-    cli: String,
-) -> () {
+pub async fn coding_memory_disable_cli(cli: String) -> () {
     state.coding_memory_disable_cli(cli).await
 }
 
 #[klynt_command]
-pub async fn coding_memory_diagnose_cli(
-    cli: String,
-) -> DiagnoseResult {
+pub async fn coding_memory_diagnose_cli(cli: String) -> DiagnoseResult {
     state.coding_memory_diagnose_cli(cli).await
 }
 
@@ -60,16 +54,12 @@ pub async fn coding_memory_browser(
 }
 
 #[klynt_command]
-pub async fn coding_memory_activity(
-    days: Option<i64>,
-) -> Vec<ActivityBucket> {
+pub async fn coding_memory_activity(days: Option<i64>) -> Vec<ActivityBucket> {
     state.coding_memory_activity(days).await
 }
 
 #[klynt_command]
-pub async fn coding_memory_cost(
-    days: Option<i64>,
-) -> CostBreakdown {
+pub async fn coding_memory_cost(days: Option<i64>) -> CostBreakdown {
     state.coding_memory_cost(days).await
 }
 
@@ -233,27 +223,21 @@ pub async fn coding_memory_session_replay_recall_overlay(
 }
 
 #[klynt_command]
-pub async fn coding_memory_mirror_alerts_feed(
-    args: MirrorAlertsFeedArgs,
-) -> Vec<MirrorAlertRow> {
+pub async fn coding_memory_mirror_alerts_feed(args: MirrorAlertsFeedArgs) -> Vec<MirrorAlertRow> {
     app_core::coding_memory::panels_phase5::mirror_alerts_feed(state.storage_pool.clone(), args)
         .await
         .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
 }
 
 #[klynt_command]
-pub async fn coding_memory_mirror_alert_action(
-    args: MirrorAlertActionArgs,
-) -> () {
+pub async fn coding_memory_mirror_alert_action(args: MirrorAlertActionArgs) -> () {
     app_core::coding_memory::panels_phase5::mirror_alert_action(state.storage_pool.clone(), args)
         .await
         .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
 }
 
 #[klynt_command]
-pub async fn coding_memory_effectiveness_trends(
-    pattern_id: String,
-) -> EffectivenessTrendsResponse {
+pub async fn coding_memory_effectiveness_trends(pattern_id: String) -> EffectivenessTrendsResponse {
     app_core::coding_memory::panels_phase5::effectiveness_trends(
         state.storage_pool.clone(),
         pattern_id,
@@ -279,9 +263,7 @@ pub async fn coding_memory_reforge_cycle_diff(
 }
 
 #[klynt_command]
-pub async fn coding_memory_project_skills_for_repo(
-    repo_id: String,
-) -> Vec<ProjectSkillRow> {
+pub async fn coding_memory_project_skills_for_repo(repo_id: String) -> Vec<ProjectSkillRow> {
     app_core::coding_memory::panels_phase5::project_skills_for_repo(
         state.storage_pool.clone(),
         repo_id,

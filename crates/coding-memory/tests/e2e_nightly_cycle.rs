@@ -122,6 +122,9 @@ async fn nightly_cycle_produces_artifact_change() {
         selective_delete_log: &selective_delete_log,
         pattern_effectiveness_log: &pattern_effectiveness_log,
         bus: None,
+        causal_repo: None,
+        symbol_extractor: None,
+        repo_roots: &Default::default(),
     };
 
     let rule_before: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM procedural_rules")

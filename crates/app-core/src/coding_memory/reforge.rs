@@ -55,6 +55,12 @@ pub struct CodingPhaseRunnerImpl {
     rule_artifacts_handler: Option<Arc<dyn RuleArtifactsHandler>>,
     enabled_artifacts: Vec<String>,
     bus: Option<Arc<bus::DomainEventBus>>,
+    #[allow(dead_code)]
+    symbol_extractor: Option<Arc<dyn coding_memory::symbols::SymbolExtractor>>,
+    #[allow(dead_code)]
+    repo_roots: std::collections::HashMap<String, std::path::PathBuf>,
+    #[allow(dead_code)]
+    causal_repo: Option<Arc<coding_memory::causal::CausalEdgeRepo>>,
 }
 
 impl CodingPhaseRunnerImpl {
@@ -95,12 +101,45 @@ impl CodingPhaseRunnerImpl {
             rule_artifacts_handler,
             enabled_artifacts,
             bus,
+            symbol_extractor: None,
+            repo_roots: Default::default(),
+            causal_repo: None,
         }
     }
 
     /// Test constructor — no LLM handlers, no enabled artifacts.
     pub fn new_for_test(pool: storage::StoragePool) -> Self {
         Self::new(pool, None, None, vec![], None)
+    }
+
+    /// Attach a symbol extractor (Phase-6 wiring).
+    #[must_use]
+    pub fn with_symbol_extractor(
+        mut self,
+        e: Option<Arc<dyn coding_memory::symbols::SymbolExtractor>>,
+    ) -> Self {
+        self.symbol_extractor = e;
+        self
+    }
+
+    /// Attach repo roots (Phase-6 symbol validation wiring).
+    #[must_use]
+    pub fn with_repo_roots(
+        mut self,
+        r: std::collections::HashMap<String, std::path::PathBuf>,
+    ) -> Self {
+        self.repo_roots = r;
+        self
+    }
+
+    /// Attach the causal edge repo (Phase-6 wiring).
+    #[must_use]
+    pub fn with_causal_repo(
+        mut self,
+        r: Option<Arc<coding_memory::causal::CausalEdgeRepo>>,
+    ) -> Self {
+        self.causal_repo = r;
+        self
     }
 
     fn handlers(&self) -> CodingPhaseHandlers<'_> {
@@ -116,7 +155,15 @@ impl CodingPhaseRunnerImpl {
             selective_delete_log: &self.selective_delete_log,
             pattern_effectiveness_log: &self.pattern_effectiveness_log,
             bus: self.bus.clone(),
+            causal_repo: self.causal_repo.as_deref(),
+            symbol_extractor: self.symbol_extractor.as_deref(),
+            repo_roots: &self.repo_roots,
         }
+    }
+
+    /// Return the optional causal repo (for wiring into other components).
+    pub fn causal_repo(&self) -> Option<&Arc<coding_memory::causal::CausalEdgeRepo>> {
+        self.causal_repo.as_ref()
     }
 }
 
@@ -152,6 +199,34 @@ impl cognitive::services::reforge::CodingPhaseRunner for CodingPhaseRunnerImpl {
         Ok(CodingPhaseRunnerOutcome {
             applied,
             narrative: None,
+        })
+    }
+
+    async fn run_symbol_validation(&self) -> common::Result<CodingPhaseRunnerOutcome> {
+        let Some(extractor) = self.symbol_extractor.clone() else {
+            return Err(common::KlyntbotError::Storage(
+                "symbol_extractor not wired".into(),
+            ));
+        };
+        let causal_repo = self.causal_repo.clone().unwrap_or_else(|| {
+            Arc::new(coding_memory::causal::CausalEdgeRepo::new(
+                self.pool.clone(),
+            ))
+        });
+        let phase = coding_memory::reforge::SymbolValidationPhase::new(
+            Arc::new(self.fact_repo.clone()),
+            Arc::new(self.episodic_repo.clone()),
+            extractor,
+            self.repo_roots.clone(),
+            causal_repo,
+        );
+        let outcome = phase.run().await?;
+        Ok(CodingPhaseRunnerOutcome {
+            applied: outcome.invalidated + outcome.marked_stale,
+            narrative: Some(format!(
+                "invalidated={}, stale={}, untouched={}",
+                outcome.invalidated, outcome.marked_stale, outcome.untouched
+            )),
         })
     }
 }

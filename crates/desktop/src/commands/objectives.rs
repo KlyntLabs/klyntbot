@@ -15,9 +15,7 @@ pub async fn objective_create(
 }
 
 #[klynt_command]
-pub async fn objective_get(
-    id: String,
-) -> ObjectiveResponse {
+pub async fn objective_get(id: String) -> ObjectiveResponse {
     state.objective_get(id).await
 }
 
@@ -32,10 +30,7 @@ pub async fn objective_update(
 }
 
 #[klynt_command]
-pub async fn objective_delete(
-    app: tauri::AppHandle,
-    id: String,
-) -> bool {
+pub async fn objective_delete(app: tauri::AppHandle, id: String) -> bool {
     let (result, updates) = state.objective_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)

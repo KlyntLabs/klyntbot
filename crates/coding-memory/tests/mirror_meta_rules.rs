@@ -5,7 +5,7 @@ use storage::StoragePool;
 fn fix_failed_signal(problem_hash: &str, attempt_count: u32) -> AiSignal {
     AiSignal {
         domain: RecallDomain::General,
-        event_kind: "FixAttemptFailed".into(),
+        event_kind: "FixAttemptFailed",
         importance: 0.5,
         salience: SalienceVerdict::Accumulate,
         content: String::new(),

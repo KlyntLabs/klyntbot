@@ -4,9 +4,9 @@
 //! (CI drift check) call `build_specta()` to ensure they see the *same*
 //! command + event list. Add new commands and events here.
 
-use tauri_specta::{collect_commands, collect_events, Builder};
 use linkme::distributed_slice;
 use std::collections::HashMap;
+use tauri_specta::{collect_commands, collect_events, Builder};
 
 /// One element per command, populated at link time by the `#[klynt_command]`
 /// and `#[klynt_raw_command]` macros. The slice IS the truth for which commands
@@ -29,18 +29,16 @@ pub enum SourceKind {
 
 /// Runtime invoke-handler that dispatches via the linkme-collected slice.
 /// Replaces `tauri::generate_handler![...]` once Phase D switchover lands.
-pub fn klynt_invoke_handler() -> impl Fn(::tauri::ipc::Invoke<::tauri::Wry>) -> bool + Send + Sync + 'static {
+pub fn klynt_invoke_handler(
+) -> impl Fn(::tauri::ipc::Invoke<::tauri::Wry>) -> bool + Send + Sync + 'static {
     let table: HashMap<&'static str, fn(::tauri::ipc::Invoke<::tauri::Wry>) -> bool> =
         KLYNT_COMMANDS.iter().map(|c| (c.name, c.invoke)).collect();
 
-    move |invoke| {
-        match table.get(invoke.message.command()) {
-            Some(f) => f(invoke),
-            None => false,
-        }
+    move |invoke| match table.get(invoke.message.command()) {
+        Some(f) => f(invoke),
+        None => false,
     }
 }
-
 
 /// Hand-maintained alongside `collect_commands![...]` so the `registration_drift`
 /// test can assert the specta list and the linkme slice stay in sync.

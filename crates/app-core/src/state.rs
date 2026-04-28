@@ -179,6 +179,12 @@ pub struct AppCore {
     pub coding_toolset: Option<coding_memory::CodingMemoryToolset>,
     /// Phase-5 session-end light pass.
     pub session_end_pass: Option<Arc<coding_memory::reforge::SessionEndPass>>,
+    /// Causal edge repo (Phase 6).
+    pub causal_edge_repo: Option<Arc<coding_memory::causal::CausalEdgeRepo>>,
+    /// Tree-sitter symbol extractor (Phase 6).
+    pub symbol_extractor: Option<Arc<dyn coding_memory::symbols::SymbolExtractor>>,
+    /// Map of repo_id → filesystem root (Phase 6 symbol validation).
+    pub repo_roots: Arc<std::sync::RwLock<std::collections::HashMap<String, std::path::PathBuf>>>,
 }
 
 impl AppCore {

@@ -67,6 +67,9 @@ proptest! {
                 selective_delete_log: &selective_delete_log,
                 pattern_effectiveness_log: &pattern_effectiveness_log,
                 bus: None,
+                causal_repo: None,
+                symbol_extractor: None,
+                repo_roots: &Default::default(),
             };
 
             CodingSynthesisPhase::run(&handlers).await.unwrap();

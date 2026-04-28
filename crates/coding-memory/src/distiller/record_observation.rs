@@ -8,6 +8,7 @@
 
 use super::error::DistillerError;
 use crate::facts::{CodingKind, FixOutcome};
+use std::path::PathBuf;
 
 /// Tool name the model must use.
 pub const RECORD_OBSERVATION_TOOL_NAME: &str = "record_observation";
@@ -45,6 +46,9 @@ pub struct Observation {
     /// `DeadEndAttempt` semantic fact alongside the episodic memory.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub outcome: Option<FixOutcome>,
+    /// File paths relevant to this observation (e.g., files touched in a fix).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<PathBuf>,
 }
 
 /// Build the `ToolDefinition` for the Distiller's Phase B LLM call.
@@ -71,6 +75,11 @@ pub fn record_observation_tool_def() -> serde_json::Value {
                     "type": "string",
                     "enum": ["success", "partial", "failure", "abandoned"],
                     "description": "Only for kind=fix_attempt. failure/abandoned triggers a counterfactual dead-end fact."
+                },
+                "files": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "File paths relevant to this observation."
                 }
             },
             "additionalProperties": false

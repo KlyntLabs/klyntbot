@@ -41,6 +41,11 @@ impl IngestEventLogRepo {
         Self { pool }
     }
 
+    /// Access the underlying pool.
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
+
     /// Insert one event. The `AgentEvent` is serialized as JSON into `payload`.
     pub async fn insert(&self, event: &AgentEvent) -> Result<()> {
         let AgentEvent::V1(v1) = event;
@@ -292,6 +297,7 @@ fn event_kind_tag(kind: &EventKind) -> &'static str {
         EventKind::CompressionApplied { .. } => "compressionApplied",
         EventKind::MirrorAlert { .. } => "mirrorAlert",
         EventKind::SkillRoutingTrace { .. } => "skillRoutingTrace",
+        EventKind::GitCommit { .. } => "gitCommit",
     }
 }
 

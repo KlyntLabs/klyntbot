@@ -207,12 +207,13 @@ impl CodingMemoryToolset {
             )),
             Arc::new(CodingMemoryMcpTool::new(
                 "trace_causes",
-                "Trace causal ancestors and descendants of a memory (stub — lands in Phase 6).",
+                "Walk the causal graph from `subject` up to `depth` levels in both directions. Returns ancestors + descendants.",
                 json!({
                     "type": "object",
                     "required": ["subject"],
                     "properties": {
-                        "subject": { "type": "string", "description": "Memory id to trace" }
+                        "subject": { "type": "string", "description": "Memory id to trace" },
+                        "depth": { "type": "integer", "description": "Walk depth (default 3)" }
                     }
                 }),
                 self.clone(),
@@ -234,9 +235,7 @@ impl CodingMemoryToolset {
             "recall_facts_as_of" => self.recall_facts_as_of(args).await,
             "recall_change_history" => self.recall_change_history(args).await,
             "recall_decision_points" => self.recall_decision_points(args).await,
-            "trace_causes" => Err(common::KlyntbotError::Storage(
-                "trace_causes lands in Phase 6".into(),
-            )),
+            "trace_causes" => self.trace_causes(args).await,
             other => Err(common::KlyntbotError::Storage(format!(
                 "unknown coding-memory tool: {other}"
             ))),
@@ -399,6 +398,28 @@ impl CodingMemoryToolset {
             .recall_decision_points(a.repo.as_deref(), a.limit)
             .await?;
         let _ = a.domain;
+        serde_json::to_value(resp).map_err(encode_err)
+    }
+
+    async fn trace_causes(&self, args: serde_json::Value) -> common::Result<serde_json::Value> {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct A {
+            subject: String,
+            #[serde(default = "default_depth")]
+            depth: u32,
+            repo: Option<String>,
+        }
+        fn default_depth() -> u32 {
+            3
+        }
+        let a: A = serde_json::from_value(args).map_err(decode_err)?;
+        let subject = uuid::Uuid::parse_str(&a.subject)
+            .map_err(|e| common::KlyntbotError::Storage(format!("subject uuid: {e}")))?;
+        let resp = self
+            .svc
+            .trace_causes(subject, a.repo.as_deref(), a.depth)
+            .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }
 }
