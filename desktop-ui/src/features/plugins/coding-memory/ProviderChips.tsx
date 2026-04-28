@@ -6,6 +6,7 @@ const PROVIDERS: { id: ProviderId | "all"; label: string }[] = [
   { id: "codex", label: "Codex" },
   { id: "kimiCli", label: "Kimi" },
   { id: "openCode", label: "opencode" },
+  { id: "klyntCli", label: "Klynt CLI" },
 ];
 
 interface Props {
