@@ -1,5 +1,6 @@
 export * from "./agents";
 export * from "./apps";
+export * as codingMemory from "./codingMemory";
 export * from "./collaboration";
 export * from "./dictation";
 export * from "./files";
