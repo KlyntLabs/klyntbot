@@ -85,11 +85,12 @@ impl ConversationTurn {
             .iter()
             .filter_map(|m| {
                 if let Message::Tool { name, content, .. } = m {
-                    let snip = if content.len() > 100 {
-                        let end = content.floor_char_boundary(100);
-                        format!("{}...", &content[..end])
+                    let text = content.as_text();
+                    let snip = if text.len() > 100 {
+                        let end = text.floor_char_boundary(100);
+                        format!("{}...", &text[..end])
                     } else {
-                        content.clone()
+                        text
                     };
                     Some(format!("{}: {}", name, snip))
                 } else {

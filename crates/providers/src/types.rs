@@ -376,7 +376,7 @@ pub enum Message {
     Tool {
         tool_call_id: String,
         name: String,
-        content: String,
+        content: ToolContent,
     },
     /// A mid-execution context update injected by LiveContextRefresher.
     /// Serialized as system role with XML tags when sent to the LLM.
@@ -422,6 +422,64 @@ pub enum ContentPart {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageUrl {
     pub url: String,
+}
+
+/// Tool result content. Backwards-compatible: deserializes from a bare string
+/// into `Text(_)`. Multipart variant carries text + image_data parts for
+/// vision / computer-use tools.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ToolContent {
+    Text(String),
+    MultiPart(Vec<ToolContentPart>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ToolContentPart {
+    Text { text: String },
+    ImageData { media_type: String, data: String },
+}
+
+impl From<String> for ToolContent {
+    fn from(s: String) -> Self {
+        ToolContent::Text(s)
+    }
+}
+
+impl From<&str> for ToolContent {
+    fn from(s: &str) -> Self {
+        ToolContent::Text(s.to_string())
+    }
+}
+
+impl ToolContent {
+    /// Concatenated text for token counting and extractive snippets.
+    /// Image parts contribute a fixed 1024-token surrogate (Anthropic's billing
+    /// approximation for ≤1568×1568 images).
+    pub fn as_text(&self) -> String {
+        match self {
+            ToolContent::Text(s) => s.clone(),
+            ToolContent::MultiPart(parts) => parts
+                .iter()
+                .filter_map(|p| match p {
+                    ToolContentPart::Text { text } => Some(text.clone()),
+                    ToolContentPart::ImageData { .. } => None,
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+        }
+    }
+
+    pub fn image_part_count(&self) -> usize {
+        match self {
+            ToolContent::Text(_) => 0,
+            ToolContent::MultiPart(parts) => parts
+                .iter()
+                .filter(|p| matches!(p, ToolContentPart::ImageData { .. }))
+                .count(),
+        }
+    }
 }
 
 pub const DEFAULT_CONTEXT_WINDOW: usize = 128_000;
@@ -473,7 +531,7 @@ impl Message {
     pub fn tool(
         tool_call_id: impl Into<String>,
         name: impl Into<String>,
-        content: impl Into<String>,
+        content: impl Into<ToolContent>,
     ) -> Self {
         Self::Tool {
             tool_call_id: tool_call_id.into(),
@@ -598,5 +656,30 @@ mod tests {
         assert_eq!(json["role"], "context_update");
         assert_eq!(json["reason"], "memory_promoted");
         assert_eq!(json["content"], "User likes coffee");
+    }
+
+    #[test]
+    fn tool_message_can_carry_image_part() {
+        let msg = Message::Tool {
+            tool_call_id: "tc1".into(),
+            name: "screenshot".into(),
+            content: ToolContent::MultiPart(vec![
+                ToolContentPart::Text { text: "captured screen at 1920x1080".into() },
+                ToolContentPart::ImageData {
+                    media_type: "image/png".into(),
+                    data: "base64-blob".into(),
+                },
+            ]),
+        };
+
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains("image_data"), "should serialize image part: {json}");
+
+        let parsed: Message = serde_json::from_str(&json).unwrap();
+        if let Message::Tool { content, .. } = parsed {
+            assert!(matches!(content, ToolContent::MultiPart(_)));
+        } else {
+            panic!("wrong variant");
+        }
     }
 }

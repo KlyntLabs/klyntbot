@@ -40,8 +40,8 @@ pub use registry::{ProviderRegistry, ProviderSpec, PROVIDERS};
 pub use types::{
     tool_calls_to_messages, ChatParams, ContentPart, DynProvider, FunctionCall, ImageUrl,
     LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
-    ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage, Usage, UserContent,
-    DEFAULT_CONTEXT_WINDOW,
+    ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage, ToolContent,
+    ToolContentPart, Usage, UserContent, DEFAULT_CONTEXT_WINDOW,
 };
 
 // -- Factory --

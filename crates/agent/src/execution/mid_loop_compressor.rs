@@ -81,16 +81,22 @@ impl MidLoopCompressor {
         let mut saved_tokens: usize = 0;
         for msg in messages[system_count..recent_start].iter_mut() {
             if let Message::Tool { content, name, .. } = msg {
-                let original_tokens = self.token_counter.estimate_text(content);
+                let original_text = content.as_text();
+                let image_count = content.image_part_count();
+                let original_tokens = self.token_counter.estimate_text(&original_text)
+                    + image_count * 1024;
                 if original_tokens > MIN_COMPRESSIBLE_TOKENS {
-                    let summary = format!(
-                        "{}... [compressed {name} result, originally {} chars]",
-                        context_engine::first_snippet(content, SUMMARY_SNIPPET_LENGTH),
-                        content.len()
+                    let summary_text = format!(
+                        "{}... [compressed {name} result, originally {} chars + {} image part(s)]",
+                        context_engine::first_snippet(&original_text, SUMMARY_SNIPPET_LENGTH),
+                        original_text.len(),
+                        image_count,
                     );
-                    let new_tokens = self.token_counter.estimate_text(&summary);
+                    let new_tokens = self.token_counter.estimate_text(&summary_text);
                     saved_tokens += original_tokens.saturating_sub(new_tokens);
-                    *content = summary;
+                    // Image parts are dropped; text becomes the summary. Compression
+                    // is one-way; the original payload is gone after this step.
+                    *content = providers::ToolContent::Text(summary_text);
                 }
             }
         }
@@ -137,7 +143,7 @@ mod tests {
         Message::Tool {
             tool_call_id: id.to_string(),
             name: name.to_string(),
-            content: result.to_string(),
+            content: providers::ToolContent::Text(result.to_string()),
         }
     }
 
@@ -190,11 +196,11 @@ mod tests {
         assert!(matches!(&messages[0], Message::System { .. }));
         if let Message::Tool { content, .. } = &messages[3] {
             assert!(
-                content.contains("[compressed"),
+                content.as_text().contains("[compressed"),
                 "older tool should contain compression marker"
             );
             assert!(
-                content.len() < large_content.len(),
+                content.as_text().len() < large_content.len(),
                 "compressed content should be shorter"
             );
         } else {
@@ -245,7 +251,7 @@ mod tests {
         let _ = compressor.compress_if_needed(&mut messages);
         assert!(messages
             .iter()
-            .any(|m| matches!(m, Message::Tool { content, .. } if content == "recent result")));
+            .any(|m| matches!(m, Message::Tool { content, .. } if content.as_text() == "recent result")));
     }
 
     #[test]

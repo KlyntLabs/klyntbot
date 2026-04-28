@@ -388,7 +388,7 @@ fn extractive_turn_summary(messages: &[Message], snippet_len: usize) -> String {
                 lines.push(format!(
                     "{}: {}",
                     name,
-                    first_snippet(content, snippet_len / 2)
+                    first_snippet(&content.as_text(), snippet_len / 2)
                 ));
             }
             _ => {}
@@ -435,15 +435,16 @@ fn microcompact_tool_results(mut messages: Vec<Message>, recent_window: usize) -
 
     for msg in messages[..cutoff].iter_mut() {
         if let Message::Tool { name, content, .. } = msg {
+            let text = content.as_text();
             if COMPACTABLE_TOOLS.iter().any(|t| name.contains(t))
-                && content.len() > MIN_COMPACTABLE_TOKENS * 4
+                && text.len() > MIN_COMPACTABLE_TOKENS * 4
             {
-                let original_len = content.len();
-                let snippet = first_snippet(content, MICROCOMPACT_SNIPPET_LEN);
-                *content = format!(
+                let original_len = text.len();
+                let snippet = first_snippet(&text, MICROCOMPACT_SNIPPET_LEN);
+                *content = providers::ToolContent::Text(format!(
                     "{} [compressed {} result, originally {} chars]",
                     snippet, name, original_len
-                );
+                ));
             }
         }
     }
@@ -661,7 +662,7 @@ mod tests {
             Message::Tool {
                 tool_call_id: "tc1".into(),
                 name: "read_file".into(),
-                content: "A".repeat(5000), // large tool result
+                content: providers::ToolContent::Text("A".repeat(5000)), // large tool result
             },
             Message::assistant("Here's what I found."),
             Message::user("Now do something else"),
@@ -671,8 +672,9 @@ mod tests {
         let compacted = microcompact_tool_results(messages, 8); // recent window = 8
                                                                 // All within recent window (6 < 8), so nothing compacted
         if let Message::Tool { content, .. } = &compacted[2] {
+            let text = content.as_text();
             assert_eq!(
-                content.len(),
+                text.len(),
                 5000,
                 "within recent window, should not compact"
             );
@@ -696,7 +698,7 @@ mod tests {
             Message::Tool {
                 tool_call_id: "tc1".into(),
                 name: "read_file".into(),
-                content: "A".repeat(5000),
+                content: providers::ToolContent::Text("A".repeat(5000)),
             },
             Message::assistant("Here's what I found."),
             Message::user("Now do something else"),
@@ -705,12 +707,13 @@ mod tests {
 
         let compacted2 = microcompact_tool_results(messages2, 2); // only last 2 recent
         if let Message::Tool { content, .. } = &compacted2[2] {
+            let text = content.as_text();
             assert!(
-                content.len() < 500,
+                text.len() < 500,
                 "stale tool result should be compacted, got {} chars",
-                content.len()
+                text.len()
             );
-            assert!(content.contains("[compressed"));
+            assert!(text.contains("[compressed"));
         } else {
             panic!("expected Tool message at index 2");
         }
@@ -723,7 +726,7 @@ mod tests {
             Message::Tool {
                 tool_call_id: "tc1".into(),
                 name: "search".into(),
-                content: "B".repeat(5000),
+                content: providers::ToolContent::Text("B".repeat(5000)),
             },
             Message::assistant("Done."),
         ];
@@ -732,7 +735,7 @@ mod tests {
         let compacted = microcompact_tool_results(messages, 8);
         if let Message::Tool { content, .. } = &compacted[1] {
             assert_eq!(
-                content.len(),
+                content.as_text().len(),
                 5000,
                 "recent tool results should not be compacted"
             );

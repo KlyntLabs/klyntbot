@@ -300,7 +300,9 @@ async fn call_provider_streaming(
                     c.as_deref().map_or(0, |t| counter.estimate_text(t))
                         + r.as_deref().map_or(0, |t| counter.estimate_text(t))
                 }
-                Message::Tool { content: c, .. } => counter.estimate_text(c),
+                Message::Tool { content: c, .. } => {
+                    counter.estimate_text(&c.as_text()) + c.image_part_count() * 1024
+                }
                 Message::ContextUpdate { content: c, .. } => counter.estimate_text(c),
             })
             .sum::<usize>() as u32;

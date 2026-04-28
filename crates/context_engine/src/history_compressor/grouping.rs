@@ -146,7 +146,7 @@ mod tests {
             Message::Tool {
                 tool_call_id: "tc1".into(),
                 name: "search".into(),
-                content: "Found 3 results".into(),
+                content: providers::ToolContent::Text("Found 3 results".into()),
             },
             Message::assistant("Here are the results."),
         ];

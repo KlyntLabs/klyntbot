@@ -86,7 +86,9 @@ pub fn estimate_message_tokens(counter: &dyn TokenCounter, msg: &providers::Mess
                 .unwrap_or(0)
                 + 20
         }
-        providers::Message::Tool { content, .. } => counter.estimate_text(content) + 10,
+        providers::Message::Tool { content, .. } => {
+            counter.estimate_text(&content.as_text()) + content.image_part_count() * 1024 + 10
+        }
         providers::Message::ContextUpdate { content, .. } => counter.estimate_text(content) + 10,
     }
 }
