@@ -16,6 +16,13 @@ use crate::types::{MemoryOp, SemanticFact};
 pub struct ConsolidationCandidate {
     pub candidate: SemanticFact,
     pub existing: Vec<SemanticFact>,
+    /// 1-hop neighbors of the subject entity (entity_name, relationship_type).
+    /// Empty if subject is not in `entities` table yet (cold-start).
+    pub subject_neighborhood: Vec<(String, String)>,
+    /// 1-hop neighbors of the object entity (only populated when object is a non-numeric ≥3 char string).
+    pub object_neighborhood: Vec<(String, String)>,
+    /// Up to 5 facts from the same entities (different subject/predicate combos than `existing`).
+    pub cross_entity_facts: Vec<SemanticFact>,
 }
 
 /// Embed a fact into the vector store, logging on failure.
@@ -176,6 +183,9 @@ mod tests {
         let candidates = vec![ConsolidationCandidate {
             candidate: candidate.clone(),
             existing: vec![],
+            subject_neighborhood: Vec::new(),
+            object_neighborhood: Vec::new(),
+            cross_entity_facts: Vec::new(),
         }];
         let ops = vec![MemoryOp::Add { id: "f1".into() }];
 
@@ -197,6 +207,9 @@ mod tests {
         let candidates = vec![ConsolidationCandidate {
             candidate: new_fact,
             existing: vec![old],
+            subject_neighborhood: Vec::new(),
+            object_neighborhood: Vec::new(),
+            cross_entity_facts: Vec::new(),
         }];
         let ops = vec![MemoryOp::Update {
             id: "f2".into(),
@@ -221,6 +234,9 @@ mod tests {
         let candidates = vec![ConsolidationCandidate {
             candidate,
             existing: vec![],
+            subject_neighborhood: Vec::new(),
+            object_neighborhood: Vec::new(),
+            cross_entity_facts: Vec::new(),
         }];
         let ops = vec![MemoryOp::Noop];
 
@@ -244,6 +260,9 @@ mod tests {
         let candidates = vec![ConsolidationCandidate {
             candidate: candidate.clone(),
             existing: vec![],
+            subject_neighborhood: Vec::new(),
+            object_neighborhood: Vec::new(),
+            cross_entity_facts: Vec::new(),
         }];
         let ops = vec![MemoryOp::Add { id: "f-low".into() }];
 
@@ -275,6 +294,9 @@ mod tests {
         let candidates = vec![ConsolidationCandidate {
             candidate: candidate.clone(),
             existing: vec![],
+            subject_neighborhood: Vec::new(),
+            object_neighborhood: Vec::new(),
+            cross_entity_facts: Vec::new(),
         }];
         let ops = vec![MemoryOp::Add {
             id: "f-high".into(),
@@ -295,5 +317,93 @@ mod tests {
             pending.is_empty(),
             "high-confidence fact should not be pending"
         );
+    }
+
+    #[test]
+    fn consolidation_candidate_carries_neighborhood_and_cross_entity_facts() {
+        let candidate = SemanticFact {
+            id: "c1".into(),
+            domain: "test".into(),
+            subject: "Alice".into(),
+            predicate: "knows".into(),
+            object: "Rust".into(),
+            confidence: 0.8,
+            source: "test".into(),
+            valid_from: "2026-04-29".into(),
+            valid_until: None,
+            recorded_at: "2026-04-29".into(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 0.0,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+        };
+        let existing = vec![SemanticFact {
+            id: "e1".into(),
+            domain: "test".into(),
+            subject: "Alice".into(),
+            predicate: "knows".into(),
+            object: "Java".into(),
+            confidence: 0.6,
+            source: "test".into(),
+            valid_from: "2026-04-29".into(),
+            valid_until: None,
+            recorded_at: "2026-04-29".into(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 0.0,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+        }];
+        let neighborhood = vec![("Bob".to_string(), "manages".to_string())];
+        let cross_entity_facts = vec![SemanticFact {
+            id: "f2".into(),
+            domain: "test".into(),
+            subject: "Bob".into(),
+            predicate: "works_at".into(),
+            object: "Anthropic".into(),
+            confidence: 0.9,
+            source: "t".into(),
+            valid_from: "2026-04-29".into(),
+            valid_until: None,
+            recorded_at: "2026-04-29".into(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 0.0,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+        }];
+
+        let cand = ConsolidationCandidate {
+            candidate,
+            existing,
+            subject_neighborhood: neighborhood.clone(),
+            object_neighborhood: vec![],
+            cross_entity_facts: cross_entity_facts.clone(),
+        };
+
+        assert_eq!(cand.subject_neighborhood, neighborhood);
+        assert_eq!(cand.cross_entity_facts.len(), 1);
     }
 }

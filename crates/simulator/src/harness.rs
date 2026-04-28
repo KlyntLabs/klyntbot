@@ -1812,6 +1812,9 @@ impl SimulationHarness {
             candidates.push(cognitive::ConsolidationCandidate {
                 candidate: semantic_fact,
                 existing,
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             });
         }
 
@@ -1835,6 +1838,9 @@ impl SimulationHarness {
                     candidates.push(cognitive::ConsolidationCandidate {
                         candidate: semantic_fact,
                         existing,
+                        subject_neighborhood: Vec::new(),
+                        object_neighborhood: Vec::new(),
+                        cross_entity_facts: Vec::new(),
                     });
                 }
             }

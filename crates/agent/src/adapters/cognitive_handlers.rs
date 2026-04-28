@@ -1083,6 +1083,9 @@ mod tests {
             .decide_batch(&[cognitive::ConsolidationCandidate {
                 candidate,
                 existing: vec![],
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             }])
             .await
             .unwrap();
@@ -1099,6 +1102,9 @@ mod tests {
             .decide_batch(&[cognitive::ConsolidationCandidate {
                 candidate,
                 existing,
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             }])
             .await
             .unwrap();
@@ -1115,6 +1121,9 @@ mod tests {
             .decide_batch(&[cognitive::ConsolidationCandidate {
                 candidate,
                 existing,
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             }])
             .await
             .unwrap();
@@ -1131,6 +1140,9 @@ mod tests {
             .decide_batch(&[cognitive::ConsolidationCandidate {
                 candidate,
                 existing,
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             }])
             .await
             .unwrap();
@@ -1207,6 +1219,9 @@ mod tests {
             .decide_batch(&[cognitive::ConsolidationCandidate {
                 candidate,
                 existing,
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             }])
             .await
             .unwrap();
@@ -1230,6 +1245,9 @@ mod tests {
             .decide_batch(&[cognitive::ConsolidationCandidate {
                 candidate,
                 existing,
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             }])
             .await
             .unwrap();

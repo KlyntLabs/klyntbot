@@ -133,6 +133,9 @@ async fn prefetch_existing(
             |(candidate, existing)| crate::consolidation::ConsolidationCandidate {
                 candidate,
                 existing,
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             },
         )
         .collect()
