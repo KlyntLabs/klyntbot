@@ -35,7 +35,9 @@ async fn mcp_tool_call_publishes_tool_call_executed() {
     let bus = Arc::new(DomainEventBus::new(64));
     let mut rx = bus.subscribe();
 
-    let registry = Arc::new(tokio::sync::RwLock::new(tools_core::registry::ToolRegistry::new()));
+    let registry = Arc::new(tokio::sync::RwLock::new(
+        tools_core::registry::ToolRegistry::new(),
+    ));
     registry.write().await.register(EchoTool);
     let bridge = ToolRegistryBridge::new_with_bus(registry, vec!["echo".into()], bus.clone());
 

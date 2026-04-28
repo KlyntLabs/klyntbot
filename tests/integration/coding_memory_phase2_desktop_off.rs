@@ -46,6 +46,9 @@ async fn desktop_off_buffers_then_drains_on_startup() {
         git_invalidation_handler: None,
         opencode_db_path: None,
         opencode_poll_interval: None,
+        kimi_wire_socket: None,
+        codex_sessions_dir: None,
+        codex_poll_interval: None,
     };
     let handle = spawn(cfg).await.expect("spawn");
 

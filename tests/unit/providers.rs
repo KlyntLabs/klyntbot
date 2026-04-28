@@ -137,7 +137,7 @@ fn message_construction() {
         } => {
             assert_eq!(tool_call_id, "call_123");
             assert_eq!(name, "read_file");
-            assert_eq!(content, "File contents");
+            assert_eq!(content.as_text(), "File contents");
         }
         _ => panic!("Expected Tool message"),
     }

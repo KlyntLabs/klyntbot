@@ -10,9 +10,7 @@
 
 use async_trait::async_trait;
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
-use platform_input::{
-    ComputerUseAction, PlatformError, PlatformInput, Point, Result,
-};
+use platform_input::{ComputerUseAction, PlatformError, PlatformInput, Point, Result};
 
 /// Map a Klynt-canonical key name to a macOS virtual key code.
 /// Returns `None` for unknown names; callers may fall back to
@@ -42,15 +40,32 @@ fn key_name_to_virtual_code(name: &str) -> Option<u16> {
         c if c.len() == 1 => {
             let ch = c.chars().next()?;
             match ch {
-                'a' => Some(0x00), 'b' => Some(0x0B), 'c' => Some(0x08),
-                'd' => Some(0x02), 'e' => Some(0x0E), 'f' => Some(0x03),
-                'g' => Some(0x05), 'h' => Some(0x04), 'i' => Some(0x22),
-                'j' => Some(0x26), 'k' => Some(0x28), 'l' => Some(0x25),
-                'm' => Some(0x2E), 'n' => Some(0x2D), 'o' => Some(0x1F),
-                'p' => Some(0x23), 'q' => Some(0x0C), 'r' => Some(0x0F),
-                's' => Some(0x01), 't' => Some(0x11), 'u' => Some(0x20),
-                'v' => Some(0x09), 'w' => Some(0x0D), 'x' => Some(0x07),
-                'y' => Some(0x10), 'z' => Some(0x06),
+                'a' => Some(0x00),
+                'b' => Some(0x0B),
+                'c' => Some(0x08),
+                'd' => Some(0x02),
+                'e' => Some(0x0E),
+                'f' => Some(0x03),
+                'g' => Some(0x05),
+                'h' => Some(0x04),
+                'i' => Some(0x22),
+                'j' => Some(0x26),
+                'k' => Some(0x28),
+                'l' => Some(0x25),
+                'm' => Some(0x2E),
+                'n' => Some(0x2D),
+                'o' => Some(0x1F),
+                'p' => Some(0x23),
+                'q' => Some(0x0C),
+                'r' => Some(0x0F),
+                's' => Some(0x01),
+                't' => Some(0x11),
+                'u' => Some(0x20),
+                'v' => Some(0x09),
+                'w' => Some(0x0D),
+                'x' => Some(0x07),
+                'y' => Some(0x10),
+                'z' => Some(0x06),
                 _ => None,
             }
         }
@@ -63,10 +78,18 @@ fn key_name_to_virtual_code(name: &str) -> Option<u16> {
 fn mods_to_flags(m: platform_input::KeyMods) -> core_graphics::event::CGEventFlags {
     use core_graphics::event::CGEventFlags;
     let mut f = CGEventFlags::empty();
-    if m.cmd { f |= CGEventFlags::CGEventFlagCommand; }
-    if m.shift { f |= CGEventFlags::CGEventFlagShift; }
-    if m.alt { f |= CGEventFlags::CGEventFlagAlternate; }
-    if m.ctrl { f |= CGEventFlags::CGEventFlagControl; }
+    if m.cmd {
+        f |= CGEventFlags::CGEventFlagCommand;
+    }
+    if m.shift {
+        f |= CGEventFlags::CGEventFlagShift;
+    }
+    if m.alt {
+        f |= CGEventFlags::CGEventFlagAlternate;
+    }
+    if m.ctrl {
+        f |= CGEventFlags::CGEventFlagControl;
+    }
     f
 }
 
@@ -89,13 +112,17 @@ impl MacInput {
     /// underlying Quartz framework).
     pub fn new() -> Result<Self> {
         let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)
-            .map_err(|()| PlatformError::PlatformCallFailed(
-                "CGEventSourceCreate failed".into(),
-            ))?;
+            .map_err(|()| PlatformError::PlatformCallFailed("CGEventSourceCreate failed".into()))?;
         Ok(Self { source })
     }
 
-    fn post_click(&self, x: i32, y: i32, button: core_graphics::event::CGMouseButton, count: i64) -> Result<()> {
+    fn post_click(
+        &self,
+        x: i32,
+        y: i32,
+        button: core_graphics::event::CGMouseButton,
+        count: i64,
+    ) -> Result<()> {
         use core_graphics::event::{CGEvent, CGEventTapLocation, CGEventType};
         use core_graphics::geometry::CGPoint;
 
@@ -109,17 +136,30 @@ impl MacInput {
             core_graphics::event::CGMouseButton::Right => CGEventType::RightMouseUp,
             _ => CGEventType::OtherMouseUp,
         };
-        let point = CGPoint { x: x as f64, y: y as f64 };
+        let point = CGPoint {
+            x: x as f64,
+            y: y as f64,
+        };
 
         for i in 1..=count {
             let down = CGEvent::new_mouse_event(self.source.clone(), down_type, point, button)
-                .map_err(|()| PlatformError::PlatformCallFailed("CGEventCreate down failed".into()))?;
+                .map_err(|()| {
+                    PlatformError::PlatformCallFailed("CGEventCreate down failed".into())
+                })?;
             // CGEventField::MouseEventClickState = 1
-            down.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, i);
+            down.set_integer_value_field(
+                core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE,
+                i,
+            );
             down.post(CGEventTapLocation::HID);
             let up = CGEvent::new_mouse_event(self.source.clone(), up_type, point, button)
-                .map_err(|()| PlatformError::PlatformCallFailed("CGEventCreate up failed".into()))?;
-            up.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, i);
+                .map_err(|()| {
+                    PlatformError::PlatformCallFailed("CGEventCreate up failed".into())
+                })?;
+            up.set_integer_value_field(
+                core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE,
+                i,
+            );
             up.post(CGEventTapLocation::HID);
         }
         Ok(())
@@ -131,7 +171,10 @@ impl MacInput {
         let event = CGEvent::new_mouse_event(
             self.source.clone(),
             CGEventType::MouseMoved,
-            CGPoint { x: x as f64, y: y as f64 },
+            CGPoint {
+                x: x as f64,
+                y: y as f64,
+            },
             CGMouseButton::Left,
         )
         .map_err(|()| PlatformError::PlatformCallFailed("MouseMoved failed".into()))?;
@@ -151,12 +194,15 @@ impl PlatformInput for MacInput {
                 let event = CGEvent::new_mouse_event(
                     self.source.clone(),
                     CGEventType::MouseMoved,
-                    CGPoint { x: x as f64, y: y as f64 },
+                    CGPoint {
+                        x: x as f64,
+                        y: y as f64,
+                    },
                     CGMouseButton::Left,
                 )
-                .map_err(|()| PlatformError::PlatformCallFailed(
-                    "CGEventCreateMouseEvent failed".into(),
-                ))?;
+                .map_err(|()| {
+                    PlatformError::PlatformCallFailed("CGEventCreateMouseEvent failed".into())
+                })?;
                 event.post(CGEventTapLocation::HID);
                 Ok(())
             }
@@ -179,18 +225,24 @@ impl PlatformInput for MacInput {
                 // Per-character via CGEventKeyboardSetUnicodeString (works for
                 // any Unicode without virtual-key resolution).
                 for ch in text.chars() {
-                    let down = CGEvent::new_keyboard_event(self.source.clone(), 0, true)
-                        .map_err(|()| PlatformError::PlatformCallFailed(
-                            "CGEventCreateKeyboardEvent down failed".into(),
-                        ))?;
+                    let down = CGEvent::new_keyboard_event(self.source.clone(), 0, true).map_err(
+                        |()| {
+                            PlatformError::PlatformCallFailed(
+                                "CGEventCreateKeyboardEvent down failed".into(),
+                            )
+                        },
+                    )?;
                     let s = ch.to_string();
                     let utf16: Vec<u16> = s.encode_utf16().collect();
                     down.set_string_from_utf16_unchecked(&utf16);
                     down.post(CGEventTapLocation::HID);
-                    let up = CGEvent::new_keyboard_event(self.source.clone(), 0, false)
-                        .map_err(|()| PlatformError::PlatformCallFailed(
-                            "CGEventCreateKeyboardEvent up failed".into(),
-                        ))?;
+                    let up = CGEvent::new_keyboard_event(self.source.clone(), 0, false).map_err(
+                        |()| {
+                            PlatformError::PlatformCallFailed(
+                                "CGEventCreateKeyboardEvent up failed".into(),
+                            )
+                        },
+                    )?;
                     up.set_string_from_utf16_unchecked(&utf16);
                     up.post(CGEventTapLocation::HID);
                 }
@@ -204,20 +256,22 @@ impl PlatformInput for MacInput {
                 for k in &keys {
                     match k.to_lowercase().as_str() {
                         "cmd" | "command" => flags |= CGEventFlags::CGEventFlagCommand,
-                        "shift"           => flags |= CGEventFlags::CGEventFlagShift,
-                        "alt" | "option"  => flags |= CGEventFlags::CGEventFlagAlternate,
-                        "ctrl" | "control"=> flags |= CGEventFlags::CGEventFlagControl,
+                        "shift" => flags |= CGEventFlags::CGEventFlagShift,
+                        "alt" | "option" => flags |= CGEventFlags::CGEventFlagAlternate,
+                        "ctrl" | "control" => flags |= CGEventFlags::CGEventFlagControl,
                         other => {
-                            final_key = key_name_to_virtual_code(other)
-                                .or(final_key); // first non-modifier wins
+                            final_key = key_name_to_virtual_code(other).or(final_key);
+                            // first non-modifier wins
                         }
                     }
                 }
                 let vk = final_key.ok_or_else(|| {
                     PlatformError::UnsupportedKey(format!("no terminal key in {:?}", keys))
                 })?;
-                let down = CGEvent::new_keyboard_event(self.source.clone(), vk, true)
-                    .map_err(|()| PlatformError::PlatformCallFailed("keyboard down failed".into()))?;
+                let down =
+                    CGEvent::new_keyboard_event(self.source.clone(), vk, true).map_err(|()| {
+                        PlatformError::PlatformCallFailed("keyboard down failed".into())
+                    })?;
                 down.set_flags(flags);
                 down.post(CGEventTapLocation::HID);
                 let up = CGEvent::new_keyboard_event(self.source.clone(), vk, false)
@@ -233,9 +287,9 @@ impl PlatformInput for MacInput {
                 for k in &keys {
                     match k.to_lowercase().as_str() {
                         "cmd" | "command" => flags |= CGEventFlags::CGEventFlagCommand,
-                        "shift"           => flags |= CGEventFlags::CGEventFlagShift,
-                        "alt" | "option"  => flags |= CGEventFlags::CGEventFlagAlternate,
-                        "ctrl" | "control"=> flags |= CGEventFlags::CGEventFlagControl,
+                        "shift" => flags |= CGEventFlags::CGEventFlagShift,
+                        "alt" | "option" => flags |= CGEventFlags::CGEventFlagAlternate,
+                        "ctrl" | "control" => flags |= CGEventFlags::CGEventFlagControl,
                         other => final_key = key_name_to_virtual_code(other).or(final_key),
                     }
                 }
@@ -243,15 +297,17 @@ impl PlatformInput for MacInput {
                     PlatformError::UnsupportedKey(format!("no terminal key in {:?}", keys))
                 })?;
                 {
-                    let down = CGEvent::new_keyboard_event(self.source.clone(), vk, true)
-                        .map_err(|()| PlatformError::PlatformCallFailed("keyboard down failed".into()))?;
+                    let down = CGEvent::new_keyboard_event(self.source.clone(), vk, true).map_err(
+                        |()| PlatformError::PlatformCallFailed("keyboard down failed".into()),
+                    )?;
                     down.set_flags(flags);
                     down.post(CGEventTapLocation::HID);
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(duration_ms as u64)).await;
                 {
-                    let up = CGEvent::new_keyboard_event(self.source.clone(), vk, false)
-                        .map_err(|()| PlatformError::PlatformCallFailed("keyboard up failed".into()))?;
+                    let up = CGEvent::new_keyboard_event(self.source.clone(), vk, false).map_err(
+                        |()| PlatformError::PlatformCallFailed("keyboard up failed".into()),
+                    )?;
                     up.set_flags(flags);
                     up.post(CGEventTapLocation::HID);
                 }
@@ -261,7 +317,12 @@ impl PlatformInput for MacInput {
                 tokio::time::sleep(std::time::Duration::from_millis(duration_ms as u64)).await;
                 Ok(())
             }
-            ComputerUseAction::Scroll { x, y, direction, amount } => {
+            ComputerUseAction::Scroll {
+                x,
+                y,
+                direction,
+                amount,
+            } => {
                 use core_graphics::event::{CGEvent, CGEventTapLocation, ScrollEventUnit};
                 use platform_input::ScrollDir;
                 // Move cursor first so the scroll lands at the right place.
@@ -280,19 +341,24 @@ impl PlatformInput for MacInput {
                     dx,
                     0,
                 )
-                .map_err(|()| PlatformError::PlatformCallFailed(
-                    "CGEventCreateScrollWheelEvent failed".into(),
-                ))?;
+                .map_err(|()| {
+                    PlatformError::PlatformCallFailed("CGEventCreateScrollWheelEvent failed".into())
+                })?;
                 event.post(CGEventTapLocation::HID);
                 Ok(())
             }
             ComputerUseAction::LeftMouseDown { x, y } => {
-                use core_graphics::event::{CGEvent, CGEventTapLocation, CGEventType, CGMouseButton};
+                use core_graphics::event::{
+                    CGEvent, CGEventTapLocation, CGEventType, CGMouseButton,
+                };
                 use core_graphics::geometry::CGPoint;
                 let event = CGEvent::new_mouse_event(
                     self.source.clone(),
                     CGEventType::LeftMouseDown,
-                    CGPoint { x: x as f64, y: y as f64 },
+                    CGPoint {
+                        x: x as f64,
+                        y: y as f64,
+                    },
                     CGMouseButton::Left,
                 )
                 .map_err(|()| PlatformError::PlatformCallFailed("LeftMouseDown failed".into()))?;
@@ -300,12 +366,17 @@ impl PlatformInput for MacInput {
                 Ok(())
             }
             ComputerUseAction::LeftMouseUp { x, y } => {
-                use core_graphics::event::{CGEvent, CGEventTapLocation, CGEventType, CGMouseButton};
+                use core_graphics::event::{
+                    CGEvent, CGEventTapLocation, CGEventType, CGMouseButton,
+                };
                 use core_graphics::geometry::CGPoint;
                 let event = CGEvent::new_mouse_event(
                     self.source.clone(),
                     CGEventType::LeftMouseUp,
-                    CGPoint { x: x as f64, y: y as f64 },
+                    CGPoint {
+                        x: x as f64,
+                        y: y as f64,
+                    },
                     CGMouseButton::Left,
                 )
                 .map_err(|()| PlatformError::PlatformCallFailed("LeftMouseUp failed".into()))?;
@@ -313,14 +384,19 @@ impl PlatformInput for MacInput {
                 Ok(())
             }
             ComputerUseAction::LeftClickDrag { from, to, .. } => {
-                use core_graphics::event::{CGEvent, CGEventTapLocation, CGEventType, CGMouseButton};
+                use core_graphics::event::{
+                    CGEvent, CGEventTapLocation, CGEventType, CGMouseButton,
+                };
                 use core_graphics::geometry::CGPoint;
                 // Press at `from`.
                 {
                     let down = CGEvent::new_mouse_event(
                         self.source.clone(),
                         CGEventType::LeftMouseDown,
-                        CGPoint { x: from.x, y: from.y },
+                        CGPoint {
+                            x: from.x,
+                            y: from.y,
+                        },
                         CGMouseButton::Left,
                     )
                     .map_err(|()| PlatformError::PlatformCallFailed("drag down failed".into()))?;
@@ -342,7 +418,9 @@ impl PlatformInput for MacInput {
                             p,
                             CGMouseButton::Left,
                         )
-                        .map_err(|()| PlatformError::PlatformCallFailed("drag step failed".into()))?;
+                        .map_err(|()| {
+                            PlatformError::PlatformCallFailed("drag step failed".into())
+                        })?;
                         drag.post(CGEventTapLocation::HID);
                     }
                     tokio::time::sleep(std::time::Duration::from_millis(8)).await;
@@ -368,9 +446,8 @@ impl PlatformInput for MacInput {
 
     async fn get_cursor_position(&self) -> Result<Point> {
         use core_graphics::event::CGEvent;
-        let event = CGEvent::new(self.source.clone()).map_err(|()| {
-            PlatformError::PlatformCallFailed("CGEventCreate failed".into())
-        })?;
+        let event = CGEvent::new(self.source.clone())
+            .map_err(|()| PlatformError::PlatformCallFailed("CGEventCreate failed".into()))?;
         let loc = event.location();
         Ok(Point { x: loc.x, y: loc.y })
     }
@@ -380,7 +457,11 @@ impl PlatformInput for MacInput {
         use core_graphics::geometry::CGPoint;
         // Force-release all mouse buttons at current position.
         let pos = self.get_cursor_position().await?;
-        for btn in [CGMouseButton::Left, CGMouseButton::Right, CGMouseButton::Center] {
+        for btn in [
+            CGMouseButton::Left,
+            CGMouseButton::Right,
+            CGMouseButton::Center,
+        ] {
             let up_type = match btn {
                 CGMouseButton::Left => CGEventType::LeftMouseUp,
                 CGMouseButton::Right => CGEventType::RightMouseUp,

@@ -193,7 +193,9 @@ impl cognitive::services::reforge::CodingPhaseRunner for CodingPhaseRunnerImpl {
     }
 
     async fn run_cross_session_dedup(&self) -> common::Result<CodingPhaseRunnerOutcome> {
-        let applied = CrossSessionDedup::run(&self.fact_repo, self.cross_session_dedup_threshold, None).await?;
+        let applied =
+            CrossSessionDedup::run(&self.fact_repo, self.cross_session_dedup_threshold, None)
+                .await?;
         Ok(CodingPhaseRunnerOutcome {
             applied,
             narrative: None,
@@ -201,7 +203,12 @@ impl cognitive::services::reforge::CodingPhaseRunner for CodingPhaseRunnerImpl {
     }
 
     async fn run_selective_delete(&self) -> common::Result<CodingPhaseRunnerOutcome> {
-        let applied = SelectiveDeleteSignal::apply_with_threshold(&self.pool, &self.selective_delete_log, self.selective_delete_threshold).await?;
+        let applied = SelectiveDeleteSignal::apply_with_threshold(
+            &self.pool,
+            &self.selective_delete_log,
+            self.selective_delete_threshold,
+        )
+        .await?;
         Ok(CodingPhaseRunnerOutcome {
             applied,
             narrative: None,

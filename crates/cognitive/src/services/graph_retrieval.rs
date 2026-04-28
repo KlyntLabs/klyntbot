@@ -5,7 +5,7 @@
 //! The boost score is the 12th relevance weight factor. It rewards facts whose
 //! subject or object mentions entities that are in the query's graph neighborhood.
 
-use crate::repos::entity::EntityRepo;
+use crate::repos::entity::{EdgeType, EntityRepo};
 
 /// Compute graph_path_boost scores for a set of facts based on query entity context.
 ///
@@ -23,44 +23,51 @@ pub async fn compute_graph_boosts(
         return boosts;
     }
 
-    // Resolve entity names to graph neighborhood
-    let mut neighborhood_names: std::collections::HashSet<String> =
-        std::collections::HashSet::new();
+    // Resolve entity names to graph neighborhood with edge types.
+    let mut neighborhood: std::collections::HashMap<String, EdgeType> =
+        std::collections::HashMap::new();
     for name in &query_entities {
         if let Ok(entities) = entity_repo.find_by_name(name).await {
             for entity in &entities {
-                neighborhood_names.insert(entity.name.to_lowercase());
-                if let Ok(Some(hood)) = entity_repo.get_neighborhood(&entity.id, 1).await {
-                    for neighbor in &hood.neighbors {
-                        neighborhood_names.insert(neighbor.name.to_lowercase());
+                neighborhood.insert(entity.name.to_lowercase(), EdgeType::Correlational);
+                if let Ok(edges) = entity_repo.get_neighborhood_with_edges(&entity.id, 1).await {
+                    for edge in &edges {
+                        neighborhood.insert(edge.neighbor.name.to_lowercase(), edge.edge_type);
                     }
                 }
             }
         }
     }
 
-    if neighborhood_names.is_empty() {
+    if neighborhood.is_empty() {
         return boosts;
     }
 
-    // Score each fact by entity overlap with the neighborhood
+    // Score each fact by weighted entity overlap with the neighborhood.
     for (fact_id, content) in fact_contents {
         let content_lower = content.to_lowercase();
-        let matches = neighborhood_names
-            .iter()
-            .filter(|name| name.len() > 2 && content_lower.contains(name.as_str()))
-            .count();
-        if matches > 0 {
-            let score = match matches {
-                1 => 0.4,
-                2 => 0.7,
-                _ => 1.0,
-            };
+        let mut weighted_score = 0.0;
+        for (name, edge_type) in &neighborhood {
+            if name.len() > 2 && content_lower.contains(name.as_str()) {
+                weighted_score += weight_for_edge_type(edge_type);
+            }
+        }
+        if weighted_score > 0.0 {
+            let score = weighted_score.min(1.0);
             boosts.insert((*fact_id).to_string(), score);
         }
     }
 
     boosts
+}
+
+fn weight_for_edge_type(t: &EdgeType) -> f64 {
+    match t {
+        EdgeType::Causal => 1.5,
+        EdgeType::Structural => 1.2,
+        EdgeType::Temporal => 1.1,
+        EdgeType::Correlational => 1.0,
+    }
 }
 
 /// Extract potential entity names from a query string.

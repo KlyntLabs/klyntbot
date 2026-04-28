@@ -15,7 +15,9 @@ fn frame_to_event_user_prompt_roundtrip() {
             "attachments": []
         }),
     };
-    let evt = frame_to_event(&frame).unwrap().expect("frame produced an event");
+    let evt = frame_to_event(&frame)
+        .unwrap()
+        .expect("frame produced an event");
     let AgentEvent::V1(v1) = evt;
     assert_eq!(v1.session_id, "s1");
 }

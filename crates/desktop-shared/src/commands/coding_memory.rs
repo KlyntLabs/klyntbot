@@ -100,8 +100,12 @@ pub struct SessionListArgs {
     pub offset: u32,
 }
 
-fn default_days_14() -> u32 { 14 }
-fn default_limit_100() -> u32 { 100 }
+fn default_days_14() -> u32 {
+    14
+}
+fn default_limit_100() -> u32 {
+    100
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
@@ -445,7 +449,6 @@ pub struct ProjectSkillRow {
     pub effectiveness: f32,
 }
 
-
 #[cfg(test)]
 mod dto_tests {
     use super::*;
@@ -491,7 +494,7 @@ mod dto_tests {
         };
         let dto = WireEventDto::from_replay_entry(&entry).expect("falls back to raw");
         assert_eq!(dto.kind, "toolCall");
-        assert!(dto.payload_decoded.is_none());
+        assert!(dto.payload_decoded.is_empty());
         assert_eq!(dto.raw_json, "not json");
     }
 }

@@ -419,11 +419,18 @@ fn register_cron_callbacks(
                     rt.block_on(async {
                         let storage_pool = storage::StoragePool::from_existing(pool.clone());
                         let repo = cognitive::FsrsParamsRepo::new(storage_pool.clone());
-                        match agent::adapters::fsrs_writeback::train_fsrs_weights(&storage_pool, &repo)
-                            .await
+                        match agent::adapters::fsrs_writeback::train_fsrs_weights(
+                            &storage_pool,
+                            &repo,
+                        )
+                        .await
                         {
-                            Ok(true) => info!("FSRS weekly optimization: weights improved and persisted"),
-                            Ok(false) => info!("FSRS weekly optimization: no improvement or insufficient data"),
+                            Ok(true) => {
+                                info!("FSRS weekly optimization: weights improved and persisted")
+                            }
+                            Ok(false) => info!(
+                                "FSRS weekly optimization: no improvement or insufficient data"
+                            ),
                             Err(e) => warn!("FSRS weekly optimization failed: {e}"),
                         }
                         Ok(None)
@@ -444,7 +451,10 @@ fn register_cron_callbacks(
                 tokio::task::block_in_place(|| {
                     rt.block_on(async {
                         if let Some(ref b) = bridge {
-                            match cognitive::services::reforge::service::run_phase6_autotuner(b.as_ref()).await
+                            match cognitive::services::reforge::service::run_phase6_autotuner(
+                                b.as_ref(),
+                            )
+                            .await
                             {
                                 Ok(eval) => {
                                     info!(
@@ -676,7 +686,10 @@ fn register_cron_callbacks(
                                 rules_handler,
                                 enabled_artifacts,
                                 Some(domain_event_bus.clone()),
-                                cog_config.coding_memory.reforge.cross_session_dedup_threshold,
+                                cog_config
+                                    .coding_memory
+                                    .reforge
+                                    .cross_session_dedup_threshold,
                                 cog_config.coding_memory.reforge.selective_delete_threshold,
                             )
                             .with_symbol_extractor(symbol_extractor)

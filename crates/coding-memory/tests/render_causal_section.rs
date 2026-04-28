@@ -57,7 +57,9 @@ async fn causal_section_lists_seeded_edges() {
         .with_causal_repo(edges.clone()),
     );
 
-    let block = render_user_prompt_block(&svc, "hello", Some("repoA")).await.unwrap();
+    let block = render_user_prompt_block(&svc, "hello", Some("repoA"))
+        .await
+        .unwrap();
     assert!(
         !block.contains("populated when causal edges are seeded"),
         "stub string still present: {block}"

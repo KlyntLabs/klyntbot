@@ -84,6 +84,8 @@ async fn daemon_start_drains_pre_existing_buffer() {
         opencode_db_path: None,
         opencode_poll_interval: None,
         kimi_wire_socket: None,
+        codex_sessions_dir: None,
+        codex_poll_interval: None,
     })
     .await
     .unwrap();

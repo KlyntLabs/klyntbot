@@ -450,9 +450,9 @@ mod tests {
         let mut m = [0.0; 19];
         let mut v = [0.0; 19];
         adam_step(&mut w, &grad, &mut m, &mut v, 1, 0.1);
-        for i in 0..19 {
+        for (i, wi) in w.iter().enumerate() {
             assert!(
-                w[i] < 1.0,
+                *wi < 1.0,
                 "Adam step with positive grad must decrease w[{i}]"
             );
         }

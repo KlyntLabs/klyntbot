@@ -57,15 +57,13 @@ impl ReforgeWriter {
         newer_id: &str,
         at: jiff::Timestamp,
     ) -> Result<()> {
-        sqlx::query(
-            "UPDATE semantic_facts SET valid_until = ?1, superseded_by = ?2 WHERE id = ?3",
-        )
-        .bind(at.to_string())
-        .bind(newer_id)
-        .bind(older_id)
-        .execute(repo.pool())
-        .await
-        .map_err(|e| KlyntbotError::Storage(format!("set_superseded_by: {e}")))?;
+        sqlx::query("UPDATE semantic_facts SET valid_until = ?1, superseded_by = ?2 WHERE id = ?3")
+            .bind(at.to_string())
+            .bind(newer_id)
+            .bind(older_id)
+            .execute(repo.pool())
+            .await
+            .map_err(|e| KlyntbotError::Storage(format!("set_superseded_by: {e}")))?;
         Ok(())
     }
 }

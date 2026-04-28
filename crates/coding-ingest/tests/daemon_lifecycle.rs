@@ -32,6 +32,8 @@ async fn daemon_accepts_event_and_writes_row() {
         opencode_db_path: None,
         opencode_poll_interval: None,
         kimi_wire_socket: None,
+        codex_sessions_dir: None,
+        codex_poll_interval: None,
     };
     let handle = spawn(cfg.clone()).await.expect("spawn");
 

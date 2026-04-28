@@ -170,6 +170,9 @@ async fn test_consolidation_add_new_fact() {
     let candidates = vec![ConsolidationCandidate {
         candidate: candidate.clone(),
         existing: vec![],
+        subject_neighborhood: Vec::new(),
+        object_neighborhood: Vec::new(),
+        cross_entity_facts: Vec::new(),
     }];
     let ops = handler.decide_batch(&candidates).await.unwrap();
     execute_memory_ops(&ops, &candidates, &repo, None, None).await;
@@ -195,6 +198,9 @@ async fn test_consolidation_update_on_changed_value() {
     let candidates = vec![ConsolidationCandidate {
         candidate: candidate.clone(),
         existing: vec![old.clone()],
+        subject_neighborhood: Vec::new(),
+        object_neighborhood: Vec::new(),
+        cross_entity_facts: Vec::new(),
     }];
     let ops = handler.decide_batch(&candidates).await.unwrap();
     execute_memory_ops(&ops, &candidates, &repo, None, None).await;
@@ -225,6 +231,9 @@ async fn test_consolidation_noop_on_duplicate() {
     let candidates = vec![ConsolidationCandidate {
         candidate: candidate.clone(),
         existing: vec![old.clone()],
+        subject_neighborhood: Vec::new(),
+        object_neighborhood: Vec::new(),
+        cross_entity_facts: Vec::new(),
     }];
     let ops = handler.decide_batch(&candidates).await.unwrap();
 
@@ -261,6 +270,9 @@ async fn test_full_pipeline_event_to_retrieval() {
         .map(|f| ConsolidationCandidate {
             candidate: f.clone(),
             existing: vec![],
+            subject_neighborhood: Vec::new(),
+            object_neighborhood: Vec::new(),
+            cross_entity_facts: Vec::new(),
         })
         .collect();
     let ops = consolidation.decide_batch(&candidates).await.unwrap();
@@ -319,6 +331,9 @@ async fn test_full_pipeline_update_replaces_old_fact() {
         .map(|f| ConsolidationCandidate {
             candidate: f.clone(),
             existing: vec![],
+            subject_neighborhood: Vec::new(),
+            object_neighborhood: Vec::new(),
+            cross_entity_facts: Vec::new(),
         })
         .collect();
     let ops1 = consolidation.decide_batch(&candidates1).await.unwrap();
@@ -351,6 +366,9 @@ async fn test_full_pipeline_update_replaces_old_fact() {
         candidates2.push(ConsolidationCandidate {
             candidate: fact.clone(),
             existing,
+            subject_neighborhood: Vec::new(),
+            object_neighborhood: Vec::new(),
+            cross_entity_facts: Vec::new(),
         });
     }
     let ops2 = consolidation.decide_batch(&candidates2).await.unwrap();

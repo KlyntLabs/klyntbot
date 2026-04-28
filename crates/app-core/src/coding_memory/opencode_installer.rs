@@ -49,9 +49,7 @@ impl OpencodeInstaller {
             let _count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM message")
                 .fetch_one(&pool)
                 .await
-                .map_err(|e| {
-                    common::KlyntbotError::Storage(format!("opencode DB query: {e}"))
-                })?;
+                .map_err(|e| common::KlyntbotError::Storage(format!("opencode DB query: {e}")))?;
             Ok(())
         })
     }

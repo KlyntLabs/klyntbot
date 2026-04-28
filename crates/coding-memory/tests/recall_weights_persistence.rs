@@ -11,7 +11,9 @@ async fn recall_weights_round_trip() {
         .await
         .unwrap();
 
-    let custom = [0.4, 0.05, 0.1, 0.05, 0.05, 0.15, 0.05, 0.05, 0.04, 0.04, 0.02, 0.0];
+    let custom = [
+        0.4, 0.05, 0.1, 0.05, 0.05, 0.15, 0.05, 0.05, 0.04, 0.04, 0.02, 0.0,
+    ];
     store_recall_weights(&pool, &custom).await.unwrap();
     let loaded = load_recall_weights(&pool).await.unwrap();
     assert_eq!(loaded, custom);

@@ -200,7 +200,10 @@ pub async fn apply_intelligence(
 async fn community_age_days(repo: &CommunityRepo, id: &str) -> u32 {
     match repo.get_community(id).await {
         Ok(Some(row)) => {
-            let created: jiff::Timestamp = row.created_at.parse().unwrap_or_else(|_| jiff::Timestamp::now());
+            let created: jiff::Timestamp = row
+                .created_at
+                .parse()
+                .unwrap_or_else(|_| jiff::Timestamp::now());
             let now = jiff::Timestamp::now();
             ((now.as_millisecond() - created.as_millisecond()).max(0) / 86_400_000) as u32
         }

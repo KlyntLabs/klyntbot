@@ -398,6 +398,12 @@ similar facts, decide the correct operation for each:\n\n\
 - noop: The candidate is already known.\n\n\
 Always prefer noop over add if the information is essentially the same.\n\
 Always prefer update over delete+add when the meaning is similar but the value changed.\n\n\
+The candidate may include SUBJECT NEIGHBORHOOD, OBJECT NEIGHBORHOOD, or CROSS-ENTITY FACTS.\n\
+Use this graph context to detect:\n\
+- Better existing matches you might miss looking only at exact subject+predicate (return update with target_id pointing to the better match if a CROSS-ENTITY FACT contradicts the new candidate).\n\
+- Redundant facts already implied by the neighborhood (return noop).\n\
+- Facts that introduce a new entity reference — extract relationships are handled separately, not here. Do NOT invent merges.\n\
+Stay conservative: prefer noop over update when uncertain.\n\n\
 Respond with JSON containing a decisions array, one entry per candidate:\n\
 {\"decisions\": [{\"index\": 1, \"action\": \"add|update|delete|noop\", \"target_id\": null}]}";
 
@@ -416,6 +422,63 @@ impl LlmConsolidationHandler {
             fallback: HeuristicConsolidationHandler,
         }
     }
+}
+
+pub(crate) fn build_consolidation_user_message(
+    candidates: &[cognitive::ConsolidationCandidate],
+) -> String {
+    use std::fmt::Write;
+    let mut out = String::new();
+    out.push_str("CANDIDATES:\n");
+    for (i, c) in candidates.iter().enumerate() {
+        let _ = writeln!(
+            out,
+            "[{}] {} -- {} -- {} (confidence: {:.2})",
+            i + 1,
+            c.candidate.subject,
+            c.candidate.predicate,
+            c.candidate.object,
+            c.candidate.confidence
+        );
+
+        if !c.existing.is_empty() {
+            out.push_str("  existing for same subject+predicate:\n");
+            for ex in &c.existing {
+                let _ = writeln!(
+                    out,
+                    "    - id={} object={} confidence={:.2}",
+                    ex.id, ex.object, ex.confidence
+                );
+            }
+        }
+        if !c.subject_neighborhood.is_empty() {
+            out.push_str("  SUBJECT NEIGHBORHOOD (1-hop):\n");
+            for (name, rel) in &c.subject_neighborhood {
+                let _ = writeln!(out, "    - {} -> {}", rel, name);
+            }
+        }
+        if !c.object_neighborhood.is_empty() {
+            out.push_str("  OBJECT NEIGHBORHOOD (1-hop):\n");
+            for (name, rel) in &c.object_neighborhood {
+                let _ = writeln!(out, "    - {} -> {}", rel, name);
+            }
+        }
+        if !c.cross_entity_facts.is_empty() {
+            out.push_str("  CROSS-ENTITY FACTS (different subject/predicate, same entities):\n");
+            for f in &c.cross_entity_facts {
+                let _ = writeln!(
+                    out,
+                    "    - {} -- {} -- {}",
+                    f.subject, f.predicate, f.object
+                );
+            }
+        }
+    }
+    out.push_str(
+        "\nDecide for ALL candidates. Return JSON:\n\
+         {\"decisions\": [{\"index\": 1, \"action\": \"add|update|delete|noop\", \"target_id\": null}]}\n",
+    );
+    out
 }
 
 #[derive(serde::Deserialize)]
@@ -496,40 +559,9 @@ impl ConsolidationHandler for LlmConsolidationHandler {
         }
 
         // Build prompt for candidates that need LLM decisions
-        let mut user_msg = String::new();
-        for (prompt_idx, &cand_idx) in llm_indices.iter().enumerate() {
-            let entry = &candidates[cand_idx];
-            let existing_json: Vec<serde_json::Value> = entry
-                .existing
-                .iter()
-                .map(|f| {
-                    json!({
-                        "id": f.id,
-                        "subject": f.subject,
-                        "predicate": f.predicate,
-                        "object": f.object,
-                        "confidence": f.confidence,
-                    })
-                })
-                .collect();
-
-            use std::fmt::Write;
-            writeln!(
-                &mut user_msg,
-                "Decision {}:\nCandidate: {}.{} = {} (confidence: {})\nExisting: {}\n",
-                prompt_idx + 1,
-                entry.candidate.subject,
-                entry.candidate.predicate,
-                entry.candidate.object,
-                entry.candidate.confidence,
-                serde_json::to_string(&existing_json).unwrap_or_default()
-            )
-            .unwrap();
-        }
-        user_msg.push_str(
-            "Decide for ALL candidates. Return JSON:\n\
-             {\"decisions\": [{\"index\": 1, \"action\": \"add|update|delete|noop\", \"target_id\": null}]}",
-        );
+        let llm_candidates: Vec<cognitive::ConsolidationCandidate> =
+            llm_indices.iter().map(|&i| candidates[i].clone()).collect();
+        let user_msg = build_consolidation_user_message(&llm_candidates);
 
         let messages = vec![
             Message::system(CONSOLIDATION_SYSTEM_PROMPT),
@@ -587,6 +619,138 @@ impl ConsolidationHandler for LlmConsolidationHandler {
             .map(|o| o.unwrap_or(MemoryOp::Noop))
             .collect())
     }
+}
+
+// ── Graph Linker ──────────────────────────────────────────────────────
+
+pub(crate) const GRAPH_LINK_SYSTEM_PROMPT: &str = r#"You are a per-turn knowledge graph linker for a personal AI assistant.
+
+You receive a single newly-written fact, the 1-hop neighborhood of its subject and object entities, and up to 5 candidate facts that share an entity with the new fact. Decide:
+
+(1) MERGES — Do any pair of entities in the neighborhood refer to the same real-world thing? Only emit a merge when the names are clearly aliases (case differences, common short forms, exact synonyms). When in doubt, do not merge. Output the canonical name and a one-sentence reason.
+
+(2) DISCOVERED RELATIONSHIPS — Does the new fact reveal a relationship between its entities and any neighbor that isn't already represented? Output as (source, target, relationship_type, edge_type, strength, evidence). edge_type ∈ {"causal", "correlational", "temporal", "structural"}.
+  - causal: A causes B (e.g., "deadline approaching" causes "stress increases")
+  - correlational: A and B co-occur but no causation claimed (default for most facts)
+  - temporal: A precedes B in time (e.g., "graduated" precedes "started job")
+  - structural: A is part of / contains B (e.g., "Anthropic contains Claude team")
+  Only emit a relationship if (a) both endpoints already exist in the neighborhood or in the new fact, AND (b) the relationship is supported by either the new fact's text or the candidate facts. Do NOT invent edges.
+
+(3) SUPERSEDED — Does the new fact directly contradict or replace any candidate fact? Mark the candidate's id, the valid_until timestamp (use the new fact's valid_at), and a short reason. Conservative: only supersede on direct contradiction, not refinement.
+
+Output strict JSON exactly matching:
+{"merges": [...], "discovered_relationships": [...], "superseded": [...]}
+
+If nothing applies, output {"merges": [], "discovered_relationships": [], "superseded": []}. Never invent IDs or names not present in the input."#;
+
+/// LLM-backed graph linker handler.
+pub struct LlmGraphLinkHandler {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmGraphLinkHandler {
+    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
+        Self {
+            provider,
+            params: params.with_response_format(ResponseFormat::JsonObject),
+        }
+    }
+}
+
+#[async_trait]
+impl cognitive::services::graph_linker::GraphLinkHandler for LlmGraphLinkHandler {
+    async fn link(
+        &self,
+        input: cognitive::services::graph_linker_types::GraphLinkInput,
+    ) -> common::Result<cognitive::services::graph_linker_types::GraphLinkOutput> {
+        if !cognitive::services::graph_linker_types::should_invoke_linker(&input) {
+            return Ok(cognitive::services::graph_linker_types::GraphLinkOutput::default());
+        }
+
+        let user_msg = build_graph_link_user_message(&input);
+
+        let messages = vec![
+            Message::system(GRAPH_LINK_SYSTEM_PROMPT.to_string()),
+            Message::user(user_msg),
+        ];
+
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| {
+                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                    "graph_link: {e}"
+                )))
+            })?;
+
+        let text = resp.content.unwrap_or_default();
+        match serde_json::from_str::<cognitive::services::graph_linker_types::GraphLinkOutput>(
+            &text,
+        ) {
+            Ok(out) => Ok(out),
+            Err(e) => {
+                tracing::warn!(error = %e, raw = %text, "graph_link: failed to parse LLM JSON; returning empty output");
+                Ok(cognitive::services::graph_linker_types::GraphLinkOutput::default())
+            }
+        }
+    }
+}
+
+fn build_graph_link_user_message(
+    input: &cognitive::services::graph_linker_types::GraphLinkInput,
+) -> String {
+    use std::fmt::Write;
+    let mut s = String::new();
+    let nf = &input.new_fact;
+    let _ = writeln!(
+        s,
+        "NEW FACT (id={}): {} -- {} -- {} (confidence: {:.2}, valid_at: {})",
+        nf.fact_id, nf.subject, nf.predicate, nf.object, nf.confidence, nf.valid_at
+    );
+
+    if let Some(t) = &input.recent_user_text {
+        let _ = writeln!(s, "\nRECENT USER TEXT: {}", t);
+    }
+
+    let _ = writeln!(s, "\nSUBJECT NEIGHBORHOOD:");
+    for n in &input.subject_neighborhood {
+        let _ = writeln!(
+            s,
+            "  - id={} name={} via={} (strength {:.2})",
+            n.entity_id, n.name, n.relationship_type, n.strength
+        );
+    }
+    if input.subject_neighborhood.is_empty() {
+        let _ = writeln!(s, "  (none)");
+    }
+
+    let _ = writeln!(s, "\nOBJECT NEIGHBORHOOD:");
+    for n in &input.object_neighborhood {
+        let _ = writeln!(
+            s,
+            "  - id={} name={} via={} (strength {:.2})",
+            n.entity_id, n.name, n.relationship_type, n.strength
+        );
+    }
+    if input.object_neighborhood.is_empty() {
+        let _ = writeln!(s, "  (none)");
+    }
+
+    let _ = writeln!(s, "\nCANDIDATE FACTS:");
+    for c in &input.candidate_facts {
+        let _ = writeln!(
+            s,
+            "  - id={} {} -- {} -- {} (valid {} -> {:?})",
+            c.fact_id, c.subject, c.predicate, c.object, c.valid_at, c.valid_until
+        );
+    }
+    if input.candidate_facts.is_empty() {
+        let _ = writeln!(s, "  (none)");
+    }
+
+    s
 }
 
 // ── Deep Consolidation ────────────────────────────────────────────────
@@ -1083,6 +1247,9 @@ mod tests {
             .decide_batch(&[cognitive::ConsolidationCandidate {
                 candidate,
                 existing: vec![],
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             }])
             .await
             .unwrap();
@@ -1099,6 +1266,9 @@ mod tests {
             .decide_batch(&[cognitive::ConsolidationCandidate {
                 candidate,
                 existing,
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             }])
             .await
             .unwrap();
@@ -1115,6 +1285,9 @@ mod tests {
             .decide_batch(&[cognitive::ConsolidationCandidate {
                 candidate,
                 existing,
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             }])
             .await
             .unwrap();
@@ -1131,6 +1304,9 @@ mod tests {
             .decide_batch(&[cognitive::ConsolidationCandidate {
                 candidate,
                 existing,
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             }])
             .await
             .unwrap();
@@ -1207,6 +1383,9 @@ mod tests {
             .decide_batch(&[cognitive::ConsolidationCandidate {
                 candidate,
                 existing,
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             }])
             .await
             .unwrap();
@@ -1230,11 +1409,99 @@ mod tests {
             .decide_batch(&[cognitive::ConsolidationCandidate {
                 candidate,
                 existing,
+                subject_neighborhood: Vec::new(),
+                object_neighborhood: Vec::new(),
+                cross_entity_facts: Vec::new(),
             }])
             .await
             .unwrap();
         let op = ops.into_iter().next().unwrap();
         assert_eq!(op, MemoryOp::Noop);
+    }
+
+    // ── LLM graph linker tests ──
+
+    #[tokio::test]
+    async fn llm_graph_link_handler_parses_well_formed_response() {
+        use cognitive::services::graph_linker::GraphLinkHandler;
+        use cognitive::services::graph_linker_types::*;
+
+        let json_response = r#"{
+            "merges": [],
+            "discovered_relationships": [
+                {"source_entity_name": "Alice", "target_entity_name": "Rust",
+                 "relationship_type": "uses", "edge_type": "correlational",
+                 "strength": 0.7, "evidence": "Alice prefers Rust per recent fact"}
+            ],
+            "superseded": []
+        }"#;
+
+        let mock = Arc::new(MockProvider::new(mock_response(json_response)));
+        let params = ChatParams::new("test-model");
+        let handler = LlmGraphLinkHandler::new(mock, params);
+
+        let input = GraphLinkInput {
+            new_fact: NewFactRef {
+                fact_id: "f1".into(),
+                subject: "Alice".into(),
+                subject_entity_id: Some("e_alice".into()),
+                predicate: "prefers".into(),
+                object: "Rust".into(),
+                object_entity_id: None,
+                confidence: 0.8,
+                valid_at: "2026-04-29T00:00:00Z".into(),
+            },
+            subject_neighborhood: vec![NeighborRef {
+                entity_id: "e_bob".into(),
+                name: "Bob".into(),
+                relationship_type: "knows".into(),
+                strength: 0.8,
+            }],
+            object_neighborhood: vec![],
+            candidate_facts: vec![],
+            recent_user_text: None,
+        };
+
+        let out = handler.link(input).await.unwrap();
+        assert_eq!(out.discovered_relationships.len(), 1);
+        assert_eq!(out.discovered_relationships[0].edge_type, "correlational");
+    }
+
+    #[tokio::test]
+    async fn llm_graph_link_handler_returns_empty_on_malformed_response() {
+        use cognitive::services::graph_linker::GraphLinkHandler;
+        use cognitive::services::graph_linker_types::*;
+
+        let mock = Arc::new(MockProvider::new(mock_response("not json")));
+        let params = ChatParams::new("test-model");
+        let handler = LlmGraphLinkHandler::new(mock, params);
+
+        let input = GraphLinkInput {
+            new_fact: NewFactRef {
+                fact_id: "f1".into(),
+                subject: "A".into(),
+                subject_entity_id: None,
+                predicate: "p".into(),
+                object: "B".into(),
+                object_entity_id: None,
+                confidence: 0.5,
+                valid_at: "2026-04-29T00:00:00Z".into(),
+            },
+            subject_neighborhood: vec![NeighborRef {
+                entity_id: "e".into(),
+                name: "X".into(),
+                relationship_type: "r".into(),
+                strength: 0.5,
+            }],
+            object_neighborhood: vec![],
+            candidate_facts: vec![],
+            recent_user_text: None,
+        };
+
+        let out = handler.link(input).await.unwrap();
+        assert!(out.discovered_relationships.is_empty());
+        assert!(out.merges.is_empty());
+        assert!(out.superseded.is_empty());
     }
 
     // ── LLM coaching reasoner tests ──
@@ -1288,5 +1555,73 @@ mod tests {
 
         let decision = handler.reason(&input).await.unwrap();
         assert!(decision.should_intervene);
+    }
+
+    #[test]
+    fn build_consolidation_user_message_includes_neighborhood_section_when_present() {
+        use cognitive::types::SemanticFact;
+        let cand = cognitive::ConsolidationCandidate {
+            candidate: SemanticFact {
+                id: "c1".into(),
+                domain: "test".into(),
+                subject: "Alice".into(),
+                predicate: "prefers".into(),
+                object: "Rust".into(),
+                confidence: 0.7,
+                source: "t".into(),
+                valid_from: "2026-04-29".into(),
+                valid_until: None,
+                recorded_at: "2026-04-29".into(),
+                superseded_at: None,
+                superseded_by: None,
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                convergence_score: 0.0,
+                project_id: None,
+                memory_type: "fact".into(),
+                scope_type: "system".into(),
+                scope_id: None,
+                scope_repo_id: None,
+                metadata: None,
+            },
+            existing: vec![],
+            subject_neighborhood: vec![("Bob".into(), "knows".into())],
+            object_neighborhood: vec![],
+            cross_entity_facts: vec![SemanticFact {
+                id: "f2".into(),
+                domain: "test".into(),
+                subject: "Bob".into(),
+                predicate: "works_at".into(),
+                object: "Anthropic".into(),
+                confidence: 0.9,
+                source: "t".into(),
+                valid_from: "2026-04-29".into(),
+                valid_until: None,
+                recorded_at: "2026-04-29".into(),
+                superseded_at: None,
+                superseded_by: None,
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                convergence_score: 0.0,
+                project_id: None,
+                memory_type: "fact".into(),
+                scope_type: "system".into(),
+                scope_id: None,
+                scope_repo_id: None,
+                metadata: None,
+            }],
+        };
+
+        let msg = build_consolidation_user_message(&[cand]);
+
+        assert!(
+            msg.contains("SUBJECT NEIGHBORHOOD"),
+            "must include neighborhood section, got:\n{msg}"
+        );
+        assert!(msg.contains("knows -> Bob"));
+        assert!(msg.contains("CROSS-ENTITY FACTS"));
+        assert!(msg.contains("works_at"));
     }
 }

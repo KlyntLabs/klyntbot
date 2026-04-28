@@ -27,8 +27,8 @@ pub use session_end::SessionEndPass;
 pub use session_summary_repo::{SessionSummaryRepo, SessionSummaryRow};
 pub use symbol_validation::{SymbolValidationOutcome, SymbolValidationPhase};
 pub use synth_handler::{CodingSynthesisHandler, RuleArtifactsHandler};
-pub use writer::ReforgeWriter;
 pub use types::{
     CodingPhaseHandlers, CodingSynthesisInput, CodingSynthesisOutput, ManagedBlockSection,
     ProjectSkillSpec, PromoteAction, RepoArtifactPlan, RuleArtifactInput, RuleArtifactOutput,
 };
+pub use writer::ReforgeWriter;

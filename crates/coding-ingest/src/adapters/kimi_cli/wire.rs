@@ -37,8 +37,7 @@ pub fn frame_to_event(frame: &WireFrame) -> Result<Option<AgentEvent>> {
         "provider_call" => "ProviderCall",
         _ => return Ok(None),
     };
-    let payload_bytes = serde_json::to_vec(&frame.payload)
-        .map_err(|e| common::KlyntbotError::Json(e))?;
+    let payload_bytes = serde_json::to_vec(&frame.payload).map_err(common::KlyntbotError::Json)?;
     super::dispatch::dispatch(hook_event, &payload_bytes).map(|opt| opt.map(AgentEvent::V1))
 }
 
@@ -49,14 +48,10 @@ pub async fn run(
 ) -> Result<()> {
     let stream = UnixStream::connect(&socket_path)
         .await
-        .map_err(|e| common::KlyntbotError::Io(e))?;
+        .map_err(common::KlyntbotError::Io)?;
     let reader = BufReader::new(stream);
     let mut lines = reader.lines();
-    while let Some(line) = lines
-        .next_line()
-        .await
-        .map_err(|e| common::KlyntbotError::Io(e))?
-    {
+    while let Some(line) = lines.next_line().await.map_err(common::KlyntbotError::Io)? {
         let frame: WireFrame = match serde_json::from_str(&line) {
             Ok(f) => f,
             Err(e) => {
@@ -93,7 +88,9 @@ mod tests {
                 "attachments": []
             }),
         };
-        let evt = frame_to_event(&frame).unwrap().expect("frame produced an event");
+        let evt = frame_to_event(&frame)
+            .unwrap()
+            .expect("frame produced an event");
         let AgentEvent::V1(v1) = evt;
         assert_eq!(v1.session_id, "s1");
     }

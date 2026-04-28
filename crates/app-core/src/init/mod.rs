@@ -436,7 +436,9 @@ impl AppCore {
                 let aggregator = feature_launcher::AttentionAggregator::new(pool);
                 match aggregator.rebuild_from_activity(90).await {
                     Ok(n) => info!(rows = n, "Initial attention rebuild complete"),
-                    Err(e) => tracing::warn!(error = %e, "Initial attention rebuild failed — will retry via cron"),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Initial attention rebuild failed — will retry via cron")
+                    }
                 }
             });
         }
@@ -919,8 +921,10 @@ impl AppCore {
             ));
             let fact_repo = ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone());
             let episode_repo = ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
+            let entity_repo = ::cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
             let writer =
-                coding_memory::distiller::DistillerWriter::new(fact_repo.clone(), episode_repo);
+                coding_memory::distiller::DistillerWriter::new(fact_repo.clone(), episode_repo)
+                    .with_entity_repo(entity_repo);
             let distiller_provider = provider_manager.clone().unwrap_or_else(|| {
                 Arc::new(providers::ProviderManager::new(
                     provider_for_distiller.clone(),
@@ -975,14 +979,7 @@ impl AppCore {
                         let ums = ums_for_retrieve.clone();
                         let weights = weights;
                         Box::pin(async move {
-                            let scored = ums
-                                .retrieve_with_overrides(
-                                    &q,
-                                    20,
-                                    0.0,
-                                    weights,
-                                )
-                                .await?;
+                            let scored = ums.retrieve_with_overrides(&q, 20, 0.0, weights).await?;
                             let mut sims = Vec::with_capacity(scored.len());
                             let mut ids = Vec::with_capacity(scored.len());
                             for s in scored {

@@ -31,9 +31,7 @@ pub async fn coding_memory_session_replay(
 }
 
 #[klynt_command]
-pub async fn coding_memory_session_list(
-    args: SessionListArgs,
-) -> Vec<SessionSummaryDto> {
+pub async fn coding_memory_session_list(args: SessionListArgs) -> Vec<SessionSummaryDto> {
     state.coding_memory_session_list(args).await
 }
 
@@ -44,11 +42,7 @@ pub async fn coding_memory_session_replay_typed(
     offset: Option<i64>,
 ) -> Vec<WireEventDto> {
     state
-        .coding_memory_session_replay_typed(
-            session_id,
-            limit.unwrap_or(500),
-            offset.unwrap_or(0),
-        )
+        .coding_memory_session_replay_typed(session_id, limit.unwrap_or(500), offset.unwrap_or(0))
         .await
 }
 

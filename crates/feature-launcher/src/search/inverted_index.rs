@@ -65,7 +65,12 @@ fn make_name_compact(name_lc: &str) -> SmolStr {
     if name_lc.bytes().all(|b| b.is_ascii_alphanumeric()) {
         SmolStr::new(name_lc)
     } else {
-        SmolStr::new(name_lc.chars().filter(|c| c.is_alphanumeric()).collect::<String>())
+        SmolStr::new(
+            name_lc
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>(),
+        )
     }
 }
 
@@ -191,14 +196,20 @@ impl InvertedFileIndex {
 
                 // Index full tokens only (no prefix explosion)
                 for token in tokenize(&name) {
-                    token_map.entry(SmolStr::new(&token)).or_default().insert(idx);
+                    token_map
+                        .entry(SmolStr::new(&token))
+                        .or_default()
+                        .insert(idx);
                 }
                 for component in path.components().filter_map(|c| c.as_os_str().to_str()) {
                     if component == name {
                         continue;
                     }
                     for token in tokenize(component) {
-                        token_map.entry(SmolStr::new(&token)).or_default().insert(idx);
+                        token_map
+                            .entry(SmolStr::new(&token))
+                            .or_default()
+                            .insert(idx);
                     }
                 }
             }
@@ -713,16 +724,30 @@ mod bench_helpers {
     use tempfile::TempDir;
 
     fn seed_tree(base: &std::path::Path, n: usize) {
-        let prefixes = &["report","readme","config","main","utils","test","lib","app","index","style"];
-        let exts = &["rs","ts","js","json","md","txt","html","css","py","go"];
+        let prefixes = &[
+            "report", "readme", "config", "main", "utils", "test", "lib", "app", "index", "style",
+        ];
+        let exts = &[
+            "rs", "ts", "js", "json", "md", "txt", "html", "css", "py", "go",
+        ];
         for i in 0..n {
             let depth = (i % 5) + 1;
             let mut p = base.to_path_buf();
             for d in 0..depth {
-                p.push(format!("{}_{}_{}", prefixes[(i + d) % prefixes.len()], i % 100, d));
+                p.push(format!(
+                    "{}_{}_{}",
+                    prefixes[(i + d) % prefixes.len()],
+                    i % 100,
+                    d
+                ));
             }
             fs::create_dir_all(&p).unwrap();
-            let name = format!("{}_{:04}.{}", prefixes[i % prefixes.len()], i, exts[i % exts.len()]);
+            let name = format!(
+                "{}_{:04}.{}",
+                prefixes[i % prefixes.len()],
+                i,
+                exts[i % exts.len()]
+            );
             fs::write(p.join(&name), b"").unwrap();
         }
     }
@@ -731,16 +756,32 @@ mod bench_helpers {
     fn check_200k_candidates() {
         let dir = TempDir::new().unwrap();
         seed_tree(dir.path(), 200_000);
-        let idx = InvertedFileIndex::build(&[dir.path().to_path_buf()], &SkipSet::defaults(), 200_000 + 1_000);
-        
+        let idx = InvertedFileIndex::build(
+            &[dir.path().to_path_buf()],
+            &SkipSet::defaults(),
+            200_000 + 1_000,
+        );
+
         if let Some((bitmap, idf)) = idx.token_index.candidates_for("re") {
-            println!("Candidates for 're' at 200k: {}, IDF: {}", bitmap.len(), idf);
+            println!(
+                "Candidates for 're' at 200k: {}, IDF: {}",
+                bitmap.len(),
+                idf
+            );
         }
         if let Some((bitmap, idf)) = idx.token_index.candidates_for("report") {
-            println!("Candidates for 'report' at 200k: {}, IDF: {}", bitmap.len(), idf);
+            println!(
+                "Candidates for 'report' at 200k: {}, IDF: {}",
+                bitmap.len(),
+                idf
+            );
         }
         if let Some((bitmap, idf)) = idx.token_index.candidates_for("co") {
-            println!("Candidates for 'co' at 200k: {}, IDF: {}", bitmap.len(), idf);
+            println!(
+                "Candidates for 'co' at 200k: {}, IDF: {}",
+                bitmap.len(),
+                idf
+            );
         }
     }
 }

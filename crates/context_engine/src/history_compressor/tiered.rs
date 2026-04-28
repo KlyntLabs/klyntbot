@@ -584,11 +584,7 @@ mod tests {
                                                                 // All within recent window (6 < 8), so nothing compacted
         if let Message::Tool { content, .. } = &compacted[2] {
             let text = content.as_text();
-            assert_eq!(
-                text.len(),
-                5000,
-                "within recent window, should not compact"
-            );
+            assert_eq!(text.len(), 5000, "within recent window, should not compact");
         }
 
         // Now test with smaller window
@@ -652,5 +648,4 @@ mod tests {
             );
         }
     }
-
 }

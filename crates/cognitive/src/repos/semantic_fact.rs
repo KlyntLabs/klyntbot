@@ -504,6 +504,34 @@ impl SemanticFactRepo {
         .await
     }
 
+    /// Returns up to `limit` facts where the given entity_id is referenced as either the subject
+    /// or object entity. Used by Track 1 (KCA Phase A) to enrich consolidation candidates with
+    /// cross-entity context.
+    pub async fn find_facts_by_entity_id(
+        &self,
+        entity_id: &str,
+        limit: usize,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        let limit_i = limit as i64;
+        sqlx::query_as::<_, SemanticFact>(
+            r#"
+            SELECT sf.*
+            FROM semantic_facts sf
+            INNER JOIN entities e
+              ON e.name = sf.subject OR e.name = sf.object
+            WHERE e.id = ?1
+              AND sf.valid_until IS NULL
+              AND sf.superseded_at IS NULL
+            ORDER BY sf.confidence DESC, sf.recorded_at DESC
+            LIMIT ?2
+            "#,
+        )
+        .bind(entity_id)
+        .bind(limit_i)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     /// Find archived facts with matching subject and predicate.
     /// Must list columns explicitly because archive has an extra `archived_at` column.
     pub async fn search_archived_by_subject_predicate(
@@ -1503,5 +1531,129 @@ mod tests {
             fast_failures: 0,
         };
         assert!((row.health_score() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn find_facts_by_entity_id_returns_facts_mentioning_entity_as_subject_or_object() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = SemanticFactRepo::new(pool.clone());
+        let entity_repo = crate::repos::entity::EntityRepo::new(pool.clone());
+
+        let alice = entity_repo
+            .upsert_entity(&crate::repos::NewEntity {
+                name: "Alice".into(),
+                entity_type: "person".into(),
+                description: None,
+                source: "test".into(),
+                source_id: None,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+        let _bob = entity_repo
+            .upsert_entity(&crate::repos::NewEntity {
+                name: "Bob".into(),
+                entity_type: "person".into(),
+                description: None,
+                source: "test".into(),
+                source_id: None,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+
+        let fact_subj = SemanticFact {
+            id: "f1".into(),
+            domain: "test".into(),
+            subject: "Alice".into(),
+            predicate: "knows".into(),
+            object: "Rust".into(),
+            confidence: 0.8,
+            source: "test".into(),
+            valid_from: "2026-04-29".into(),
+            valid_until: None,
+            recorded_at: "2026-04-29".into(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 0.0,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+        };
+        let fact_obj = SemanticFact {
+            id: "f2".into(),
+            domain: "test".into(),
+            subject: "Bob".into(),
+            predicate: "manages".into(),
+            object: "Alice".into(),
+            confidence: 0.8,
+            source: "test".into(),
+            valid_from: "2026-04-29".into(),
+            valid_until: None,
+            recorded_at: "2026-04-29".into(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 0.0,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+        };
+        let fact_unrelated = SemanticFact {
+            id: "f3".into(),
+            domain: "test".into(),
+            subject: "Carol".into(),
+            predicate: "uses".into(),
+            object: "Python".into(),
+            confidence: 0.8,
+            source: "test".into(),
+            valid_from: "2026-04-29".into(),
+            valid_until: None,
+            recorded_at: "2026-04-29".into(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 0.0,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+        };
+
+        repo.upsert(&fact_subj).await.unwrap();
+        repo.upsert(&fact_obj).await.unwrap();
+        repo.upsert(&fact_unrelated).await.unwrap();
+
+        let alice_facts = repo.find_facts_by_entity_id(&alice.id, 10).await.unwrap();
+
+        let texts: Vec<String> = alice_facts.iter().map(|f| f.subject.clone()).collect();
+        assert!(
+            texts.contains(&"Alice".to_string()),
+            "should include facts where Alice is subject"
+        );
+        assert!(
+            texts.contains(&"Bob".to_string()),
+            "should include facts where Alice is object"
+        );
+        assert!(
+            !texts.contains(&"Carol".to_string()),
+            "should NOT include unrelated facts"
+        );
+        assert!(alice_facts.len() <= 10);
     }
 }

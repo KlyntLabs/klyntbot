@@ -82,17 +82,16 @@ fn ranking_quality_bench(c: &mut Criterion) {
     for i in 0..17 {
         fs::write(base.join(format!("test_module_{i}.rs")), b"").unwrap();
     }
-    let idx = InvertedFileIndex::build(
-        &[base.to_path_buf()],
-        &SkipSet::defaults(),
-        1000,
-    );
+    let idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::defaults(), 1000);
 
     c.bench_function("inverted_index_ranking_parser_test", |b| {
         b.iter(|| {
             let r = idx.search(black_box("parser test"), 10);
             assert!(!r.is_empty());
-            assert_eq!(idx.entry_name(r[0].entry_idx).unwrap(), "parser_module_test.rs");
+            assert_eq!(
+                idx.entry_name(r[0].entry_idx).unwrap(),
+                "parser_module_test.rs"
+            );
             black_box(r.len());
         });
     });

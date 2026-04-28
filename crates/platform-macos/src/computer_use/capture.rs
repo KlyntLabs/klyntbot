@@ -5,8 +5,8 @@
 
 use async_trait::async_trait;
 use platform_capture::{
-    AccessibilityNode, AxScope, CaptureError, DisplayInfo, Frame,
-    PixelFormat, PlatformCapture, Result, WindowId, WindowInfo,
+    AccessibilityNode, AxScope, CaptureError, DisplayInfo, Frame, PixelFormat, PlatformCapture,
+    Result, WindowId, WindowInfo,
 };
 use platform_input::Rect;
 
@@ -23,22 +23,23 @@ impl MacCapture {
             fn CGMainDisplayID() -> u32;
         }
         let id = unsafe { CGMainDisplayID() };
-        Ok(Self { default_display_id: id })
+        Ok(Self {
+            default_display_id: id,
+        })
     }
 }
 
 #[async_trait]
 impl PlatformCapture for MacCapture {
     async fn capture_screen(&self, _region: Option<Rect>) -> Result<Frame> {
+        use core_media_rs::cm_sample_buffer::CMSampleBuffer;
+        use core_video_rs::cv_pixel_buffer::{lock::LockTrait, CVPixelBuffer};
         use screencapturekit::{
             shareable_content::SCShareableContent,
-            stream::configuration::SCStreamConfiguration,
             stream::configuration::pixel_format::PixelFormat as SckPixelFormat,
-            stream::content_filter::SCContentFilter,
+            stream::configuration::SCStreamConfiguration, stream::content_filter::SCContentFilter,
             stream::screenshot_manager::capture,
         };
-        use core_media_rs::cm_sample_buffer::CMSampleBuffer;
-        use core_video_rs::cv_pixel_buffer::{CVPixelBuffer, lock::LockTrait};
         use tokio::task;
 
         let display_id = self.default_display_id;
@@ -51,8 +52,7 @@ impl PlatformCapture for MacCapture {
                 .find(|d| d.display_id() == display_id)
                 .ok_or(CaptureError::DisplayNotFound(display_id))?;
 
-            let filter = SCContentFilter::new()
-                .with_display_excluding_windows(&display, &[]);
+            let filter = SCContentFilter::new().with_display_excluding_windows(&display, &[]);
             let cfg = SCStreamConfiguration::default()
                 .set_width(display.width())
                 .map_err(|e| CaptureError::CaptureFailed(format!("set_width: {e:?}")))?
@@ -66,7 +66,8 @@ impl PlatformCapture for MacCapture {
             let sample_buffer: CMSampleBuffer = capture(&filter, &cfg)
                 .map_err(|e| CaptureError::CaptureFailed(format!("capture: {e:?}")))?;
 
-            let pixel_buffer: CVPixelBuffer = sample_buffer.get_pixel_buffer()
+            let pixel_buffer: CVPixelBuffer = sample_buffer
+                .get_pixel_buffer()
                 .map_err(|e| CaptureError::CaptureFailed(format!("get_pixel_buffer: {e:?}")))?;
 
             let width = pixel_buffer.get_width();
@@ -75,14 +76,17 @@ impl PlatformCapture for MacCapture {
             let expected_len = height as usize * bytes_per_row;
 
             let data = {
-                let lock = pixel_buffer.lock()
+                let lock = pixel_buffer
+                    .lock()
                     .map_err(|e| CaptureError::CaptureFailed(format!("lock: {e:?}")))?;
                 let slice = lock.as_slice();
                 // slice lifetime is tied to lock; copy out.
                 if slice.len() < expected_len {
-                    return Err(CaptureError::CaptureFailed(
-                        format!("pixel buffer too small: {} < {}", slice.len(), expected_len)
-                    ));
+                    return Err(CaptureError::CaptureFailed(format!(
+                        "pixel buffer too small: {} < {}",
+                        slice.len(),
+                        expected_len
+                    )));
                 }
                 slice[..expected_len].to_vec()
             };
@@ -126,10 +130,16 @@ impl PlatformCapture for MacCapture {
         }
         #[repr(C)]
         #[derive(Copy, Clone)]
-        struct CGPoint { x: f64, y: f64 }
+        struct CGPoint {
+            x: f64,
+            y: f64,
+        }
         #[repr(C)]
         #[derive(Copy, Clone)]
-        struct CGSize { width: f64, height: f64 }
+        struct CGSize {
+            width: f64,
+            height: f64,
+        }
 
         const MAX_DISPLAYS: u32 = 32;
         let mut ids = [0u32; MAX_DISPLAYS as usize];
@@ -139,7 +149,8 @@ impl PlatformCapture for MacCapture {
         let err = unsafe { CGGetActiveDisplayList(MAX_DISPLAYS, ids.as_mut_ptr(), &mut count) };
         if err != 0 {
             return Err(CaptureError::CaptureFailed(format!(
-                "CGGetActiveDisplayList failed: {}", err
+                "CGGetActiveDisplayList failed: {}",
+                err
             )));
         }
 

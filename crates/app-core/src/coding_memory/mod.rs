@@ -1,19 +1,19 @@
 //! `coding-memory` adapters owned by `app-core`.
 
+/// Codex config.toml installer.
+pub mod codex_installer;
+/// Git post-commit hook installer (writes `.git/hooks/post-commit`).
+pub mod git_hook_installer;
 /// Handlers backing desktop Tauri commands.
 pub mod handlers;
 /// Claude Code settings.json installer.
 pub mod installer;
-/// Codex config.toml installer.
-pub mod codex_installer;
 /// Kimi hooks.json installer.
 pub mod kimi_installer;
-/// Opencode opt-in marker (poll-only, no hook install).
-pub mod opencode_installer;
-/// Git post-commit hook installer (writes `.git/hooks/post-commit`).
-pub mod git_hook_installer;
 /// Phase-5 mirror source wiring.
 pub mod mirror;
+/// Opencode opt-in marker (poll-only, no hook install).
+pub mod opencode_installer;
 /// Phase-5 panel handlers.
 pub mod panels_phase5;
 /// Phase-4 recall handlers.
@@ -90,10 +90,14 @@ impl crate::AppCore {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<desktop_shared::commands::coding_memory::WireEventDto>, ApiError> {
-        let entries = self.coding_memory_session_replay(Some(session_id), limit, offset).await?;
+        let entries = self
+            .coding_memory_session_replay(Some(session_id), limit, offset)
+            .await?;
         Ok(entries
             .iter()
-            .filter_map(|e| desktop_shared::commands::coding_memory::WireEventDto::from_replay_entry(e).ok())
+            .filter_map(|e| {
+                desktop_shared::commands::coding_memory::WireEventDto::from_replay_entry(e).ok()
+            })
             .collect())
     }
 
@@ -136,7 +140,9 @@ impl crate::AppCore {
                 let binary = hook_binary_path()?;
                 if enabled {
                     tokio::task::spawn_blocking(move || {
-                        crate::coding_memory::codex_installer::CodexInstaller::install(&cfg, &binary)
+                        crate::coding_memory::codex_installer::CodexInstaller::install(
+                            &cfg, &binary,
+                        )
                     })
                 } else {
                     tokio::task::spawn_blocking(move || {
@@ -170,11 +176,14 @@ impl crate::AppCore {
                     .ok_or_else(|| ApiError::new("INTERNAL_ERROR", "no home dir"))?
                     .join(".local/share/opencode/opencode.db");
                 if enabled {
-                    if let Err(e) = crate::coding_memory::opencode_installer::OpencodeInstaller::install(&db) {
+                    if let Err(e) =
+                        crate::coding_memory::opencode_installer::OpencodeInstaller::install(&db)
+                    {
                         tracing::warn!(error = %e, "opencode install failed");
                     }
                 } else {
-                    let _ = crate::coding_memory::opencode_installer::OpencodeInstaller::uninstall(&db);
+                    let _ =
+                        crate::coding_memory::opencode_installer::OpencodeInstaller::uninstall(&db);
                 }
             }
             _ => {
@@ -329,10 +338,7 @@ impl crate::AppCore {
 
     /// Install the `.git/hooks/post-commit` hook for a repository root.
     #[tracing::instrument(skip(self), err)]
-    pub async fn coding_memory_install_git_hook(
-        &self,
-        repo_root: String,
-    ) -> Result<(), ApiError> {
+    pub async fn coding_memory_install_git_hook(&self, repo_root: String) -> Result<(), ApiError> {
         let path = std::path::PathBuf::from(repo_root);
         tokio::task::spawn_blocking(move || {
             crate::coding_memory::git_hook_installer::install(&path)

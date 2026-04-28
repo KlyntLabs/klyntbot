@@ -139,7 +139,9 @@ async fn nightly_cycle_produces_artifact_change() {
     let delete_applied = SelectiveDeleteSignal::apply(&pool, &selective_delete_log)
         .await
         .unwrap();
-    let dedup_applied = CrossSessionDedup::run(&fact_repo, 0.92, None).await.unwrap();
+    let dedup_applied = CrossSessionDedup::run(&fact_repo, 0.92, None)
+        .await
+        .unwrap();
 
     let rule_after: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM procedural_rules")
         .fetch_one(pool.inner())

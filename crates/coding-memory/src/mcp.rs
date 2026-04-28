@@ -267,7 +267,13 @@ impl CodingMemoryToolset {
         };
         let resp = self
             .svc
-            .recall_index(&a.query, normalize_repo_arg(a.repo.as_deref()), kinds_opt, a.days, a.limit)
+            .recall_index(
+                &a.query,
+                normalize_repo_arg(a.repo.as_deref()),
+                kinds_opt,
+                a.days,
+                a.limit,
+            )
             .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }
@@ -371,7 +377,11 @@ impl CodingMemoryToolset {
         let a: A = serde_json::from_value(args).map_err(decode_err)?;
         let resp = self
             .svc
-            .recall_change_history(&a.subject, &a.predicate, normalize_repo_arg(a.repo.as_deref()))
+            .recall_change_history(
+                &a.subject,
+                &a.predicate,
+                normalize_repo_arg(a.repo.as_deref()),
+            )
             .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }
@@ -395,7 +405,11 @@ impl CodingMemoryToolset {
         let a: A = serde_json::from_value(args).map_err(decode_err)?;
         let resp = self
             .svc
-            .recall_decision_points(a.domain.as_deref(), normalize_repo_arg(a.repo.as_deref()), a.limit)
+            .recall_decision_points(
+                a.domain.as_deref(),
+                normalize_repo_arg(a.repo.as_deref()),
+                a.limit,
+            )
             .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }

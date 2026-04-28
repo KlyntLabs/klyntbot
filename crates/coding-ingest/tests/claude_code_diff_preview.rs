@@ -20,7 +20,10 @@ fn edit_emits_diff_preview() {
     let bytes = serde_json::to_vec(&raw).unwrap();
     let evt = adapter.parse("PostToolUse", &bytes).unwrap().unwrap();
     let AgentEvent::V1(v1) = evt;
-    if let EventKind::FileEdit { op, diff_preview, .. } = v1.kind {
+    if let EventKind::FileEdit {
+        op, diff_preview, ..
+    } = v1.kind
+    {
         assert_eq!(op, FileOp::Modify);
         let preview = diff_preview.expect("diff_preview should be Some for Edit");
         assert!(preview.contains("-fn old"));

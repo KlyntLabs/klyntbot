@@ -220,7 +220,11 @@ fn parse_skill_frontmatter(body: &str, fallback: &str) -> (String, String, Strin
     let mut lines = body.lines();
     let first = lines.next().unwrap_or("").trim();
     if first != "---" {
-        return (fallback.to_string(), "Auto-detected workflow pattern".into(), body.to_string());
+        return (
+            fallback.to_string(),
+            "Auto-detected workflow pattern".into(),
+            body.to_string(),
+        );
     }
     let mut front = String::new();
     let mut in_front = true;

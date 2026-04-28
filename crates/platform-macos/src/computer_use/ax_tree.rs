@@ -30,9 +30,7 @@ pub fn walk_focused_app(pid: i32, max_depth: usize) -> Result<AccessibilityNode>
 }
 
 fn walk(element: &AXUIElement, depth_remaining: usize) -> Result<AccessibilityNode> {
-    let role = element
-        .copy_string_attribute("AXRole")
-        .unwrap_or_default();
+    let role = element.copy_string_attribute("AXRole").unwrap_or_default();
     let label = element
         .copy_string_attribute("AXTitle")
         .or_else(|_| element.copy_string_attribute("AXDescription"))
@@ -72,15 +70,11 @@ fn read_frame(element: &AXUIElement) -> Result<Rect> {
     let pos: AXValue = element
         .copy_attribute("AXPosition")?
         .downcast_into()
-        .ok_or_else(|| {
-            CaptureError::AxTreeUnavailable("AXPosition was not an AXValue".into())
-        })?;
+        .ok_or_else(|| CaptureError::AxTreeUnavailable("AXPosition was not an AXValue".into()))?;
     let size: AXValue = element
         .copy_attribute("AXSize")?
         .downcast_into()
-        .ok_or_else(|| {
-            CaptureError::AxTreeUnavailable("AXSize was not an AXValue".into())
-        })?;
+        .ok_or_else(|| CaptureError::AxTreeUnavailable("AXSize was not an AXValue".into()))?;
 
     let pos = pos
         .to_point()

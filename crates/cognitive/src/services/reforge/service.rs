@@ -660,9 +660,7 @@ pub async fn run_reforge(
 ///
 /// Exported so the nightly cron callback can invoke it independently of
 /// the full Reforge cycle.
-pub async fn run_phase6_autotuner(
-    bridge: &dyn AutotunerBridge,
-) -> common::Result<Phase6Result> {
+pub async fn run_phase6_autotuner(bridge: &dyn AutotunerBridge) -> common::Result<Phase6Result> {
     bridge.run_evaluation().await
 }
 

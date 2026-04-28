@@ -15,8 +15,6 @@ use tracing::{debug, info, warn};
 
 use bus::DomainEvent;
 
-use futures_util::future::join_all;
-
 use crate::consolidation::ConsolidationHandler;
 use crate::embedder::SemanticFactEmbedder;
 use crate::extraction::ExtractionHandler;
@@ -94,48 +92,99 @@ async fn collect_batch(
 }
 
 /// For each extracted fact, concurrently look up existing similar facts from the repo.
-async fn prefetch_existing(
-    extractions: &[crate::extraction::BatchExtraction],
-    observations: &[Observation],
+/// KCA Track 1: enriched with 1-hop neighborhood + cross-entity facts.
+pub(crate) async fn prefetch_existing(
     repo: &SemanticFactRepo,
+    entity_repo: &crate::repos::EntityRepo,
+    candidates: Vec<crate::types::SemanticFact>,
 ) -> Vec<crate::consolidation::ConsolidationCandidate> {
-    let mut all_facts: Vec<(crate::types::SemanticFact, _)> = Vec::new();
+    use futures_util::stream::{FuturesUnordered, StreamExt};
 
-    for batch_ext in extractions {
-        let Some(obs) = observations.get(batch_ext.observation_index) else {
-            warn!(
-                "Skipping extraction with out-of-bounds observation_index {}",
-                batch_ext.observation_index
-            );
-            continue;
-        };
-        for extracted in &batch_ext.facts {
-            let fact = crate::extraction::to_semantic_fact(extracted, obs);
-            let subject = fact.subject.clone();
-            let predicate = fact.predicate.clone();
-            let repo = repo.clone();
-            let fut = Box::pin(async move {
-                repo.find_similar(&subject, &predicate)
-                    .await
-                    .unwrap_or_default()
-            });
-            all_facts.push((fact, fut));
-        }
-    }
-
-    let (facts, futs): (Vec<_>, Vec<_>) = all_facts.into_iter().unzip();
-    let existing_results = join_all(futs).await;
-
-    facts
+    let mut tasks: FuturesUnordered<_> = candidates
         .into_iter()
-        .zip(existing_results)
-        .map(
-            |(candidate, existing)| crate::consolidation::ConsolidationCandidate {
-                candidate,
-                existing,
-            },
-        )
-        .collect()
+        .map(|cand| {
+            let r = repo.clone();
+            let e = entity_repo.clone();
+            async move {
+                let existing = r
+                    .find_similar(&cand.subject, &cand.predicate)
+                    .await
+                    .unwrap_or_default();
+
+                // Subject neighborhood
+                let subject_neighborhood = match e.find_by_name(&cand.subject).await {
+                    Ok(rows) if !rows.is_empty() => {
+                        let node = &rows[0];
+                        e.get_neighborhood_with_edges(&node.id, 1)
+                            .await
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|ne| (ne.neighbor.name, ne.relationship_type))
+                            .collect()
+                    }
+                    _ => Vec::new(),
+                };
+
+                // Object neighborhood (only if object looks like an entity name)
+                let object_neighborhood = if looks_like_entity_name(&cand.object) {
+                    match e.find_by_name(&cand.object).await {
+                        Ok(rows) if !rows.is_empty() => {
+                            let node = &rows[0];
+                            e.get_neighborhood_with_edges(&node.id, 1)
+                                .await
+                                .unwrap_or_default()
+                                .into_iter()
+                                .map(|ne| (ne.neighbor.name, ne.relationship_type))
+                                .collect()
+                        }
+                        _ => Vec::new(),
+                    }
+                } else {
+                    Vec::new()
+                };
+
+                // Cross-entity facts: top-5 facts mentioning the subject entity, dedup against `existing`.
+                let cross_entity_facts = match e.find_by_name(&cand.subject).await {
+                    Ok(rows) if !rows.is_empty() => {
+                        let node = &rows[0];
+                        let all = r
+                            .find_facts_by_entity_id(&node.id, 10)
+                            .await
+                            .unwrap_or_default();
+                        all.into_iter()
+                            .filter(|f| {
+                                !(f.subject == cand.subject && f.predicate == cand.predicate)
+                            })
+                            .take(5)
+                            .collect()
+                    }
+                    _ => Vec::new(),
+                };
+
+                crate::consolidation::ConsolidationCandidate {
+                    candidate: cand,
+                    existing,
+                    subject_neighborhood,
+                    object_neighborhood,
+                    cross_entity_facts,
+                }
+            }
+        })
+        .collect();
+
+    let mut out = Vec::new();
+    while let Some(c) = tasks.next().await {
+        out.push(c);
+    }
+    out
+}
+
+fn looks_like_entity_name(s: &str) -> bool {
+    s.len() >= 3
+        && s.len() <= 100
+        && !s
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
 }
 
 /// Configuration for starting the background consolidation service (avoids too-many-arguments).
@@ -168,6 +217,8 @@ pub struct BackgroundServiceConfig {
     /// Optional pending memory repo — low-confidence facts are routed here
     /// instead of being inserted directly into semantic_facts.
     pub pending_repo: Option<crate::repos::PendingMemoryRepo>,
+    /// Optional graph link handler — fire-and-forget LLM enrichment for newly written facts.
+    pub graph_link_handler: Option<Arc<dyn crate::services::graph_linker::GraphLinkHandler>>,
 }
 
 /// Background service that processes domain events into cognitive memory.
@@ -200,6 +251,7 @@ impl BackgroundConsolidationService {
             deep_handler,
             density_repo,
             pending_repo,
+            graph_link_handler,
         } = config;
         // Cognitive collectors are SignalConsumers wired by the app-core init
         // layer; the legacy broadcast-collector startup that lived here is
@@ -441,8 +493,18 @@ impl BackgroundConsolidationService {
                     }
 
                     // Prefetch existing facts + batch consolidation
-                    let candidates =
-                        prefetch_existing(&result.extractions, &to_extract, &repo).await;
+                    let extracted_facts: Vec<crate::types::SemanticFact> = result
+                        .extractions
+                        .iter()
+                        .flat_map(|ext| {
+                            let obs = to_extract.get(ext.observation_index);
+                            ext.facts.iter().filter_map(move |f| {
+                                obs.map(|o| crate::extraction::to_semantic_fact(f, o))
+                            })
+                        })
+                        .collect();
+                    let entity_repo = crate::repos::EntityRepo::new(repo.pool().clone());
+                    let candidates = prefetch_existing(&repo, &entity_repo, extracted_facts).await;
 
                     if !candidates.is_empty() {
                         let ops = match consolidation.decide_batch(&candidates).await {
@@ -629,6 +691,31 @@ impl BackgroundConsolidationService {
                                 _ => {}
                             }
                         }
+
+                        if let Some(ref linker) = graph_link_handler {
+                            let written: Vec<(crate::types::SemanticFact, crate::types::MemoryOp)> =
+                                candidates
+                                    .iter()
+                                    .zip(ops.iter())
+                                    .filter(|(_, op)| {
+                                        matches!(
+                                            op,
+                                            crate::types::MemoryOp::Add { .. }
+                                                | crate::types::MemoryOp::Update { .. }
+                                        )
+                                    })
+                                    .map(|(c, op)| (c.candidate.clone(), op.clone()))
+                                    .collect();
+                            if !written.is_empty() {
+                                let linker = linker.clone();
+                                let fr = repo.clone();
+                                let er = entity_repo.clone();
+                                tokio::spawn(async move {
+                                    run_post_consolidation_linker(&fr, &er, linker, written, None)
+                                        .await;
+                                });
+                            }
+                        }
                     }
 
                     // Self-healing: drain dead-letter if LLM is healthy (no fallbacks this batch)
@@ -712,6 +799,172 @@ impl BackgroundConsolidationService {
             }
         }
     }
+}
+
+/// KCA Track 2 — fire-and-forget graph linker. Called after entity-edge writes for
+/// each Add/Update fact. Errors are logged, never propagated.
+pub async fn run_post_consolidation_linker(
+    fact_repo: &SemanticFactRepo,
+    entity_repo: &crate::repos::EntityRepo,
+    handler: Arc<dyn crate::services::graph_linker::GraphLinkHandler>,
+    written: Vec<(crate::types::SemanticFact, crate::types::MemoryOp)>,
+    recent_user_text: Option<String>,
+) {
+    use crate::services::graph_linker_types::*;
+
+    for (fact, op) in written {
+        if !matches!(
+            op,
+            crate::types::MemoryOp::Add { .. } | crate::types::MemoryOp::Update { .. }
+        ) {
+            continue;
+        }
+
+        let subject_node = entity_repo
+            .find_by_name(&fact.subject)
+            .await
+            .ok()
+            .and_then(|r| r.into_iter().next());
+        let object_node = if looks_like_entity_name(&fact.object) {
+            entity_repo
+                .find_by_name(&fact.object)
+                .await
+                .ok()
+                .and_then(|r| r.into_iter().next())
+        } else {
+            None
+        };
+
+        let subject_neighborhood = match &subject_node {
+            Some(n) => entity_repo
+                .get_neighborhood_with_edges(&n.id, 1)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|ne| NeighborRef {
+                    entity_id: ne.neighbor.id,
+                    name: ne.neighbor.name,
+                    relationship_type: ne.relationship_type,
+                    strength: ne.strength,
+                })
+                .collect(),
+            None => Vec::new(),
+        };
+        let object_neighborhood = match &object_node {
+            Some(n) => entity_repo
+                .get_neighborhood_with_edges(&n.id, 1)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|ne| NeighborRef {
+                    entity_id: ne.neighbor.id,
+                    name: ne.neighbor.name,
+                    relationship_type: ne.relationship_type,
+                    strength: ne.strength,
+                })
+                .collect(),
+            None => Vec::new(),
+        };
+
+        let candidate_facts = match &subject_node {
+            Some(n) => fact_repo
+                .find_facts_by_entity_id(&n.id, 5)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|f| f.id != fact.id)
+                .map(|f| ExistingFactRef {
+                    fact_id: f.id,
+                    subject: f.subject,
+                    predicate: f.predicate,
+                    object: f.object,
+                    valid_at: f.valid_from.clone(),
+                    valid_until: f.valid_until.clone(),
+                })
+                .collect(),
+            None => Vec::new(),
+        };
+
+        let input = GraphLinkInput {
+            new_fact: NewFactRef {
+                fact_id: fact.id.clone(),
+                subject: fact.subject.clone(),
+                subject_entity_id: subject_node.as_ref().map(|n| n.id.clone()),
+                predicate: fact.predicate.clone(),
+                object: fact.object.clone(),
+                object_entity_id: object_node.as_ref().map(|n| n.id.clone()),
+                confidence: fact.confidence,
+                valid_at: fact.valid_from.clone(),
+            },
+            subject_neighborhood,
+            object_neighborhood,
+            candidate_facts,
+            recent_user_text: recent_user_text.clone(),
+        };
+
+        match handler.link(input).await {
+            Ok(out) => {
+                if let Err(e) = apply_graph_link_output(fact_repo, entity_repo, &fact, &out).await {
+                    tracing::warn!(error = %e, fact_id = %fact.id, "graph_linker: apply failed");
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, fact_id = %fact.id, "graph_linker: handler returned error");
+            }
+        }
+    }
+}
+
+async fn apply_graph_link_output(
+    fact_repo: &SemanticFactRepo,
+    entity_repo: &crate::repos::EntityRepo,
+    fact: &crate::types::SemanticFact,
+    out: &crate::services::graph_linker_types::GraphLinkOutput,
+) -> common::Result<()> {
+    // 1. Apply discovered relationships (typed edges).
+    for rel in &out.discovered_relationships {
+        let src = match entity_repo.find_by_name(&rel.source_entity_name).await {
+            Ok(rows) => rows.into_iter().next(),
+            Err(_) => None,
+        };
+        let tgt = match entity_repo.find_by_name(&rel.target_entity_name).await {
+            Ok(rows) => rows.into_iter().next(),
+            Err(_) => None,
+        };
+        if let (Some(s), Some(t)) = (src, tgt) {
+            if let Err(e) = entity_repo
+                .upsert_relationship_typed(
+                    &s.id,
+                    &t.id,
+                    &rel.relationship_type,
+                    &rel.edge_type,
+                    rel.strength,
+                    Some(&rel.evidence),
+                    "graph_linker",
+                )
+                .await
+            {
+                tracing::debug!(error = %e, "linker: upsert_relationship_typed failed");
+            }
+        }
+    }
+
+    // 2. Apply supersedes.
+    for sup in &out.superseded {
+        if let Err(e) = fact_repo.supersede(&sup.old_fact_id, &fact.id).await {
+            tracing::debug!(error = %e, old = %sup.old_fact_id, "linker: supersede failed");
+        }
+    }
+
+    // 3. Apply merges (entity merges). Conservative: only emit a merge_log row.
+    // Actual merging happens in nightly Reforge Phase 6.5 to avoid corrupting in-flight state.
+    for _merge in &out.merges {
+        // merge_proposals table will be added in Track 9 if needed.
+        // For now, log only.
+        tracing::debug!("linker: merge proposal skipped (nightly reforge handles merges)");
+    }
+
+    Ok(())
 }
 
 /// Create a type key for an event (used as accumulator key). Retained for
@@ -967,5 +1220,311 @@ mod tests {
             "[user]: What language?\n[assistant]: I can help!\n[user]: I prefer Rust for backend";
         let result = summarize_observation(enriched);
         assert_eq!(result, "I prefer Rust for backend");
+    }
+
+    #[tokio::test]
+    async fn prefetch_existing_includes_neighborhood_when_entities_exist() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let fact_repo = crate::repos::SemanticFactRepo::new(pool.clone());
+        let entity_repo = crate::repos::EntityRepo::new(pool.clone());
+
+        // Seed: Alice—knows—Bob (already in graph)
+        let alice = entity_repo
+            .upsert_entity(&crate::repos::NewEntity {
+                name: "Alice".into(),
+                entity_type: "person".into(),
+                description: None,
+                source: "t".into(),
+                source_id: None,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+        let bob = entity_repo
+            .upsert_entity(&crate::repos::NewEntity {
+                name: "Bob".into(),
+                entity_type: "person".into(),
+                description: None,
+                source: "t".into(),
+                source_id: None,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+        entity_repo
+            .upsert_relationship(&crate::repos::NewRelationship {
+                source_entity_id: alice.id.clone(),
+                target_entity_id: bob.id.clone(),
+                relationship_type: "knows".into(),
+                evidence: None,
+                source: "t".into(),
+            })
+            .await
+            .unwrap();
+        let fact1 = crate::types::SemanticFact {
+            id: "f1".into(),
+            domain: "test".into(),
+            subject: "Alice".into(),
+            predicate: "knows".into(),
+            object: "Bob".into(),
+            confidence: 0.8,
+            source: "t".into(),
+            valid_from: "2026-04-29".into(),
+            valid_until: None,
+            recorded_at: "2026-04-29".into(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 0.0,
+            project_id: None,
+            memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+        };
+        let fact2 = crate::types::SemanticFact {
+            id: "f2".into(),
+            domain: "test".into(),
+            subject: "Bob".into(),
+            predicate: "manages".into(),
+            object: "Alice".into(),
+            confidence: 0.9,
+            source: "t".into(),
+            valid_from: "2026-04-29".into(),
+            valid_until: None,
+            recorded_at: "2026-04-29".into(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 0.0,
+            project_id: None,
+            memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+        };
+        fact_repo.upsert(&fact1).await.unwrap();
+        fact_repo.upsert(&fact2).await.unwrap();
+
+        // New extracted fact: Alice prefers Rust
+        let new_fact = crate::types::SemanticFact {
+            id: "f3".into(),
+            domain: "test".into(),
+            subject: "Alice".into(),
+            predicate: "prefers".into(),
+            object: "Rust".into(),
+            confidence: 0.7,
+            source: "t".into(),
+            valid_from: "2026-04-29".into(),
+            valid_until: None,
+            recorded_at: "2026-04-29".into(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 0.0,
+            project_id: None,
+            memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+        };
+
+        let candidates = prefetch_existing(&fact_repo, &entity_repo, vec![new_fact.clone()]).await;
+
+        assert_eq!(candidates.len(), 1);
+        let cand = &candidates[0];
+        assert_eq!(cand.candidate.subject, "Alice");
+
+        // Subject neighborhood should include Bob via "knows"
+        let nbrs: Vec<&str> = cand
+            .subject_neighborhood
+            .iter()
+            .map(|(n, _)| n.as_str())
+            .collect();
+        assert!(
+            nbrs.contains(&"Bob"),
+            "subject neighborhood must include Bob, got {:?}",
+            cand.subject_neighborhood
+        );
+
+        // Cross-entity facts should include Bob's works_at fact
+        let cef_subjects: Vec<&str> = cand
+            .cross_entity_facts
+            .iter()
+            .map(|f| f.subject.as_str())
+            .collect();
+        assert!(
+            cef_subjects.contains(&"Bob"),
+            "cross-entity facts should include Bob's facts, got {:?}",
+            cef_subjects
+        );
+    }
+
+    use crate::services::graph_linker::GraphLinkHandler;
+    use crate::services::graph_linker_types::{GraphLinkInput, GraphLinkOutput};
+    use std::sync::Mutex;
+
+    struct CapturingLinker(Mutex<Vec<GraphLinkInput>>);
+
+    #[async_trait::async_trait]
+    impl GraphLinkHandler for CapturingLinker {
+        async fn link(&self, input: GraphLinkInput) -> common::Result<GraphLinkOutput> {
+            self.0.lock().unwrap().push(input);
+            Ok(GraphLinkOutput::default())
+        }
+    }
+
+    #[tokio::test]
+    async fn linker_invoked_after_add_op_with_neighborhood() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let fact_repo = SemanticFactRepo::new(pool.clone());
+        let entity_repo = crate::repos::EntityRepo::new(pool.clone());
+
+        let alice = entity_repo
+            .upsert_entity(&crate::repos::NewEntity {
+                name: "Alice".into(),
+                entity_type: "person".into(),
+                description: None,
+                source: "t".into(),
+                source_id: None,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+        let bob = entity_repo
+            .upsert_entity(&crate::repos::NewEntity {
+                name: "Bob".into(),
+                entity_type: "person".into(),
+                description: None,
+                source: "t".into(),
+                source_id: None,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+        entity_repo
+            .upsert_relationship(&crate::repos::NewRelationship {
+                source_entity_id: alice.id.clone(),
+                target_entity_id: bob.id.clone(),
+                relationship_type: "knows".into(),
+                evidence: None,
+                source: "t".into(),
+            })
+            .await
+            .unwrap();
+
+        let linker = Arc::new(CapturingLinker(Mutex::new(Vec::new())));
+
+        let new_fact = crate::types::SemanticFact {
+            id: "f3".into(),
+            domain: "test".into(),
+            subject: "Alice".into(),
+            predicate: "prefers".into(),
+            object: "Rust".into(),
+            confidence: 0.7,
+            source: "t".into(),
+            valid_from: "2026-04-29".into(),
+            valid_until: None,
+            recorded_at: "2026-04-29".into(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 0.0,
+            project_id: None,
+            memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+        };
+        fact_repo.upsert(&new_fact).await.unwrap();
+
+        run_post_consolidation_linker(
+            &fact_repo,
+            &entity_repo,
+            linker.clone() as Arc<dyn GraphLinkHandler>,
+            vec![(
+                new_fact.clone(),
+                crate::types::MemoryOp::Add {
+                    id: new_fact.id.clone(),
+                },
+            )],
+            None,
+        )
+        .await;
+
+        let captured = linker.0.lock().unwrap();
+        assert_eq!(captured.len(), 1);
+        assert_eq!(captured[0].new_fact.subject, "Alice");
+        assert!(
+            !captured[0].subject_neighborhood.is_empty(),
+            "neighborhood must be populated"
+        );
+    }
+
+    #[tokio::test]
+    async fn linker_skipped_for_cold_start_facts() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let fact_repo = SemanticFactRepo::new(pool.clone());
+        let entity_repo = crate::repos::EntityRepo::new(pool.clone());
+
+        let linker = Arc::new(CapturingLinker(Mutex::new(Vec::new())));
+
+        let new_fact = crate::types::SemanticFact {
+            id: "f3".into(),
+            domain: "test".into(),
+            subject: "Zoe".into(),
+            predicate: "loves".into(),
+            object: "skydiving".into(),
+            confidence: 0.7,
+            source: "t".into(),
+            valid_from: "2026-04-29".into(),
+            valid_until: None,
+            recorded_at: "2026-04-29".into(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 0.0,
+            project_id: None,
+            memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".into(),
+            scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
+        };
+        fact_repo.upsert(&new_fact).await.unwrap();
+
+        run_post_consolidation_linker(
+            &fact_repo,
+            &entity_repo,
+            linker.clone() as Arc<dyn GraphLinkHandler>,
+            vec![(
+                new_fact.clone(),
+                crate::types::MemoryOp::Add {
+                    id: new_fact.id.clone(),
+                },
+            )],
+            None,
+        )
+        .await;
+
+        let cap = linker.0.lock().unwrap();
+        assert_eq!(cap.len(), 1);
+        assert!(cap[0].subject_neighborhood.is_empty());
+        assert!(cap[0].object_neighborhood.is_empty());
+        assert!(cap[0].candidate_facts.is_empty());
     }
 }

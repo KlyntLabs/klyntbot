@@ -90,11 +90,20 @@ pub enum ComputerUseAction {
     MouseMove { x: i32, y: i32 },
 
     /// Scroll at (x, y) in the given direction by `amount` lines.
-    Scroll { x: i32, y: i32, direction: ScrollDir, amount: i32 },
+    Scroll {
+        x: i32,
+        y: i32,
+        direction: ScrollDir,
+        amount: i32,
+    },
 
     /// Click-and-drag from `from` to `to`, optionally holding modifiers
     /// during the drag.
-    LeftClickDrag { from: Point, to: Point, hold_modifiers: KeyMods },
+    LeftClickDrag {
+        from: Point,
+        to: Point,
+        hold_modifiers: KeyMods,
+    },
 
     /// Press the left button at (x, y) without releasing. Use with
     /// `LeftMouseUp` for manual drag sequences.

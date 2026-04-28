@@ -50,6 +50,8 @@ pub mod retry_queue;
 /// Phase C — reconciliation (ADD/SUPERSEDE/NOOP).
 pub mod phase_c;
 
+pub mod test_helpers;
+
 /// Which distiller phase produced a write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DistillerPhase {
@@ -151,6 +153,7 @@ struct DistillerInner {
     #[allow(dead_code)]
     retriever: Arc<dyn context_engine::MemoryRetriever>,
     retry_repo: Option<DistillationRetryRepo>,
+    graph_link_handler: Option<Arc<dyn cognitive::services::graph_linker::GraphLinkHandler>>,
     buffer: Mutex<TurnBuffer>,
     /// Optional event bus. When `Some`, every successful fact / episode write
     /// publishes a `DomainEvent::CodingMemoryUpdated` so UI panels can refresh
@@ -213,6 +216,7 @@ impl Distiller {
                 provider,
                 retriever,
                 retry_repo: None,
+                graph_link_handler: None,
                 buffer: Mutex::new(TurnBuffer::new()),
                 event_bus: None,
                 extractor,
@@ -238,6 +242,17 @@ impl Distiller {
         self
     }
 
+    /// Attach a graph-link handler for post-write entity graph enrichment (KCA Track 3).
+    pub fn with_graph_link_handler(
+        mut self,
+        handler: Arc<dyn cognitive::services::graph_linker::GraphLinkHandler>,
+    ) -> Self {
+        let inner = Arc::get_mut(&mut self.inner)
+            .expect("Distiller::with_graph_link_handler called after clone");
+        inner.graph_link_handler = Some(handler);
+        self
+    }
+
     /// Publishes a `CodingMemoryUpdated` event if a bus is attached. Cheap:
     /// `broadcast::send` returns immediately even with no subscribers.
     fn publish_memory_updated(&self, kind: bus::CodingMemoryKind, id: &str) {
@@ -247,6 +262,36 @@ impl Distiller {
                 id: id.to_string(),
             });
         }
+    }
+
+    /// Fire-and-forget graph linker for a freshly-written coding fact (KCA Track 3).
+    fn spawn_linker_for_fact(&self, fact: &cognitive::types::SemanticFact, recent_user_text: &str) {
+        let Some(ref handler) = self.inner.graph_link_handler else {
+            return;
+        };
+        let Some(entity_repo) = self.inner.writer.entity_repo() else {
+            return;
+        };
+        let fact_repo = self.inner.writer.facts().clone();
+        let entity_repo = entity_repo.clone();
+        let handler = handler.clone();
+        let fact = fact.clone();
+        let recent_user_text = if recent_user_text.is_empty() {
+            None
+        } else {
+            Some(recent_user_text.to_string())
+        };
+        let fact_id = fact.id.clone();
+        tokio::spawn(async move {
+            cognitive::services::background::run_post_consolidation_linker(
+                &fact_repo,
+                &entity_repo,
+                handler,
+                vec![(fact, cognitive::types::MemoryOp::Add { id: fact_id })],
+                recent_user_text,
+            )
+            .await;
+        });
     }
 
     /// Accept an event into the per-turn buffer. Triggers `distill_turn` on boundary.
@@ -443,7 +488,8 @@ impl Distiller {
                 return Err(DistillerError::CostCeiling {
                     spent_usd: spent,
                     ceiling_usd: ceiling,
-                }.into());
+                }
+                .into());
             }
         }
 
@@ -637,6 +683,7 @@ impl Distiller {
                         }
                         ReconcileDecision::Add => {
                             let fact_id = pf.fact.id.clone();
+                            let fact_for_linker = pf.fact.clone();
                             self.inner
                                 .writer
                                 .write_fact(pf)
@@ -644,10 +691,12 @@ impl Distiller {
                                 .map_err(common::KlyntbotError::from)?;
                             self.publish_memory_updated(bus::CodingMemoryKind::Fact, &fact_id);
                             report.semantic_writes += 1;
+                            self.spawn_linker_for_fact(&fact_for_linker, &user_prompt_text);
                         }
                         ReconcileDecision::Supersede { predecessor_id } => {
                             let succ_id = pf.fact.id.clone();
                             let succ_valid_from = pf.fact.valid_from.clone();
+                            let fact_for_linker = pf.fact.clone();
                             self.inner
                                 .writer
                                 .write_fact(pf)
@@ -660,6 +709,7 @@ impl Distiller {
                                 .complete_supersede(&predecessor_id, &succ_id, &succ_valid_from)
                                 .await;
                             report.semantic_writes += 1;
+                            self.spawn_linker_for_fact(&fact_for_linker, &user_prompt_text);
                         }
                     }
                 }

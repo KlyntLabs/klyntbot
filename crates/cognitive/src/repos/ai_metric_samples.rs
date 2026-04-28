@@ -74,7 +74,7 @@ impl MetricRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ai_core::{Aggregation, MetricSample, MetricSpec};
+    use ai_core::{Aggregation, MetricSpec};
 
     #[tokio::test]
     async fn insert_and_aggregate() {

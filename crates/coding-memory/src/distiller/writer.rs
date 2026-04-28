@@ -11,6 +11,8 @@ use cognitive::types::{EpisodicMemory, SemanticFact};
 use cognitive::{EpisodicMemoryRepo, SemanticFactRepo};
 use serde_json::json;
 
+use cognitive::repos::entity::EntityRepo;
+
 /// A fact prepared for writing — carries the row plus coding-memory metadata.
 #[derive(Debug, Clone)]
 pub struct PreparedFact {
@@ -45,13 +47,25 @@ pub struct PreparedEpisode {
 pub struct DistillerWriter {
     facts: SemanticFactRepo,
     episodes: EpisodicMemoryRepo,
+    entity_repo: Option<EntityRepo>,
 }
 
 impl DistillerWriter {
     /// Construct a writer around existing cognitive repos.
     #[must_use]
     pub fn new(facts: SemanticFactRepo, episodes: EpisodicMemoryRepo) -> Self {
-        Self { facts, episodes }
+        Self {
+            facts,
+            episodes,
+            entity_repo: None,
+        }
+    }
+
+    /// Attach an entity repo for graph-edge writes (KCA Track 3).
+    #[must_use]
+    pub fn with_entity_repo(mut self, repo: EntityRepo) -> Self {
+        self.entity_repo = Some(repo);
+        self
     }
 
     /// Write a semantic fact. Returns `ProvenanceMissing` when source_events is empty.
@@ -76,6 +90,12 @@ impl DistillerWriter {
             .map_err(|e| DistillerError::Storage {
                 detail: format!("upsert_with_metadata: {e}"),
             })?;
+
+        if let Some(ref er) = self.entity_repo {
+            crate::distiller::phase_c::write_entity_edges_for_distiller_fact(&prepared.fact, er)
+                .await;
+        }
+
         Ok(())
     }
 
@@ -114,6 +134,11 @@ impl DistillerWriter {
         &self.episodes
     }
 
+    /// Borrow the optional entity repo.
+    pub fn entity_repo(&self) -> Option<&EntityRepo> {
+        self.entity_repo.as_ref()
+    }
+
     /// Bump access_count on a fact by id.
     pub async fn bump_access(&self, id: &str) -> Result<(), DistillerError> {
         self.facts
@@ -138,16 +163,14 @@ impl DistillerWriter {
                 detail: format!("complete_supersede: {e}"),
             })?;
         // Bi-temporal: align valid_until with successor's valid_from.
-        sqlx::query(
-            "UPDATE semantic_facts SET valid_until = ?1 WHERE id = ?2",
-        )
-        .bind(successor_valid_from)
-        .bind(predecessor_id)
-        .execute(self.facts.pool())
-        .await
-        .map_err(|e| DistillerError::Storage {
-            detail: format!("complete_supersede valid_until: {e}"),
-        })?;
+        sqlx::query("UPDATE semantic_facts SET valid_until = ?1 WHERE id = ?2")
+            .bind(successor_valid_from)
+            .bind(predecessor_id)
+            .execute(self.facts.pool())
+            .await
+            .map_err(|e| DistillerError::Storage {
+                detail: format!("complete_supersede valid_until: {e}"),
+            })?;
         Ok(())
     }
 }

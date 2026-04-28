@@ -10673,6 +10673,7 @@ dependencies = [
  "platform-capture",
  "platform-input",
  "screencapturekit",
+ "tempfile",
  "tokio",
  "tracing",
 ]
