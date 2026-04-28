@@ -244,6 +244,7 @@ desktop_macros::klynt_collect_commands![
     crate::commands::launcher::launcher_dashboard,
     crate::commands::launcher::launcher_pin,
     crate::commands::launcher::launcher_unpin,
+    crate::commands::launcher::launcher_rebuild_attention,
     crate::commands::launcher::launcher_list_pinned,
     crate::commands::launcher::launcher_clipboard_delete,
     crate::commands::launcher::launcher_clipboard_pin,

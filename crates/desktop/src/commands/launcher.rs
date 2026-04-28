@@ -63,6 +63,11 @@ pub async fn launcher_clipboard_pin(id: i64, pinned: bool) -> () {
     state.launcher_clipboard_pin(id, pinned).await
 }
 
+#[klynt_command]
+pub async fn launcher_rebuild_attention() -> u64 {
+    state.launcher_rebuild_attention().await
+}
+
 #[klynt_raw_command]
 #[tauri::command]
 #[specta::specta]

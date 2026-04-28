@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
-    Calculator, ClipboardRepo, FileKind, FrequencyRepo, LauncherItem, LauncherItemKind,
-    PinsRepo, SourceRegistry, UrlNavigation,
+    Calculator, ClipboardRepo, EntityAttentionRepo, FileKind, FrequencyRepo, LauncherItem,
+    LauncherItemKind, PinsRepo, SourceRegistry, UrlNavigation,
 };
 use feature_notes::repo::NoteRepo;
 use storage::Repos;
@@ -17,6 +17,7 @@ pub struct LauncherSearchEngine {
     pub frequency_repo: Arc<FrequencyRepo>,
     pub clipboard_repo: Arc<ClipboardRepo>,
     pub pins_repo: Arc<PinsRepo>,
+    pub entity_attention_repo: Option<Arc<EntityAttentionRepo>>,
     /// Stored here so the OS watcher thread is joined on drop.
     pub _file_watcher: Option<feature_launcher::SourceFileWatcher>,
 }
@@ -31,6 +32,23 @@ impl LauncherSearchEngine {
     ) -> Result<Vec<LauncherItem>, ApiError> {
         let query = query.trim();
         if query.is_empty() {
+            // Try attention-ranked defaults first; fall back to frecency if unavailable.
+            if let Some(ref attention_repo) = self.entity_attention_repo {
+                match attention_repo.top_by_attention(None, 8).await {
+                    Ok(rows) => {
+                        return Ok(rows
+                            .into_iter()
+                            .map(|row| {
+                                feature_launcher::search::attention::into_launcher_item(row)
+                            })
+                            .collect());
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Attention defaults failed — falling back to frecency");
+                    }
+                }
+            }
+
             let top = self
                 .frequency_repo
                 .top_frecency(8)

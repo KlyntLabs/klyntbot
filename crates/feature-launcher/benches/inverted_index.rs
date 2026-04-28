@@ -26,8 +26,12 @@ fn seed_tree(root: &std::path::Path, files: usize) {
 }
 
 fn build_bench(c: &mut Criterion) {
+    let mut sizes = vec![500usize, 5_000, 50_000];
+    if std::env::var("BENCH_LARGE").is_ok() {
+        sizes.push(200_000);
+    }
     let mut group = c.benchmark_group("inverted_index_build");
-    for size in [500usize, 5_000, 50_000].iter() {
+    for size in sizes.iter() {
         let dir = TempDir::new().unwrap();
         seed_tree(dir.path(), *size);
         let roots = vec![dir.path().to_path_buf()];
@@ -44,7 +48,11 @@ fn build_bench(c: &mut Criterion) {
 }
 
 fn search_bench(c: &mut Criterion) {
-    for &corpus in &[5_000usize, 50_000] {
+    let mut sizes = vec![5_000usize, 50_000];
+    if std::env::var("BENCH_LARGE").is_ok() {
+        sizes.push(200_000);
+    }
+    for &corpus in &sizes {
         let dir = TempDir::new().unwrap();
         seed_tree(dir.path(), corpus);
         let idx = InvertedFileIndex::build(
@@ -66,5 +74,29 @@ fn search_bench(c: &mut Criterion) {
     }
 }
 
-criterion_group!(benches, build_bench, search_bench);
+fn ranking_quality_bench(c: &mut Criterion) {
+    let dir = TempDir::new().unwrap();
+    let base = dir.path();
+    fs::write(base.join("parser_module_test.rs"), b"").unwrap();
+    fs::write(base.join("test_parser_module.rs"), b"").unwrap();
+    for i in 0..17 {
+        fs::write(base.join(format!("test_module_{i}.rs")), b"").unwrap();
+    }
+    let idx = InvertedFileIndex::build(
+        &[base.to_path_buf()],
+        &SkipSet::defaults(),
+        1000,
+    );
+
+    c.bench_function("inverted_index_ranking_parser_test", |b| {
+        b.iter(|| {
+            let r = idx.search(black_box("parser test"), 10);
+            assert!(!r.is_empty());
+            assert_eq!(idx.entry_name(r[0].entry_idx).unwrap(), "parser_module_test.rs");
+            black_box(r.len());
+        });
+    });
+}
+
+criterion_group!(benches, build_bench, search_bench, ranking_quality_bench);
 criterion_main!(benches);
