@@ -113,7 +113,7 @@ pub async fn session_list(
     let mut binds: Vec<String> = vec![since_clause];
     if let Some(src) = args.source.as_ref() {
         sql.push_str(" AND source = ?2");
-        binds.push(src.clone());
+        binds.push(provider_id_to_db_slug(src));
     }
     if let Some(repo) = args.repo_id.as_ref() {
         sql.push_str(if binds.len() == 2 { " AND repo_id = ?3" } else { " AND repo_id = ?2" });
@@ -363,4 +363,16 @@ pub async fn sensitivity_inspector(
             }
         })
         .collect())
+}
+
+
+/// Translate camelCase ProviderId values from the UI to kebab-case DB slugs.
+/// `codex` is identity; the other three require translation.
+fn provider_id_to_db_slug(id: &str) -> String {
+    match id {
+        "claudeCode" => "claude-code".into(),
+        "kimiCli" => "kimi-cli".into(),
+        "openCode" => "opencode".into(),
+        _ => id.into(),
+    }
 }
