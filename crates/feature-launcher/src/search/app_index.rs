@@ -1,5 +1,7 @@
 use crate::types::*;
 use parking_lot::RwLock;
+use smol_str::SmolStr;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -7,7 +9,7 @@ use std::sync::Arc;
 pub struct AppEntry {
     pub name: String,
     pub path: PathBuf,
-    pub bundle_id: Option<String>,
+    pub bundle_id: Option<SmolStr>,
     /// Path to the cached 64x64 PNG icon (resolved via sips).
     pub icon_path: Option<PathBuf>,
 }
@@ -98,16 +100,35 @@ impl AppIndex {
 
     #[cfg(target_os = "macos")]
     pub async fn index_applications(&self) {
-        let dirs = ["/Applications", "/System/Applications"];
+        let dirs = [
+            "/Applications",
+            "/System/Applications",
+            "/System/Library/CoreServices",
+            "/System/Library/CoreServices/Applications",
+        ];
         let home = std::env::var("HOME").unwrap_or_default();
         let user_apps = format!("{}/Applications", home);
 
         let mut apps = Vec::new();
         for dir in dirs.iter().chain(std::iter::once(&user_apps.as_str())) {
-            if let Ok(entries) = Self::walk_apps(Path::new(dir), 3) {
+            // CoreServices nests one level deeper than /Applications.
+            let max_depth = if dir.starts_with("/System/Library/CoreServices") {
+                4
+            } else {
+                3
+            };
+            if let Ok(entries) = Self::walk_apps(Path::new(dir), max_depth) {
                 apps.extend(entries);
             }
         }
+
+        // Populate bundle_id from Info.plist for every app.
+        for app in &mut apps {
+            app.bundle_id = platform_macos::apps::read_bundle_id(&app.path).map(SmolStr::new);
+        }
+
+        // Dedupe by bundle_id, preferring /Applications over system locations.
+        apps = Self::dedupe_by_bundle_id(apps);
 
         if let Some(cache) = &self.icon_cache {
             for app in &mut apps {
@@ -115,16 +136,18 @@ impl AppIndex {
             }
         }
         let icon_count = apps.iter().filter(|a| a.icon_path.is_some()).count();
+        let bundle_count = apps.iter().filter(|a| a.bundle_id.is_some()).count();
         tracing::info!(
-            "Indexed {} applications ({} with icons)",
+            "Indexed {} applications ({} with icons, {} with bundle ids)",
             apps.len(),
-            icon_count
+            icon_count,
+            bundle_count
         );
         self.set_apps(apps);
     }
 
     #[cfg(target_os = "macos")]
-    fn walk_apps(dir: &Path, max_depth: usize) -> std::io::Result<Vec<AppEntry>> {
+    pub(crate) fn walk_apps(dir: &Path, max_depth: usize) -> std::io::Result<Vec<AppEntry>> {
         let mut apps = Vec::new();
         if max_depth == 0 {
             return Ok(apps);
@@ -143,6 +166,21 @@ impl AppIndex {
             }
         }
         Ok(apps)
+    }
+
+    /// Dedupe app entries by bundle_id, preferring `/Applications` over system / nested paths.
+    /// Apps without a bundle_id are kept as-is (their identity is path-based).
+    pub(crate) fn dedupe_by_bundle_id(mut apps: Vec<AppEntry>) -> Vec<AppEntry> {
+        apps.sort_by_key(|a| match a.path.starts_with("/Applications") {
+            true => 0,
+            false => 1,
+        });
+        let mut seen: HashSet<SmolStr> = HashSet::new();
+        apps.retain(|a| match &a.bundle_id {
+            Some(b) => seen.insert(b.clone()),
+            None => true,
+        });
+        apps
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -224,5 +262,73 @@ mod tests {
         }]);
         let results = index.search("", 10);
         assert!(results.is_empty());
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn index_populates_bundle_id_from_plist() {
+        use std::fs;
+        let dir = tempfile::TempDir::new().unwrap();
+        let app_path = dir.path().join("Foo.app");
+        let contents = app_path.join("Contents");
+        fs::create_dir_all(&contents).unwrap();
+        fs::write(
+            contents.join("Info.plist"),
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+             <plist version=\"1.0\"><dict>\n\
+             <key>CFBundleIdentifier</key><string>com.example.Foo</string>\n\
+             </dict></plist>\n",
+        ).unwrap();
+
+        let apps = AppIndex::walk_apps(dir.path(), 3).unwrap();
+        let apps_with_bid: Vec<_> = apps.iter().filter_map(|a| {
+            let bid = platform_macos::apps::read_bundle_id(&a.path)?;
+            Some((a.name.clone(), bid))
+        }).collect();
+        assert_eq!(apps_with_bid, vec![("Foo".to_string(), "com.example.Foo".to_string())]);
+    }
+
+    #[test]
+    fn dedupe_by_bundle_id_keeps_user_path() {
+        let apps = vec![
+            AppEntry {
+                name: "Safari".into(),
+                path: "/System/Applications/Safari.app".into(),
+                bundle_id: Some("com.apple.Safari".into()),
+                icon_path: None,
+            },
+            AppEntry {
+                name: "Safari".into(),
+                path: "/Applications/Safari.app".into(),
+                bundle_id: Some("com.apple.Safari".into()),
+                icon_path: None,
+            },
+        ];
+        let deduped = AppIndex::dedupe_by_bundle_id(apps);
+        assert_eq!(deduped.len(), 1);
+        assert_eq!(
+            deduped[0].path,
+            std::path::PathBuf::from("/Applications/Safari.app")
+        );
+    }
+
+    #[test]
+    fn dedupe_keeps_path_keyed_entries() {
+        let apps = vec![
+            AppEntry {
+                name: "Foo".into(),
+                path: "/Applications/Foo.app".into(),
+                bundle_id: None,
+                icon_path: None,
+            },
+            AppEntry {
+                name: "Bar".into(),
+                path: "/Applications/Bar.app".into(),
+                bundle_id: None,
+                icon_path: None,
+            },
+        ];
+        let deduped = AppIndex::dedupe_by_bundle_id(apps);
+        assert_eq!(deduped.len(), 2, "path-keyed entries cannot dupe by bundle");
     }
 }
