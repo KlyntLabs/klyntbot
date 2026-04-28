@@ -319,6 +319,7 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
                         "provenance": {
                             "source": "reforge.coding_synthesis",
                             "supporting": supporting,
+                            "supporting_chains": supporting,
                         },
                         "kind": "workflow_pattern",
                     })
@@ -358,6 +359,7 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
                         "provenance": {
                             "source": "reforge.coding_synthesis",
                             "supporting": supporting,
+                            "supporting_chains": supporting,
                         },
                         "kind": "failure_pattern",
                     })
