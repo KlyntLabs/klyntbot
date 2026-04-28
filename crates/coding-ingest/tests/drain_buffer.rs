@@ -83,6 +83,7 @@ async fn daemon_start_drains_pre_existing_buffer() {
         git_invalidation_handler: None,
         opencode_db_path: None,
         opencode_poll_interval: None,
+        kimi_wire_socket: None,
     })
     .await
     .unwrap();

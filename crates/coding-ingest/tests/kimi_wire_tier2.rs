@@ -1,46 +1,31 @@
-//! Tier-2 Wire client smoke test — verifies the line-decoder roundtrip.
+//! Tier-2 Wire client smoke test — verifies frame-to-event translation.
 
-use coding_ingest::adapters::kimi_cli::wire::WireClient;
-use coding_ingest::event::{AgentEventV1, AgentSource, EventKind};
-use jiff::Timestamp;
-use std::path::PathBuf;
-use uuid::Uuid;
+use coding_ingest::adapters::kimi_cli::wire::{frame_to_event, WireFrame};
+use coding_ingest::event::AgentEvent;
 
 #[test]
-fn decode_frame_roundtrip() {
-    let event = AgentEventV1 {
-        id: Uuid::nil(),
-        source: AgentSource::KimiCli,
-        session_id: "s".into(),
-        turn_id: None,
-        cwd: PathBuf::from("/tmp"),
-        repo: None,
-        occurred_at: Timestamp::from_second(0).unwrap(),
-        kind: EventKind::SessionEnd {
-            reason: "wire".into(),
-        },
+fn frame_to_event_user_prompt_roundtrip() {
+    let frame = WireFrame {
+        frame_type: "user_prompt".into(),
+        session_id: "s1".into(),
+        payload: serde_json::json!({
+            "session_id": "s1",
+            "cwd": "/tmp",
+            "prompt": "hello",
+            "attachments": []
+        }),
     };
-    let line = serde_json::to_string(&event).unwrap();
-    let back = WireClient::decode_frame(&line).expect("decode");
-    assert_eq!(back, event);
+    let evt = frame_to_event(&frame).unwrap().expect("frame produced an event");
+    let AgentEvent::V1(v1) = evt;
+    assert_eq!(v1.session_id, "s1");
 }
 
 #[test]
-fn decode_frame_strips_trailing_newline() {
-    let event = AgentEventV1 {
-        id: Uuid::nil(),
-        source: AgentSource::KimiCli,
-        session_id: "s".into(),
-        turn_id: None,
-        cwd: PathBuf::from("/tmp"),
-        repo: None,
-        occurred_at: Timestamp::from_second(0).unwrap(),
-        kind: EventKind::SessionEnd {
-            reason: "x".into(),
-        },
+fn frame_to_event_unknown_type_returns_none() {
+    let frame = WireFrame {
+        frame_type: "exotic_unknown".into(),
+        session_id: "s1".into(),
+        payload: serde_json::Value::Null,
     };
-    let mut line = serde_json::to_string(&event).unwrap();
-    line.push('\n');
-    let back = WireClient::decode_frame(&line).expect("decode");
-    assert_eq!(back.session_id, "s");
+    assert!(frame_to_event(&frame).unwrap().is_none());
 }

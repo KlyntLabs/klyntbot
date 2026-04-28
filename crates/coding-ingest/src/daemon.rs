@@ -32,6 +32,9 @@ pub struct IngestDaemonConfig {
     pub opencode_db_path: Option<PathBuf>,
     /// Polling interval for opencode. Defaults to 500 ms.
     pub opencode_poll_interval: Option<std::time::Duration>,
+    /// Optional kimi-cli Wire Unix socket path. When set, a tier-2 streaming
+    /// task is spawned alongside tier-1 hooks.
+    pub kimi_wire_socket: Option<PathBuf>,
 }
 
 impl std::fmt::Debug for IngestDaemonConfig {
@@ -59,6 +62,8 @@ pub struct IngestDaemonHandle {
     drain_task: tokio::task::JoinHandle<()>,
     #[allow(dead_code)]
     opencode_task: Option<tokio::task::JoinHandle<()>>,
+    #[allow(dead_code)]
+    kimi_wire_task: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl IngestDaemonHandle {
@@ -73,6 +78,10 @@ impl IngestDaemonHandle {
         self.drain_task.abort();
         let _ = self.drain_task.await;
         if let Some(t) = self.opencode_task {
+            t.abort();
+            let _ = t.await;
+        }
+        if let Some(t) = self.kimi_wire_task {
             t.abort();
             let _ = t.await;
         }
@@ -162,11 +171,23 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
     // Opencode poller task — optional, spawned when db path is configured.
     let opencode_task = if let Some(db_path) = cfg.opencode_db_path {
         let interval = cfg.opencode_poll_interval.unwrap_or(std::time::Duration::from_millis(500));
-        if let Some(tx) = cfg.event_tx {
+        if let Some(tx) = cfg.event_tx.clone() {
             let poller = crate::adapters::opencode::poller::OpencodePoller::new(db_path, tx, interval);
             Some(poller.spawn())
         } else {
             tracing::warn!("opencode db path set but no event_tx — poller not spawned");
+            None
+        }
+    } else {
+        None
+    };
+
+    // Kimi-cli Wire tier-2 streaming task — optional.
+    let kimi_wire_task = if let Some(socket_path) = cfg.kimi_wire_socket {
+        if let Some(tx) = cfg.event_tx {
+            Some(crate::adapters::kimi_cli::spawn_wire(socket_path, tx))
+        } else {
+            tracing::warn!("kimi_wire_socket set but no event_tx — wire loop not spawned");
             None
         }
     } else {
@@ -179,6 +200,7 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
         heartbeat_task,
         drain_task,
         opencode_task,
+        kimi_wire_task,
     })
 }
 

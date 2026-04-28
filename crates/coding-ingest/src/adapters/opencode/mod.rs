@@ -9,7 +9,7 @@ pub mod schema;
 
 use super::IngestAdapter;
 use crate::event::AgentEvent;
-use common::{KlyntbotError, Result};
+use common::Result;
 
 /// Adapter for opencode SQLite polling.
 ///
