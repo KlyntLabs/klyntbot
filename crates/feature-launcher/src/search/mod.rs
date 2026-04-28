@@ -15,6 +15,7 @@ pub mod inverted_index;
 pub mod token_index;
 pub mod running_apps;
 pub mod script_runner;
+pub mod signals;
 pub mod ssh_hosts;
 pub mod system_commands;
 pub mod system_prefs;
@@ -37,6 +38,10 @@ pub use git_repos::GitReposSource;
 pub use inverted_index::{IndexEntry, InvertedFileIndex, ScoredEntry};
 pub use running_apps::RunningAppsSource;
 pub use script_runner::ScriptRunner;
+pub use signals::{
+    new_attention_signals, new_running_signals, AttentionSignals, AttentionStat, RunningSignal,
+    RunningSignals,
+};
 pub use ssh_hosts::SshHostsSource;
 pub use system_commands::SystemCommands;
 pub use system_prefs::SystemPrefsSource;
