@@ -350,7 +350,11 @@ pub const SPECTA_COMMAND_NAMES: &[&str] = &[
     "dismiss_pending_memory",
     "list_pending_memories",
     "permissions_check_accessibility",
+    "permissions_check_screen_recording",
     "permissions_open_accessibility",
+    "permissions_open_screen_recording",
+    "permissions_request_accessibility_for_input",
+    "permissions_request_screen_recording",
     "practice_segment_note",
     "practice_start_session",
     "practice_submit_unit",
@@ -852,7 +856,11 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::pending_memory::list_pending_memories,
             // permissions
             crate::commands::permissions::permissions_check_accessibility,
+            crate::commands::permissions::permissions_check_screen_recording,
             crate::commands::permissions::permissions_open_accessibility,
+            crate::commands::permissions::permissions_open_screen_recording,
+            crate::commands::permissions::permissions_request_accessibility_for_input,
+            crate::commands::permissions::permissions_request_screen_recording,
             // practice
             crate::commands::practice::practice_segment_note,
             crate::commands::practice::practice_start_session,
