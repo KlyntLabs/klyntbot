@@ -142,8 +142,31 @@ pub async fn render_user_prompt_block(
     }
     likely.push('\n');
 
-    // Causal context — empty until Phase 6, but stub the section.
-    let causal = "### Causal context\n_(populated when causal edges are seeded — Phase 6.)_\n\n";
+    // Causal context — list edges originating from the top likely-relevant
+    // memories (up to 3) at depth 1. Empty section is suppressed.
+    let mut causal = String::new();
+    if let Some(top) = idx.results.first() {
+        if let Ok(parsed_id) = uuid::Uuid::parse_str(&top.id.to_string()) {
+            match svc.trace_causes(parsed_id, repo, 1).await {
+                Ok(trace) if !trace.descendants.is_empty() => {
+                    causal.push_str("### Causal context\n");
+                    for edge in trace.descendants.iter().take(5) {
+                        causal.push_str(&format!(
+                            "- `{}` → `{}` ({:?})\n",
+                            short_id(&edge.from_id.to_string()),
+                            short_id(&edge.to_id.to_string()),
+                            edge.edge_kind
+                        ));
+                    }
+                    causal.push('\n');
+                }
+                Ok(_) => {} // No edges — omit section entirely.
+                Err(e) => {
+                    tracing::debug!(error = %e, "trace_causes failed in render_user_prompt_block");
+                }
+            }
+        }
+    }
 
     let footer = if !idx.results.is_empty() {
         format!(
