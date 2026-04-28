@@ -690,6 +690,65 @@ V1 is "shipped" when:
 7. Skill YAML scope-locks demonstrably prevent the agent from sending events to apps outside the allowlist.
 8. Headless integration tests using `MockInput`/`MockCapture` cover ≥80% of the agent-loop control flow on non-macOS CI.
 
+## Game Changer Extensions (v1.1 / v2)
+
+These five extensions are explicitly **out of scope for v1** but are designed to compose cleanly with the v1 architecture so they can land as additive releases. They are listed in the order of expected user-impact.
+
+The five split into two categories:
+
+- **v1.1 deepenings** (items 1, 3, 4) — reuse the v1 primitives (`ComputerUseSession`, perception cascade, ScreenCaptureKit, reforge feedback). Each could ship within weeks of v1 stabilizing.
+- **v2 new vectors** (items 2, 5) — introduce dependencies the v1 spec does not have (system-level LaunchAgent, signed-artifact registry). Each is a multi-month effort.
+
+### 1. Auto-Swarm Mode via reforge (parallel sub-skills) — *v1.1*
+
+When a task naturally decomposes into independent sub-tasks (*"summarize each unread email," "compare prices across 5 stores," "fix every TypeScript error in directory X"*), the agent spawns **parallel sub-agents**. Each sub-agent runs in its own time-bounded `ComputerUseSession` with a narrow scope lock; a coordinator gathers results.
+
+- **Why it matters**: A 50-email triage drops from a 10-minute serial slog to a ~1-minute parallel sweep. This is the natural extension once `ComputerUseSession` is the unit of execution and procedural memory provides templates.
+- **Builds on v1**: A "swarm decomposer" detects parallelizable tasks (LLM call) and spawns N copies of a session with parameter substitution. Each session keeps its own scope lock, audit log, and HUD pill (HUD shows N concurrent sessions with progress bars, side-panel timeline forks per swarm).
+- **Risks**: Cross-session interference (one click in app A while app B is also being clicked). Mitigation: scope locks must be *non-overlapping* across concurrent sessions; coordinator validates this before fan-out. TTS narration and cursor overlay need queuing/muting policies for multi-session runs.
+
+### 2. Proactive 24/7 Personal Agent — *v2*
+
+A long-running daemon that watches signals (calendar, email arrival, system events, clipboard history, repeating user behaviors mined from `agent_action_log`) and **proactively offers** — or, with pre-approval, **executes** — actions.
+
+- **Why it matters**: Today's agent is reactive — user types, agent acts. v2's agent *anticipates*. *"You have a 2 pm with Sara — I queued the Notion doc you used last meeting."* *"You've copied 4 different addresses in the last 5 minutes — should I add them to a spreadsheet?"* This is the difference between *tool* and *assistant*.
+- **Builds on v1**: Cron + reforge + procedural memory + mirror is all the substrate. v2 adds a "proactive observer" running as a `launchctl` LaunchAgent, subscribing to system event sources (calendar via EventKit, email arrival via IMAP idle or Mail.app AX, clipboard via existing `NSPasteboard.changeCount`, app focus changes). Suggestions surface as desktop notifications; high-confidence + pre-approved patterns auto-execute under a fresh `ComputerUseSession`.
+- **Risks**: Battery drain (mitigation: aggressive idle detection — observe only when the user is present at the machine; pause completely on battery below 20%). Privacy footprint of a daemon reading inbox/calendar/clipboard (mitigation: every observed signal logged + user-auditable; daemon disabled by default; explicit per-source opt-in). False positives that train the user to ignore notifications (mitigation: confidence-gated execution, single-tap "never suggest this again," weekly summary of suggestions vs. taken actions).
+
+### 3. Self-Healing Replay — *v1.1*
+
+When a direct replay fails mid-step (a button moved, was renamed, or no longer exists), the agent automatically:
+
+1. Detects divergence via the AX-tree compatibility check.
+2. Falls back to the perception cascade (VLM) to locate the *new* equivalent target — guided by the stored `critical_ax_nodes_json` semantic descriptor (role + label + relative path).
+3. Patches the trajectory in place — updates the selector or parameter template.
+4. Continues execution.
+5. Records the divergence + fix as a `WorkflowInductionSignals` event so reforge improves the template.
+
+- **Why it matters**: Without self-healing, every UI redesign invalidates entire swaths of the workflow library. With self-healing, workflows are *adaptive* — small UI changes (button rename, layout shift) are absorbed silently; the user only sees friction for major redesigns.
+- **Builds on v1**: Every primitive exists already — graceful-degradation replay, AX-tree compatibility check, perception cascade, reforge feedback. v1.1 adds the *patch-and-continue* path: instead of falling all the way back to "run from scratch," surgically fix the broken step and resume from the patched index.
+- **Risks**: Wrong target selection silently corrupts the workflow (mitigation: confidence threshold for auto-patch is high (>0.9); medium-confidence patches surface a "did I do this right?" prompt at session end before persisting the patched template into `web_tree_memories`).
+
+### 4. Session video recording (lightweight) — *v1.1*
+
+Each session is captured as a low-bitrate H.264 screen recording (e.g. 5 fps, 720p, ~50 KB/s) via ScreenCaptureKit's video stream API. Stored alongside per-action screenshots in `data/recordings/{session_id}.mp4`.
+
+- **Why it matters**: Screenshots are great for static review; video shows the *between-action* state — animations, transitions, mouse trajectories, the moment a popup appeared. For debugging an agent that "clicked the wrong button," video makes the failure obvious in seconds. Also: shareable bug reports, future video-based reforge signal, and users get a visual library of what their agent has been doing.
+- **Builds on v1**: ScreenCaptureKit (already wired in v1 for single-frame capture) supports video streams natively via the same `SCStream` API. v1.1 adds a `recording_handle` to each `ComputerUseSession` lifecycle and a side-panel video player. JPEG screenshots remain the canonical action evidence; video is supplementary.
+- **Risks**: Storage growth (~3 MB/minute × 50 sessions/day ≈ 150 MB/day). Mitigation: rolling-window retention with user-configurable cap (default: last 7 days, ~1 GB ceiling). Privacy: recordings never leave the device; deletable per-session; not uploaded for distillation.
+
+### 5. Community workflow marketplace — *v2*
+
+Successful workflows in `web_tree_memories` can be **exported as signed, portable artifacts** (`.klynt-workflow` files). Users publish to a community registry; others browse, install, rate. The skill router can pull popular workflows on-demand from the registry.
+
+- **Why it matters**: Procedural memory's value compounds with users — but only if users share. A library of "10,000 known workflows" beats any individual user's local memory by orders of magnitude on first-run latency. This is the economic flywheel that turns Klynt from *personal assistant* into *shared knowledge layer*.
+- **Builds on v1**: Workflow templates are already structured JSON in `web_tree_memories` (parameterized, semantic descriptors, no pixel coordinates). v2 adds: (1) export with Ed25519 signing per publisher, (2) optional registry server (local-first preserved — registry is *opt-in*, never load-bearing), (3) trust UI showing signer + popularity + recent failure rate, (4) sandboxed install — community workflows always run with extra confirmation prompts until explicitly trusted by the user.
+- **Risks**: Malicious workflows that look benign but exfiltrate data. Mitigation: every install runs first under **tier-3 confirmation for every action**, sandboxed scope (`app_allowlist` strictly enforced from the workflow's declared targets), community trust score, cryptographic signing identifying the publisher, community moderation flagging bad actors. Workflow staleness (mitigation: registry tracks last-known-working-date; UI warns when installing a workflow whose last successful run was >30 days ago).
+
+### Sequencing recommendation
+
+When v1 stabilizes, ship **3 (Self-Healing Replay)** first — it has zero new infrastructure and the largest leverage on v1's procedural memory. Then **1 (Auto-Swarm)** which extends `ComputerUseSession` parallelism. Then **4 (Session video)** — small footprint, big debugging win. Items **2** and **5** are v2 commitments and should be planned with their own design specs.
+
 ## Appendix: research summary
 
 State-of-the-art findings (April 2026) that informed this design:
