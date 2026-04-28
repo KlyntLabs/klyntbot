@@ -52,3 +52,64 @@ pub struct KeyMods {
     pub ctrl: bool,
     pub fn_key: bool,
 }
+
+/// Action vocabulary mirroring Anthropic's `computer_20251124` tool 1:1.
+///
+/// All coordinates are global-desktop logical points (Quartz top-left
+/// origin). Each variant corresponds exactly to one Anthropic action.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ComputerUseAction {
+    /// Take a screenshot of the full desktop or a specified region.
+    Screenshot { region: Option<Rect> },
+
+    /// Single left-button click at (x, y) with optional modifiers held.
+    LeftClick { x: i32, y: i32, modifiers: KeyMods },
+
+    /// Two left clicks within the system double-click interval.
+    DoubleClick { x: i32, y: i32, modifiers: KeyMods },
+
+    /// Three left clicks in rapid succession.
+    TripleClick { x: i32, y: i32, modifiers: KeyMods },
+
+    /// Right-button click at (x, y).
+    RightClick { x: i32, y: i32 },
+
+    /// Middle-button click at (x, y).
+    MiddleClick { x: i32, y: i32 },
+
+    /// Type a UTF-8 string. Implementations should use the system's
+    /// current keyboard layout for ASCII printable characters.
+    Type { text: String },
+
+    /// Press a key combination. Each entry is a key name or modifier
+    /// (e.g. `["cmd", "shift", "t"]`).
+    Key { keys: Vec<String> },
+
+    /// Move the cursor to (x, y) without clicking.
+    MouseMove { x: i32, y: i32 },
+
+    /// Scroll at (x, y) in the given direction by `amount` lines.
+    Scroll { x: i32, y: i32, direction: ScrollDir, amount: i32 },
+
+    /// Click-and-drag from `from` to `to`, optionally holding modifiers
+    /// during the drag.
+    LeftClickDrag { from: Point, to: Point, hold_modifiers: KeyMods },
+
+    /// Press the left button at (x, y) without releasing. Use with
+    /// `LeftMouseUp` for manual drag sequences.
+    LeftMouseDown { x: i32, y: i32 },
+
+    /// Release the left button at (x, y).
+    LeftMouseUp { x: i32, y: i32 },
+
+    /// Hold a key combination for `duration_ms`.
+    HoldKey { keys: Vec<String>, duration_ms: u32 },
+
+    /// Sleep `duration_ms` milliseconds. Used to wait for animations.
+    Wait { duration_ms: u32 },
+
+    /// Render `region` at full resolution (may be implemented as a higher-
+    /// scale capture).
+    Zoom { region: Rect },
+}
