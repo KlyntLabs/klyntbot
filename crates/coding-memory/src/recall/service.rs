@@ -336,13 +336,7 @@ impl CodingRecallService {
         since_days: u32,
         limit: usize,
     ) -> common::Result<Vec<crate::recall::open_threads::OpenThread>> {
-        crate::recall::open_threads::list_open_threads(
-            &self.ep_repo,
-            repo,
-            since_days,
-            limit,
-        )
-        .await
+        crate::recall::open_threads::list_open_threads(&self.ep_repo, repo, since_days, limit).await
     }
 
     /// Walk the causal graph from `subject` up to `depth` levels.

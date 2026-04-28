@@ -1,6 +1,6 @@
 //! Inv 4 — bi-temporal monotone: `valid_until >= valid_from` always.
 
-use jiff::Timestamp;
+use jiff::{Timestamp, ToSpan};
 use proptest::prelude::*;
 use storage::StoragePool;
 
@@ -41,6 +41,7 @@ proptest! {
                 let stored_until = fact.valid_until.unwrap();
                 prop_assert!(stored_until >= fact.valid_from);
             }
-        });
+            Ok(())
+        }).unwrap();
     }
 }

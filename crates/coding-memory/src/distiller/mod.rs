@@ -443,7 +443,7 @@ impl Distiller {
                 return Err(DistillerError::CostCeiling {
                     spent_usd: spent,
                     ceiling_usd: ceiling,
-                });
+                }.into());
             }
         }
 

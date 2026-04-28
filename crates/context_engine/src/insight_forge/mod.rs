@@ -92,7 +92,6 @@ impl InsightForge {
         self.searchers.push(searcher);
     }
 
-    #[cfg(test)]
     pub fn searcher_names(&self) -> Vec<&str> {
         self.searchers.iter().map(|s| s.domain_name()).collect()
     }

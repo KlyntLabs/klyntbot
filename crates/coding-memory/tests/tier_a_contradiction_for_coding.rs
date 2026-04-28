@@ -1,8 +1,6 @@
 //! Tier A activation: ContradictionDetected fires for conflicting coding facts.
 
 use bus::DomainEvent;
-use coding_memory::distiller::Distiller;
-use std::sync::Arc;
 
 mod common;
 
@@ -10,7 +8,7 @@ mod common;
 async fn contradiction_fires_when_repo_context_conflicts() {
     let pool = common::pool_with_migrations().await;
     let repos = cognitive::SemanticFactRepo::new(pool.inner().clone());
-    let bus = bus::DomainEventBus::new();
+    let bus = bus::DomainEventBus::new(1024);
     let mut sub = bus.subscribe();
 
     // Seed two conflicting facts for the same repo.
@@ -66,12 +64,12 @@ async fn contradiction_fires_when_repo_context_conflicts() {
 
     // Publish a synthetic contradiction event.
     bus.publish(DomainEvent::ContradictionDetected {
-        subject: "repo:myrepo".into(),
-        predicate: "framework".into(),
-        old_object: "django".into(),
+        existing_subject: "repo:myrepo".into(),
+        existing_predicate: "framework".into(),
+        existing_object: "django".into(),
         new_object: "rails".into(),
-        repo: Some("myrepo".into()),
-    }).await;
+        confidence: 0.9,
+    });
 
     let evt = tokio::time::timeout(
         std::time::Duration::from_secs(1),

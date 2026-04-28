@@ -13,6 +13,7 @@
 pub mod causal;
 /// Coding-domain searcher for InsightForge (Tier B4).
 pub mod code_domain_searcher;
+pub use code_domain_searcher::CodeDomainSearcher;
 /// Coding session state enum (Tier B3).
 pub mod code_state;
 /// Counterfactual memory derivation (Tier B1).

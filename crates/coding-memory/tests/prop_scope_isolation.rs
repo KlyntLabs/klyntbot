@@ -101,6 +101,7 @@ proptest! {
                     "leak: got scope {} when querying repo_{}", entry.scope, query_repo_idx
                 );
             }
-        });
+            Ok(())
+        }).unwrap();
     }
 }

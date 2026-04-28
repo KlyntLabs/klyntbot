@@ -6,13 +6,13 @@
 //! - Stability demotion is the soft-delete equivalent.
 
 use common::{KlyntbotError, Result};
-use jiff::Timestamp;
 
-/// Wrapper enforcing Reforge's DELETE-free invariant.
+/** Wrapper enforcing Reforge's DELETE-free invariant. */
 #[derive(Debug, Clone)]
 pub struct ReforgeWriter;
 
 impl ReforgeWriter {
+    /// Create a new `ReforgeWriter`.
     pub fn new() -> Self {
         Self
     }

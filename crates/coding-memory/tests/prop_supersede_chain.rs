@@ -3,7 +3,7 @@
 use coding_memory::distiller::writer::DistillerWriter;
 use coding_memory::scope::{ProvenanceKind, ProvenanceMetadata};
 use cognitive::types::SemanticFact;
-use jiff::Timestamp;
+use jiff::{Timestamp, ToSpan};
 use proptest::prelude::*;
 use storage::StoragePool;
 use uuid::Uuid;
@@ -67,6 +67,7 @@ proptest! {
                 let succ = &pair[1];
                 prop_assert_eq!(pred.valid_until.as_deref(), Some(succ.valid_from.as_str()));
             }
-        });
+            Ok(())
+        }).unwrap();
     }
 }

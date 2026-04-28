@@ -10,7 +10,10 @@ fn deployed_keyword_scores_high() {
 
 #[test]
 fn refactored_keyword_scores_high() {
-    let s = score_turn("refactored the user repo to use storage abstraction", Some(&[]));
+    let s = score_turn(
+        "refactored the user repo to use storage abstraction",
+        Some(&[]),
+    );
     assert!(s.total >= 0.7);
 }
 

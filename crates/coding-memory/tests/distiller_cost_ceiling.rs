@@ -24,7 +24,7 @@ async fn phase_b_halts_at_ceiling() {
         ingest,
         writer,
         Arc::new(providers::ProviderManager::new(
-            Arc::new(providers::NoopProvider::default()),
+            Arc::new(providers::NoopProvider),
             None,
             None,
         )),
@@ -48,8 +48,7 @@ async fn phase_b_halts_at_ceiling() {
     distiller.accept_event(event).await.unwrap();
 
     let result = distiller.distill_turn("s1", Some("t1")).await;
-    assert!(
-        matches!(result, Err(DistillerError::CostCeiling { .. })),
-        "expected CostCeiling error, got {result:?}"
-    );
+    assert!(result.is_err(), "expected error, got {result:?}");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("cost ceiling"), "expected 'cost ceiling' in error: {err}");
 }

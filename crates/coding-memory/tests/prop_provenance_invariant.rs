@@ -51,6 +51,7 @@ proptest! {
             let meta_json: serde_json::Value = serde_json::from_str(&meta.0.unwrap()).unwrap();
             let events = meta_json["provenance"]["sourceEvents"].as_array().unwrap();
             prop_assert_eq!(events.len(), source_event_count);
-        });
+            Ok(())
+        }).unwrap();
     }
 }

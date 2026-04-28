@@ -2,8 +2,17 @@
 
 use coding_memory::CodeDomainSearcher;
 use cognitive::{EpisodicMemoryRepo, SemanticFactRepo};
+use context_engine::DomainSearcher;
 use std::sync::Arc;
 use storage::StoragePool;
+
+struct NoopRetriever;
+#[async_trait::async_trait]
+impl context_engine::MemoryRetriever for NoopRetriever {
+    async fn retrieve(&self, _query: &str, _limit: usize) -> Vec<context_engine::MemoryEntry> {
+        vec![]
+    }
+}
 
 #[tokio::test]
 async fn code_domain_searcher_name_is_coding() {
@@ -19,7 +28,7 @@ fn insight_forge_searcher_names_works() {
     let mut forge = context_engine::InsightForge::new(
         context_engine::InsightForgeConfig::default(),
         Arc::new(context_engine::HeuristicDecomposer),
-        Arc::new(context_engine::NoopMemoryRetriever),
+        Arc::new(NoopRetriever),
     );
     let pool = tokio::runtime::Runtime::new()
         .unwrap()

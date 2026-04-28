@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-/// Per-session scope resolver with an in-memory cache.
+/** Per-session scope resolver with an in-memory cache. */
 pub struct ScopeResolver {
     cache: Mutex<HashMap<PathBuf, Option<String>>>,
 }
@@ -17,6 +17,7 @@ impl Default for ScopeResolver {
 }
 
 impl ScopeResolver {
+    /// Create a new empty resolver.
     pub fn new() -> Self {
         Self {
             cache: Mutex::new(HashMap::new()),

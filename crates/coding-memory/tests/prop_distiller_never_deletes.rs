@@ -73,6 +73,12 @@ proptest! {
                         stability: 1.0,
                         last_accessed: None,
                         access_count: 0,
+                        project_id: None,
+                        scope_type: "user".into(),
+                        scope_id: None,
+                        scope_repo_id: None,
+                        metadata: None,
+                        kind: Some("turn_trace".into()),
                     },
                     kind: "turn_trace".into(),
                     metadata_json: None,
@@ -89,6 +95,7 @@ proptest! {
 
             prop_assert!(facts >= prev_facts, "facts decreased {prev_facts} -> {facts}");
             prop_assert!(eps >= prev_eps, "episodes decreased {prev_eps} -> {eps}");
-        });
+            Ok(())
+        }).unwrap();
     }
 }
