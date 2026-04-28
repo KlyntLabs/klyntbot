@@ -64,6 +64,14 @@ pub struct GraphNeighborhood {
     pub relationships: Vec<RelationshipRow>,
 }
 
+/// 1-hop neighborhood edge with typed relationship.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NeighborhoodEdge {
+    pub neighbor: EntityRow,
+    pub relationship_type: String,
+    pub strength: f64,
+}
+
 // ── Repository ──────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -296,6 +304,52 @@ impl EntityRepo {
             neighbors,
             relationships: all_rels,
         }))
+    }
+
+    /// Returns the 1-hop neighborhood of `entity_id` as (neighbor, edge_type) pairs.
+    /// Used by Track 1 to enrich consolidation candidates.
+    pub async fn get_neighborhood_with_edges(
+        &self,
+        entity_id: &str,
+        _depth: usize,
+    ) -> Result<Vec<NeighborhoodEdge>, sqlx::Error> {
+        let rows = sqlx::query_as::<_, RelationshipRow>(
+            r#"
+            SELECT * FROM entity_relationships
+            WHERE (source_entity_id = ?1 OR target_entity_id = ?1)
+              AND valid_until IS NULL
+            ORDER BY strength DESC
+            LIMIT 32
+            "#,
+        )
+        .bind(entity_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut neighbor_ids = Vec::new();
+        let mut rel_map = std::collections::HashMap::new();
+        for r in &rows {
+            let other = if r.source_entity_id == entity_id {
+                &r.target_entity_id
+            } else {
+                &r.source_entity_id
+            };
+            neighbor_ids.push(other.clone());
+            rel_map.insert(other.clone(), (r.relationship_type.clone(), r.strength));
+        }
+
+        let neighbors = self.get_entities_by_ids(&neighbor_ids).await?;
+        Ok(neighbors
+            .into_iter()
+            .map(|n| {
+                let (rel_type, strength) = rel_map.get(&n.id).cloned().unwrap_or_default();
+                NeighborhoodEdge {
+                    neighbor: n,
+                    relationship_type: rel_type,
+                    strength,
+                }
+            })
+            .collect())
     }
 
     /// Get entities related to `entity_id`, optionally filtered by relationship type.
@@ -819,5 +873,40 @@ mod tests {
             !candidates.is_empty(),
             "Should find Rust/Rust Lang as duplicates"
         );
+    }
+
+    #[tokio::test]
+    async fn get_neighborhood_with_edges_returns_neighbors_and_relationship_types() {
+        let pool = setup().await;
+        let repo = EntityRepo::new(pool.clone());
+        let alice = repo.upsert_entity(&person_entity("Alice")).await.unwrap();
+        let bob = repo.upsert_entity(&person_entity("Bob")).await.unwrap();
+        let charlie = repo.upsert_entity(&person_entity("Charlie")).await.unwrap();
+
+        repo.upsert_relationship(&NewRelationship {
+            source_entity_id: alice.id.clone(),
+            target_entity_id: bob.id.clone(),
+            relationship_type: "knows".into(),
+            evidence: None,
+            source: "t".into(),
+        })
+        .await
+        .unwrap();
+        repo.upsert_relationship(&NewRelationship {
+            source_entity_id: bob.id.clone(),
+            target_entity_id: charlie.id.clone(),
+            relationship_type: "manages".into(),
+            evidence: None,
+            source: "t".into(),
+        })
+        .await
+        .unwrap();
+
+        let nbrs = repo.get_neighborhood_with_edges(&alice.id, 1).await.unwrap();
+
+        // 1-hop from Alice: only Bob (Charlie is 2-hop)
+        assert_eq!(nbrs.len(), 1);
+        assert_eq!(nbrs[0].neighbor.name, "Bob");
+        assert_eq!(nbrs[0].relationship_type, "knows");
     }
 }
