@@ -412,6 +412,29 @@ impl AppCore {
             }
         }
 
+        // Seed brand-new installs only — established users wait for the nightly cron
+        // instead of redoing a 90-day scan on every launch.
+        {
+            let pool = storage_pool.inner().clone();
+            tokio::spawn(async move {
+                let already_populated: bool = sqlx::query_scalar::<_, i64>(
+                    "SELECT EXISTS(SELECT 1 FROM entity_attention LIMIT 1)",
+                )
+                .fetch_one(&pool)
+                .await
+                .map(|n| n != 0)
+                .unwrap_or(false);
+                if already_populated {
+                    return;
+                }
+                let aggregator = feature_launcher::AttentionAggregator::new(pool);
+                match aggregator.rebuild_from_activity(90).await {
+                    Ok(n) => info!(rows = n, "Initial attention rebuild complete"),
+                    Err(e) => tracing::warn!(error = %e, "Initial attention rebuild failed — will retry via cron"),
+                }
+            });
+        }
+
         // ── Phase 6: Coaching ────────────────────────────────────────────
         let coaching::CoachingResult {
             intervention_rx,

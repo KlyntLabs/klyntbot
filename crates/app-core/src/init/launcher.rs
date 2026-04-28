@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use feature_launcher::{
-    AppIndex, ClipboardRepo, FileSearchSource, FrequencyRepo, FsEventKind, ScriptRunner,
-    SearchSource, SourceRegistry,
+    AppIndex, AttentionSource, ClipboardRepo, EntityAttentionRepo, FileSearchSource, FrequencyRepo,
+    FsEventKind, ScriptRunner, SearchSource, SourceRegistry,
 };
 use storage::StoragePool;
 use tokio_util::sync::CancellationToken;
@@ -37,6 +37,7 @@ pub(super) async fn init_launcher(
     let frequency_repo = FrequencyRepo::new(pool.clone());
     let clipboard_repo = ClipboardRepo::new(pool.clone());
     let pins_repo = feature_launcher::PinsRepo::new(&storage_pool);
+    let entity_attention_repo = Arc::new(EntityAttentionRepo::new(pool.clone()));
 
     let mut sources: Vec<Arc<dyn feature_launcher::SearchSource>> = Vec::new();
     let icon_cache_dir = config.data_dir_path().join("cache").join("app-icons");
@@ -351,6 +352,9 @@ pub(super) async fn init_launcher(
         }
     }
 
+    // Attention source (queries entity_attention table populated by nightly aggregator)
+    sources.push(Arc::new(AttentionSource::new(Arc::clone(&entity_attention_repo))));
+
     // ── Create registry and spawn background services ──
 
     let registry = SourceRegistry::new(sources);
@@ -387,6 +391,7 @@ pub(super) async fn init_launcher(
         frequency_repo: Arc::new(frequency_repo),
         clipboard_repo: Arc::new(clipboard_repo),
         pins_repo: Arc::new(pins_repo),
+        entity_attention_repo: Some(Arc::clone(&entity_attention_repo)),
         _file_watcher: file_watcher,
     });
 

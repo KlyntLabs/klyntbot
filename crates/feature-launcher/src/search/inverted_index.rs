@@ -1,9 +1,10 @@
 use crate::types::FileKind;
+use rustc_hash::FxHashMap;
 use smol_str::SmolStr;
-use std::collections::HashMap;
+
 use std::path::PathBuf;
 
-const MAX_PREFIX_LEN: usize = 12;
+use super::token_index::TokenIndex;
 
 #[derive(Debug, Clone)]
 pub struct IndexEntry {
@@ -11,6 +12,8 @@ pub struct IndexEntry {
     pub name: String,
     pub kind: FileKind,
     pub depth: u8,
+    pub name_lc: SmolStr,
+    pub name_compact: SmolStr,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -22,14 +25,14 @@ pub struct ScoredEntry {
 #[derive(Clone)]
 pub struct InvertedFileIndex {
     pub(crate) entries: Vec<IndexEntry>,
-    pub(crate) postings: HashMap<SmolStr, Vec<u32>>,
+    pub(crate) token_index: TokenIndex,
 }
 
 impl InvertedFileIndex {
     pub fn empty() -> Self {
         Self {
             entries: Vec::new(),
-            postings: HashMap::new(),
+            token_index: TokenIndex::build(vec![]),
         }
     }
 
@@ -41,8 +44,28 @@ impl InvertedFileIndex {
         self.entries.is_empty()
     }
 
+    pub fn entry_name(&self, idx: u32) -> Option<&str> {
+        self.entries.get(idx as usize).map(|e| e.name.as_str())
+    }
+
     pub fn clone_for_patch(&self) -> Self {
         self.clone()
+    }
+}
+
+fn make_name_lc(name: &str) -> SmolStr {
+    if name.bytes().all(|b| !b.is_ascii_uppercase()) {
+        SmolStr::new(name)
+    } else {
+        SmolStr::new(name.to_lowercase())
+    }
+}
+
+fn make_name_compact(name_lc: &str) -> SmolStr {
+    if name_lc.bytes().all(|b| b.is_ascii_alphanumeric()) {
+        SmolStr::new(name_lc)
+    } else {
+        SmolStr::new(name_lc.chars().filter(|c| c.is_alphanumeric()).collect::<String>())
     }
 }
 
@@ -52,17 +75,6 @@ pub(crate) fn tokenize(s: &str) -> Vec<String> {
         .filter(|t| !t.is_empty())
         .map(|t| t.to_lowercase())
         .collect()
-}
-
-/// Generate prefix keys for a token: "downloads" → ["d","do","dow",...,"downloads"] capped at MAX_PREFIX_LEN chars.
-pub(crate) fn prefixes(token: &str) -> impl Iterator<Item = SmolStr> + '_ {
-    token
-        .char_indices()
-        .take(MAX_PREFIX_LEN)
-        .map(move |(i, c)| {
-            let end = i + c.len_utf8();
-            SmolStr::new(&token[..end])
-        })
 }
 
 use ignore::WalkBuilder;
@@ -115,7 +127,7 @@ pub(crate) fn classify_extension(path: &Path) -> FileKind {
 impl InvertedFileIndex {
     pub fn build(roots: &[PathBuf], skip: &SkipSet, max_entries: usize) -> Self {
         let mut entries: Vec<IndexEntry> = Vec::new();
-        let mut postings: HashMap<SmolStr, Vec<u32>> = HashMap::new();
+        let mut token_map: FxHashMap<SmolStr, roaring::RoaringBitmap> = FxHashMap::default();
 
         'outer: for root in roots {
             if !root.exists() {
@@ -166,77 +178,96 @@ impl InvertedFileIndex {
                 }
                 let depth = entry.depth().min(255) as u8;
                 let idx = entries.len() as u32;
+                let name_lc = make_name_lc(&name);
+                let name_compact = make_name_compact(&name_lc);
                 entries.push(IndexEntry {
                     path: path.to_path_buf(),
                     name: name.clone(),
                     kind: classify_extension(path),
                     depth,
+                    name_lc,
+                    name_compact,
                 });
 
-                // Index name tokens
+                // Index full tokens only (no prefix explosion)
                 for token in tokenize(&name) {
-                    for prefix in prefixes(&token) {
-                        postings.entry(prefix).or_default().push(idx);
-                    }
+                    token_map.entry(SmolStr::new(&token)).or_default().insert(idx);
                 }
-                // Index path component tokens (ii: from spec Q3)
                 for component in path.components().filter_map(|c| c.as_os_str().to_str()) {
                     if component == name {
                         continue;
                     }
                     for token in tokenize(component) {
-                        for prefix in prefixes(&token) {
-                            postings.entry(prefix).or_default().push(idx);
-                        }
+                        token_map.entry(SmolStr::new(&token)).or_default().insert(idx);
                     }
                 }
             }
         }
 
-        // Sort + dedupe each posting list (a name + path tokens can yield duplicates)
-        for list in postings.values_mut() {
-            list.sort_unstable();
-            list.dedup();
-        }
+        let n = entries.len() as f32;
+        let tokens: Vec<(SmolStr, roaring::RoaringBitmap, f32)> = token_map
+            .into_iter()
+            .map(|(token, bitmap)| {
+                let df = bitmap.len() as f32;
+                let w = ((n - df + 0.5) / (df + 0.5) + 1.0).ln().max(0.05);
+                (token, bitmap, w)
+            })
+            .collect();
 
-        Self { entries, postings }
+        let token_index = TokenIndex::build(tokens);
+
+        Self {
+            entries,
+            token_index,
+        }
     }
 }
 
-fn score_entry_match(query_tokens: &[String], entry: &IndexEntry) -> i32 {
-    let name_lower = entry.name.to_lowercase();
+fn score_entry_match(query_tokens: &[(String, f32)], entry: &IndexEntry) -> i32 {
+    let name_lc = entry.name_lc.as_str();
+    let name_cmp = entry.name_compact.as_str();
     let mut score: i32 = 0;
-    for q in query_tokens {
-        if name_lower == *q {
-            score += 140;
-            continue;
-        }
-        if name_lower.starts_with(q) {
-            score += 118;
-            continue;
-        }
-        // compact-prefix: collapse separators in name
-        let compact: String = name_lower.chars().filter(|c| c.is_alphanumeric()).collect();
-        if compact.starts_with(q) {
-            score += 106;
-            continue;
-        }
-        if name_lower.contains(q) {
-            score += 60;
-            continue;
-        }
-        // subsequence
-        if is_subsequence(q, &name_lower) {
-            score += 44;
-            continue;
-        }
+    for (q, weight) in query_tokens {
+        let tier = if name_lc == *q {
+            140
+        } else if name_lc.starts_with(q) {
+            118
+        } else if name_cmp.starts_with(q) {
+            106
+        } else if name_lc.contains(q.as_str()) {
+            60
+        } else if is_subsequence_fast(q, name_lc) {
+            44
+        } else {
+            0
+        };
+        score += (tier as f32 * weight) as i32;
     }
-    // depth penalty
-    score -= (entry.depth as i32) * 2;
-    score
+    score - (entry.depth as i32) * 2
 }
 
-fn is_subsequence(needle: &str, haystack: &str) -> bool {
+/// Fast subsequence check using byte-level scan for ASCII strings.
+/// Falls back to char-level for non-ASCII.
+fn is_subsequence_fast(needle: &str, haystack: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    // ASCII fast path: operate on bytes directly.
+    if needle.is_ascii() && haystack.is_ascii() {
+        let hay = haystack.as_bytes();
+        let mut pos = 0;
+        for &n in needle.as_bytes() {
+            while pos < hay.len() && hay[pos] != n {
+                pos += 1;
+            }
+            if pos >= hay.len() {
+                return false;
+            }
+            pos += 1;
+        }
+        return true;
+    }
+    // Unicode fallback.
     let mut h = haystack.chars();
     'outer: for nc in needle.chars() {
         for hc in h.by_ref() {
@@ -260,47 +291,75 @@ impl InvertedFileIndex {
             return Vec::new();
         }
 
-        // For each token, get a posting list using its longest available prefix (up to MAX_PREFIX_LEN).
-        let mut lists: Vec<&Vec<u32>> = Vec::with_capacity(tokens.len());
+        // For each token, get candidates and IDF weight.
+        let mut per_token: Vec<(std::borrow::Cow<'_, roaring::RoaringBitmap>, f32)> =
+            Vec::with_capacity(tokens.len());
+        let mut token_weights: Vec<(String, f32)> = Vec::with_capacity(tokens.len());
         for t in &tokens {
-            let key = SmolStr::new(&t[..t.len().min(MAX_PREFIX_LEN)]);
-            match self.postings.get(&key) {
-                Some(list) => lists.push(list),
-                None => return Vec::new(), // missing token → no results
-            }
-        }
-
-        // Sort lists by length ascending; intersect.
-        lists.sort_by_key(|l| l.len());
-        let mut candidates: Vec<u32> = lists[0].clone();
-        for list in &lists[1..] {
-            candidates.retain(|idx| list.binary_search(idx).is_ok());
-            if candidates.is_empty() {
-                return Vec::new();
-            }
-        }
-
-        // Score
-        let mut scored: Vec<ScoredEntry> = candidates
-            .iter()
-            .map(|&idx| {
-                let entry = &self.entries[idx as usize];
-                ScoredEntry {
-                    entry_idx: idx,
-                    score: score_entry_match(&tokens, entry),
+            match self.token_index.candidates_for_cow(t) {
+                Some((bitmap, idf)) => {
+                    per_token.push((bitmap, idf));
+                    token_weights.push((t.clone(), idf));
                 }
-            })
+                None => return Vec::new(),
+            }
+        }
+
+        // Sort by bitmap length ascending; intersect.
+        per_token.sort_by_key(|(b, _)| b.len());
+
+        // Single-token fast path: avoid cloning the bitmap.
+        if per_token.len() == 1 {
+            let (bitmap, _) = per_token.into_iter().next().unwrap();
+            return self.score_candidates(bitmap.as_ref(), &token_weights, limit);
+        }
+
+        let mut per_token_iter = per_token.into_iter();
+        let candidates: roaring::RoaringBitmap = if let Some(first) = per_token_iter.next() {
+            let mut c = first.0.into_owned();
+            for (bitmap, _) in per_token_iter {
+                c &= bitmap.as_ref();
+                if c.is_empty() {
+                    return Vec::new();
+                }
+            }
+            c
+        } else {
+            return Vec::new();
+        };
+
+        self.score_candidates(&candidates, &token_weights, limit)
+    }
+
+    fn score_candidates(
+        &self,
+        candidates: &roaring::RoaringBitmap,
+        token_weights: &[(String, f32)],
+        limit: usize,
+    ) -> Vec<ScoredEntry> {
+        // Score with bounded min-heap.
+        let mut heap: std::collections::BinaryHeap<std::cmp::Reverse<(i32, i32, u32)>> =
+            std::collections::BinaryHeap::with_capacity(limit + 1);
+        for idx in candidates.iter() {
+            let s = score_entry_match(token_weights, &self.entries[idx as usize]);
+            let name_len = self.entries[idx as usize].name.len() as i32;
+            if heap.len() < limit {
+                heap.push(std::cmp::Reverse((s, -name_len, idx)));
+            } else if let Some(&std::cmp::Reverse((worst_score, worst_neg_len, _))) = heap.peek() {
+                if s > worst_score || (s == worst_score && -name_len > worst_neg_len) {
+                    heap.pop();
+                    heap.push(std::cmp::Reverse((s, -name_len, idx)));
+                }
+            }
+        }
+
+        let mut out: Vec<ScoredEntry> = heap
+            .into_sorted_vec()
+            .into_iter()
+            .map(|std::cmp::Reverse((score, _, entry_idx))| ScoredEntry { entry_idx, score })
             .collect();
-        scored.sort_by(|a, b| {
-            b.score.cmp(&a.score).then_with(|| {
-                let a_len = self.entries[a.entry_idx as usize].name.len();
-                let b_len = self.entries[b.entry_idx as usize].name.len();
-                a_len.cmp(&b_len)
-            })
-        });
-        scored.retain(|s| !self.entries[s.entry_idx as usize].name.is_empty());
-        scored.truncate(limit);
-        scored
+        out.retain(|s| !self.entries[s.entry_idx as usize].name.is_empty());
+        out
     }
 }
 
@@ -320,32 +379,30 @@ impl InvertedFileIndex {
         };
         let depth = path.components().count().min(255) as u8;
         let idx = self.entries.len() as u32;
+        let name_lc = make_name_lc(&name);
+        let name_compact = make_name_compact(&name_lc);
         self.entries.push(IndexEntry {
             path: path.to_path_buf(),
             name: name.clone(),
             kind: classify_extension(path),
             depth,
+            name_lc,
+            name_compact,
         });
         for token in tokenize(&name) {
-            for prefix in prefixes(&token) {
-                let list = self.postings.entry(prefix).or_default();
-                list.push(idx);
-                list.sort_unstable();
-                list.dedup();
-            }
+            self.token_index.insert_pending(SmolStr::new(&token), idx);
         }
         for component in path.components().filter_map(|c| c.as_os_str().to_str()) {
             if component == name {
                 continue;
             }
             for token in tokenize(component) {
-                for prefix in prefixes(&token) {
-                    let list = self.postings.entry(prefix).or_default();
-                    list.push(idx);
-                    list.sort_unstable();
-                    list.dedup();
-                }
+                self.token_index.insert_pending(SmolStr::new(&token), idx);
             }
+        }
+
+        if self.token_index.should_compact() {
+            self.token_index.compact(self.entries.len());
         }
     }
 
@@ -356,14 +413,12 @@ impl InvertedFileIndex {
             Some(t) => t as u32,
             None => return,
         };
-        // Drop the entry's name → blank; remove from all postings.
-        // Cheap approach: scan all postings, drop this idx.
-        for list in self.postings.values_mut() {
-            list.retain(|&i| i != target);
-        }
         // Mark entry as empty (keep slot to preserve indices).
         self.entries[target as usize].name.clear();
         self.entries[target as usize].path = PathBuf::new();
+        self.entries[target as usize].name_lc = SmolStr::new("");
+        self.entries[target as usize].name_compact = SmolStr::new("");
+        self.token_index.remove_doc(target);
     }
 
     /// Rename = remove + create.
@@ -445,20 +500,6 @@ mod tests {
         assert_eq!(tokenize(""), Vec::<String>::new());
     }
 
-    #[test]
-    fn prefixes_caps_at_max_len() {
-        let p: Vec<_> = prefixes("documentation").collect();
-        assert_eq!(p.len(), 12);
-        assert_eq!(p[0].as_str(), "d");
-        assert_eq!(p[11].as_str(), "documentatio");
-    }
-
-    #[test]
-    fn prefixes_short_token() {
-        let p: Vec<_> = prefixes("rs").collect();
-        assert_eq!(p, vec![SmolStr::new("r"), SmolStr::new("rs")]);
-    }
-
     use std::fs;
     use tempfile::TempDir;
 
@@ -472,10 +513,10 @@ mod tests {
 
         let idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::default(), 1_000_000);
         assert_eq!(idx.len(), 2);
-        // "downloads" should be in postings (path component indexing)
-        assert!(idx.postings.contains_key(&SmolStr::new("dow")));
-        // "hello" prefix should be there too
-        assert!(idx.postings.contains_key(&SmolStr::new("hel")));
+        // "downloads" should be found via range walk on "dow"
+        assert!(idx.token_index.candidates_for("downloads").is_some());
+        // "hello" exact match
+        assert!(idx.token_index.candidates_for("hello").is_some());
     }
 
     #[test]
@@ -526,6 +567,18 @@ mod tests {
     }
 
     #[test]
+    fn search_short_prefix_range_walk() {
+        let dir = TempDir::new().unwrap();
+        let base = dir.path();
+        fs::write(base.join("report.md"), "").unwrap();
+        fs::write(base.join("readme.txt"), "").unwrap();
+        fs::write(base.join("notes.md"), "").unwrap();
+        let idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::defaults(), 1000);
+        let results = idx.search("re", 10);
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
     fn apply_events_adds_new_file() {
         let dir = TempDir::new().unwrap();
         let base = dir.path();
@@ -552,6 +605,92 @@ mod tests {
         assert!(idx.search("doomed", 10).is_empty());
     }
 
+    #[test]
+    fn apply_event_create_caches_lc_and_compact() {
+        let dir = TempDir::new().unwrap();
+        let base = dir.path();
+        let mut idx = InvertedFileIndex::empty();
+        let p = base.join("MyFile_v2.rs");
+        fs::write(&p, "").unwrap();
+        idx.apply_event_create(&p);
+        assert_eq!(idx.len(), 1);
+        let entry = &idx.entries[0];
+        assert_eq!(entry.name_lc.as_str(), "myfile_v2.rs");
+        assert_eq!(entry.name_compact.as_str(), "myfilev2rs");
+    }
+
+    #[test]
+    fn build_caches_lc_and_compact() {
+        let dir = TempDir::new().unwrap();
+        let base = dir.path();
+        fs::write(base.join("UPPER.TXT"), "").unwrap();
+        let idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::defaults(), 1000);
+        let entry = &idx.entries[0];
+        assert_eq!(entry.name_lc.as_str(), "upper.txt");
+        assert_eq!(entry.name_compact.as_str(), "uppertxt");
+    }
+
+    #[test]
+    fn idf_downweights_common_tokens() {
+        let dir = TempDir::new().unwrap();
+        let base = dir.path();
+        fs::write(base.join("parser_module_test.rs"), "").unwrap();
+        fs::write(base.join("test_parser_module.rs"), "").unwrap();
+        for i in 0..17 {
+            fs::write(base.join(format!("test_module_{i}.rs")), "").unwrap();
+        }
+        let idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::defaults(), 1000);
+        let results = idx.search("parser test", 10);
+        assert!(!results.is_empty());
+        let top_name = &idx.entries[results[0].entry_idx as usize].name;
+        assert_eq!(top_name, "parser_module_test.rs");
+    }
+
+    #[test]
+    fn idf_recomputed_on_incremental_add() {
+        let dir = TempDir::new().unwrap();
+        let base = dir.path();
+        fs::write(base.join("parser.rs"), "").unwrap();
+        let mut idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::defaults(), 1000);
+        let idf_before = idx.token_index.candidates_for("parser").unwrap().1;
+
+        for i in 0..20 {
+            let p = base.join(format!("parser_{i}.rs"));
+            fs::write(&p, "").unwrap();
+            idx.apply_event_create(&p);
+        }
+        // Delta is not flushed until threshold; force compaction to update IDF.
+        idx.token_index.compact(idx.entries.len());
+        let idf_after = idx.token_index.candidates_for("parser").unwrap().1;
+        assert!(
+            idf_after < idf_before,
+            "IDF should drop after adding more documents with the same token: before={idf_before}, after={idf_after}"
+        );
+    }
+
+    #[test]
+    fn delta_compaction_roundtrip() {
+        let dir = TempDir::new().unwrap();
+        let base = dir.path();
+        fs::write(base.join("file_a.rs"), "").unwrap();
+        fs::write(base.join("file_b.rs"), "").unwrap();
+        let mut idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::defaults(), 1000);
+
+        // Remove one file
+        idx.apply_event_remove(&base.join("file_a.rs"));
+        assert!(idx.search("file_a", 10).is_empty());
+
+        // Add a new file
+        let new_path = base.join("file_c.rs");
+        fs::write(&new_path, "").unwrap();
+        idx.apply_event_create(&new_path);
+        assert!(!idx.search("file_c", 10).is_empty());
+
+        // Verify compaction happened or search still works
+        let results = idx.search("file", 10);
+        assert_eq!(results.len(), 2); // file_b and file_c
+    }
+
     #[cfg(target_os = "macos")]
     #[tokio::test]
     async fn mdfind_paths_returns_empty_for_unmatched_query() {
@@ -564,5 +703,44 @@ mod tests {
         )
         .await;
         assert!(paths.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod bench_helpers {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn seed_tree(base: &std::path::Path, n: usize) {
+        let prefixes = &["report","readme","config","main","utils","test","lib","app","index","style"];
+        let exts = &["rs","ts","js","json","md","txt","html","css","py","go"];
+        for i in 0..n {
+            let depth = (i % 5) + 1;
+            let mut p = base.to_path_buf();
+            for d in 0..depth {
+                p.push(format!("{}_{}_{}", prefixes[(i + d) % prefixes.len()], i % 100, d));
+            }
+            fs::create_dir_all(&p).unwrap();
+            let name = format!("{}_{:04}.{}", prefixes[i % prefixes.len()], i, exts[i % exts.len()]);
+            fs::write(p.join(&name), b"").unwrap();
+        }
+    }
+
+    #[test]
+    fn check_200k_candidates() {
+        let dir = TempDir::new().unwrap();
+        seed_tree(dir.path(), 200_000);
+        let idx = InvertedFileIndex::build(&[dir.path().to_path_buf()], &SkipSet::defaults(), 200_000 + 1_000);
+        
+        if let Some((bitmap, idf)) = idx.token_index.candidates_for("re") {
+            println!("Candidates for 're' at 200k: {}, IDF: {}", bitmap.len(), idf);
+        }
+        if let Some((bitmap, idf)) = idx.token_index.candidates_for("report") {
+            println!("Candidates for 'report' at 200k: {}, IDF: {}", bitmap.len(), idf);
+        }
+        if let Some((bitmap, idf)) = idx.token_index.candidates_for("co") {
+            println!("Candidates for 'co' at 200k: {}, IDF: {}", bitmap.len(), idf);
+        }
     }
 }

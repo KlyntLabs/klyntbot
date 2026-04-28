@@ -84,4 +84,15 @@ impl AppCore {
     pub async fn launcher_list_pinned(&self) -> Result<Vec<feature_launcher::Pin>, ApiError> {
         self.launcher_engine()?.pins_repo.list_pinned().await.map_err(Into::into)
     }
+
+    /// Rebuild entity attention from activity events.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn launcher_rebuild_attention(&self) -> Result<u64, ApiError> {
+        let pool = self.storage_pool.inner().clone();
+        let aggregator = feature_launcher::AttentionAggregator::new(pool);
+        aggregator
+            .rebuild_from_activity(90)
+            .await
+            .map_err(|e| ApiError::new("ATTENTION_REBUILD_FAILED", e.to_string()))
+    }
 }

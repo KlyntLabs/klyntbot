@@ -168,6 +168,7 @@ pub(super) const JOB_INSIGHT_REFRESH: &str = "__klyntbot_insight_refresh";
 pub(super) const JOB_LEARNING_ANALYSIS: &str = "__klyntbot_learning_analysis";
 pub(super) const JOB_CROSS_DOMAIN_NIGHTLY: &str = "__klyntbot_cross_domain_nightly";
 const JOB_LAUNCHER_USAGE_PRUNE: &str = "__klyntbot_launcher_usage_prune";
+const JOB_LAUNCHER_ATTENTION_REBUILD: &str = "__klyntbot_launcher_attention_rebuild";
 const JOB_REFORGE_NIGHTLY: &str = "__klyntbot_reforge_nightly";
 
 /// Register individual cron handlers.
@@ -1000,6 +1001,34 @@ fn register_cron_callbacks(
         );
     }
 
+    // ── launcher_attention_rebuild ────────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let rt = rt.clone();
+        cron_executor.register(
+            JOB_LAUNCHER_ATTENTION_REBUILD,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        let aggregator = feature_launcher::AttentionAggregator::new(pool);
+                        match aggregator.rebuild_from_activity(90).await {
+                            Ok(0) => Ok(Some("No attention data to rebuild".to_string())),
+                            Ok(n) => {
+                                info!(rows = n, "Launcher attention rebuild complete");
+                                Ok(Some(format!("Rebuilt attention for {n} entities")))
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "Launcher attention rebuild failed");
+                                Ok(Some(format!("Launcher attention rebuild failed: {e}")))
+                            }
+                        }
+                    })
+                })
+            }),
+        );
+    }
+
     // ── recurring_tasks ───────────────────────────────────────────────────
     {
         let todo_repo = repos.tasks.clone();
@@ -1210,6 +1239,15 @@ async fn ensure_cron_jobs(
             tz: None
         },
         "Prune old launcher usage entries",
+        "system"
+    );
+    ensure_job!(
+        JOB_LAUNCHER_ATTENTION_REBUILD,
+        scheduling::CronSchedule::Cron {
+            expr: "0 0 3 * * *".to_string(),
+            tz: None
+        },
+        "Rebuild launcher attention from activity events",
         "system"
     );
 

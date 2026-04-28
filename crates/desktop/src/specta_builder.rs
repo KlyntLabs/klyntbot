@@ -248,6 +248,7 @@ pub const SPECTA_COMMAND_NAMES: &[&str] = &[
     "launcher_window_action",
     "launcher_open_app",
     "launcher_clipboard_paste",
+    "launcher_rebuild_attention",
     "get_mirror_state",
     "get_routing_history",
     "get_mirror_narratives",
@@ -742,6 +743,7 @@ pub fn build_specta() -> Builder<tauri::Wry> {
             crate::commands::launcher::launcher_window_action,
             crate::commands::launcher::launcher_open_app,
             crate::commands::launcher::launcher_clipboard_paste,
+            crate::commands::launcher::launcher_rebuild_attention,
             // mirror
             crate::commands::mirror::get_mirror_state,
             crate::commands::mirror::get_routing_history,
