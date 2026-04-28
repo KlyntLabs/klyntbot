@@ -34,6 +34,9 @@ async fn synthetic_claude_code_session_round_trips() {
         repo: repo.clone(),
         event_tx: None,
         op_handler: None,
+        git_invalidation_handler: None,
+        opencode_db_path: None,
+        opencode_poll_interval: None,
     };
     let handle = spawn(cfg).await.expect("daemon spawn");
 

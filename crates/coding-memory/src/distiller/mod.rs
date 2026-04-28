@@ -553,19 +553,31 @@ impl Distiller {
                                 | Some(crate::facts::FixOutcome::Abandoned)
                         )
                     {
+                        let files: Vec<std::path::PathBuf> = obs.files.clone();
+                        let anchors = if files.is_empty() {
+                            vec![]
+                        } else {
+                            let pairs: Vec<(std::path::PathBuf, i64)> =
+                                files.iter().map(|p| (p.clone(), 0i64)).collect();
+                            crate::distiller::phase_a::extract_refactor_anchors(
+                                &*self.inner.extractor,
+                                &pairs,
+                                "unknown",
+                            )
+                        };
                         let synthetic = crate::facts::FixAttempt {
                             problem_hash: crate::problem_hash::ProblemHash::of(&obs.subject)
                                 .as_str()
                                 .to_string(),
                             problem: obs.subject.clone(),
-                            files: vec![],
+                            files,
                             approach: obs.object.clone(),
                             outcome: obs.outcome.unwrap(),
                             insight: Some(obs.reasoning.clone()),
                             duration_ms: 0,
                             test_before: None,
                             test_after: None,
-                            anchored_symbols: vec![],
+                            anchored_symbols: anchors,
                             provenance: prov_llm.clone(),
                             sensitivity: crate::scope::Sensitivity::Normal,
                         };

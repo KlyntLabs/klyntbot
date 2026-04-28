@@ -29,6 +29,8 @@ async fn daemon_accepts_event_and_writes_row() {
         event_tx: None,
         op_handler: None,
         git_invalidation_handler: None,
+        opencode_db_path: None,
+        opencode_poll_interval: None,
     };
     let handle = spawn(cfg.clone()).await.expect("spawn");
 

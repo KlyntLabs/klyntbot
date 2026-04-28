@@ -104,11 +104,13 @@ pub fn run(args: Vec<String>) -> i32 {
     }
 
     let home = home_dir();
-    let client = HookClient::new(
-        home.join("ingest.sock"),
-        home.join("ingest-buffer.jsonl"),
-        home.join(".hook-warn.stamp"),
-    );
+    let sock_path = std::env::var("KLYNTBOT_HOOK_SOCKET")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| home.join("ingest.sock"));
+    let buffer_path = std::env::var("KLYNTBOT_HOOK_BUFFER")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| home.join("ingest-buffer.jsonl"));
+    let client = HookClient::new(sock_path, buffer_path, home.join(".hook-warn.stamp"));
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

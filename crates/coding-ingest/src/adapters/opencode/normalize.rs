@@ -1,7 +1,6 @@
 //! Convert opencode `MessageRow` into `AgentEventV1`.
 
-use crate::event::FileOp;
-use crate::event::{AgentEventV1, AgentSource, EventKind, TokenUsage};
+use crate::event::{AgentEventV1, AgentSource, EventKind};
 use common::Result;
 use jiff::Timestamp;
 use std::path::PathBuf;

@@ -100,8 +100,25 @@ pub async fn render_user_prompt_block(
 ) -> common::Result<String> {
     let budgeter: Arc<dyn TokenBudgeter> = default_budgeter();
 
+    // QueryPipeline enrichment — if configured, run the prompt through PRF + expansion.
+    let enhanced_query = if let Some(ref pipeline) = svc.query_pipeline() {
+        let ctx = context_engine::RetrievalContext {
+            active_skill: None,
+            active_task: None,
+            recent_user_messages: vec![query.to_string()],
+            situation: None,
+            active_view: None,
+            recent_correction: None,
+        };
+        let budget = context_engine::EnhancementBudget::normal();
+        let out = pipeline.enhance(query, &ctx, &budget).await;
+        out.query.primary
+    } else {
+        query.to_string()
+    };
+
     // Dead-end check first — placed at top if matches found.
-    let dead_ends = svc.check_dead_ends(query, repo).await?;
+    let dead_ends = svc.check_dead_ends(&enhanced_query, repo).await?;
     let warn = if dead_ends.aggregate_confidence > 0.7 && !dead_ends.matches.is_empty() {
         let m = &dead_ends.matches[0];
         format!(
@@ -113,7 +130,7 @@ pub async fn render_user_prompt_block(
     };
 
     // Likely-relevant memories.
-    let idx = svc.recall_index(query, repo, None, None, 6).await?;
+    let idx = svc.recall_index(&enhanced_query, repo, None, None, 6).await?;
     let mut likely = String::from("### Likely relevant\n");
     for r in idx.results.iter().take(6) {
         likely.push_str(&format!(

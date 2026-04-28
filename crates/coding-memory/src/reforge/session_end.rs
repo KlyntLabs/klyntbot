@@ -162,7 +162,11 @@ impl SessionEndPass {
             report.causal_edges_detected = n;
         }
 
-        // 4. Build deterministic ≤200-token summary.
+        // 4. Stale-candidate resolution — mark low-stability facts as superseded.
+        let stale_count = resolve_stale_candidates(&ep_repo, repo_id).await?;
+        report.deduped_attempts += stale_count; // reuse counter for now
+
+        // 5. Build deterministic ≤200-token summary.
         let summary = build_summary_md(session_id, repo_id, &invocations).await;
         let token_count = estimate_tokens(&summary);
         report.summary_tokens = token_count;
@@ -199,6 +203,37 @@ async fn build_summary_md(
     } else {
         out
     }
+}
+
+/// Resolve stale candidates: facts with stability < 0.2 and no access in 30 days.
+async fn resolve_stale_candidates(
+    ep_repo: &EpisodicMemoryRepo,
+    repo_id: Option<&str>,
+) -> Result<u32> {
+    let pool = ep_repo.pool().clone();
+    let cutoff = Timestamp::now()
+        .checked_sub(jiff::ToSpan::days(30))
+        .unwrap_or(Timestamp::MIN)
+        .to_string();
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT id FROM episodic_memories \
+         WHERE (scope_repo_id = ?1 OR (?1 IS NULL AND scope_repo_id IS NULL)) \
+         AND stability < 0.2 AND COALESCE(last_accessed, '1970-01-01') < ?2",
+    )
+    .bind(repo_id)
+    .bind(&cutoff)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| KlyntbotError::Storage(format!("stale query: {e}")))?;
+    let mut count = 0;
+    for (id,) in rows {
+        if let Err(e) = ep_repo.delete_by_id(&id).await {
+            tracing::warn!(id, error = %e, "stale candidate delete failed");
+        } else {
+            count += 1;
+        }
+    }
+    Ok(count)
 }
 
 fn estimate_tokens(s: &str) -> u32 {

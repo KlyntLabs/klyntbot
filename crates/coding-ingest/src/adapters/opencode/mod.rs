@@ -4,13 +4,12 @@
 //! the messages table every 500 ms.
 
 mod normalize;
+pub mod poller;
 mod schema;
 
 use super::IngestAdapter;
-use crate::event::{AgentEvent, AgentEventV1, AgentSource, EventKind, TokenUsage};
+use crate::event::AgentEvent;
 use common::{KlyntbotError, Result};
-use jiff::Timestamp;
-use uuid::Uuid;
 
 /// Adapter for opencode SQLite polling.
 ///

@@ -21,7 +21,7 @@ async fn phase_b_halts_at_ceiling() {
             cost_ceiling_usd: Some(0.0),
             ..DistillerConfig::default()
         },
-        ingest,
+        ingest.clone(),
         writer,
         Arc::new(providers::ProviderManager::new(
             Arc::new(providers::NoopProvider),
@@ -45,6 +45,7 @@ async fn phase_b_halts_at_ceiling() {
             attachments: vec![],
         },
     });
+    ingest.insert(&event).await.unwrap();
     distiller.accept_event(event).await.unwrap();
 
     let result = distiller.distill_turn("s1", Some("t1")).await;

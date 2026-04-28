@@ -30,6 +30,7 @@ coding-memory = { path = "../coding-memory" }
 storage = { workspace = true }
 filetime = "0.2"
 assert_cmd = "2"
+proptest = "1"
 
 [[bin]]
 name = "klyntbot-hook"

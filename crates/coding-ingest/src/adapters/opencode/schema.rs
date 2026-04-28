@@ -2,7 +2,8 @@
 
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, sqlx::FromRow)]
+#[allow(dead_code)]
 pub struct MessageRow {
     pub id: i64,
     pub session_id: String,

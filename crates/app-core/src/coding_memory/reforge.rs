@@ -187,7 +187,7 @@ impl cognitive::services::reforge::CodingPhaseRunner for CodingPhaseRunnerImpl {
     }
 
     async fn run_cross_session_dedup(&self) -> common::Result<CodingPhaseRunnerOutcome> {
-        let applied = CrossSessionDedup::run(&self.fact_repo, 0.92).await?;
+        let applied = CrossSessionDedup::run(&self.fact_repo, 0.92, None).await?;
         Ok(CodingPhaseRunnerOutcome {
             applied,
             narrative: None,

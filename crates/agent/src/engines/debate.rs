@@ -638,6 +638,7 @@ pub async fn run_debate(
         temperature: config.temperature_override,
         max_tokens: None,
         response_format: None,
+        role: None,
     };
 
     let mut effective_max_rounds = max_rounds;

@@ -129,14 +129,26 @@ impl DistillerWriter {
         &self,
         predecessor_id: &str,
         successor_id: &str,
-        _successor_valid_from: &str,
+        successor_valid_from: &str,
     ) -> Result<(), DistillerError> {
         self.facts
             .supersede(predecessor_id, successor_id)
             .await
             .map_err(|e| DistillerError::Storage {
                 detail: format!("complete_supersede: {e}"),
-            })
+            })?;
+        // Bi-temporal: align valid_until with successor's valid_from.
+        sqlx::query(
+            "UPDATE semantic_facts SET valid_until = ?1 WHERE id = ?2",
+        )
+        .bind(successor_valid_from)
+        .bind(predecessor_id)
+        .execute(self.facts.pool())
+        .await
+        .map_err(|e| DistillerError::Storage {
+            detail: format!("complete_supersede valid_until: {e}"),
+        })?;
+        Ok(())
     }
 }
 

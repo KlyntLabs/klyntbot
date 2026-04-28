@@ -1027,6 +1027,11 @@ impl AppCore {
                         symbol_extractor.clone(),
                     ),
                 );
+            let opencode_db_path = if config.coding_memory.cli.opencode.enabled {
+                dirs::home_dir().map(|h| h.join(".local/share/opencode/opencode.sqlite"))
+            } else {
+                None
+            };
             let daemon_cfg = coding_ingest::daemon::IngestDaemonConfig {
                 socket_path: data_dir.join("ingest.sock"),
                 buffer_path: data_dir.join("ingest-buffer.jsonl"),
@@ -1039,6 +1044,8 @@ impl AppCore {
                     crate::coding_memory::recall::RecallOpHandler::new(recall.clone()),
                 )),
                 git_invalidation_handler: Some(git_handler),
+                opencode_db_path,
+                opencode_poll_interval: None,
             };
             match coding_ingest::daemon::spawn(daemon_cfg).await {
                 Ok(h) => Some(h),

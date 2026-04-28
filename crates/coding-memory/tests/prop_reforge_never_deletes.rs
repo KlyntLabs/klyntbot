@@ -75,7 +75,7 @@ proptest! {
             CodingSynthesisPhase::run(&handlers).await.unwrap();
             RuleArtifactGenerationPhase::run(&handlers, &[]).await.unwrap();
             SelectiveDeleteSignal::apply(&pool, &selective_delete_log).await.unwrap();
-            CrossSessionDedup::run(&fact_repo, 0.92).await.unwrap();
+            CrossSessionDedup::run(&fact_repo, 0.92, None).await.unwrap();
 
             let after: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM episodic_memories")
                 .fetch_one(pool.inner())

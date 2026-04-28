@@ -59,6 +59,7 @@ pub struct CodingRecallService {
     #[allow(dead_code)]
     budgeter: Arc<dyn TokenBudgeter>,
     causal_repo: Option<Arc<crate::causal::CausalEdgeRepo>>,
+    query_pipeline: Option<Arc<context_engine::QueryPipeline>>,
 }
 
 impl std::fmt::Debug for CodingRecallService {
@@ -94,6 +95,7 @@ impl CodingRecallService {
             budgeter,
             config,
             causal_repo: None,
+            query_pipeline: None,
         }
     }
 
@@ -109,6 +111,18 @@ impl CodingRecallService {
     pub fn with_causal_repo(mut self, repo: Arc<crate::causal::CausalEdgeRepo>) -> Self {
         self.causal_repo = Some(repo);
         self
+    }
+
+    /// Attach a query enhancement pipeline (Phase-4 wiring).
+    #[must_use]
+    pub fn with_query_pipeline(mut self, pipeline: Arc<context_engine::QueryPipeline>) -> Self {
+        self.query_pipeline = Some(pipeline);
+        self
+    }
+
+    /// Access the optional query pipeline.
+    pub fn query_pipeline(&self) -> &Option<Arc<context_engine::QueryPipeline>> {
+        &self.query_pipeline
     }
 
     /// Layer-1 — compact index with C3 escalation.

@@ -4,6 +4,12 @@
 pub mod handlers;
 /// Claude Code settings.json installer.
 pub mod installer;
+/// Codex config.toml installer.
+pub mod codex_installer;
+/// Kimi hooks.json installer.
+pub mod kimi_installer;
+/// Opencode opt-in marker (poll-only, no hook install).
+pub mod opencode_installer;
 /// Phase-5 mirror source wiring.
 pub mod mirror;
 /// Phase-5 panel handlers.
@@ -96,16 +102,52 @@ impl crate::AppCore {
                 .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
             }
             "codex" => {
-                // Codex installer writes TOML hook stanza.
-                // Stub: mark enabled in config; full installer lands in Phase 7.
+                let cfg = dirs::home_dir()
+                    .ok_or_else(|| ApiError::new("INTERNAL_ERROR", "no home dir"))?
+                    .join(".codex/config.toml");
+                let binary = hook_binary_path()?;
+                if enabled {
+                    tokio::task::spawn_blocking(move || {
+                        crate::coding_memory::codex_installer::CodexInstaller::install(&cfg, &binary)
+                    })
+                } else {
+                    tokio::task::spawn_blocking(move || {
+                        crate::coding_memory::codex_installer::CodexInstaller::uninstall(&cfg)
+                    })
+                }
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
             }
             "kimi-cli" => {
-                // Kimi installer writes hook stanza.
-                // Stub: mark enabled in config; full installer lands in Phase 7.
+                let cfg = dirs::home_dir()
+                    .ok_or_else(|| ApiError::new("INTERNAL_ERROR", "no home dir"))?
+                    .join(".config/kimi-cli/hooks.json");
+                let binary = hook_binary_path()?;
+                if enabled {
+                    tokio::task::spawn_blocking(move || {
+                        crate::coding_memory::kimi_installer::KimiInstaller::install(&cfg, &binary)
+                    })
+                } else {
+                    tokio::task::spawn_blocking(move || {
+                        crate::coding_memory::kimi_installer::KimiInstaller::uninstall(&cfg)
+                    })
+                }
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
             }
             "opencode" => {
-                // Opencode is poll-only; no settings file write.
-                // Stub: mark enabled in config.
+                let db = dirs::home_dir()
+                    .ok_or_else(|| ApiError::new("INTERNAL_ERROR", "no home dir"))?
+                    .join(".local/share/opencode/opencode.sqlite");
+                if enabled {
+                    if let Err(e) = crate::coding_memory::opencode_installer::OpencodeInstaller::install(&db) {
+                        tracing::warn!(error = %e, "opencode install failed");
+                    }
+                } else {
+                    let _ = crate::coding_memory::opencode_installer::OpencodeInstaller::uninstall(&db);
+                }
             }
             _ => {
                 return Err(ApiError::new(

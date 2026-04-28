@@ -117,5 +117,5 @@ async fn marks_stale_when_symbol_present_but_file_changed() {
         .await
         .unwrap();
     let parsed: serde_json::Value = metadata.parse().unwrap();
-    assert_eq!(parsed["status"], "stale_candidate");
+    assert_eq!(parsed["status"], "needs_review");
 }
