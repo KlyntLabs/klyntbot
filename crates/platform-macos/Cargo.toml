@@ -24,5 +24,6 @@ objc2-foundation = { version = "0.3", features = ["NSString", "NSArray", "NSData
 core-graphics = "0.24"
 core-foundation = "0.10"
 screencapturekit = "0.3"
+async-trait = { workspace = true }
 platform-input = { path = "../platform-input" }
 platform-capture = { path = "../platform-capture" }
