@@ -159,5 +159,7 @@ E. **Klynt-platform-only richness panels** (no kimi-vis equivalent — these are
 - Should the Plugins page also host non-coding-memory plugins (Skills viewer, MCP server inspector) in v1, or ship v1 with only the Coding Memory tab and add others incrementally?
 - Persisted view preferences (last-selected tab, filter state, source filter): localStorage vs. a small `plugins_ui_state` table?
 
+**Status (2026-04-28):** Implemented per `docs/superpowers/plans/2026-04-28-plugins-coding-memory-viewer.md`. Out-of-scope tabs (Context, State, Dual, Agents) and `TimelineView`/`DecisionPath` modes remain deferred.
+
 **Does NOT affect:** Existing chat/threads UI, the launcher, or any backend ingestion path. All changes are additive (new feature folder + new endpoints).
 
