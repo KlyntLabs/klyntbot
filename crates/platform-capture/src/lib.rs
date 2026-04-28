@@ -115,3 +115,30 @@ pub enum CaptureError {
 }
 
 pub type Result<T> = std::result::Result<T, CaptureError>;
+
+use async_trait::async_trait;
+
+/// Trait implemented by per-platform screen-capture and accessibility-
+/// tree backends.
+#[async_trait]
+pub trait PlatformCapture: Send + Sync {
+    /// Capture a screen frame. If `region` is `None`, capture the full
+    /// virtual desktop. The returned `Frame` carries physical pixels
+    /// with `scale` indicating backing scale factor.
+    async fn capture_screen(&self, region: Option<Rect>) -> Result<Frame>;
+
+    /// Capture a single window by id.
+    async fn capture_window(&self, window_id: WindowId) -> Result<Frame>;
+
+    /// Enumerate active displays.
+    async fn list_displays(&self) -> Result<Vec<DisplayInfo>>;
+
+    /// Return information about the frontmost window across all apps.
+    /// `None` if no window is frontmost (e.g. all apps are hidden).
+    async fn get_active_window(&self) -> Result<Option<WindowInfo>>;
+
+    /// Walk the accessibility tree at the given scope. Implementations
+    /// should bound traversal depth to a reasonable default (the
+    /// rendered tree of complex apps may have thousands of nodes).
+    async fn get_ax_tree(&self, scope: AxScope) -> Result<AccessibilityNode>;
+}
