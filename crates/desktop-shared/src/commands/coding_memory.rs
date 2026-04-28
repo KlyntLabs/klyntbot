@@ -29,6 +29,77 @@ pub struct SessionReplayEntry {
     pub payload: String,
 }
 
+/// Decoded form of `SessionReplayEntry` for the FE viewer. The original
+/// `payload` is kept as `raw_json` for the detail panel; `payload_decoded`
+/// is the parsed structured value when valid JSON.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct WireEventDto {
+    pub id: String,
+    pub source: String,
+    pub session_id: String,
+    pub kind: String,
+    pub occurred_at: String,
+    /// Structured payload when `payload` parsed as JSON; `None` otherwise.
+    pub payload_decoded: Option<serde_json::Value>,
+    /// Raw JSON string (always present, exactly as stored in `ingest_event_log`).
+    pub raw_json: String,
+}
+
+impl WireEventDto {
+    pub fn from_replay_entry(entry: &SessionReplayEntry) -> Result<Self, std::convert::Infallible> {
+        let payload_decoded = serde_json::from_str::<serde_json::Value>(&entry.payload).ok();
+        Ok(Self {
+            id: entry.id.clone(),
+            source: entry.source.clone(),
+            session_id: entry.session_id.clone(),
+            kind: entry.kind.clone(),
+            occurred_at: entry.occurred_at.clone(),
+            payload_decoded,
+            raw_json: entry.payload.clone(),
+        })
+    }
+}
+
+/// One row in the Plugins → Coding Memory session list.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSummaryDto {
+    pub session_id: String,
+    pub source: String,
+    pub cwd: Option<String>,
+    pub repo_id: Option<String>,
+    pub started_at: String,
+    pub last_event_at: String,
+    pub event_count: i64,
+    pub turn_count: i64,
+    pub tool_call_count: i64,
+    pub error_count: i64,
+    pub total_input_tokens: i64,
+    pub total_output_tokens: i64,
+    pub total_cost_usd: f64,
+}
+
+/// Filters for `coding_memory_session_list`.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionListArgs {
+    /// Optional source filter (`"claudeCode" | "codex" | "kimiCli" | "openCode"`).
+    pub source: Option<String>,
+    /// Optional repo id.
+    pub repo_id: Option<String>,
+    /// Look back N days. Defaults to 14.
+    #[serde(default = "default_days_14")]
+    pub since_days: u32,
+    #[serde(default = "default_limit_100")]
+    pub limit: u32,
+    #[serde(default)]
+    pub offset: u32,
+}
+
+fn default_days_14() -> u32 { 14 }
+fn default_limit_100() -> u32 { 100 }
+
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnoseResult {
@@ -369,4 +440,55 @@ pub struct ProjectSkillRow {
     pub status: String,
     /// Effectiveness score (live).
     pub effectiveness: f32,
+}
+
+
+#[cfg(test)]
+mod dto_tests {
+    use super::*;
+
+    #[test]
+    fn wire_event_dto_decodes_session_replay_payload() {
+        // A SessionStart payload as it appears in `ingest_event_log.payload`.
+        let payload = serde_json::json!({
+            "v": 1,
+            "id": "01923aaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "source": "kimiCli",
+            "sessionId": "sess-123",
+            "turnId": null,
+            "cwd": "/repo",
+            "repo": null,
+            "occurredAt": "2026-04-28T12:00:00Z",
+            "kind": { "type": "sessionStart", "model": "claude-haiku-4-5", "skills": [] }
+        });
+        let entry = SessionReplayEntry {
+            id: "row-1".into(),
+            source: "kimiCli".into(),
+            session_id: "sess-123".into(),
+            kind: "sessionStart".into(),
+            occurred_at: "2026-04-28T12:00:00Z".into(),
+            payload: payload.to_string(),
+        };
+        let dto = WireEventDto::from_replay_entry(&entry).expect("decoded");
+        assert_eq!(dto.kind, "sessionStart");
+        assert_eq!(dto.session_id, "sess-123");
+        assert_eq!(dto.source, "kimiCli");
+        assert!(dto.raw_json.contains("claude-haiku-4-5"));
+    }
+
+    #[test]
+    fn wire_event_dto_handles_corrupt_payload() {
+        let entry = SessionReplayEntry {
+            id: "row-2".into(),
+            source: "codex".into(),
+            session_id: "sess-2".into(),
+            kind: "toolCall".into(),
+            occurred_at: "2026-04-28T12:00:01Z".into(),
+            payload: "not json".into(),
+        };
+        let dto = WireEventDto::from_replay_entry(&entry).expect("falls back to raw");
+        assert_eq!(dto.kind, "toolCall");
+        assert!(dto.payload_decoded.is_none());
+        assert_eq!(dto.raw_json, "not json");
+    }
 }

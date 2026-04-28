@@ -94,6 +94,8 @@ desktop_macros::klynt_collect_commands![
     crate::commands::coding_memory::coding_memory_check_dead_ends,
     crate::commands::coding_memory::coding_memory_cli_health,
     crate::commands::coding_memory::coding_memory_session_replay,
+    crate::commands::coding_memory::coding_memory_session_list,
+    crate::commands::coding_memory::coding_memory_session_replay_typed,
     crate::commands::coding_memory::coding_memory_enable_cli,
     crate::commands::coding_memory::coding_memory_disable_cli,
     crate::commands::coding_memory::coding_memory_diagnose_cli,
