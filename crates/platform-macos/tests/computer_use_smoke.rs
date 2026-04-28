@@ -29,9 +29,14 @@ async fn move_mouse_and_read_position() {
         .expect("MouseMove");
 
     // Read back; allow ±2 pixel tolerance for compositor rounding.
-    let pos = input.get_cursor_position().await.expect("get_cursor_position");
+    let pos = input
+        .get_cursor_position()
+        .await
+        .expect("get_cursor_position");
     assert!(
         (pos.x - 200.0).abs() <= 2.0 && (pos.y - 200.0).abs() <= 2.0,
-        "expected ~(200,200), got ({}, {})", pos.x, pos.y
+        "expected ~(200,200), got ({}, {})",
+        pos.x,
+        pos.y
     );
 }

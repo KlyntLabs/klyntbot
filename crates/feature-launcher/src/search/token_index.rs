@@ -87,13 +87,18 @@ impl TokenIndex {
     ///
     /// Short queries (< 3 chars) do a trie range walk + union.
     /// Longer queries first try exact match, falling back to range walk.
+    #[allow(dead_code)]
     pub fn candidates_for(&self, q: &str) -> Option<(RoaringBitmap, f32)> {
-        self.candidates_for_cow(q).map(|(cow, w)| (cow.into_owned(), w))
+        self.candidates_for_cow(q)
+            .map(|(cow, w)| (cow.into_owned(), w))
     }
 
     /// Like `candidates_for` but returns a `Cow` to avoid cloning when
     /// no mutation (delta/tombstone application) is required.
-    pub fn candidates_for_cow<'a>(&'a self, q: &str) -> Option<(std::borrow::Cow<'a, RoaringBitmap>, f32)> {
+    pub fn candidates_for_cow<'a>(
+        &'a self,
+        q: &str,
+    ) -> Option<(std::borrow::Cow<'a, RoaringBitmap>, f32)> {
         use std::borrow::Cow;
 
         // Fast path: pre-computed short prefixes (1-2 chars) when no delta/tombstones.
@@ -286,9 +291,7 @@ mod tests {
 
     #[test]
     fn delta_merged_in_search() {
-        let tokens = vec![
-            (SmolStr::new("report"), RoaringBitmap::from_iter([1]), 1.0),
-        ];
+        let tokens = vec![(SmolStr::new("report"), RoaringBitmap::from_iter([1]), 1.0)];
         let mut idx = TokenIndex::build(tokens);
         idx.insert_pending(SmolStr::new("report"), 2);
         idx.insert_pending(SmolStr::new("readme"), 3);
@@ -299,8 +302,16 @@ mod tests {
     #[test]
     fn compaction_roundtrip() {
         let tokens = vec![
-            (SmolStr::new("report"), RoaringBitmap::from_iter([1, 2]), 1.0),
-            (SmolStr::new("readme"), RoaringBitmap::from_iter([2, 3]), 1.0),
+            (
+                SmolStr::new("report"),
+                RoaringBitmap::from_iter([1, 2]),
+                1.0,
+            ),
+            (
+                SmolStr::new("readme"),
+                RoaringBitmap::from_iter([2, 3]),
+                1.0,
+            ),
         ];
         let mut idx = TokenIndex::build(tokens);
         idx.insert_pending(SmolStr::new("report"), 4);
@@ -313,9 +324,11 @@ mod tests {
 
     #[test]
     fn tombstones_filter_exact_match() {
-        let tokens = vec![
-            (SmolStr::new("report"), RoaringBitmap::from_iter([1, 2]), 1.0),
-        ];
+        let tokens = vec![(
+            SmolStr::new("report"),
+            RoaringBitmap::from_iter([1, 2]),
+            1.0,
+        )];
         let mut idx = TokenIndex::build(tokens);
         idx.remove_doc(2);
         let (bitmap, _) = idx.candidates_for("report").unwrap();

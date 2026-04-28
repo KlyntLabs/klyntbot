@@ -9,10 +9,19 @@ pub struct FixtureBuilder {
     assistant_msg: Option<String>,
 }
 
+impl Default for FixtureBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FixtureBuilder {
     /// Create a new builder.
     pub fn new() -> Self {
-        Self { user_prompt: None, assistant_msg: None }
+        Self {
+            user_prompt: None,
+            assistant_msg: None,
+        }
     }
     /// Set the user prompt.
     pub fn with_user_prompt(mut self, t: impl Into<String>) -> Self {
@@ -90,7 +99,11 @@ fn naive_repo_context_extract(text: &str) -> Option<(String, String, String)> {
     for t in triggers {
         if let Some(i) = lower.find(t) {
             let after = &text[i + t.len()..];
-            let object = after.split_whitespace().next()?.trim_end_matches('.').to_string();
+            let object = after
+                .split_whitespace()
+                .next()?
+                .trim_end_matches('.')
+                .to_string();
             return Some(("klyntbot".to_string(), "uses".to_string(), object));
         }
     }

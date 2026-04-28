@@ -95,7 +95,9 @@ mod tests {
         };
         let item = into_launcher_item(row);
         assert_eq!(item.title, "GitHub");
-        assert!(matches!(item.kind, LauncherItemKind::UrlNavigation { url } if url == "https://github.com"));
+        assert!(
+            matches!(item.kind, LauncherItemKind::UrlNavigation { url } if url == "https://github.com")
+        );
     }
 
     #[test]

@@ -9,9 +9,11 @@ struct LastAction {
     cycle_index: usize,
 }
 
+type FrameRect = (f64, f64, f64, f64);
+
 pub struct WindowManager {
     last_actions: Mutex<HashMap<u32, LastAction>>,
-    frame_history: Mutex<HashMap<u32, VecDeque<(f64, f64, f64, f64)>>>,
+    frame_history: Mutex<HashMap<u32, VecDeque<FrameRect>>>,
 }
 
 impl WindowManager {

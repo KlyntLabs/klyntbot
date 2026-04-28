@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse::Parse, parse2, punctuated::Punctuated, Path, Token};
+use syn::{Path, Token, parse::Parse, parse2, punctuated::Punctuated};
 
 struct Input {
     paths: Punctuated<Path, Token![,]>,

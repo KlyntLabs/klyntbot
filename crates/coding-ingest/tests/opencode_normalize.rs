@@ -14,8 +14,14 @@ fn normalize_recovers_cwd_from_metadata() {
         created_at: "1700000000".into(),
     };
     let v1 = normalize::row_to_event(row).unwrap().unwrap();
-    assert_eq!(v1.cwd, std::path::PathBuf::from("/Users/jayden/Projects/Klynt/bot"));
-    assert!(v1.repo.is_some(), "repo should resolve from cwd via RepoScope");
+    assert_eq!(
+        v1.cwd,
+        std::path::PathBuf::from("/Users/jayden/Projects/Klynt/bot")
+    );
+    assert!(
+        v1.repo.is_some(),
+        "repo should resolve from cwd via RepoScope"
+    );
     assert_eq!(v1.source, AgentSource::OpenCode);
 }
 
@@ -54,12 +60,14 @@ fn assistant_with_tool_calls_column_classifies_as_toolcall_not_heuristic() {
         session_id: "s1".into(),
         role: "assistant".into(),
         content: "{ \"this is just JSON the model returned, not a tool call\": true }".into(),
-        tool_calls: None,        // ← no actual tool call
+        tool_calls: None, // ← no actual tool call
         tool_call_id: None,
         metadata: None,
         created_at: "1700000000".into(),
     };
     let v1 = normalize::row_to_event(row).unwrap().unwrap();
-    assert!(matches!(v1.kind, EventKind::AssistantMsg { .. }),
-        "must NOT classify as ToolCall when tool_calls column is empty");
+    assert!(
+        matches!(v1.kind, EventKind::AssistantMsg { .. }),
+        "must NOT classify as ToolCall when tool_calls column is empty"
+    );
 }

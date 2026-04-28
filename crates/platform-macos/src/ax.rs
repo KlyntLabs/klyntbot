@@ -72,11 +72,7 @@ impl AXUIElement {
         let key = CFString::new(name);
         let mut out: CFTypeRef = std::ptr::null();
         let err = unsafe {
-            AXUIElementCopyAttributeValue(
-                self.as_concrete_TypeRef(),
-                key.as_CFTypeRef(),
-                &mut out,
-            )
+            AXUIElementCopyAttributeValue(self.as_concrete_TypeRef(), key.as_CFTypeRef(), &mut out)
         };
         if err != AX_ERROR_SUCCESS || out.is_null() {
             return Err(CaptureError::AxTreeUnavailable(format!(
@@ -87,6 +83,7 @@ impl AXUIElement {
     }
 
     /// Set an attribute to a CoreFoundation value.
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
     pub fn set_attribute(&self, name: &str, value: CFTypeRef) -> Result<(), CaptureError> {
         let key = CFString::new(name);
         let err = unsafe {
@@ -103,9 +100,9 @@ impl AXUIElement {
     /// Convenience: copy a string attribute (e.g. `AXTitle`, `AXRole`).
     pub fn copy_string_attribute(&self, name: &str) -> Result<String, CaptureError> {
         let value = self.copy_attribute(name)?;
-        let cfstr = value.downcast_into::<CFString>().ok_or_else(|| {
-            CaptureError::AxTreeUnavailable(format!("{name} was not a CFString"))
-        })?;
+        let cfstr = value
+            .downcast_into::<CFString>()
+            .ok_or_else(|| CaptureError::AxTreeUnavailable(format!("{name} was not a CFString")))?;
         Ok(cfstr.to_string())
     }
 
@@ -138,7 +135,10 @@ impl AXValue {
     /// Create an `AXValue` from a `CGPoint`.
     pub fn from_point(point: CGPoint) -> Option<Self> {
         let ptr = unsafe {
-            AXValueCreate(K_AX_VALUE_CG_POINT_TYPE, &point as *const _ as *const c_void)
+            AXValueCreate(
+                K_AX_VALUE_CG_POINT_TYPE,
+                &point as *const _ as *const c_void,
+            )
         };
         if ptr.is_null() {
             None
@@ -149,9 +149,8 @@ impl AXValue {
 
     /// Create an `AXValue` from a `CGSize`.
     pub fn from_size(size: CGSize) -> Option<Self> {
-        let ptr = unsafe {
-            AXValueCreate(K_AX_VALUE_CG_SIZE_TYPE, &size as *const _ as *const c_void)
-        };
+        let ptr =
+            unsafe { AXValueCreate(K_AX_VALUE_CG_SIZE_TYPE, &size as *const _ as *const c_void) };
         if ptr.is_null() {
             None
         } else {

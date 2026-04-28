@@ -6,7 +6,13 @@ use std::path::Path;
 const START: &str = "# klyntbot-managed:start";
 const END: &str = "# klyntbot-managed:end";
 
-const EVENTS: &[&str] = &["session.start", "user.prompt", "tool.pre", "tool.post", "session.end"];
+const EVENTS: &[&str] = &[
+    "session.start",
+    "user.prompt",
+    "tool.pre",
+    "tool.post",
+    "session.end",
+];
 
 /// Codex config.toml installer.
 pub struct CodexInstaller;
@@ -101,8 +107,7 @@ fn strip_managed(s: &str) -> String {
 fn atomic_write(p: &Path, body: &str) -> Result<()> {
     let tmp = p.with_extension("tmp");
     if let Some(parent) = p.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
+        std::fs::create_dir_all(parent).map_err(|e| KlyntbotError::Storage(e.to_string()))?;
     }
     std::fs::write(&tmp, body).map_err(|e| KlyntbotError::Storage(e.to_string()))?;
     std::fs::rename(&tmp, p).map_err(|e| KlyntbotError::Storage(e.to_string()))?;

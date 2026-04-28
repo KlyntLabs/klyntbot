@@ -7,10 +7,10 @@ pub struct ParsedCommand {
 impl ParsedCommand {
     pub fn declared_state_param(&self) -> Option<&FnArg> {
         self.fn_item.sig.inputs.iter().find(|arg| {
-            if let FnArg::Typed(pat_type) = arg {
-                if let Pat::Ident(PatIdent { ident, .. }) = &*pat_type.pat {
-                    return ident == "state";
-                }
+            if let FnArg::Typed(pat_type) = arg
+                && let Pat::Ident(PatIdent { ident, .. }) = &*pat_type.pat
+            {
+                return ident == "state";
             }
             false
         })

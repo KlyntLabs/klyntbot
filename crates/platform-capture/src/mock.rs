@@ -1,8 +1,8 @@
 //! `MockCapture` — returns fixture frames + AX trees for testing.
 
 use crate::{
-    AccessibilityNode, AxScope, CaptureError, DisplayInfo, Frame,
-    PixelFormat, PlatformCapture, Result, WindowId, WindowInfo,
+    AccessibilityNode, AxScope, CaptureError, DisplayInfo, Frame, PixelFormat, PlatformCapture,
+    Result, WindowId, WindowInfo,
 };
 use async_trait::async_trait;
 use platform_input::Rect;

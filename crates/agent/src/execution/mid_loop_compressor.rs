@@ -83,8 +83,8 @@ impl MidLoopCompressor {
             if let Message::Tool { content, name, .. } = msg {
                 let original_text = content.as_text();
                 let image_count = content.image_part_count();
-                let original_tokens = self.token_counter.estimate_text(&original_text)
-                    + image_count * 1024;
+                let original_tokens =
+                    self.token_counter.estimate_text(&original_text) + image_count * 1024;
                 if original_tokens > MIN_COMPRESSIBLE_TOKENS {
                     let summary_text = format!(
                         "{}... [compressed {name} result, originally {} chars + {} image part(s)]",
@@ -249,9 +249,9 @@ mod tests {
             tool_msg("3", "t3", "recent result"),
         ];
         let _ = compressor.compress_if_needed(&mut messages);
-        assert!(messages
-            .iter()
-            .any(|m| matches!(m, Message::Tool { content, .. } if content.as_text() == "recent result")));
+        assert!(messages.iter().any(
+            |m| matches!(m, Message::Tool { content, .. } if content.as_text() == "recent result")
+        ));
     }
 
     #[test]

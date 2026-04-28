@@ -123,7 +123,10 @@ pub async fn write_entity_edges_for_distiller_fact(
             source_entity_id: subject_id,
             target_entity_id: object_id,
             relationship_type: fact.predicate.clone(),
-            evidence: Some(format!("{} {} {}", fact.subject, fact.predicate, fact.object)),
+            evidence: Some(format!(
+                "{} {} {}",
+                fact.subject, fact.predicate, fact.object
+            )),
             source: "coding_distiller".into(),
         })
         .await
@@ -133,12 +136,20 @@ pub async fn write_entity_edges_for_distiller_fact(
 }
 
 fn looks_like_entity_name(s: &str) -> bool {
-    s.len() >= 3 && s.len() <= 100 && !s.chars().all(|c| c.is_ascii_digit() || c == '.' || c == '-')
+    s.len() >= 3
+        && s.len() <= 100
+        && !s
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
 }
 
 fn infer_entity_type(predicate: &str) -> String {
     let p = predicate.to_lowercase();
-    if p.contains("uses") || p.contains("requires") { "tool".into() }
-    else if p.contains("works_at") || p.contains("manages") { "organization".into() }
-    else { "concept".into() }
+    if p.contains("uses") || p.contains("requires") {
+        "tool".into()
+    } else if p.contains("works_at") || p.contains("manages") {
+        "organization".into()
+    } else {
+        "concept".into()
+    }
 }

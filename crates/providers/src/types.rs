@@ -664,7 +664,9 @@ mod tests {
             tool_call_id: "tc1".into(),
             name: "screenshot".into(),
             content: ToolContent::MultiPart(vec![
-                ToolContentPart::Text { text: "captured screen at 1920x1080".into() },
+                ToolContentPart::Text {
+                    text: "captured screen at 1920x1080".into(),
+                },
                 ToolContentPart::ImageData {
                     media_type: "image/png".into(),
                     data: "base64-blob".into(),
@@ -673,7 +675,10 @@ mod tests {
         };
 
         let json = serde_json::to_string(&msg).unwrap();
-        assert!(json.contains("image_data"), "should serialize image part: {json}");
+        assert!(
+            json.contains("image_data"),
+            "should serialize image part: {json}"
+        );
 
         let parsed: Message = serde_json::from_str(&json).unwrap();
         if let Message::Tool { content, .. } = parsed {

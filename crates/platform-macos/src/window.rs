@@ -200,8 +200,8 @@ pub fn get_screen_frame() -> (f64, f64, f64, f64) {
 /// Accessibility permission or no focused window).
 #[cfg(target_os = "macos")]
 pub fn set_window_frame(pid: i32, x: f64, y: f64, w: f64, h: f64) -> bool {
-    use core_foundation::base::TCFType;
     use crate::ax::{AXUIElement, AXValue};
+    use core_foundation::base::TCFType;
     use core_graphics::geometry::{CGPoint, CGSize};
 
     let app = match AXUIElement::create_application(pid) {
@@ -257,14 +257,8 @@ pub fn get_frontmost_window_frame(pid: i32) -> Option<(f64, f64, f64, f64)> {
         .ok()?
         .downcast_into()?;
 
-    let position: AXValue = focused
-        .copy_attribute("AXPosition")
-        .ok()?
-        .downcast_into()?;
-    let size: AXValue = focused
-        .copy_attribute("AXSize")
-        .ok()?
-        .downcast_into()?;
+    let position: AXValue = focused.copy_attribute("AXPosition").ok()?.downcast_into()?;
+    let size: AXValue = focused.copy_attribute("AXSize").ok()?.downcast_into()?;
 
     let position = position.to_point()?;
     let size = size.to_size()?;

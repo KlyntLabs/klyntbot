@@ -353,7 +353,9 @@ pub(super) async fn init_launcher(
     }
 
     // Attention source (queries entity_attention table populated by nightly aggregator)
-    sources.push(Arc::new(AttentionSource::new(Arc::clone(&entity_attention_repo))));
+    sources.push(Arc::new(AttentionSource::new(Arc::clone(
+        &entity_attention_repo,
+    ))));
 
     // ── Create registry and spawn background services ──
 

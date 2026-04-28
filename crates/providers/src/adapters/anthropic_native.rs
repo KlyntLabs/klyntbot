@@ -159,19 +159,25 @@ impl AnthropicNativeProvider {
                     ..
                 } => {
                     let blocks = match content {
-                        crate::types::ToolContent::Text(text) => vec![json!({"type": "text", "text": text})],
+                        crate::types::ToolContent::Text(text) => {
+                            vec![json!({"type": "text", "text": text})]
+                        }
                         crate::types::ToolContent::MultiPart(parts) => parts
                             .iter()
                             .map(|p| match p {
-                                crate::types::ToolContentPart::Text { text } => json!({"type": "text", "text": text}),
-                                crate::types::ToolContentPart::ImageData { media_type, data } => json!({
-                                    "type": "image",
-                                    "source": {
-                                        "type": "base64",
-                                        "media_type": media_type,
-                                        "data": data,
-                                    }
-                                }),
+                                crate::types::ToolContentPart::Text { text } => {
+                                    json!({"type": "text", "text": text})
+                                }
+                                crate::types::ToolContentPart::ImageData { media_type, data } => {
+                                    json!({
+                                        "type": "image",
+                                        "source": {
+                                            "type": "base64",
+                                            "media_type": media_type,
+                                            "data": data,
+                                        }
+                                    })
+                                }
                             })
                             .collect(),
                     };
@@ -918,7 +924,10 @@ mod tests {
         assert_eq!(result[0]["content"][0]["type"], "tool_result");
         assert_eq!(result[0]["content"][0]["tool_use_id"], "call_1");
         assert_eq!(result[0]["content"][0]["content"][0]["type"], "text");
-        assert_eq!(result[0]["content"][0]["content"][0]["text"], "file contents here");
+        assert_eq!(
+            result[0]["content"][0]["content"][0]["text"],
+            "file contents here"
+        );
     }
 
     #[test]

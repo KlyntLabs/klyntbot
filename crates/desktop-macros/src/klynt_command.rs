@@ -13,10 +13,10 @@ pub fn expand(input: TokenStream) -> TokenStream {
     let parsed = ParsedCommand { fn_item };
 
     if !matches!(parsed.fn_item.vis, Visibility::Public(_)) {
-        return err(&parsed.fn_item.sig.fn_token, ERR_MISSING_PUB);
+        return err(parsed.fn_item.sig.fn_token, ERR_MISSING_PUB);
     }
     if parsed.fn_item.sig.asyncness.is_none() {
-        return err(&parsed.fn_item.sig.fn_token, ERR_MISSING_ASYNC);
+        return err(parsed.fn_item.sig.fn_token, ERR_MISSING_ASYNC);
     }
     if let Some(state_param) = parsed.declared_state_param() {
         return err(state_param, ERR_DECLARED_STATE);

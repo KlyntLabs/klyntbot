@@ -1,6 +1,4 @@
-use platform_input::{
-    mock::MockInput, ComputerUseAction, KeyMods, PlatformInput,
-};
+use platform_input::{mock::MockInput, ComputerUseAction, KeyMods, PlatformInput};
 
 #[tokio::test]
 async fn records_actions_in_arrival_order() {

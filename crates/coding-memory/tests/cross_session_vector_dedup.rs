@@ -74,6 +74,8 @@ async fn vector_similarity_dedup_with_embedder() {
     repo.upsert(&f2).await.unwrap();
 
     let embedder = MockEmbedder;
-    let applied = CrossSessionDedup::run(&repo, 0.92, Some(&embedder)).await.unwrap();
+    let applied = CrossSessionDedup::run(&repo, 0.92, Some(&embedder))
+        .await
+        .unwrap();
     assert_eq!(applied, 1);
 }

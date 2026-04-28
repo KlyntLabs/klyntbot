@@ -62,6 +62,7 @@ pub struct CodingRecallService {
     #[allow(dead_code)]
     budgeter: Arc<dyn TokenBudgeter>,
     causal_repo: Option<Arc<crate::causal::CausalEdgeRepo>>,
+    entity_repo: Option<Arc<cognitive::EntityRepo>>,
     query_pipeline: Option<Arc<context_engine::QueryPipeline>>,
 }
 
@@ -98,6 +99,7 @@ impl CodingRecallService {
             budgeter,
             config,
             causal_repo: None,
+            entity_repo: None,
             query_pipeline: None,
         }
     }
@@ -116,6 +118,13 @@ impl CodingRecallService {
         self
     }
 
+    /// Attach the entity repo (KCA Phase A wiring).
+    #[must_use]
+    pub fn with_entity_repo(mut self, repo: Arc<cognitive::EntityRepo>) -> Self {
+        self.entity_repo = Some(repo);
+        self
+    }
+
     /// Attach a query enhancement pipeline (Phase-4 wiring).
     #[must_use]
     pub fn with_query_pipeline(mut self, pipeline: Arc<context_engine::QueryPipeline>) -> Self {
@@ -126,6 +135,11 @@ impl CodingRecallService {
     /// Access the optional query pipeline.
     pub fn query_pipeline(&self) -> &Option<Arc<context_engine::QueryPipeline>> {
         &self.query_pipeline
+    }
+
+    /// Access the optional entity repo.
+    pub fn entity_repo(&self) -> Option<&Arc<cognitive::EntityRepo>> {
+        self.entity_repo.as_ref()
     }
 
     /// Layer-1 — compact index with C3 escalation.
@@ -167,7 +181,7 @@ impl CodingRecallService {
                 Some(d) => {
                     let cutoff = jiff::Timestamp::now()
                         .checked_sub(jiff::ToSpan::days(d as i64))
-                        .unwrap_or_else(|_| jiff::Timestamp::MIN);
+                        .unwrap_or(jiff::Timestamp::MIN);
                     e.when >= cutoff
                 }
                 None => true,
@@ -390,16 +404,16 @@ pub fn default_weights() -> [f64; 12] {
 
 /// Load persisted recall weights from the DB. Returns defaults if no row exists.
 pub async fn load_recall_weights(pool: &storage::StoragePool) -> common::Result<[f64; 12]> {
-    let row: Option<(String,)> = sqlx::query_as("SELECT weights FROM recall_weights WHERE id = 'local'")
-        .fetch_optional(pool.inner())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(format!("load_recall_weights: {e}")))?;
+    let row: Option<(String,)> =
+        sqlx::query_as("SELECT weights FROM recall_weights WHERE id = 'local'")
+            .fetch_optional(pool.inner())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("load_recall_weights: {e}")))?;
     let json = match row {
         Some((j,)) => j,
         None => return Ok(default_weights()),
     };
-    let parsed: Vec<f64> = serde_json::from_str(&json)
-        .map_err(|e| common::KlyntbotError::Json(e))?;
+    let parsed: Vec<f64> = serde_json::from_str(&json).map_err(common::KlyntbotError::Json)?;
     if parsed.len() != 12 {
         return Ok(default_weights());
     }
@@ -409,8 +423,11 @@ pub async fn load_recall_weights(pool: &storage::StoragePool) -> common::Result<
 }
 
 /// Store recall weights to the DB, marking source as `reforge_trained`.
-pub async fn store_recall_weights(pool: &storage::StoragePool, w: &[f64; 12]) -> common::Result<()> {
-    let json = serde_json::to_string(w).map_err(|e| common::KlyntbotError::Json(e))?;
+pub async fn store_recall_weights(
+    pool: &storage::StoragePool,
+    w: &[f64; 12],
+) -> common::Result<()> {
+    let json = serde_json::to_string(w).map_err(common::KlyntbotError::Json)?;
     sqlx::query("UPDATE recall_weights SET weights = ?1, updated_at = datetime('now'), source = 'reforge_trained' WHERE id = 'local'")
         .bind(json)
         .execute(pool.inner())

@@ -436,7 +436,9 @@ impl AppCore {
                 let aggregator = feature_launcher::AttentionAggregator::new(pool);
                 match aggregator.rebuild_from_activity(90).await {
                     Ok(n) => info!(rows = n, "Initial attention rebuild complete"),
-                    Err(e) => tracing::warn!(error = %e, "Initial attention rebuild failed — will retry via cron"),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Initial attention rebuild failed — will retry via cron")
+                    }
                 }
             });
         }
@@ -977,14 +979,7 @@ impl AppCore {
                         let ums = ums_for_retrieve.clone();
                         let weights = weights;
                         Box::pin(async move {
-                            let scored = ums
-                                .retrieve_with_overrides(
-                                    &q,
-                                    20,
-                                    0.0,
-                                    weights,
-                                )
-                                .await?;
+                            let scored = ums.retrieve_with_overrides(&q, 20, 0.0, weights).await?;
                             let mut sims = Vec::with_capacity(scored.len());
                             let mut ids = Vec::with_capacity(scored.len());
                             for s in scored {

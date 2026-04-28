@@ -64,7 +64,8 @@ pub fn launcher_migrations() -> Vec<FeatureMigration> {
         FeatureMigration {
             feature_name: "launcher".to_string(),
             version: 2,
-            description: "Entity attention: decay-weighted attention seconds from activity_events".to_string(),
+            description: "Entity attention: decay-weighted attention seconds from activity_events"
+                .to_string(),
             sql: include_str!("../migrations/002_entity_attention.sql").to_string(),
         },
     ]

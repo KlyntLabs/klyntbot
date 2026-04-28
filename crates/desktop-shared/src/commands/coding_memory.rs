@@ -100,8 +100,12 @@ pub struct SessionListArgs {
     pub offset: u32,
 }
 
-fn default_days_14() -> u32 { 14 }
-fn default_limit_100() -> u32 { 100 }
+fn default_days_14() -> u32 {
+    14
+}
+fn default_limit_100() -> u32 {
+    100
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
@@ -444,7 +448,6 @@ pub struct ProjectSkillRow {
     /// Effectiveness score (live).
     pub effectiveness: f32,
 }
-
 
 #[cfg(test)]
 mod dto_tests {

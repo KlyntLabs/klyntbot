@@ -1550,7 +1550,7 @@ mod tests {
             })
             .await
             .unwrap();
-        let bob = entity_repo
+        let _bob = entity_repo
             .upsert_entity(&crate::repos::NewEntity {
                 name: "Bob".into(),
                 entity_type: "person".into(),
@@ -1642,9 +1642,18 @@ mod tests {
         let alice_facts = repo.find_facts_by_entity_id(&alice.id, 10).await.unwrap();
 
         let texts: Vec<String> = alice_facts.iter().map(|f| f.subject.clone()).collect();
-        assert!(texts.contains(&"Alice".to_string()), "should include facts where Alice is subject");
-        assert!(texts.contains(&"Bob".to_string()), "should include facts where Alice is object");
-        assert!(!texts.contains(&"Carol".to_string()), "should NOT include unrelated facts");
+        assert!(
+            texts.contains(&"Alice".to_string()),
+            "should include facts where Alice is subject"
+        );
+        assert!(
+            texts.contains(&"Bob".to_string()),
+            "should include facts where Alice is object"
+        );
+        assert!(
+            !texts.contains(&"Carol".to_string()),
+            "should NOT include unrelated facts"
+        );
         assert!(alice_facts.len() <= 10);
     }
 }

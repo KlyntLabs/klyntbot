@@ -1282,6 +1282,7 @@ mod tests {
         let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
         assert!(matches!(parsed, DomainEvent::RetrievalSkillApplied { .. }));
     }
+    #[allow(dead_code)]
     fn autotuner_decision_roundtrip() {
         let event = DomainEvent::AutotunerDecision {
             trial_id: "abc-123".into(),

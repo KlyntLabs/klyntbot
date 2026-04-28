@@ -1,6 +1,6 @@
 use sqlx::SqlitePool;
-use storage::StorageError;
 use std::collections::HashMap;
+use storage::StorageError;
 
 #[derive(Debug, Clone, sqlx::FromRow, serde::Serialize)]
 pub struct EntityAttentionRow {
@@ -144,7 +144,11 @@ impl EntityAttentionRepo {
         // Build an IN clause. SQLite has a limit of 999 variables per query,
         // but typical launcher batches are < 1000. For safety we could chunk,
         // but the caller (InvertedFileIndex builder) already caps entries.
-        let placeholders: Vec<String> = paths.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+        let placeholders: Vec<String> = paths
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect();
         let sql = format!(
             "SELECT canonical_id, attention_secs FROM entity_attention \
              WHERE kind = 'file' AND canonical_id IN ({}) \
@@ -173,14 +177,23 @@ mod tests {
     use storage::StoragePool;
 
     async fn setup() -> (EntityAttentionRepo, SqlitePool) {
-        let pool = StoragePool::connect_in_memory().await.unwrap().inner().clone();
+        let pool = StoragePool::connect_in_memory()
+            .await
+            .unwrap()
+            .inner()
+            .clone();
         StoragePool::run_feature_migrations(&pool, &crate::launcher_migrations())
             .await
             .unwrap();
         (EntityAttentionRepo::new(pool.clone()), pool)
     }
 
-    fn row(canonical_id: &str, kind: &str, display_name: &str, attention_secs: i64) -> EntityAttentionRow {
+    fn row(
+        canonical_id: &str,
+        kind: &str,
+        display_name: &str,
+        attention_secs: i64,
+    ) -> EntityAttentionRow {
         EntityAttentionRow {
             canonical_id: canonical_id.to_string(),
             kind: kind.to_string(),
@@ -195,9 +208,15 @@ mod tests {
     #[tokio::test]
     async fn upsert_and_top_by_attention() {
         let (repo, _pool) = setup().await;
-        repo.upsert(&row("com.apple.Safari", "app", "Safari", 3600)).await.unwrap();
-        repo.upsert(&row("github.com", "site", "GitHub", 7200)).await.unwrap();
-        repo.upsert(&row("com.apple.Xcode", "app", "Xcode", 1800)).await.unwrap();
+        repo.upsert(&row("com.apple.Safari", "app", "Safari", 3600))
+            .await
+            .unwrap();
+        repo.upsert(&row("github.com", "site", "GitHub", 7200))
+            .await
+            .unwrap();
+        repo.upsert(&row("com.apple.Xcode", "app", "Xcode", 1800))
+            .await
+            .unwrap();
 
         let top = repo.top_by_attention(None, 10).await.unwrap();
         assert_eq!(top.len(), 3);
@@ -213,8 +232,12 @@ mod tests {
     #[tokio::test]
     async fn upsert_overwrites_on_conflict() {
         let (repo, _pool) = setup().await;
-        repo.upsert(&row("com.apple.Safari", "app", "Safari", 100)).await.unwrap();
-        repo.upsert(&row("com.apple.Safari", "app", "Safari", 200)).await.unwrap();
+        repo.upsert(&row("com.apple.Safari", "app", "Safari", 100))
+            .await
+            .unwrap();
+        repo.upsert(&row("com.apple.Safari", "app", "Safari", 200))
+            .await
+            .unwrap();
 
         let top = repo.top_by_attention(None, 1).await.unwrap();
         assert_eq!(top[0].attention_secs, 200);
@@ -224,7 +247,8 @@ mod tests {
     async fn purge_older_than_removes_stale() {
         let (repo, _pool) = setup().await;
         let mut old = row("old.app", "app", "Old App", 100);
-        old.last_used_at = (jiff::Timestamp::now() - jiff::SignedDuration::from_hours(48 * 24)).to_string();
+        old.last_used_at =
+            (jiff::Timestamp::now() - jiff::SignedDuration::from_hours(48 * 24)).to_string();
         repo.upsert(&old).await.unwrap();
 
         let fresh = row("fresh.app", "app", "Fresh App", 100);
@@ -241,26 +265,42 @@ mod tests {
     #[tokio::test]
     async fn personal_for_paths_returns_scores() {
         let (repo, _pool) = setup().await;
-        repo.upsert(&row("/home/user/project/main.rs", "file", "main.rs", 500)).await.unwrap();
-        repo.upsert(&row("/home/user/project/lib.rs", "file", "lib.rs", 250)).await.unwrap();
+        repo.upsert(&row("/home/user/project/main.rs", "file", "main.rs", 500))
+            .await
+            .unwrap();
+        repo.upsert(&row("/home/user/project/lib.rs", "file", "lib.rs", 250))
+            .await
+            .unwrap();
 
-        let scores = repo.personal_for_paths(&[
-            "/home/user/project/main.rs".to_string(),
-            "/home/user/project/lib.rs".to_string(),
-            "/home/user/other.rs".to_string(),
-        ]).await.unwrap();
+        let scores = repo
+            .personal_for_paths(&[
+                "/home/user/project/main.rs".to_string(),
+                "/home/user/project/lib.rs".to_string(),
+                "/home/user/other.rs".to_string(),
+            ])
+            .await
+            .unwrap();
 
         assert_eq!(scores.len(), 2);
-        assert!(scores.get("/home/user/project/main.rs").unwrap() > scores.get("/home/user/project/lib.rs").unwrap());
+        assert!(
+            scores.get("/home/user/project/main.rs").unwrap()
+                > scores.get("/home/user/project/lib.rs").unwrap()
+        );
         assert!(*scores.get("/home/user/project/main.rs").unwrap() <= 1.0);
     }
 
     #[tokio::test]
     async fn fts_search_ranks_by_combined_bm25_and_attention() {
         let (repo, _pool) = setup().await;
-        repo.upsert(&row("com.apple.Safari", "app", "Safari", 100)).await.unwrap();
-        repo.upsert(&row("com.google.Chrome", "app", "Google Chrome", 500)).await.unwrap();
-        repo.upsert(&row("org.mozilla.Firefox", "app", "Firefox", 300)).await.unwrap();
+        repo.upsert(&row("com.apple.Safari", "app", "Safari", 100))
+            .await
+            .unwrap();
+        repo.upsert(&row("com.google.Chrome", "app", "Google Chrome", 500))
+            .await
+            .unwrap();
+        repo.upsert(&row("org.mozilla.Firefox", "app", "Firefox", 300))
+            .await
+            .unwrap();
 
         // Searching for "chrome" should return Google Chrome.
         let results = repo.fts_search("chrome", 10).await.unwrap();

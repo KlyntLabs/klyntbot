@@ -424,7 +424,9 @@ impl LlmConsolidationHandler {
     }
 }
 
-pub(crate) fn build_consolidation_user_message(candidates: &[cognitive::ConsolidationCandidate]) -> String {
+pub(crate) fn build_consolidation_user_message(
+    candidates: &[cognitive::ConsolidationCandidate],
+) -> String {
     use std::fmt::Write;
     let mut out = String::new();
     out.push_str("CANDIDATES:\n");
@@ -442,7 +444,11 @@ pub(crate) fn build_consolidation_user_message(candidates: &[cognitive::Consolid
         if !c.existing.is_empty() {
             out.push_str("  existing for same subject+predicate:\n");
             for ex in &c.existing {
-                let _ = writeln!(out, "    - id={} object={} confidence={:.2}", ex.id, ex.object, ex.confidence);
+                let _ = writeln!(
+                    out,
+                    "    - id={} object={} confidence={:.2}",
+                    ex.id, ex.object, ex.confidence
+                );
             }
         }
         if !c.subject_neighborhood.is_empty() {
@@ -460,7 +466,11 @@ pub(crate) fn build_consolidation_user_message(candidates: &[cognitive::Consolid
         if !c.cross_entity_facts.is_empty() {
             out.push_str("  CROSS-ENTITY FACTS (different subject/predicate, same entities):\n");
             for f in &c.cross_entity_facts {
-                let _ = writeln!(out, "    - {} -- {} -- {}", f.subject, f.predicate, f.object);
+                let _ = writeln!(
+                    out,
+                    "    - {} -- {} -- {}",
+                    f.subject, f.predicate, f.object
+                );
             }
         }
     }
@@ -549,10 +559,8 @@ impl ConsolidationHandler for LlmConsolidationHandler {
         }
 
         // Build prompt for candidates that need LLM decisions
-        let llm_candidates: Vec<cognitive::ConsolidationCandidate> = llm_indices
-            .iter()
-            .map(|&i| candidates[i].clone())
-            .collect();
+        let llm_candidates: Vec<cognitive::ConsolidationCandidate> =
+            llm_indices.iter().map(|&i| candidates[i].clone()).collect();
         let user_msg = build_consolidation_user_message(&llm_candidates);
 
         let messages = vec![
@@ -652,7 +660,10 @@ impl LlmGraphLinkHandler {
 
 #[async_trait]
 impl cognitive::services::graph_linker::GraphLinkHandler for LlmGraphLinkHandler {
-    async fn link(&self, input: cognitive::services::graph_linker_types::GraphLinkInput) -> common::Result<cognitive::services::graph_linker_types::GraphLinkOutput> {
+    async fn link(
+        &self,
+        input: cognitive::services::graph_linker_types::GraphLinkInput,
+    ) -> common::Result<cognitive::services::graph_linker_types::GraphLinkOutput> {
         if !cognitive::services::graph_linker_types::should_invoke_linker(&input) {
             return Ok(cognitive::services::graph_linker_types::GraphLinkOutput::default());
         }
@@ -668,10 +679,16 @@ impl cognitive::services::graph_linker::GraphLinkHandler for LlmGraphLinkHandler
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("graph_link: {e}"))))?;
+            .map_err(|e| {
+                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                    "graph_link: {e}"
+                )))
+            })?;
 
         let text = resp.content.unwrap_or_default();
-        match serde_json::from_str::<cognitive::services::graph_linker_types::GraphLinkOutput>(&text) {
+        match serde_json::from_str::<cognitive::services::graph_linker_types::GraphLinkOutput>(
+            &text,
+        ) {
             Ok(out) => Ok(out),
             Err(e) => {
                 tracing::warn!(error = %e, raw = %text, "graph_link: failed to parse LLM JSON; returning empty output");
@@ -681,7 +698,9 @@ impl cognitive::services::graph_linker::GraphLinkHandler for LlmGraphLinkHandler
     }
 }
 
-fn build_graph_link_user_message(input: &cognitive::services::graph_linker_types::GraphLinkInput) -> String {
+fn build_graph_link_user_message(
+    input: &cognitive::services::graph_linker_types::GraphLinkInput,
+) -> String {
     use std::fmt::Write;
     let mut s = String::new();
     let nf = &input.new_fact;
@@ -1404,8 +1423,8 @@ mod tests {
 
     #[tokio::test]
     async fn llm_graph_link_handler_parses_well_formed_response() {
-        use cognitive::services::graph_linker_types::*;
         use cognitive::services::graph_linker::GraphLinkHandler;
+        use cognitive::services::graph_linker_types::*;
 
         let json_response = r#"{
             "merges": [],
@@ -1450,8 +1469,8 @@ mod tests {
 
     #[tokio::test]
     async fn llm_graph_link_handler_returns_empty_on_malformed_response() {
-        use cognitive::services::graph_linker_types::*;
         use cognitive::services::graph_linker::GraphLinkHandler;
+        use cognitive::services::graph_linker_types::*;
 
         let mock = Arc::new(MockProvider::new(mock_response("not json")));
         let params = ChatParams::new("test-model");
@@ -1597,7 +1616,10 @@ mod tests {
 
         let msg = build_consolidation_user_message(&[cand]);
 
-        assert!(msg.contains("SUBJECT NEIGHBORHOOD"), "must include neighborhood section, got:\n{msg}");
+        assert!(
+            msg.contains("SUBJECT NEIGHBORHOOD"),
+            "must include neighborhood section, got:\n{msg}"
+        );
         assert!(msg.contains("knows -> Bob"));
         assert!(msg.contains("CROSS-ENTITY FACTS"));
         assert!(msg.contains("works_at"));

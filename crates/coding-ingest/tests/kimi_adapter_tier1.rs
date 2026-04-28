@@ -3,8 +3,7 @@
 use coding_ingest::adapters::kimi_cli::dispatch::dispatch;
 
 fn ok(event: &str, payload: &str) {
-    let parsed = dispatch(event, payload.as_bytes())
-        .unwrap_or_else(|e| panic!("{event}: {e}"));
+    let parsed = dispatch(event, payload.as_bytes()).unwrap_or_else(|e| panic!("{event}: {e}"));
     assert!(parsed.is_some(), "{event} produced None");
 }
 
@@ -12,7 +11,10 @@ fn ok(event: &str, payload: &str) {
 fn dispatch_covers_thirteen_events() {
     let common = r#""session_id":"s1","cwd":"/tmp""#;
 
-    ok("SessionStart", &format!("{{{common},\"model\":\"kimi\",\"source\":\"cli\"}}"));
+    ok(
+        "SessionStart",
+        &format!("{{{common},\"model\":\"kimi\",\"source\":\"cli\"}}"),
+    );
     ok("SessionEnd", &format!("{{{common},\"reason\":\"quit\"}}"));
     ok("UserPrompt", &format!("{{{common},\"prompt\":\"hi\"}}"));
     ok("AssistantMsg", &format!("{{{common},\"text\":\"hi\"}}"));
@@ -28,7 +30,10 @@ fn dispatch_covers_thirteen_events() {
         "TestRun",
         &format!("{{{common},\"command\":\"cargo test\",\"passed\":1,\"failed\":0}}"),
     );
-    ok("CompactEvent", &format!("{{{common},\"trigger\":\"auto\"}}"));
+    ok(
+        "CompactEvent",
+        &format!("{{{common},\"trigger\":\"auto\"}}"),
+    );
     ok("Error", &format!("{{{common},\"message\":\"boom\"}}"));
     ok(
         "SkillActivated",
@@ -47,6 +52,10 @@ fn dispatch_covers_thirteen_events() {
 
 #[test]
 fn unknown_event_returns_none() {
-    let r = dispatch("DefinitelyUnknown", b"{\"session_id\":\"s\",\"cwd\":\"/x\"}").unwrap();
+    let r = dispatch(
+        "DefinitelyUnknown",
+        b"{\"session_id\":\"s\",\"cwd\":\"/x\"}",
+    )
+    .unwrap();
     assert!(r.is_none());
 }

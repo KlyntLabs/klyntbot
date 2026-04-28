@@ -1,6 +1,6 @@
 //! Distiller halts Phase B when daily cost ceiling is breached.
 
-use coding_memory::distiller::{Distiller, DistillerConfig, DistillerError};
+use coding_memory::distiller::{Distiller, DistillerConfig};
 use std::sync::Arc;
 
 mod common;
@@ -51,5 +51,8 @@ async fn phase_b_halts_at_ceiling() {
     let result = distiller.distill_turn("s1", Some("t1")).await;
     assert!(result.is_err(), "expected error, got {result:?}");
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("cost ceiling"), "expected 'cost ceiling' in error: {err}");
+    assert!(
+        err.contains("cost ceiling"),
+        "expected 'cost ceiling' in error: {err}"
+    );
 }

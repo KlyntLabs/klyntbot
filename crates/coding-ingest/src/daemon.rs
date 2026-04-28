@@ -170,9 +170,12 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
 
     // Opencode poller task — optional, spawned when db path is configured.
     let opencode_task = if let Some(db_path) = cfg.opencode_db_path {
-        let interval = cfg.opencode_poll_interval.unwrap_or(std::time::Duration::from_millis(500));
+        let interval = cfg
+            .opencode_poll_interval
+            .unwrap_or(std::time::Duration::from_millis(500));
         if let Some(tx) = cfg.event_tx.clone() {
-            let poller = crate::adapters::opencode::poller::OpencodePoller::new(db_path, tx, interval);
+            let poller =
+                crate::adapters::opencode::poller::OpencodePoller::new(db_path, tx, interval);
             Some(poller.spawn())
         } else {
             tracing::warn!("opencode db path set but no event_tx — poller not spawned");

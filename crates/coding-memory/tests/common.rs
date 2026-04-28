@@ -1,4 +1,5 @@
 //! Shared test helpers for coding-memory tests.
+#![allow(dead_code)]
 
 use coding_memory::distiller::writer::{DistillerWriter, PreparedFact};
 use cognitive::{EpisodicMemoryRepo, SemanticFactRepo};

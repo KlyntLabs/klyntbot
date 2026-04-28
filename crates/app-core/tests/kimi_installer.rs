@@ -10,7 +10,12 @@ fn install_writes_managed_block_to_kimi_hooks_json() {
     let body = std::fs::read_to_string(&cfg).unwrap();
     let v: serde_json::Value = serde_json::from_str(&body).unwrap();
     let entries = v["klyntbot"].as_array().unwrap();
-    assert_eq!(entries.len(), 13, "expected 13 hooks, got {}", entries.len());
+    assert_eq!(
+        entries.len(),
+        13,
+        "expected 13 hooks, got {}",
+        entries.len()
+    );
 }
 
 #[test]

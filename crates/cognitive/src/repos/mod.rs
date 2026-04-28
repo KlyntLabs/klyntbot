@@ -156,6 +156,13 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
                 .to_string(),
             sql: include_str!("../../migrations/008_mirror_coding_alert.sql").to_string(),
         },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 6,
+            description: "Edge typing for entity_relationships (causal/correlational/temporal/structural)"
+                .to_string(),
+            sql: include_str!("../../migrations/009_edge_types.sql").to_string(),
+        },
     ]
 }
 

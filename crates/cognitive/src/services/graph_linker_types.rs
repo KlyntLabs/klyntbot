@@ -84,7 +84,8 @@ pub struct SupersedeOp {
 
 /// Heuristic gate: skip the LLM call when we have no graph context to work with.
 pub fn should_invoke_linker(input: &GraphLinkInput) -> bool {
-    let has_neighborhood = !input.subject_neighborhood.is_empty() || !input.object_neighborhood.is_empty();
+    let has_neighborhood =
+        !input.subject_neighborhood.is_empty() || !input.object_neighborhood.is_empty();
     let has_candidates = !input.candidate_facts.is_empty();
     has_neighborhood || has_candidates
 }

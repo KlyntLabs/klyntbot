@@ -47,6 +47,11 @@ fn list_for_scope_matches_repo_id() {
     let store = SkillStore::load(&dir).unwrap();
 
     let repo = store.list_for_scope(Some("my-org/my-repo"));
-    assert_eq!(repo.len(), 1, "expected 1 repo-scoped skill, got {}", repo.len());
+    assert_eq!(
+        repo.len(),
+        1,
+        "expected 1 repo-scoped skill, got {}",
+        repo.len()
+    );
     assert_eq!(repo[0].frontmatter.name, "repo-specific");
 }

@@ -9,12 +9,9 @@ use coding_memory::distiller::test_helpers::{distill_test_turn, FixtureBuilder};
 #[tokio::test]
 async fn distiller_writes_entity_edges_for_repo_context_fact() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    storage::StoragePool::run_feature_migrations(
-        pool.inner(),
-        &cognitive::cognitive_migrations(),
-    )
-    .await
-    .unwrap();
+    storage::StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
     let fact_repo = SemanticFactRepo::new(pool.inner().clone());
     let entity_repo = EntityRepo::new(pool.inner().clone());
 
@@ -37,5 +34,9 @@ async fn distiller_writes_entity_edges_for_repo_context_fact() {
         .await
         .unwrap();
     let names: Vec<&str> = nbrs.iter().map(|n| n.neighbor.name.as_str()).collect();
-    assert!(names.contains(&"cargo-nextest"), "expected cargo-nextest neighbor, got {:?}", names);
+    assert!(
+        names.contains(&"cargo-nextest"),
+        "expected cargo-nextest neighbor, got {:?}",
+        names
+    );
 }

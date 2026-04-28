@@ -74,28 +74,31 @@ impl AttentionAggregator {
             let decay = (-lambda * days_ago).exp();
             let weighted = row.duration_secs.unwrap_or(0) as f64 * decay;
 
-            groups.entry(key).and_modify(|acc| {
-                acc.attention_secs += weighted;
-                if row.started_at > acc.last_used_at {
-                    acc.last_used_at = row.started_at.clone();
-                    // Prefer the most recent display_name.
-                    if !row.display_name.is_empty() {
-                        acc.display_name = row.display_name.clone();
+            groups
+                .entry(key)
+                .and_modify(|acc| {
+                    acc.attention_secs += weighted;
+                    if row.started_at > acc.last_used_at {
+                        acc.last_used_at = row.started_at.clone();
+                        // Prefer the most recent display_name.
+                        if !row.display_name.is_empty() {
+                            acc.display_name = row.display_name.clone();
+                        }
                     }
-                }
-                if row.category_id.is_some() {
-                    acc.category_id = row.category_id.clone();
-                }
-            }).or_insert(Accum {
-                display_name: if row.display_name.is_empty() {
-                    row.canonical_id.clone()
-                } else {
-                    row.display_name.clone()
-                },
-                attention_secs: weighted,
-                last_used_at: row.started_at,
-                category_id: row.category_id,
-            });
+                    if row.category_id.is_some() {
+                        acc.category_id = row.category_id.clone();
+                    }
+                })
+                .or_insert(Accum {
+                    display_name: if row.display_name.is_empty() {
+                        row.canonical_id.clone()
+                    } else {
+                        row.display_name.clone()
+                    },
+                    attention_secs: weighted,
+                    last_used_at: row.started_at,
+                    category_id: row.category_id,
+                });
         }
 
         let unique_category_ids: Vec<String> = groups
@@ -174,7 +177,11 @@ mod tests {
     use storage::StoragePool;
 
     async fn setup() -> (AttentionAggregator, SqlitePool) {
-        let pool = StoragePool::connect_in_memory().await.unwrap().inner().clone();
+        let pool = StoragePool::connect_in_memory()
+            .await
+            .unwrap()
+            .inner()
+            .clone();
         StoragePool::run_feature_migrations(&pool, &crate::launcher_migrations())
             .await
             .unwrap();
@@ -209,10 +216,23 @@ mod tests {
 
         // Seed some activity events.
         let now = jiff::Timestamp::now();
-        let events: Vec<(&str, Option<&str>, Option<&str>, i64, jiff::Timestamp)> = vec![
+        type EventRow<'a> = (
+            &'a str,
+            Option<&'a str>,
+            Option<&'a str>,
+            i64,
+            jiff::Timestamp,
+        );
+        let events: Vec<EventRow> = vec![
             ("Safari", None, Some("com.apple.Safari"), 3600, now),
             ("Safari", None, Some("com.apple.Safari"), 1800, now),
-            ("Chrome", Some("github.com"), Some("com.google.Chrome"), 7200, now),
+            (
+                "Chrome",
+                Some("github.com"),
+                Some("com.google.Chrome"),
+                7200,
+                now,
+            ),
         ];
 
         for (app, site, bundle, dur, ts) in events {

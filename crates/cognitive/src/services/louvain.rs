@@ -228,11 +228,15 @@ fn phase1_local_moves(edges: &[(String, String, f64)]) -> CommunityAssignment {
     }
 }
 
+type WeightedEdge = (String, String, f64);
+
+type NodeOriginMap = HashMap<String, Vec<String>>;
+
 fn contract(
-    edges: &[(String, String, f64)],
+    edges: &[WeightedEdge],
     assignments: &HashMap<String, usize>,
-    node_to_origin: &HashMap<String, Vec<String>>,
-) -> (Vec<(String, String, f64)>, HashMap<String, Vec<String>>) {
+    node_to_origin: &NodeOriginMap,
+) -> (Vec<WeightedEdge>, NodeOriginMap) {
     let mut acc: HashMap<(String, String), f64> = HashMap::new();
     for (a, b, w) in edges {
         let ca = assignments.get(a).unwrap_or(&0).to_string();
@@ -241,10 +245,8 @@ fn contract(
         *acc.entry((lo, hi)).or_insert(0.0) += w;
     }
     // Keep self-loops — they contribute to super-node degrees in the next Phase 1.
-    let new_edges: Vec<(String, String, f64)> = acc
-        .into_iter()
-        .map(|((a, b), w)| (a, b, w))
-        .collect();
+    let new_edges: Vec<(String, String, f64)> =
+        acc.into_iter().map(|((a, b), w)| (a, b, w)).collect();
 
     // Each super-node tracks which original nodes it represents.
     let mut new_origin: HashMap<String, Vec<String>> = HashMap::new();
@@ -372,11 +374,21 @@ mod tests {
         ];
         let result = detect_communities(&edges);
         let unique: std::collections::HashSet<_> = result.assignments.values().collect();
-        assert_eq!(unique.len(), 2, "expected exactly 2 communities, got {}: {:?}", unique.len(), result.assignments);
+        assert_eq!(
+            unique.len(),
+            2,
+            "expected exactly 2 communities, got {}: {:?}",
+            unique.len(),
+            result.assignments
+        );
         // Same-clique nodes share community.
         assert_eq!(result.assignments["a"], result.assignments["b"]);
         assert_eq!(result.assignments["e"], result.assignments["f"]);
         assert_ne!(result.assignments["a"], result.assignments["e"]);
-        assert!(result.modularity > 0.30, "expected modularity > 0.30, got {}", result.modularity);
+        assert!(
+            result.modularity > 0.30,
+            "expected modularity > 0.30, got {}",
+            result.modularity
+        );
     }
 }

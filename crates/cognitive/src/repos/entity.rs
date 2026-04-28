@@ -46,6 +46,8 @@ pub struct RelationshipRow {
     pub source: String,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub edge_type: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +57,34 @@ pub struct NewRelationship {
     pub relationship_type: String,
     pub evidence: Option<String>,
     pub source: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EdgeType {
+    Causal,
+    Correlational,
+    Temporal,
+    Structural,
+}
+
+impl EdgeType {
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "causal" => Self::Causal,
+            "temporal" => Self::Temporal,
+            "structural" => Self::Structural,
+            _ => Self::Correlational,
+        }
+    }
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Causal => "causal",
+            Self::Correlational => "correlational",
+            Self::Temporal => "temporal",
+            Self::Structural => "structural",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +99,7 @@ pub struct GraphNeighborhood {
 pub struct NeighborhoodEdge {
     pub neighbor: EntityRow,
     pub relationship_type: String,
+    pub edge_type: EdgeType,
     pub strength: f64,
 }
 
@@ -241,6 +272,76 @@ impl EntityRepo {
         }
     }
 
+    /// Upsert a relationship with an explicit edge type (KCA Track 9-typing).
+    /// If same source+target+type exists, bump strength by 0.1 (capped at 1.0) and update edge_type.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn upsert_relationship_typed(
+        &self,
+        source: &str,
+        target: &str,
+        relationship_type: &str,
+        edge_type: &str,
+        strength: f64,
+        evidence: Option<&str>,
+        source_label: &str,
+    ) -> Result<RelationshipRow, sqlx::Error> {
+        let now = jiff::Timestamp::now().to_string();
+        let normalized = EdgeType::parse(edge_type).as_str();
+
+        let existing = sqlx::query_as::<_, RelationshipRow>(
+            "SELECT * FROM entity_relationships WHERE source_entity_id = ?1 AND target_entity_id = ?2 AND relationship_type = ?3",
+        )
+        .bind(source)
+        .bind(target)
+        .bind(relationship_type)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        if let Some(row) = existing {
+            let new_strength = (row.strength + 0.1).min(1.0);
+            sqlx::query(
+                "UPDATE entity_relationships SET strength = ?1, updated_at = ?2, evidence = COALESCE(?3, evidence), edge_type = ?4 WHERE id = ?5",
+            )
+            .bind(new_strength)
+            .bind(&now)
+            .bind(evidence)
+            .bind(normalized)
+            .bind(&row.id)
+            .execute(&self.pool)
+            .await?;
+
+            sqlx::query_as::<_, RelationshipRow>("SELECT * FROM entity_relationships WHERE id = ?1")
+                .bind(&row.id)
+                .fetch_one(&self.pool)
+                .await
+        } else {
+            let id = uuid::Uuid::new_v4().to_string();
+            sqlx::query(
+                r#"
+                INSERT INTO entity_relationships (id, source_entity_id, target_entity_id,
+                    relationship_type, edge_type, strength, evidence, source, created_at, updated_at)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
+                "#,
+            )
+            .bind(&id)
+            .bind(source)
+            .bind(target)
+            .bind(relationship_type)
+            .bind(normalized)
+            .bind(strength)
+            .bind(evidence)
+            .bind(source_label)
+            .bind(&now)
+            .execute(&self.pool)
+            .await?;
+
+            sqlx::query_as::<_, RelationshipRow>("SELECT * FROM entity_relationships WHERE id = ?1")
+                .bind(&id)
+                .fetch_one(&self.pool)
+                .await
+        }
+    }
+
     /// Get a neighborhood around an entity at depth 1 or 2.
     pub async fn get_neighborhood(
         &self,
@@ -315,7 +416,10 @@ impl EntityRepo {
     ) -> Result<Vec<NeighborhoodEdge>, sqlx::Error> {
         let rows = sqlx::query_as::<_, RelationshipRow>(
             r#"
-            SELECT * FROM entity_relationships
+            SELECT id, source_entity_id, target_entity_id, relationship_type, strength, evidence,
+                   valid_from, valid_until, source, created_at, updated_at,
+                   COALESCE(edge_type, 'correlational') as edge_type
+            FROM entity_relationships
             WHERE (source_entity_id = ?1 OR target_entity_id = ?1)
               AND valid_until IS NULL
             ORDER BY strength DESC
@@ -335,17 +439,26 @@ impl EntityRepo {
                 &r.source_entity_id
             };
             neighbor_ids.push(other.clone());
-            rel_map.insert(other.clone(), (r.relationship_type.clone(), r.strength));
+            let et = r
+                .edge_type
+                .as_deref()
+                .map(EdgeType::parse)
+                .unwrap_or(EdgeType::Correlational);
+            rel_map.insert(other.clone(), (r.relationship_type.clone(), r.strength, et));
         }
 
         let neighbors = self.get_entities_by_ids(&neighbor_ids).await?;
         Ok(neighbors
             .into_iter()
             .map(|n| {
-                let (rel_type, strength) = rel_map.get(&n.id).cloned().unwrap_or_default();
+                let (rel_type, strength, edge_type) = rel_map
+                    .get(&n.id)
+                    .cloned()
+                    .unwrap_or_else(|| (String::new(), 0.0, EdgeType::Correlational));
                 NeighborhoodEdge {
                     neighbor: n,
                     relationship_type: rel_type,
+                    edge_type,
                     strength,
                 }
             })
@@ -902,11 +1015,103 @@ mod tests {
         .await
         .unwrap();
 
-        let nbrs = repo.get_neighborhood_with_edges(&alice.id, 1).await.unwrap();
+        let nbrs = repo
+            .get_neighborhood_with_edges(&alice.id, 1)
+            .await
+            .unwrap();
 
         // 1-hop from Alice: only Bob (Charlie is 2-hop)
         assert_eq!(nbrs.len(), 1);
         assert_eq!(nbrs[0].neighbor.name, "Bob");
         assert_eq!(nbrs[0].relationship_type, "knows");
+    }
+
+    #[test]
+    fn edge_type_parse_known_values() {
+        assert_eq!(EdgeType::parse("causal"), EdgeType::Causal);
+        assert_eq!(EdgeType::parse("correlational"), EdgeType::Correlational);
+        assert_eq!(EdgeType::parse("temporal"), EdgeType::Temporal);
+        assert_eq!(EdgeType::parse("structural"), EdgeType::Structural);
+        assert_eq!(EdgeType::parse("garbage"), EdgeType::Correlational); // fallback
+        assert_eq!(EdgeType::parse(""), EdgeType::Correlational);
+    }
+
+    #[test]
+    fn edge_type_as_str_round_trip() {
+        for t in [
+            EdgeType::Causal,
+            EdgeType::Correlational,
+            EdgeType::Temporal,
+            EdgeType::Structural,
+        ] {
+            assert_eq!(EdgeType::parse(t.as_str()), t);
+        }
+    }
+
+    #[tokio::test]
+    async fn upsert_relationship_typed_persists_edge_type() {
+        let pool = setup().await;
+        let repo = EntityRepo::new(pool.clone());
+        let a = repo.upsert_entity(&person_entity("A")).await.unwrap();
+        let b = repo.upsert_entity(&person_entity("B")).await.unwrap();
+
+        repo.upsert_relationship_typed(
+            &a.id,
+            &b.id,
+            "causes",
+            "causal",
+            0.9,
+            Some("evidence"),
+            "test",
+        )
+        .await
+        .unwrap();
+
+        let row = sqlx::query_as::<_, RelationshipRow>(
+            "SELECT * FROM entity_relationships WHERE source_entity_id = ?1 AND target_entity_id = ?2 AND relationship_type = 'causes'",
+        )
+        .bind(&a.id)
+        .bind(&b.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert_eq!(row.edge_type.as_deref(), Some("causal"));
+        assert!((row.strength - 0.9).abs() < 1e-6);
+    }
+
+    #[tokio::test]
+    async fn neighborhood_with_edges_includes_edge_type() {
+        let pool = setup().await;
+        let repo = EntityRepo::new(pool.clone());
+        let a = repo
+            .upsert_entity(&NewEntity {
+                name: "Cause".into(),
+                entity_type: "concept".into(),
+                description: None,
+                source: "t".into(),
+                source_id: None,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+        let b = repo
+            .upsert_entity(&NewEntity {
+                name: "Effect".into(),
+                entity_type: "concept".into(),
+                description: None,
+                source: "t".into(),
+                source_id: None,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+        repo.upsert_relationship_typed(&a.id, &b.id, "leads_to", "causal", 0.9, None, "t")
+            .await
+            .unwrap();
+
+        let nbrs = repo.get_neighborhood_with_edges(&a.id, 1).await.unwrap();
+        assert_eq!(nbrs.len(), 1);
+        assert_eq!(nbrs[0].edge_type, EdgeType::Causal);
     }
 }

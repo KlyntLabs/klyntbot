@@ -15,8 +15,6 @@ use tracing::{debug, info, warn};
 
 use bus::DomainEvent;
 
-use futures_util::stream::{FuturesUnordered, StreamExt};
-
 use crate::consolidation::ConsolidationHandler;
 use crate::embedder::SemanticFactEmbedder;
 use crate::extraction::ExtractionHandler;
@@ -154,7 +152,9 @@ pub(crate) async fn prefetch_existing(
                             .await
                             .unwrap_or_default();
                         all.into_iter()
-                            .filter(|f| !(f.subject == cand.subject && f.predicate == cand.predicate))
+                            .filter(|f| {
+                                !(f.subject == cand.subject && f.predicate == cand.predicate)
+                            })
                             .take(5)
                             .collect()
                     }
@@ -180,7 +180,11 @@ pub(crate) async fn prefetch_existing(
 }
 
 fn looks_like_entity_name(s: &str) -> bool {
-    s.len() >= 3 && s.len() <= 100 && !s.chars().all(|c| c.is_ascii_digit() || c == '.' || c == '-')
+    s.len() >= 3
+        && s.len() <= 100
+        && !s
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
 }
 
 /// Configuration for starting the background consolidation service (avoids too-many-arguments).
@@ -500,8 +504,7 @@ impl BackgroundConsolidationService {
                         })
                         .collect();
                     let entity_repo = crate::repos::EntityRepo::new(repo.pool().clone());
-                    let candidates =
-                        prefetch_existing(&repo, &entity_repo, extracted_facts).await;
+                    let candidates = prefetch_existing(&repo, &entity_repo, extracted_facts).await;
 
                     if !candidates.is_empty() {
                         let ops = match consolidation.decide_batch(&candidates).await {
@@ -689,20 +692,27 @@ impl BackgroundConsolidationService {
                             }
                         }
 
-                        // KCA Track 2: fire-and-forget graph linker for newly written facts.
                         if let Some(ref linker) = graph_link_handler {
-                            let written: Vec<(crate::types::SemanticFact, crate::types::MemoryOp)> = candidates
-                                .iter()
-                                .zip(ops.iter())
-                                .filter(|(_, op)| matches!(op, crate::types::MemoryOp::Add { .. } | crate::types::MemoryOp::Update { .. }))
-                                .map(|(c, op)| (c.candidate.clone(), op.clone()))
-                                .collect();
+                            let written: Vec<(crate::types::SemanticFact, crate::types::MemoryOp)> =
+                                candidates
+                                    .iter()
+                                    .zip(ops.iter())
+                                    .filter(|(_, op)| {
+                                        matches!(
+                                            op,
+                                            crate::types::MemoryOp::Add { .. }
+                                                | crate::types::MemoryOp::Update { .. }
+                                        )
+                                    })
+                                    .map(|(c, op)| (c.candidate.clone(), op.clone()))
+                                    .collect();
                             if !written.is_empty() {
                                 let linker = linker.clone();
                                 let fr = repo.clone();
                                 let er = entity_repo.clone();
                                 tokio::spawn(async move {
-                                    run_post_consolidation_linker(&fr, &er, linker, written, None).await;
+                                    run_post_consolidation_linker(&fr, &er, linker, written, None)
+                                        .await;
                                 });
                             }
                         }
@@ -803,13 +813,24 @@ pub async fn run_post_consolidation_linker(
     use crate::services::graph_linker_types::*;
 
     for (fact, op) in written {
-        if !matches!(op, crate::types::MemoryOp::Add { .. } | crate::types::MemoryOp::Update { .. }) {
+        if !matches!(
+            op,
+            crate::types::MemoryOp::Add { .. } | crate::types::MemoryOp::Update { .. }
+        ) {
             continue;
         }
 
-        let subject_node = entity_repo.find_by_name(&fact.subject).await.ok().and_then(|r| r.into_iter().next());
+        let subject_node = entity_repo
+            .find_by_name(&fact.subject)
+            .await
+            .ok()
+            .and_then(|r| r.into_iter().next());
         let object_node = if looks_like_entity_name(&fact.object) {
-            entity_repo.find_by_name(&fact.object).await.ok().and_then(|r| r.into_iter().next())
+            entity_repo
+                .find_by_name(&fact.object)
+                .await
+                .ok()
+                .and_then(|r| r.into_iter().next())
         } else {
             None
         };
@@ -900,8 +921,6 @@ async fn apply_graph_link_output(
     fact: &crate::types::SemanticFact,
     out: &crate::services::graph_linker_types::GraphLinkOutput,
 ) -> common::Result<()> {
-    use crate::services::graph_linker_types::*;
-
     // 1. Apply discovered relationships (typed edges).
     for rel in &out.discovered_relationships {
         let src = match entity_repo.find_by_name(&rel.source_entity_name).await {
@@ -914,16 +933,18 @@ async fn apply_graph_link_output(
         };
         if let (Some(s), Some(t)) = (src, tgt) {
             if let Err(e) = entity_repo
-                .upsert_relationship(&crate::repos::NewRelationship {
-                    source_entity_id: s.id,
-                    target_entity_id: t.id,
-                    relationship_type: rel.relationship_type.clone(),
-                    evidence: Some(rel.evidence.clone()),
-                    source: "graph_linker".to_string(),
-                })
+                .upsert_relationship_typed(
+                    &s.id,
+                    &t.id,
+                    &rel.relationship_type,
+                    &rel.edge_type,
+                    rel.strength,
+                    Some(&rel.evidence),
+                    "graph_linker",
+                )
                 .await
             {
-                tracing::debug!(error = %e, "linker: upsert_relationship failed");
+                tracing::debug!(error = %e, "linker: upsert_relationship_typed failed");
             }
         }
     }
@@ -1324,12 +1345,28 @@ mod tests {
         assert_eq!(cand.candidate.subject, "Alice");
 
         // Subject neighborhood should include Bob via "knows"
-        let nbrs: Vec<&str> = cand.subject_neighborhood.iter().map(|(n, _)| n.as_str()).collect();
-        assert!(nbrs.contains(&"Bob"), "subject neighborhood must include Bob, got {:?}", cand.subject_neighborhood);
+        let nbrs: Vec<&str> = cand
+            .subject_neighborhood
+            .iter()
+            .map(|(n, _)| n.as_str())
+            .collect();
+        assert!(
+            nbrs.contains(&"Bob"),
+            "subject neighborhood must include Bob, got {:?}",
+            cand.subject_neighborhood
+        );
 
         // Cross-entity facts should include Bob's works_at fact
-        let cef_subjects: Vec<&str> = cand.cross_entity_facts.iter().map(|f| f.subject.as_str()).collect();
-        assert!(cef_subjects.contains(&"Bob"), "cross-entity facts should include Bob's facts, got {:?}", cef_subjects);
+        let cef_subjects: Vec<&str> = cand
+            .cross_entity_facts
+            .iter()
+            .map(|f| f.subject.as_str())
+            .collect();
+        assert!(
+            cef_subjects.contains(&"Bob"),
+            "cross-entity facts should include Bob's facts, got {:?}",
+            cef_subjects
+        );
     }
 
     use crate::services::graph_linker::GraphLinkHandler;
@@ -1417,7 +1454,12 @@ mod tests {
             &fact_repo,
             &entity_repo,
             linker.clone() as Arc<dyn GraphLinkHandler>,
-            vec![(new_fact.clone(), crate::types::MemoryOp::Add { id: new_fact.id.clone() })],
+            vec![(
+                new_fact.clone(),
+                crate::types::MemoryOp::Add {
+                    id: new_fact.id.clone(),
+                },
+            )],
             None,
         )
         .await;
@@ -1425,7 +1467,10 @@ mod tests {
         let captured = linker.0.lock().unwrap();
         assert_eq!(captured.len(), 1);
         assert_eq!(captured[0].new_fact.subject, "Alice");
-        assert!(!captured[0].subject_neighborhood.is_empty(), "neighborhood must be populated");
+        assert!(
+            !captured[0].subject_neighborhood.is_empty(),
+            "neighborhood must be populated"
+        );
     }
 
     #[tokio::test]
@@ -1466,7 +1511,12 @@ mod tests {
             &fact_repo,
             &entity_repo,
             linker.clone() as Arc<dyn GraphLinkHandler>,
-            vec![(new_fact.clone(), crate::types::MemoryOp::Add { id: new_fact.id.clone() })],
+            vec![(
+                new_fact.clone(),
+                crate::types::MemoryOp::Add {
+                    id: new_fact.id.clone(),
+                },
+            )],
             None,
         )
         .await;

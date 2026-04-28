@@ -7,6 +7,8 @@
 
 use crate::recall::budget::{default_budgeter, HeuristicBudgeter, TokenBudgeter};
 use crate::recall::{CodingRecallService, RecallQuery};
+use cognitive::repos::entity::{EdgeType, EntityRepo};
+use std::fmt::Write;
 use std::sync::Arc;
 
 /// Token budget for SessionStart injection (design §8).
@@ -92,6 +94,57 @@ pub async fn render_session_start_block(
     Ok(truncated)
 }
 
+/// Render causal + related context from the entity graph, grouped by edge type.
+///
+/// Causal edges are shown under `### Causal Context`; everything else
+/// (structural, temporal, correlational) under `### Related Context`.
+pub async fn render_causal_context(
+    entity_repo: &EntityRepo,
+    seed_names: &[&str],
+) -> common::Result<String> {
+    let mut causal = Vec::new();
+    let mut other = Vec::new();
+
+    for name in seed_names {
+        let entities = entity_repo.find_by_name(name).await?;
+        for node in &entities {
+            let edges = entity_repo
+                .get_neighborhood_with_edges(&node.id, 1)
+                .await
+                .unwrap_or_default();
+            for edge in edges {
+                let line = format!(
+                    "- {} —[{}]→ {}",
+                    node.name, edge.relationship_type, edge.neighbor.name
+                );
+                if edge.edge_type == EdgeType::Causal {
+                    causal.push(line);
+                } else {
+                    other.push(line);
+                }
+            }
+        }
+    }
+
+    let mut s = String::new();
+    if !causal.is_empty() {
+        s.push_str("### Causal Context\n");
+        for c in causal {
+            let _ = writeln!(s, "{c}");
+        }
+    }
+    if !other.is_empty() {
+        if !s.is_empty() {
+            s.push('\n');
+        }
+        s.push_str("### Related Context\n");
+        for c in other {
+            let _ = writeln!(s, "{c}");
+        }
+    }
+    Ok(s)
+}
+
 /// Render the UserPromptSubmit injection block.
 pub async fn render_user_prompt_block(
     svc: &Arc<CodingRecallService>,
@@ -130,7 +183,9 @@ pub async fn render_user_prompt_block(
     };
 
     // Likely-relevant memories.
-    let idx = svc.recall_index(&enhanced_query, repo, None, None, 6).await?;
+    let idx = svc
+        .recall_index(&enhanced_query, repo, None, None, 6)
+        .await?;
     let mut likely = String::from("### Likely relevant\n");
     for r in idx.results.iter().take(6) {
         likely.push_str(&format!(
@@ -142,28 +197,23 @@ pub async fn render_user_prompt_block(
     }
     likely.push('\n');
 
-    // Causal context — list edges originating from the top likely-relevant
-    // memories (up to 3) at depth 1. Empty section is suppressed.
+    // Causal / related context from the entity graph.
     let mut causal = String::new();
-    if let Some(top) = idx.results.first() {
-        if let Ok(parsed_id) = uuid::Uuid::parse_str(&top.id.to_string()) {
-            match svc.trace_causes(parsed_id, repo, 1).await {
-                Ok(trace) if !trace.descendants.is_empty() => {
-                    causal.push_str("### Causal context\n");
-                    for edge in trace.descendants.iter().take(5) {
-                        causal.push_str(&format!(
-                            "- `{}` → `{}` ({:?})\n",
-                            short_id(&edge.from_id.to_string()),
-                            short_id(&edge.to_id.to_string()),
-                            edge.edge_kind
-                        ));
-                    }
-                    causal.push('\n');
-                }
-                Ok(_) => {} // No edges — omit section entirely.
-                Err(e) => {
-                    tracing::debug!(error = %e, "trace_causes failed in render_user_prompt_block");
-                }
+    let seed_names: Vec<&str> = idx
+        .results
+        .iter()
+        .take(3)
+        .map(|r| r.title.as_str())
+        .collect();
+    if let Some(entity_repo) = svc.entity_repo() {
+        match render_causal_context(entity_repo, &seed_names).await {
+            Ok(ctx) if !ctx.is_empty() => {
+                causal.push_str(&ctx);
+                causal.push('\n');
+            }
+            Ok(_) => {}
+            Err(e) => {
+                tracing::debug!(error = %e, "render_causal_context failed in render_user_prompt_block");
             }
         }
     }

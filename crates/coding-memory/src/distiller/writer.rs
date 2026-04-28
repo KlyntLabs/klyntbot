@@ -54,7 +54,11 @@ impl DistillerWriter {
     /// Construct a writer around existing cognitive repos.
     #[must_use]
     pub fn new(facts: SemanticFactRepo, episodes: EpisodicMemoryRepo) -> Self {
-        Self { facts, episodes, entity_repo: None }
+        Self {
+            facts,
+            episodes,
+            entity_repo: None,
+        }
     }
 
     /// Attach an entity repo for graph-edge writes (KCA Track 3).
@@ -87,9 +91,9 @@ impl DistillerWriter {
                 detail: format!("upsert_with_metadata: {e}"),
             })?;
 
-        // KCA Track 3: write entity edges for distilled facts.
         if let Some(ref er) = self.entity_repo {
-            crate::distiller::phase_c::write_entity_edges_for_distiller_fact(&prepared.fact, er).await;
+            crate::distiller::phase_c::write_entity_edges_for_distiller_fact(&prepared.fact, er)
+                .await;
         }
 
         Ok(())
@@ -130,6 +134,11 @@ impl DistillerWriter {
         &self.episodes
     }
 
+    /// Borrow the optional entity repo.
+    pub fn entity_repo(&self) -> Option<&EntityRepo> {
+        self.entity_repo.as_ref()
+    }
+
     /// Bump access_count on a fact by id.
     pub async fn bump_access(&self, id: &str) -> Result<(), DistillerError> {
         self.facts
@@ -154,16 +163,14 @@ impl DistillerWriter {
                 detail: format!("complete_supersede: {e}"),
             })?;
         // Bi-temporal: align valid_until with successor's valid_from.
-        sqlx::query(
-            "UPDATE semantic_facts SET valid_until = ?1 WHERE id = ?2",
-        )
-        .bind(successor_valid_from)
-        .bind(predecessor_id)
-        .execute(self.facts.pool())
-        .await
-        .map_err(|e| DistillerError::Storage {
-            detail: format!("complete_supersede valid_until: {e}"),
-        })?;
+        sqlx::query("UPDATE semantic_facts SET valid_until = ?1 WHERE id = ?2")
+            .bind(successor_valid_from)
+            .bind(predecessor_id)
+            .execute(self.facts.pool())
+            .await
+            .map_err(|e| DistillerError::Storage {
+                detail: format!("complete_supersede valid_until: {e}"),
+            })?;
         Ok(())
     }
 }

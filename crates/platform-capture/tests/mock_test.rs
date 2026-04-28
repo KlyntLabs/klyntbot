@@ -1,6 +1,4 @@
-use platform_capture::{
-    mock::MockCapture, AccessibilityNode, AxScope, PlatformCapture,
-};
+use platform_capture::{mock::MockCapture, AccessibilityNode, AxScope, PlatformCapture};
 use platform_input::Rect;
 use std::collections::HashMap;
 
@@ -23,7 +21,12 @@ async fn returns_fixture_ax_tree() {
         role: "AXWindow".into(),
         label: Some("Test".into()),
         value: None,
-        frame: Rect { x: 0.0, y: 0.0, w: 800.0, h: 600.0 },
+        frame: Rect {
+            x: 0.0,
+            y: 0.0,
+            w: 800.0,
+            h: 600.0,
+        },
         children: vec![],
         attrs: HashMap::new(),
     };
