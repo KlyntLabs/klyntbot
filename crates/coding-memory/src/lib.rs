@@ -117,5 +117,12 @@ pub fn coding_memory_migrations() -> Vec<FeatureMigration> {
                 .to_string(),
             sql: include_str!("../migrations/005_phase6_invalidation.sql").to_string(),
         },
+        FeatureMigration {
+            feature_name: "coding_memory".to_string(),
+            version: 6,
+            description: "Persisted 12-axis recall ranking weights for trainable ranking."
+                .to_string(),
+            sql: include_str!("../migrations/006_recall_weights.sql").to_string(),
+        },
     ]
 }

@@ -144,7 +144,7 @@ pub struct CausalTraceResponse {
 }
 
 pub mod service;
-pub use service::{default_weights, CodingRecallService, CodingRecallServiceConfig};
+pub use service::{default_weights, load_recall_weights, store_recall_weights, CodingRecallService, CodingRecallServiceConfig};
 
 /// Row in a `recall_facts_as_of` response.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

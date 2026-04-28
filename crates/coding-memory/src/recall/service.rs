@@ -27,6 +27,8 @@ pub struct CodingRecallServiceConfig {
     pub probe_threshold: f32,
     /// Default top-k for `recall_index`.
     pub default_limit: u32,
+    /// 12-axis relevance weight vector.
+    pub weights: [f64; 12],
 }
 
 impl Default for CodingRecallServiceConfig {
@@ -34,6 +36,7 @@ impl Default for CodingRecallServiceConfig {
         Self {
             probe_threshold: 0.3,
             default_limit: 10,
+            weights: default_weights(),
         }
     }
 }
@@ -151,7 +154,7 @@ impl CodingRecallService {
             .unwrap_or_default();
         let scored = self
             .ums
-            .retrieve_with_overrides(query, limit as usize, 0.0, default_weights())
+            .retrieve_with_overrides(query, limit as usize, 0.0, self.config.weights)
             .await?;
         let entries: Vec<IndexEntry> = scored
             .iter()
@@ -383,4 +386,35 @@ pub fn default_weights() -> [f64; 12] {
     [
         0.35, 0.05, 0.10, 0.05, 0.05, 0.20, 0.05, 0.05, 0.02, 0.02, 0.05, 0.01,
     ]
+}
+
+/// Load persisted recall weights from the DB. Returns defaults if no row exists.
+pub async fn load_recall_weights(pool: &storage::StoragePool) -> common::Result<[f64; 12]> {
+    let row: Option<(String,)> = sqlx::query_as("SELECT weights FROM recall_weights WHERE id = 'local'")
+        .fetch_optional(pool.inner())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("load_recall_weights: {e}")))?;
+    let json = match row {
+        Some((j,)) => j,
+        None => return Ok(default_weights()),
+    };
+    let parsed: Vec<f64> = serde_json::from_str(&json)
+        .map_err(|e| common::KlyntbotError::Json(e))?;
+    if parsed.len() != 12 {
+        return Ok(default_weights());
+    }
+    let mut out = [0.0; 12];
+    out.copy_from_slice(&parsed);
+    Ok(out)
+}
+
+/// Store recall weights to the DB, marking source as `reforge_trained`.
+pub async fn store_recall_weights(pool: &storage::StoragePool, w: &[f64; 12]) -> common::Result<()> {
+    let json = serde_json::to_string(w).map_err(|e| common::KlyntbotError::Json(e))?;
+    sqlx::query("UPDATE recall_weights SET weights = ?1, updated_at = datetime('now'), source = 'reforge_trained' WHERE id = 'local'")
+        .bind(json)
+        .execute(pool.inner())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("store_recall_weights: {e}")))?;
+    Ok(())
 }

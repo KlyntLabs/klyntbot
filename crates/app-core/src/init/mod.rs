@@ -961,19 +961,28 @@ impl AppCore {
             let telem = coding_memory::RecallInvocationRepo::new(storage_pool.clone());
             let budgeter = coding_memory::recall::budget::default_budgeter();
 
+            let recall_weights = coding_memory::recall::load_recall_weights(&storage_pool)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::warn!(error = %e, "load_recall_weights failed, using defaults");
+                    coding_memory::recall::default_weights()
+                });
+
             let skills: Vec<std::sync::Arc<dyn coding_memory::RetrievalSkill>> = {
                 use coding_memory::retrieval_skills::{QueryDecomposer, QueryRewriter};
                 let ums_for_retrieve = ums.clone();
+                let weights = recall_weights;
                 let retrieve: coding_memory::retrieval_skills::query_rewriter::RetrieveFn =
                     std::sync::Arc::new(move |q: String| {
                         let ums = ums_for_retrieve.clone();
+                        let weights = weights;
                         Box::pin(async move {
                             let scored = ums
                                 .retrieve_with_overrides(
                                     &q,
                                     20,
                                     0.0,
-                                    coding_memory::recall::default_weights(),
+                                    weights,
                                 )
                                 .await?;
                             let mut sims = Vec::with_capacity(scored.len());
@@ -999,7 +1008,10 @@ impl AppCore {
 
             Arc::new(
                 coding_memory::recall::CodingRecallService::new(
-                    coding_memory::recall::CodingRecallServiceConfig::default(),
+                    coding_memory::recall::CodingRecallServiceConfig {
+                        weights: recall_weights,
+                        ..coding_memory::recall::CodingRecallServiceConfig::default()
+                    },
                     ums,
                     fact_repo,
                     ep_repo,
