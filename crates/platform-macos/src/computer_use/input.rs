@@ -38,6 +38,36 @@ impl MacInput {
             ))?;
         Ok(Self { source })
     }
+
+    fn post_click(&self, x: i32, y: i32, button: core_graphics::event::CGMouseButton, count: i64) -> Result<()> {
+        use core_graphics::event::{CGEvent, CGEventTapLocation, CGEventType};
+        use core_graphics::geometry::CGPoint;
+
+        let down_type = match button {
+            core_graphics::event::CGMouseButton::Left => CGEventType::LeftMouseDown,
+            core_graphics::event::CGMouseButton::Right => CGEventType::RightMouseDown,
+            _ => CGEventType::OtherMouseDown,
+        };
+        let up_type = match button {
+            core_graphics::event::CGMouseButton::Left => CGEventType::LeftMouseUp,
+            core_graphics::event::CGMouseButton::Right => CGEventType::RightMouseUp,
+            _ => CGEventType::OtherMouseUp,
+        };
+        let point = CGPoint { x: x as f64, y: y as f64 };
+
+        for _ in 0..count {
+            let down = CGEvent::new_mouse_event(self.source.clone(), down_type, point, button)
+                .map_err(|()| PlatformError::PlatformCallFailed("CGEventCreate down failed".into()))?;
+            // CGEventField::MouseEventClickState = 1
+            down.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, count);
+            down.post(CGEventTapLocation::HID);
+            let up = CGEvent::new_mouse_event(self.source.clone(), up_type, point, button)
+                .map_err(|()| PlatformError::PlatformCallFailed("CGEventCreate up failed".into()))?;
+            up.set_integer_value_field(core_graphics::event::EventField::MOUSE_EVENT_CLICK_STATE, count);
+            up.post(CGEventTapLocation::HID);
+        }
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -59,6 +89,21 @@ impl PlatformInput for MacInput {
                 ))?;
                 event.post(CGEventTapLocation::HID);
                 Ok(())
+            }
+            ComputerUseAction::LeftClick { x, y, .. } => {
+                self.post_click(x, y, core_graphics::event::CGMouseButton::Left, 1)
+            }
+            ComputerUseAction::DoubleClick { x, y, .. } => {
+                self.post_click(x, y, core_graphics::event::CGMouseButton::Left, 2)
+            }
+            ComputerUseAction::TripleClick { x, y, .. } => {
+                self.post_click(x, y, core_graphics::event::CGMouseButton::Left, 3)
+            }
+            ComputerUseAction::RightClick { x, y } => {
+                self.post_click(x, y, core_graphics::event::CGMouseButton::Right, 1)
+            }
+            ComputerUseAction::MiddleClick { x, y } => {
+                self.post_click(x, y, core_graphics::event::CGMouseButton::Center, 1)
             }
             _ => Err(PlatformError::NotImplemented),
         }
