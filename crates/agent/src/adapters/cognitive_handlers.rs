@@ -398,6 +398,12 @@ similar facts, decide the correct operation for each:\n\n\
 - noop: The candidate is already known.\n\n\
 Always prefer noop over add if the information is essentially the same.\n\
 Always prefer update over delete+add when the meaning is similar but the value changed.\n\n\
+The candidate may include SUBJECT NEIGHBORHOOD, OBJECT NEIGHBORHOOD, or CROSS-ENTITY FACTS.\n\
+Use this graph context to detect:\n\
+- Better existing matches you might miss looking only at exact subject+predicate (return update with target_id pointing to the better match if a CROSS-ENTITY FACT contradicts the new candidate).\n\
+- Redundant facts already implied by the neighborhood (return noop).\n\
+- Facts that introduce a new entity reference — extract relationships are handled separately, not here. Do NOT invent merges.\n\
+Stay conservative: prefer noop over update when uncertain.\n\n\
 Respond with JSON containing a decisions array, one entry per candidate:\n\
 {\"decisions\": [{\"index\": 1, \"action\": \"add|update|delete|noop\", \"target_id\": null}]}";
 
@@ -416,6 +422,53 @@ impl LlmConsolidationHandler {
             fallback: HeuristicConsolidationHandler,
         }
     }
+}
+
+pub(crate) fn build_consolidation_user_message(candidates: &[cognitive::ConsolidationCandidate]) -> String {
+    use std::fmt::Write;
+    let mut out = String::new();
+    out.push_str("CANDIDATES:\n");
+    for (i, c) in candidates.iter().enumerate() {
+        let _ = writeln!(
+            out,
+            "[{}] {} -- {} -- {} (confidence: {:.2})",
+            i + 1,
+            c.candidate.subject,
+            c.candidate.predicate,
+            c.candidate.object,
+            c.candidate.confidence
+        );
+
+        if !c.existing.is_empty() {
+            out.push_str("  existing for same subject+predicate:\n");
+            for ex in &c.existing {
+                let _ = writeln!(out, "    - id={} object={} confidence={:.2}", ex.id, ex.object, ex.confidence);
+            }
+        }
+        if !c.subject_neighborhood.is_empty() {
+            out.push_str("  SUBJECT NEIGHBORHOOD (1-hop):\n");
+            for (name, rel) in &c.subject_neighborhood {
+                let _ = writeln!(out, "    - {} -> {}", rel, name);
+            }
+        }
+        if !c.object_neighborhood.is_empty() {
+            out.push_str("  OBJECT NEIGHBORHOOD (1-hop):\n");
+            for (name, rel) in &c.object_neighborhood {
+                let _ = writeln!(out, "    - {} -> {}", rel, name);
+            }
+        }
+        if !c.cross_entity_facts.is_empty() {
+            out.push_str("  CROSS-ENTITY FACTS (different subject/predicate, same entities):\n");
+            for f in &c.cross_entity_facts {
+                let _ = writeln!(out, "    - {} -- {} -- {}", f.subject, f.predicate, f.object);
+            }
+        }
+    }
+    out.push_str(
+        "\nDecide for ALL candidates. Return JSON:\n\
+         {\"decisions\": [{\"index\": 1, \"action\": \"add|update|delete|noop\", \"target_id\": null}]}\n",
+    );
+    out
 }
 
 #[derive(serde::Deserialize)]
@@ -496,40 +549,11 @@ impl ConsolidationHandler for LlmConsolidationHandler {
         }
 
         // Build prompt for candidates that need LLM decisions
-        let mut user_msg = String::new();
-        for (prompt_idx, &cand_idx) in llm_indices.iter().enumerate() {
-            let entry = &candidates[cand_idx];
-            let existing_json: Vec<serde_json::Value> = entry
-                .existing
-                .iter()
-                .map(|f| {
-                    json!({
-                        "id": f.id,
-                        "subject": f.subject,
-                        "predicate": f.predicate,
-                        "object": f.object,
-                        "confidence": f.confidence,
-                    })
-                })
-                .collect();
-
-            use std::fmt::Write;
-            writeln!(
-                &mut user_msg,
-                "Decision {}:\nCandidate: {}.{} = {} (confidence: {})\nExisting: {}\n",
-                prompt_idx + 1,
-                entry.candidate.subject,
-                entry.candidate.predicate,
-                entry.candidate.object,
-                entry.candidate.confidence,
-                serde_json::to_string(&existing_json).unwrap_or_default()
-            )
-            .unwrap();
-        }
-        user_msg.push_str(
-            "Decide for ALL candidates. Return JSON:\n\
-             {\"decisions\": [{\"index\": 1, \"action\": \"add|update|delete|noop\", \"target_id\": null}]}",
-        );
+        let llm_candidates: Vec<cognitive::ConsolidationCandidate> = llm_indices
+            .iter()
+            .map(|&i| candidates[i].clone())
+            .collect();
+        let user_msg = build_consolidation_user_message(&llm_candidates);
 
         let messages = vec![
             Message::system(CONSOLIDATION_SYSTEM_PROMPT),
@@ -1306,5 +1330,70 @@ mod tests {
 
         let decision = handler.reason(&input).await.unwrap();
         assert!(decision.should_intervene);
+    }
+
+    #[test]
+    fn build_consolidation_user_message_includes_neighborhood_section_when_present() {
+        use cognitive::types::SemanticFact;
+        let cand = cognitive::ConsolidationCandidate {
+            candidate: SemanticFact {
+                id: "c1".into(),
+                domain: "test".into(),
+                subject: "Alice".into(),
+                predicate: "prefers".into(),
+                object: "Rust".into(),
+                confidence: 0.7,
+                source: "t".into(),
+                valid_from: "2026-04-29".into(),
+                valid_until: None,
+                recorded_at: "2026-04-29".into(),
+                superseded_at: None,
+                superseded_by: None,
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                convergence_score: 0.0,
+                project_id: None,
+                memory_type: "fact".into(),
+                scope_type: "system".into(),
+                scope_id: None,
+                scope_repo_id: None,
+                metadata: None,
+            },
+            existing: vec![],
+            subject_neighborhood: vec![("Bob".into(), "knows".into())],
+            object_neighborhood: vec![],
+            cross_entity_facts: vec![SemanticFact {
+                id: "f2".into(),
+                domain: "test".into(),
+                subject: "Bob".into(),
+                predicate: "works_at".into(),
+                object: "Anthropic".into(),
+                confidence: 0.9,
+                source: "t".into(),
+                valid_from: "2026-04-29".into(),
+                valid_until: None,
+                recorded_at: "2026-04-29".into(),
+                superseded_at: None,
+                superseded_by: None,
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                convergence_score: 0.0,
+                project_id: None,
+                memory_type: "fact".into(),
+                scope_type: "system".into(),
+                scope_id: None,
+                scope_repo_id: None,
+                metadata: None,
+            }],
+        };
+
+        let msg = build_consolidation_user_message(&[cand]);
+
+        assert!(msg.contains("SUBJECT NEIGHBORHOOD"), "must include neighborhood section, got:\n{msg}");
+        assert!(msg.contains("knows -> Bob"));
+        assert!(msg.contains("CROSS-ENTITY FACTS"));
+        assert!(msg.contains("works_at"));
     }
 }
