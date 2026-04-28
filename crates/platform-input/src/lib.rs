@@ -113,3 +113,51 @@ pub enum ComputerUseAction {
     /// scale capture).
     Zoom { region: Rect },
 }
+
+use thiserror::Error;
+
+/// Errors produced by `PlatformInput` implementations.
+#[derive(Debug, Error)]
+pub enum PlatformError {
+    #[error("permission denied: {0}")]
+    PermissionDenied(String),
+
+    #[error("invalid coordinates: ({x}, {y})")]
+    InvalidCoordinates { x: i32, y: i32 },
+
+    #[error("unsupported key: {0}")]
+    UnsupportedKey(String),
+
+    #[error("platform call failed: {0}")]
+    PlatformCallFailed(String),
+
+    #[error("not implemented on this platform")]
+    NotImplemented,
+}
+
+pub type Result<T> = std::result::Result<T, PlatformError>;
+
+use async_trait::async_trait;
+
+/// Trait implemented by per-platform input injection backends.
+///
+/// All methods are `async` so implementations may dispatch to a
+/// `spawn_blocking` worker. CGEvent on macOS is itself thread-safe;
+/// the async signature allows future Wayland-style implementations
+/// that require message passing.
+#[async_trait]
+pub trait PlatformInput: Send + Sync {
+    /// Execute a single action. Implementations must serialize the
+    /// underlying OS calls so two concurrent `perform_action` calls
+    /// on the same instance do not race.
+    async fn perform_action(&self, action: ComputerUseAction) -> Result<()>;
+
+    /// Return the current cursor position in logical points (Quartz
+    /// top-left origin).
+    async fn get_cursor_position(&self) -> Result<Point>;
+
+    /// Release any held mouse buttons or modifier keys. Called by the
+    /// emergency-stop hotkey hook to ensure the system is left in a
+    /// clean state when an in-progress action is aborted.
+    async fn release_all(&self) -> Result<()>;
+}

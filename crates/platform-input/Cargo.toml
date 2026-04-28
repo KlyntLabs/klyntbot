@@ -7,3 +7,4 @@ edition = "2021"
 tokio = { workspace = true, features = ["sync"] }
 thiserror = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+async-trait = { workspace = true }
