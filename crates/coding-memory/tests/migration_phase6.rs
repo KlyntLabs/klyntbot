@@ -44,7 +44,9 @@ async fn migration_005_creates_anchored_symbol_index() {
     .await
     .unwrap();
     assert!(
-        names.iter().any(|(n,)| n == "idx_anchored_symbol_file_facts"),
+        names
+            .iter()
+            .any(|(n,)| n == "idx_anchored_symbol_file_facts"),
         "expected functional anchored-symbol index on semantic_facts; got {names:?}"
     );
 }

@@ -1,6 +1,6 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::MorningBriefingResponse;
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 

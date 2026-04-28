@@ -1,7 +1,7 @@
 use app_core::AppCore;
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{WorkspaceFile, WorkspaceFileContent};
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 #[klynt_command]
 pub async fn workspace_list_files() -> Vec<WorkspaceFile> {
@@ -9,17 +9,12 @@ pub async fn workspace_list_files() -> Vec<WorkspaceFile> {
 }
 
 #[klynt_command]
-pub async fn workspace_read_file(
-    filename: String,
-) -> WorkspaceFileContent {
+pub async fn workspace_read_file(filename: String) -> WorkspaceFileContent {
     state.workspace_read_file(&filename).await
 }
 
 #[klynt_command]
-pub async fn workspace_write_file(
-    filename: String,
-    content: String,
-) -> WorkspaceFileContent {
+pub async fn workspace_write_file(filename: String, content: String) -> WorkspaceFileContent {
     state.workspace_write_file(&filename, &content).await
 }
 

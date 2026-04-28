@@ -1,6 +1,6 @@
+use desktop_macros::klynt_command;
 use desktop_shared::entity_link_types::*;
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
@@ -15,19 +15,14 @@ pub async fn project_source_create(
 }
 
 #[klynt_command]
-pub async fn project_source_delete(
-    app: tauri::AppHandle,
-    id: String,
-) -> bool {
+pub async fn project_source_delete(app: tauri::AppHandle, id: String) -> bool {
     let (result, updates) = state.project_source_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
 #[klynt_command]
-pub async fn project_source_list(
-    project_id: String,
-) -> Vec<ProjectSourceResponse> {
+pub async fn project_source_list(project_id: String) -> Vec<ProjectSourceResponse> {
     state.project_source_list(project_id).await
 }
 

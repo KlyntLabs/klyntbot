@@ -19,8 +19,7 @@ var Default = Counter{}
 fn extracts_go_top_level() {
     let extractor = TreeSitterExtractor::new();
     let symbols = extractor.extract(Path::new("a.go"), SRC, "h3");
-    let names: std::collections::HashSet<_> =
-        symbols.iter().map(|s| s.symbol.as_str()).collect();
+    let names: std::collections::HashSet<_> = symbols.iter().map(|s| s.symbol.as_str()).collect();
     for expected in ["Add", "Counter", "Bump", "Max", "Default"] {
         assert!(names.contains(expected), "missing {expected} in {names:?}");
     }

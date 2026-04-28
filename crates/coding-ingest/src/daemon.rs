@@ -1,7 +1,7 @@
 //! Desktop-embedded ingestion daemon — owns the Unix-socket lifecycle, the
 //! file-buffer drainer, and the `desktop.lock` heartbeat.
 
-use crate::event::AgentEvent;
+use crate::event::{AgentEvent, EventKind};
 use crate::store::IngestEventLogRepo;
 use crate::transport::FileBufferFallback;
 use common::{KlyntbotError, Result};
@@ -26,6 +26,8 @@ pub struct IngestDaemonConfig {
     pub event_tx: Option<tokio::sync::mpsc::UnboundedSender<crate::event::AgentEvent>>,
     /// Optional request/response handler for `op` frames (e.g. recall context).
     pub op_handler: Option<Arc<dyn OpHandler>>,
+    /// Optional Phase-6 git-invalidation handler.
+    pub git_invalidation_handler: Option<Arc<dyn crate::git_invalidation::GitInvalidationHandler>>,
 }
 
 impl std::fmt::Debug for IngestDaemonConfig {
@@ -35,6 +37,10 @@ impl std::fmt::Debug for IngestDaemonConfig {
             .field("buffer_path", &self.buffer_path)
             .field("lock_path", &self.lock_path)
             .field("op_handler", &self.op_handler.is_some())
+            .field(
+                "git_invalidation_handler",
+                &self.git_invalidation_handler.is_some(),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -45,6 +51,8 @@ pub struct IngestDaemonHandle {
     shutdown_tx: Option<oneshot::Sender<()>>,
     accept_task: tokio::task::JoinHandle<()>,
     heartbeat_task: tokio::task::JoinHandle<()>,
+    #[allow(dead_code)]
+    drain_task: tokio::task::JoinHandle<()>,
 }
 
 impl IngestDaemonHandle {
@@ -56,6 +64,8 @@ impl IngestDaemonHandle {
         let _ = self.accept_task.await;
         self.heartbeat_task.abort();
         let _ = self.heartbeat_task.await;
+        self.drain_task.abort();
+        let _ = self.drain_task.await;
     }
 }
 
@@ -84,6 +94,7 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
 
     let event_tx = cfg.event_tx.clone();
     let op_handler = cfg.op_handler.clone();
+    let git_handler = cfg.git_invalidation_handler.clone();
     let accept_task = tokio::spawn(async move {
         loop {
             tokio::select! {
@@ -94,8 +105,9 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
                             let repo = repo.clone();
                             let event_tx = event_tx.clone();
                             let op_handler = op_handler.clone();
+                            let git_handler = git_handler.clone();
                             tokio::spawn(async move {
-                                if let Err(e) = handle_connection(stream, repo, event_tx, op_handler).await {
+                                if let Err(e) = handle_connection(stream, repo, event_tx, op_handler, git_handler).await {
                                     tracing::warn!(error = %e, "ingest handler failed");
                                 }
                             });
@@ -104,6 +116,23 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
                             tracing::warn!(error = %e, "accept failed");
                         }
                     }
+                }
+            }
+        }
+    });
+
+    // Drain task — processes pending invalidations on startup.
+    let pool = cfg.repo.pool().clone();
+    let drain_handler = cfg.git_invalidation_handler.clone();
+    let drain_task = tokio::spawn(async move {
+        if let Some(handler) = drain_handler {
+            let repo = crate::pending_invalidations::PendingInvalidationsRepo::new(
+                storage::StoragePool::from_existing(pool),
+            );
+            let drained = repo.drain_unprocessed().await.unwrap_or_default();
+            for (row_id, event) in drained {
+                if handler.handle(&event).await.is_ok() {
+                    let _ = repo.mark_processed(&row_id).await;
                 }
             }
         }
@@ -124,6 +153,7 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
         shutdown_tx: Some(shutdown_tx),
         accept_task,
         heartbeat_task,
+        drain_task,
     })
 }
 
@@ -141,6 +171,7 @@ async fn handle_connection(
     repo: Arc<IngestEventLogRepo>,
     event_tx: Option<tokio::sync::mpsc::UnboundedSender<AgentEvent>>,
     op_handler: Option<Arc<dyn OpHandler>>,
+    git_handler: Option<Arc<dyn crate::git_invalidation::GitInvalidationHandler>>,
 ) -> Result<()> {
     let mut len_buf = [0u8; 4];
     stream
@@ -187,6 +218,24 @@ async fn handle_connection(
     let event: AgentEvent = serde_json::from_value(json_val)
         .map_err(|e| KlyntbotError::Storage(format!("decode event: {e}")))?;
     repo.insert(&event).await?;
+
+    let AgentEvent::V1(v1) = &event;
+    if matches!(v1.kind, EventKind::GitCommit { .. }) {
+        if let Some(handler) = &git_handler {
+            if let Err(e) = handler.handle(&event).await {
+                tracing::warn!(error = %e, "git invalidation failed");
+            }
+        } else {
+            let pool = storage::StoragePool::from_existing(repo.pool().clone());
+            if let Err(e) = crate::pending_invalidations::PendingInvalidationsRepo::new(pool)
+                .append(&event)
+                .await
+            {
+                tracing::warn!(error = %e, "pending_invalidations append failed");
+            }
+        }
+    }
+
     if let Some(tx) = event_tx {
         let _ = tx.send(event);
     }

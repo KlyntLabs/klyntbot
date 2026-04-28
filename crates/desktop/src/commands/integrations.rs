@@ -1,6 +1,6 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{AiToolInfo, AiToolInstallResult, AiToolsInstallParams};
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
@@ -10,9 +10,7 @@ pub async fn ai_tools_detect() -> Vec<AiToolInfo> {
 }
 
 #[klynt_command]
-pub async fn ai_tools_install(
-    params: AiToolsInstallParams,
-) -> Vec<AiToolInstallResult> {
+pub async fn ai_tools_install(params: AiToolsInstallParams) -> Vec<AiToolInstallResult> {
     state.ai_tools_install(params).await
 }
 

@@ -5,7 +5,7 @@ use storage::StoragePool;
 fn skill_routed_signal(skill: &str, repo: Option<&str>, confidence: f64) -> AiSignal {
     AiSignal {
         domain: RecallDomain::General,
-        event_kind: "SkillRouted".into(),
+        event_kind: "SkillRouted",
         importance: 0.4,
         salience: SalienceVerdict::Accumulate,
         content: String::new(),

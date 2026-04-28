@@ -11,9 +11,7 @@ use crate::app_core::AppCore;
 use crate::focus_timer::FocusTimer;
 
 #[klynt_command]
-pub async fn distraction_dismiss(
-    app_name: String,
-) -> () {
+pub async fn distraction_dismiss(app_name: String) -> () {
     state.distraction_dismiss(app_name).await
 }
 
@@ -43,8 +41,7 @@ pub async fn distraction_allow_session(
 }
 
 #[klynt_command]
-pub async fn distraction_learned_rules(
-) -> Vec<LearnedRuleResponse> {
+pub async fn distraction_learned_rules() -> Vec<LearnedRuleResponse> {
     state.distraction_learned_rules().await
 }
 

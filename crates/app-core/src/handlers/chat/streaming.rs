@@ -3,13 +3,13 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
-use agent::AgentEvent;
 use agent::engines::debate;
 use agent::engines::debate_types::{
     DebateConfig, DebateContext, DebateEvent, DebateResult, DefaultInteractionMode,
     SquadInteractionMode,
 };
 use agent::engines::interaction::detect_interaction_mode;
+use agent::AgentEvent;
 use cognitive::{BlackboardRepo, PersonaAccuracyRepo, ResolvedSquad};
 use common::EntityCard;
 use desktop_shared::commands::{ChatMessageResponse, SessionContextInput};

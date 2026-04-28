@@ -1,8 +1,8 @@
 //! Asserts the linkme slice (Tauri runtime truth) and the specta hand-list
 //! (FE binding truth) contain the same set of command names.
 
-use std::collections::BTreeSet;
 use desktop::specta_builder::{KLYNT_COMMANDS, SPECTA_COMMAND_NAMES};
+use std::collections::BTreeSet;
 
 #[test]
 fn linkme_and_specta_lists_match() {

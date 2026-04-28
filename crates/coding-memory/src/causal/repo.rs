@@ -142,7 +142,14 @@ fn parse_kind(s: &str) -> common::Result<CausalEdgeKind> {
 }
 
 fn parse_row(
-    (id, from_id, to_id, kind, confidence, inferred_at): (String, String, String, String, f64, String),
+    (id, from_id, to_id, kind, confidence, inferred_at): (
+        String,
+        String,
+        String,
+        String,
+        f64,
+        String,
+    ),
 ) -> common::Result<CausalEdge> {
     Ok(CausalEdge {
         id: Uuid::parse_str(&id)

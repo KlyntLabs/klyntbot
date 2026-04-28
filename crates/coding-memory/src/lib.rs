@@ -9,6 +9,8 @@
 
 #![deny(missing_docs)]
 
+/// Causal edge repo + auto-detection (Phase 6).
+pub mod causal;
 /// Coding-domain searcher for InsightForge (Tier B4).
 pub mod code_domain_searcher;
 /// Coding session state enum (Tier B3).
@@ -21,6 +23,8 @@ pub mod distiller;
 pub mod error;
 /// Coding fact taxonomy (`FixAttempt`, `RepoContext`, …).
 pub mod facts;
+/// Git invalidation handler impl (Phase 6).
+pub mod git_invalidation;
 /// MCP tool stubs — registered with `default_exposed_tools()`.
 pub mod mcp;
 /// Mirror integration — alerts, effectiveness, stale-memory signals.
@@ -34,21 +38,20 @@ pub mod recall;
 pub mod reforge;
 /// Reforge coding phases (2.5, 3.5) stubs.
 pub mod reforge_phase;
-/// Causal edge repo + auto-detection (Phase 6).
-pub mod causal;
 /// C3 retrieval-skill registry stubs.
 pub mod retrieval_skills;
 /// Scope partitioning, provenance, anchored symbols, causal edges.
 pub mod scope;
 /// `MemorySink` trait + `InProcessSink` / `IngestSocketSink` stubs.
 pub mod sink;
-/// Tree-sitter symbol extraction (Phase 6).
-pub mod symbols;
 /// Project skill evolver — Detect, Synthesize, Write, Journal, Supersede.
 pub mod skill_evolver;
 /// Scope-aware skill store extension + project skill evolution.
 pub mod skills;
+/// Tree-sitter symbol extraction (Phase 6).
+pub mod symbols;
 
+pub use causal::{CausalEdgeDetector, CausalEdgeRepo, ProblemHashGroup};
 pub use error::{CodingMemoryError, NotImplementedInPhase};
 pub use mcp::{CodingMemoryToolset, CODING_MEMORY_MCP_TOOLS};
 pub use recall::telemetry::{RecallInvocationRepo, RecallInvocationRow};
@@ -67,7 +70,6 @@ pub use retrieval_skills::{
     BudgetTier, EscalationContext, EscalationOutcome, RetrievalSkill, RetrievalSkillRegistry,
 };
 pub use symbols::{Language, SymbolExtractor, TreeSitterExtractor};
-pub use causal::{CausalEdgeDetector, CausalEdgeRepo, ProblemHashGroup};
 
 use tools_core::FeatureMigration;
 

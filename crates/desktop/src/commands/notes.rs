@@ -104,10 +104,7 @@ pub async fn note_links_all() -> Vec<NoteLinkResponse> {
 }
 
 #[klynt_command]
-pub async fn note_list_by_entity(
-    entity_type: String,
-    entity_id: String,
-) -> Vec<NoteListItem> {
+pub async fn note_list_by_entity(entity_type: String, entity_id: String) -> Vec<NoteListItem> {
     state.note_list_by_entity(entity_type, entity_id).await
 }
 
@@ -140,10 +137,7 @@ pub async fn note_version_restore(
 // ── Attachment commands ─────────────────────────────────────────────────
 
 #[klynt_command]
-pub async fn note_save_attachment(
-    data: String,
-    filename: String,
-) -> String {
+pub async fn note_save_attachment(data: String, filename: String) -> String {
     state.note_save_attachment(data, filename).await
 }
 
@@ -289,9 +283,7 @@ pub async fn note_insight_review(
 }
 
 #[klynt_command]
-pub async fn note_insight_cache_get(
-    note_id: String,
-) -> Option<InsightReviewResponse> {
+pub async fn note_insight_cache_get(note_id: String) -> Option<InsightReviewResponse> {
     state.note_insight_cache_get(&note_id).await
 }
 
@@ -340,9 +332,7 @@ pub async fn note_insight_generate_scenario(note_id: String) -> ScenarioChalleng
 }
 
 #[klynt_command]
-pub async fn note_insight_changes_summary(
-    note_id: String,
-) -> Option<ChangesSummaryResponse> {
+pub async fn note_insight_changes_summary(note_id: String) -> Option<ChangesSummaryResponse> {
     state.note_insight_changes_summary(&note_id).await
 }
 
@@ -456,16 +446,12 @@ pub async fn flashcard_total_due() -> i64 {
 }
 
 #[klynt_command]
-pub async fn flashcard_list_struggling(
-    limit: Option<i64>,
-) -> Vec<StrugglingCardResponse> {
+pub async fn flashcard_list_struggling(limit: Option<i64>) -> Vec<StrugglingCardResponse> {
     state.flashcard_list_struggling(limit.unwrap_or(5)).await
 }
 
 #[klynt_command]
-pub async fn flashcard_generate(
-    params: FlashcardGenerateParams,
-) -> FlashcardGenerateResponse {
+pub async fn flashcard_generate(params: FlashcardGenerateParams) -> FlashcardGenerateResponse {
     state.flashcard_generate(params).await
 }
 
@@ -479,16 +465,12 @@ pub async fn flashcard_save_generated(
 // ── Active Recall commands ──────────────────────────────────────────
 
 #[klynt_command]
-pub async fn flashcard_submit_answer(
-    params: FlashcardSubmitAnswerParams,
-) -> GradeResultResponse {
+pub async fn flashcard_submit_answer(params: FlashcardSubmitAnswerParams) -> GradeResultResponse {
     state.flashcard_submit_answer(params).await
 }
 
 #[klynt_command]
-pub async fn flashcard_explain_answer(
-    params: FlashcardExplainParams,
-) -> FlashcardExplainResponse {
+pub async fn flashcard_explain_answer(params: FlashcardExplainParams) -> FlashcardExplainResponse {
     state.flashcard_explain_answer(params).await
 }
 
@@ -510,9 +492,7 @@ pub async fn flashcard_save_mode_preference(deck: String, mode: String) -> () {
 }
 
 #[klynt_command]
-pub async fn flashcard_get_mode_preference(
-    deck: String,
-) -> Option<DeckPreferenceResponse> {
+pub async fn flashcard_get_mode_preference(deck: String) -> Option<DeckPreferenceResponse> {
     let row = state
         .deck_preference_repo()?
         .get(&deck)
@@ -548,9 +528,7 @@ pub async fn flashcard_recent_learning_sessions(
 // ── Retention Health ────────────────────────────────────────────────
 
 #[klynt_command]
-pub async fn note_retention_health(
-    note_id: String,
-) -> Option<NoteRetentionHealthResponse> {
+pub async fn note_retention_health(note_id: String) -> Option<NoteRetentionHealthResponse> {
     state.note_retention_health(note_id).await
 }
 

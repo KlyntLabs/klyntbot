@@ -39,7 +39,9 @@ fn fixattempt_episode_carries_anchored_symbols_when_files_known() {
     };
     let metadata: serde_json::Value =
         serde_json::from_str(ep.metadata_json.unwrap().to_string().as_str()).unwrap();
-    let anchors = metadata["anchoredSymbols"].as_array().expect("anchors array");
+    let anchors = metadata["anchoredSymbols"]
+        .as_array()
+        .expect("anchors array");
     assert_eq!(anchors.len(), 1);
     assert_eq!(anchors[0]["symbol"], "buggy");
 }

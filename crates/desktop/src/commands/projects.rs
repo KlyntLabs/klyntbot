@@ -1,53 +1,39 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{
     ProjectCreateParams, ProjectHealthMetricsResponse, ProjectResponse, ProjectUpdateParams,
 };
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
 #[klynt_command]
-pub async fn project_create(
-    app: tauri::AppHandle,
-    params: ProjectCreateParams,
-) -> ProjectResponse {
+pub async fn project_create(app: tauri::AppHandle, params: ProjectCreateParams) -> ProjectResponse {
     let (result, updates) = state.project_create(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
 #[klynt_command]
-pub async fn project_get(
-    id: String,
-) -> ProjectResponse {
+pub async fn project_get(id: String) -> ProjectResponse {
     state.project_get(id).await
 }
 
 #[klynt_command]
-pub async fn project_update(
-    app: tauri::AppHandle,
-    params: ProjectUpdateParams,
-) -> ProjectResponse {
+pub async fn project_update(app: tauri::AppHandle, params: ProjectUpdateParams) -> ProjectResponse {
     let (result, updates) = state.project_update(params).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
 #[klynt_command]
-pub async fn project_delete(
-    app: tauri::AppHandle,
-    id: String,
-) -> bool {
+pub async fn project_delete(app: tauri::AppHandle, id: String) -> bool {
     let (result, updates) = state.project_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
 #[klynt_command]
-pub async fn project_archive(
-    app: tauri::AppHandle,
-    id: String,
-) -> ProjectResponse {
+pub async fn project_archive(app: tauri::AppHandle, id: String) -> ProjectResponse {
     let (result, updates) = state.project_archive(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -78,9 +64,7 @@ pub async fn project_update_role(
 }
 
 #[klynt_command]
-pub async fn project_health_metrics(
-    project_id: String,
-) -> ProjectHealthMetricsResponse {
+pub async fn project_health_metrics(project_id: String) -> ProjectHealthMetricsResponse {
     state.project_health_metrics(project_id).await
 }
 

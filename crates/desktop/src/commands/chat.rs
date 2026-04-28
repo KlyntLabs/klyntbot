@@ -27,10 +27,7 @@ pub async fn chat_threads() -> Vec<ChatThreadResponse> {
 }
 
 #[klynt_command]
-pub async fn chat_messages(
-    session_key: String,
-    limit: Option<i64>,
-) -> Vec<ChatMessageResponse> {
+pub async fn chat_messages(session_key: String, limit: Option<i64>) -> Vec<ChatMessageResponse> {
     state.chat_messages(session_key, limit).await
 }
 
@@ -52,24 +49,17 @@ pub async fn chat_send(
 }
 
 #[klynt_command]
-pub async fn chat_pin_thread(
-    session_key: String,
-) -> () {
+pub async fn chat_pin_thread(session_key: String) -> () {
     state.chat_pin_thread(session_key).await
 }
 
 #[klynt_command]
-pub async fn chat_rename_thread(
-    session_key: String,
-    title: String,
-) -> () {
+pub async fn chat_rename_thread(session_key: String, title: String) -> () {
     state.chat_rename_thread(session_key, title).await
 }
 
 #[klynt_command]
-pub async fn chat_delete_thread(
-    session_key: String,
-) -> () {
+pub async fn chat_delete_thread(session_key: String) -> () {
     state.chat_delete_thread(session_key).await
 }
 
@@ -87,23 +77,17 @@ pub async fn chat_respond_interaction(
 }
 
 #[klynt_command]
-pub async fn chat_get_session(
-    session_key: String,
-) -> ChatSessionResponse {
+pub async fn chat_get_session(session_key: String) -> ChatSessionResponse {
     state.chat_get_session(session_key).await
 }
 
 #[klynt_command]
-pub async fn chat_list_sessions_by_project(
-    project_id: String,
-) -> Vec<ChatThreadResponse> {
+pub async fn chat_list_sessions_by_project(project_id: String) -> Vec<ChatThreadResponse> {
     state.chat_list_sessions_by_project(project_id).await
 }
 
 #[klynt_command]
-pub async fn chat_delete_stale_sessions(
-    before_days: u32,
-) -> u64 {
+pub async fn chat_delete_stale_sessions(before_days: u32) -> u64 {
     state.chat_delete_stale_sessions(before_days).await
 }
 

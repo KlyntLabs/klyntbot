@@ -3,8 +3,8 @@ use config::ShortcutsConfig;
 use desktop_shared::{errors::ApiError, CommandResult};
 use tauri::AppHandle;
 
-use desktop_macros::klynt_command;
 use crate::shortcuts::register_shortcuts;
+use desktop_macros::klynt_command;
 
 #[klynt_command]
 pub async fn shortcuts_get() -> ShortcutsConfig {
@@ -13,11 +13,7 @@ pub async fn shortcuts_get() -> ShortcutsConfig {
 }
 
 #[klynt_command]
-pub async fn shortcuts_update(
-    app: AppHandle,
-    launcher: String,
-    tray: String,
-) -> ShortcutsConfig {
+pub async fn shortcuts_update(app: AppHandle, launcher: String, tray: String) -> ShortcutsConfig {
     let shortcuts = ShortcutsConfig { launcher, tray };
 
     // Snapshot current config for rollback.

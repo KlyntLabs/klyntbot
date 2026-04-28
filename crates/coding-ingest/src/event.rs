@@ -314,4 +314,15 @@ pub enum EventKind {
         /// Skill ids chosen for injection.
         chosen: Vec<String>,
     },
+    /// A git post-commit hook fired. Drives Phase-6 symbol invalidation.
+    GitCommit {
+        /// Commit hash (HEAD after the commit).
+        commit_hash: String,
+        /// Parent commit hash (None for initial commit).
+        parent_hash: Option<String>,
+        /// Repo root absolute path.
+        repo_root: PathBuf,
+        /// Files changed in this commit (relative to `repo_root`).
+        changed_files: Vec<PathBuf>,
+    },
 }

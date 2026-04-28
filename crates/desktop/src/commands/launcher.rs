@@ -13,9 +13,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[klynt_command]
-pub async fn launcher_search(
-    query: String,
-) -> Vec<LauncherItem> {
+pub async fn launcher_search(query: String) -> Vec<LauncherItem> {
     state.launcher_search(query).await
 }
 
@@ -36,24 +34,17 @@ pub async fn launcher_dashboard() -> DashboardData {
 }
 
 #[klynt_command]
-pub async fn launcher_clipboard_paste(
-    id: i64,
-) -> Option<ClipboardEntry> {
+pub async fn launcher_clipboard_paste(id: i64) -> Option<ClipboardEntry> {
     state.launcher_clipboard_paste(id).await
 }
 
 #[klynt_command]
-pub async fn launcher_clipboard_delete(
-    id: i64,
-) -> () {
+pub async fn launcher_clipboard_delete(id: i64) -> () {
     state.launcher_clipboard_delete(id).await
 }
 
 #[klynt_command]
-pub async fn launcher_clipboard_pin(
-    id: i64,
-    pinned: bool,
-) -> () {
+pub async fn launcher_clipboard_pin(id: i64, pinned: bool) -> () {
     state.launcher_clipboard_pin(id, pinned).await
 }
 

@@ -16,9 +16,7 @@ pub async fn reforge_skill_names() -> SkillListResponse {
 }
 
 #[klynt_command]
-pub async fn reforge_skill_versions(
-    skill_name: String,
-) -> Vec<SkillVersionResponse> {
+pub async fn reforge_skill_versions(skill_name: String) -> Vec<SkillVersionResponse> {
     state.skill_version_list(&skill_name).await
 }
 
@@ -31,11 +29,7 @@ pub async fn reforge_skill_version_detail(
 }
 
 #[klynt_command]
-pub async fn reforge_skill_reset(
-    skill_name: String,
-    file_path: String,
-    version: i64,
-) -> () {
+pub async fn reforge_skill_reset(skill_name: String, file_path: String, version: i64) -> () {
     state
         .skill_version_reset(&skill_name, &file_path, version)
         .await

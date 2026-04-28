@@ -47,8 +47,12 @@ async fn by_to_returns_inbound_rows() {
     let a = Uuid::new_v4();
     let b = Uuid::new_v4();
     let c = Uuid::new_v4();
-    repo.insert(&edge(a, c, CausalEdgeKind::FixedBy)).await.unwrap();
-    repo.insert(&edge(b, c, CausalEdgeKind::Broke)).await.unwrap();
+    repo.insert(&edge(a, c, CausalEdgeKind::FixedBy))
+        .await
+        .unwrap();
+    repo.insert(&edge(b, c, CausalEdgeKind::Broke))
+        .await
+        .unwrap();
     let got = repo.by_to(c).await.unwrap();
     assert_eq!(got.len(), 2);
 }

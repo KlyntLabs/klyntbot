@@ -1,8 +1,8 @@
 //! Tauri commands for OAuth flows.
 
 use desktop_shared::commands::{McpConfigResponse, OAuthStartParams};
-use desktop_shared::events::{McpOAuthCompletePayload, MCP_OAUTH_ERROR};
 use desktop_shared::errors::ApiError;
+use desktop_shared::events::{McpOAuthCompletePayload, MCP_OAUTH_ERROR};
 use rand::distr::Alphanumeric;
 use rand::Rng;
 use tauri::{AppHandle, Emitter, Manager};
@@ -19,10 +19,7 @@ use super::registry;
 
 /// Start an OAuth flow: opens the browser and waits for the callback.
 #[klynt_command]
-pub async fn mcp_oauth_start(
-    app: AppHandle,
-    params: OAuthStartParams,
-) -> () {
+pub async fn mcp_oauth_start(app: AppHandle, params: OAuthStartParams) -> () {
     info!(
         provider = %params.provider,
         server = %params.server_name,
@@ -238,9 +235,7 @@ pub async fn mcp_oauth_start(
 
 /// Disconnect OAuth for a server (clear credentials).
 #[klynt_command]
-pub async fn mcp_oauth_disconnect(
-    server_name: String,
-) -> McpConfigResponse {
+pub async fn mcp_oauth_disconnect(server_name: String) -> McpConfigResponse {
     let mut cfg = state.config.write().await;
 
     let server =

@@ -160,6 +160,13 @@ impl AppCore {
             let _ = repos.dnd_override.clear().await;
         }
 
+        // ── Phase-6 components (created early for distiller, recall, daemon, cron) ─
+        let symbol_extractor: Arc<dyn coding_memory::symbols::SymbolExtractor> =
+            Arc::new(coding_memory::TreeSitterExtractor::new());
+        let causal_edges = Arc::new(coding_memory::causal::CausalEdgeRepo::new(
+            storage_pool.clone(),
+        ));
+
         // ── Phase 2: Cron ────────────────────────────────────────────────
         let cron::CronResult {
             cron_executor,
@@ -172,6 +179,8 @@ impl AppCore {
             provider.clone(),
             &domain_event_bus,
             vector_store.clone(),
+            Some(symbol_extractor.clone()),
+            Some(causal_edges.clone()),
         )
         .await?;
 
@@ -883,12 +892,13 @@ impl AppCore {
             if let Some(ref m) = config.cognitive.model {
                 distiller_cfg.model.clone_from(m);
             }
-            let mut d = coding_memory::distiller::Distiller::new(
+            let mut d = coding_memory::distiller::Distiller::with_extractor(
                 distiller_cfg,
                 ingest_repo,
                 writer,
                 distiller_provider,
                 retriever,
+                symbol_extractor.clone(),
             );
             d = d.with_retry_repo(coding_memory::distiller::DistillationRetryRepo::new(
                 storage_pool.inner().clone(),
@@ -953,7 +963,8 @@ impl AppCore {
                     telem,
                     budgeter,
                 )
-                .with_skills(registry),
+                .with_skills(registry)
+                .with_causal_repo(causal_edges.clone()),
             )
         };
         let toolset = coding_memory::CodingMemoryToolset::new(recall.clone());
@@ -971,6 +982,13 @@ impl AppCore {
         // ── Spawn coding-ingest daemon (with real-time event forwarding) ─
         let ingest_daemon_handle = {
             let data_dir = config.data_dir_path();
+            let git_handler: Arc<dyn coding_ingest::git_invalidation::GitInvalidationHandler> =
+                Arc::new(
+                    coding_memory::git_invalidation::GitInvalidationHandlerImpl::new(
+                        storage_pool.clone(),
+                        symbol_extractor.clone(),
+                    ),
+                );
             let daemon_cfg = coding_ingest::daemon::IngestDaemonConfig {
                 socket_path: data_dir.join("ingest.sock"),
                 buffer_path: data_dir.join("ingest-buffer.jsonl"),
@@ -982,6 +1000,7 @@ impl AppCore {
                 op_handler: Some(std::sync::Arc::new(
                     crate::coding_memory::recall::RecallOpHandler::new(recall.clone()),
                 )),
+                git_invalidation_handler: Some(git_handler),
             };
             match coding_ingest::daemon::spawn(daemon_cfg).await {
                 Ok(h) => Some(h),
@@ -1123,6 +1142,9 @@ impl AppCore {
             recall: Some(recall.clone()),
             coding_toolset: Some(toolset),
             session_end_pass: None,
+            causal_edge_repo: None,
+            symbol_extractor: None,
+            repo_roots: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────
@@ -1132,17 +1154,33 @@ impl AppCore {
             let co_act = ::cognitive::CoActivationRepo::new(storage_pool.inner().clone());
             let utilization =
                 coding_memory::recall::telemetry::RecallInvocationRepo::new(storage_pool.clone());
-            let session_end_pass = Arc::new(coding_memory::reforge::SessionEndPass::new(
-                session_summary_repo.clone(),
-                co_act,
-                utilization,
+            let ep_repo = Arc::new(::cognitive::EpisodicMemoryRepo::new(
+                storage_pool.inner().clone(),
             ));
+            let causal_detector = Arc::new(coding_memory::causal::CausalEdgeDetector::new(
+                causal_edges.clone(),
+                ep_repo,
+            ));
+            let session_end_pass = Arc::new(
+                coding_memory::reforge::SessionEndPass::new(
+                    session_summary_repo.clone(),
+                    co_act,
+                    utilization,
+                )
+                .with_causal_detector(causal_detector),
+            );
             crate::coding_memory::reforge::register_session_end_dispatch(
                 domain_event_bus.clone(),
                 session_end_pass.clone(),
             )
             .await;
             core.session_end_pass = Some(session_end_pass);
+            core.causal_edge_repo = Some(causal_edges);
+        }
+
+        // ── Phase-6 symbol extractor + repo roots ────────────────────────
+        {
+            core.symbol_extractor = Some(symbol_extractor);
         }
 
         // ── Distiller event receiver + sweep timers ──────────────────────

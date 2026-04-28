@@ -570,6 +570,15 @@ pub async fn run_reforge(
         }
     }
 
+    if let Some(runner) = coding_phase_runner {
+        if let Err(e) = runner.run_symbol_validation().await {
+            warn!("Phase 6.5b symbol validation failed: {e}");
+            result
+                .phase_errors
+                .push(format!("phase 6.5b symbol validation: {e}"));
+        }
+    }
+
     // ------------------------------------------------------------------
     // Phase 7: Compact
     // ------------------------------------------------------------------

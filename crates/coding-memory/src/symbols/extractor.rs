@@ -14,17 +14,9 @@ pub trait SymbolExtractor: Send + Sync + std::fmt::Debug {
 }
 
 /// Tree-sitter–backed extractor with a bounded LRU cache.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TreeSitterExtractor {
     cache: SymbolCache,
-}
-
-impl Default for TreeSitterExtractor {
-    fn default() -> Self {
-        Self {
-            cache: SymbolCache::default(),
-        }
-    }
 }
 
 impl TreeSitterExtractor {
@@ -50,7 +42,7 @@ impl TreeSitterExtractor {
 impl SymbolExtractor for TreeSitterExtractor {
     fn extract(&self, path: &Path, source: &str, git_hash: &str) -> Vec<AnchoredSymbol> {
         let hash = Self::content_hash(source);
-        if let Some(hit) = self.cache.get(&path.to_path_buf(), &hash) {
+        if let Some(hit) = self.cache.get(path, &hash) {
             return hit;
         }
 
@@ -95,17 +87,13 @@ impl SymbolExtractor for TreeSitterExtractor {
                 .iter()
                 .find(|c| c.index == symbol_idx)
                 .map(|c| c.node);
-            let kind_capture = m
-                .captures
-                .iter()
-                .find(|c| c.index != symbol_idx)
-                .map(|c| {
-                    query
-                        .capture_names()
-                        .get(c.index as usize)
-                        .copied()
-                        .unwrap_or("symbol")
-                });
+            let kind_capture = m.captures.iter().find(|c| c.index != symbol_idx).map(|c| {
+                query
+                    .capture_names()
+                    .get(c.index as usize)
+                    .copied()
+                    .unwrap_or("symbol")
+            });
             let Some(name_node) = symbol_node else {
                 continue;
             };
@@ -114,9 +102,7 @@ impl SymbolExtractor for TreeSitterExtractor {
                 Err(_) => continue,
             };
             let kind = kind_capture.unwrap_or("symbol").to_string();
-            let parent_node = name_node
-                .parent()
-                .unwrap_or_else(|| tree.root_node());
+            let parent_node = name_node.parent().unwrap_or_else(|| tree.root_node());
             let span_start = u32::try_from(parent_node.start_byte()).unwrap_or(u32::MAX);
             let span_end = u32::try_from(parent_node.end_byte()).unwrap_or(u32::MAX);
             out.push(AnchoredSymbol {

@@ -47,6 +47,8 @@ pub(super) async fn init_cron(
     provider: providers::DynProvider,
     domain_event_bus: &Arc<DomainEventBus>,
     vector_store: Option<storage::VectorStore>,
+    symbol_extractor: Option<Arc<dyn coding_memory::symbols::SymbolExtractor>>,
+    causal_edge_repo: Option<Arc<coding_memory::causal::CausalEdgeRepo>>,
 ) -> Result<CronResult, String> {
     // 6. CronExecutor — handler registration only; TemporalScheduler drives firing.
     let cron_executor = CronExecutor::new(repos.cron.clone(), Arc::clone(domain_event_bus));
@@ -123,6 +125,8 @@ pub(super) async fn init_cron(
         metric_source,
         trial_repo,
         autotuner.clone(),
+        symbol_extractor,
+        causal_edge_repo,
     );
 
     let cron_executor = Arc::new(cron_executor);
@@ -180,6 +184,8 @@ fn register_cron_callbacks(
     metric_source: Arc<dyn autotuner::MetricSource>,
     trial_repo: storage::TrialRepo,
     orchestrator: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
+    symbol_extractor: Option<Arc<dyn coding_memory::symbols::SymbolExtractor>>,
+    causal_edge_repo: Option<Arc<coding_memory::causal::CausalEdgeRepo>>,
 ) {
     let rt = tokio::runtime::Handle::current();
 
@@ -411,6 +417,8 @@ fn register_cron_callbacks(
         let trial_repo_for_reforge = trial_repo;
         let orchestrator_for_reforge = orchestrator.clone();
         let domain_event_bus_for_reforge = Arc::clone(domain_event_bus);
+        let symbol_extractor_for_reforge = symbol_extractor.clone();
+        let causal_edge_repo_for_reforge = causal_edge_repo.clone();
         cron_executor.register(
             JOB_REFORGE_NIGHTLY,
             Arc::new(move |_job: &scheduling::CronJob| {
@@ -423,6 +431,8 @@ fn register_cron_callbacks(
                 let trial_repo = trial_repo_for_reforge.clone();
                 let orchestrator = orchestrator_for_reforge.clone();
                 let domain_event_bus = domain_event_bus_for_reforge.clone();
+                let symbol_extractor = symbol_extractor_for_reforge.clone();
+                let causal_edge_repo = causal_edge_repo_for_reforge.clone();
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
                         let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
@@ -603,7 +613,9 @@ fn register_cron_callbacks(
                                 rules_handler,
                                 enabled_artifacts,
                                 Some(domain_event_bus.clone()),
-                            );
+                            )
+                            .with_symbol_extractor(symbol_extractor)
+                            .with_causal_repo(causal_edge_repo);
 
                         match cognitive::services::reforge::service::run_reforge(
                             &repos_reforge.reforge_state,

@@ -4,17 +4,18 @@
 
 #[test]
 fn no_raw_tauri_command_outside_macros() {
-    let dirs = [
-        "crates/desktop/src/commands/",
-        "crates/desktop/src/oauth/",
-    ];
+    let dirs = ["crates/desktop/src/commands/", "crates/desktop/src/oauth/"];
 
     for dir in &dirs {
         let output = std::process::Command::new("rg")
             .args(["-l", "#\\[tauri::command", dir])
             .output()
             .expect("rg available — install ripgrep if missing");
-        let files: Vec<_> = String::from_utf8(output.stdout).unwrap().lines().map(String::from).collect();
+        let files: Vec<_> = String::from_utf8(output.stdout)
+            .unwrap()
+            .lines()
+            .map(String::from)
+            .collect();
 
         for file in &files {
             let content = std::fs::read_to_string(file).unwrap();

@@ -1,7 +1,7 @@
 use app_core::handlers::autotuner::AutoTunerStatus;
 use autotuner::{ChampionSummary, ExperimentSummary};
-use desktop_shared::CommandResult;
 use desktop_macros::klynt_command;
+use desktop_shared::CommandResult;
 
 use crate::app_core::AppCore;
 
@@ -11,9 +11,7 @@ pub async fn autotuner_status() -> AutoTunerStatus {
 }
 
 #[klynt_command]
-pub async fn autotuner_history(
-    limit: Option<u32>,
-) -> Vec<ExperimentSummary> {
+pub async fn autotuner_history(limit: Option<u32>) -> Vec<ExperimentSummary> {
     state.autotuner_history(limit.unwrap_or(20)).await
 }
 

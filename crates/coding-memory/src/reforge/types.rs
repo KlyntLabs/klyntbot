@@ -34,6 +34,12 @@ pub struct CodingPhaseHandlers<'a> {
         &'a crate::mirror::pattern_effectiveness::PatternEffectivenessLogRepo,
     /// Optional bus for emitting `PatternOutcome` etc. during the cycle.
     pub bus: Option<Arc<bus::DomainEventBus>>,
+    /// Causal edge repo (Phase 6).
+    pub causal_repo: Option<&'a crate::causal::CausalEdgeRepo>,
+    /// Optional symbol extractor (Phase 6).
+    pub symbol_extractor: Option<&'a dyn crate::symbols::SymbolExtractor>,
+    /// Map of repo_id → filesystem root (Phase 6 symbol validation).
+    pub repo_roots: &'a std::collections::HashMap<String, std::path::PathBuf>,
 }
 
 /// Input bundle for `CodingSynthesisHandler::synthesize_coding`.

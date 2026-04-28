@@ -20,8 +20,7 @@ export const MAX = 42;
 fn extracts_typescript_top_level() {
     let extractor = TreeSitterExtractor::new();
     let symbols = extractor.extract(Path::new("a.ts"), SRC, "h1");
-    let names: std::collections::HashSet<_> =
-        symbols.iter().map(|s| s.symbol.as_str()).collect();
+    let names: std::collections::HashSet<_> = symbols.iter().map(|s| s.symbol.as_str()).collect();
     for expected in ["add", "Counter", "bump", "Greeter", "Mode", "MAX"] {
         assert!(names.contains(expected), "missing {expected} in {names:?}");
     }

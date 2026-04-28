@@ -1,6 +1,6 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{KnowledgeHealthSummary, TopicDetailParams, TopicDetailResponse};
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
@@ -10,9 +10,7 @@ pub async fn knowledge_health_summary() -> KnowledgeHealthSummary {
 }
 
 #[klynt_command]
-pub async fn knowledge_topic_detail(
-    params: TopicDetailParams,
-) -> TopicDetailResponse {
+pub async fn knowledge_topic_detail(params: TopicDetailParams) -> TopicDetailResponse {
     state.knowledge_topic_detail(params).await
 }
 

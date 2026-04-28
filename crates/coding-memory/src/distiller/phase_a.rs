@@ -44,7 +44,10 @@ pub fn extract_refactor_anchors(
 pub fn anchors_from_enriched(events: &[AgentEvent]) -> Vec<AnchoredSymbol> {
     let mut out = Vec::new();
     for AgentEvent::V1(v1) in events {
-        if let EventKind::FileEditEnriched { anchored_symbols, .. } = &v1.kind {
+        if let EventKind::FileEditEnriched {
+            anchored_symbols, ..
+        } = &v1.kind
+        {
             for sym in anchored_symbols {
                 out.push(AnchoredSymbol {
                     file_path: sym.file_path.clone(),

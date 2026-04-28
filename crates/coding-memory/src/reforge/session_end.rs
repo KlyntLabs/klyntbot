@@ -12,6 +12,7 @@
 //!    `session_summaries`. The Phase-4 SessionStart renderer reads this for
 //!    its "Open threads" section.
 
+use crate::causal::CausalEdgeDetector;
 use crate::recall::telemetry::RecallInvocationRepo;
 use crate::reforge::session_summary_repo::{SessionSummaryRepo, SessionSummaryRow};
 use cognitive::{CoActivationRepo, EpisodicMemoryRepo};
@@ -19,6 +20,7 @@ use common::{KlyntbotError, Result};
 use jiff::Timestamp;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Outcome of one pass — surfaced to telemetry.
 #[derive(Debug, Clone, Default)]
@@ -27,6 +29,8 @@ pub struct SessionEndReport {
     pub pairs_bumped: u32,
     /// Number of duplicate fix-attempt episodes removed.
     pub deduped_attempts: u32,
+    /// Number of causal edges detected.
+    pub causal_edges_detected: u32,
     /// Token count of the summary.
     pub summary_tokens: u32,
 }
@@ -37,6 +41,7 @@ pub struct SessionEndPass {
     summaries: SessionSummaryRepo,
     co_activation: CoActivationRepo,
     utilization: RecallInvocationRepo,
+    causal_detector: Option<Arc<CausalEdgeDetector>>,
 }
 
 impl SessionEndPass {
@@ -50,7 +55,15 @@ impl SessionEndPass {
             summaries,
             co_activation,
             utilization,
+            causal_detector: None,
         }
+    }
+
+    /// Attach an optional causal-edge detector.
+    #[must_use]
+    pub fn with_causal_detector(mut self, detector: Arc<CausalEdgeDetector>) -> Self {
+        self.causal_detector = Some(detector);
+        self
     }
 
     /// Run the pass.
@@ -140,7 +153,16 @@ impl SessionEndPass {
             }
         }
 
-        // 3. Build deterministic ≤200-token summary.
+        // 3. Causal-edge detection.
+        if let Some(detector) = &self.causal_detector {
+            let n = detector
+                .detect_for_session(session_id)
+                .await
+                .map_err(|e| KlyntbotError::Storage(format!("causal detection: {e}")))?;
+            report.causal_edges_detected = n;
+        }
+
+        // 4. Build deterministic ≤200-token summary.
         let summary = build_summary_md(session_id, repo_id, &invocations).await;
         let token_count = estimate_tokens(&summary);
         report.summary_tokens = token_count;

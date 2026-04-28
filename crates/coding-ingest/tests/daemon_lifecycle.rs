@@ -28,6 +28,7 @@ async fn daemon_accepts_event_and_writes_row() {
         repo: repo.clone(),
         event_tx: None,
         op_handler: None,
+        git_invalidation_handler: None,
     };
     let handle = spawn(cfg.clone()).await.expect("spawn");
 

@@ -1,9 +1,9 @@
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{
     LabelCreateParams, LabelReorderParams, LabelUpdateParams, StatusLabelResponse,
     StatusWorkflowResponse, WorkflowCreateParams,
 };
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
@@ -18,16 +18,12 @@ pub async fn workflow_get(id: String) -> Option<StatusWorkflowResponse> {
 }
 
 #[klynt_command]
-pub async fn workflow_get_effective(
-    project_id: Option<String>,
-) -> Vec<StatusLabelResponse> {
+pub async fn workflow_get_effective(project_id: Option<String>) -> Vec<StatusLabelResponse> {
     state.workflow_get_effective(project_id).await
 }
 
 #[klynt_command]
-pub async fn workflow_create(
-    params: WorkflowCreateParams,
-) -> StatusWorkflowResponse {
+pub async fn workflow_create(params: WorkflowCreateParams) -> StatusWorkflowResponse {
     state.workflow_create(params).await
 }
 
@@ -37,16 +33,12 @@ pub async fn workflow_delete(id: String) -> bool {
 }
 
 #[klynt_command]
-pub async fn label_create(
-    params: LabelCreateParams,
-) -> StatusLabelResponse {
+pub async fn label_create(params: LabelCreateParams) -> StatusLabelResponse {
     state.label_create(params).await
 }
 
 #[klynt_command]
-pub async fn label_update(
-    params: LabelUpdateParams,
-) -> StatusLabelResponse {
+pub async fn label_update(params: LabelUpdateParams) -> StatusLabelResponse {
     state.label_update(params).await
 }
 

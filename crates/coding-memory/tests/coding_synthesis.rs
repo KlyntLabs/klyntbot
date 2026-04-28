@@ -64,6 +64,9 @@ async fn extract_pattern_persists_procedural_rule() {
         selective_delete_log: &sd_repo,
         pattern_effectiveness_log: &pat_eff_repo,
         bus: None,
+        causal_repo: None,
+        symbol_extractor: None,
+        repo_roots: &Default::default(),
     };
 
     CodingSynthesisPhase::run(&handlers)
@@ -119,6 +122,9 @@ async fn promote_to_project_understanding_writes_semantic_fact() {
         selective_delete_log: &sd_repo,
         pattern_effectiveness_log: &pat_eff_repo,
         bus: None,
+        causal_repo: None,
+        symbol_extractor: None,
+        repo_roots: &Default::default(),
     };
 
     CodingSynthesisPhase::run(&handlers)

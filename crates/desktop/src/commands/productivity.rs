@@ -18,8 +18,7 @@ use crate::app_core::AppCore;
 use crate::focus_timer::FocusTimer;
 
 #[klynt_command]
-pub async fn productivity_today(
-) -> Option<ProductivitySummaryResponse> {
+pub async fn productivity_today() -> Option<ProductivitySummaryResponse> {
     state.productivity_today().await
 }
 
@@ -50,22 +49,17 @@ pub async fn productivity_focus_start(
 }
 
 #[klynt_command]
-pub async fn productivity_focus_end(
-    notes: Option<String>,
-) -> Option<FocusSessionResponse> {
+pub async fn productivity_focus_end(notes: Option<String>) -> Option<FocusSessionResponse> {
     state.productivity_focus_end(notes).await
 }
 
 #[klynt_command]
-pub async fn productivity_focus_status(
-) -> Option<FocusSessionResponse> {
+pub async fn productivity_focus_status() -> Option<FocusSessionResponse> {
     state.productivity_focus_status().await
 }
 
 #[klynt_command]
-pub async fn productivity_sessions(
-    date: String,
-) -> Vec<FocusSessionResponse> {
+pub async fn productivity_sessions(date: String) -> Vec<FocusSessionResponse> {
     state.productivity_sessions(date).await
 }
 
@@ -80,20 +74,17 @@ pub async fn productivity_intelligence_sessions(
 }
 
 #[klynt_command]
-pub async fn productivity_weekly(
-) -> Vec<ProductivitySummaryResponse> {
+pub async fn productivity_weekly() -> Vec<ProductivitySummaryResponse> {
     state.productivity_weekly().await
 }
 
 #[klynt_command]
-pub async fn productivity_categories(
-) -> Vec<ActivityCategoryResponse> {
+pub async fn productivity_categories() -> Vec<ActivityCategoryResponse> {
     state.productivity_categories().await
 }
 
 #[klynt_command]
-pub async fn productivity_tracked_apps(
-) -> Vec<TrackedAppResponse> {
+pub async fn productivity_tracked_apps() -> Vec<TrackedAppResponse> {
     state.productivity_tracked_apps().await
 }
 
@@ -109,15 +100,12 @@ pub async fn productivity_summary_range(
 }
 
 #[klynt_command]
-pub async fn productivity_activity_feed(
-    limit: Option<i64>,
-) -> Vec<ActivityTimelineResponse> {
+pub async fn productivity_activity_feed(limit: Option<i64>) -> Vec<ActivityTimelineResponse> {
     state.productivity_activity_feed(limit).await
 }
 
 #[klynt_command]
-pub async fn productivity_goals(
-) -> Vec<GoalProgressResponse> {
+pub async fn productivity_goals() -> Vec<GoalProgressResponse> {
     state.productivity_goals().await
 }
 
@@ -135,9 +123,7 @@ pub async fn productivity_pomodoro_start(
 }
 
 #[klynt_command]
-pub async fn productivity_time_entries(
-    date: String,
-) -> Vec<TimeEntryResponse> {
+pub async fn productivity_time_entries(date: String) -> Vec<TimeEntryResponse> {
     state.productivity_time_entries(date).await
 }
 
@@ -156,17 +142,12 @@ pub async fn productivity_goal_create(
 }
 
 #[klynt_command]
-pub async fn productivity_goal_delete(
-    id: i64,
-) -> () {
+pub async fn productivity_goal_delete(id: i64) -> () {
     state.productivity_goal_delete(id).await
 }
 
 #[klynt_command]
-pub async fn productivity_goal_toggle(
-    id: i64,
-    enabled: bool,
-) -> () {
+pub async fn productivity_goal_toggle(id: i64, enabled: bool) -> () {
     state.productivity_goal_toggle(id, enabled).await
 }
 
@@ -186,9 +167,7 @@ pub async fn productivity_time_entry_create(
 }
 
 #[klynt_command]
-pub async fn productivity_time_entry_delete(
-    id: i64,
-) -> () {
+pub async fn productivity_time_entry_delete(id: i64) -> () {
     state.productivity_time_entry_delete(id).await
 }
 
@@ -236,16 +215,12 @@ pub async fn productivity_recategorize_app(
 // ── V2: Insights & Auto-Focus ─────────────────────────────────────────
 
 #[klynt_command]
-pub async fn productivity_insights(
-    date: Option<String>,
-) -> Vec<InsightCardResponse> {
+pub async fn productivity_insights(date: Option<String>) -> Vec<InsightCardResponse> {
     state.productivity_insights(date).await
 }
 
 #[klynt_command]
-pub async fn productivity_insight_dismiss(
-    id: String,
-) -> () {
+pub async fn productivity_insight_dismiss(id: String) -> () {
     state.productivity_insight_dismiss(id).await
 }
 
@@ -316,8 +291,7 @@ pub async fn distraction_respond(
 // ── V3: Project Tracking ─────────────────────────────────────────────
 
 #[klynt_command]
-pub async fn productivity_projects_list(
-) -> Vec<ProductivityProjectResponse> {
+pub async fn productivity_projects_list() -> Vec<ProductivityProjectResponse> {
     state.productivity_projects_list().await
 }
 
@@ -338,9 +312,7 @@ pub async fn productivity_project_upsert(
 }
 
 #[klynt_command]
-pub async fn productivity_project_delete(
-    id: String,
-) -> () {
+pub async fn productivity_project_delete(id: String) -> () {
     state.productivity_project_delete(id).await
 }
 
@@ -517,9 +489,7 @@ pub async fn focus_session_take_break(timer: State<'_, Arc<FocusTimer>>) -> Comm
 // ── Patterns & Hourly Breakdown ─────────────────────────────────────
 
 #[klynt_command]
-pub async fn productivity_patterns(
-    days: Option<u32>,
-) -> ProductivityPatternsResponse {
+pub async fn productivity_patterns(days: Option<u32>) -> ProductivityPatternsResponse {
     state.productivity_patterns(days).await
 }
 

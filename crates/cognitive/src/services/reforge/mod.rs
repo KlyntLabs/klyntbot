@@ -123,6 +123,8 @@ pub trait CodingPhaseRunner: Send + Sync {
     async fn run_cross_session_dedup(&self) -> common::Result<CodingPhaseRunnerOutcome>;
     /// Phase 6 extension — selective-delete signal.
     async fn run_selective_delete(&self) -> common::Result<CodingPhaseRunnerOutcome>;
+    /// Phase 6.5b — Reforge deep symbol validation (Phase 6).
+    async fn run_symbol_validation(&self) -> common::Result<CodingPhaseRunnerOutcome>;
 }
 
 /// Dispatch helper for the unit test in `tests/run_reforge_with_coding.rs`.
@@ -140,6 +142,9 @@ pub async fn dispatch_coding_phases_for_test(
         count += 1;
     }
     if runner.run_selective_delete().await.is_ok() {
+        count += 1;
+    }
+    if runner.run_symbol_validation().await.is_ok() {
         count += 1;
     }
     Ok(count)

@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse2, ItemFn};
+use syn::{ItemFn, parse2};
 
-use crate::errors::{err, ERR_NOT_FUNCTION};
+use crate::errors::{ERR_NOT_FUNCTION, err};
 
 pub fn expand(input: TokenStream) -> TokenStream {
     let fn_item: ItemFn = match parse2(input.clone()) {

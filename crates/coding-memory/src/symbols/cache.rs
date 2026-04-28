@@ -28,8 +28,12 @@ impl SymbolCache {
     }
 
     /// Cache miss → `None`. Cache hit promotes the entry.
-    pub fn get(&self, path: &PathBuf, content_hash: &[u8; 32]) -> Option<Vec<AnchoredSymbol>> {
-        let key = (path.clone(), *content_hash);
+    pub fn get(
+        &self,
+        path: &std::path::Path,
+        content_hash: &[u8; 32],
+    ) -> Option<Vec<AnchoredSymbol>> {
+        let key = (path.to_path_buf(), *content_hash);
         self.inner.lock().get(&key).cloned()
     }
 

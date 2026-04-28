@@ -72,7 +72,7 @@ async fn build_input(handlers: &CodingPhaseHandlers<'_>) -> Result<CodingSynthes
         let fix_attempts = fetch_fix_attempts(&pool, &rid, &since).await?;
         let patterns = fetch_workflow_patterns(&pool, &rid).await?;
         let context_facts = fetch_repo_context(&pool, &rid).await?;
-        let causal_chains = fetch_causal_chain_groups(&pool, &rid).await?;
+        let causal_chains = fetch_causal_chain_groups(handlers, &rid, &since).await?;
         bundles.push(RepoSynthesisBundle {
             repo_id: rid,
             fix_attempts,
@@ -210,13 +210,27 @@ async fn fetch_repo_context(
 }
 
 async fn fetch_causal_chain_groups(
-    pool: &storage::StoragePool,
+    handlers: &CodingPhaseHandlers<'_>,
     repo_id: &str,
+    since: &Timestamp,
 ) -> Result<Vec<CausalChainGroup>> {
-    // Phase 6 will populate edges with problem_hash. Phase 5 returns empty groups.
-    let _ = pool;
-    let _ = repo_id;
-    Ok(Vec::new())
+    let Some(causal_repo) = handlers.causal_repo else {
+        return Ok(Vec::new());
+    };
+    let groups = causal_repo
+        .groups_by_problem_hash(Some(repo_id), *since, 3)
+        .await?;
+    Ok(groups
+        .into_iter()
+        .map(|g| {
+            let count = u32::try_from(g.edge_ids.len()).unwrap_or(u32::MAX);
+            CausalChainGroup {
+                problem_hash: g.problem_hash,
+                edge_ids: g.edge_ids,
+                count,
+            }
+        })
+        .collect())
 }
 
 #[allow(clippy::type_complexity)]

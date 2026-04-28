@@ -36,10 +36,7 @@ pub async fn key_result_update_metric(
 }
 
 #[klynt_command]
-pub async fn key_result_delete(
-    app: tauri::AppHandle,
-    id: String,
-) -> bool {
+pub async fn key_result_delete(app: tauri::AppHandle, id: String) -> bool {
     let (result, updates) = state.key_result_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)

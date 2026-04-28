@@ -79,6 +79,9 @@ async fn writes_managed_block_for_each_enabled_artifact() {
         selective_delete_log: &sd,
         pattern_effectiveness_log: &pat,
         bus: None,
+        causal_repo: None,
+        symbol_extractor: None,
+        repo_roots: &Default::default(),
     };
 
     RuleArtifactGenerationPhase::run(&handlers, &["claude_md".into()])

@@ -20,6 +20,7 @@ usage:
   klyntbot-hook <source> [hook-event]
   klyntbot-hook status
   klyntbot-hook context [--session-start | --user-prompt-submit <text>] [--repo <repo>]
+  klyntbot-hook git-post-commit
   source ∈ { claude-code, codex, kimi-cli, opencode }
 ";
 
@@ -36,6 +37,10 @@ pub fn run(args: Vec<String>) -> i32 {
 
     if first == "context" {
         return run_context(args);
+    }
+
+    if first == "git-post-commit" {
+        return run_git_post_commit();
     }
 
     let source = first.clone();
@@ -202,6 +207,46 @@ fn read_last_distilled(db_path: &std::path::Path) -> Option<String> {
         let repo = IngestEventLogRepo::new(pool);
         repo.last_distilled_at().await.ok().flatten()
     })
+}
+
+fn run_git_post_commit() -> i32 {
+    use crate::adapters::git_post_commit::GitPostCommitAdapter;
+
+    let mut raw = Vec::with_capacity(2 * 1024);
+    if let Err(e) = std::io::Read::read_to_end(&mut std::io::stdin(), &mut raw) {
+        eprintln!("klyntbot-hook git-post-commit: stdin read: {e}");
+        return 1;
+    }
+    let event = match GitPostCommitAdapter::parse(&raw) {
+        Ok(Some(e)) => e,
+        Ok(None) => return 0,
+        Err(e) => {
+            eprintln!("klyntbot-hook git-post-commit: parse: {e}");
+            return 1;
+        }
+    };
+
+    let home = home_dir();
+    let client = HookClient::new(
+        home.join("ingest.sock"),
+        home.join("ingest-buffer.jsonl"),
+        home.join(".hook-warn.stamp"),
+    );
+    let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("klyntbot-hook git-post-commit: runtime: {e}");
+            return 1;
+        }
+    };
+    if let Err(e) = rt.block_on(client.send(&event)) {
+        eprintln!("klyntbot-hook git-post-commit: send: {e}");
+        return 1;
+    }
+    0
 }
 
 fn home_dir() -> PathBuf {

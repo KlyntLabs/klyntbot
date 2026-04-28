@@ -31,15 +31,13 @@ pub async fn finance_accounts() -> Vec<FinanceAccountRow> {
 }
 
 #[klynt_command]
-pub async fn finance_transactions(
-    limit: Option<i64>
-) -> Vec<FinanceTransactionRow> {
+pub async fn finance_transactions(limit: Option<i64>) -> Vec<FinanceTransactionRow> {
     state.finance_transactions(limit).await
 }
 
 #[klynt_command]
 pub async fn finance_transactions_filtered(
-    params: FinanceTransactionFilterParams
+    params: FinanceTransactionFilterParams,
 ) -> Vec<FinanceTransactionRow> {
     state.finance_transactions_filtered(params).await
 }
@@ -61,7 +59,7 @@ pub async fn finance_investments() -> Vec<FinanceInvestmentRow> {
 
 #[klynt_command]
 pub async fn finance_investments_filtered(
-    portfolio_id: Option<String>
+    portfolio_id: Option<String>,
 ) -> Vec<FinanceInvestmentRow> {
     state.finance_investments_filtered(portfolio_id).await
 }
@@ -91,7 +89,7 @@ pub async fn finance_exchange_rates() -> HashMap<String, f64> {
 #[klynt_command]
 pub async fn finance_account_create(
     app: tauri::AppHandle,
-    params: FinanceAccountCreateParams
+    params: FinanceAccountCreateParams,
 ) -> FinanceAccountRow {
     let (result, updates) = state.finance_account_create(params).await?;
     super::emit_updates(&app, &updates);
@@ -101,7 +99,7 @@ pub async fn finance_account_create(
 #[klynt_command]
 pub async fn finance_account_update(
     app: tauri::AppHandle,
-    params: FinanceAccountUpdateParams
+    params: FinanceAccountUpdateParams,
 ) -> FinanceAccountRow {
     let (result, updates) = state.finance_account_update(params).await?;
     super::emit_updates(&app, &updates);
@@ -109,10 +107,7 @@ pub async fn finance_account_update(
 }
 
 #[klynt_command]
-pub async fn finance_account_delete(
-    app: tauri::AppHandle,
-    id: String
-) -> bool {
+pub async fn finance_account_delete(app: tauri::AppHandle, id: String) -> bool {
     let (result, updates) = state.finance_account_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -121,7 +116,7 @@ pub async fn finance_account_delete(
 #[klynt_command]
 pub async fn finance_transaction_create(
     app: tauri::AppHandle,
-    params: FinanceTransactionCreateParams
+    params: FinanceTransactionCreateParams,
 ) -> FinanceTransactionRow {
     let (result, updates) = state.finance_transaction_create(params).await?;
     super::emit_updates(&app, &updates);
@@ -129,10 +124,7 @@ pub async fn finance_transaction_create(
 }
 
 #[klynt_command]
-pub async fn finance_transaction_delete(
-    app: tauri::AppHandle,
-    id: String
-) -> bool {
+pub async fn finance_transaction_delete(app: tauri::AppHandle, id: String) -> bool {
     let (result, updates) = state.finance_transaction_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -141,7 +133,7 @@ pub async fn finance_transaction_delete(
 #[klynt_command]
 pub async fn finance_budget_create(
     app: tauri::AppHandle,
-    params: FinanceBudgetCreateParams
+    params: FinanceBudgetCreateParams,
 ) -> FinanceBudgetRow {
     let (result, updates) = state.finance_budget_create(params).await?;
     super::emit_updates(&app, &updates);
@@ -151,7 +143,7 @@ pub async fn finance_budget_create(
 #[klynt_command]
 pub async fn finance_budget_update(
     app: tauri::AppHandle,
-    params: FinanceBudgetUpdateParams
+    params: FinanceBudgetUpdateParams,
 ) -> FinanceBudgetRow {
     let (result, updates) = state.finance_budget_update(params).await?;
     super::emit_updates(&app, &updates);
@@ -159,10 +151,7 @@ pub async fn finance_budget_update(
 }
 
 #[klynt_command]
-pub async fn finance_budget_delete(
-    app: tauri::AppHandle,
-    id: String
-) -> bool {
+pub async fn finance_budget_delete(app: tauri::AppHandle, id: String) -> bool {
     let (result, updates) = state.finance_budget_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -171,7 +160,7 @@ pub async fn finance_budget_delete(
 #[klynt_command]
 pub async fn finance_goal_create(
     app: tauri::AppHandle,
-    params: FinanceGoalCreateParams
+    params: FinanceGoalCreateParams,
 ) -> FinanceGoalRow {
     let (result, updates) = state.finance_goal_create(params).await?;
     super::emit_updates(&app, &updates);
@@ -181,7 +170,7 @@ pub async fn finance_goal_create(
 #[klynt_command]
 pub async fn finance_goal_update(
     app: tauri::AppHandle,
-    params: FinanceGoalUpdateParams
+    params: FinanceGoalUpdateParams,
 ) -> FinanceGoalRow {
     let (result, updates) = state.finance_goal_update(params).await?;
     super::emit_updates(&app, &updates);
@@ -189,10 +178,7 @@ pub async fn finance_goal_update(
 }
 
 #[klynt_command]
-pub async fn finance_goal_delete(
-    app: tauri::AppHandle,
-    id: String
-) -> bool {
+pub async fn finance_goal_delete(app: tauri::AppHandle, id: String) -> bool {
     let (result, updates) = state.finance_goal_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -201,7 +187,7 @@ pub async fn finance_goal_delete(
 #[klynt_command]
 pub async fn finance_liability_create(
     app: tauri::AppHandle,
-    params: FinanceLiabilityCreateParams
+    params: FinanceLiabilityCreateParams,
 ) -> FinanceLiabilityRow {
     let (result, updates) = state.finance_liability_create(params).await?;
     super::emit_updates(&app, &updates);
@@ -211,7 +197,7 @@ pub async fn finance_liability_create(
 #[klynt_command]
 pub async fn finance_liability_update(
     app: tauri::AppHandle,
-    params: FinanceLiabilityUpdateParams
+    params: FinanceLiabilityUpdateParams,
 ) -> FinanceLiabilityRow {
     let (result, updates) = state.finance_liability_update(params).await?;
     super::emit_updates(&app, &updates);
@@ -219,10 +205,7 @@ pub async fn finance_liability_update(
 }
 
 #[klynt_command]
-pub async fn finance_liability_delete(
-    app: tauri::AppHandle,
-    id: String
-) -> bool {
+pub async fn finance_liability_delete(app: tauri::AppHandle, id: String) -> bool {
     let (result, updates) = state.finance_liability_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
@@ -231,7 +214,7 @@ pub async fn finance_liability_delete(
 #[klynt_command]
 pub async fn finance_portfolio_create(
     app: tauri::AppHandle,
-    params: FinancePortfolioCreateParams
+    params: FinancePortfolioCreateParams,
 ) -> FinancePortfolioRow {
     let (result, updates) = state.finance_portfolio_create(params).await?;
     super::emit_updates(&app, &updates);
@@ -241,7 +224,7 @@ pub async fn finance_portfolio_create(
 #[klynt_command]
 pub async fn finance_investment_create(
     app: tauri::AppHandle,
-    params: FinanceInvestmentCreateParams
+    params: FinanceInvestmentCreateParams,
 ) -> FinanceInvestmentRow {
     let (result, updates) = state.finance_investment_create(params).await?;
     super::emit_updates(&app, &updates);
@@ -251,7 +234,7 @@ pub async fn finance_investment_create(
 #[klynt_command]
 pub async fn finance_investment_update(
     app: tauri::AppHandle,
-    params: FinanceInvestmentUpdateParams
+    params: FinanceInvestmentUpdateParams,
 ) -> FinanceInvestmentRow {
     let (result, updates) = state.finance_investment_update(params).await?;
     super::emit_updates(&app, &updates);
@@ -263,7 +246,7 @@ pub async fn finance_investment_update(
 #[klynt_command]
 pub async fn finance_allocation_target_upsert(
     app: tauri::AppHandle,
-    params: FinanceAllocationTargetUpsertParams
+    params: FinanceAllocationTargetUpsertParams,
 ) -> FinanceAllocationTargetRow {
     let (result, updates) = state.finance_allocation_target_upsert(params).await?;
     super::emit_updates(&app, &updates);
@@ -285,7 +268,7 @@ pub async fn finance_allocation_targets(
 #[klynt_command]
 pub async fn finance_investment_tx_create(
     app: tauri::AppHandle,
-    params: FinanceInvestmentTxCreateParams
+    params: FinanceInvestmentTxCreateParams,
 ) -> FinanceInvestmentTxRow {
     let (result, updates) = state.finance_investment_tx_create(params).await?;
     super::emit_updates(&app, &updates);
@@ -318,16 +301,13 @@ pub async fn finance_report_spending(
 #[klynt_command]
 pub async fn finance_report_income(
     date_from: Option<String>,
-    date_to: Option<String>
+    date_to: Option<String>,
 ) -> FinanceCategoryReportResponse {
     state.finance_report_income(date_from, date_to).await
 }
 
 #[klynt_command]
-pub async fn finance_report_trends(
-    metric: String,
-    periods: Option<i64>
-) -> Vec<FinanceTrendPoint> {
+pub async fn finance_report_trends(metric: String, periods: Option<i64>) -> Vec<FinanceTrendPoint> {
     state.finance_report_trends(metric, periods).await
 }
 

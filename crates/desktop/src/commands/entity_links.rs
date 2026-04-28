@@ -1,6 +1,6 @@
+use desktop_macros::klynt_command;
 use desktop_shared::entity_link_types::*;
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 use crate::app_core::AppCore;
 
@@ -15,20 +15,14 @@ pub async fn entity_link_create(
 }
 
 #[klynt_command]
-pub async fn entity_link_delete(
-    app: tauri::AppHandle,
-    id: String,
-) -> bool {
+pub async fn entity_link_delete(app: tauri::AppHandle, id: String) -> bool {
     let (result, updates) = state.entity_link_delete(id).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
 
 #[klynt_command]
-pub async fn entity_links_for_entity(
-    kind: String,
-    id: String,
-) -> LinkedEntitiesResponse {
+pub async fn entity_links_for_entity(kind: String, id: String) -> LinkedEntitiesResponse {
     state.entity_links_for_entity(kind, id).await
 }
 

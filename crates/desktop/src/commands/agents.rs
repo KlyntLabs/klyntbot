@@ -1,7 +1,7 @@
 use app_core::AppCore;
+use desktop_macros::klynt_command;
 use desktop_shared::commands::{AgentFileContent, AgentFileSummary, AgentProfileSummary};
 use desktop_shared::CommandResult;
-use desktop_macros::klynt_command;
 
 #[klynt_command]
 pub async fn agent_list_profiles() -> Vec<AgentProfileSummary> {
@@ -9,10 +9,7 @@ pub async fn agent_list_profiles() -> Vec<AgentProfileSummary> {
 }
 
 #[klynt_command]
-pub async fn agent_read_file(
-    agent_name: String,
-    filename: String,
-) -> AgentFileContent {
+pub async fn agent_read_file(agent_name: String, filename: String) -> AgentFileContent {
     state.agent_read_file(&agent_name, &filename).await
 }
 
@@ -28,25 +25,17 @@ pub async fn agent_write_file(
 }
 
 #[klynt_command]
-pub async fn agent_create_profile(
-    name: String,
-) -> AgentProfileSummary {
+pub async fn agent_create_profile(name: String) -> AgentProfileSummary {
     state.agent_create_profile(&name).await
 }
 
 #[klynt_command]
-pub async fn agent_create_skill(
-    agent_name: String,
-    skill_name: String,
-) -> AgentFileSummary {
+pub async fn agent_create_skill(agent_name: String, skill_name: String) -> AgentFileSummary {
     state.agent_create_skill(&agent_name, &skill_name).await
 }
 
 #[klynt_command]
-pub async fn agent_delete_file(
-    agent_name: String,
-    filename: String,
-) -> bool {
+pub async fn agent_delete_file(agent_name: String, filename: String) -> bool {
     state.agent_delete_file(&agent_name, &filename).await
 }
 

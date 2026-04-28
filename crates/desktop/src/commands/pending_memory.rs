@@ -31,29 +31,21 @@ impl From<cognitive::repos::PendingMemoryRow> for PendingMemoryResponse {
 // ── Commands ─────────────────────────────────────────────────────────────
 
 #[klynt_command]
-pub async fn list_pending_memories(
-    limit: Option<i64>,
-) -> Vec<PendingMemoryResponse> {
+pub async fn list_pending_memories(limit: Option<i64>) -> Vec<PendingMemoryResponse> {
     let repo = state.pending_memory_repo()?;
     let rows = repo.list_pending(limit.unwrap_or(20)).await;
     Ok(rows.into_iter().map(PendingMemoryResponse::from).collect())
 }
 
 #[klynt_command]
-pub async fn approve_pending_memory(
-    app: tauri::AppHandle,
-    id: String,
-) -> () {
+pub async fn approve_pending_memory(app: tauri::AppHandle, id: String) -> () {
     state.approve_pending_memory(&id).await?;
     super::emit_entity_updated(&app, EntityKind::PendingMemory, &id);
     Ok(())
 }
 
 #[klynt_command]
-pub async fn dismiss_pending_memory(
-    app: tauri::AppHandle,
-    id: String,
-) -> () {
+pub async fn dismiss_pending_memory(app: tauri::AppHandle, id: String) -> () {
     state.dismiss_pending_memory(&id).await?;
     super::emit_entity_updated(&app, EntityKind::PendingMemory, &id);
     Ok(())

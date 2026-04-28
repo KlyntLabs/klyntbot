@@ -5,10 +5,7 @@ use desktop_shared::CommandResult;
 use crate::app_core::AppCore;
 
 #[klynt_command]
-pub async fn retention_history(
-    days: i64,
-    by_domain: Option<bool>,
-) -> RetentionHistoryResponse {
+pub async fn retention_history(days: i64, by_domain: Option<bool>) -> RetentionHistoryResponse {
     state
         .retention_history(RetentionHistoryParams {
             days,

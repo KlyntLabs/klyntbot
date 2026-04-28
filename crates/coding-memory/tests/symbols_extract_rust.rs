@@ -22,8 +22,7 @@ pub const MAX: u32 = 42;
 fn extracts_rust_top_level_symbols() {
     let extractor = TreeSitterExtractor::new();
     let symbols = extractor.extract(Path::new("src/lib.rs"), SRC, "deadbeef");
-    let names: std::collections::HashSet<_> =
-        symbols.iter().map(|s| s.symbol.as_str()).collect();
+    let names: std::collections::HashSet<_> = symbols.iter().map(|s| s.symbol.as_str()).collect();
     for expected in ["add", "Counter", "new", "bump", "Mode", "Greet", "MAX"] {
         assert!(names.contains(expected), "missing {expected} in {names:?}");
     }

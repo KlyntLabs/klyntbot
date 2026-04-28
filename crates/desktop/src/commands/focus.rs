@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use desktop_shared::{errors::ApiError, CommandResult};
 use desktop_macros::{klynt_command, klynt_raw_command};
+use desktop_shared::{errors::ApiError, CommandResult};
 use feature_focus::repo::FocusSession;
 use feature_focus::FocusMode;
 use tauri::State;
@@ -64,10 +64,7 @@ pub async fn focus_shortcuts_installed() -> CommandResult<bool> {
 
 /// Activate a DND focus session ending at `ends_at` (RFC 3339).
 #[klynt_command]
-pub async fn focus_activate(
-    mode: FocusMode,
-    ends_at: String,
-) -> FocusSession {
+pub async fn focus_activate(mode: FocusMode, ends_at: String) -> FocusSession {
     let ts = ends_at
         .parse::<jiff::Timestamp>()
         .map_err(|e| ApiError::new("BAD_TIMESTAMP", e.to_string()))?;
@@ -79,9 +76,7 @@ pub async fn focus_activate(
 
 /// Deactivate the active DND session for `mode`. Idempotent.
 #[klynt_command]
-pub async fn focus_deactivate(
-    mode: FocusMode,
-) -> () {
+pub async fn focus_deactivate(mode: FocusMode) -> () {
     let mgr = state.dnd_manager()?;
     mgr.deactivate(mode)
         .await
@@ -90,10 +85,7 @@ pub async fn focus_deactivate(
 
 /// Extend the active session for `mode`, setting a new end time (RFC 3339).
 #[klynt_command]
-pub async fn focus_extend(
-    mode: FocusMode,
-    new_ends_at: String,
-) -> FocusSession {
+pub async fn focus_extend(mode: FocusMode, new_ends_at: String) -> FocusSession {
     let ts = new_ends_at
         .parse::<jiff::Timestamp>()
         .map_err(|e| ApiError::new("BAD_TIMESTAMP", e.to_string()))?;
@@ -105,9 +97,7 @@ pub async fn focus_extend(
 
 /// Return the current active session for `mode`, or `null` if none.
 #[klynt_command]
-pub async fn focus_active(
-    mode: FocusMode,
-) -> Option<FocusSession> {
+pub async fn focus_active(mode: FocusMode) -> Option<FocusSession> {
     let mgr = state.dnd_manager()?;
     mgr.active(mode)
         .await
