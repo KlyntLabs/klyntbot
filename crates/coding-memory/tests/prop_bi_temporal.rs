@@ -1,34 +1,46 @@
-//! Invariant 2 — `valid_until >= valid_from` for every semantic fact.
+//! Inv 4 — bi-temporal monotone: `valid_until >= valid_from` always.
 
-use cognitive::types::SemanticFact;
 use jiff::Timestamp;
+use proptest::prelude::*;
+use storage::StoragePool;
 
-#[test]
-fn bi_temporal_monotone_for_new_fact() {
-    let now = Timestamp::now();
-    let f = SemanticFact {
-        id: "f1".into(),
-        domain: "work".into(),
-        subject: "x".into(),
-        predicate: "y".into(),
-        object: "z".into(),
-        confidence: 0.9,
-        source: "distiller".into(),
-        valid_from: now.to_string(),
-        valid_until: None,
-        recorded_at: now.to_string(),
-        superseded_at: None,
-        superseded_by: None,
-        stability: 1.0,
-        last_accessed: None,
-        access_count: 0,
-        convergence_score: 1.0,
-        project_id: None,
-        memory_type: "fact".into(),
-        scope_type: "user".into(),
-        scope_id: None,
-        scope_repo_id: None,
-        metadata: None,
-    };
-    assert!(f.valid_until.is_none() || f.valid_until >= Some(f.valid_from.clone()));
+mod common;
+
+fn arb_offset_seconds() -> impl Strategy<Value = i64> {
+    -86_400i64..=86_400i64
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(64))]
+
+    #[test]
+    fn valid_until_never_precedes_valid_from(
+        valid_from_offset in arb_offset_seconds(),
+        valid_until_offset in arb_offset_seconds(),
+    ) {
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        rt.block_on(async {
+            let pool = common::pool_with_migrations().await;
+            let repos = cognitive::SemanticFactRepo::new(pool.inner().clone());
+
+            let now = Timestamp::now();
+            let valid_from = now.checked_add(valid_from_offset.seconds()).unwrap();
+            let candidate_until = now.checked_add(valid_until_offset.seconds()).unwrap();
+
+            let result = repos.insert_with_validity(
+                "s", "p", "o",
+                None,
+                valid_from,
+                Some(candidate_until),
+            ).await;
+
+            if candidate_until < valid_from {
+                prop_assert!(result.is_err(), "repo accepted invalid until < from");
+            } else {
+                let fact = result.unwrap();
+                let stored_until = fact.valid_until.unwrap();
+                prop_assert!(stored_until >= fact.valid_from);
+            }
+        });
+    }
 }

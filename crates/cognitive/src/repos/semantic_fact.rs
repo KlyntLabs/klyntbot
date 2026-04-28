@@ -844,6 +844,68 @@ impl SemanticFactRepo {
                 .collect()
         })
     }
+
+    /// Insert a fact with explicit validity window, rejecting bi-temporal violations.
+    pub async fn insert_with_validity(
+        &self,
+        subject: &str,
+        predicate: &str,
+        object: &str,
+        scope_repo_id: Option<&str>,
+        valid_from: jiff::Timestamp,
+        valid_until: Option<jiff::Timestamp>,
+    ) -> common::Result<SemanticFact> {
+        if let Some(until) = valid_until {
+            if until < valid_from {
+                return Err(common::KlyntbotError::Storage(format!(
+                    "bi-temporal violation: valid_until {until} < valid_from {valid_from}"
+                )));
+            }
+        }
+        let fact = SemanticFact {
+            id: uuid::Uuid::new_v4().to_string(),
+            domain: "code".into(),
+            subject: subject.into(),
+            predicate: predicate.into(),
+            object: object.into(),
+            confidence: 1.0,
+            source: "proptest".into(),
+            valid_from: valid_from.to_string(),
+            valid_until: valid_until.map(|t| t.to_string()),
+            recorded_at: jiff::Timestamp::now().to_string(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            convergence_score: 1.0,
+            project_id: None,
+            memory_type: "fact".into(),
+            scope_type: "user".into(),
+            scope_id: None,
+            scope_repo_id: scope_repo_id.map(str::to_string),
+            metadata: None,
+        };
+        self.upsert(&fact).await.map_err(|e| {
+            common::KlyntbotError::Storage(format!("semantic_fact upsert: {e}"))
+        })?;
+        Ok(fact)
+    }
+
+    /// List the full supersede chain for a (subject, predicate) pair.
+    pub async fn list_supersede_chain(
+        &self,
+        subject: &str,
+        predicate: &str,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        sqlx::query_as::<_, SemanticFact>(
+            "SELECT * FROM semantic_facts WHERE subject = ?1 AND predicate = ?2 ORDER BY valid_from ASC",
+        )
+        .bind(subject)
+        .bind(predicate)
+        .fetch_all(&self.pool)
+        .await
+    }
 }
 
 #[cfg(test)]

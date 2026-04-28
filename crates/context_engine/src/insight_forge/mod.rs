@@ -92,6 +92,11 @@ impl InsightForge {
         self.searchers.push(searcher);
     }
 
+    #[cfg(any(test, feature = "test-helpers"))]
+    pub fn searcher_names(&self) -> Vec<&str> {
+        self.searchers.iter().map(|s| s.domain_name()).collect()
+    }
+
     /// Decide whether InsightForge should activate for this request.
     pub fn should_activate(&self, strategy: &ExecutionStrategy, message: &str) -> bool {
         if !self.config.enabled {
