@@ -18,6 +18,8 @@ pub use repos::*;
 pub use search::*;
 pub use services::*;
 pub use migration::migrate_app_ids_to_bundle_ids;
+#[doc(hidden)]
+pub use search::running_apps::apply_snapshot as apply_running_snapshot_for_bench;
 pub use tool::LauncherTool;
 pub use types::WindowAction;
 pub use types::*;

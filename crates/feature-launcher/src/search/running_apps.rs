@@ -46,7 +46,7 @@ impl super::SearchSource for RunningAppsSource {
 
 /// Replace the contents of `signals` with the given snapshot, dropping any
 /// stale entries no longer present and skipping snapshot rows without a bundle ID.
-pub(crate) fn apply_snapshot(signals: &RunningSignals, snapshot: &[RunningApp]) {
+pub fn apply_snapshot(signals: &RunningSignals, snapshot: &[RunningApp]) {
     let live: HashSet<SmolStr> = snapshot
         .iter()
         .filter_map(|a| a.bundle_id.as_deref().map(SmolStr::new))
