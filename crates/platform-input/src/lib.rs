@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// A point in the global virtual desktop coordinate space (logical points,
 /// Quartz top-left origin). On Retina displays this is logical points, not
 /// physical pixels — `CGEvent` accepts these values directly.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
@@ -161,3 +161,5 @@ pub trait PlatformInput: Send + Sync {
     /// clean state when an in-progress action is aborted.
     async fn release_all(&self) -> Result<()>;
 }
+
+pub mod mock;
