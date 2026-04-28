@@ -56,7 +56,22 @@ pub(super) async fn init_launcher(
                 .with_attention_signals(Arc::clone(&attention_signals)),
         );
         let idx = Arc::clone(&app_index);
-        tokio::spawn(async move { idx.index_applications().await });
+        let migration_pool = pool.clone();
+        tokio::spawn(async move {
+            idx.index_applications().await;
+            // After first index, rewrite any path-keyed pin/usage rows to bundle IDs.
+            let apps_snapshot = idx.snapshot_apps();
+            match feature_launcher::migrate_app_ids_to_bundle_ids(
+                &migration_pool,
+                &apps_snapshot,
+            )
+            .await
+            {
+                Ok(n) if n > 0 => tracing::info!("Migrated {n} launcher item ids to bundle-id form"),
+                Ok(_) => {}
+                Err(e) => tracing::warn!("launcher id migration failed: {e}"),
+            }
+        });
         sources.push(app_index);
     }
 

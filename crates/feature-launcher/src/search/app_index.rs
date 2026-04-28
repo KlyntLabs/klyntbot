@@ -102,6 +102,12 @@ impl AppIndex {
         *self.apps.write() = apps;
     }
 
+    /// Snapshot the current app list. Used by the one-shot ID migration after
+    /// initial indexing completes.
+    pub fn snapshot_apps(&self) -> Vec<AppEntry> {
+        self.apps.read().clone()
+    }
+
     pub fn search(&self, query: &str, limit: usize) -> Vec<LauncherItem> {
         let apps = self.apps.read();
         let scored = super::fuzzy_match(query, &apps, |app| &app.name, limit);

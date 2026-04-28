@@ -1,4 +1,5 @@
 pub mod clipboard;
+pub mod migration;
 pub mod repos;
 pub mod search;
 pub mod services;
@@ -16,6 +17,7 @@ pub use clipboard::ClipboardMonitor;
 pub use repos::*;
 pub use search::*;
 pub use services::*;
+pub use migration::migrate_app_ids_to_bundle_ids;
 pub use tool::LauncherTool;
 pub use types::WindowAction;
 pub use types::*;
