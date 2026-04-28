@@ -42,12 +42,35 @@ impl MacInput {
 
 #[async_trait]
 impl PlatformInput for MacInput {
-    async fn perform_action(&self, _action: ComputerUseAction) -> Result<()> {
-        Err(PlatformError::NotImplemented)
+    async fn perform_action(&self, action: ComputerUseAction) -> Result<()> {
+        use core_graphics::event::{CGEvent, CGEventTapLocation, CGEventType, CGMouseButton};
+        use core_graphics::geometry::CGPoint;
+
+        match action {
+            ComputerUseAction::MouseMove { x, y } => {
+                let event = CGEvent::new_mouse_event(
+                    self.source.clone(),
+                    CGEventType::MouseMoved,
+                    CGPoint { x: x as f64, y: y as f64 },
+                    CGMouseButton::Left,
+                )
+                .map_err(|()| PlatformError::PlatformCallFailed(
+                    "CGEventCreateMouseEvent failed".into(),
+                ))?;
+                event.post(CGEventTapLocation::HID);
+                Ok(())
+            }
+            _ => Err(PlatformError::NotImplemented),
+        }
     }
 
     async fn get_cursor_position(&self) -> Result<Point> {
-        Err(PlatformError::NotImplemented)
+        use core_graphics::event::CGEvent;
+        let event = CGEvent::new(self.source.clone()).map_err(|()| {
+            PlatformError::PlatformCallFailed("CGEventCreate failed".into())
+        })?;
+        let loc = event.location();
+        Ok(Point { x: loc.x, y: loc.y })
     }
 
     async fn release_all(&self) -> Result<()> {
