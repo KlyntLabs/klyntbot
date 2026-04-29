@@ -32,9 +32,15 @@ pub struct IngestDaemonConfig {
     pub opencode_db_path: Option<PathBuf>,
     /// Polling interval for opencode. Defaults to 500 ms.
     pub opencode_poll_interval: Option<std::time::Duration>,
-    /// Optional kimi-cli Wire Unix socket path. When set, a tier-2 streaming
-    /// task is spawned alongside tier-1 hooks.
-    pub kimi_wire_socket: Option<PathBuf>,
+    /// Optional kimi sessions directory (typically `~/.kimi/sessions`). When
+    /// set, a [`KimiPoller`](crate::adapters::kimi_cli::poller::KimiPoller) task is spawned to tail
+    /// per-session `wire.jsonl` files.
+    pub kimi_sessions_dir: Option<PathBuf>,
+    /// Polling interval for kimi. Defaults to 1 s.
+    pub kimi_poll_interval: Option<std::time::Duration>,
+    /// Optional override for `~/.kimi/kimi.json` (used to resolve work-dir
+    /// hashes). Defaults to `<HOME>/.kimi/kimi.json`.
+    pub kimi_json_path: Option<PathBuf>,
     /// Optional Codex sessions directory. When set, a JSONL poller task is
     /// spawned to tail `~/.codex/sessions/<YYYY>/<MM>/<DD>/*.jsonl`.
     pub codex_sessions_dir: Option<PathBuf>,
@@ -200,12 +206,31 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
         None
     };
 
-    // Kimi-cli Wire tier-2 streaming task — optional.
-    let kimi_wire_task = if let Some(socket_path) = cfg.kimi_wire_socket {
+    // Kimi-cli per-session JSONL poller — optional, spawned when sessions
+    // dir is set in the config. The caller is responsible for providing
+    // `kimi_json_path` (mirrors how `opencode_db_path` is plumbed).
+    let kimi_wire_task = if let Some(sessions_dir) = cfg.kimi_sessions_dir {
+        let interval = cfg
+            .kimi_poll_interval
+            .unwrap_or(std::time::Duration::from_secs(1));
         if let Some(tx) = cfg.event_tx.clone() {
-            Some(crate::adapters::kimi_cli::spawn_wire(socket_path, tx))
+            // Default to a non-existent path if the caller didn't provide
+            // one — `WorkdirIndex::refresh` treats NotFound as an empty
+            // index, which is the right behaviour.
+            let kimi_json = cfg
+                .kimi_json_path
+                .clone()
+                .unwrap_or_else(|| std::path::PathBuf::from("/nonexistent/kimi.json"));
+            let poller = crate::adapters::kimi_cli::poller::KimiPoller::new(
+                sessions_dir,
+                kimi_json,
+                tx,
+                cfg.repo.clone(),
+                interval,
+            );
+            Some(poller.spawn())
         } else {
-            tracing::warn!("kimi_wire_socket set but no event_tx — wire loop not spawned");
+            tracing::warn!("kimi_sessions_dir set but no event_tx — poller not spawned");
             None
         }
     } else {
