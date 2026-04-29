@@ -61,10 +61,10 @@ const MAX_TOOL_RESULT_LENGTH: usize = 50_000;
 /// Returns `(safe_calls, unsafe_calls)` where safe calls can be run in
 /// parallel via `futures::future::join_all` and unsafe calls must run
 /// sequentially to avoid side-effect races.
-pub fn partition_by_concurrency_safety(
-    tool_calls: &[providers::ToolCall],
-    registry: &tools::registry::ToolRegistry,
-) -> (Vec<&providers::ToolCall>, Vec<&providers::ToolCall>) {
+pub fn partition_by_concurrency_safety<'a>(
+    tool_calls: &'a [providers::ToolCall],
+    registry: &'a tools::registry::ToolRegistry,
+) -> (Vec<&'a providers::ToolCall>, Vec<&'a providers::ToolCall>) {
     let mut safe = Vec::new();
     let mut unsafe_ = Vec::new();
     for tc in tool_calls {
@@ -670,33 +670,31 @@ impl ExecutionCore {
                         };
 
                         // Emit ToolEnd AFTER executing
-                        if let Some(ref tx) = tx {
-                            // Truncate result to 2KB to avoid huge WebSocket payloads
-                            let truncated = if result_str.len() > 2048 {
-                                // Find a valid UTF-8 char boundary at or before 2048
-                                let end = (0..=2048)
-                                    .rev()
-                                    .find(|&i| result_str.is_char_boundary(i))
-                                    .unwrap_or(0);
-                                let mut s = result_str[..end].to_string();
-                                s.push_str("…[truncated]");
-                                Some(s)
-                            } else {
-                                Some(result_str.clone())
-                            };
-                            fan_out_event(
-                                tx.as_ref(),
-                                self.domain_event_bus.as_ref(),
-                                crate::events::AgentEvent::ToolEnd {
-                                    name: name.clone(),
-                                    success,
-                                    duration_ms,
-                                    result: truncated,
-                                    agent: None,
-                                },
-                            )
-                            .await;
-                        }
+                        // Truncate result to 2KB to avoid huge WebSocket payloads
+                        let truncated = if result_str.len() > 2048 {
+                            // Find a valid UTF-8 char boundary at or before 2048
+                            let end = (0..=2048)
+                                .rev()
+                                .find(|&i| result_str.is_char_boundary(i))
+                                .unwrap_or(0);
+                            let mut s = result_str[..end].to_string();
+                            s.push_str("…[truncated]");
+                            Some(s)
+                        } else {
+                            Some(result_str.clone())
+                        };
+                        fan_out_event(
+                            tx.as_ref(),
+                            self.domain_event_bus.as_ref(),
+                            crate::events::AgentEvent::ToolEnd {
+                                name: name.clone(),
+                                success,
+                                duration_ms,
+                                result: truncated,
+                                agent: None,
+                            },
+                        )
+                        .await;
 
                         ToolExecutionResult {
                             tool_call_id: id,
