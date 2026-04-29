@@ -25,6 +25,7 @@ pub mod memory_promotion;
 pub mod memory_retriever;
 pub mod micro_reforge;
 pub mod micro_reforge_types;
+pub use micro_reforge::{MicroReforgeHandler, NoopMicroReforgeHandler};
 pub mod reforge;
 pub mod retrieval;
 
