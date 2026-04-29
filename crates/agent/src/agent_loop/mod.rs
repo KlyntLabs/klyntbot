@@ -161,7 +161,7 @@ impl AgentLoop {
             let session_key = msg.session_key();
             let last_assistant = if let Ok(session_arc) = self
                 .session_manager
-                .get_or_create(session_key.as_str(), None)
+                .get_or_create(session_key.as_str())
                 .await
             {
                 let session = session_arc.lock().await;
@@ -563,11 +563,11 @@ impl AgentLoop {
         let session_key = msg.session_key();
         let session_arc = self
             .session_manager
-            .get_or_create(session_key.as_str(), None)
+            .get_or_create(session_key.as_str())
             .await?;
 
         // Mutate session and collect data under the per-session lock
-        let (history, embed_msg_id, session_squad_id, last_assistant_content) = {
+        let (history, embed_msg_id, last_assistant_content) = {
             let mut session = session_arc.lock().await;
             // Capture last assistant message if a correction or memory miss was detected
             let last_assistant = if correction_strength.is_some() || is_memory_miss {
@@ -586,8 +586,7 @@ impl AgentLoop {
             session.add_message("user", &msg.content);
             let msg_id = session.messages.last().map(|m| m.id.clone());
             let history = session.get_history(self.history_limit).to_vec();
-            let squad_id = session.squad_id.clone();
-            (history, msg_id, squad_id, last_assistant)
+            (history, msg_id, last_assistant)
             // per-session lock released here
         };
 
@@ -669,10 +668,7 @@ impl AgentLoop {
         };
 
         // Run through pipeline
-        let mut routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
-        if let Some(sid) = session_squad_id {
-            routing_ctx.squad_id = Some(sid);
-        }
+        let routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
         let response_content = self
             .run_pipeline(&msg.content, history, &routing_ctx, None, None, correction)
             .await?;
@@ -739,7 +735,7 @@ impl AgentLoop {
         // Get or create session and mutate under the per-session lock
         let session_arc = self
             .session_manager
-            .get_or_create(&session_key, None)
+            .get_or_create(&session_key)
             .await?;
         let history = {
             let mut session = session_arc.lock().await;
@@ -826,7 +822,7 @@ impl AgentLoop {
     /// Persist the in-memory session to SQL without adding a new message.
     /// Used in error paths to ensure the user message is not lost.
     async fn persist_session(&self, session_key: &str) {
-        if let Ok(session_arc) = self.session_manager.get_or_create(session_key, None).await {
+        if let Ok(session_arc) = self.session_manager.get_or_create(session_key).await {
             let session_clone = {
                 let session = session_arc.lock().await;
                 session.clone()
@@ -839,7 +835,7 @@ impl AgentLoop {
 
     /// Save assistant response to session and return the persisted message ID.
     async fn save_to_session(&self, session_key: &str, content: &str) -> Option<String> {
-        if let Ok(session_arc) = self.session_manager.get_or_create(session_key, None).await {
+        if let Ok(session_arc) = self.session_manager.get_or_create(session_key).await {
             // Mutate under per-session lock, clone for async save
             let (session_clone, msg_id) = {
                 let mut session = session_arc.lock().await;
@@ -955,7 +951,7 @@ impl AgentLoop {
 
         let session_arc = self
             .session_manager
-            .get_or_create(session_key, None)
+            .get_or_create(session_key)
             .await?;
         let (history, embed_msg_id) = {
             let mut session = session_arc.lock().await;
@@ -1008,7 +1004,7 @@ impl AgentLoop {
         // lock pattern in process_message: first lock decrements cooldown + captures
         // last assistant; second lock gates the emit.
         let (last_assistant_content, cooldown_after_decrement) =
-            if let Ok(session_arc) = self.session_manager.get_or_create(&session_key, None).await {
+            if let Ok(session_arc) = self.session_manager.get_or_create(&session_key).await {
                 let mut session = session_arc.lock().await;
                 let last_asst = if correction_strength.is_some() || is_memory_miss {
                     session
@@ -1040,7 +1036,7 @@ impl AgentLoop {
                 if cooldown_after_decrement == 0 {
                     // Set cooldown under a fresh lock (mirrors process_message's second lock)
                     if let Ok(session_arc) =
-                        self.session_manager.get_or_create(&session_key, None).await
+                        self.session_manager.get_or_create(&session_key).await
                     {
                         let mut session = session_arc.lock().await;
                         session.correction_cooldown = 3;
@@ -1100,14 +1096,6 @@ impl AgentLoop {
             session_key.clone().into(),
             interaction_tx,
         );
-
-        // Set squad_id from session if this is a squad chat
-        if let Ok(session_arc) = self.session_manager.get_or_create(&session_key, None).await {
-            let session = session_arc.lock().await;
-            if let Some(ref sid) = session.squad_id {
-                routing_ctx.squad_id = Some(sid.clone());
-            }
-        }
 
         let cancel_token = CancellationToken::new();
         let cancel_clone = cancel_token.clone();

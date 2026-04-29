@@ -31,7 +31,6 @@ pub mod reforge;
 pub mod retention_history;
 pub mod review_stats;
 pub mod settings;
-pub mod squads;
 pub mod status;
 pub mod tasks;
 pub mod timeline;

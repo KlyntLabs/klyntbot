@@ -40,7 +40,6 @@ members = [
     "crates/platform-capture",
     "crates/platform-macos",
     "crates/autotuner",
-    "crates/simulator",
     "crates/voice-engine",
     "crates/feature-language-learning",
     "crates/ai-core",
@@ -92,7 +91,6 @@ feature-learning = { path = "crates/feature-learning" }
 klyntbot-server = { path = "crates/klyntbot-server" }
 platform-macos = { path = "crates/platform-macos" }
 autotuner = { path = "crates/autotuner" }
-simulator = { path = "crates/simulator" }
 voice-engine = { path = "crates/voice-engine" }
 feature-language-learning = { path = "crates/feature-language-learning" }
 ai-core = { path = "crates/ai-core" }
@@ -237,7 +235,6 @@ feature-coaching.workspace = true
 plugin-runtime.workspace = true
 tools-core.workspace = true
 extism.workspace = true
-simulator.workspace = true
 walkdir = "2"
 dashmap.workspace = true
 assert_cmd = "2"

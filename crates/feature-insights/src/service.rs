@@ -223,7 +223,6 @@ impl InsightService {
         content: &InsightContent,
         input_hash: &str,
         scope_config: &ScopeConfig,
-        persona_ids: &[String],
         parent_insight_id: Option<&str>,
         scope_note_ids: &[String],
     ) -> Result<InsightReviewRow, sqlx::Error> {
@@ -240,7 +239,6 @@ impl InsightService {
                 &content_json,
                 input_hash,
                 &stored_scope,
-                persona_ids,
                 parent_insight_id,
             )
             .await?;

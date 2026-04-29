@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use agent::{AgentLoop, PersonaManager};
+use agent::AgentLoop;
 use bus::{DomainEventBus, MessageBus};
 use cognitive::situation::UserSituation;
 use scheduling::temporal::cron_executor::CronExecutor;
@@ -11,7 +11,6 @@ use tracing::info;
 /// Results from the agent initialization phase.
 pub(super) struct AgentResult {
     pub cognitive_provider: Option<providers::DynProvider>,
-    pub persona_manager: Arc<RwLock<PersonaManager>>,
     pub agent: Arc<AgentLoop>,
     pub inbound_rx: mpsc::Receiver<bus::InboundMessage>,
     pub pipeline_broadcast_tx: tokio::sync::broadcast::Sender<cognitive::PipelineEvent>,
@@ -28,7 +27,7 @@ pub(super) struct AgentResult {
 pub(super) async fn init_agent(
     config: &config::Config,
     storage_pool: &StoragePool,
-    repos: &Repos,
+    _repos: &Repos,
     provider: providers::DynProvider,
     vector_store: Option<VectorStore>,
     bus: &Arc<MessageBus>,
@@ -41,14 +40,6 @@ pub(super) async fn init_agent(
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
 ) -> Result<AgentResult, String> {
-    // 7. Load personas
-    let data_dir = config.data_dir_path();
-    let personas_dir = data_dir.join("personas");
-    let mut persona_manager = PersonaManager::load(&personas_dir).await;
-    persona_manager.resolve_scopes(repos).await;
-    let persona_manager = Arc::new(RwLock::new(persona_manager));
-    info!("persona manager loaded");
-
     // Run activity-log migrations (unified activity log).
     StoragePool::run_feature_migrations(
         storage_pool.inner(),
@@ -116,7 +107,6 @@ pub(super) async fn init_agent(
 
     Ok(AgentResult {
         cognitive_provider,
-        persona_manager,
         agent,
         inbound_rx,
         pipeline_broadcast_tx,

@@ -1,7 +1,5 @@
 //! Session CRUD handlers — get, list by project, delete stale.
 
-use std::collections::HashMap;
-
 use desktop_shared::commands::{ChatSessionResponse, ChatThreadResponse};
 use desktop_shared::errors::ApiError;
 use storage::Repos;
@@ -30,7 +28,6 @@ fn session_row_to_response(
         project_id: row.project_id.clone(),
         conversation_type: row.conversation_type.clone(),
         pinned: row.pinned,
-        squad_id: row.squad_id.clone(),
     }
 }
 
@@ -73,9 +70,6 @@ pub async fn chat_list_sessions_by_project(
             area_name: None,
             project_id: s.project_id.clone(),
             project_name: None,
-            squad_id: s.squad_id.clone(),
-            squad_name: None,
-            squad_icon: None,
         })
         .collect())
 }
@@ -105,43 +99,7 @@ impl AppCore {
         &self,
         project_id: String,
     ) -> Result<Vec<ChatThreadResponse>, ApiError> {
-        let mut threads = chat_list_sessions_by_project(&self.repos, project_id).await?;
-
-        // Enrich squad_name and squad_icon via post-fetch lookup if squad_repo is available.
-        if let Some(squad_repo) = &self.squad_repo {
-            // Collect unique squad IDs that need resolving.
-            let squad_ids: Vec<String> = threads
-                .iter()
-                .filter_map(|t| t.squad_id.clone())
-                .collect::<std::collections::HashSet<_>>()
-                .into_iter()
-                .collect();
-
-            if !squad_ids.is_empty() {
-                // Fetch squad rows concurrently and build a lookup map.
-                let futures: Vec<_> = squad_ids.iter().map(|id| squad_repo.get(id)).collect();
-                let results = futures_util::future::join_all(futures).await;
-                let mut squad_map: HashMap<String, (String, String)> =
-                    HashMap::with_capacity(squad_ids.len());
-                for result in results {
-                    if let Ok(Some(row)) = result {
-                        squad_map.insert(row.id.clone(), (row.name.clone(), row.icon.clone()));
-                    }
-                }
-
-                // Apply squad_name and squad_icon to each thread.
-                for thread in &mut threads {
-                    if let Some(sid) = &thread.squad_id {
-                        if let Some((name, icon)) = squad_map.get(sid) {
-                            thread.squad_name = Some(name.clone());
-                            thread.squad_icon = Some(icon.clone());
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(threads)
+        chat_list_sessions_by_project(&self.repos, project_id).await
     }
 
     #[tracing::instrument(skip(self), err)]

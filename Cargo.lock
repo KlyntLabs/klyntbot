@@ -7671,7 +7671,6 @@ dependencies = [
  "serde",
  "serde_json",
  "session",
- "simulator",
  "sqlx",
  "storage",
  "tempfile",
@@ -12982,40 +12981,6 @@ dependencies = [
  "num-traits",
  "thiserror 2.0.18",
  "time",
-]
-
-[[package]]
-name = "simulator"
-version = "0.1.1"
-dependencies = [
- "activity-log",
- "agent",
- "app-core",
- "async-trait",
- "autotuner",
- "bus",
- "cognitive",
- "common",
- "config",
- "context_engine",
- "feature-coaching",
- "feature-finance",
- "feature-notes",
- "feature-productivity",
- "feature-tasks",
- "jiff",
- "providers",
- "rand 0.9.4",
- "serde",
- "serde_json",
- "sqlx",
- "storage",
- "tempfile",
- "tokio",
- "toml 0.8.2",
- "tools",
- "tracing",
- "uuid",
 ]
 
 [[package]]

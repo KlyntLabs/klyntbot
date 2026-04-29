@@ -13,10 +13,9 @@ use crate::state::AppCore;
 
 // ── Public free functions ────────────────────────────────────────────────
 
-#[tracing::instrument(skip(repos, squad_repo), err)]
+#[tracing::instrument(skip(repos), err)]
 pub async fn chat_threads(
     repos: &Repos,
-    squad_repo: Option<&cognitive::SquadRepo>,
 ) -> Result<Vec<ChatThreadResponse>, ApiError> {
     let default_filter = ProjectFilter::default();
     let (sessions, visible_contexts, all_areas, all_projects) = tokio::join!(
@@ -29,29 +28,6 @@ pub async fn chat_threads(
     let visible_contexts = visible_contexts.map_err(map_storage_err)?;
     let all_areas = all_areas.map_err(map_storage_err)?;
     let all_projects = all_projects.map_err(map_storage_err)?;
-
-    // Collect unique squad_ids and batch-resolve names/icons
-    let squad_ids: Vec<&str> = sessions
-        .iter()
-        .filter_map(|s| s.squad_id.as_deref())
-        .collect::<std::collections::HashSet<_>>()
-        .into_iter()
-        .collect();
-    let squad_map: HashMap<String, (String, String)> = if !squad_ids.is_empty() {
-        if let Some(repo) = squad_repo {
-            let mut map = HashMap::new();
-            for id in &squad_ids {
-                if let Ok(Some(squad)) = repo.get(id).await {
-                    map.insert(squad.id.clone(), (squad.name.clone(), squad.icon.clone()));
-                }
-            }
-            map
-        } else {
-            HashMap::new()
-        }
-    } else {
-        HashMap::new()
-    };
 
     let ctx_map: HashMap<&str, _> = visible_contexts
         .iter()
@@ -79,13 +55,6 @@ pub async fn chat_threads(
                 .to_string();
             let ctx = ctx_map.get(s.key.as_str());
 
-            let (squad_name, squad_icon) = s
-                .squad_id
-                .as_deref()
-                .and_then(|id| squad_map.get(id))
-                .map(|(name, icon)| (Some(name.clone()), Some(icon.clone())))
-                .unwrap_or((None, None));
-
             ChatThreadResponse {
                 session_key: s.key.clone(),
                 title,
@@ -111,18 +80,14 @@ pub async fn chat_threads(
                         .as_deref()
                         .and_then(|id| project_names.get(id).map(|s| s.to_string()))
                 }),
-                squad_id: s.squad_id.clone(),
-                squad_name,
-                squad_icon,
             }
         })
         .collect())
 }
 
-#[tracing::instrument(skip(repos, persona_repo), err)]
+#[tracing::instrument(skip(repos), err)]
 pub async fn chat_messages(
     repos: &Repos,
-    persona_repo: Option<&cognitive::PersonaRepo>,
     session_key: String,
     limit: Option<i64>,
 ) -> Result<Vec<ChatMessageResponse>, ApiError> {
@@ -132,29 +97,6 @@ pub async fn chat_messages(
         .get_recent_messages(&session_key, lim)
         .await
         .map_err(map_storage_err)?;
-
-    // Batch-resolve persona names for messages that have persona_id
-    let persona_ids: Vec<&str> = rows
-        .iter()
-        .filter_map(|m| m.persona_id.as_deref())
-        .collect::<std::collections::HashSet<_>>()
-        .into_iter()
-        .collect();
-    let persona_names: HashMap<String, String> = if !persona_ids.is_empty() {
-        if let Some(repo) = persona_repo {
-            let mut map = HashMap::new();
-            for id in &persona_ids {
-                if let Ok(Some(persona)) = repo.get(id).await {
-                    map.insert(persona.id.clone(), persona.name.clone());
-                }
-            }
-            map
-        } else {
-            HashMap::new()
-        }
-    } else {
-        HashMap::new()
-    };
 
     Ok(rows
         .iter()
@@ -170,10 +112,6 @@ pub async fn chat_messages(
                 .as_ref()
                 .and_then(|meta| meta.get("transparency"))
                 .and_then(|v| serde_json::from_value(v.clone()).ok());
-            let persona_name = m
-                .persona_id
-                .as_deref()
-                .and_then(|id| persona_names.get(id).cloned());
             ChatMessageResponse {
                 id: m.id.to_string(),
                 role: m.role.clone(),
@@ -181,8 +119,6 @@ pub async fn chat_messages(
                 timestamp: *m.timestamp,
                 segments,
                 transparency,
-                persona_id: m.persona_id.clone(),
-                persona_name,
             }
         })
         .collect())
@@ -244,7 +180,7 @@ pub async fn chat_delete_thread(
 impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub async fn chat_threads(&self) -> Result<Vec<ChatThreadResponse>, ApiError> {
-        chat_threads(&self.repos, self.squad_repo.as_ref()).await
+        chat_threads(&self.repos).await
     }
 
     #[tracing::instrument(skip(self), err)]
@@ -253,7 +189,7 @@ impl AppCore {
         session_key: String,
         limit: Option<i64>,
     ) -> Result<Vec<ChatMessageResponse>, ApiError> {
-        chat_messages(&self.repos, self.persona_repo.as_ref(), session_key, limit).await
+        chat_messages(&self.repos, session_key, limit).await
     }
 
     #[tracing::instrument(skip(self), err)]
