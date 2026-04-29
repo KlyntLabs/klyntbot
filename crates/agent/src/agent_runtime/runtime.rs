@@ -69,6 +69,12 @@ pub struct AgentRuntime {
     enhancement_budget_overrides: config::schema::BudgetOverrides,
     enhancement_param_sink: Option<Arc<std::sync::RwLock<Option<common::TrialParams>>>>,
     micro_reforge_service: Option<Arc<cognitive::services::micro_reforge::MicroReforgeService>>,
+    /// KCA Track 7: predictive cache for warming follow-up queries.
+    predictive_cache: Option<Arc<cognitive::services::predictive_cache::PredictiveCache>>,
+    /// KCA Track 7: LLM query predictor for cache warming.
+    query_predictor: Option<Arc<crate::adapters::cognitive_handlers::LlmQueryPredictorHandler>>,
+    /// KCA Track 7: number of predictions to generate per turn.
+    predictions_per_turn: u32,
 }
 
 impl AgentRuntime {
@@ -103,6 +109,9 @@ impl AgentRuntime {
             enhancement_budget_overrides: config::schema::BudgetOverrides::default(),
             enhancement_param_sink: None,
             micro_reforge_service: None,
+            predictive_cache: None,
+            query_predictor: None,
+            predictions_per_turn: 3,
         }
     }
 
@@ -201,6 +210,27 @@ impl AgentRuntime {
         svc: Arc<cognitive::services::micro_reforge::MicroReforgeService>,
     ) -> Self {
         self.micro_reforge_service = Some(svc);
+        self
+    }
+
+    pub fn with_predictive_cache(
+        mut self,
+        cache: Arc<cognitive::services::predictive_cache::PredictiveCache>,
+    ) -> Self {
+        self.predictive_cache = Some(cache);
+        self
+    }
+
+    pub fn with_query_predictor(
+        mut self,
+        predictor: Arc<crate::adapters::cognitive_handlers::LlmQueryPredictorHandler>,
+    ) -> Self {
+        self.query_predictor = Some(predictor);
+        self
+    }
+
+    pub fn with_predictions_per_turn(mut self, n: u32) -> Self {
+        self.predictions_per_turn = n;
         self
     }
 
@@ -481,6 +511,33 @@ impl AgentRuntime {
             let svc = svc.clone();
             tokio::spawn(async move {
                 let _ = svc.note_turn().await;
+            });
+        }
+
+        // KCA Track 7: predictive cache warming.
+        if let (Some(predictor), Some(cache), Some(retriever)) = (
+            self.query_predictor.as_ref(),
+            self.predictive_cache.as_ref(),
+            self.memory_service.as_ref(),
+        ) {
+            let predictor = predictor.clone();
+            let cache = cache.clone();
+            let retriever = retriever.clone();
+            let recent_turn_text = format!("USER: {}\nASSISTANT: {}", message, loop_result.content);
+            let n = self.predictions_per_turn;
+            tokio::spawn(async move {
+                let preds = match predictor.predict_next(&recent_turn_text, n).await {
+                    Ok(p) => p,
+                    Err(e) => { tracing::debug!(error = %e, "predictor failed"); return; }
+                };
+                for q in preds {
+                    let key = cognitive::services::predictive_cache::query_hash(&q);
+                    if cache.get(&key).await.is_some() { continue; }
+                    match retriever.retrieve_with_overrides(&q, 10, 0.55, [0.3, 0.2, 0.15, 0.1, 0.25, 0.05, 0.1, 0.05, 0.15, 0.1, 0.08, 0.06]).await {
+                        Ok(results) => cache.put(key, results).await,
+                        Err(e) => tracing::debug!(error = %e, "predictive retrieve failed"),
+                    }
+                }
             });
         }
 

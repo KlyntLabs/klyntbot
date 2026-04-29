@@ -466,6 +466,10 @@ impl Distiller {
                 scope_repo_id: repo_id.clone(),
                 metadata: None,
                 kind: Some("refactor_episode".into()),
+                tier: "raw".into(),
+                parent_id: None,
+                child_count: 0,
+                rolled_up_at: None,
             };
             let _ = self
                 .inner
@@ -843,6 +847,10 @@ impl Distiller {
             scope_repo_id: None,
             metadata: None,
             kind: Some("turn_trace".into()),
+            tier: "raw".into(),
+            parent_id: None,
+            child_count: 0,
+            rolled_up_at: None,
         };
         let ep = PreparedEpisode {
             episode,

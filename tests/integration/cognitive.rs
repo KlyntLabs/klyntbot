@@ -980,6 +980,10 @@ async fn test_reforge_cycle_end_to_end() {
         scope_repo_id: None,
         metadata: None,
         kind: None,
+        tier: "raw".into(),
+        parent_id: None,
+        child_count: 0,
+        rolled_up_at: None,
     };
     episodic_repo.insert(&episodic).await.unwrap();
 
@@ -1163,6 +1167,10 @@ async fn test_reforge_phase6_with_autotuner_bridge() {
         scope_repo_id: None,
         metadata: None,
         kind: None,
+        tier: "raw".into(),
+        parent_id: None,
+        child_count: 0,
+        rolled_up_at: None,
     };
     episodic_repo.insert(&episodic).await.unwrap();
 
@@ -1295,6 +1303,10 @@ async fn test_reforge_with_feedback_signals() {
         scope_repo_id: None,
         metadata: None,
         kind: None,
+        tier: "raw".into(),
+        parent_id: None,
+        child_count: 0,
+        rolled_up_at: None,
     };
     episodic_repo.insert(&episodic).await.unwrap();
 

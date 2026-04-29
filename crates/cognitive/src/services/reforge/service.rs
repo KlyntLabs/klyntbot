@@ -152,6 +152,10 @@ pub async fn run_reforge(
                     kind: None,
                     scope_repo_id: None,
                     metadata: None,
+                    tier: "raw".to_string(),
+                    parent_id: None,
+                    child_count: 0,
+                    rolled_up_at: None,
                 };
                 if let Err(e) = episodic_repo.insert(&mem).await {
                     warn!("Reforge: failed to persist cross-session pattern: {e}");
@@ -286,6 +290,10 @@ pub async fn run_reforge(
         kind: None,
         scope_repo_id: None,
         metadata: None,
+        tier: "raw".to_string(),
+        parent_id: None,
+        child_count: 0,
+        rolled_up_at: None,
     };
     if let Err(e) = episodic_repo.insert(&narrative_mem).await {
         warn!("Reforge: failed to store narrative memory: {e}");

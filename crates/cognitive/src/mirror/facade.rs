@@ -500,6 +500,10 @@ impl MirrorFacade {
                     kind: None,
                     scope_repo_id: None,
                     metadata: None,
+                    tier: "raw".to_string(),
+                    parent_id: None,
+                    child_count: 0,
+                    rolled_up_at: None,
                 };
                 if let Err(e) = repo.insert(&mem).await {
                     tracing::warn!("mirror: failed to write episodic memory: {e}");

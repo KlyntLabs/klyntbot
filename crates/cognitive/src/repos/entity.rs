@@ -50,6 +50,15 @@ pub struct RelationshipRow {
     pub edge_type: Option<String>,
 }
 
+/// Lightweight edge row for graph construction (KCA Track 6).
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct EdgeRow {
+    pub source_id: String,
+    pub target_id: String,
+    pub edge_type: String,
+    pub strength: f64,
+}
+
 #[derive(Debug, Clone)]
 pub struct NewRelationship {
     pub source_entity_id: String,
@@ -806,6 +815,30 @@ impl EntityRepo {
             query = query.bind(id);
         }
         query.fetch_all(&self.pool).await
+    }
+
+    /// List all entities ordered by mention count (KCA Track 6).
+    pub async fn list_all_entities(&self, limit: usize) -> Result<Vec<EntityRow>, sqlx::Error> {
+        let lim = limit as i64;
+        sqlx::query_as::<_, EntityRow>(
+            "SELECT * FROM entities ORDER BY mention_count DESC LIMIT ?1"
+        )
+        .bind(lim)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// List all active edges with their type and strength (KCA Track 6).
+    pub async fn list_all_edges(&self, limit: usize) -> Result<Vec<EdgeRow>, sqlx::Error> {
+        let lim = limit as i64;
+        sqlx::query_as::<_, EdgeRow>(
+            "SELECT source_entity_id as source_id, target_entity_id as target_id, \
+             COALESCE(edge_type, 'correlational') as edge_type, strength \
+             FROM entity_relationships WHERE valid_until IS NULL LIMIT ?1"
+        )
+        .bind(lim)
+        .fetch_all(&self.pool)
+        .await
     }
 }
 

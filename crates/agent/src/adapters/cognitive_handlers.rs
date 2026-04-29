@@ -1309,6 +1309,158 @@ impl MicroReforgeHandler for LlmMicroReforgeHandler {
     }
 }
 
+// ── Query Predictor (KCA Track 7) ───────────────────────────────────────────
+
+pub(crate) const QUERY_PREDICTOR_SYSTEM_PROMPT: &str = r#"You are a query predictor.
+
+Given the just-completed conversation turn, predict the user's next 1-3 most likely follow-up questions.
+
+Output strict JSON:
+{"predictions": ["...", "...", "..."]}
+
+Heuristics:
+- If user asked "what is X?", a likely follow-up is "how do I use X?" or "what's an alternative to X?"
+- If user asked "how do I do Y?", likely follow-ups are "is there a faster way?" or "what about edge case Z?"
+- Keep predictions short (≤80 chars), specific, and grounded in the actual turn content.
+- Don't invent topics not present in the conversation."#;
+
+pub struct LlmQueryPredictorHandler {
+    provider: providers::DynProvider,
+    params: providers::ChatParams,
+}
+
+impl LlmQueryPredictorHandler {
+    pub fn new(provider: providers::DynProvider, params: providers::ChatParams) -> Self {
+        Self { provider, params }
+    }
+
+    pub async fn predict_next(&self, recent_turn: &str, n: u32) -> common::Result<Vec<String>> {
+        let user = format!("RECENT TURN:\n{}\n\nPredict {n} follow-up questions.", recent_turn);
+        let messages = vec![
+            providers::Message::system(QUERY_PREDICTOR_SYSTEM_PROMPT),
+            providers::Message::user(user),
+        ];
+        let resp = self.provider.chat(&messages, None, &self.params).await
+            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("query_predictor: {e}"))))?;
+        #[derive(serde::Deserialize)]
+        struct R { predictions: Vec<String> }
+        let parsed: R = serde_json::from_str(&resp.content.unwrap_or_default())
+            .map_err(|e| common::KlyntbotError::Json(e))?;
+        Ok(parsed.predictions.into_iter().take(n as usize).collect())
+    }
+}
+
+// ── Hierarchical Summarizer (KCA Track 8) ───────────────────────────────────
+
+pub(crate) const HIERARCHICAL_HOURLY_PROMPT: &str = r#"You are an episodic memory summarizer.
+
+Summarize the following hour of activity into a single 2-3 sentence paragraph that:
+- Names the dominant topic(s) of the hour.
+- Lists key decisions or discoveries.
+- Preserves quantifiable details (numbers, names, durations).
+
+Output plain text, no JSON, no headings."#;
+
+pub(crate) const HIERARCHICAL_DAILY_PROMPT: &str = r#"You are an episodic memory summarizer.
+
+Summarize the following day of hourly summaries into a 4-6 sentence narrative paragraph that:
+- Names the day's primary themes.
+- Captures arc (morning vs evening, build-up vs resolution).
+- Preserves any breakthroughs, blockers, or open questions.
+
+Output plain text, no JSON, no headings."#;
+
+pub(crate) const HIERARCHICAL_WEEKLY_PROMPT: &str = r#"You are an episodic memory summarizer.
+
+Summarize the week of daily summaries into a structured narrative with:
+- 1 paragraph: dominant theme of the week.
+- 1 paragraph: notable wins.
+- 1 paragraph: notable open threads.
+
+Output plain text with paragraph breaks, no JSON, no headings."#;
+
+pub struct LlmHierarchicalSummarizer {
+    provider: providers::DynProvider,
+    params: providers::ChatParams,
+}
+
+impl LlmHierarchicalSummarizer {
+    pub fn new(provider: providers::DynProvider, params: providers::ChatParams) -> Self {
+        Self { provider, params }
+    }
+}
+
+#[async_trait::async_trait]
+impl cognitive::services::hierarchical_compressor::HierarchicalSummarizer for LlmHierarchicalSummarizer {
+    async fn summarize(&self, items: &[cognitive::types::EpisodicMemory], tier: cognitive::services::hierarchical_compressor::Tier) -> common::Result<String> {
+        if items.is_empty() { return Ok(String::new()); }
+        let system = match tier {
+            cognitive::services::hierarchical_compressor::Tier::Raw => "Return content unchanged.",
+            cognitive::services::hierarchical_compressor::Tier::Hourly => HIERARCHICAL_HOURLY_PROMPT,
+            cognitive::services::hierarchical_compressor::Tier::Daily => HIERARCHICAL_DAILY_PROMPT,
+            cognitive::services::hierarchical_compressor::Tier::Weekly => HIERARCHICAL_WEEKLY_PROMPT,
+        };
+        let user = items.iter()
+            .map(|e| format!("[{}] {}", e.recorded_at, e.summary.as_deref().unwrap_or(&e.content)))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let messages = vec![
+            providers::Message::system(system),
+            providers::Message::user(user),
+        ];
+        let resp = self.provider.chat(&messages, None, &self.params).await
+            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("hier_summarize: {e}"))))?;
+        Ok(resp.content.unwrap_or_default())
+    }
+}
+
+// ── Temporal Pruner (KCA Track 13) ──────────────────────────────────────────
+
+pub(crate) const TEMPORAL_PRUNE_SYSTEM_PROMPT: &str = r#"You are a temporal pruner for retrieved facts.
+
+You receive a list of facts (subject, predicate, object, valid_at, valid_until) and a query_time. Your job: identify facts that are CLEARLY superseded by newer facts in the same batch about the SAME (subject, predicate) pair. Drop the older one.
+
+Rules:
+- Only drop a fact if there's another fact with the SAME (subject, predicate) and a more recent valid_at.
+- Do NOT drop facts about different predicates ("works_at" vs "manages" — keep both even if one is older).
+- Do NOT drop facts that have explicit `valid_until` — those represent historical truths the user may still want to know.
+- If unsure, keep the fact.
+
+Output JSON: {"keep": ["fact_id1", ...], "drop": [{"fact_id": "...", "reason": "..."}]}"#;
+
+pub struct LlmTemporalPrunerHandler {
+    provider: providers::DynProvider,
+    params: providers::ChatParams,
+}
+
+impl LlmTemporalPrunerHandler {
+    pub fn new(provider: providers::DynProvider, params: providers::ChatParams) -> Self {
+        Self { provider, params }
+    }
+}
+
+#[async_trait::async_trait]
+impl cognitive::services::temporal_pruner::TemporalPrunerHandler for LlmTemporalPrunerHandler {
+    async fn prune(&self, input: cognitive::services::temporal_pruner::PruneInput) -> common::Result<cognitive::services::temporal_pruner::PruneOutput> {
+        if input.facts.is_empty() { return Ok(Default::default()); }
+        let user = serde_json::to_string(&input)
+            .map_err(|e| common::KlyntbotError::Json(e))?;
+        let messages = vec![
+            providers::Message::system(TEMPORAL_PRUNE_SYSTEM_PROMPT),
+            providers::Message::user(user),
+        ];
+        let resp = self.provider.chat(&messages, None, &self.params).await
+            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("temporal_prune: {e}"))))?;
+        match serde_json::from_str::<cognitive::services::temporal_pruner::PruneOutput>(&resp.content.unwrap_or_default()) {
+            Ok(o) => Ok(o),
+            Err(_) => Ok(cognitive::services::temporal_pruner::PruneOutput {
+                keep: input.facts.iter().map(|f| f.fact_id.clone()).collect(),
+                drop: vec![],
+            }),
+        }
+    }
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -1995,5 +2147,53 @@ mod tests {
         let out = handler.judge(input).await.unwrap();
         assert_eq!(out.verdicts.len(), 2);
         assert_eq!(out.verdicts[1].verdict, "hallucinated");
+    }
+
+    #[tokio::test]
+    async fn llm_query_predictor_returns_n_predictions() {
+        let json = r#"{"predictions": ["how do I install rust?", "what about cargo?", "memory safety details?"]}"#;
+        let provider = MockProvider::new(LlmResponse {
+            content: Some(json.to_string()),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage::default(),
+            reasoning_content: None,
+        });
+        let handler = LlmQueryPredictorHandler::new(
+            Arc::new(provider),
+            providers::ChatParams::new("m").with_max_tokens(256).with_response_format(providers::ResponseFormat::JsonObject),
+        );
+
+        let preds = handler.predict_next("user just asked about Rust", 3).await.unwrap();
+        assert_eq!(preds.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn llm_temporal_pruner_drops_facts_with_explicit_supersede() {
+        use cognitive::services::temporal_pruner::*;
+
+        let json = r#"{"keep": ["f2"], "drop": [{"fact_id": "f1", "reason": "f2 supersedes by date"}]}"#;
+        let provider = MockProvider::new(LlmResponse {
+            content: Some(json.to_string()),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage::default(),
+            reasoning_content: None,
+        });
+        let handler = LlmTemporalPrunerHandler::new(
+            Arc::new(provider),
+            providers::ChatParams::new("m").with_max_tokens(512).with_response_format(providers::ResponseFormat::JsonObject),
+        );
+
+        let input = PruneInput {
+            facts: vec![
+                PruneFactRef { fact_id: "f1".into(), subject: "Alice".into(), predicate: "works_at".into(), object: "Google".into(), valid_at: "2023-01-01T00:00:00Z".into(), valid_until: None },
+                PruneFactRef { fact_id: "f2".into(), subject: "Alice".into(), predicate: "works_at".into(), object: "Anthropic".into(), valid_at: "2025-06-01T00:00:00Z".into(), valid_until: None },
+            ],
+            query_time: "2026-04-29T00:00:00Z".into(),
+        };
+        let out = handler.prune(input).await.unwrap();
+        assert_eq!(out.drop.len(), 1);
+        assert_eq!(out.drop[0].fact_id, "f1");
     }
 }

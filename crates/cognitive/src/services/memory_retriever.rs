@@ -58,6 +58,12 @@ pub struct UnifiedMemoryService {
     entity_repo: Option<crate::repos::EntityRepo>,
     /// Last-retrieved fact metadata: (id, subject, predicate) for feedback detection.
     last_retrieved_facts: Arc<Mutex<Vec<(String, String, String)>>>,
+    /// KCA Track 6: TTL-cached PPR graph for multi-hop retrieval expansion.
+    ppr_cache: Option<Arc<crate::services::ppr_retrieval::CachedPprGraph>>,
+    /// KCA Track 7: predictive cache for warming follow-up queries.
+    predictive_cache: Option<Arc<crate::services::predictive_cache::PredictiveCache>>,
+    /// KCA Track 13: temporal pruner to drop stale facts at retrieval time.
+    temporal_pruner: Option<Arc<dyn crate::services::temporal_pruner::TemporalPrunerHandler>>,
 }
 
 impl UnifiedMemoryService {
@@ -75,6 +81,9 @@ impl UnifiedMemoryService {
             depth_cache: KnowledgeDepthCache::new(60),
             community_cache: CommunityCache::new(300), // 5-minute TTL
             last_retrieved_facts: Arc::new(Mutex::new(Vec::new())),
+            ppr_cache: None,
+            predictive_cache: None,
+            temporal_pruner: None,
         }
     }
 
@@ -118,6 +127,24 @@ impl UnifiedMemoryService {
 
     pub fn with_entity_repo(mut self, repo: crate::repos::EntityRepo) -> Self {
         self.entity_repo = Some(repo);
+        self
+    }
+
+    /// KCA Track 6: enable PPR-based multi-hop retrieval expansion.
+    pub fn with_ppr_cache(mut self, cache: Arc<crate::services::ppr_retrieval::CachedPprGraph>) -> Self {
+        self.ppr_cache = Some(cache);
+        self
+    }
+
+    /// KCA Track 7: enable predictive cache.
+    pub fn with_predictive_cache(mut self, cache: Arc<crate::services::predictive_cache::PredictiveCache>) -> Self {
+        self.predictive_cache = Some(cache);
+        self
+    }
+
+    /// KCA Track 13: enable temporal pruning.
+    pub fn with_temporal_pruner(mut self, pruner: Arc<dyn crate::services::temporal_pruner::TemporalPrunerHandler>) -> Self {
+        self.temporal_pruner = Some(pruner);
         self
     }
 
@@ -349,6 +376,15 @@ impl UnifiedMemoryService {
             return Ok(Vec::new());
         }
 
+        // KCA Track 7: predictive cache hit.
+        if let Some(cache) = self.predictive_cache.as_ref() {
+            let key = crate::services::predictive_cache::query_hash(query);
+            if let Some(cached) = cache.get(&key).await {
+                tracing::debug!("predictive cache HIT for {query:?}");
+                return Ok(cached);
+            }
+        }
+
         let situational_boost = self.current_situational_boost().await;
         let params = RetrievalParams {
             limit: vector_top_k,
@@ -371,7 +407,7 @@ impl UnifiedMemoryService {
             scope_chain: Vec::new(),
         };
 
-        match retrieve_relevant_facts(
+        let mut facts = match retrieve_relevant_facts(
             &self.fact_repo,
             self.embedder.as_deref(),
             query,
@@ -383,15 +419,50 @@ impl UnifiedMemoryService {
         )
         .await
         {
-            Ok(facts) => Ok(facts
+            Ok(facts) => facts
                 .into_iter()
                 .filter(|f| f.score > MIN_FACT_SCORE)
-                .collect()),
+                .collect::<Vec<ScoredFact>>(),
             Err(e) => {
                 warn!("Shadow retrieval failed: {e}");
-                Ok(Vec::new())
+                Vec::new()
+            }
+        };
+
+        // KCA Track 6: PPR expansion.
+        if let (Some(cache), Some(entity_repo)) = (self.ppr_cache.as_ref(), self.entity_repo.as_ref()) {
+            let ppr_results = crate::services::ppr_retrieval::retrieve_with_ppr_boost(
+                &self.fact_repo, entity_repo, cache, query, params.limit
+            ).await.unwrap_or_default();
+            facts = rrf_merge_scored_facts(facts, ppr_results, 60);
+        }
+
+        // KCA Track 13: temporal prune.
+        if let Some(pruner) = self.temporal_pruner.as_ref() {
+            let input = crate::services::temporal_pruner::PruneInput {
+                facts: facts.iter().map(|s| crate::services::temporal_pruner::PruneFactRef {
+                    fact_id: s.fact.id.clone(),
+                    subject: s.fact.subject.clone(),
+                    predicate: s.fact.predicate.clone(),
+                    object: s.fact.object.clone(),
+                    valid_at: s.fact.valid_from.clone(),
+                    valid_until: s.fact.valid_until.clone(),
+                }).collect(),
+                query_time: jiff::Timestamp::now().to_string(),
+            };
+            match pruner.prune(input).await {
+                Ok(out) => {
+                    let dropped = out.drop.len();
+                    facts = crate::services::temporal_pruner::apply_prune(facts, &out);
+                    if dropped > 0 {
+                        tracing::debug!(dropped, "temporal_prune dropped stale facts");
+                    }
+                }
+                Err(e) => tracing::warn!(error = %e, "temporal_prune skipped"),
             }
         }
+
+        Ok(facts)
     }
 
     async fn fetch_recalls(&self, query: &str, limit: usize) -> Vec<(String, f64, String)> {
@@ -633,6 +704,29 @@ fn normalize_scores(scores: &[f64]) -> Vec<f64> {
         return vec![1.0; scores.len()];
     }
     scores.iter().map(|s| (s - min) / range).collect()
+}
+
+/// RRF merge two ScoredFact lists. Dedupes by fact id.
+fn rrf_merge_scored_facts(
+    a: Vec<ScoredFact>,
+    b: Vec<ScoredFact>,
+    k: usize,
+) -> Vec<ScoredFact> {
+    let mut by_id: std::collections::HashMap<String, (ScoredFact, f64)> = Default::default();
+    for (rank, sf) in a.into_iter().enumerate() {
+        let s = 1.0 / (k as f64 + (rank + 1) as f64);
+        by_id.entry(sf.fact.id.clone()).and_modify(|v| v.1 += s).or_insert((sf, s));
+    }
+    for (rank, sf) in b.into_iter().enumerate() {
+        let s = 1.0 / (k as f64 + (rank + 1) as f64);
+        by_id.entry(sf.fact.id.clone()).and_modify(|v| v.1 += s).or_insert((sf, s));
+    }
+    let mut out: Vec<_> = by_id.into_iter().map(|(_, (mut sf, score))| {
+        sf.score = score;
+        sf
+    }).collect();
+    out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    out
 }
 
 /// Check if a recall's content overlaps with any fact predicate.
