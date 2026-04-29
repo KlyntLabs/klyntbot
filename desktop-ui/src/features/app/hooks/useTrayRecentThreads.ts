@@ -107,27 +107,21 @@ export function useTrayRecentThreads({
     let cancelled = false;
     let timeoutId: number | null = null;
 
-    const scheduleSync = () => {
-      timeoutId = window.setTimeout(() => {
-        timeoutId = null;
-        void setTrayRecentThreads(syncEntries)
-          .then(() => {
-            if (cancelled) {
-              return;
-            }
-            lastSyncedEntriesRef.current = serializedEntries;
-          })
-          .catch(() => {
-            if (cancelled) {
-              return;
-            }
-            // Retry until the desktop bridge or tray is ready for the same payload.
-            scheduleSync();
-          });
-      }, SYNC_DEBOUNCE_MS);
-    };
-
-    scheduleSync();
+    timeoutId = window.setTimeout(() => {
+      timeoutId = null;
+      void setTrayRecentThreads(syncEntries)
+        .then(() => {
+          if (cancelled) return;
+          lastSyncedEntriesRef.current = serializedEntries;
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          // Mark this payload as "attempted" so we don't loop. The next genuine
+          // change to entries will retry naturally via the effect dep.
+          lastSyncedEntriesRef.current = serializedEntries;
+          console.warn("[tray] setTrayRecentThreads failed", error);
+        });
+    }, SYNC_DEBOUNCE_MS);
 
     return () => {
       cancelled = true;

@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ProviderChips } from "./ProviderChips";
 import { SessionList } from "./SessionList";
 import { WireViewer } from "./WireViewer";
 import { ReforgeCycleDiff } from "./ReforgeCycleDiff";
 import { listCodingSessions } from "@/api/endpoints/codingMemory";
 import type { ProviderId, SessionSummaryDto } from "./types";
+
+const POLL_INTERVAL_MS = 4000;
 
 export function CodingMemoryPlugin() {
   const [provider, setProvider] = useState<ProviderId | "all">("all");
@@ -13,12 +15,18 @@ export function CodingMemoryPlugin() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [secondaryTab, setSecondaryTab] = useState<"sessions" | "reforge">("sessions");
+  const [live, setLive] = useState(true);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+  const initialLoadRef = useRef(true);
 
+  // Initial + filter-change load (shows skeleton). Re-runs only when provider changes.
   useEffect(() => {
     let cancelled = false;
+    initialLoadRef.current = true;
     setLoading(true);
     listCodingSessions({
-      source: provider === "all" ? undefined : provider,
+      source: provider === "all" ? null : provider,
+      repoId: null,
       sinceDays: 14,
       limit: 100,
       offset: 0,
@@ -27,10 +35,42 @@ export function CodingMemoryPlugin() {
         if (cancelled) return;
         setSessions(rows);
         setSelectedId((prev) => prev ?? rows[0]?.sessionId ?? null);
+        setLastSyncedAt(Date.now());
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          initialLoadRef.current = false;
+        }
+      });
     return () => { cancelled = true; };
-  }, [provider, refreshKey]);
+  }, [provider]);
+
+  // Background poll — silent refresh, preserves selection + scroll.
+  useEffect(() => {
+    if (!live) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const rows = await listCodingSessions({
+          source: provider === "all" ? null : provider,
+          repoId: null,
+          sinceDays: 14,
+          limit: 100,
+          offset: 0,
+        });
+        if (cancelled) return;
+        setSessions(rows);
+        setSelectedId((prev) => prev ?? rows[0]?.sessionId ?? null);
+        setLastSyncedAt(Date.now());
+        setRefreshKey((k) => k + 1);
+      } catch {
+        // swallow — keep last good rows
+      }
+    };
+    const id = window.setInterval(tick, POLL_INTERVAL_MS);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [live, provider]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: sessions.length };
@@ -38,9 +78,24 @@ export function CodingMemoryPlugin() {
     return c;
   }, [sessions]);
 
+  const lastSyncedLabel = lastSyncedAt
+    ? new Date(lastSyncedAt).toLocaleTimeString()
+    : "—";
+
   return (
     <div className="cm-plugin">
-      <ProviderChips active={provider} onChange={setProvider} counts={counts} />
+      <div className="cm-plugin__live-row">
+        <ProviderChips active={provider} onChange={setProvider} counts={counts} />
+        <button
+          type="button"
+          className={"cm-plugin__live-toggle" + (live ? " cm-plugin__live-toggle--on" : "")}
+          onClick={() => setLive((v) => !v)}
+          title={live ? "Click to pause auto-refresh" : "Click to resume auto-refresh"}
+        >
+          <span className="cm-plugin__live-dot" aria-hidden="true" />
+          {live ? "Live" : "Paused"} · synced {lastSyncedLabel}
+        </button>
+      </div>
       <div className="cm-plugin__secondary-tabs">
         <button
           type="button"

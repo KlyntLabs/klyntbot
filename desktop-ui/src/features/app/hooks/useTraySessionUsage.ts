@@ -73,24 +73,19 @@ export function useTraySessionUsage({
     let cancelled = false;
     let timeoutId: number | null = null;
 
-    const scheduleSync = () => {
-      timeoutId = window.setTimeout(() => {
-        void setTraySessionUsage(usage)
-          .then(() => {
-            if (!cancelled) {
-              lastSyncedUsageRef.current = serializedUsage;
-            }
-          })
-          .catch(() => {
-            if (!cancelled) {
-              // Retry until the desktop bridge or tray is ready for the same usage payload.
-              scheduleSync();
-            }
-          });
-      }, SYNC_DEBOUNCE_MS);
-    };
-
-    scheduleSync();
+    timeoutId = window.setTimeout(() => {
+      void setTraySessionUsage(usage)
+        .then(() => {
+          if (!cancelled) lastSyncedUsageRef.current = serializedUsage;
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          // Mark this payload as "attempted" so we don't loop. A genuine usage
+          // change will re-trigger the effect naturally.
+          lastSyncedUsageRef.current = serializedUsage;
+          console.warn("[tray] setTraySessionUsage failed", error);
+        });
+    }, SYNC_DEBOUNCE_MS);
 
     return () => {
       cancelled = true;

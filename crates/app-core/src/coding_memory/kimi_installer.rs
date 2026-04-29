@@ -47,9 +47,9 @@ impl KimiInstaller {
         let mut block = String::from(START);
         block.push('\n');
         for ev in EVENTS {
+            let cmd = super::installer::build_hook_command(hook_binary, "kimi-cli", ev);
             block.push_str(&format!(
-                "[[hooks]]\nevent = \"{ev}\"\ncommand = \"{} --hook kimi-cli {ev}\"\n\n",
-                hook_binary.display()
+                "[[hooks]]\nevent = \"{ev}\"\ncommand = \"{cmd}\"\n\n",
             ));
         }
         block.push_str(END);

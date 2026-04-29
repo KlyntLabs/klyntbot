@@ -47,7 +47,7 @@ impl ClaudeCodeInstaller {
                 "matcher": MATCHER_TAG,
                 "hooks": [{
                     "type": "command",
-                    "command": format!("{} --hook claude-code {}", hook_binary.display(), event),
+                    "command": build_hook_command(hook_binary, "claude-code", event),
                 }]
             }));
         }
@@ -109,6 +109,31 @@ impl ClaudeCodeInstaller {
             )));
         }
         Ok(())
+    }
+}
+
+/// Build the shell command string written into the hook config.
+///
+/// If `KLYNTBOT_HOME` is set in the desktop app's process environment (e.g.
+/// dev runs with `KLYNTBOT_HOME=~/.klyntbot-dev`), bake it into the command
+/// via `/usr/bin/env` so the hook writes to the same data dir the desktop
+/// reads from — regardless of which shell launches the CLI later.
+pub(crate) fn build_hook_command(hook_binary: &Path, source: &str, event: &str) -> String {
+    let bin = hook_binary.display();
+    match std::env::var("KLYNTBOT_HOME").ok().filter(|v| !v.trim().is_empty()) {
+        Some(home) => {
+            let home = shell_escape(&home);
+            format!("/usr/bin/env KLYNTBOT_HOME={home} {bin} --hook {source} {event}")
+        }
+        None => format!("{bin} --hook {source} {event}"),
+    }
+}
+
+fn shell_escape(s: &str) -> String {
+    if s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-' | '.' | '~')) {
+        s.to_string()
+    } else {
+        format!("'{}'", s.replace('\'', "'\\''"))
     }
 }
 

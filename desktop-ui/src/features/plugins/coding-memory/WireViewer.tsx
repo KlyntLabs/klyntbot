@@ -29,24 +29,40 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
   const [showMirror, setShowMirror] = useState(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
+  // Reset transient UI state only when the session itself changes, not on background polls.
+  useEffect(() => {
+    setExpandedSet(new Set());
+    setSearchQuery("");
+    setErrorsOnly(false);
+    setSelectedToolEvent(null);
+  }, [sessionId]);
+
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    const isBackgroundRefresh = refreshKey > 0 && events.length > 0;
+    if (!isBackgroundRefresh) setLoading(true);
     setError(null);
-    if (refreshKey === 0) {
-      setExpandedSet(new Set());
-      setSearchQuery("");
-      setErrorsOnly(false);
-    }
     fetchSessionWire(sessionId, 1000, 0)
       .then((rows) => {
-        if (!cancelled) setEvents(rows);
+        if (cancelled) return;
+        // Only update if the row count or tail timestamp actually changed,
+        // to avoid React re-rendering Virtuoso on every poll.
+        setEvents((prev) => {
+          if (prev.length === rows.length) {
+            const prevTail = prev[prev.length - 1];
+            const nextTail = rows[rows.length - 1];
+            if (prevTail && nextTail && prevTail.occurredAt === nextTail.occurredAt) {
+              return prev;
+            }
+          }
+          return rows;
+        });
       })
       .catch((err) => {
-        if (!cancelled) setError(String(err.message ?? err));
+        if (!cancelled && !isBackgroundRefresh) setError(String(err.message ?? err));
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !isBackgroundRefresh) setLoading(false);
       });
     return () => { cancelled = true; };
   }, [sessionId, refreshKey]);
