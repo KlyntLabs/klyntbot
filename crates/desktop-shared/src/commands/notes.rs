@@ -234,20 +234,6 @@ pub struct InsightReviewResponse {
     pub self_assessment: Option<Vec<QuizQuestion>>,
     pub concept_map: Option<String>,
     pub perspectives: Option<String>,
-    pub persona_ids: Option<Vec<String>>,
-    /// Full persona metadata resolved from persona_ids (for frontend PersonaCard rendering).
-    #[serde(default)]
-    pub personas: Vec<PersonaMetaResponse>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct PersonaMetaResponse {
-    pub id: String,
-    pub name: String,
-    pub role: String,
-    pub icon: String,
-    pub tone: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -270,9 +256,6 @@ pub struct QuizQuestion {
 pub struct TabContent {
     pub tab: String,
     pub content: String,
-    /// Persona metadata — only populated when tab == "perspectives".
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub personas: Vec<PersonaMetaResponse>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -345,7 +328,6 @@ pub struct InsightChatParams {
     pub tab_name: String,
     pub user_message: String,
     pub session_key: String,
-    pub squad_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -609,65 +591,6 @@ pub struct InsightScopeConfigParams {
     pub merge_threshold: Option<f64>,
 }
 
-// ── Persona Management ──────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct PersonaResponse {
-    pub id: String,
-    pub name: String,
-    pub role: String,
-    pub expertise: String,
-    pub perspective: String,
-    pub tone: String,
-    pub icon: String,
-    pub source: String,
-    pub domains: Vec<String>,
-    pub is_active: bool,
-    pub relevance_score: f64,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct CreatePersonaParams {
-    pub name: String,
-    pub role: String,
-    pub expertise: String,
-    pub perspective: String,
-    pub tone: String,
-    pub icon: String,
-    pub domains: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdatePersonaParams {
-    pub id: String,
-    pub name: Option<String>,
-    pub role: Option<String>,
-    pub expertise: Option<String>,
-    pub perspective: Option<String>,
-    pub tone: Option<String>,
-    pub icon: Option<String>,
-    pub domains: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct SetPersonaPinsParams {
-    pub note_id: String,
-    pub persona_ids: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct RatePersonaParams {
-    pub id: String,
-    pub helpful: bool,
-}
-
 // ── Distractor Generation ────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -743,33 +666,6 @@ pub struct FlashcardExplainResponse {
 pub struct DeckPreferenceResponse {
     pub deck: String,
     pub answer_mode: String,
-}
-
-// ── Persona Chat ────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct PersonaChatParams {
-    pub note_id: String,
-    pub persona_id: String,
-    pub persona_name: String,
-    pub persona_role: String,
-    pub persona_tone: String,
-    pub user_message: String,
-    pub history: Vec<PersonaChatMessage>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct PersonaChatMessage {
-    pub role: String,
-    pub content: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct PersonaChatResponse {
-    pub reply: String,
 }
 
 // ── Recent Learning Sessions ─────────────────────────────────────

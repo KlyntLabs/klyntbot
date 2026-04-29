@@ -22,8 +22,6 @@ fn row_to_insight_response(row: feature_insights::InsightReviewRow) -> InsightRe
                 .ok()
         });
 
-    let persona_ids: Option<Vec<String>> = serde_json::from_str(&row.persona_ids).ok();
-
     InsightReviewResponse {
         insight_review_id: row.id,
         note_id: row.note_id,
@@ -34,8 +32,6 @@ fn row_to_insight_response(row: feature_insights::InsightReviewRow) -> InsightRe
         self_assessment,
         concept_map: content.concept_map,
         perspectives: content.perspectives,
-        persona_ids,
-        personas: vec![], // Resolved by caller (note_insight_cache_get) when async context is available
     }
 }
 
@@ -45,7 +41,6 @@ impl AppCore {
         &self,
         note_id: &str,
         scope_params: Option<&InsightScopeConfigParams>,
-        squad_id: Option<&str>,
         emitter_override: Option<Arc<dyn crate::events::AppEventEmitter>>,
     ) -> Result<InsightReviewStarted, ApiError> {
         let note = self
@@ -173,10 +168,6 @@ impl AppCore {
                 (ctx.text, ctx.note_title, None)
             };
 
-        let resolved_squad = self
-            .resolve_squad_full(note_id, squad_id, &note_domains)
-            .await;
-
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 4096);
         let changes_params = providers::cognitive_chat_params(&config, 512);
@@ -232,7 +223,6 @@ impl AppCore {
 
         let pipeline_pool = self.storage_pool.inner().clone();
         let pipeline_bus = self.domain_event_bus.clone();
-        let note_body_owned = note.body.clone();
         tokio::spawn(async move {
             run_insight_pipeline(InsightPipelineArgs {
                 provider,
@@ -242,10 +232,7 @@ impl AppCore {
                 content_hash: content_hash_clone,
                 context: context_text,
                 note_title,
-                note_body: note_body_owned,
                 params,
-                resolved_squad,
-                note_domains,
                 parent_insight_id,
                 scope_note_ids,
                 scope_config: scope,
@@ -282,30 +269,7 @@ impl AppCore {
             None => return Ok(None),
         };
 
-        let mut response = row_to_insight_response(row);
-
-        // Resolve persona IDs → full metadata for PersonaCard rendering
-        if let Some(ref ids) = response.persona_ids {
-            if !ids.is_empty() {
-                if let Some(ref repo) = self.persona_repo {
-                    let mut personas = Vec::new();
-                    for id in ids {
-                        if let Ok(Some(p)) = repo.get(id).await {
-                            personas.push(PersonaMetaResponse {
-                                id: p.id,
-                                name: p.name,
-                                role: p.role,
-                                icon: p.icon,
-                                tone: p.tone,
-                            });
-                        }
-                    }
-                    response.personas = personas;
-                }
-            }
-        }
-
-        Ok(Some(response))
+        Ok(Some(row_to_insight_response(row)))
     }
 
     /// Knowledge growth metrics from the cognitive fact store.
@@ -645,7 +609,7 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("NOT_FOUND", "Note not found"))?;
 
         // Use InsightService pipeline for consistent context quality.
-        // Fetch tags + domains once (reused for both context building and persona selection).
+        // Fetch tags + domains once (reused for context building).
         let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
         let entity_repo = cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
         let note_domains = insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
@@ -694,86 +658,10 @@ impl AppCore {
         let response_lang = resolve_response_lang(&config);
         drop(config);
 
-        // Track persona metadata for perspectives tab (returned alongside content)
-        let mut tab_personas: Vec<PersonaMetaResponse> = Vec::new();
-
         let lang = response_lang.as_deref();
 
-        // Perspectives tab uses the debate engine; all other tabs use a single LLM call.
         let content = if tab == "perspectives" {
-            use agent::engines::debate::run_debate;
-            use agent::engines::debate_types::*;
-            use tokio_util::sync::CancellationToken;
-
-            let resolved = self
-                .resolve_squad_full(note_id, None, &note_domains)
-                .await
-                .ok_or_else(|| {
-                    ApiError::new(
-                        "NOT_ENOUGH_PERSONAS",
-                        "No personas available for perspectives",
-                    )
-                })?;
-
-            tab_personas = resolved
-                .personas
-                .iter()
-                .map(|p| PersonaMetaResponse {
-                    id: p.id.clone(),
-                    name: p.name.clone(),
-                    role: p.role.clone(),
-                    icon: p.icon.clone(),
-                    tone: p.tone.clone(),
-                })
-                .collect();
-
-            let debate_config = DebateConfig::for_notes();
-            let debate_context = DebateContext {
-                skill_prompt: String::new(),
-                conversation_history: vec![],
-                user_message: format!("{}\n\n{}", note.title, note.body),
-                cognitive_context: Some(ctx_text.clone()),
-                domains: note_domains.clone(),
-            };
-
-            let (debate_event_tx, _debate_event_rx) =
-                tokio::sync::mpsc::channel::<DebateEvent>(100);
-            let cancel = CancellationToken::new();
-
-            let blackboard_repo = cognitive::BlackboardRepo::new(self.storage_pool.inner().clone());
-            let accuracy_repo =
-                cognitive::PersonaAccuracyRepo::new(self.storage_pool.inner().clone());
-
-            let result = run_debate(
-                debate_config,
-                debate_context,
-                resolved,
-                provider,
-                &blackboard_repo,
-                &accuracy_repo,
-                debate_event_tx,
-                None,
-                cancel,
-            )
-            .await
-            .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
-
-            let parts: Vec<String> = result
-                .persona_responses
-                .iter()
-                .map(|r| {
-                    format!(
-                        "## {} — {}\n\n{}",
-                        r.persona_name, r.persona_role, r.content
-                    )
-                })
-                .collect();
-
-            if parts.is_empty() {
-                String::new()
-            } else {
-                parts.join("\n\n---\n\n")
-            }
+            String::new()
         } else {
             let prompt = match tab {
                 "synthesis" => insight_prompts::synthesis_prompt(&ctx_text, lang),
@@ -835,7 +723,6 @@ impl AppCore {
                         &insight_content,
                         &input_hash,
                         &feature_insights::ScopeConfig::default(),
-                        &[],
                         None,
                         &[],
                     )
@@ -849,7 +736,6 @@ impl AppCore {
         Ok(TabContent {
             tab: tab.to_string(),
             content,
-            personas: tab_personas,
         })
     }
 
@@ -1110,244 +996,6 @@ impl AppCore {
         notes
     }
 
-    /// Run a multi-round debate on the note content using the squad's personas.
-    /// Emits debate events through the insight SSE channel.
-    #[tracing::instrument(skip(self), err)]
-    pub async fn note_insight_debate(
-        &self,
-        note_id: &str,
-        squad_id: Option<&str>,
-    ) -> Result<(), ApiError> {
-        use agent::engines::debate::run_debate;
-        use agent::engines::debate_types::*;
-        use tokio_util::sync::CancellationToken;
-
-        let provider = self
-            .cognitive_provider
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
-
-        let note = self
-            .note_repo
-            .get_note(note_id)
-            .await
-            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
-            .ok_or_else(|| ApiError::new("NOT_FOUND", "Note not found"))?;
-
-        let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
-        let entity_repo = cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
-        let note_domains = insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
-
-        let resolved = self
-            .resolve_squad_full(note_id, squad_id, &note_domains)
-            .await
-            .ok_or_else(|| {
-                ApiError::new(
-                    "NOT_ENOUGH_PERSONAS",
-                    "Need at least 2 personas for a debate",
-                )
-            })?;
-        if resolved.personas.len() < 2 {
-            return Err(ApiError::new(
-                "NOT_ENOUGH_PERSONAS",
-                "Need at least 2 personas for a debate",
-            ));
-        }
-
-        let blackboard_repo = cognitive::BlackboardRepo::new(self.storage_pool.inner().clone());
-        let accuracy_repo = cognitive::PersonaAccuracyRepo::new(self.storage_pool.inner().clone());
-
-        let debate_config = DebateConfig::for_notes();
-        let debate_context = DebateContext {
-            skill_prompt: String::new(),
-            conversation_history: vec![],
-            user_message: format!(
-                "Analyze this note from your unique perspective. What are the key insights, \
-                 weaknesses, and recommendations?\n\n# {}\n\n{}",
-                note.title, note.body
-            ),
-            cognitive_context: None,
-            domains: note_domains,
-        };
-
-        let (debate_event_tx, mut debate_event_rx) = tokio::sync::mpsc::channel::<DebateEvent>(100);
-        let cancel = CancellationToken::new();
-
-        // Clone emitter for the relay task
-        let emitter = Arc::clone(&self.event_emitter);
-
-        // Spawn relay task: convert DebateEvents → insight SSE events
-        let relay_handle = tokio::spawn(async move {
-            while let Some(event) = debate_event_rx.recv().await {
-                match event {
-                    DebateEvent::RoundStarted {
-                        round,
-                        phase,
-                        persona_order,
-                        ..
-                    } => {
-                        emitter.emit_event(
-                            "insight:debate-round-started",
-                            serde_json::json!({
-                                "round": round,
-                                "totalRounds": 0,
-                                "phase": phase.as_str(),
-                            }),
-                        );
-                        let _ = persona_order;
-                    }
-                    DebateEvent::PersonaPerspective {
-                        persona_id,
-                        name,
-                        icon,
-                        role,
-                        content,
-                        challenge,
-                        ..
-                    } => {
-                        emitter.emit_event(
-                            "insight:debate-persona",
-                            serde_json::json!({
-                                "personaId": persona_id,
-                                "personaName": name,
-                                "personaIcon": icon,
-                                "personaRole": role,
-                                "content": content,
-                                "challenge": challenge,
-                            }),
-                        );
-                    }
-                    DebateEvent::JudgeDecision {
-                        round,
-                        consensus_score,
-                        decision,
-                        speaking_order,
-                    } => {
-                        emitter.emit_event(
-                            "insight:debate-judge",
-                            serde_json::json!({
-                                "round": round,
-                                "consensusScore": consensus_score,
-                                "decision": decision,
-                                "speakingOrder": speaking_order,
-                            }),
-                        );
-                    }
-                    DebateEvent::RoundCompleted { round, .. } => {
-                        emitter.emit_event(
-                            "insight:debate-round-completed",
-                            serde_json::json!({
-                                "round": round,
-                            }),
-                        );
-                    }
-                    DebateEvent::ConsensusReached { round, score } => {
-                        emitter.emit_event(
-                            "insight:debate-consensus",
-                            serde_json::json!({
-                                "round": round,
-                                "consensusScore": score,
-                            }),
-                        );
-                    }
-                    DebateEvent::Complete => {}
-                    _ => {}
-                }
-            }
-        });
-
-        // Run the debate
-        let emitter_done = Arc::clone(&self.event_emitter);
-        let provider_clone = provider.clone();
-        let note_id_owned = note_id.to_string();
-        tokio::spawn(async move {
-            let _result = run_debate(
-                debate_config,
-                debate_context,
-                resolved,
-                &provider_clone,
-                &blackboard_repo,
-                &accuracy_repo,
-                debate_event_tx,
-                None,
-                cancel,
-            )
-            .await;
-
-            let _ = relay_handle.await;
-
-            emitter_done.emit_event(
-                "insight:debate-done",
-                serde_json::json!({ "noteId": note_id_owned }),
-            );
-        });
-
-        Ok(())
-    }
-
-    /// Resolve squad as a full `ResolvedSquad` (needed by the debate engine).
-    ///
-    /// Falls back to the builtin general squad, then to domain-based persona
-    /// selection wrapped in a synthetic `ResolvedSquad`.
-    async fn resolve_squad_full(
-        &self,
-        note_id: &str,
-        squad_id: Option<&str>,
-        domains: &[String],
-    ) -> Option<cognitive::ResolvedSquad> {
-        if let Some(sid) = squad_id {
-            if let Some(squad_repo) = &self.squad_repo {
-                if let Ok(Some(resolved)) = squad_repo.resolve_squad(sid).await {
-                    return Some(resolved);
-                }
-            }
-        }
-        if let Some(squad_repo) = &self.squad_repo {
-            if let Ok(Some(resolved)) = squad_repo.resolve_squad("builtin-squad-general").await {
-                return Some(resolved);
-            }
-        }
-        // Fallback: wrap loose personas in a synthetic ResolvedSquad
-        let personas = match &self.persona_repo {
-            Some(repo) => repo
-                .select_for_note(note_id, domains, 6)
-                .await
-                .unwrap_or_default(),
-            None => return None,
-        };
-        if personas.is_empty() {
-            return None;
-        }
-        let now = jiff::Timestamp::now().to_string();
-        Some(cognitive::ResolvedSquad {
-            squad: cognitive::SquadRow {
-                id: "synthetic-note-squad".to_string(),
-                name: "Note Analysis".to_string(),
-                description: "Auto-selected personas for note analysis".to_string(),
-                icon: "🔍".to_string(),
-                orchestrator_skill: String::new(),
-                source: "synthetic".to_string(),
-                domains: serde_json::to_string(domains).unwrap_or_else(|_| "[]".to_string()),
-                is_active: 1,
-                default_interaction_mode: "debate".to_string(),
-                last_smart_mode: None,
-                last_smart_updated: None,
-                created_at: now.clone(),
-                updated_at: now,
-            },
-            members: personas
-                .iter()
-                .enumerate()
-                .map(|(i, p)| cognitive::SquadMemberRow {
-                    squad_id: "synthetic-note-squad".to_string(),
-                    persona_id: p.id.clone(),
-                    role_in_squad: "member".to_string(),
-                    sort_order: i as i64,
-                })
-                .collect(),
-            personas,
-        })
-    }
 }
 
 struct InsightPipelineArgs {
@@ -1358,10 +1006,7 @@ struct InsightPipelineArgs {
     content_hash: String,
     context: String,
     note_title: String,
-    note_body: String,
     params: providers::ChatParams,
-    resolved_squad: Option<cognitive::ResolvedSquad>,
-    note_domains: Vec<String>,
     parent_insight_id: Option<String>,
     scope_note_ids: Vec<String>,
     scope_config: feature_insights::ScopeConfig,
@@ -1371,10 +1016,6 @@ struct InsightPipelineArgs {
 }
 
 async fn run_insight_pipeline(args: InsightPipelineArgs) {
-    use agent::engines::debate::run_debate;
-    use agent::engines::debate_types::*;
-    use tokio_util::sync::CancellationToken;
-
     let InsightPipelineArgs {
         provider,
         emitter,
@@ -1383,10 +1024,7 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
         content_hash,
         context,
         note_title,
-        note_body,
         params,
-        resolved_squad,
-        note_domains,
         parent_insight_id,
         scope_note_ids,
         scope_config,
@@ -1402,157 +1040,22 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
     let assessment_prompt = insight_prompts::self_assessment_prompt(&context, lang);
     let concept_map_prompt = insight_prompts::concept_map_prompt(&context, &note_title, lang);
 
-    // Extract personas for metadata emission (before moving resolved_squad)
-    let personas: Vec<cognitive::PersonaRow> = resolved_squad
-        .as_ref()
-        .map(|rs| rs.personas.clone())
-        .unwrap_or_default();
-
-    let personas_meta: Vec<serde_json::Value> = personas
-        .iter()
-        .map(|p| {
-            serde_json::json!({
-                "id": p.id,
-                "name": p.name,
-                "role": p.role,
-                "icon": p.icon,
-                "tone": p.tone,
-            })
-        })
-        .collect();
-    emitter.emit_event(
-        "insight:perspectives-meta",
-        serde_json::json!({ "personas": personas_meta }),
-    );
-
-    // Perspectives generation via debate engine (runs concurrently with other tabs)
-    let perspectives_future = {
-        let provider = provider.clone();
-        let emitter = emitter.clone();
-        let context = context.clone();
-        let note_title = note_title.clone();
-        let note_body = note_body.clone();
-        let pool = pool.clone();
-        async move {
-            let squad = match resolved_squad {
-                Some(s) if !s.personas.is_empty() => s,
-                _ => return None,
-            };
-
-            let debate_config = DebateConfig::for_notes();
-
-            let debate_context = DebateContext {
-                skill_prompt: String::new(), // Notes don't use orchestrator skills
-                conversation_history: vec![],
-                user_message: format!("{}\n\n{}", note_title, note_body),
-                cognitive_context: Some(context),
-                domains: note_domains,
-            };
-
-            let (debate_event_tx, mut debate_event_rx) =
-                tokio::sync::mpsc::channel::<DebateEvent>(100);
-            let cancel = CancellationToken::new();
-
-            let blackboard_repo = cognitive::BlackboardRepo::new(pool.clone());
-            let accuracy_repo = cognitive::PersonaAccuracyRepo::new(pool);
-
-            // Spawn relay task: convert DebateEvents → insight SSE events
-            let relay_emitter = emitter.clone();
-            let relay_handle = tokio::spawn(async move {
-                while let Some(event) = debate_event_rx.recv().await {
-                    match event {
-                        DebateEvent::PersonaPerspective {
-                            persona_id,
-                            name,
-                            content,
-                            ..
-                        } => {
-                            relay_emitter.emit_event(
-                                "insight:persona-perspective",
-                                serde_json::json!({
-                                    "personaId": persona_id,
-                                    "personaName": name,
-                                    "content": content,
-                                }),
-                            );
-                        }
-                        DebateEvent::Complete => {}
-                        _ => {} // Other debate events not surfaced in insight pipeline
-                    }
-                }
-            });
-
-            let result = run_debate(
-                debate_config,
-                debate_context,
-                squad,
-                &provider,
-                &blackboard_repo,
-                &accuracy_repo,
-                debate_event_tx,
-                None,
-                cancel,
-            )
-            .await;
-
-            // Wait for relay task to finish
-            let _ = relay_handle.await;
-
-            match result {
-                Ok(debate_result) => {
-                    let parts: Vec<String> = debate_result
-                        .persona_responses
-                        .iter()
-                        .map(|r| {
-                            format!(
-                                "## {} — {}\n\n{}",
-                                r.persona_name, r.persona_role, r.content
-                            )
-                        })
-                        .collect();
-                    if parts.is_empty() {
-                        None
-                    } else {
-                        Some(parts.join("\n\n---\n\n"))
-                    }
-                }
-                Err(e) => {
-                    emitter.emit_event(
-                        "insight:error",
-                        serde_json::json!({ "tab": "perspectives", "error": e.to_string() }),
-                    );
-                    None
-                }
-            }
-        }
-    };
-
-    let ((gaps, assessment, concept_map), perspectives) = tokio::join!(
-        async {
-            tokio::join!(
-                generate_tab(&provider, &emitter, "gaps", &gaps_prompt, &params),
-                generate_tab(
-                    &provider,
-                    &emitter,
-                    "assessment",
-                    &assessment_prompt,
-                    &params,
-                ),
-                generate_tab(
-                    &provider,
-                    &emitter,
-                    "concept-map",
-                    &concept_map_prompt,
-                    &params,
-                ),
-            )
-        },
-        perspectives_future,
-    );
-
-    emitter.emit_event(
-        "insight:tab-done",
-        serde_json::json!({ "tab": "perspectives", "content": perspectives }),
+    let (gaps, assessment, concept_map) = tokio::join!(
+        generate_tab(&provider, &emitter, "gaps", &gaps_prompt, &params),
+        generate_tab(
+            &provider,
+            &emitter,
+            "assessment",
+            &assessment_prompt,
+            &params,
+        ),
+        generate_tab(
+            &provider,
+            &emitter,
+            "concept-map",
+            &concept_map_prompt,
+            &params,
+        ),
     );
 
     if let Some(ref service) = insight_service {
@@ -1561,16 +1064,14 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
             gap_analysis: gaps,
             self_assessment: assessment,
             concept_map,
-            perspectives,
+            perspectives: None,
         };
-        let persona_ids: Vec<String> = personas.iter().map(|p| p.id.clone()).collect();
         if let Ok(row) = service
             .store_insight(
                 &note_id,
                 &content,
                 &content_hash,
                 &scope_config,
-                &persona_ids,
                 parent_insight_id.as_deref(),
                 &scope_note_ids,
             )

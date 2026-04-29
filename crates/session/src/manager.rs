@@ -36,10 +36,6 @@ pub struct Session {
     #[serde(default)]
     pub metadata: HashMap<String, serde_json::Value>,
 
-    /// Optional squad ID — when set, this session uses multi-persona squad execution.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub squad_id: Option<String>,
-
     /// Messages remaining before next keyword correction can fire (0 = ready).
     #[serde(default)]
     pub correction_cooldown: u32,
@@ -55,7 +51,6 @@ impl Session {
             created_at: now,
             updated_at: now,
             metadata: HashMap::new(),
-            squad_id: None,
             correction_cooldown: 0,
         }
     }
@@ -274,7 +269,6 @@ impl SessionManager {
             created_at: *row.created_at,
             updated_at: *row.updated_at,
             metadata,
-            squad_id: row.squad_id,
             correction_cooldown: 0,
         }
     }
@@ -283,11 +277,9 @@ impl SessionManager {
     ///
     /// Returns an `Arc<TokioMutex<Session>>` — the caller locks it per-session.
     /// Concurrent calls for *different* keys proceed without blocking each other.
-    /// When `squad_id` is `Some`, new sessions are stamped with the squad.
     pub async fn get_or_create(
         &self,
         key: impl Into<String>,
-        squad_id: Option<&str>,
     ) -> Result<Arc<TokioMutex<Session>>> {
         let key = key.into();
 
@@ -374,12 +366,10 @@ impl SessionManager {
             Err(storage::StorageError::NotFound(_)) => {
                 let metadata = serde_json::Value::Object(serde_json::Map::new());
                 self.sql_repo
-                    .upsert_session(&key, &metadata, squad_id)
+                    .upsert_session(&key, &metadata)
                     .await?;
                 debug!("Creating new session in SQL: {}", key);
-                let mut s = Session::new(key.clone());
-                s.squad_id = squad_id.map(|s| s.to_string());
-                s
+                Session::new(key.clone())
             }
             Err(e) => return Err(e.into()),
         };
@@ -400,7 +390,7 @@ impl SessionManager {
         let metadata = serde_json::to_value(&session.metadata)
             .map_err(|e| KlyntbotError::Storage(format!("session metadata: {e}")))?;
         self.sql_repo
-            .upsert_session(&session.key, &metadata, session.squad_id.as_deref())
+            .upsert_session(&session.key, &metadata)
             .await?;
 
         // Build batch arrays from session messages
@@ -412,8 +402,6 @@ impl SessionManager {
             let mut request_ids = Vec::with_capacity(session.messages.len());
             let mut tool_calls_list = Vec::with_capacity(session.messages.len());
             let mut metadata_list = Vec::with_capacity(session.messages.len());
-            let mut persona_ids = Vec::with_capacity(session.messages.len());
-
             for msg in &session.messages {
                 ids.push(Uuid::parse_str(&msg.id).unwrap_or_else(|_| Uuid::new_v4()));
                 roles.push(msg.role.clone());
@@ -422,7 +410,6 @@ impl SessionManager {
                 request_ids.push(msg.request_id.clone());
                 tool_calls_list.push(msg.tool_calls.clone());
                 metadata_list.push(msg.metadata.clone());
-                persona_ids.push(None); // persona_id not tracked in in-memory Session
             }
 
             self.sql_repo
@@ -435,7 +422,6 @@ impl SessionManager {
                     &request_ids,
                     &tool_calls_list,
                     &metadata_list,
-                    &persona_ids,
                 )
                 .await?;
         }
@@ -463,7 +449,6 @@ impl SessionManager {
                         None,
                         None,
                         None,
-                        None, // persona_id
                     )
                     .await;
 
@@ -978,18 +963,18 @@ mod tests {
         let repo = storage::SessionRepo::new(pool.inner().clone());
         let manager = SessionManager::from_repo(repo, 2).await;
 
-        let _s1 = manager.get_or_create("key-1", None).await.unwrap();
-        let _s2 = manager.get_or_create("key-2", None).await.unwrap();
+        let _s1 = manager.get_or_create("key-1").await.unwrap();
+        let _s2 = manager.get_or_create("key-2").await.unwrap();
 
         {
-            let s1 = manager.get_or_create("key-1", None).await.unwrap();
+            let s1 = manager.get_or_create("key-1").await.unwrap();
             let mut session = s1.lock().await;
             session.add_message("user", "important data");
         }
 
-        let _s3 = manager.get_or_create("key-3", None).await.unwrap();
+        let _s3 = manager.get_or_create("key-3").await.unwrap();
 
-        let s1_reloaded = manager.get_or_create("key-1", None).await.unwrap();
+        let s1_reloaded = manager.get_or_create("key-1").await.unwrap();
         let session = s1_reloaded.lock().await;
         assert!(
             session

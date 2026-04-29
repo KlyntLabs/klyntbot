@@ -29,7 +29,7 @@ use tools::{
 use tools_core::FeaturePackage;
 
 use super::super::context_sources::{
-    AreaSource, BootstrapSource, IdentitySource, PageContextSource, PersonaContextSource,
+    AreaSource, BootstrapSource, IdentitySource, PageContextSource,
     ProductivityContextSource, ProjectContextSource, SessionContextSource,
     SessionMemoryContextSource, TodoSource,
 };
@@ -273,12 +273,6 @@ impl AgentLoopBuilder {
             config.confidence.threshold.to_bits(),
         ));
 
-        // Load persona manager for PersonaContextSource
-        let personas_dir = workspace.join("personas");
-        let persona_manager = Arc::new(tokio::sync::RwLock::new(
-            crate::persona::PersonaManager::load(&personas_dir).await,
-        ));
-
         // Soul context source (KLYNTBOT.md)
         let soul_source = skill_system::SoulContextSource::load(&data_dir_path)?;
         // Skill listing source (frontmatter listing of all skills)
@@ -298,10 +292,6 @@ impl AgentLoopBuilder {
             )),
             Box::new(AreaSource::new(repos.areas.clone())),
             Box::new(TodoSource::new(repos.tasks.clone())),
-            Box::new(PersonaContextSource::new(
-                Arc::clone(&persona_manager),
-                repos.session_context.clone(),
-            )),
             Box::new(PageContextSource::new(repos.clone())),
         ];
 

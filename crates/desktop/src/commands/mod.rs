@@ -38,7 +38,6 @@ pub mod retention_history;
 pub mod review_stats;
 pub mod settings;
 pub mod shortcuts;
-pub mod squads;
 pub mod status;
 pub mod status_badge;
 pub mod tasks;

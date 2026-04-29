@@ -131,12 +131,10 @@ CREATE TABLE sessions (
     project_id        TEXT REFERENCES projects(id),
     conversation_type TEXT DEFAULT 'general',
     pinned            INTEGER DEFAULT 0,
-    squad_id          TEXT,
     compressed_prefix      TEXT,
     compressed_through_idx INTEGER,
     compressed_at          INTEGER
 );
-CREATE INDEX IF NOT EXISTS idx_sessions_squad ON sessions(squad_id);
 
 -- ============================================================
 -- Session Messages
@@ -149,8 +147,7 @@ CREATE TABLE session_messages (
     timestamp   INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     request_id  TEXT,
     tool_calls  TEXT,
-    metadata    TEXT,
-    persona_id  TEXT
+    metadata    TEXT
 );
 CREATE INDEX idx_session_messages_key_ts ON session_messages(session_key, timestamp);
 

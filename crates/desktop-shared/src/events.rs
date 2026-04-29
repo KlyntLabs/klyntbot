@@ -52,11 +52,6 @@ pub const AGENT_DELEGATION_COMPLETED: &str = "agent:delegation_completed";
 pub const AGENT_PLAN_GENERATED: &str = "agent:plan_generated";
 pub const AGENT_PLAN_STEP_COMPLETED: &str = "agent:plan_step_completed";
 pub const AGENT_BUDGET_WARNING: &str = "agent:budget_warning";
-pub const AGENT_PERSONA_PERSPECTIVE: &str = "agent:persona_perspective";
-pub const AGENT_DEBATE_ROUND_STARTED: &str = "agent:debate_round_started";
-pub const AGENT_DEBATE_ROUND_COMPLETED: &str = "agent:debate_round_completed";
-pub const AGENT_DEBATE_JUDGE_DECISION: &str = "agent:debate_judge_decision";
-pub const AGENT_CONSENSUS_REACHED: &str = "agent:consensus_reached";
 pub const AGENT_MEMORY_PROMOTED: &str = "agent:memory_promoted";
 pub const AUTOTUNER_REPORT: &str = "autotuner:report";
 pub const AUTOTUNER_PROMOTION: &str = "autotuner:promotion";
@@ -410,46 +405,6 @@ pub struct BudgetWarningPayload {
     pub monthly_spend_usd: f64,
     pub monthly_budget_usd: f64,
     pub usage_percent: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct PersonaPerspectivePayload {
-    pub session_key: String,
-    pub persona_id: String,
-    pub persona_name: String,
-    pub persona_icon: String,
-    pub persona_role: String,
-    pub content: String,
-    pub challenge: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct DebateRoundStartedPayload {
-    pub session_key: String,
-    pub round: u32,
-    pub total_rounds: u32,
-    pub phase: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct DebateJudgeDecisionPayload {
-    pub session_key: String,
-    pub round: u32,
-    pub consensus_score: f64,
-    pub decision: String,
-    pub speaking_order: Vec<String>,
-    pub reasoning: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct DebateRoundCompletedPayload {
-    pub session_key: String,
-    pub round: u32,
-    pub consensus_score: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -870,26 +825,6 @@ impl tauri_specta::Event for PlanStepCompletedPayload {
 
 impl tauri_specta::Event for BudgetWarningPayload {
     const NAME: &'static str = "budget-warning-payload";
-}
-
-impl tauri_specta::Event for PersonaPerspectivePayload {
-    const NAME: &'static str = "persona-perspective-payload";
-}
-
-impl tauri_specta::Event for DebateRoundStartedPayload {
-    const NAME: &'static str = "debate-round-started-payload";
-}
-
-impl tauri_specta::Event for DebateJudgeDecisionPayload {
-    const NAME: &'static str = "debate-judge-decision-payload";
-}
-
-impl tauri_specta::Event for DebateRoundCompletedPayload {
-    const NAME: &'static str = "debate-round-completed-payload";
-}
-
-impl tauri_specta::Event for ConsensusReachedPayload {
-    const NAME: &'static str = "consensus-reached-payload";
 }
 
 impl tauri_specta::Event for TransparencyData {

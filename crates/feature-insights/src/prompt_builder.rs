@@ -276,7 +276,6 @@ mod tests {
             content: serde_json::to_string(&parent_content).unwrap(),
             input_hash: "hash".to_string(),
             scope_config: "{}".to_string(),
-            persona_ids: "[]".to_string(),
             parent_insight_id: None,
             token_cost_usd: None,
             superseded_at: None,

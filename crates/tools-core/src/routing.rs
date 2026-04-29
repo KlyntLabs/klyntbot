@@ -75,8 +75,6 @@ pub struct RoutingContext {
     /// Platform-native interaction channel (Telegram buttons, Discord selects, etc.).
     /// When present, `ask_user` uses this for structured UI instead of text fallback.
     pub interaction_channel: Option<Arc<dyn InteractionChannel>>,
-    /// Squad context — when set, the agent uses SquadExecutor for multi-persona responses.
-    pub squad_id: Option<String>,
     /// Autotuner champion parameters for the current trial (if any).
     pub champion_params: Option<common::TrialParams>,
 }
@@ -92,7 +90,6 @@ impl RoutingContext {
             delegation_depth: 0,
             entity_tx: None,
             interaction_channel: None,
-            squad_id: None,
             champion_params: None,
         }
     }
@@ -111,38 +108,14 @@ impl RoutingContext {
             delegation_depth: 0,
             entity_tx: None,
             interaction_channel: None,
-            squad_id: None,
             champion_params: None,
         }
     }
 
-    /// Non-interactive mode with a squad context.
-    pub fn with_squad(channel: ChannelName, chat_id: ChatId, squad_id: String) -> Self {
-        Self {
-            channel,
-            chat_id,
-            interaction_tx: None,
-            is_direct_mode: false,
-            delegation_depth: 0,
-            entity_tx: None,
-            interaction_channel: None,
-            squad_id: Some(squad_id),
-            champion_params: None,
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_routing_context_squad_id() {
-        let ctx = RoutingContext::new("cli".into(), "test-chat".into());
-        assert!(ctx.squad_id.is_none());
-
-        let ctx2 =
-            RoutingContext::with_squad("cli".into(), "test-chat".into(), "squad-123".to_string());
-        assert_eq!(ctx2.squad_id.as_deref(), Some("squad-123"));
-    }
 }

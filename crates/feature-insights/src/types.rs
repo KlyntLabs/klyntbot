@@ -76,7 +76,6 @@ pub struct InsightReviewRow {
     pub content: String,
     pub input_hash: String,
     pub scope_config: String,
-    pub persona_ids: String,
     pub parent_insight_id: Option<String>,
     pub token_cost_usd: Option<f64>,
     pub superseded_at: Option<String>,

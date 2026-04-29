@@ -222,57 +222,6 @@ pub enum AgentEvent {
         tool_name: String,
     },
 
-    /// A persona in a squad completed its analysis.
-    PersonaPerspective {
-        #[serde(rename = "personaId")]
-        persona_id: String,
-        #[serde(rename = "personaName")]
-        persona_name: String,
-        #[serde(rename = "personaIcon")]
-        persona_icon: String,
-        #[serde(rename = "personaRole")]
-        persona_role: String,
-        content: String,
-        /// What the judge asked this persona to address (targeted phase only).
-        #[serde(rename = "challenge", skip_serializing_if = "Option::is_none")]
-        challenge: Option<String>,
-    },
-
-    /// A debate round started.
-    DebateRoundStarted {
-        round: u32,
-        #[serde(rename = "totalRounds")]
-        total_rounds: u32,
-        /// "opening" | "discussion" | "targeted" | "final"
-        phase: String,
-    },
-
-    /// Emitted after the judge evaluates each round.
-    DebateJudgeDecision {
-        round: u32,
-        #[serde(rename = "consensusScore")]
-        consensus_score: f64,
-        decision: String,
-        #[serde(rename = "speakingOrder")]
-        speaking_order: Vec<String>,
-        reasoning: String,
-    },
-
-    /// A debate round completed with all persona responses.
-    DebateRoundCompleted {
-        round: u32,
-        #[serde(rename = "consensusScore")]
-        consensus_score: f64,
-    },
-
-    /// Consensus was reached — debate terminates early.
-    ConsensusReached {
-        round: u32,
-        #[serde(rename = "consensusScore")]
-        consensus_score: f64,
-        summary: String,
-    },
-
     /// Live context was injected mid-execution (e.g., memory promoted during ReAct loop).
     ContextReassembled {
         updates: Vec<crate::execution::live_context_refresher::ContextReassembledUpdate>,

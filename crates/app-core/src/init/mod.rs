@@ -281,7 +281,6 @@ impl AppCore {
         // ── Phase 3: Agent ───────────────────────────────────────────────
         let agent::AgentResult {
             cognitive_provider,
-            persona_manager,
             agent,
             inbound_rx,
             pipeline_broadcast_tx,
@@ -1125,7 +1124,6 @@ impl AppCore {
             storage_pool: storage_pool.clone(),
             agent: Arc::clone(&agent),
             bus: bus.clone(),
-            persona_manager,
             config: Arc::clone(&shared_config),
             hot_config: Arc::clone(&hot_config),
             channel_manager: channel_manager.clone(),
@@ -1191,8 +1189,6 @@ impl AppCore {
             knowledge_atom_repo: Some(::cognitive::KnowledgeAtomRepo::new(
                 storage_pool.inner().clone(),
             )),
-            persona_repo: Some(::cognitive::PersonaRepo::new(storage_pool.inner().clone())),
-            squad_repo: Some(::cognitive::SquadRepo::new(storage_pool.inner().clone())),
             review_session_repo: Some(::cognitive::ReviewSessionRepo::new(
                 storage_pool.inner().clone(),
             )),

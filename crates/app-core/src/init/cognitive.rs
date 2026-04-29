@@ -17,18 +17,6 @@ pub(super) async fn init_cognitive(
     shutdown_token: &CancellationToken,
     embedding_engine: Arc<tools::EmbeddingEngine>,
 ) {
-    // Seed builtin personas (idempotent, safe on every startup)
-    let persona_repo = cognitive::repos::PersonaRepo::new(storage_pool.inner().clone());
-    if let Err(e) = persona_repo.seed_builtins().await {
-        warn!("Failed to seed builtin personas: {e}");
-    }
-
-    // Seed builtin squads (idempotent, safe on every startup)
-    let squad_repo = cognitive::SquadRepo::new(storage_pool.inner().clone());
-    if let Err(e) = squad_repo.seed_builtins().await {
-        warn!("Failed to seed builtin squads: {e}");
-    }
-
     // Seed compiled default skills to disk on first run (skills dir empty).
     // Records v1 in skill_versions for each seeded file so the Reforge cycle
     // can detect user edits against the known baseline.

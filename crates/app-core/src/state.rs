@@ -2,7 +2,7 @@ use std::sync::atomic::AtomicI32;
 use std::sync::Arc;
 
 use crate::handlers::launcher::LauncherSearchEngine;
-use agent::{AgentLoop, PersonaManager};
+use agent::AgentLoop;
 use bus::{DomainEventBus, MessageBus};
 use channels::ChannelManager;
 use cognitive::situation::UserSituation;
@@ -43,7 +43,6 @@ pub struct AppCore {
     pub storage_pool: StoragePool,
     pub agent: Arc<AgentLoop>,
     pub bus: Arc<MessageBus>,
-    pub persona_manager: Arc<RwLock<PersonaManager>>,
     pub config: Arc<RwLock<config::Config>>,
     /// Shared hot-reloadable config subset — updated by file watcher and settings handlers.
     pub hot_config: Arc<RwLock<config::HotConfig>>,
@@ -119,10 +118,6 @@ pub struct AppCore {
     pub flashcard_repo: Option<cognitive::FlashcardRepo>,
     /// Knowledge atom repo (None when cognitive feature unavailable).
     pub knowledge_atom_repo: Option<cognitive::KnowledgeAtomRepo>,
-    /// Persona repo for Insight Review personas (None when cognitive feature unavailable).
-    pub persona_repo: Option<cognitive::PersonaRepo>,
-    /// Squad repo for Insight Review persona squads (None when cognitive feature unavailable).
-    pub squad_repo: Option<cognitive::SquadRepo>,
     /// Review session repo for active recall sessions (None when cognitive feature unavailable).
     pub review_session_repo: Option<cognitive::ReviewSessionRepo>,
     /// Deck preference repo for per-deck answer mode settings (None when cognitive feature unavailable).
@@ -278,14 +273,6 @@ impl AppCore {
         self.domain_event_bus
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "domain event bus is not available"))
-    }
-
-    /// Return persona repo or a "not available" error.
-    #[tracing::instrument(skip(self), err)]
-    pub fn persona_repo(&self) -> Result<&cognitive::PersonaRepo, ApiError> {
-        self.persona_repo
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Persona repo not available"))
     }
 
     /// Return flashcard repo or a "not available" error.

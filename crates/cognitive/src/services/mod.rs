@@ -25,7 +25,6 @@ pub mod graph_linker_types;
 pub mod graph_retrieval;
 pub mod hierarchical_compressor;
 pub mod louvain;
-pub mod memory_promotion;
 pub mod memory_retriever;
 pub mod micro_reforge;
 pub mod ppr_retrieval;

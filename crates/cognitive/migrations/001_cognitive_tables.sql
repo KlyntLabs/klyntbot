@@ -394,67 +394,6 @@ CREATE INDEX IF NOT EXISTS idx_relationships_source ON entity_relationships(sour
 CREATE INDEX IF NOT EXISTS idx_relationships_target ON entity_relationships(target_entity_id);
 CREATE INDEX IF NOT EXISTS idx_relationships_type ON entity_relationships(relationship_type);
 
--- ── Persona Registry ────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS insight_personas (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    role TEXT NOT NULL,
-    expertise TEXT NOT NULL,
-    perspective TEXT NOT NULL,
-    tone TEXT NOT NULL DEFAULT 'analytical',
-    icon TEXT NOT NULL DEFAULT '🧠',
-    source TEXT NOT NULL DEFAULT 'builtin',
-    domains JSON NOT NULL DEFAULT '[]',
-    is_active INTEGER NOT NULL DEFAULT 1,
-    relevance_score REAL NOT NULL DEFAULT 0.5,
-    skill_path          TEXT,
-    questioning_style   TEXT NOT NULL DEFAULT 'analytical',
-    cognitive_bias      TEXT NOT NULL DEFAULT 'balanced',
-    analysis_frameworks TEXT NOT NULL DEFAULT '[]',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_personas_source ON insight_personas(source);
-CREATE INDEX IF NOT EXISTS idx_personas_active ON insight_personas(is_active);
-
-CREATE TABLE IF NOT EXISTS insight_persona_pins (
-    note_id TEXT NOT NULL,
-    persona_id TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (note_id, persona_id)
-);
-
--- ── Squads ──────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS squads (
-    id                  TEXT PRIMARY KEY,
-    name                TEXT NOT NULL,
-    description         TEXT NOT NULL DEFAULT '',
-    icon                TEXT NOT NULL DEFAULT '',
-    orchestrator_skill  TEXT NOT NULL DEFAULT 'general',
-    source              TEXT NOT NULL DEFAULT 'user',
-    domains             TEXT NOT NULL DEFAULT '[]',
-    is_active           INTEGER NOT NULL DEFAULT 1,
-    default_interaction_mode TEXT NOT NULL DEFAULT 'lead',
-    last_smart_mode     TEXT,
-    last_smart_updated  TEXT,
-    created_at          TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_squads_name_user
-    ON squads(name) WHERE source = 'user';
-
-CREATE TABLE IF NOT EXISTS squad_members (
-    squad_id        TEXT NOT NULL REFERENCES squads(id) ON DELETE CASCADE,
-    persona_id      TEXT NOT NULL,
-    role_in_squad   TEXT NOT NULL DEFAULT 'member',
-    sort_order      INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (squad_id, persona_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_squad_members_persona ON squad_members(persona_id);
 
 -- ── Knowledge Topics ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS knowledge_topics (
@@ -608,47 +547,6 @@ CREATE TABLE IF NOT EXISTS insight_progress_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_progress_insight ON insight_progress_snapshots(insight_review_id, version);
 
--- ── Blackboard (Phase 3: transient shared working memory for debate) ────
-CREATE TABLE IF NOT EXISTS blackboard_entries (
-    id          TEXT PRIMARY KEY,
-    session_key TEXT NOT NULL,
-    squad_id    TEXT NOT NULL,
-    round       INTEGER NOT NULL,
-    persona_id  TEXT NOT NULL,
-    persona_name TEXT NOT NULL,
-    entry_type  TEXT NOT NULL DEFAULT 'observation',
-    content     TEXT NOT NULL,
-    confidence  REAL NOT NULL DEFAULT 0.5,
-    references_entry_id TEXT,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_blackboard_session ON blackboard_entries(session_key, round);
-CREATE INDEX IF NOT EXISTS idx_blackboard_squad ON blackboard_entries(squad_id);
-CREATE INDEX IF NOT EXISTS idx_blackboard_session_key
-    ON blackboard_entries(session_key);
-CREATE INDEX IF NOT EXISTS idx_blackboard_created_at
-    ON blackboard_entries(created_at);
-
--- ── Persona Accuracy (Phase 3: FSRS-based persona learning) ─────────
-CREATE TABLE IF NOT EXISTS persona_accuracy (
-    id              TEXT PRIMARY KEY,
-    persona_id      TEXT NOT NULL,
-    squad_id        TEXT NOT NULL,
-    domain          TEXT NOT NULL DEFAULT 'general',
-    total_debates   INTEGER NOT NULL DEFAULT 0,
-    consensus_hits  INTEGER NOT NULL DEFAULT 0,
-    stability       REAL NOT NULL DEFAULT 1.0,
-    difficulty      REAL NOT NULL DEFAULT 5.0,
-    last_debate_at  TEXT,
-    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(persona_id, squad_id, domain)
-);
-
-CREATE INDEX IF NOT EXISTS idx_persona_accuracy_persona ON persona_accuracy(persona_id);
-CREATE INDEX IF NOT EXISTS idx_persona_accuracy_lookup
-    ON persona_accuracy(persona_id, squad_id, domain);
 
 -- Coaching intervention history (persistent log for dashboard + retroactive feedback)
 CREATE TABLE IF NOT EXISTS coaching_intervention_log (

@@ -28,7 +28,6 @@ pub mod learning;
 #[cfg(test)]
 mod notes_integration_tests;
 pub mod output;
-pub mod persona;
 pub mod subagent;
 
 // ── Skill loader re-export (moved into agent_profile/) ──────────────────────
@@ -54,7 +53,6 @@ pub use execution::{CycleOutcome, ExecutionCore, ExecutionParams, ToolExecutionR
 pub use finance::FinanceHandlerImpl;
 pub use learning::LearningService;
 pub use learning_handler::LearningHandlerImpl;
-pub use persona::{PersonaChain, PersonaManager, PersonaScope};
 pub use productivity::ProductivityHandlerImpl;
 pub use progress::ProgressHandlerImpl;
 pub use recurring_tasks::RecurringTaskSpawner;
