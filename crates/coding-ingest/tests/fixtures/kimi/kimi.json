@@ -1,0 +1,9 @@
+{
+  "work_dirs": [
+    {
+      "path": "/tmp/kimi-fixture-repo",
+      "kaos": "local",
+      "last_session_id": null
+    }
+  ]
+}
