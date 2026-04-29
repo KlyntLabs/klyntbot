@@ -7639,6 +7639,77 @@ dependencies = [
 ]
 
 [[package]]
+name = "klynt-core"
+version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "common",
+ "klynt-execpolicy",
+ "klynt-hooks",
+ "klynt-protocol",
+ "klynt-sandbox",
+ "klynt-skill-loader",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tools-core",
+]
+
+[[package]]
+name = "klynt-execpolicy"
+version = "0.0.1"
+dependencies = [
+ "common",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "klynt-hooks"
+version = "0.0.1"
+dependencies = [
+ "common",
+ "serde",
+ "tokio",
+ "toml 0.8.2",
+]
+
+[[package]]
+name = "klynt-protocol"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "klynt-sandbox"
+version = "0.0.1"
+dependencies = [
+ "common",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "klynt-sandbox-helper"
+version = "0.0.1"
+dependencies = [
+ "common",
+]
+
+[[package]]
+name = "klynt-skill-loader"
+version = "0.0.1"
+dependencies = [
+ "common",
+ "globset",
+ "serde",
+ "serde_yaml",
+ "skill-system",
+]
+
+[[package]]
 name = "klyntbot"
 version = "0.1.1"
 dependencies = [
