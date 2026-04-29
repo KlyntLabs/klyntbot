@@ -92,6 +92,19 @@ pub trait Tool: Send + Sync {
         ToolMetadata::default()
     }
 
+    /// Whether this tool can be safely dispatched in parallel with other
+    /// `is_concurrency_safe == true` tools in the same iteration.
+    ///
+    /// Returns `false` by default. Override to `true` for read-only tools
+    /// (e.g., `read`, `glob`, `grep`, `recall_*`) that have no observable
+    /// side effects on the filesystem, network, or shared mutable state.
+    ///
+    /// The execution loop partitions tool calls by this flag: safe tools
+    /// run via `futures::future::join_all`; unsafe tools run sequentially.
+    fn is_concurrency_safe(&self, _args: &Value) -> bool {
+        false
+    }
+
     /// Optional per-tool timeout override.
     ///
     /// When `Some(duration)`, the execution core uses this instead of the
@@ -149,6 +162,51 @@ impl From<String> for ToolOutput {
 impl From<&str> for ToolOutput {
     fn from(s: &str) -> Self {
         ToolOutput::Text(s.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// Minimal Tool fixture for trait-default testing.
+    struct DefaultsTool;
+
+    #[async_trait]
+    impl Tool for DefaultsTool {
+        fn name(&self) -> &str { "defaults" }
+        fn description(&self) -> &str { "fixture" }
+        fn parameters(&self) -> Value { json!({"type": "object"}) }
+        async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
+            Ok(String::new())
+        }
+    }
+
+    #[test]
+    fn is_concurrency_safe_defaults_to_false() {
+        let t = DefaultsTool;
+        assert!(!t.is_concurrency_safe(&json!({})));
+    }
+
+    /// Tool that explicitly opts into concurrency-safe.
+    struct ReadOnlyTool;
+
+    #[async_trait]
+    impl Tool for ReadOnlyTool {
+        fn name(&self) -> &str { "readonly" }
+        fn description(&self) -> &str { "fixture" }
+        fn parameters(&self) -> Value { json!({"type": "object"}) }
+        async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
+            Ok(String::new())
+        }
+        fn is_concurrency_safe(&self, _args: &Value) -> bool { true }
+    }
+
+    #[test]
+    fn is_concurrency_safe_can_be_overridden_to_true() {
+        let t = ReadOnlyTool;
+        assert!(t.is_concurrency_safe(&json!({})));
     }
 }
 
