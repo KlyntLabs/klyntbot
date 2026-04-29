@@ -9,6 +9,8 @@ use serde_json::json;
 
 use cognitive::extraction::ExtractedFact;
 use cognitive::types::{MemoryOp, Observation};
+use cognitive::services::extraction_critic::ExtractionCriticHandler;
+use cognitive::services::extraction_critic_types::*;
 use cognitive::services::micro_reforge::MicroReforgeHandler;
 use cognitive::services::micro_reforge_types::{MicroReforgeInput, MicroReforgeOutput};
 use cognitive::{ConsolidationHandler, ExtractionHandler};
@@ -1070,6 +1072,55 @@ impl CoachingReasonerHandler for LlmCoachingReasonerHandler {
     }
 }
 
+// ── Extraction critic handler (KCA Track 5) ────────────────────────────────
+
+pub(crate) const EXTRACTION_CRITIC_SYSTEM_PROMPT: &str = r#"You are a fact-extraction critic.
+
+You receive a turn of conversation and a list of facts that another system extracted from it. For each fact, decide:
+- "grounded": the fact is directly stated or strongly implied in the turn text.
+- "hallucinated": the fact contains information not present in the turn text. Includes invented entity names, fabricated numbers, or claims the user did not make.
+- "ambiguous": evidence is partial or could be read either way; do not penalize.
+
+Also report any FACTS that the extractor MISSED — but only those clearly stated in the turn (≤3 missed facts).
+
+Output JSON:
+{"verdicts": [{"fact_id": "...", "verdict": "grounded|hallucinated|ambiguous", "reason": "..."}], "missed_facts": [{"subject": "...", "predicate": "...", "object": "...", "confidence": 0.0-1.0}]}
+
+Be strict on hallucinated but conservative on missed_facts — only include the obvious ones."#;
+
+pub struct LlmExtractionCriticHandler {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmExtractionCriticHandler {
+    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
+        Self { provider, params }
+    }
+}
+
+#[async_trait]
+impl ExtractionCriticHandler for LlmExtractionCriticHandler {
+    async fn judge(&self, input: ExtractionCriticInput) -> common::Result<ExtractionCriticOutput> {
+        if input.extracted_facts.is_empty() { return Ok(Default::default()); }
+        let user = serde_json::to_string(&input)
+            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("critic serialize: {e}"))))?;
+        let messages = vec![
+            Message::System { content: EXTRACTION_CRITIC_SYSTEM_PROMPT.to_string() },
+            Message::User { content: providers::UserContent::Text(user) },
+        ];
+        let resp = self.provider.chat(&messages, None, &self.params).await
+            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("critic: {e}"))))?;
+        match serde_json::from_str::<ExtractionCriticOutput>(&resp.content.unwrap_or_default()) {
+            Ok(o) => Ok(o),
+            Err(e) => {
+                tracing::warn!(error = %e, "critic: parse failed");
+                Ok(Default::default())
+            }
+        }
+    }
+}
+
 // ── Micro-Reforge handler (KCA Track 4) ────────────────────────────────────
 
 pub(crate) const MICRO_REFORGE_SYSTEM_PROMPT: &str = r#"You are a procedural-rule synthesizer running mid-session.
@@ -1724,5 +1775,42 @@ mod tests {
         let out = handler.synthesize(input).await.unwrap();
         assert_eq!(out.proposed_rules.len(), 1);
         assert!(out.proposed_rules[0].confidence > 0.8);
+    }
+
+    #[tokio::test]
+    async fn llm_extraction_critic_marks_hallucinated_facts() {
+        use cognitive::services::extraction_critic_types::*;
+        use cognitive::services::extraction_critic::ExtractionCriticHandler;
+
+        let json = r#"{
+            "verdicts": [
+                {"fact_id": "f1", "verdict": "grounded", "reason": "directly stated"},
+                {"fact_id": "f2", "verdict": "hallucinated", "reason": "not in turn text"}
+            ],
+            "missed_facts": []
+        }"#;
+        let provider = MockProvider::new(LlmResponse {
+            content: Some(json.to_string()),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cache_read_tokens: 0, cache_write_tokens: 0 },
+            reasoning_content: None,
+        });
+        let handler = LlmExtractionCriticHandler::new(
+            Arc::new(provider),
+            ChatParams::new("m").with_max_tokens(1024),
+        );
+
+        let input = ExtractionCriticInput {
+            turn_text: "I love Rust.".into(),
+            extracted_facts: vec![
+                FactRef { fact_id: "f1".into(), subject: "user".into(), predicate: "loves".into(), object: "Rust".into() },
+                FactRef { fact_id: "f2".into(), subject: "user".into(), predicate: "hates".into(), object: "Java".into() },
+            ],
+        };
+
+        let out = handler.judge(input).await.unwrap();
+        assert_eq!(out.verdicts.len(), 2);
+        assert_eq!(out.verdicts[1].verdict, "hallucinated");
     }
 }
