@@ -1091,7 +1091,7 @@ impl AgentLoop {
         let (interaction_tx, interaction_rx) = mpsc::channel(4);
 
         // Routing context with interaction channel for ask_user tool
-        let mut routing_ctx = RoutingContext::with_interaction(
+        let routing_ctx = RoutingContext::with_interaction(
             "cli".into(),
             session_key.clone().into(),
             interaction_tx,

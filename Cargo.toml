@@ -252,8 +252,6 @@ debug = false  # Deps don't need debug info — saves ~4GB of DWARF sections.
 
 [profile.dev.package.arrow]
 opt-level = 3
-[profile.dev.package.arrow2]
-opt-level = 3
 [profile.dev.package.arrow-array]
 opt-level = 3
 [profile.dev.package.arrow-buffer]
