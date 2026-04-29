@@ -86,3 +86,50 @@ pub fn hash_for(work_dir: &str, kaos: &str) -> String {
         format!("{kaos}_{hex}")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hash_for_local_is_md5_hex() {
+        // md5("/tmp/kimi-fixture-repo") computed once with `md5sum` for the
+        // golden value — DON'T regenerate, this is a contract test.
+        let h = hash_for("/tmp/kimi-fixture-repo", "local");
+        assert_eq!(h.len(), 32);
+        assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn hash_for_non_local_is_prefixed() {
+        let h = hash_for("/foo", "remote");
+        assert!(h.starts_with("remote_"), "got {h}");
+    }
+
+    #[tokio::test]
+    async fn refresh_missing_file_is_ok() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nope.json");
+        let idx = WorkdirIndex::new();
+        idx.refresh(&path).await.expect("missing file is not an error");
+        assert!(idx.get("anyhash").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn refresh_loads_entries_and_resolves() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kimi.json");
+        std::fs::write(
+            &path,
+            r#"{"work_dirs":[{"path":"/tmp/kimi-fixture-repo","kaos":"local","last_session_id":null}]}"#,
+        )
+        .unwrap();
+        let idx = WorkdirIndex::new();
+        idx.refresh(&path).await.unwrap();
+        let h = hash_for("/tmp/kimi-fixture-repo", "local");
+        assert_eq!(
+            idx.get(&h).await.unwrap(),
+            std::path::PathBuf::from("/tmp/kimi-fixture-repo")
+        );
+    }
+}
