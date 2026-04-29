@@ -52,3 +52,26 @@ pub(crate) fn build_community_intelligence_handler(
         ) as Box<dyn cognitive::services::reforge::CommunityIntelligenceHandler>
     })
 }
+
+/// Build a [`MicroReforgeHandler`] for KCA Track 4.
+///
+/// Returns an LLM-backed handler when a provider is available, a no-op fallback otherwise.
+pub(crate) fn build_micro_reforge_handler(
+    cognitive_provider: &Option<providers::DynProvider>,
+    config: &config::Config,
+) -> std::sync::Arc<dyn cognitive::services::micro_reforge::MicroReforgeHandler> {
+    if let Some(ref cp) = cognitive_provider {
+        let model = config.cognitive.micro_reforge.model.clone()
+            .unwrap_or_else(|| config.cognitive.model.clone().unwrap_or_else(|| config.agents.defaults.model.clone()));
+        let params = providers::ChatParams::new(model)
+            .with_temperature(0.2)
+            .with_max_tokens(4096)
+            .with_response_format(providers::ResponseFormat::JsonObject);
+        std::sync::Arc::new(agent::adapters::cognitive_handlers::LlmMicroReforgeHandler::new(
+            cp.clone(),
+            params,
+        ))
+    } else {
+        std::sync::Arc::new(cognitive::services::micro_reforge::NoopMicroReforgeHandler)
+    }
+}
