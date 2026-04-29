@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 use coding_memory::reforge::{CodingSynthesisHandler, CodingSynthesisInput, CodingSynthesisOutput};
-use common::{KlyntbotError, ProviderError, Result};
+use common::Result;
 use providers::{ChatParams, DynProvider, Message, ResponseFormat};
 use tracing::warn;
 
@@ -97,7 +97,7 @@ Refuse to promote anything with confidence < 0.7. Reference ids only — never i
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use common::ProviderError;
+
     use providers::{LlmProvider, LlmResponse, ProviderCapabilities, ProviderHealth, Usage};
     use serde_json::Value;
     use std::sync::Arc;

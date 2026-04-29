@@ -561,35 +561,33 @@ impl ExecutionCore {
                         // Limit concurrent tool executions to prevent runaway parallelism.
                         let _permit = semaphore.acquire().await.expect("semaphore closed");
 
-                        // Snapshot args for execution; move original into ToolStart event.
-                        let args_for_tool = args.clone();
-
                         // Emit ToolStart BEFORE executing
                         if let Some(ref tx) = tx {
                             let _ = tx
                                 .send(crate::events::AgentEvent::ToolStart {
                                     name: name.clone(),
-                                    args,
+                                    args: args.clone(),
                                     agent: None,
                                 })
                                 .await;
                         }
 
                         let start = Instant::now();
+                        let args_snapshot = args.clone();
                         // Look up the tool and release the read lock BEFORE executing.
                         // This prevents deadlocks when a tool (e.g., delegate) needs
                         // write access to the registry during execution.
                         let exec_result = tokio::time::timeout(timeout_dur, async {
                             let tool = {
                                 let reg = registry.read().await;
-                                reg.prepare(&name, &args_for_tool, &ctx)?
+                                reg.prepare(&name, &args, &ctx)?
                             };
                             // Run interceptor chain before executing (if configured)
                             if let Some(ref chain) = interceptor_chain {
-                                chain.check(&name, &args_for_tool, None).await?;
+                                chain.check(&name, &args, None).await?;
                             }
                             // Read lock is dropped — safe for tools that re-enter the registry
-                            tool.execute(args_for_tool, &ctx).await
+                            tool.execute(args, &ctx).await
                         })
                         .await;
                         let duration_ms = start.elapsed().as_millis() as u64;
@@ -636,7 +634,7 @@ impl ExecutionCore {
                         ToolExecutionResult {
                             tool_call_id: id,
                             tool_name: name,
-                            arguments: args_for_tool,
+                            arguments: args_snapshot,
                             result: result_str,
                             duration_ms,
                             success,

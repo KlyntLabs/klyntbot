@@ -50,196 +50,15 @@ pub struct CostTracker {
     monthly_budget_usd: Option<f64>,
 }
 
-/// Per-million-token pricing for a model.
-struct ModelPricing {
-    input: f64,
-    output: f64,
-    cache_read: f64,
-    cache_write: f64,
-}
-
-/// Get pricing for a model by exact ID match, then substring fallback.
-fn model_pricing(model: &str) -> ModelPricing {
-    let m = model.to_lowercase();
-
-    // Exact match table (checked first).
-    // "Prices last verified" dates indicate when each section was last checked
-    // against provider pricing pages. Update on each pricing change.
-    match m.as_str() {
-        // ── Anthropic Claude 4.x ── prices last verified: 2026-03-13
-        "claude-opus-4-6" | "claude-opus-4" | "claude-opus-4-20250514" => ModelPricing {
-            input: 15.0,
-            output: 75.0,
-            cache_read: 1.50,
-            cache_write: 18.75,
-        },
-        "claude-sonnet-4-6"
-        | "claude-sonnet-4-5"
-        | "claude-sonnet-4"
-        | "claude-sonnet-4-20250514" => ModelPricing {
-            input: 3.0,
-            output: 15.0,
-            cache_read: 0.30,
-            cache_write: 3.75,
-        },
-        "claude-haiku-4-5" | "claude-haiku-4-5-20251001" => ModelPricing {
-            input: 0.80,
-            output: 4.0,
-            cache_read: 0.08,
-            cache_write: 1.0,
-        },
-        // ── Anthropic Claude 3.5 ── prices last verified: 2026-03-13
-        "claude-3-5-sonnet-20241022" | "claude-3-5-sonnet-latest" => ModelPricing {
-            input: 3.0,
-            output: 15.0,
-            cache_read: 0.30,
-            cache_write: 3.75,
-        },
-        "claude-3-5-haiku-20241022" | "claude-3-5-haiku-latest" => ModelPricing {
-            input: 0.80,
-            output: 4.0,
-            cache_read: 0.08,
-            cache_write: 1.0,
-        },
-        // ── Anthropic Claude 3 ── prices last verified: 2026-03-13
-        "claude-3-haiku-20240307" => ModelPricing {
-            input: 0.25,
-            output: 1.25,
-            cache_read: 0.03,
-            cache_write: 0.30,
-        },
-        // ── OpenAI GPT-4o family ── prices last verified: 2026-03-13
-        "gpt-4o" | "gpt-4o-2024-11-20" | "gpt-4o-2024-08-06" => ModelPricing {
-            input: 2.50,
-            output: 10.0,
-            cache_read: 1.25,
-            cache_write: 0.0,
-        },
-        "gpt-4o-mini" | "gpt-4o-mini-2024-07-18" => ModelPricing {
-            input: 0.15,
-            output: 0.60,
-            cache_read: 0.075,
-            cache_write: 0.0,
-        },
-        // ── Google Gemini ── prices last verified: 2026-03-13
-        "gemini-2.0-flash" | "gemini-2.0-flash-001" => ModelPricing {
-            input: 0.10,
-            output: 0.40,
-            cache_read: 0.025,
-            cache_write: 0.0,
-        },
-        "gemini-1.5-pro" | "gemini-1.5-pro-002" => ModelPricing {
-            input: 1.25,
-            output: 5.0,
-            cache_read: 0.315,
-            cache_write: 0.0,
-        },
-        "gemini-1.5-flash" | "gemini-1.5-flash-002" => ModelPricing {
-            input: 0.075,
-            output: 0.30,
-            cache_read: 0.01875,
-            cache_write: 0.0,
-        },
-        // ── DeepSeek ── prices last verified: 2026-03-13
-        "deepseek-chat" | "deepseek-v3" => ModelPricing {
-            input: 0.27,
-            output: 1.10,
-            cache_read: 0.07,
-            cache_write: 0.0,
-        },
-        "deepseek-reasoner" | "deepseek-r1" => ModelPricing {
-            input: 0.55,
-            output: 2.19,
-            cache_read: 0.14,
-            cache_write: 0.0,
-        },
-        // ── Mistral ── prices last verified: 2026-03-13
-        "mistral-large-latest" => ModelPricing {
-            input: 2.0,
-            output: 6.0,
-            cache_read: 0.0,
-            cache_write: 0.0,
-        },
-        "mistral-small-latest" => ModelPricing {
-            input: 0.10,
-            output: 0.30,
-            cache_read: 0.0,
-            cache_write: 0.0,
-        },
-        _ => substring_fallback(&m),
-    }
-}
-
-/// Fallback pricing using substring matching for unknown exact model IDs.
-fn substring_fallback(model: &str) -> ModelPricing {
-    if model.contains("opus") {
-        ModelPricing {
-            input: 15.0,
-            output: 75.0,
-            cache_read: 1.50,
-            cache_write: 18.75,
-        }
-    } else if model.contains("sonnet") {
-        ModelPricing {
-            input: 3.0,
-            output: 15.0,
-            cache_read: 0.30,
-            cache_write: 3.75,
-        }
-    } else if model.contains("haiku") {
-        // Default to 3.5/4.x Haiku pricing — more recent and commonly used.
-        // claude-3-haiku is matched exactly above; unknown haiku variants skew newer.
-        ModelPricing {
-            input: 0.80,
-            output: 4.0,
-            cache_read: 0.08,
-            cache_write: 1.0,
-        }
-    } else if model.contains("gpt-4o-mini") {
-        ModelPricing {
-            input: 0.15,
-            output: 0.60,
-            cache_read: 0.075,
-            cache_write: 0.0,
-        }
-    } else if model.contains("gpt-4o") {
-        ModelPricing {
-            input: 2.50,
-            output: 10.0,
-            cache_read: 1.25,
-            cache_write: 0.0,
-        }
-    } else if model.contains("gemini") {
-        ModelPricing {
-            input: 0.10,
-            output: 0.40,
-            cache_read: 0.025,
-            cache_write: 0.0,
-        }
-    } else if model.contains("deepseek") {
-        ModelPricing {
-            input: 0.27,
-            output: 1.10,
-            cache_read: 0.07,
-            cache_write: 0.0,
-        }
-    } else {
-        ModelPricing {
-            input: 0.0,
-            output: 0.0,
-            cache_read: 0.0,
-            cache_write: 0.0,
-        }
-    }
-}
-
 pub fn estimate_cost(usage: &Usage, model: &str) -> f64 {
-    let pricing = model_pricing(model);
-    let input_cost = (usage.prompt_tokens as f64 / 1_000_000.0) * pricing.input;
-    let output_cost = (usage.completion_tokens as f64 / 1_000_000.0) * pricing.output;
-    let cache_read_cost = (usage.cache_read_tokens as f64 / 1_000_000.0) * pricing.cache_read;
-    let cache_write_cost = (usage.cache_write_tokens as f64 / 1_000_000.0) * pricing.cache_write;
-    input_cost + output_cost + cache_read_cost + cache_write_cost
+    common::pricing::cost_with_cache_for(
+        model,
+        usage.prompt_tokens as u64,
+        usage.completion_tokens as u64,
+        usage.cache_read_tokens as u64,
+        usage.cache_write_tokens as u64,
+    )
+    .unwrap_or(0.0)
 }
 
 impl CostTracker {
@@ -407,69 +226,6 @@ mod tests {
     }
 
     #[test]
-    fn test_model_pricing_haiku_exact() {
-        // claude-3-haiku has its own exact-match entry at the lower legacy price
-        let pricing = model_pricing("claude-3-haiku-20240307");
-        assert!((pricing.input - 0.25).abs() < 0.001);
-        assert!((pricing.output - 1.25).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_model_pricing_haiku_fallback_uses_newer_price() {
-        // Unknown haiku variants should default to the newer 3.5/4.x rate
-        let pricing = model_pricing("claude-haiku-future-xyz");
-        assert!((pricing.input - 0.80).abs() < 0.001);
-        assert!((pricing.output - 4.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_model_pricing_claude4x_variants() {
-        // All Claude 4.x Sonnet aliases should have the same pricing
-        for id in &["claude-sonnet-4-6", "claude-sonnet-4-5", "claude-sonnet-4"] {
-            let pricing = model_pricing(id);
-            assert!(
-                (pricing.input - 3.0).abs() < 0.001,
-                "{id}: unexpected input price"
-            );
-            assert!(
-                (pricing.output - 15.0).abs() < 0.001,
-                "{id}: unexpected output price"
-            );
-        }
-        // Haiku 4.5
-        let h = model_pricing("claude-haiku-4-5-20251001");
-        assert!((h.input - 0.80).abs() < 0.001);
-        // Opus 4.6
-        let o = model_pricing("claude-opus-4-6");
-        assert!((o.input - 15.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_model_pricing_gpt4o() {
-        let pricing = model_pricing("gpt-4o");
-        assert!((pricing.input - 2.50).abs() < 0.001);
-        assert!((pricing.output - 10.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_model_pricing_gpt4o_mini_separate() {
-        let pricing = model_pricing("gpt-4o-mini");
-        assert!((pricing.input - 0.15).abs() < 0.001);
-        assert!((pricing.output - 0.60).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_gpt4o_mini_has_own_pricing() {
-        let pricing = model_pricing("gpt-4o-mini");
-        // gpt-4o-mini should NOT match gpt-4o pricing
-        assert!(
-            pricing.input < 1.0,
-            "gpt-4o-mini input should be < $1/MTok, got {}",
-            pricing.input
-        );
-    }
-
-    #[test]
     fn test_cache_tokens_included_in_cost() {
         let usage = Usage {
             prompt_tokens: 100_000,
@@ -484,44 +240,9 @@ mod tests {
         // Cache write: 0.02M * $3.75 = $0.075
         // Total: $0.54
         assert!(
-            cost > 0.45,
+            (cost - 0.54).abs() < 0.001,
             "Cost should include cache tokens, got {}",
             cost
-        );
-    }
-
-    #[test]
-    fn test_gemini_pricing_exists() {
-        let pricing = model_pricing("gemini-2.0-flash");
-        assert!(pricing.input > 0.0, "Gemini should have non-zero pricing");
-    }
-
-    #[test]
-    fn test_deepseek_pricing_exists() {
-        let pricing = model_pricing("deepseek-chat");
-        assert!(pricing.input > 0.0, "DeepSeek should have non-zero pricing");
-    }
-
-    #[test]
-    fn test_substring_fallback_still_works_for_unknown_claude_variants() {
-        // An unknown Claude variant should fall through to substring matching
-        let pricing = model_pricing("claude-future-opus-xyz");
-        assert!(
-            pricing.input > 0.0,
-            "Unknown opus variant should get opus pricing via fallback"
-        );
-    }
-
-    #[test]
-    fn test_cache_read_rate_for_sonnet() {
-        let pricing = model_pricing("claude-sonnet-4");
-        assert!(
-            (pricing.cache_read - 0.30).abs() < 0.001,
-            "claude-sonnet-4 cache_read should be $0.30/MTok"
-        );
-        assert!(
-            (pricing.cache_write - 3.75).abs() < 0.001,
-            "claude-sonnet-4 cache_write should be $3.75/MTok"
         );
     }
 }
