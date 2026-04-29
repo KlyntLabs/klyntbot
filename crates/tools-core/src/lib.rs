@@ -175,9 +175,15 @@ mod tests {
 
     #[async_trait]
     impl Tool for DefaultsTool {
-        fn name(&self) -> &str { "defaults" }
-        fn description(&self) -> &str { "fixture" }
-        fn parameters(&self) -> Value { json!({"type": "object"}) }
+        fn name(&self) -> &str {
+            "defaults"
+        }
+        fn description(&self) -> &str {
+            "fixture"
+        }
+        fn parameters(&self) -> Value {
+            json!({"type": "object"})
+        }
         async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
             Ok(String::new())
         }
@@ -194,13 +200,21 @@ mod tests {
 
     #[async_trait]
     impl Tool for ReadOnlyTool {
-        fn name(&self) -> &str { "readonly" }
-        fn description(&self) -> &str { "fixture" }
-        fn parameters(&self) -> Value { json!({"type": "object"}) }
+        fn name(&self) -> &str {
+            "readonly"
+        }
+        fn description(&self) -> &str {
+            "fixture"
+        }
+        fn parameters(&self) -> Value {
+            json!({"type": "object"})
+        }
         async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
             Ok(String::new())
         }
-        fn is_concurrency_safe(&self, _args: &Value) -> bool { true }
+        fn is_concurrency_safe(&self, _args: &Value) -> bool {
+            true
+        }
     }
 
     #[test]

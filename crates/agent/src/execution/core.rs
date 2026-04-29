@@ -37,7 +37,8 @@ pub async fn fan_out_event(
         let _ = tx.send(evt.clone()).await;
     }
     if let Some(bus) = domain_bus {
-        let payload = serde_json::to_value(&evt).unwrap_or_else(|_| serde_json::json!({"type": "unknown"}));
+        let payload =
+            serde_json::to_value(&evt).unwrap_or_else(|_| serde_json::json!({"type": "unknown"}));
         bus.publish(bus::DomainEvent::Generic {
             kind: "agent_event".into(),
             payload,
