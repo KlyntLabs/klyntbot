@@ -8,6 +8,7 @@ pub mod atom_decay;
 pub mod atom_extraction;
 pub mod background;
 pub mod community_intelligence;
+pub mod community_membership_online;
 pub mod compaction;
 pub mod consolidation;
 pub mod context_source;

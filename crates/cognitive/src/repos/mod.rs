@@ -177,6 +177,12 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             description: "Extraction critic log for nightly re-evaluation (KCA Track 5)".to_string(),
             sql: include_str!("../../migrations/012_extraction_critic_log.sql").to_string(),
         },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 9,
+            description: "Entity-community membership for online clustering (KCA Track 11)".to_string(),
+            sql: include_str!("../../migrations/013_entity_community_members.sql").to_string(),
+        },
     ]
 }
 
