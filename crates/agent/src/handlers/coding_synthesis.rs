@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 use coding_memory::reforge::{CodingSynthesisHandler, CodingSynthesisInput, CodingSynthesisOutput};
-use common::Result;
+use common::{KlyntbotError, ProviderError, Result};
 use providers::{ChatParams, DynProvider, Message, ResponseFormat};
 use tracing::warn;
 

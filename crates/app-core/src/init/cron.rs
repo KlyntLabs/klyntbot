@@ -170,6 +170,9 @@ const JOB_LAUNCHER_USAGE_PRUNE: &str = "__klyntbot_launcher_usage_prune";
 const JOB_LAUNCHER_ATTENTION_REBUILD: &str = "__klyntbot_launcher_attention_rebuild";
 const JOB_REFORGE_NIGHTLY: &str = "__klyntbot_reforge_nightly";
 const JOB_MICRO_REFORGE: &str = "__klyntbot_micro_reforge";
+const JOB_EPISODIC_ROLLUP_HOURLY: &str = "__klyntbot_episodic_rollup_hourly";
+const JOB_EPISODIC_ROLLUP_DAILY: &str = "__klyntbot_episodic_rollup_daily";
+const JOB_EPISODIC_ROLLUP_WEEKLY: &str = "__klyntbot_episodic_rollup_weekly";
 const JOB_FSRS_OPTIMIZE: &str = "__klyntbot_fsrs_optimize_weekly";
 
 /// Register individual cron handlers.
@@ -815,6 +818,135 @@ fn register_cron_callbacks(
         );
     }
 
+    // ── episodic rollup hourly ───────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let cog_config = config.clone();
+        let cog_provider = cognitive_provider.clone();
+        let rt = rt.clone();
+        cron_executor.register(
+            JOB_EPISODIC_ROLLUP_HOURLY,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                let cog_config = cog_config.clone();
+                let cog_provider = cog_provider.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        if !cog_config.cognitive.hierarchical.enabled {
+                            return Ok(None);
+                        }
+                        let repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
+                        let summarizer = crate::handlers::cognitive::build_hierarchical_summarizer(
+                            &cog_provider,
+                            &cog_config,
+                        );
+                        match cognitive::services::hierarchical_compressor::roll_up_hourly(
+                            &repo,
+                            summarizer,
+                        )
+                        .await
+                        {
+                            Ok(n) => {
+                                info!(created = n, "hierarchical rollup hourly done");
+                                Ok(Some(format!("Hierarchical hourly: {} buckets created", n)))
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "hierarchical rollup hourly failed");
+                                Ok(Some(format!("Hierarchical hourly failed: {e}")))
+                            }
+                        }
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── episodic rollup daily ────────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let cog_config = config.clone();
+        let cog_provider = cognitive_provider.clone();
+        let rt = rt.clone();
+        cron_executor.register(
+            JOB_EPISODIC_ROLLUP_DAILY,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                let cog_config = cog_config.clone();
+                let cog_provider = cog_provider.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        if !cog_config.cognitive.hierarchical.enabled {
+                            return Ok(None);
+                        }
+                        let repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
+                        let summarizer = crate::handlers::cognitive::build_hierarchical_summarizer(
+                            &cog_provider,
+                            &cog_config,
+                        );
+                        match cognitive::services::hierarchical_compressor::roll_up_daily(
+                            &repo,
+                            summarizer,
+                        )
+                        .await
+                        {
+                            Ok(n) => {
+                                info!(created = n, "hierarchical rollup daily done");
+                                Ok(Some(format!("Hierarchical daily: {} buckets created", n)))
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "hierarchical rollup daily failed");
+                                Ok(Some(format!("Hierarchical daily failed: {e}")))
+                            }
+                        }
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── episodic rollup weekly ───────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let cog_config = config.clone();
+        let cog_provider = cognitive_provider.clone();
+        let rt = rt.clone();
+        cron_executor.register(
+            JOB_EPISODIC_ROLLUP_WEEKLY,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                let cog_config = cog_config.clone();
+                let cog_provider = cog_provider.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        if !cog_config.cognitive.hierarchical.enabled {
+                            return Ok(None);
+                        }
+                        let repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
+                        let summarizer = crate::handlers::cognitive::build_hierarchical_summarizer(
+                            &cog_provider,
+                            &cog_config,
+                        );
+                        match cognitive::services::hierarchical_compressor::roll_up_weekly(
+                            &repo,
+                            summarizer,
+                        )
+                        .await
+                        {
+                            Ok(n) => {
+                                info!(created = n, "hierarchical rollup weekly done");
+                                Ok(Some(format!("Hierarchical weekly: {} buckets created", n)))
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "hierarchical rollup weekly failed");
+                                Ok(Some(format!("Hierarchical weekly failed: {e}")))
+                            }
+                        }
+                    })
+                })
+            }),
+        );
+    }
+
     // ── atom_extraction_catchall ─────────────────────────────────────
     {
         let pool = repos.pool().clone();
@@ -1269,6 +1401,35 @@ async fn ensure_cron_jobs(
                 every_ms: 5 * 60 * 1000, // every 5 minutes
             },
             "Micro-Reforge timer (KCA Track 4)",
+            "system"
+        );
+    }
+    if config.cognitive.hierarchical.enabled {
+        ensure_job!(
+            JOB_EPISODIC_ROLLUP_HOURLY,
+            scheduling::CronSchedule::Cron {
+                expr: config.cognitive.hierarchical.hourly_schedule.clone(),
+                tz: Some(config.timezone.clone()),
+            },
+            "Hourly episodic compression (KCA Track 8)",
+            "system"
+        );
+        ensure_job!(
+            JOB_EPISODIC_ROLLUP_DAILY,
+            scheduling::CronSchedule::Cron {
+                expr: config.cognitive.hierarchical.daily_schedule.clone(),
+                tz: Some(config.timezone.clone()),
+            },
+            "Daily episodic compression (KCA Track 8)",
+            "system"
+        );
+        ensure_job!(
+            JOB_EPISODIC_ROLLUP_WEEKLY,
+            scheduling::CronSchedule::Cron {
+                expr: config.cognitive.hierarchical.weekly_schedule.clone(),
+                tz: Some(config.timezone.clone()),
+            },
+            "Weekly episodic compression (KCA Track 8)",
             "system"
         );
     }

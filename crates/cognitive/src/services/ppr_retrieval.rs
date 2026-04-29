@@ -303,6 +303,8 @@ mod tests {
     #[tokio::test]
     async fn build_graph_from_entity_repo() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
+        let migrations = crate::repos::cognitive_migrations();
+        StoragePool::run_feature_migrations(pool.inner(), &migrations).await.unwrap();
         let repo = EntityRepo::new(pool.inner().clone());
         let a = repo
             .upsert_entity(&NewEntity {
@@ -347,10 +349,10 @@ mod tests {
         let (graph, name_to_idx) = build_graph_from_entities(&repo).await.unwrap();
         assert_eq!(graph.node_count(), 3);
         assert!(graph.edge_count() >= 2);
-        assert!(name_to_idx.contains_key("A"));
+        assert!(name_to_idx.contains_key("a"), "name_to_idx keys are lowercase");
         // Causal weighted higher than correlational by edge_type:
-        let a_idx = name_to_idx["A"];
-        let b_idx = name_to_idx["B"];
+        let a_idx = name_to_idx["a"];
+        let b_idx = name_to_idx["b"];
         let edge = graph.find_edge(a_idx, b_idx).unwrap();
         let w = *graph.edge_weight(edge).unwrap();
         assert!(
@@ -363,6 +365,8 @@ mod tests {
     #[tokio::test]
     async fn cached_graph_reuses_within_ttl() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
+        let migrations = crate::repos::cognitive_migrations();
+        StoragePool::run_feature_migrations(pool.inner(), &migrations).await.unwrap();
         let repo = EntityRepo::new(pool.inner().clone());
         repo.upsert_entity(&NewEntity {
             name: "A".into(),

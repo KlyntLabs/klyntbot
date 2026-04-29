@@ -84,3 +84,34 @@ pub(crate) fn build_micro_reforge_handler(
         std::sync::Arc::new(cognitive::services::micro_reforge::NoopMicroReforgeHandler)
     }
 }
+
+/// Build a [`HierarchicalSummarizer`] for KCA Track 8 episodic roll-ups.
+///
+/// Returns an LLM-backed handler when a provider is available, a no-op fallback otherwise.
+pub(crate) fn build_hierarchical_summarizer(
+    cognitive_provider: &Option<providers::DynProvider>,
+    config: &config::Config,
+) -> std::sync::Arc<dyn cognitive::services::hierarchical_compressor::HierarchicalSummarizer> {
+    if let Some(ref cp) = cognitive_provider {
+        let model = config
+            .cognitive
+            .hierarchical
+            .model
+            .clone()
+            .unwrap_or_else(|| {
+                config
+                    .cognitive
+                    .model
+                    .clone()
+                    .unwrap_or_else(|| config.agents.defaults.model.clone())
+            });
+        let params = providers::ChatParams::new(model)
+            .with_temperature(0.3)
+            .with_max_tokens(1024);
+        std::sync::Arc::new(
+            agent::adapters::cognitive_handlers::LlmHierarchicalSummarizer::new(cp.clone(), params),
+        )
+    } else {
+        std::sync::Arc::new(cognitive::services::hierarchical_compressor::NoopHierarchicalSummarizer)
+    }
+}

@@ -107,25 +107,6 @@ Non-blocking issues deferred for later. Not part of any active plan; pick up onc
 3. Plumb the value from `launcher_system_command(args: HashMap<String,String>)` by parsing `args.get("duration_secs").and_then(|s| s.parse().ok())`.
 4. Once stable, drop the frontend-side `focus_activate` workaround in `useExecuteItem.ts:86-97`.
 
-
-
-
----
-
-## 8. Agent: `cost_tracker.rs` pricing table duplicates `common::pricing` (missing cache support)
-
-**Observed (2026-04-29):** `crates/agent/src/output/cost_tracker.rs` maintains a complete parallel pricing table (Claude, GPT-4o, Gemini, DeepSeek, Mistral) with exact-match and substring fallback logic. `crates/common/src/pricing.rs` already has `MODEL_PRICING` + `lookup()` + `cost_for()`, but it lacks `cache_read` / `cache_write` rates and does not cover Gemini or Mistral families.
-
-**Scope:** The agent version returns zero cost for unknown models; the common version returns `None`. The tables have also diverged on exact model IDs (e.g. `haiku-4-5` pricing differs between the two).
-
-**Next steps:**
-1. Extend `common::pricing::ModelPricing` with optional `cache_read_per_mtok` and `cache_write_per_mtok` fields.
-2. Add missing model families (Gemini, Mistral, deepseek-reasoner) to `common::MODEL_PRICING`.
-3. Replace `agent::output::cost_tracker::model_pricing()` and `substring_fallback()` with `common::pricing::cost_for()` / `lookup()`.
-4. Port `cost_tracker` tests to common or delete the local ones.
-
----
-
 ## 9. Agent: tree builders are 6 near-identical copy-pasted files
 
 **Observed (2026-04-29):** `adapters/finance_tree_builder.rs`, `learning_tree_builder.rs`, `note_tree_builder.rs`, `okr_tree_builder.rs`, `productivity_tree_builder.rs`, and `task_tree_builder.rs` each duplicate:

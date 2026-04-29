@@ -8,7 +8,7 @@ use cognitive::repos::episodic_memory::EpisodicMemoryRepo;
 use cognitive::repos::procedural_rule::ProceduralRuleRepo;
 
 /// A rule that appears transferable from one CLI source to another.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct TransferableCandidate {
     /// Rule ID in `procedural_rules`.
     pub rule_id: String,
@@ -141,6 +141,12 @@ mod tests {
     #[tokio::test]
     async fn find_transferable_rules_matches_pattern_across_sources() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
+        StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+            .await
+            .unwrap();
+        StoragePool::run_feature_migrations(pool.inner(), &crate::coding_memory_migrations())
+            .await
+            .unwrap();
         let rule_repo = ProceduralRuleRepo::new(pool.inner().clone());
 
         // ClaudeCode-only rule.

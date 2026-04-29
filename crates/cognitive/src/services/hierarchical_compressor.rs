@@ -28,6 +28,17 @@ pub trait HierarchicalSummarizer: Send + Sync {
     async fn summarize(&self, items: &[EpisodicMemory], tier: Tier) -> common::Result<String>;
 }
 
+/// No-op summarizer that returns a static placeholder. Used when no LLM provider
+/// is configured for cognitive work.
+pub struct NoopHierarchicalSummarizer;
+
+#[async_trait::async_trait]
+impl HierarchicalSummarizer for NoopHierarchicalSummarizer {
+    async fn summarize(&self, items: &[EpisodicMemory], _tier: Tier) -> common::Result<String> {
+        Ok(format!("(noop summary of {} items)", items.len()))
+    }
+}
+
 /// Roll up all unrolled raw episodics into hourly summaries.
 /// Returns the number of hourly buckets created.
 pub async fn roll_up_hourly(

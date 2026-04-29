@@ -299,18 +299,18 @@ impl cognitive::services::reforge::CrossCliPhaseRunner for CodingPhaseRunnerImpl
             };
             let decision_str = if approved { "approved" } else { "rejected" };
             let log_id = uuid::Uuid::new_v4().to_string();
-            sqlx::query!(
+            sqlx::query(
                 r#"INSERT INTO cross_cli_transfer_log (id, rule_id, rule_text_snapshot, from_sources, promoted_to_sources, support_strength, decision, reforge_run_id)
                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
-                log_id,
-                cand.rule_id,
-                cand.rule_text,
-                from_sources_json,
-                promoted_to_json,
-                cand.support_strength as i64,
-                decision_str,
-                run_id
             )
+            .bind(&log_id)
+            .bind(&cand.rule_id)
+            .bind(&cand.rule_text)
+            .bind(&from_sources_json)
+            .bind(&promoted_to_json)
+            .bind(cand.support_strength as i64)
+            .bind(decision_str)
+            .bind(run_id)
             .execute(self.pool.inner())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -368,10 +368,10 @@ impl cognitive::services::reforge::SkillDiscoveryRunner for CodingPhaseRunnerImp
         let mut written = 0u32;
         for s in &out.skills {
             // Dedup against pending or approved with same name.
-            let exists = sqlx::query!(
+            let exists = sqlx::query(
                 "SELECT id FROM skill_proposals WHERE name = ?1 AND status IN ('pending', 'approved') LIMIT 1",
-                s.name
             )
+            .bind(&s.name)
             .fetch_optional(self.pool.inner())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -381,18 +381,18 @@ impl cognitive::services::reforge::SkillDiscoveryRunner for CodingPhaseRunnerImp
 
             let id = uuid::Uuid::new_v4().to_string();
             let source_ids = serde_json::to_string(&s.source_rule_ids).unwrap_or_default();
-            sqlx::query!(
+            sqlx::query(
                 r#"INSERT INTO skill_proposals (id, name, description, yaml_frontmatter, body_markdown, source_rule_ids, avg_confidence, status, reforge_run_id)
                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8)"#,
-                id,
-                s.name,
-                s.description,
-                s.yaml_frontmatter,
-                s.body_markdown,
-                source_ids,
-                s.avg_confidence,
-                run_id
             )
+            .bind(&id)
+            .bind(&s.name)
+            .bind(&s.description)
+            .bind(&s.yaml_frontmatter)
+            .bind(&s.body_markdown)
+            .bind(&source_ids)
+            .bind(s.avg_confidence)
+            .bind(run_id)
             .execute(self.pool.inner())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;

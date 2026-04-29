@@ -840,6 +840,33 @@ impl EntityRepo {
         .fetch_all(&self.pool)
         .await
     }
+
+    /// Record a merge proposal from the graph linker (KCA Track 2).
+    /// Actual merging is deferred to nightly Reforge Phase 6.5.
+    pub async fn record_merge_proposal(
+        &self,
+        entity_a: &str,
+        entity_b: &str,
+        canonical: &str,
+        reason: &str,
+        source: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO entity_merge_proposals
+                (entity_a_id, entity_b_id, canonical_name, reason, source, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'))
+            "#,
+        )
+        .bind(entity_a)
+        .bind(entity_b)
+        .bind(canonical)
+        .bind(reason)
+        .bind(source)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

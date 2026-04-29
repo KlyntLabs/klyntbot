@@ -158,6 +158,13 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
         },
         FeatureMigration {
             feature_name: "cognitive".to_string(),
+            version: 13,
+            description: "Entity merge proposals from per-turn graph linker (KCA Track 2)"
+                .to_string(),
+            sql: include_str!("../../migrations/010_entity_merge_proposals.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
             version: 7,
             description: "Micro-Reforge state and run audit log (KCA Track 4)".to_string(),
             sql: include_str!("../../migrations/011_micro_reforge_state.sql").to_string(),

@@ -615,8 +615,7 @@ impl LlmCrossCliSynthesisHandler {
         if candidates.is_empty() {
             return Ok(Default::default());
         }
-        let user = serde_json::to_string(&candidates)
-            .map_err(|e| common::KlyntbotError::Internal(e.to_string()))?;
+        let user = serde_json::to_string(&candidates)?;
         let messages = vec![
             Message::system(CROSS_CLI_SYNTHESIS_PROMPT),
             Message::user(user),
@@ -631,7 +630,7 @@ impl LlmCrossCliSynthesisHandler {
 // LlmSkillDiscoveryHandler — KCA Track 12
 // ---------------------------------------------------------------------------
 
-const SKILL_DISCOVERY_PROMPT: &str = r#"You are a Klynt skill author.
+const SKILL_DISCOVERY_PROMPT: &str = r###"You are a Klynt skill author.
 
 You are given clusters of related procedural rules (each cluster is a coherent behavioral pattern).
 For each cluster, produce a candidate Klynt orchestrator skill following the Agent Skills format:
@@ -652,7 +651,7 @@ Rules:
 - Skip clusters that don't form a coherent skill (e.g., random unrelated rules with low Jaccard overlap).
 - Never invent rule_ids; reference only those provided.
 - Never name a skill the same as an existing skill (avoid: task-management, finance-management, automation, learning, notebook).
-- Keep skills simple. If unsure, don't propose."#;
+- Keep skills simple. If unsure, don't propose."###;
 
 #[derive(serde::Deserialize, Default, Debug)]
 pub struct SkillDiscoveryOutput {
@@ -719,8 +718,7 @@ impl LlmSkillDiscoveryHandler {
                 })
                 .collect(),
         };
-        let user = serde_json::to_string(&payload)
-            .map_err(|e| common::KlyntbotError::Internal(e.to_string()))?;
+        let user = serde_json::to_string(&payload)?;
         let messages = vec![
             Message::system(SKILL_DISCOVERY_PROMPT),
             Message::user(user),
@@ -824,7 +822,7 @@ mod tests {
     async fn skill_discovery_handler_emits_skill_md() {
         use cognitive::services::reforge::skill_discovery::RuleCluster;
 
-        let json = r#"{
+        let json = r##"{
           "skills": [{
             "name": "rust-test-then-lint",
             "description": "Runs cargo nextest and clippy in sequence with smart retry.",
@@ -834,7 +832,7 @@ mod tests {
             "avg_confidence": 0.85
           }],
           "notes": null
-        }"#;
+        }"##;
         let provider = std::sync::Arc::new(MockProvider {
             response: json.to_string(),
         });
