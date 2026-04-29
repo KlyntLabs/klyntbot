@@ -1121,6 +1121,75 @@ impl ExtractionCriticHandler for LlmExtractionCriticHandler {
     }
 }
 
+// ── Community membership handler (KCA Track 11) ─────────────────────────────
+
+pub(crate) const COMMUNITY_MEMBERSHIP_SYSTEM_PROMPT: &str = r#"You are a knowledge-graph cluster membership confirmer.
+
+You are given a candidate entity, a community summary, and a co-activation score. Decide:
+- confirm = true: this entity belongs in the community.
+- confirm = false: it does not, the heuristic was misleading.
+
+Output JSON: {"confirm": true|false, "reason": "short reason"}.
+
+Be conservative: confirm only when the entity clearly fits the community theme."#;
+
+#[derive(Debug, Clone)]
+pub struct CommunityMembershipDecision {
+    pub confirm: bool,
+    pub reason: String,
+}
+
+pub struct LlmCommunityMembershipHandler {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmCommunityMembershipHandler {
+    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
+        Self { provider, params }
+    }
+
+    pub async fn confirm_membership(
+        &self,
+        entity_name: &str,
+        entity_type: &str,
+        community_name: &str,
+        community_summary: &str,
+        score: f64,
+    ) -> common::Result<CommunityMembershipDecision> {
+        let user = format!(
+            "Entity: {} (type: {})\nCommunity: {}\nSummary: {}\nCo-activation score: {:.2}\n\nConfirm membership?",
+            entity_name, entity_type, community_name, community_summary, score
+        );
+        let messages = vec![
+            Message::System { content: COMMUNITY_MEMBERSHIP_SYSTEM_PROMPT.to_string() },
+            Message::User { content: providers::UserContent::Text(user) },
+        ];
+        let resp = self.provider.chat(&messages, None, &self.params).await
+            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("community_membership: {e}"))))?;
+
+        #[derive(serde::Deserialize)]
+        struct R { confirm: bool, reason: String }
+        match serde_json::from_str::<R>(&resp.content.unwrap_or_default()) {
+            Ok(r) => Ok(CommunityMembershipDecision { confirm: r.confirm, reason: r.reason }),
+            Err(_) => Ok(CommunityMembershipDecision { confirm: false, reason: "parse failed".into() }),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl cognitive::services::community_membership_online::AsyncConfirmFn for LlmCommunityMembershipHandler {
+    async fn confirm(&self, entity_name: &str, entity_type: &str, community_name: &str, summary: &str, score: f64) -> bool {
+        match self.confirm_membership(entity_name, entity_type, community_name, summary, score).await {
+            Ok(decision) => decision.confirm,
+            Err(e) => {
+                tracing::warn!(error = %e, "community_membership confirm failed");
+                false
+            }
+        }
+    }
+}
+
 // ── Micro-Reforge handler (KCA Track 4) ────────────────────────────────────
 
 pub(crate) const MICRO_REFORGE_SYSTEM_PROMPT: &str = r#"You are a procedural-rule synthesizer running mid-session.
@@ -1775,6 +1844,27 @@ mod tests {
         let out = handler.synthesize(input).await.unwrap();
         assert_eq!(out.proposed_rules.len(), 1);
         assert!(out.proposed_rules[0].confidence > 0.8);
+    }
+
+    #[tokio::test]
+    async fn llm_community_membership_confirms_match() {
+        let json = r#"{"confirm": true, "reason": "C aligns with alpha by topic"}"#;
+        let provider = MockProvider::new(LlmResponse {
+            content: Some(json.to_string()),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cache_read_tokens: 0, cache_write_tokens: 0 },
+            reasoning_content: None,
+        });
+        let handler = LlmCommunityMembershipHandler::new(
+            Arc::new(provider),
+            ChatParams::new("m").with_max_tokens(256),
+        );
+
+        let result = handler.confirm_membership(
+            "C", "concept", "alpha", "topic about α-particles", 0.85
+        ).await.unwrap();
+        assert!(result.confirm);
     }
 
     #[tokio::test]

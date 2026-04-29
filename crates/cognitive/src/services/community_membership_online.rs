@@ -1,5 +1,6 @@
 //! KCA Track 11 — online community membership.
 
+use async_trait::async_trait;
 use crate::repos::entity::EntityRepo;
 use crate::repos::community::CommunityRepo;
 
@@ -38,6 +39,43 @@ pub async fn find_best_community_for_entity(
         .into_iter()
         .max_by(|a, b| a.1.1.partial_cmp(&b.1.1).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(id, (name, score))| CommunityMatch { community_id: id, community_name: name, score }))
+}
+
+#[async_trait]
+pub trait AsyncConfirmFn: Send + Sync {
+    async fn confirm(&self, entity_name: &str, entity_type: &str, community_name: &str, summary: &str, score: f64) -> bool;
+}
+
+pub async fn run_for_session(
+    entity_repo: &EntityRepo,
+    community_repo: &CommunityRepo,
+    touched_entity_ids: Vec<String>,
+    confirm_handler: std::sync::Arc<dyn AsyncConfirmFn>,
+) {
+    for eid in touched_entity_ids {
+        if !community_repo.list_for_entity(&eid).await.unwrap_or_default().is_empty() {
+            continue; // already in a community
+        }
+        let m = match find_best_community_for_entity(entity_repo, community_repo, &eid).await {
+            Ok(Some(m)) => m,
+            _ => continue,
+        };
+        if m.score < 1.0 {
+            // Below threshold; skip until nightly Reforge has more data.
+            continue;
+        }
+        let entity = match entity_repo.find_by_id(&eid).await.unwrap_or(None) {
+            Some(e) => e, None => continue,
+        };
+        // Get community summary.
+        let summary = community_repo.get_summary(&m.community_id).await.unwrap_or_default().unwrap_or_default();
+        let decision = confirm_handler.confirm(
+            &entity.name, &entity.entity_type, &m.community_name, &summary, m.score
+        ).await;
+        if decision {
+            let _ = community_repo.add_member(&m.community_id, &eid).await;
+        }
+    }
 }
 
 #[cfg(test)]
