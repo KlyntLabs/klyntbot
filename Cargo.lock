@@ -3135,16 +3135,20 @@ dependencies = [
  "ciborium",
  "clap 4.6.1",
  "criterion-plot",
+ "futures",
  "is-terminal",
  "itertools 0.10.5",
  "num-traits",
  "once_cell",
  "oorandom",
+ "plotters",
+ "rayon",
  "regex",
  "serde",
  "serde_derive",
  "serde_json",
  "tinytemplate",
+ "tokio",
  "walkdir",
 ]
 
@@ -7628,6 +7632,59 @@ dependencies = [
 ]
 
 [[package]]
+name = "kca-bench"
+version = "0.1.0"
+dependencies = [
+ "agent",
+ "app-core",
+ "coding-memory",
+ "cognitive",
+ "common",
+ "config",
+ "criterion",
+ "jiff",
+ "kca-e2e",
+ "petgraph 0.7.1",
+ "providers",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "kca-e2e"
+version = "0.1.0"
+dependencies = [
+ "agent",
+ "app-core",
+ "async-trait",
+ "bus",
+ "coding-ingest",
+ "coding-memory",
+ "cognitive",
+ "common",
+ "config",
+ "desktop-shared",
+ "futures",
+ "jiff",
+ "proptest",
+ "providers",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "keyboard-types"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10761,6 +10818,34 @@ dependencies = [
  "quick-xml 0.39.2",
  "serde",
  "time",
+]
+
+[[package]]
+name = "plotters"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5aeb6f403d7a4911efb1e33402027fc44f29b5bf6def3effcc22d7bb75f2b747"
+dependencies = [
+ "num-traits",
+ "plotters-backend",
+ "plotters-svg",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
+name = "plotters-backend"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df42e13c12958a16b3f7f4386b9ab1f3e7933914ecea48da7139435263a4172a"
+
+[[package]]
+name = "plotters-svg"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51bae2ac328883f7acdfea3d66a7c35751187f870bc81f94563733a154d7a670"
+dependencies = [
+ "plotters-backend",
 ]
 
 [[package]]
