@@ -500,6 +500,7 @@ impl MirrorFacade {
                     kind: None,
                     scope_repo_id: None,
                     metadata: None,
+                    actor_id: None,
                     tier: "raw".to_string(),
                     parent_id: None,
                     child_count: 0,
@@ -586,6 +587,92 @@ fn build_narrative_context(
         correction_count,
         top_skills_by_usage: top_skills,
         past_narrative_feedback,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Skill proposal management — KCA Track 12
+// ---------------------------------------------------------------------------
+
+/// A row from the `skill_proposals` table for listing pending proposals.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct SkillProposalRow {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub avg_confidence: f64,
+    pub proposed_at: String,
+}
+
+impl MirrorFacade {
+    /// KCA Track 12 — approve a skill proposal, write its SKILL.md to disk, mark approved.
+    pub async fn approve_skill_proposal(
+        &self,
+        proposal_id: &str,
+        skills_dir: &std::path::Path,
+    ) -> common::Result<std::path::PathBuf> {
+        let row: (String, String, String, String) = sqlx::query_as(
+            "SELECT name, yaml_frontmatter, body_markdown, status FROM skill_proposals WHERE id = ?1",
+        )
+        .bind(proposal_id)
+        .fetch_optional(self.repo.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?
+        .ok_or_else(|| common::KlyntbotError::StorageNotFound(format!("skill proposal {proposal_id}")))?;
+
+        if row.3 != "pending" {
+            return Err(common::KlyntbotError::Storage(format!(
+                "proposal {proposal_id} is {}",
+                row.3
+            )));
+        }
+
+        let dir = skills_dir.join(&row.0);
+        tokio::fs::create_dir_all(&dir).await?;
+        let path = dir.join("SKILL.md");
+        let content = format!("{}\n\n{}", row.1, row.2);
+        tokio::fs::write(&path, content).await?;
+
+        sqlx::query(
+            "UPDATE skill_proposals SET status = 'approved', decided_at = datetime('now'), decided_by = 'user' WHERE id = ?1",
+        )
+        .bind(proposal_id)
+        .execute(self.repo.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+
+        Ok(path)
+    }
+
+    /// Reject a skill proposal.
+    pub async fn reject_skill_proposal(
+        &self,
+        proposal_id: &str,
+        _reason: Option<&str>,
+    ) -> common::Result<()> {
+        sqlx::query(
+            "UPDATE skill_proposals SET status = 'rejected', decided_at = datetime('now'), decided_by = 'user' WHERE id = ?1",
+        )
+        .bind(proposal_id)
+        .execute(self.repo.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(())
+    }
+
+    /// List pending skill proposals ordered by proposed_at DESC.
+    pub async fn list_pending_skill_proposals(
+        &self,
+        limit: usize,
+    ) -> common::Result<Vec<SkillProposalRow>> {
+        let lim = limit as i64;
+        sqlx::query_as::<_, SkillProposalRow>(
+            "SELECT id, name, description, avg_confidence, proposed_at FROM skill_proposals WHERE status = 'pending' ORDER BY proposed_at DESC LIMIT ?1",
+        )
+        .bind(lim)
+        .fetch_all(self.repo.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
     }
 }
 
@@ -872,5 +959,31 @@ mod tests {
         let state = facade.get_state().await.unwrap();
         assert!(state.latest_brain_version.is_some());
         assert_eq!(state.latest_brain_version.unwrap().version, 1);
+    }
+
+    #[tokio::test]
+    async fn approve_skill_proposal_writes_skill_to_disk_and_marks_proposal_approved() {
+        let facade = setup().await;
+        let tmpdir = tempfile::tempdir().unwrap();
+
+        // Insert proposal.
+        let id = "p1";
+        sqlx::query(
+            r#"INSERT INTO skill_proposals (id, name, description, yaml_frontmatter, body_markdown, source_rule_ids, avg_confidence, status)
+               VALUES (?1, 'rust-test-then-lint', 'Test + lint Rust', '---
+name: rust-test-then-lint
+---', '# Body
+', '[]', 0.85, 'pending')"#,
+        ).bind(id)
+        .execute(facade.repo.db()).await.unwrap();
+
+        let path = facade.approve_skill_proposal(id, tmpdir.path()).await.unwrap();
+        assert!(path.exists(), "SKILL.md should be written");
+
+        // Status should be approved.
+        let row: (String,) = sqlx::query_as("SELECT status FROM skill_proposals WHERE id = ?1")
+            .bind(id)
+            .fetch_one(facade.repo.db()).await.unwrap();
+        assert_eq!(row.0, "approved");
     }
 }

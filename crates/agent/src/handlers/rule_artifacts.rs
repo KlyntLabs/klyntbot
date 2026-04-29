@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use coding_memory::reforge::{RuleArtifactInput, RuleArtifactOutput, RuleArtifactsHandler};
 use coding_memory::reforge_phase::RuleArtifact;
-use common::{KlyntbotError, ProviderError, Result};
+use common::Result;
 use providers::{ChatParams, DynProvider, Message, ResponseFormat};
 use tracing::warn;
 
@@ -48,11 +48,7 @@ impl RuleArtifactsHandler for RuleArtifactsHandlerImpl {
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| {
-                KlyntbotError::Provider(ProviderError::InvalidResponse(format!(
-                    "Phase 3.5 chat: {e}"
-                )))
-            })?;
+            .map_err(|e| crate::provider_err("Phase 3.5 chat", e))?;
 
         let raw = response.content.unwrap_or_default();
 
@@ -113,12 +109,9 @@ Rules:\n\
 }
 
 fn recover_artifact(raw: &str, artifact: &RuleArtifact) -> RuleArtifactOutput {
-    if let Some(start) = raw.find('{') {
-        if let Some(end) = raw.rfind('}') {
-            let candidate = &raw[start..=end];
-            if let Ok(parsed) = serde_json::from_str::<RuleArtifactOutput>(candidate) {
-                return parsed;
-            }
+    if let Some(candidate) = common::helpers::extract_json_object(raw) {
+        if let Ok(parsed) = serde_json::from_str::<RuleArtifactOutput>(candidate) {
+            return parsed;
         }
     }
     RuleArtifactOutput {

@@ -980,6 +980,7 @@ async fn test_reforge_cycle_end_to_end() {
         scope_repo_id: None,
         metadata: None,
         kind: None,
+        actor_id: None,
         tier: "raw".into(),
         parent_id: None,
         child_count: 0,
@@ -1024,6 +1025,8 @@ async fn test_reforge_cycle_end_to_end() {
         None, // no co_activation repo for split
         None, // no domain event bus
         None, // no coding phase runner
+        None, // no cross-cli runner
+        None, // no skill discovery runner
     )
     .await;
 
@@ -1167,6 +1170,7 @@ async fn test_reforge_phase6_with_autotuner_bridge() {
         scope_repo_id: None,
         metadata: None,
         kind: None,
+        actor_id: None,
         tier: "raw".into(),
         parent_id: None,
         child_count: 0,
@@ -1213,6 +1217,8 @@ async fn test_reforge_phase6_with_autotuner_bridge() {
         None, // no co_activation repo for split
         None, // no domain event bus
         None, // no coding phase runner
+        None, // no cross-cli runner
+        None, // no skill discovery runner
     )
     .await;
 
@@ -1303,6 +1309,7 @@ async fn test_reforge_with_feedback_signals() {
         scope_repo_id: None,
         metadata: None,
         kind: None,
+        actor_id: None,
         tier: "raw".into(),
         parent_id: None,
         child_count: 0,
@@ -1380,6 +1387,8 @@ async fn test_reforge_with_feedback_signals() {
         None, // no co_activation repo for split
         None, // no domain event bus
         None, // no coding phase runner
+        None, // no cross-cli runner
+        None, // no skill discovery runner
     )
     .await;
 

@@ -27,6 +27,15 @@ use super::AgentEvent;
 /// Window (in minutes) to retroactively mark shadow log entries as corrected.
 const CORRECTION_WINDOW_MINUTES: i32 = 15;
 
+/// Truncate `content` to `max` bytes, appending "..." if truncated.
+fn preview_text(content: &str, max: usize) -> String {
+    if content.len() > max {
+        format!("{}...", truncate_at_boundary(content, max))
+    } else {
+        content.to_string()
+    }
+}
+
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
     /// Agent events (content chunks, tool status).
@@ -544,11 +553,7 @@ impl AgentLoop {
             *last_active.write().await = Some((msg.channel.clone(), msg.chat_id.clone()));
         }
 
-        let preview = if msg.content.len() > 80 {
-            format!("{}...", truncate_at_boundary(&msg.content, 80))
-        } else {
-            msg.content.clone()
-        };
+        let preview = preview_text(&msg.content, 80);
 
         info!(
             "Processing message from {}:{}: {}",
@@ -939,11 +944,7 @@ impl AgentLoop {
         session_key: &str,
         label: &str,
     ) -> Result<Vec<session::SessionMessage>> {
-        let preview = if content.len() > 80 {
-            format!("{}...", truncate_at_boundary(content, 80))
-        } else {
-            content.to_string()
-        };
+        let preview = preview_text(content, 80);
         debug!("Processing {} message: {}", label, preview);
 
         let session_arc = self.session_manager.get_or_create(session_key).await?;

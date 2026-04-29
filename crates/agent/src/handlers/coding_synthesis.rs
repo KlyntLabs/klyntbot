@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 use coding_memory::reforge::{CodingSynthesisHandler, CodingSynthesisInput, CodingSynthesisOutput};
-use common::{KlyntbotError, ProviderError, Result};
+use common::Result;
 use providers::{ChatParams, DynProvider, Message, ResponseFormat};
 use tracing::warn;
 
@@ -51,11 +51,7 @@ impl CodingSynthesisHandler for CodingSynthesisHandlerImpl {
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| {
-                KlyntbotError::Provider(ProviderError::InvalidResponse(format!(
-                    "Phase 2.5 chat: {e}"
-                )))
-            })?;
+            .map_err(|e| crate::provider_err("Phase 2.5 chat", e))?;
 
         let raw = response.content.unwrap_or_default();
 
@@ -70,13 +66,9 @@ impl CodingSynthesisHandler for CodingSynthesisHandlerImpl {
 }
 
 fn recover(raw: &str) -> CodingSynthesisOutput {
-    // Attempt to extract a JSON object from the response — fall back to empty.
-    if let Some(start) = raw.find('{') {
-        if let Some(end) = raw.rfind('}') {
-            let candidate = &raw[start..=end];
-            if let Ok(parsed) = serde_json::from_str::<CodingSynthesisOutput>(candidate) {
-                return parsed;
-            }
+    if let Some(candidate) = common::helpers::extract_json_object(raw) {
+        if let Ok(parsed) = serde_json::from_str::<CodingSynthesisOutput>(candidate) {
+            return parsed;
         }
     }
     CodingSynthesisOutput {
@@ -105,7 +97,7 @@ Refuse to promote anything with confidence < 0.7. Reference ids only — never i
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use common::ProviderError;
+
     use providers::{LlmProvider, LlmResponse, ProviderCapabilities, ProviderHealth, Usage};
     use serde_json::Value;
     use std::sync::Arc;

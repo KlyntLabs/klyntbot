@@ -25,8 +25,8 @@ impl EpisodicMemoryRepo {
             r#"
             INSERT INTO episodic_memories (id, domain, content, summary, importance,
                 occurred_at, recorded_at, stability, last_accessed, access_count, project_id,
-                scope_type, scope_id, scope_repo_id, metadata, kind, tier, parent_id, child_count, rolled_up_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+                scope_type, scope_id, scope_repo_id, metadata, kind, actor_id, tier, parent_id, child_count, rolled_up_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
             "#,
         )
         .bind(&mem.id)
@@ -45,6 +45,7 @@ impl EpisodicMemoryRepo {
         .bind(&mem.scope_repo_id)
         .bind(&mem.metadata)
         .bind(&mem.kind)
+        .bind(&mem.actor_id)
         .bind(&mem.tier)
         .bind(&mem.parent_id)
         .bind(mem.child_count)
@@ -295,6 +296,7 @@ mod tests {
             scope_repo_id: None,
             metadata: None,
             kind: None,
+            actor_id: None,
             tier: "raw".to_string(),
             parent_id: None,
             child_count: 0,

@@ -79,6 +79,7 @@ proptest! {
                         scope_repo_id: None,
                         metadata: None,
                         kind: Some("turn_trace".into()),
+                        actor_id: None,
                         tier: "raw".into(),
                         parent_id: None,
                         child_count: 0,

@@ -442,4 +442,7 @@ pub struct ReforgeResult {
     pub communities_renamed: u32,
     pub communities_merged: u32,
     pub communities_split: u32,
+    // KCA Track 10 + 12
+    pub cross_cli_promoted: u32,
+    pub skills_proposed: u32,
 }

@@ -57,3 +57,10 @@ pub use productivity::ProductivityHandlerImpl;
 pub use progress::ProgressHandlerImpl;
 pub use recurring_tasks::RecurringTaskSpawner;
 pub use subagent::{SubagentManager, SubagentProfile};
+
+/// Helper: wrap an error into `KlyntbotError::Provider(InvalidResponse(...))`.
+pub(crate) fn provider_err(label: &str, e: impl std::fmt::Display) -> common::KlyntbotError {
+    common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+        "{label}: {e}"
+    )))
+}

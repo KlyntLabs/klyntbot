@@ -76,6 +76,7 @@ fn dummy_episode() -> EpisodicMemory {
         scope_repo_id: None,
         metadata: None,
         kind: None,
+        actor_id: None,
         tier: "raw".into(),
         parent_id: None,
         child_count: 0,

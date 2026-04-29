@@ -180,6 +180,18 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             description: "Hierarchical episodic compression columns (KCA Track 8)".to_string(),
             sql: include_str!("../../migrations/014_hierarchical_episodics.sql").to_string(),
         },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 11,
+            description: "Skill proposals table for memory-grounded skill discovery (KCA Track 12)".to_string(),
+            sql: include_str!("../../migrations/015_skill_proposals.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 12,
+            description: "Episodic actor_id for cross-CLI transfer (KCA Track 10/12)".to_string(),
+            sql: include_str!("../../migrations/016_episodic_actor_id.sql").to_string(),
+        },
     ]
 }
 
