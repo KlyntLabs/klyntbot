@@ -106,12 +106,12 @@ pub(crate) async fn dispatch_dev(
         }
         "distraction_get_pending_intervention" => {
             let _ = core;
-            dev::val(app_core::take_pending_intervention())
+            dev::val(Ok(app_core::take_pending_intervention()))
         }
         "distraction_clear_pending_intervention" => {
             let _ = core;
             app_core::clear_pending_intervention();
-            dev::val(())
+            dev::val(Ok(()))
         }
         _ => return None,
     })

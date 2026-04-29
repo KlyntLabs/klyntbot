@@ -983,6 +983,27 @@ async distractionDeleteRule(id: number) : Promise<Result<null, ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Pulled by the overlay's React layer on mount to recover the latest
+ * alert if the push event was emitted before the listener was wired.
+ * Returns `None` once the overlay has acked via `clear_pending`.
+ */
+async distractionGetPendingIntervention() : Promise<Result<InterventionPayload | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("distraction_get_pending_intervention") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async distractionClearPendingIntervention() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("distraction_clear_pending_intervention") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async entitySearch(params: EntitySearchParams) : Promise<Result<EntityResponse[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("entity_search", { params }) };
