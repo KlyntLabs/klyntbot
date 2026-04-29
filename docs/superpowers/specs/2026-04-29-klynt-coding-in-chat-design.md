@@ -188,7 +188,7 @@ Result: only the React surface and the channel-routing constants are net-new ent
 ```
 ~/.klyntbot/
   config.json                        # existing + new codingMode/permissions/skills/hooks keys
-  data.db                            # existing (+ new columns on chat_sessions)
+  data.db                            # existing (+ new columns on sessions)
   lance/                             # existing
   skills/                            # existing convention; user-installed skills
   project-skills/<repo-id>/          # Reforge-synthesized
@@ -196,7 +196,7 @@ Result: only the React surface and the channel-routing constants are net-new ent
   hooks.toml                         # hook configuration
 ```
 
-No `sessions/<id>/` per-session directories. No `ingest.sock`. No `desktop.lock`. The single `data.db` plus the existing `chat_messages` / `chat_sessions` tables are sufficient.
+No `sessions/<id>/` per-session directories. No `ingest.sock`. No `desktop.lock`. The single `data.db` plus the existing `chat_messages` / `sessions` tables are sufficient.
 
 ---
 
@@ -311,8 +311,8 @@ Plus:
 3. **`crates/agent/src/events.rs`** — 18 new variants under `#[non_exhaustive]` (see §10). Three previously-listed variants from the superseded spec are deleted (Wire-related: nothing to plumb).
 4. **`crates/common/src/types.rs`** — add `pub const CODING_CHANNEL: &str = "coding";` alongside the existing `SYSTEM_CHANNEL` / `CLI_CHANNEL` / `MCP_CHANNEL` literals. (Note: existing channel names like `"desktop"`, `"telegram"`, etc. are passed as raw strings to `ChannelName::new(...)` rather than constants; we lift `coding` to a constant because it's referenced in tool gating + Distiller filtering.)
 5. **Chat channel match-arm audit** — every existing `match AgentEvent { ... }` outside the coding path must have a `_ =>` catch-all so additive variants don't break compilation.
-6. **`chat_sessions` schema** — add columns per §11: `mode` (TEXT NOT NULL DEFAULT 'chat'), `cwd` (TEXT, nullable), `repo_id` (TEXT, nullable), `repo_branch` (TEXT, nullable), `tool_profile` (TEXT, nullable), `approval_mode` (TEXT NOT NULL DEFAULT 'default'), `total_cost_usd` (REAL NOT NULL DEFAULT 0), `total_tokens` (INTEGER NOT NULL DEFAULT 0), `starred` (BOOLEAN NOT NULL DEFAULT FALSE), `parent_session_id` (TEXT, nullable). One migration per pre-release policy.
-7. **New Tauri command `chat_set_mode`** — accepts `{ sessionKey, mode }`, persists to the new `chat_sessions.mode` column, returns the updated row. Used by the `<CodingModePill>` mid-thread flip; new threads set the mode at creation via the existing `chat_send` payload.
+6. **`sessions` schema** — add 8 new columns per §11 (`cwd`, `repo_id`, `repo_branch`, `tool_profile`, `approval_mode`, `total_cost_usd`, `total_tokens`, `parent_session_id`); reuse existing `conversation_type` (values `'general'` \| `'coding'`) and `pinned` (starred semantics). One migration per pre-release policy.
+7. **New Tauri command `chat_set_mode`** — accepts `{ sessionKey, mode }`, persists to `sessions.conversation_type`, returns the updated row. Used by the `<CodingModePill>` mid-thread flip; new threads set the mode at creation via the existing `chat_send` payload.
 
 ---
 
@@ -508,7 +508,7 @@ Timeout: 600s (matches existing `INTERACTIVE_TOOL_TIMEOUT`). Cancellation: invok
 
 `Composer.tsx` is unchanged except that `composerProps` (built by `useKlyntbotSurfaceProps`) gains a `modeOptions: [{ id: "chat", label: "Chat" }, { id: "coding", label: "Coding" }]` and `selectedMode` / `onSelectMode`. The composer's existing meta-bar slot (currently displaying the model and collaboration-mode pills) gains a new `<CodingModePill>` that swaps mode mid-thread.
 
-Implementation: extend `useChatSession` to track and persist `thread.mode` to the backend (round-trip via a new `chat_set_mode` command writes to the `chat_sessions` table column added in §3).
+Implementation: extend `useChatSession` to track and persist `thread.mode` to the backend (round-trip via a new `chat_set_mode` command writes to the `sessions` table column added in §3).
 
 **Mid-thread flip semantics:** Flipping the mode applies from the next user turn forward. Prior history (messages, tool rows, approval cards, diff rows) is unchanged. The next agent turn rebuilds the tool list (per the new mode's curated profile) and regenerates the system prompt before `execute_loop` runs. Approval rules persisted via "Allow always" / "Add rule" remain in effect regardless of mode (they're stored in `~/.klyntbot/config.json` and `~/.klyntbot/rules/`, not per-thread).
 
@@ -662,7 +662,7 @@ MCP gateway:     varies by user config
 
 ### `/power on|off` slash command
 
-Replaces the old `--power` flag and `/power` slash. Toggles the active profile **for the current thread**. Tool list rebuilt; system prompt regenerated for next iteration. Persists to the `chat_sessions.tool_profile` column. Emits `PowerModeToggled` event.
+Replaces the old `--power` flag and `/power` slash. Toggles the active profile **for the current thread**. Tool list rebuilt; system prompt regenerated for next iteration. Persists to the `sessions.tool_profile` column. Emits `PowerModeToggled` event.
 
 ### Deferred-tool discovery (Phase 2)
 
@@ -1196,28 +1196,32 @@ All additive. Existing chat listeners ignore them via the catch-all in chatStrea
 
 ### Chat thread = coding session
 
-Each row in the existing `chat_sessions` table is a session. The original spec's `klynt_sessions` table is **not** added.
+Each row in the existing `sessions` table is a session. The original spec's `klynt_sessions` table is **not** added.
 
 ### Schema changes
 
-`chat_sessions` gains:
+`sessions` gains 8 new columns; 2 existing columns are reused:
 
 ```sql
-ALTER TABLE chat_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'chat';   -- 'chat' | 'coding'
-ALTER TABLE chat_sessions ADD COLUMN cwd TEXT;
-ALTER TABLE chat_sessions ADD COLUMN repo_id TEXT;
-ALTER TABLE chat_sessions ADD COLUMN repo_branch TEXT;
-ALTER TABLE chat_sessions ADD COLUMN tool_profile TEXT;                   -- 'minimal' | 'curated' | 'power'
-ALTER TABLE chat_sessions ADD COLUMN approval_mode TEXT NOT NULL DEFAULT 'default';  -- 'default' | 'plan' | 'bypass'
-ALTER TABLE chat_sessions ADD COLUMN total_cost_usd REAL NOT NULL DEFAULT 0;
-ALTER TABLE chat_sessions ADD COLUMN total_tokens INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE chat_sessions ADD COLUMN starred BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE chat_sessions ADD COLUMN parent_session_id TEXT;              -- if forked from another thread
+-- conversation_type already exists; extended valid values:
+--   'general' (existing default), 'coding' (new for coding-mode threads).
+-- pinned already exists; reused as the spec's "starred" semantics.
+
+ALTER TABLE sessions ADD COLUMN cwd TEXT;
+ALTER TABLE sessions ADD COLUMN repo_id TEXT;
+ALTER TABLE sessions ADD COLUMN repo_branch TEXT;
+ALTER TABLE sessions ADD COLUMN tool_profile TEXT;                    -- 'minimal' | 'curated' | 'power'
+ALTER TABLE sessions ADD COLUMN approval_mode TEXT NOT NULL DEFAULT 'default';  -- 'default' | 'plan' | 'bypass'
+ALTER TABLE sessions ADD COLUMN total_cost_usd REAL NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN total_tokens INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN parent_session_id TEXT;               -- forks
 ```
+
+**Reuse of existing columns:** The existing `pinned INTEGER DEFAULT 0` column carries the spec's "starred" semantics (1 = starred, 0 = not). The existing `conversation_type TEXT DEFAULT 'general'` carries the mode — values `'general'` (default chat) or `'coding'` (coding mode). New code references these existing columns directly; no rename, no alias.
 
 Per CLAUDE.md pre-release policy, this is consolidated into a single migration; no incremental migration files.
 
-**Type conventions:** Match the existing `chat_sessions` table's conventions (verified during writing-plans). SQLite has no native BOOLEAN — the `starred BOOLEAN` declaration above is conventional but stored as INTEGER (0 / 1) in practice. The `parent_session_id TEXT` column is **not** declared with a `REFERENCES chat_sessions(id)` foreign key in Phase 1; forks may outlive their parents (parent deleted manually) and there's no need for cascade behavior. Phase 2+ may add an FK with `ON DELETE SET NULL` if introspection patterns warrant it.
+**Type conventions:** Match the existing `sessions` table's conventions. The `parent_session_id TEXT` column is **not** declared with a `REFERENCES sessions(id)` foreign key in Phase 1; forks may outlive their parents (parent deleted manually) and there's no need for cascade behavior. Phase 2+ may add an FK with `ON DELETE SET NULL` if introspection patterns warrant it.
 
 ### Resume
 
@@ -1229,7 +1233,7 @@ The agent loop never replays prior tool calls. On thread switch, the chat surfac
 
 ### `cwd` updates
 
-`chat_sessions.cwd` is set at thread creation (auto-detected from workspace context, or `null` for general chat threads). Bash `cd` calls inside the sandbox are **process-local** to that bash invocation — they do not update the persisted column, and they do not carry across tool calls (each `bash` invocation starts a new sandboxed process). To change the persisted cwd of a thread, the user invokes `/sessions cd <path>` (Phase 2 slash command) or recreates the thread from a different workspace context.
+`sessions.cwd` is set at thread creation (auto-detected from workspace context, or `null` for general chat threads). Bash `cd` calls inside the sandbox are **process-local** to that bash invocation — they do not update the persisted column, and they do not carry across tool calls (each `bash` invocation starts a new sandboxed process). To change the persisted cwd of a thread, the user invokes `/sessions cd <path>` (Phase 2 slash command) or recreates the thread from a different workspace context.
 
 ### Forking
 
@@ -1253,7 +1257,7 @@ A new slash command `/sessions fork` creates a new thread with `parent_session_i
 }
 ```
 
-A nightly cron job (registered via the existing `app-core/src/init/cron.rs`) prunes sessions older than `retentionDays` whose `starred = false`. Disk-budget pruning happens on-demand when the threshold is crossed.
+A nightly cron job (registered via the existing `app-core/src/init/cron.rs`) prunes sessions older than `retentionDays` whose `pinned = 0`. Disk-budget pruning happens on-demand when the threshold is crossed.
 
 ### Multi-process safety
 
@@ -1285,7 +1289,7 @@ The table in the superseded spec §14 carries forward verbatim. `RecallInjected`
 
 #### Category C — Schema delta (shrunk)
 
-The `klynt_sessions` table is **not** added. Instead, `chat_sessions` gains the columns listed in §11. Coding-memory spec §4 *Schema deltas* adds a row referencing this spec's §11.
+The `klynt_sessions` table is **not** added. Instead, `sessions` gains the columns listed in §11. Coding-memory spec §4 *Schema deltas* adds a row referencing this spec's §11.
 
 #### Category D — Native source — chat coding mode (replaces "klynt-cli native source")
 
@@ -1316,7 +1320,7 @@ docs(specs): amend coding-memory for klyntbot desktop coding-mode source
 - §5 add 10 rich AgentEvent variants
 - §5 add desktop coding-mode adapter row + Native source subsection
 - §6 add rich-variant Distiller handling table
-- §4 add chat_sessions column delta reference
+- §4 add sessions column delta reference
 - §13.D mark shared config keys
 ```
 
@@ -1356,7 +1360,7 @@ Coding-memory spec's 9 invariants + this spec's 11 (next section) = **20 invaria
 - Slash command catalog wired (agent-routed: `/plan`, `/yolo`, `/power`, `/recall`; direct: `/skills *`, `/status`, `/sessions star/unstar`, `/resume`, `/help`).
 - Tauri commands `coding_*` for direct slash-command dispatch.
 - Mode toggle on composer; auto-detection from workspace context.
-- All 10 new `chat_sessions` columns (per §11): `mode`, `cwd`, `repo_id`, `repo_branch`, `tool_profile`, `approval_mode`, `total_cost_usd`, `total_tokens`, `starred`, `parent_session_id`. Single consolidated migration per pre-release policy.
+- 8 new `sessions` columns (per §11): `cwd`, `repo_id`, `repo_branch`, `tool_profile`, `approval_mode`, `total_cost_usd`, `total_tokens`, `parent_session_id`. Existing `conversation_type` and `pinned` columns reused for mode and starred semantics. Single consolidated migration per pre-release policy.
 - Hook engine reads `~/.klyntbot/hooks.toml`; PreToolUse + PostToolUse fire correctly.
 - Distiller subscriber + Mirror signal subscriber spawned at AppCore init; consume coding-channel events.
 - Settings → Coding page (read-only or edit-then-save for declarative permissions, sandbox toggle, skill list).
@@ -1586,13 +1590,13 @@ tests/fixtures/coding/
 |---|---|---|
 | 1 | Surface | Klyntbot desktop chat — no separate binary, no TUI. |
 | 2 | Process model | Single Tauri process. No multi-process coordination. |
-| 3 | Coding mode | Per-thread toggle on the composer; auto-detect from workspace context; persisted in `chat_sessions.mode`. |
+| 3 | Coding mode | Per-thread toggle on the composer; auto-detect from workspace context; persisted in `sessions.conversation_type` (existing column; values `'general'` \| `'coding'`). |
 | 4 | Command surface | Composer slash commands. Two paths: agent-routed and direct. |
 | 5 | Tool surface | Curated default of 24 tools when in coding mode; `/power on` expands. |
 | 6 | Approval | Three layers (declarative + Starlark + Mirror-learned); chat-inline approval cards as `kind: "approval"` ConversationItem. |
 | 7 | Sandbox | OS-level (Seatbelt / Landlock + bwrap); Windows deferred. |
 | 8 | Skill system | `.klyntbot/skills/` only; `/skills install` for external sources; Settings tab parity. |
-| 9 | Sessions | Chat thread = coding session; columns added to `chat_sessions`; no separate `klynt_sessions` table. |
+| 9 | Sessions | Chat thread = coding session; columns added to `sessions`; no separate `klynt_sessions` table. |
 | 10 | Wire | Deleted. Future IDE bridge designed separately. |
 | 11 | Event richness | `agent::events::AgentEvent` gains 18 additive variants under `#[non_exhaustive]`; `coding-ingest::AgentEvent` gains 10. |
 | 12 | Distribution | Bundled with desktop installer. |
@@ -1618,7 +1622,7 @@ Plus surgical edits:
 - `crates/agent/src/events.rs` — 18 new variants under `#[non_exhaustive]`.
 - `crates/common/src/types.rs` — add `pub const CODING_CHANNEL: &str = "coding";` alongside `SYSTEM_CHANNEL` / `CLI_CHANNEL` / `MCP_CHANNEL`.
 - `crates/agent/src/agent_runtime/runtime.rs` — `AgentRuntime` constructor accepts `Arc<DomainEventBus>` for the cognitive-ingest path (per CLAUDE.md the bus is already passed as `Arc`).
-- `chat_sessions` schema columns (mode, cwd, repo_id, repo_branch, tool_profile, approval_mode, total_cost_usd, total_tokens, starred, parent_session_id).
+- `sessions` schema columns (cwd, repo_id, repo_branch, tool_profile, approval_mode, total_cost_usd, total_tokens, parent_session_id; existing `conversation_type` and `pinned` reused).
 - Chat channel match-arm audit for `_ =>` catch-all.
 - `desktop-ui/src/features/coding/` (React; new feature directory).
 - `crates/desktop/src/commands/coding.rs` (Tauri commands for slash direct-dispatch).
@@ -1743,7 +1747,7 @@ For the single-PR coordination per §12:
 ### `docs/superpowers/specs/2026-04-22-coding-memory-design.md` amendments
 
 1. **§3** Add row to *Key decisions* table: "klyntbot desktop coding mode is a first-class source emitting the rich variant set; external CLIs emit a subset"
-2. **§4** Add row to *Schema deltas* table: `chat_sessions` columns (per this spec §11) — `mode`, `cwd`, `repo_id`, `repo_branch`, `tool_profile`, `approval_mode`, `total_cost_usd`, `total_tokens`, `starred`, `parent_session_id`.
+2. **§4** Add row to *Schema deltas* table: `sessions` columns (per this spec §11) — `cwd`, `repo_id`, `repo_branch`, `tool_profile`, `approval_mode`, `total_cost_usd`, `total_tokens`, `parent_session_id`; existing `conversation_type` and `pinned` reused.
 3. **§5** Add 10 new variants to `AgentEventV1::EventKind` (per this spec §10).
 4. **§5** Add row to *CLI adapter mappings*: "klyntbot desktop coding mode" (Native, in-process emit, all rich events).
 5. **§5** Add new subsection "Native source: klyntbot desktop coding mode" describing in-process emission (no `MemorySink` abstraction needed; single process).
