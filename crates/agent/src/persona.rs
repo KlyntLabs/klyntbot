@@ -603,6 +603,7 @@ CryptoGuard project persona.
         let mgr = PersonaManager {
             personas: vec![global, area, project],
             resolved_scopes: resolved,
+            personas_dir: std::path::PathBuf::from("/tmp"),
         };
 
         let ctx = make_context(

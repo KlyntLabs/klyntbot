@@ -156,6 +156,18 @@ pub struct CognitiveConfig {
     /// Model used for the extraction critic (KCA Track 5). Defaults to `model`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub critic_model: Option<String>,
+
+    /// Predictive cache config (KCA Track 7).
+    #[serde(default)]
+    pub predictive_cache: PredictiveCacheConfig,
+
+    /// Hierarchical episodic compression config (KCA Track 8).
+    #[serde(default)]
+    pub hierarchical: HierarchicalConfig,
+
+    /// Model used for temporal pruning (KCA Track 13). Defaults to `model`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temporal_prune_model: Option<String>,
 }
 
 impl Default for CognitiveConfig {
@@ -195,6 +207,9 @@ impl Default for CognitiveConfig {
             history_compression: HistoryCompressionConfig::default(),
             micro_reforge: MicroReforgeConfig::default(),
             critic_model: None,
+            predictive_cache: PredictiveCacheConfig::default(),
+            hierarchical: HierarchicalConfig::default(),
+            temporal_prune_model: None,
         }
     }
 }
@@ -554,6 +569,50 @@ impl Default for MicroReforgeConfig {
     }
 }
 
+/// Predictive cache config (KCA Track 7).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PredictiveCacheConfig {
+    pub enabled: bool,
+    pub predictions_per_turn: u32,
+    pub ttl_seconds: u32,
+    /// If hit rate over rolling 100 lookups falls below this, auto-disable for 24h.
+    pub min_hit_rate_for_keep_alive: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+impl Default for PredictiveCacheConfig {
+    fn default() -> Self {
+        Self { enabled: true, predictions_per_turn: 3, ttl_seconds: 300, min_hit_rate_for_keep_alive: 0.20, model: None }
+    }
+}
+
+/// Hierarchical episodic compression config (KCA Track 8).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HierarchicalConfig {
+    pub enabled: bool,
+    /// Cron expression for hourly roll-up (default: 5 minutes past every hour).
+    pub hourly_schedule: String,
+    pub daily_schedule: String,
+    pub weekly_schedule: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+impl Default for HierarchicalConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            hourly_schedule: "0 5 * * * *".into(),
+            daily_schedule: "0 30 0 * * *".into(),
+            weekly_schedule: "0 0 1 * * 1".into(), // Monday 01:00
+            model: None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -598,5 +657,21 @@ mod tests {
         let cfg: CognitiveConfig = serde_json::from_str(json).unwrap();
         assert!(!cfg.micro_reforge.enabled);
         assert_eq!(cfg.micro_reforge.turn_threshold, 20);
+    }
+
+    #[test]
+    fn predictive_cache_config_defaults() {
+        let cfg: CognitiveConfig = serde_json::from_str("{}").unwrap();
+        assert!(cfg.predictive_cache.enabled);
+        assert_eq!(cfg.predictive_cache.predictions_per_turn, 3);
+        assert_eq!(cfg.predictive_cache.ttl_seconds, 300);
+        assert_eq!(cfg.predictive_cache.min_hit_rate_for_keep_alive, 0.20);
+    }
+
+    #[test]
+    fn hierarchical_config_defaults() {
+        let cfg: CognitiveConfig = serde_json::from_str("{}").unwrap();
+        assert!(cfg.hierarchical.enabled);
+        assert_eq!(cfg.hierarchical.hourly_schedule, "0 5 * * * *");
     }
 }

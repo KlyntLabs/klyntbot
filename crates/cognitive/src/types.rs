@@ -65,6 +65,10 @@ pub struct EpisodicMemory {
     pub scope_repo_id: Option<String>,
     pub metadata: Option<String>,
     pub kind: Option<String>,
+    pub tier: String,
+    pub parent_id: Option<String>,
+    pub child_count: i64,
+    pub rolled_up_at: Option<String>,
 }
 
 /// A procedural rule learned from reflection.

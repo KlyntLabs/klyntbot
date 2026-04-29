@@ -83,6 +83,10 @@ pub fn build_prepared(
                     scope_repo_id: effective_scope_repo.clone(),
                     metadata: None,
                     kind: Some("fix_attempt".into()),
+                    tier: "raw".into(),
+                    parent_id: None,
+                    child_count: 0,
+                    rolled_up_at: None,
                 },
                 kind: "fix_attempt".into(),
                 metadata_json: Some(serde_json::json!({

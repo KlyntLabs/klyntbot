@@ -1167,6 +1167,10 @@ mod tests {
                 scope_repo_id: None,
                 metadata: None,
                 kind: None,
+                tier: "raw".into(),
+                parent_id: None,
+                child_count: 0,
+                rolled_up_at: None,
             },
             cognitive::EpisodicMemory {
                 id: "m2".into(),
@@ -1185,6 +1189,10 @@ mod tests {
                 scope_repo_id: None,
                 metadata: None,
                 kind: None,
+                tier: "raw".into(),
+                parent_id: None,
+                child_count: 0,
+                rolled_up_at: None,
             },
         ];
         let result = build_memory_snapshot(&memories);

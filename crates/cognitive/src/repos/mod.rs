@@ -46,7 +46,7 @@ pub use enrichment::{
     ConversationDensityRepo, ConversationDensityRow, KnowledgeSnapshotRepo, KnowledgeSnapshotRow,
 };
 pub use entity::{
-    EntityRepo, EntityRow, GraphNeighborhood, NewEntity, NewRelationship, RelationshipRow,
+    EdgeRow, EntityRepo, EntityRow, GraphNeighborhood, NewEntity, NewRelationship, RelationshipRow,
 };
 pub use episodic_memory::EpisodicMemoryRepo;
 pub use event_log::EventLogRepo;
@@ -182,6 +182,12 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             version: 9,
             description: "Entity-community membership for online clustering (KCA Track 11)".to_string(),
             sql: include_str!("../../migrations/013_entity_community_members.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 10,
+            description: "Hierarchical episodic compression columns (KCA Track 8)".to_string(),
+            sql: include_str!("../../migrations/014_hierarchical_episodics.sql").to_string(),
         },
     ]
 }
