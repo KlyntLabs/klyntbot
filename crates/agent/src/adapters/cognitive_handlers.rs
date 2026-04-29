@@ -9,6 +9,8 @@ use serde_json::json;
 
 use cognitive::extraction::ExtractedFact;
 use cognitive::types::{MemoryOp, Observation};
+use cognitive::services::micro_reforge::MicroReforgeHandler;
+use cognitive::services::micro_reforge_types::{MicroReforgeInput, MicroReforgeOutput};
 use cognitive::{ConsolidationHandler, ExtractionHandler};
 use feature_coaching::reasoner::{
     CoachingDecision, CoachingReasonerHandler, InterventionType, ReasonerInput,
@@ -1068,6 +1070,63 @@ impl CoachingReasonerHandler for LlmCoachingReasonerHandler {
     }
 }
 
+// ── Micro-Reforge handler (KCA Track 4) ────────────────────────────────────
+
+pub(crate) const MICRO_REFORGE_SYSTEM_PROMPT: &str = r#"You are a procedural-rule synthesizer running mid-session.
+
+You are given recent episodic memories, recent low-level observations, and a summary of existing procedural rules. Your job: identify NEW stable behavioral patterns worth promoting to a rule. Rules are short imperative statements ("When X, do Y").
+
+Conservative criteria — only propose a rule when ALL of the following hold:
+1. The pattern appears in ≥3 recent episodic memories.
+2. The pattern is not already represented in existing_rules_summary (paraphrasing counts as duplicate).
+3. The rule is actionable for an AI assistant (not a description; not a fact about the user).
+4. Confidence ≥ 0.6.
+
+Output JSON exactly:
+{"proposed_rules": [{"domain": "...", "rule_text": "...", "confidence": 0.0-1.0, "signal_count": N, "evidence_episodic_ids": ["..."]}], "notes": "optional"}
+
+If nothing meets the bar, return {"proposed_rules": [], "notes": "no stable patterns this cycle"}. Never invent episodic ids; reference only those provided in the input."#;
+
+pub struct LlmMicroReforgeHandler {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmMicroReforgeHandler {
+    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
+        Self { provider, params }
+    }
+}
+
+#[async_trait]
+impl MicroReforgeHandler for LlmMicroReforgeHandler {
+    async fn synthesize(&self, input: MicroReforgeInput) -> common::Result<MicroReforgeOutput> {
+        let user = serde_json::to_string(&input)
+            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("micro_reforge serialize: {e}"))))?;
+        let messages = vec![
+            Message::System {
+                content: MICRO_REFORGE_SYSTEM_PROMPT.to_string(),
+            },
+            Message::User {
+                content: providers::UserContent::Text(user),
+            },
+        ];
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("micro_reforge: {e}"))))?;
+        let text = resp.content.unwrap_or_default();
+        match serde_json::from_str::<MicroReforgeOutput>(&text) {
+            Ok(out) => Ok(out),
+            Err(e) => {
+                tracing::warn!(error = %e, raw = %text, "micro_reforge: parse failed; returning empty");
+                Ok(MicroReforgeOutput::default())
+            }
+        }
+    }
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -1623,5 +1682,47 @@ mod tests {
         assert!(msg.contains("knows -> Bob"));
         assert!(msg.contains("CROSS-ENTITY FACTS"));
         assert!(msg.contains("works_at"));
+    }
+
+    #[tokio::test]
+    async fn llm_micro_reforge_handler_extracts_high_confidence_rules() {
+        use cognitive::services::micro_reforge_types::*;
+        use cognitive::services::micro_reforge::MicroReforgeHandler;
+
+        let json = r#"{
+            "proposed_rules": [
+                {"domain": "coding", "rule_text": "When user runs cargo nextest, also run clippy.",
+                 "confidence": 0.85, "signal_count": 4,
+                 "evidence_episodic_ids": ["ep1", "ep2"]}
+            ],
+            "notes": null
+        }"#;
+        let provider = MockProvider::new(LlmResponse {
+            content: Some(json.to_string()),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cache_read_tokens: 0, cache_write_tokens: 0 },
+            reasoning_content: None,
+        });
+        let handler = LlmMicroReforgeHandler::new(
+            Arc::new(provider),
+            ChatParams::new("m").with_max_tokens(2048),
+        );
+
+        let input = MicroReforgeInput {
+            recent_episodics: vec![EpisodicRef {
+                id: "ep1".into(), domain: "coding".into(),
+                summary: "user ran cargo nextest".into(), importance: 0.7,
+                recorded_at: "2026-04-29T00:00:00Z".into(),
+            }],
+            recent_observations: vec![],
+            existing_rules_summary: vec![],
+            session_count: 3,
+            turn_count_since_last_run: 10,
+        };
+
+        let out = handler.synthesize(input).await.unwrap();
+        assert_eq!(out.proposed_rules.len(), 1);
+        assert!(out.proposed_rules[0].confidence > 0.8);
     }
 }
