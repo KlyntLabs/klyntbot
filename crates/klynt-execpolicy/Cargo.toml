@@ -1,0 +1,13 @@
+[package]
+name = "klynt-execpolicy"
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+description = "Klynt execution policy — Starlark prefix-rule approval engine. Adapted from codex-rs/execpolicy/."
+
+[dependencies]
+common = { path = "../common" }
+serde = { workspace = true }
+thiserror = "1"
+
+[dev-dependencies]

@@ -1,0 +1,21 @@
+[package]
+name = "klynt-core"
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+description = "Klynt core — coding-tool registry (bash/read/edit/...), execpolicy/sandbox/hooks glue, slash-command direct dispatch."
+
+[dependencies]
+common = { path = "../common" }
+tools-core = { path = "../tools-core" }
+klynt-protocol = { path = "../klynt-protocol" }
+klynt-execpolicy = { path = "../klynt-execpolicy" }
+klynt-sandbox = { path = "../klynt-sandbox" }
+klynt-hooks = { path = "../klynt-hooks" }
+klynt-skill-loader = { path = "../klynt-skill-loader" }
+async-trait = "0.1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["process", "time", "macros", "sync"] }
+
+[dev-dependencies]

@@ -1,0 +1,19 @@
+[package]
+name = "klynt-sandbox"
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+description = "Klynt sandbox — Seatbelt (.sbpl) for macOS, Landlock+bwrap for Linux. Adapted from codex-rs/sandboxing/."
+
+[dependencies]
+common = { path = "../common" }
+serde = { workspace = true }
+thiserror = "1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Add Seatbelt-specific deps in Plan 2.
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Add Landlock + bwrap deps in Plan 2.
+
+[dev-dependencies]

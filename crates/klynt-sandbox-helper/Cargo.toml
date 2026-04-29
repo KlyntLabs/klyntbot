@@ -1,0 +1,15 @@
+[package]
+name = "klynt-sandbox-helper"
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+description = "Linux child-process helper that applies Landlock + seccomp before exec'ing a tool. Adapted from codex-rs/linux-sandbox/."
+
+[[bin]]
+name = "klynt-sandbox-helper"
+path = "src/main.rs"
+
+[dependencies]
+common = { path = "../common" }
+
+[dev-dependencies]

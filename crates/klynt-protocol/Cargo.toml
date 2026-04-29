@@ -1,0 +1,12 @@
+[package]
+name = "klynt-protocol"
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+description = "Klynt protocol types — event/op/submission types for the coding-in-chat surface. Adapted from codex-rs/protocol/."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
