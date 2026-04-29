@@ -187,6 +187,38 @@ impl ProceduralRuleRepo {
         Ok(result.rows_affected())
     }
 
+    /// Record which AgentSources have observed a rule. Persisted as JSON metadata.
+    pub async fn set_observed_sources(&self, id: &str, sources: &[&str]) -> Result<(), sqlx::Error> {
+        let json = serde_json::to_string(sources).unwrap_or_else(|_| "[]".into());
+        sqlx::query(
+            "UPDATE procedural_rules SET metadata = json_set(COALESCE(metadata, '{}'), '$.observed_sources', json(?1)) WHERE id = ?2",
+        )
+        .bind(json)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn list_observed_sources(&self, id: &str) -> Result<Vec<String>, sqlx::Error> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT json_extract(metadata, '$.observed_sources') as srcs FROM procedural_rules WHERE id = ?1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.and_then(|(r,)| serde_json::from_str(&r).ok()).unwrap_or_default())
+    }
+
+    pub async fn find_by_id(&self, id: &str) -> Result<Option<crate::types::ProceduralRule>, sqlx::Error> {
+        sqlx::query_as::<_, crate::types::ProceduralRule>(
+            "SELECT * FROM procedural_rules WHERE id = ?1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
     /// Deactivate a rule.
     pub async fn deactivate(&self, id: &str) -> Result<(), sqlx::Error> {
         sqlx::query(

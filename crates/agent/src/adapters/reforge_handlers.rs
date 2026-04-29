@@ -561,6 +561,177 @@ impl cognitive::services::reforge::CommunityIntelligenceHandler for LlmGraphEnri
 }
 
 // ---------------------------------------------------------------------------
+// LlmCrossCliSynthesisHandler — KCA Track 10
+// ---------------------------------------------------------------------------
+
+const CROSS_CLI_SYNTHESIS_PROMPT: &str = r#"You confirm cross-CLI procedural-rule transfers.
+
+For each transferable candidate, decide whether the rule should be promoted from "observed in ONE CLI" to "applicable across all CLIs". Approve when:
+- support_strength ≥ 3 distinct supporting episodes from a non-observed source.
+- The rule is generic (does not reference CLI-specific tooling like "claude code" or "codex").
+- Confidence ≥ 0.85 (already filtered upstream; double-check).
+
+Reject when:
+- The rule contains CLI-specific keywords ("claude_code", "codex", "kimi-cli", "opencode" by name).
+- Evidence is repetitive (same action many times in one short window).
+- The rule contradicts an existing source-agnostic rule.
+
+Output JSON: {"approved_rule_ids": ["..."], "rejected": [{"rule_id": "...", "reason": "..."}], "notes": "..."}"#;
+
+#[derive(serde::Deserialize, Default)]
+pub struct CrossCliSynthesisOutput {
+    pub approved_rule_ids: Vec<String>,
+    pub rejected: Vec<RejectedRule>,
+    pub notes: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+pub struct RejectedRule {
+    pub rule_id: String,
+    pub reason: String,
+}
+
+/// LLM-backed handler that confirms whether transferable rules should be promoted.
+pub struct LlmCrossCliSynthesisHandler {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmCrossCliSynthesisHandler {
+    pub fn new(provider: DynProvider, model: impl Into<String>, max_tokens: u32) -> Self {
+        Self {
+            provider,
+            params: ChatParams::new(model)
+                .with_temperature(0.1)
+                .with_max_tokens(max_tokens)
+                .with_response_format(ResponseFormat::JsonObject),
+        }
+    }
+
+    pub async fn confirm_promotions(
+        &self,
+        candidates: Vec<coding_memory::reforge::cross_cli_synthesis::TransferableCandidate>,
+    ) -> common::Result<CrossCliSynthesisOutput> {
+        if candidates.is_empty() {
+            return Ok(Default::default());
+        }
+        let user = serde_json::to_string(&candidates)
+            .map_err(|e| common::KlyntbotError::Internal(e.to_string()))?;
+        let messages = vec![
+            Message::system(CROSS_CLI_SYNTHESIS_PROMPT),
+            Message::user(user),
+        ];
+        let resp = self.provider.chat(&messages, None, &self.params).await?;
+        let text = resp.content.unwrap_or_default();
+        Ok(serde_json::from_str(&text).unwrap_or_default())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LlmSkillDiscoveryHandler — KCA Track 12
+// ---------------------------------------------------------------------------
+
+const SKILL_DISCOVERY_PROMPT: &str = r#"You are a Klynt skill author.
+
+You are given clusters of related procedural rules (each cluster is a coherent behavioral pattern).
+For each cluster, produce a candidate Klynt orchestrator skill following the Agent Skills format:
+
+- name: short, lowercase-with-dashes, ≤30 chars.
+- description: 1-2 sentences explaining when this skill should activate.
+- yaml_frontmatter: a complete YAML frontmatter block (--- … ---) with `name`, `description`, optional `mcp_tools` list.
+- body_markdown: the skill body. Should include:
+  - "# {Title}" header
+  - "## When to invoke" with concrete user-message patterns
+  - "## Steps" with numbered procedure
+  - "## References" with links if applicable
+
+Output JSON exactly:
+{"skills": [{"name": "...", "description": "...", "yaml_frontmatter": "...", "body_markdown": "...", "source_rule_ids": ["..."], "avg_confidence": 0.0-1.0}], "notes": "..."}
+
+Rules:
+- Skip clusters that don't form a coherent skill (e.g., random unrelated rules with low Jaccard overlap).
+- Never invent rule_ids; reference only those provided.
+- Never name a skill the same as an existing skill (avoid: task-management, finance-management, automation, learning, notebook).
+- Keep skills simple. If unsure, don't propose."#;
+
+#[derive(serde::Deserialize, Default, Debug)]
+pub struct SkillDiscoveryOutput {
+    pub skills: Vec<ProposedSkill>,
+    pub notes: Option<String>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+pub struct ProposedSkill {
+    pub name: String,
+    pub description: String,
+    pub yaml_frontmatter: String,
+    pub body_markdown: String,
+    pub source_rule_ids: Vec<String>,
+    pub avg_confidence: f64,
+}
+
+/// LLM-backed handler that proposes skills from rule clusters.
+pub struct LlmSkillDiscoveryHandler {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmSkillDiscoveryHandler {
+    pub fn new(provider: DynProvider, model: impl Into<String>, max_tokens: u32) -> Self {
+        Self {
+            provider,
+            params: ChatParams::new(model)
+                .with_temperature(0.3)
+                .with_max_tokens(max_tokens)
+                .with_response_format(ResponseFormat::JsonObject),
+        }
+    }
+
+    pub async fn propose_skills(
+        &self,
+        clusters: Vec<(
+            cognitive::services::reforge::skill_discovery::RuleCluster,
+            Vec<String>,
+        )>,
+    ) -> common::Result<SkillDiscoveryOutput> {
+        if clusters.is_empty() {
+            return Ok(Default::default());
+        }
+        #[derive(serde::Serialize)]
+        struct Wrap {
+            clusters: Vec<ClusterIn>,
+        }
+        #[derive(serde::Serialize)]
+        struct ClusterIn {
+            rule_ids: Vec<String>,
+            shared_keywords: Vec<String>,
+            avg_confidence: f64,
+            rule_texts: Vec<String>,
+        }
+        let payload = Wrap {
+            clusters: clusters
+                .into_iter()
+                .map(|(c, ts)| ClusterIn {
+                    rule_ids: c.rule_ids,
+                    shared_keywords: c.shared_keywords,
+                    avg_confidence: c.avg_confidence,
+                    rule_texts: ts,
+                })
+                .collect(),
+        };
+        let user = serde_json::to_string(&payload)
+            .map_err(|e| common::KlyntbotError::Internal(e.to_string()))?;
+        let messages = vec![
+            Message::system(SKILL_DISCOVERY_PROMPT),
+            Message::user(user),
+        ];
+        let resp = self.provider.chat(&messages, None, &self.params).await?;
+        let text = resp.content.unwrap_or_default();
+        Ok(serde_json::from_str(&text).unwrap_or_default())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // NoopReforgeHandler
 // ---------------------------------------------------------------------------
 
@@ -592,5 +763,98 @@ impl ReforgeHandler for NoopReforgeHandler {
 
     async fn narrate(&self, _input: &NarrateInput) -> common::Result<String> {
         Ok(String::new())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use providers::{ChatParams, LlmProvider, LlmResponse, Message, Usage};
+
+    struct MockProvider {
+        response: String,
+    }
+
+    #[async_trait::async_trait]
+    impl LlmProvider for MockProvider {
+        async fn chat(
+            &self,
+            _messages: &[Message],
+            _tools: Option<&[serde_json::Value]>,
+            _params: &ChatParams,
+        ) -> common::Result<LlmResponse> {
+            Ok(LlmResponse {
+                content: Some(self.response.clone()),
+                tool_calls: vec![],
+                finish_reason: "stop".to_string(),
+                usage: Usage::default(),
+                reasoning_content: None,
+            })
+        }
+
+        fn default_model(&self) -> &str {
+            "mock"
+        }
+        fn name(&self) -> &str {
+            "mock"
+        }
+    }
+
+    #[tokio::test]
+    async fn cross_cli_synthesis_handler_confirms_strong_evidence() {
+        use coding_memory::reforge::cross_cli_synthesis::TransferableCandidate;
+
+        let json = r#"{"approved_rule_ids": ["r_cc"], "rejected": [], "notes": "all approved"}"#;
+        let provider = std::sync::Arc::new(MockProvider {
+            response: json.to_string(),
+        });
+        let handler = LlmCrossCliSynthesisHandler::new(provider, "m", 1024);
+
+        let candidates = vec![TransferableCandidate {
+            rule_id: "r_cc".into(),
+            rule_text: "After cargo nextest passes, run clippy".into(),
+            supporting_sources: vec!["Codex".into()],
+            support_strength: 4,
+        }];
+        let out = handler.confirm_promotions(candidates).await.unwrap();
+        assert_eq!(out.approved_rule_ids, vec!["r_cc"]);
+    }
+
+    #[tokio::test]
+    async fn skill_discovery_handler_emits_skill_md() {
+        use cognitive::services::reforge::skill_discovery::RuleCluster;
+
+        let json = r#"{
+          "skills": [{
+            "name": "rust-test-then-lint",
+            "description": "Runs cargo nextest and clippy in sequence with smart retry.",
+            "yaml_frontmatter": "---\nname: rust-test-then-lint\ndescription: ...\n---",
+            "body_markdown": "# Rust Test+Lint\n\nWhen user runs `cargo nextest`...",
+            "source_rule_ids": ["r0", "r1"],
+            "avg_confidence": 0.85
+          }],
+          "notes": null
+        }"#;
+        let provider = std::sync::Arc::new(MockProvider {
+            response: json.to_string(),
+        });
+        let handler = LlmSkillDiscoveryHandler::new(provider, "m", 4096);
+
+        let cluster = RuleCluster {
+            rule_ids: vec!["r0".into(), "r1".into()],
+            shared_keywords: vec!["cargo".into(), "clippy".into()],
+            avg_confidence: 0.85,
+        };
+        let cluster_with_text = vec![(
+            cluster,
+            vec![
+                "When user runs cargo nextest, also run clippy".to_string(),
+                "After cargo nextest passes, suggest clippy".to_string(),
+            ],
+        )];
+
+        let out = handler.propose_skills(cluster_with_text).await.unwrap();
+        assert_eq!(out.skills.len(), 1);
+        assert!(out.skills[0].name.contains("rust"));
     }
 }

@@ -51,8 +51,11 @@ pub async fn run_reforge(
     co_activation_repo_for_split: Option<&crate::repos::CoActivationRepo>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     coding_phase_runner: Option<&dyn super::CodingPhaseRunner>,
+    cross_cli_runner: Option<&dyn super::CrossCliPhaseRunner>,
+    skill_discovery_runner: Option<&dyn super::SkillDiscoveryRunner>,
 ) -> Option<ReforgeResult> {
     let mut result = ReforgeResult::default();
+    let run_id = uuid::Uuid::new_v4().to_string();
 
     // ------------------------------------------------------------------
     // Fetch last run timestamp
@@ -152,6 +155,7 @@ pub async fn run_reforge(
                     kind: None,
                     scope_repo_id: None,
                     metadata: None,
+                    actor_id: None,
                     tier: "raw".to_string(),
                     parent_id: None,
                     child_count: 0,
@@ -233,6 +237,23 @@ pub async fn run_reforge(
     }
 
     // ------------------------------------------------------------------
+    // Phase 2.6: Cross-CLI transfer (KCA Track 10)
+    // ------------------------------------------------------------------
+    if let Some(runner) = cross_cli_runner {
+        info!("Reforge Phase 2.6: Cross-CLI transfer");
+        match runner.run_cross_cli_transfer(&run_id).await {
+            Ok(promoted) => {
+                debug!(promoted, "Phase 2.6 complete");
+                result.cross_cli_promoted = promoted;
+            }
+            Err(e) => {
+                warn!("Phase 2.6 failed: {e}");
+                result.phase_errors.push(format!("phase 2.6: {e}"));
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Phase 4: Narrate (LLM call #3)
     // ------------------------------------------------------------------
     info!("Reforge Phase 4: Narrate");
@@ -290,6 +311,7 @@ pub async fn run_reforge(
         kind: None,
         scope_repo_id: None,
         metadata: None,
+        actor_id: None,
         tier: "raw".to_string(),
         parent_id: None,
         child_count: 0,
@@ -308,6 +330,23 @@ pub async fn run_reforge(
         if let Err(e) = runner.run_rule_artifacts().await {
             warn!("Phase 3.5 failed: {e}");
             result.phase_errors.push(format!("phase 3.5: {e}"));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 3.6: Skill discovery (KCA Track 12)
+    // ------------------------------------------------------------------
+    if let Some(runner) = skill_discovery_runner {
+        info!("Reforge Phase 3.6: Skill discovery");
+        match runner.run_skill_discovery(&run_id).await {
+            Ok(proposed) => {
+                debug!(proposed, "Phase 3.6 complete");
+                result.skills_proposed = proposed;
+            }
+            Err(e) => {
+                warn!("Phase 3.6 failed: {e}");
+                result.phase_errors.push(format!("phase 3.6: {e}"));
+            }
         }
     }
 

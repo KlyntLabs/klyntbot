@@ -228,6 +228,7 @@ fn raw_episode(id: &str, domain: &str, content: &str) -> EpisodicMemory {
         stability: 1.0, last_accessed: None, access_count: 0,
         project_id: None, scope_type: "user".into(), scope_id: None,
         scope_repo_id: None, metadata: None, kind: None,
+        actor_id: None,
         tier: "raw".into(), parent_id: None, child_count: 0, rolled_up_at: None,
     }
 }
