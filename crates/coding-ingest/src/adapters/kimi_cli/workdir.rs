@@ -54,9 +54,8 @@ impl WorkdirIndex {
                 )));
             }
         };
-        let meta: KimiMetadata = serde_json::from_slice(&bytes).map_err(|e| {
-            common::KlyntbotError::Storage(format!("kimi.json parse: {e}"))
-        })?;
+        let meta: KimiMetadata = serde_json::from_slice(&bytes)
+            .map_err(|e| common::KlyntbotError::Storage(format!("kimi.json parse: {e}")))?;
         let mut next = HashMap::with_capacity(meta.work_dirs.len());
         for entry in meta.work_dirs {
             let hash = hash_for(&entry.path, &entry.kaos);
@@ -111,7 +110,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("nope.json");
         let idx = WorkdirIndex::new();
-        idx.refresh(&path).await.expect("missing file is not an error");
+        idx.refresh(&path)
+            .await
+            .expect("missing file is not an error");
         assert!(idx.get("anyhash").await.is_none());
     }
 

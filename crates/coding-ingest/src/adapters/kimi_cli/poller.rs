@@ -204,8 +204,7 @@ impl KimiPoller {
                 let ts = jiff::Timestamp::new(record.timestamp.trunc() as i64, 0)
                     .unwrap_or_else(|_| jiff::Timestamp::now());
                 let model_hint = state.last_model.clone();
-                if let Some(evt) =
-                    maybe_emit_session_start(state, session_id, cwd, ts, model_hint)
+                if let Some(evt) = maybe_emit_session_start(state, session_id, cwd, ts, model_hint)
                 {
                     out.push(evt);
                 }
@@ -260,14 +259,13 @@ async fn walk(dir: &Path, out: &mut Vec<PathBuf>, depth: usize) -> Result<()> {
         .map_err(|e| common::KlyntbotError::Storage(format!("kimi readdir: {e}")))?
     {
         let path = entry.path();
-        let ty = entry.file_type().await.map_err(|e| {
-            common::KlyntbotError::Storage(format!("kimi file_type: {e}"))
-        })?;
+        let ty = entry
+            .file_type()
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("kimi file_type: {e}")))?;
         if ty.is_dir() {
             Box::pin(walk(&path, out, depth + 1)).await?;
-        } else if ty.is_file()
-            && path.file_name().and_then(|s| s.to_str()) == Some("wire.jsonl")
-        {
+        } else if ty.is_file() && path.file_name().and_then(|s| s.to_str()) == Some("wire.jsonl") {
             out.push(path);
         }
     }
@@ -283,7 +281,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let nested = dir.path().join("hash1/uuid1");
         tokio::fs::create_dir_all(&nested).await.unwrap();
-        tokio::fs::write(nested.join("wire.jsonl"), "x").await.unwrap();
+        tokio::fs::write(nested.join("wire.jsonl"), "x")
+            .await
+            .unwrap();
         let sub = nested.join("subagents/sa1");
         tokio::fs::create_dir_all(&sub).await.unwrap();
         tokio::fs::write(sub.join("wire.jsonl"), "y").await.unwrap();
@@ -293,7 +293,9 @@ mod tests {
 
     #[tokio::test]
     async fn list_wire_files_missing_dir_is_ok() {
-        let res = list_wire_files(Path::new("/no/such/path/12345")).await.unwrap();
+        let res = list_wire_files(Path::new("/no/such/path/12345"))
+            .await
+            .unwrap();
         assert!(res.is_empty());
     }
 }

@@ -56,20 +56,19 @@ pub fn map_event(
             buffer_tool_call(state, payload, occurred_at);
             vec![]
         }
-        "ToolResult" => map_tool_result(
-            state, payload, &repo, turn_id, session_id, cwd, occurred_at,
-        ),
+        "ToolResult" => {
+            map_tool_result(state, payload, &repo, turn_id, session_id, cwd, occurred_at)
+        }
         "StatusUpdate" => {
             update_status(state, payload);
             vec![]
         }
-        "TurnEnd" | "StepBegin" | "StepInterrupted" | "CompactionBegin"
-        | "CompactionEnd" | "MCPLoadingBegin" | "MCPLoadingEnd"
-        | "HookTriggered" | "HookResolved" | "BtwBegin" | "BtwEnd"
-        | "PlanDisplay" | "ImageURLPart" | "AudioURLPart" | "VideoURLPart"
+        "TurnEnd" | "StepBegin" | "StepInterrupted" | "CompactionBegin" | "CompactionEnd"
+        | "MCPLoadingBegin" | "MCPLoadingEnd" | "HookTriggered" | "HookResolved" | "BtwBegin"
+        | "BtwEnd" | "PlanDisplay" | "ImageURLPart" | "AudioURLPart" | "VideoURLPart"
         | "ThinkPart" | "ToolCallPart" | "Notification" | "ApprovalRequest"
-        | "ApprovalResponse" | "QuestionRequest" | "QuestionResponse"
-        | "HookRequest" | "HookResponse" | "ToolCallRequest" | "SteerInput" => vec![],
+        | "ApprovalResponse" | "QuestionRequest" | "QuestionResponse" | "HookRequest"
+        | "HookResponse" | "ToolCallRequest" | "SteerInput" => vec![],
         other => {
             tracing::debug!(kind = other, "kimi mapper: skipping unknown event type");
             vec![]
@@ -220,10 +219,9 @@ fn map_tool_result(
         .get("is_error")
         .and_then(Value::as_bool)
         .unwrap_or(false);
-    let duration_ms = u32::try_from(
-        (occurred_at.as_millisecond() - pending.started_at.as_millisecond()).max(0),
-    )
-    .unwrap_or(u32::MAX);
+    let duration_ms =
+        u32::try_from((occurred_at.as_millisecond() - pending.started_at.as_millisecond()).max(0))
+            .unwrap_or(u32::MAX);
     vec![AgentEventV1 {
         id: Uuid::new_v4(),
         source: AgentSource::KimiCli,
@@ -266,7 +264,9 @@ fn update_status(_state: &mut SessionState, payload: &Value) {
 }
 
 fn extract_user_input_text(input: Option<&Value>) -> String {
-    let Some(value) = input else { return String::new() };
+    let Some(value) = input else {
+        return String::new();
+    };
     if let Some(s) = value.as_str() {
         return s.to_string();
     }
@@ -316,7 +316,10 @@ mod tests {
     use std::path::Path;
 
     fn record(env: WireEnvelope, ts: f64) -> WireRecord {
-        WireRecord { timestamp: ts, message: env }
+        WireRecord {
+            timestamp: ts,
+            message: env,
+        }
     }
 
     fn collected(kind: &str, payload: Value) -> CollectedEvent {
@@ -334,7 +337,13 @@ mod tests {
             "TurnBegin",
             serde_json::json!({"user_input": [{"type":"text","text":"hi"}]}),
         );
-        let r = record(WireEnvelope { kind: "TurnBegin".into(), payload: c.payload.clone() }, 100.0);
+        let r = record(
+            WireEnvelope {
+                kind: "TurnBegin".into(),
+                payload: c.payload.clone(),
+            },
+            100.0,
+        );
         let out = map_event(&mut state, &c, &r, "sess1", Path::new("/tmp"));
         assert_eq!(out.len(), 1);
         match &out[0].kind {
@@ -347,7 +356,13 @@ mod tests {
     fn turn_begin_string_input_works() {
         let mut state = SessionState::default();
         let c = collected("TurnBegin", serde_json::json!({"user_input": "plain"}));
-        let r = record(WireEnvelope { kind: "TurnBegin".into(), payload: c.payload.clone() }, 1.0);
+        let r = record(
+            WireEnvelope {
+                kind: "TurnBegin".into(),
+                payload: c.payload.clone(),
+            },
+            1.0,
+        );
         let out = map_event(&mut state, &c, &r, "s", Path::new("/tmp"));
         assert_eq!(out.len(), 1);
     }
@@ -356,7 +371,13 @@ mod tests {
     fn text_part_emits_assistant_msg() {
         let mut state = SessionState::default();
         let c = collected("TextPart", serde_json::json!({"text":"hello back"}));
-        let r = record(WireEnvelope { kind: "TextPart".into(), payload: c.payload.clone() }, 1.0);
+        let r = record(
+            WireEnvelope {
+                kind: "TextPart".into(),
+                payload: c.payload.clone(),
+            },
+            1.0,
+        );
         let out = map_event(&mut state, &c, &r, "s", Path::new("/tmp"));
         assert_eq!(out.len(), 1);
         assert!(matches!(out[0].kind, EventKind::AssistantMsg { .. }));
@@ -370,7 +391,13 @@ mod tests {
             "ToolCall",
             serde_json::json!({"id":"c1","function":{"name":"Read","arguments":"{\"path\":\"/x\"}"}}),
         );
-        let r1 = record(WireEnvelope { kind: "ToolCall".into(), payload: c1.payload.clone() }, 100.0);
+        let r1 = record(
+            WireEnvelope {
+                kind: "ToolCall".into(),
+                payload: c1.payload.clone(),
+            },
+            100.0,
+        );
         let out1 = map_event(&mut state, &c1, &r1, "s", Path::new("/tmp"));
         assert!(out1.is_empty(), "ToolCall must buffer, not emit");
 
@@ -379,11 +406,22 @@ mod tests {
             "ToolResult",
             serde_json::json!({"id":"c1","content":"ok","is_error":false}),
         );
-        let r2 = record(WireEnvelope { kind: "ToolResult".into(), payload: c2.payload.clone() }, 100.5);
+        let r2 = record(
+            WireEnvelope {
+                kind: "ToolResult".into(),
+                payload: c2.payload.clone(),
+            },
+            100.5,
+        );
         let out2 = map_event(&mut state, &c2, &r2, "s", Path::new("/tmp"));
         assert_eq!(out2.len(), 1);
         match &out2[0].kind {
-            EventKind::ToolCall { tool, ok, duration_ms, .. } => {
+            EventKind::ToolCall {
+                tool,
+                ok,
+                duration_ms,
+                ..
+            } => {
                 assert_eq!(tool, "Read");
                 assert!(*ok);
                 assert!(*duration_ms <= 1000, "should be ~500ms, got {duration_ms}");
@@ -396,7 +434,13 @@ mod tests {
     fn unknown_kind_is_skipped() {
         let mut state = SessionState::default();
         let c = collected("BrandNewType_2027", serde_json::json!({}));
-        let r = record(WireEnvelope { kind: c.kind.clone(), payload: c.payload.clone() }, 1.0);
+        let r = record(
+            WireEnvelope {
+                kind: c.kind.clone(),
+                payload: c.payload.clone(),
+            },
+            1.0,
+        );
         let out = map_event(&mut state, &c, &r, "s", Path::new("/tmp"));
         assert!(out.is_empty());
     }
@@ -405,8 +449,10 @@ mod tests {
     fn session_start_emitted_once() {
         let mut state = SessionState::default();
         let ts = unix_seconds_to_ts(100.0);
-        let first = maybe_emit_session_start(&mut state, "s", Path::new("/tmp"), ts, Some("k2".into()));
-        let second = maybe_emit_session_start(&mut state, "s", Path::new("/tmp"), ts, Some("k2".into()));
+        let first =
+            maybe_emit_session_start(&mut state, "s", Path::new("/tmp"), ts, Some("k2".into()));
+        let second =
+            maybe_emit_session_start(&mut state, "s", Path::new("/tmp"), ts, Some("k2".into()));
         assert!(first.is_some());
         assert!(second.is_none());
     }

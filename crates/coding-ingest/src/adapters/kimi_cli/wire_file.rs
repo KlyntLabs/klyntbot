@@ -137,9 +137,7 @@ mod tests {
                 assert!((r.timestamp - 1777096658.415196).abs() < 1e-6);
                 assert_eq!(r.message.kind, "TurnBegin");
                 assert_eq!(
-                    r.message.payload["user_input"][0]["text"]
-                        .as_str()
-                        .unwrap(),
+                    r.message.payload["user_input"][0]["text"].as_str().unwrap(),
                     "hi"
                 );
             }
