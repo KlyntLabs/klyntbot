@@ -16,6 +16,8 @@ use crate::causal::CausalEdgeDetector;
 use crate::recall::telemetry::RecallInvocationRepo;
 use crate::reforge::session_summary_repo::{SessionSummaryRepo, SessionSummaryRow};
 use cognitive::{CoActivationRepo, EpisodicMemoryRepo};
+use cognitive::repos::EntityRepo;
+use cognitive::repos::CommunityRepo;
 use common::{KlyntbotError, Result};
 use jiff::Timestamp;
 use serde_json::Value;
@@ -42,6 +44,9 @@ pub struct SessionEndPass {
     co_activation: CoActivationRepo,
     utilization: RecallInvocationRepo,
     causal_detector: Option<Arc<CausalEdgeDetector>>,
+    entity_repo: Option<EntityRepo>,
+    community_repo: Option<CommunityRepo>,
+    community_handler: Option<Arc<dyn cognitive::services::community_membership_online::AsyncConfirmFn>>,
 }
 
 impl SessionEndPass {
@@ -56,7 +61,31 @@ impl SessionEndPass {
             co_activation,
             utilization,
             causal_detector: None,
+            entity_repo: None,
+            community_repo: None,
+            community_handler: None,
         }
+    }
+
+    /// Attach entity repo for online community membership (KCA Track 11).
+    #[must_use]
+    pub fn with_entity_repo(mut self, repo: EntityRepo) -> Self {
+        self.entity_repo = Some(repo);
+        self
+    }
+
+    /// Attach community repo for online community membership (KCA Track 11).
+    #[must_use]
+    pub fn with_community_repo(mut self, repo: CommunityRepo) -> Self {
+        self.community_repo = Some(repo);
+        self
+    }
+
+    /// Attach community membership handler for online community membership (KCA Track 11).
+    #[must_use]
+    pub fn with_community_handler(mut self, handler: Arc<dyn cognitive::services::community_membership_online::AsyncConfirmFn>) -> Self {
+        self.community_handler = Some(handler);
+        self
     }
 
     /// Attach an optional causal-edge detector.
@@ -166,7 +195,17 @@ impl SessionEndPass {
         let stale_count = resolve_stale_candidates(&ep_repo, repo_id).await?;
         report.deduped_attempts += stale_count; // reuse counter for now
 
-        // 5. Build deterministic ≤200-token summary.
+        // 5. Online community membership (KCA Track 11).
+        if let (Some(entity_repo), Some(community_repo), Some(handler)) = (&self.entity_repo, &self.community_repo, &self.community_handler) {
+            let touched_ids = collect_touched_entity_ids(entity_repo, &all_ids).await;
+            if !touched_ids.is_empty() {
+                cognitive::services::community_membership_online::run_for_session(
+                    entity_repo, community_repo, touched_ids, handler.clone(),
+                ).await;
+            }
+        }
+
+        // 6. Build deterministic ≤200-token summary.
         let summary = build_summary_md(session_id, repo_id, &invocations).await;
         let token_count = estimate_tokens(&summary);
         report.summary_tokens = token_count;
@@ -234,6 +273,39 @@ async fn resolve_stale_candidates(
         }
     }
     Ok(count)
+}
+
+/// Collect entity IDs touched by recalled facts in this session (KCA Track 11).
+async fn collect_touched_entity_ids(
+    entity_repo: &EntityRepo,
+    fact_ids: &[String],
+) -> Vec<String> {
+    if fact_ids.is_empty() { return Vec::new(); }
+    let fact_repo = cognitive::repos::SemanticFactRepo::new(entity_repo.pool().clone());
+    let refs: Vec<&str> = fact_ids.iter().map(|s| s.as_str()).collect();
+    let facts = match fact_repo.get_batch(&refs).await {
+        Ok(f) => f,
+        Err(e) => { tracing::warn!(error = %e, "collect_touched_entity_ids: get_batch failed"); return Vec::new(); }
+    };
+
+    let mut names: std::collections::HashSet<String> = Default::default();
+    for f in &facts {
+        names.insert(f.subject.clone());
+        names.insert(f.object.clone());
+    }
+
+    let mut entity_ids: std::collections::HashSet<String> = Default::default();
+    for name in names {
+        match entity_repo.find_by_name(&name).await {
+            Ok(rows) => {
+                for row in rows {
+                    entity_ids.insert(row.id);
+                }
+            }
+            Err(e) => tracing::warn!(error = %e, name = %name, "find_by_name failed"),
+        }
+    }
+    entity_ids.into_iter().collect()
 }
 
 fn estimate_tokens(s: &str) -> u32 {

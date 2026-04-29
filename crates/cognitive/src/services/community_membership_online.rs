@@ -42,7 +42,7 @@ pub async fn find_best_community_for_entity(
 }
 
 #[async_trait]
-pub trait AsyncConfirmFn: Send + Sync {
+pub trait AsyncConfirmFn: Send + Sync + std::fmt::Debug {
     async fn confirm(&self, entity_name: &str, entity_type: &str, community_name: &str, summary: &str, score: f64) -> bool;
 }
 

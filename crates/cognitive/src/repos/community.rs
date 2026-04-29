@@ -29,6 +29,7 @@ fn map_sqlx(e: sqlx::Error) -> common::KlyntbotError {
     common::KlyntbotError::Storage(e.to_string())
 }
 
+#[derive(Debug, Clone)]
 pub struct CommunityRepo {
     pool: SqlitePool,
 }
