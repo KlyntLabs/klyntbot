@@ -132,6 +132,35 @@ impl AccumulatedObservationRepo {
         Ok(())
     }
 
+    /// List the most recent observations across all event types.
+    pub async fn list_recent(&self, limit: i64) -> Vec<Observation> {
+        let rows: Vec<AccumulatedRow> = match sqlx::query_as(
+            "SELECT id, event_type_key, domain, content, importance, source_event, observed_at, day_key \
+             FROM accumulated_observations \
+             ORDER BY observed_at DESC LIMIT ?1",
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                warn!("Failed to list recent accumulated observations: {e}");
+                return Vec::new();
+            }
+        };
+
+        rows.into_iter()
+            .map(|row| Observation {
+                domain: row.domain,
+                content: row.content,
+                importance: row.importance,
+                source_event: row.source_event,
+                timestamp: row.observed_at.parse().unwrap_or_else(|_| Timestamp::now()),
+            })
+            .collect()
+    }
+
     /// Delete all observations for an event type (after promotion).
     pub async fn delete_by_key(&self, event_type_key: &str) {
         if let Err(e) =
