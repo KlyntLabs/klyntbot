@@ -682,11 +682,7 @@ impl cognitive::services::graph_linker::GraphLinkHandler for LlmGraphLinkHandler
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| {
-                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                    "graph_link: {e}"
-                )))
-            })?;
+            .map_err(|e| crate::provider_err("graph_link", e))?;
 
         let text = resp.content.unwrap_or_default();
         match serde_json::from_str::<cognitive::services::graph_linker_types::GraphLinkOutput>(
@@ -851,11 +847,8 @@ impl cognitive::pipeline::DeepConsolidationHandler for LlmDeepConsolidationHandl
         let response = self.provider.chat(&messages, None, &self.params).await?;
         let content = response.content.unwrap_or_default();
 
-        let parsed: DeepConsolidationResponse = serde_json::from_str(&content).map_err(|e| {
-            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                "Deep consolidation JSON parse: {e}"
-            )))
-        })?;
+        let parsed: DeepConsolidationResponse = serde_json::from_str(&content)
+            .map_err(|e| crate::provider_err("Deep consolidation JSON parse", e))?;
 
         let mut ops = Vec::new();
         for decision in parsed.decisions {
@@ -1104,11 +1097,8 @@ impl ExtractionCriticHandler for LlmExtractionCriticHandler {
         if input.extracted_facts.is_empty() {
             return Ok(Default::default());
         }
-        let user = serde_json::to_string(&input).map_err(|e| {
-            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                "critic serialize: {e}"
-            )))
-        })?;
+        let user = serde_json::to_string(&input)
+            .map_err(|e| crate::provider_err("critic serialize", e))?;
         let messages = vec![
             Message::System {
                 content: EXTRACTION_CRITIC_SYSTEM_PROMPT.to_string(),
@@ -1121,11 +1111,7 @@ impl ExtractionCriticHandler for LlmExtractionCriticHandler {
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| {
-                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                    "critic: {e}"
-                )))
-            })?;
+            .map_err(|e| crate::provider_err("critic", e))?;
         match serde_json::from_str::<ExtractionCriticOutput>(&resp.content.unwrap_or_default()) {
             Ok(o) => Ok(o),
             Err(e) => {
@@ -1196,11 +1182,7 @@ impl LlmCommunityMembershipHandler {
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| {
-                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                    "community_membership: {e}"
-                )))
-            })?;
+            .map_err(|e| crate::provider_err("community_membership", e))?;
 
         #[derive(serde::Deserialize)]
         struct R {
@@ -1276,11 +1258,8 @@ impl LlmMicroReforgeHandler {
 #[async_trait]
 impl MicroReforgeHandler for LlmMicroReforgeHandler {
     async fn synthesize(&self, input: MicroReforgeInput) -> common::Result<MicroReforgeOutput> {
-        let user = serde_json::to_string(&input).map_err(|e| {
-            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                "micro_reforge serialize: {e}"
-            )))
-        })?;
+        let user = serde_json::to_string(&input)
+            .map_err(|e| crate::provider_err("micro_reforge serialize", e))?;
         let messages = vec![
             Message::System {
                 content: MICRO_REFORGE_SYSTEM_PROMPT.to_string(),
@@ -1293,11 +1272,7 @@ impl MicroReforgeHandler for LlmMicroReforgeHandler {
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| {
-                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                    "micro_reforge: {e}"
-                )))
-            })?;
+            .map_err(|e| crate::provider_err("micro_reforge", e))?;
         let text = resp.content.unwrap_or_default();
         match serde_json::from_str::<MicroReforgeOutput>(&text) {
             Ok(out) => Ok(out),
@@ -1341,7 +1316,7 @@ impl LlmQueryPredictorHandler {
             providers::Message::user(user),
         ];
         let resp = self.provider.chat(&messages, None, &self.params).await
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("query_predictor: {e}"))))?;
+            .map_err(|e| crate::provider_err("query_predictor", e))?;
         #[derive(serde::Deserialize)]
         struct R { predictions: Vec<String> }
         let parsed: R = serde_json::from_str(&resp.content.unwrap_or_default())
@@ -1409,7 +1384,7 @@ impl cognitive::services::hierarchical_compressor::HierarchicalSummarizer for Ll
             providers::Message::user(user),
         ];
         let resp = self.provider.chat(&messages, None, &self.params).await
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("hier_summarize: {e}"))))?;
+            .map_err(|e| crate::provider_err("hier_summarize", e))?;
         Ok(resp.content.unwrap_or_default())
     }
 }
@@ -1450,7 +1425,7 @@ impl cognitive::services::temporal_pruner::TemporalPrunerHandler for LlmTemporal
             providers::Message::user(user),
         ];
         let resp = self.provider.chat(&messages, None, &self.params).await
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("temporal_prune: {e}"))))?;
+            .map_err(|e| crate::provider_err("temporal_prune", e))?;
         match serde_json::from_str::<cognitive::services::temporal_pruner::PruneOutput>(&resp.content.unwrap_or_default()) {
             Ok(o) => Ok(o),
             Err(_) => Ok(cognitive::services::temporal_pruner::PruneOutput {

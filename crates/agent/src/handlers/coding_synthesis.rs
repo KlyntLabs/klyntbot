@@ -51,11 +51,7 @@ impl CodingSynthesisHandler for CodingSynthesisHandlerImpl {
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| {
-                KlyntbotError::Provider(ProviderError::InvalidResponse(format!(
-                    "Phase 2.5 chat: {e}"
-                )))
-            })?;
+            .map_err(|e| crate::provider_err("Phase 2.5 chat", e))?;
 
         let raw = response.content.unwrap_or_default();
 
@@ -70,13 +66,9 @@ impl CodingSynthesisHandler for CodingSynthesisHandlerImpl {
 }
 
 fn recover(raw: &str) -> CodingSynthesisOutput {
-    // Attempt to extract a JSON object from the response — fall back to empty.
-    if let Some(start) = raw.find('{') {
-        if let Some(end) = raw.rfind('}') {
-            let candidate = &raw[start..=end];
-            if let Ok(parsed) = serde_json::from_str::<CodingSynthesisOutput>(candidate) {
-                return parsed;
-            }
+    if let Some(candidate) = common::helpers::extract_json_object(raw) {
+        if let Ok(parsed) = serde_json::from_str::<CodingSynthesisOutput>(candidate) {
+            return parsed;
         }
     }
     CodingSynthesisOutput {

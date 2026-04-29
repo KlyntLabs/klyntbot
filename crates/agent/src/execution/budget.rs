@@ -117,7 +117,6 @@ impl ExecutionBudget {
         }
     }
 
-    /// Record token usage from an LLM response.
     pub fn deduct(&mut self, usage: &providers::Usage) {
         let total = usage.prompt_tokens as u64 + usage.completion_tokens as u64;
         self.tokens_used += total;
@@ -128,7 +127,6 @@ impl ExecutionBudget {
         self.cost_usd += cost_usd;
     }
 
-    /// Increment the turn counter. Call after each complete LLM cycle.
     pub fn tick_turn(&mut self) {
         self.turns_used += 1;
     }

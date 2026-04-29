@@ -61,11 +61,8 @@ impl NarrativeHandler for LlmNarrativeHandler {
         let response = self.provider.chat(&messages, None, &params).await?;
         let content = response.content.unwrap_or_default();
 
-        serde_json::from_str::<GeneratedNarrative>(&content).map_err(|e| {
-            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                "Mirror narrative JSON parse error: {e}"
-            )))
-        })
+        serde_json::from_str::<GeneratedNarrative>(&content)
+            .map_err(|e| crate::provider_err("Mirror narrative JSON parse error", e))
     }
 
     async fn generate_mirror_response(&self, query: &str, ctx: NarrativeContext) -> Result<String> {
