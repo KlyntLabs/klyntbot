@@ -101,6 +101,7 @@ impl QualityScoreRepo {
 mod tests {
     use super::*;
     use crate::ProductivityFeature;
+    use crate::types::SessionSource;
 
     async fn setup_pool() -> SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
@@ -161,8 +162,9 @@ mod tests {
 
         // Create a session first (needed for FK)
         sqlx::query(
-            "INSERT INTO productivity_sessions (id, session_type, started_at, source, created_at, updated_at) VALUES ('sess-qs', 'focus', '2026-03-09T10:00:00Z', 'auto', '2026-03-09T10:00:00Z', '2026-03-09T10:00:00Z')",
+            "INSERT INTO productivity_sessions (id, session_type, started_at, source, created_at, updated_at) VALUES ('sess-qs', 'focus', '2026-03-09T10:00:00Z', ?1, '2026-03-09T10:00:00Z', '2026-03-09T10:00:00Z')",
         )
+        .bind(SessionSource::AutoDetected.to_string())
         .execute(&repo.pool)
         .await
         .unwrap();

@@ -4,8 +4,13 @@ use desktop_shared::errors::ApiError;
 use crate::state::AppCore;
 
 /// Workspace files the user may view/edit, with human-readable descriptions.
+///
+/// Note: agent personality/tone is owned by `KLYNTBOT.md` in the data dir
+/// (served by `SoulContextSource`). The legacy `SOUL.md` workspace file was
+/// retired because two soul-like files at different priorities silently
+/// overrode each other. The remaining workspace files cover auxiliary
+/// instructions that layer on top of the soul.
 const WORKSPACE_FILES: &[(&str, &str)] = &[
-    ("SOUL.md", "Agent personality and values"),
     ("AGENTS.md", "Agent instructions and guidelines"),
     ("USER.md", "Your profile and preferences"),
     ("TOOLS.md", "Available tools documentation"),
@@ -91,7 +96,6 @@ impl AppCore {
 
 fn embedded_template(filename: &str) -> Option<&'static str> {
     match filename {
-        "SOUL.md" => Some(include_str!("../../../../workspace/SOUL.md")),
         "AGENTS.md" => Some(include_str!("../../../../workspace/AGENTS.md")),
         "USER.md" => Some(include_str!("../../../../workspace/USER.md")),
         "TOOLS.md" => Some(include_str!("../../../../workspace/TOOLS.md")),

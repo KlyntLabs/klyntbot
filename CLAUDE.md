@@ -194,6 +194,10 @@ Transform vague tasks into verifiable goals — "fix the bug" → "write a test 
 
 - **Structured observability (OpenTelemetry, Prometheus, metrics dashboards)** — this is a single-user local app. Existing `tracing` logs and `PipelineEvent` SSE stream are sufficient. Don't add observability infrastructure.
 
+## System prompt = KLYNTBOT.md
+
+The system prompt sent to the LLM on every chat turn is built from `ContextEngine::build_system_prompt()` (called by `AgentRuntime::process` at `crates/agent/src/agent_runtime/runtime.rs`). It joins all registered `ContextSource` outputs in priority order; the highest-priority source is `SoulContextSource`, which lives-reads `~/.klyntbot/KLYNTBOT.md` (or `~/.klyntbot-dev/KLYNTBOT.md`). Edits to that file take effect on the next message — no restart, no rebuild. To change the agent's tone, formatting rules, persona, language, or any global behavior, **edit KLYNTBOT.md** rather than hard-coding it in Rust. The default content (used on first run if the file is missing) lives in `crates/skill-system/src/soul.rs::DEFAULT_SOUL`. The squad chat path (`handlers/chat/streaming.rs::execute_direct_address`) uses a different prompt builder (`debate::build_persona_system_prompt`) and does NOT read the soul — squads override personality via persona rows.
+
 ## Gotchas
 
 - **MSRV 1.93** — Rust stable 1.93. APIs like `is_some_and`, `is_none_or` are available. Clippy catches MSRV violations.

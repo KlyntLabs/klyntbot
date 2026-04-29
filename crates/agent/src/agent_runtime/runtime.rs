@@ -246,10 +246,20 @@ impl AgentRuntime {
             DepthMode::Ultra => tier0_cfg.ultra,
         };
 
+        // Build the system prompt from registered ContextSources
+        // (SoulContextSource + SkillListingSource). Without this call the
+        // assembler would receive an empty system message and the model would
+        // run on pretraining defaults — see KLYNTBOT.md for the canonical
+        // tone/formatting rules that this prompt carries into every turn.
+        let system_prompt = self
+            .context_engine
+            .build_system_prompt(ctx.channel.as_str(), ctx.chat_id.as_str(), Some(message))
+            .await;
+
         let context_request = ContextRequest {
             message_text: message.to_string(),
             history,
-            system_prompt: String::new(), // Built by ContextSources (SoulContextSource + SkillListingSource)
+            system_prompt,
             strategy: ExecutionStrategy::ToolAssisted { max_iterations: 30 },
             tool_definitions: tool_definitions.to_vec(),
             context_window: self.context_window,

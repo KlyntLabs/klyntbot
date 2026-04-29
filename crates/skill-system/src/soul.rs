@@ -23,6 +23,12 @@ You are Klyntbot, a personal AI assistant.
 - Use metric units
 - Currency: VND
 - Timezone: auto-detect from system
+
+## Formatting (STRICT — overrides any default writing style)
+
+**Emoji rule.** Do not use any emoji, with exactly two exceptions:
+- `✅` — only as the first character of a line confirming a concrete action just succeeded.
+- `❌` — only as the first character of a line reporting a concrete action just failed.
 "#;
 
 /// Context source that loads KLYNTBOT.md from the data directory.
@@ -73,11 +79,27 @@ impl ContextSource for SoulContextSource {
     }
 
     async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
-        let content = self.content.read().await;
-        if content.is_empty() {
-            None
-        } else {
-            Some(content.clone())
+        // Live-read so edits to KLYNTBOT.md take effect on the next turn
+        // without restarting the agent. The cached copy is the fallback
+        // for transient read failures (e.g. atomic mid-write swap).
+        match tokio::fs::read_to_string(&self.path).await {
+            Ok(fresh) => {
+                {
+                    let mut cached = self.content.write().await;
+                    if *cached != fresh {
+                        *cached = fresh.clone();
+                    }
+                }
+                if fresh.is_empty() { None } else { Some(fresh) }
+            }
+            Err(_) => {
+                let cached = self.content.read().await;
+                if cached.is_empty() {
+                    None
+                } else {
+                    Some(cached.clone())
+                }
+            }
         }
     }
 

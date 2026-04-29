@@ -3,7 +3,7 @@
 
 pub use ::app_core::AppCore;
 
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use ::app_core::events::{AppEventEmitter, CompoundEmitter};
 use ::app_core::EventChannels;
@@ -25,6 +25,33 @@ static BRIDGE_SERVER: OnceLock<mcp_bridge::BridgeServer> = OnceLock::new();
 /// The watcher task exits when this token is cancelled (on graceful
 /// shutdown) or when the runtime drops (on process exit).
 static DATA_VERSION_WATCHER: OnceLock<tokio_util::sync::CancellationToken> = OnceLock::new();
+
+/// Latest distraction intervention awaiting display. Populated each time a
+/// `DistractionAlert` is forwarded; cleared when the overlay's React layer
+/// acks via `distraction_clear_pending_intervention`. This survives the
+/// emit-before-mount race for the lazily-created overlay window.
+static PENDING_INTERVENTION: OnceLock<Mutex<Option<events::InterventionPayload>>> =
+    OnceLock::new();
+
+fn pending_intervention_slot() -> &'static Mutex<Option<events::InterventionPayload>> {
+    PENDING_INTERVENTION.get_or_init(|| Mutex::new(None))
+}
+
+pub fn take_pending_intervention() -> Option<events::InterventionPayload> {
+    pending_intervention_slot().lock().ok()?.clone()
+}
+
+pub fn clear_pending_intervention() {
+    if let Ok(mut g) = pending_intervention_slot().lock() {
+        *g = None;
+    }
+}
+
+fn store_pending_intervention(payload: events::InterventionPayload) {
+    if let Ok(mut g) = pending_intervention_slot().lock() {
+        *g = Some(payload);
+    }
+}
 
 /// Bridges `AppEventEmitter` to Tauri's native event system.
 struct TauriEventEmitter {
@@ -294,6 +321,10 @@ fn wire_event_channels(
                     "confident_distracting".to_string()
                 },
             };
+
+            // Cache before emit: covers cold-start where the overlay's React
+            // layer hasn't subscribed yet. Frontend pulls this on mount.
+            store_pending_intervention(intervention.clone());
 
             // Show overlay window on the monitor where the cursor is (= where the distracting app is)
             if let Some(overlay) =

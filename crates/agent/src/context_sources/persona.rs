@@ -46,6 +46,11 @@ impl ContextSource for PersonaContextSource {
             .await
             .ok()??;
 
+        // Live-read so edits to personas/*.md take effect without restart.
+        // Scope resolution (area/project IDs) is preserved from the initial
+        // load — those references are stable once resolved.
+        self.persona_manager.write().await.reload_personas().await;
+
         let mgr = self.persona_manager.read().await;
         let chain = mgr.for_session(&context);
 

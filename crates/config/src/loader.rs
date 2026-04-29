@@ -169,8 +169,10 @@ pub fn exists() -> bool {
 }
 
 /// Embedded workspace template files — copied on first init if missing.
+///
+/// `SOUL.md` is intentionally absent: agent personality is owned by
+/// `KLYNTBOT.md` in the data dir (see `SoulContextSource`).
 const WORKSPACE_TEMPLATES: &[(&str, &str)] = &[
-    ("SOUL.md", include_str!("../../../workspace/SOUL.md")),
     ("AGENTS.md", include_str!("../../../workspace/AGENTS.md")),
     ("USER.md", include_str!("../../../workspace/USER.md")),
     ("TOOLS.md", include_str!("../../../workspace/TOOLS.md")),

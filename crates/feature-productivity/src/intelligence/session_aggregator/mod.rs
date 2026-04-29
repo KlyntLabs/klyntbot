@@ -270,7 +270,7 @@ impl SessionAggregator {
                 dominant_category: Some(category.clone()),
                 category_purity: Some(purity),
                 quality_score: None,
-                source: "auto".to_string(),
+                source: SessionSource::AutoDetected.to_string(),
                 app_breakdown: None,
                 context_switches: 0,
                 distraction_count: 0,

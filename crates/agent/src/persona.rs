@@ -2,7 +2,7 @@
 //! resolves scopes against PARA entities, and chains personas for sessions.
 
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use storage::rows::session_context::SessionContextRow;
@@ -62,29 +62,42 @@ struct ResolvedScope {
 pub struct PersonaManager {
     personas: Vec<Persona>,
     resolved_scopes: HashMap<String, ResolvedScope>,
+    personas_dir: PathBuf,
 }
 
 impl PersonaManager {
     /// Load all persona files from a directory.
     pub async fn load(personas_dir: &Path) -> Self {
+        let personas = Self::read_dir(personas_dir).await;
+        Self {
+            personas,
+            resolved_scopes: HashMap::new(),
+            personas_dir: personas_dir.to_path_buf(),
+        }
+    }
+
+    /// Re-read persona files from the original directory. Preserves the
+    /// previously resolved scopes (area/project IDs) — those are stable
+    /// references that don't need to be recomputed for tone/instructions edits.
+    /// Call this before serving a chat turn so the user's edits to
+    /// `personas/*.md` take effect without restarting.
+    pub async fn reload_personas(&mut self) {
+        self.personas = Self::read_dir(&self.personas_dir).await;
+    }
+
+    async fn read_dir(personas_dir: &Path) -> Vec<Persona> {
         let mut personas = Vec::new();
 
         if !personas_dir.exists() {
             debug!("Personas directory does not exist: {:?}", personas_dir);
-            return Self {
-                personas,
-                resolved_scopes: HashMap::new(),
-            };
+            return personas;
         }
 
         let mut entries = match fs::read_dir(personas_dir).await {
             Ok(e) => e,
             Err(e) => {
                 warn!("Failed to read personas directory: {}", e);
-                return Self {
-                    personas,
-                    resolved_scopes: HashMap::new(),
-                };
+                return personas;
             }
         };
 
@@ -104,10 +117,7 @@ impl PersonaManager {
         }
 
         debug!("Loaded {} personas", personas.len());
-        Self {
-            personas,
-            resolved_scopes: HashMap::new(),
-        }
+        personas
     }
 
     /// Resolve persona scopes against the database (area/project name → ID).
@@ -490,6 +500,7 @@ CryptoGuard project persona.
         let mgr = PersonaManager {
             personas: vec![global],
             resolved_scopes: HashMap::new(),
+            personas_dir: std::path::PathBuf::new(),
         };
 
         let ctx = make_context("test:1", None, None, None, None);
@@ -522,6 +533,7 @@ CryptoGuard project persona.
         let mgr = PersonaManager {
             personas: vec![global, finance],
             resolved_scopes: HashMap::new(),
+            personas_dir: std::path::PathBuf::new(),
         };
 
         // Finance session: both global and finance match

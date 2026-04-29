@@ -169,6 +169,8 @@ desktop_macros::klynt_collect_commands![
     crate::commands::distraction::distraction_allow_session,
     crate::commands::distraction::distraction_learned_rules,
     crate::commands::distraction::distraction_delete_rule,
+    crate::commands::distraction::distraction_get_pending_intervention,
+    crate::commands::distraction::distraction_clear_pending_intervention,
     crate::commands::entities::entity_search,
     crate::commands::entities::entity_merge,
     crate::commands::entities::entity_get_neighborhood,

@@ -1,17 +1,23 @@
-//! Bootstrap context source — loads AGENTS.md, SOUL.md, USER.md, etc.
+//! Bootstrap context source — loads AGENTS.md, USER.md, etc. from the workspace dir.
+//!
+//! The canonical personality / formatting file is `KLYNTBOT.md` in the data
+//! directory, served by `SoulContextSource` (priority 50). The bootstrap
+//! files here are auxiliary instructions that the user may layer on top.
 
 use std::path::PathBuf;
 
 use async_trait::async_trait;
 use context_engine::source::{ContextSource, SourceContext};
 use tokio::fs;
-use tokio::sync::OnceCell;
 use tracing::{debug, warn};
 
 /// Bootstrap file names loaded from the workspace directory.
+///
+/// `SOUL.md` is intentionally NOT in this list — `KLYNTBOT.md` (served by
+/// `SoulContextSource`) is the single canonical personality file. Having two
+/// soul-like files at different priorities created silent overrides.
 const BOOTSTRAP_FILES: &[&str] = &[
     "AGENTS.md",
-    "SOUL.md",
     "USER.md",
     "TOOLS.md",
     "IDENTITY.md",
@@ -40,21 +46,17 @@ fn truncate_to_token_limit(content: &str, max_tokens: usize) -> &str {
     }
 }
 
-/// Provides bootstrap file content (cached after first load).
+/// Provides bootstrap file content with live-read.
 ///
-/// Reads markdown files from the workspace directory and caches them
-/// permanently (they don't change at runtime).
+/// Re-reads markdown files from the workspace directory on every `provide()`
+/// so user edits take effect on the next chat turn without restarting.
 pub struct BootstrapSource {
     workspace: PathBuf,
-    cached: OnceCell<String>,
 }
 
 impl BootstrapSource {
     pub fn new(workspace: PathBuf) -> Self {
-        Self {
-            workspace,
-            cached: OnceCell::new(),
-        }
+        Self { workspace }
     }
 
     async fn load_bootstrap(&self) -> String {
@@ -120,15 +122,11 @@ impl ContextSource for BootstrapSource {
     }
 
     async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
-        let content = self
-            .cached
-            .get_or_init(|| async { self.load_bootstrap().await })
-            .await;
-
+        let content = self.load_bootstrap().await;
         if content.is_empty() {
             None
         } else {
-            Some(content.clone())
+            Some(content)
         }
     }
 

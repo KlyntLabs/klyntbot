@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { invoke } from "@/api/client";
 import { useEvent } from "@/hooks/useEvent";
 import { useTransparentBackground } from "@/hooks/window/useTransparentBackground";
 import { useWindowAutoResize } from "@/hooks/window/useWindowAutoResize";
@@ -28,13 +29,33 @@ export function DistractionOverlay() {
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useTransparentBackground();
-  useWindowAutoResize(bodyRef, { width: 340, minHeight: 0, maxHeight: 300 });
+  useWindowAutoResize(bodyRef, { width: 340, minHeight: 120, maxHeight: 300 });
 
   useEvent<InterventionPayload>("distraction:intervention", (payload) => {
     setIntervention(payload);
     setVerdict(null);
     if (payload.needsLlm) setLoading(true);
   });
+
+  // Pull-on-mount: covers the cold-start race where the backend emitted
+  // `distraction:intervention` before this listener was registered. The
+  // backend caches the latest alert in a process-wide slot; we drain it
+  // here and clear it once the user acts (see hideWindow below).
+  useEffect(() => {
+    let cancelled = false;
+    void invoke<InterventionPayload | null>("distraction_get_pending_intervention")
+      .then((payload) => {
+        if (cancelled || !payload) return;
+        setIntervention((prev) => prev ?? payload);
+        if (payload.needsLlm) setLoading(true);
+      })
+      .catch(() => {
+        // dev/browser without backend — ignore
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEvent<VerdictPayload>("distraction:verdict", (payload) => {
     setVerdict(payload);
@@ -66,6 +87,11 @@ export function DistractionOverlay() {
     setIntervention(null);
     setVerdict(null);
     setLoading(false);
+    try {
+      await invoke("distraction_clear_pending_intervention");
+    } catch {
+      // dev/browser without backend — ignore
+    }
     if (!isTauri()) return;
     try {
       await getCurrentWindow().hide();

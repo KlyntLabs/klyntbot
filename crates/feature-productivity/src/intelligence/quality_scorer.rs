@@ -261,7 +261,7 @@ mod tests {
             dominant_category: Some("coding".to_string()),
             category_purity: Some(purity),
             quality_score: None,
-            source: "auto".to_string(),
+            source: SessionSource::AutoDetected.to_string(),
             app_breakdown: None,
             context_switches: switches,
             distraction_count: distractions,

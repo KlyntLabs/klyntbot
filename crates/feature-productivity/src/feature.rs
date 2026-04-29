@@ -32,13 +32,22 @@ impl ProductivityFeature {
 /// Productivity schema migrations. Free function so callers don't need to
 /// instantiate the feature just to run migrations.
 pub fn productivity_migrations() -> Vec<FeatureMigration> {
-    vec![FeatureMigration {
-        feature_name: "productivity".to_string(),
-        version: 2,
-        description: "Create productivity tracking tables (removed legacy focus_sessions)"
-            .to_string(),
-        sql: include_str!("../migrations/001_productivity_tables.sql").to_string(),
-    }]
+    vec![
+        FeatureMigration {
+            feature_name: "productivity".to_string(),
+            version: 2,
+            description: "Create productivity tracking tables (removed legacy focus_sessions)"
+                .to_string(),
+            sql: include_str!("../migrations/001_productivity_tables.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "productivity".to_string(),
+            version: 3,
+            description: "Fix auto-detected session source values in productivity_sessions"
+                .to_string(),
+            sql: include_str!("../migrations/003_fix_auto_source_values.sql").to_string(),
+        },
+    ]
 }
 
 #[async_trait]
