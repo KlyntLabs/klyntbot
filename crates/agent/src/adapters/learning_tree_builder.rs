@@ -21,39 +21,34 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, info, warn};
+use tracing::{warn};
 
-use bus::{
-    ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, DomainEventBus,
-    UpdatePriority,
-};
-use cognitive::TextEmbedder;
+use bus::{ContextUpdateReason, DomainEvent};
+
 use context_engine::book_index::types::{SourceType, TreeNode, TreeNodeType};
-use context_engine::book_index::BookTreeRepo;
+
+use super::tree_builder_base::{run_event_loop, slugify, TreeBuilderCore};
 
 pub struct LearningTreeBuilder {
-    tree_repo: Arc<dyn BookTreeRepo>,
-    vector_store: Arc<storage::VectorStore>,
-    embedder: Arc<dyn TextEmbedder>,
-    context_update_queue: Option<Arc<ContextUpdateQueue>>,
-    #[allow(dead_code)]
-    domain_event_bus: Option<Arc<DomainEventBus>>,
+    core: TreeBuilderCore,
 }
 
 impl LearningTreeBuilder {
     pub fn new(
-        tree_repo: Arc<dyn BookTreeRepo>,
+        tree_repo: Arc<dyn context_engine::book_index::BookTreeRepo>,
         vector_store: Arc<storage::VectorStore>,
-        embedder: Arc<dyn TextEmbedder>,
-        context_update_queue: Option<Arc<ContextUpdateQueue>>,
-        domain_event_bus: Option<Arc<DomainEventBus>>,
+        embedder: Arc<dyn cognitive::TextEmbedder>,
+        context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
+        domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     ) -> Self {
         Self {
-            tree_repo,
-            vector_store,
-            embedder,
-            context_update_queue,
-            domain_event_bus,
+            core: TreeBuilderCore::new(
+                tree_repo,
+                vector_store,
+                embedder,
+                context_update_queue,
+                domain_event_bus,
+            ),
         }
     }
 
@@ -87,58 +82,44 @@ impl LearningTreeBuilder {
     /// `RetentionMilestoneReached` events and appends tree nodes for each.
     pub async fn run(
         self: Arc<Self>,
-        mut rx: broadcast::Receiver<DomainEvent>,
+        rx: broadcast::Receiver<DomainEvent>,
         shutdown: CancellationToken,
     ) {
-        info!("LearningTreeBuilder: subscriber started");
-
-        loop {
-            tokio::select! {
-                _ = shutdown.cancelled() => {
-                    info!("LearningTreeBuilder: shutdown received");
-                    break;
-                }
-                result = rx.recv() => {
-                    match result {
-                        Ok(DomainEvent::KnowledgeAtomAccepted { atom_id, atom_type }) => {
-                            if let Err(e) = self.handle_atom_accepted(&atom_id, &atom_type, None).await {
-                                warn!(
-                                    atom_id = %atom_id,
-                                    "LearningTreeBuilder: failed to process atom accepted: {e}"
-                                );
-                            }
-                        }
-                        Ok(DomainEvent::RetentionMilestoneReached {
-                            atom_id,
-                            topic_id: _,
-                            new_retention_pct,
-                            milestone,
-                            previous_pct: _,
-                        }) => {
-                            if let Err(e) = self
-                                .handle_retention_milestone(&atom_id, &milestone, new_retention_pct)
-                                .await
-                            {
-                                warn!(
-                                    atom_id = %atom_id,
-                                    "LearningTreeBuilder: failed to process retention milestone: {e}"
-                                );
-                            }
-                        }
-                        Ok(_) => {
-                            // Not a learning event — ignore.
-                        }
-                        Err(broadcast::error::RecvError::Lagged(n)) => {
-                            warn!("LearningTreeBuilder: lagged, skipped {n} events");
-                        }
-                        Err(broadcast::error::RecvError::Closed) => {
-                            info!("LearningTreeBuilder: event channel closed");
-                            break;
+        run_event_loop("LearningTreeBuilder", rx, shutdown, |event| {
+            let this = Arc::clone(&self);
+            async move {
+                match event {
+                    DomainEvent::KnowledgeAtomAccepted { atom_id, atom_type } => {
+                        if let Err(e) = this.handle_atom_accepted(&atom_id, &atom_type, None).await
+                        {
+                            warn!(
+                                atom_id = %atom_id,
+                                "LearningTreeBuilder: failed to process atom accepted: {e}"
+                            );
                         }
                     }
+                    DomainEvent::RetentionMilestoneReached {
+                        atom_id,
+                        topic_id: _,
+                        new_retention_pct,
+                        milestone,
+                        previous_pct: _,
+                    } => {
+                        if let Err(e) = this
+                            .handle_retention_milestone(&atom_id, &milestone, new_retention_pct)
+                            .await
+                        {
+                            warn!(
+                                atom_id = %atom_id,
+                                "LearningTreeBuilder: failed to process retention milestone: {e}"
+                            );
+                        }
+                    }
+                    _ => {}
                 }
             }
-        }
+        })
+        .await
     }
 
     /// Handle a knowledge atom accepted event: upsert the global learning root
@@ -152,7 +133,7 @@ impl LearningTreeBuilder {
         let type_node_id = format!("learning-type-{}", slugify(atom_type));
         let atom_node_id = format!("learning-atom-{atom_id}");
 
-        debug!(
+        tracing::debug!(
             atom_id = %atom_id,
             atom_type = %atom_type,
             atom_node_id = %atom_node_id,
@@ -162,7 +143,18 @@ impl LearningTreeBuilder {
         let nodes =
             build_atom_accepted_nodes(atom_id, atom_type, subject, &type_node_id, &atom_node_id);
 
-        self.persist_nodes(&nodes, atom_id).await
+        self.core
+            .persist_nodes(
+                "LearningTreeBuilder",
+                &nodes,
+                atom_id,
+                ContextUpdateReason::Custom("learning_tree_updated".to_string()),
+                Some(format!(
+                    "Learning tree updated: {} new node(s) for atom {atom_id}",
+                    nodes.len()
+                )),
+            )
+            .await
     }
 
     /// Handle a retention milestone event: upsert the global learning root and
@@ -179,7 +171,7 @@ impl LearningTreeBuilder {
         let type_node_id = "learning-type-milestone".to_string();
         let milestone_node_id = format!("learning-milestone-{atom_id}-{}", slugify(milestone));
 
-        debug!(
+        tracing::debug!(
             atom_id = %atom_id,
             milestone = %milestone,
             new_retention_pct,
@@ -195,95 +187,18 @@ impl LearningTreeBuilder {
             &milestone_node_id,
         );
 
-        self.persist_nodes(&nodes, atom_id).await
-    }
-
-    /// Persist nodes: insert each one (ignoring duplicate-ID errors for
-    /// idempotent root/type nodes), embed leaf nodes, push context update,
-    /// and emit TreeNodesRebuilt.
-    async fn persist_nodes(&self, nodes: &[TreeNode], source_id: &str) -> common::Result<()> {
-        let mut inserted = Vec::new();
-
-        for node in nodes {
-            match self.tree_repo.insert_node(node).await {
-                Ok(()) => inserted.push(node),
-                Err(_) => {
-                    // Duplicate key — node already exists. Expected for global
-                    // learning root and per-type section nodes.
-                    debug!(
-                        node_id = %node.id,
-                        "LearningTreeBuilder: node already exists, skipping insert"
-                    );
-                }
-            }
-        }
-
-        // Embed newly inserted nodes.
-        let mut embedded_count = 0_usize;
-        for node in &inserted {
-            let embed_text = compose_embedding_text(node);
-            if embed_text.is_empty() {
-                continue;
-            }
-            match self.embedder.embed(&embed_text).await {
-                Ok(embedding) => {
-                    let level_str = node.level.to_string();
-                    if let Err(e) = self
-                        .vector_store
-                        .upsert_tree_node_embedding(
-                            &node.id,
-                            &embedding,
-                            source_id,
-                            &level_str,
-                            node.source_type.as_str(),
-                        )
-                        .await
-                    {
-                        warn!(
-                            node_id = %node.id,
-                            "LearningTreeBuilder: failed to upsert embedding: {e}"
-                        );
-                    } else {
-                        embedded_count += 1;
-                    }
-                }
-                Err(e) => {
-                    warn!(
-                        node_id = %node.id,
-                        "LearningTreeBuilder: failed to generate embedding: {e}"
-                    );
-                }
-            }
-        }
-
-        // TreeNodesRebuilt variant deleted; EntityTreeLinker no-op.
-
-        // Push context update for live injection.
-        if let Some(queue) = &self.context_update_queue {
-            queue.push(ContextUpdate {
-                reason: ContextUpdateReason::Custom("learning_tree_updated".to_string()),
-                content: Some(format!(
-                    "Learning tree updated: {} new node(s) for atom {source_id}",
-                    inserted.len()
+        self.core
+            .persist_nodes(
+                "LearningTreeBuilder",
+                &nodes,
+                atom_id,
+                ContextUpdateReason::Custom("learning_tree_updated".to_string()),
+                Some(format!(
+                    "Learning tree updated: {} new node(s) for atom {atom_id}",
+                    nodes.len()
                 )),
-                metadata: Some(serde_json::json!({
-                    "source_id": source_id,
-                    "inserted_count": inserted.len(),
-                    "embedded_count": embedded_count,
-                })),
-                priority: UpdatePriority::Low,
-                timestamp: jiff::Timestamp::now(),
-            });
-        }
-
-        info!(
-            source_id = %source_id,
-            inserted_count = inserted.len(),
-            embedded_count,
-            "LearningTreeBuilder: nodes persisted"
-        );
-
-        Ok(())
+            )
+            .await
     }
 }
 
@@ -413,39 +328,13 @@ pub fn build_milestone_nodes(
 }
 
 // ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-/// Slugify a string for use in deterministic node IDs.
-/// Lowercases and replaces non-alphanumeric chars with hyphens, collapsing runs.
-fn slugify(s: &str) -> String {
-    s.to_ascii_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .split('-')
-        .filter(|p| !p.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
-}
-
-/// Compose embedding text for a learning tree node.
-/// Level 0: title only; Level 1: type title; Level 2+: content.
-fn compose_embedding_text(node: &TreeNode) -> String {
-    match node.level {
-        0 => node.title.as_deref().unwrap_or("").to_string(),
-        1 => node.title.as_deref().unwrap_or(&node.content).to_string(),
-        _ => node.content.clone(),
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::tree_builder_base::{compose_embedding_text, slugify};
 
     // --- slugify ---
 
@@ -467,6 +356,62 @@ mod tests {
     #[test]
     fn slugify_collapses_separators() {
         assert_eq!(slugify("a  --  b"), "a-b");
+    }
+
+    // --- compose_embedding_text ---
+
+    #[test]
+    fn embedding_level_0_returns_title() {
+        let node = TreeNode {
+            id: "learning-root".into(),
+            parent_id: None,
+            node_type: TreeNodeType::Section,
+            content: "learning-root".into(),
+            title: Some("Learning & Knowledge".into()),
+            level: 0,
+            source_type: SourceType::Learning,
+            source_id: "learning-root".into(),
+            position: 0,
+            metadata: None,
+        };
+        assert_eq!(compose_embedding_text(&node), "Learning & Knowledge");
+    }
+
+    #[test]
+    fn embedding_level_1_returns_type_title() {
+        let node = TreeNode {
+            id: "learning-type-concept".into(),
+            parent_id: Some("learning-root".into()),
+            node_type: TreeNodeType::Section,
+            content: "concept".into(),
+            title: Some("concept".into()),
+            level: 1,
+            source_type: SourceType::Learning,
+            source_id: "learning-root".into(),
+            position: 1,
+            metadata: None,
+        };
+        assert_eq!(compose_embedding_text(&node), "concept");
+    }
+
+    #[test]
+    fn embedding_level_2_returns_content() {
+        let node = TreeNode {
+            id: "learning-atom-abc".into(),
+            parent_id: Some("learning-type-concept".into()),
+            node_type: TreeNodeType::Text,
+            content: "Accepted: concept atom abc-123".into(),
+            title: None,
+            level: 2,
+            source_type: SourceType::Learning,
+            source_id: "abc-123".into(),
+            position: 2,
+            metadata: None,
+        };
+        assert_eq!(
+            compose_embedding_text(&node),
+            "Accepted: concept atom abc-123"
+        );
     }
 
     // --- build_atom_accepted_nodes ---
@@ -615,61 +560,5 @@ mod tests {
         for node in &nodes {
             assert_eq!(node.source_type.as_str(), "learning");
         }
-    }
-
-    // --- compose_embedding_text ---
-
-    #[test]
-    fn embedding_level_0_returns_title() {
-        let node = TreeNode {
-            id: "learning-root".into(),
-            parent_id: None,
-            node_type: TreeNodeType::Section,
-            content: "learning-root".into(),
-            title: Some("Learning & Knowledge".into()),
-            level: 0,
-            source_type: SourceType::Learning,
-            source_id: "learning-root".into(),
-            position: 0,
-            metadata: None,
-        };
-        assert_eq!(compose_embedding_text(&node), "Learning & Knowledge");
-    }
-
-    #[test]
-    fn embedding_level_1_returns_type_title() {
-        let node = TreeNode {
-            id: "learning-type-concept".into(),
-            parent_id: Some("learning-root".into()),
-            node_type: TreeNodeType::Section,
-            content: "concept".into(),
-            title: Some("concept".into()),
-            level: 1,
-            source_type: SourceType::Learning,
-            source_id: "learning-root".into(),
-            position: 1,
-            metadata: None,
-        };
-        assert_eq!(compose_embedding_text(&node), "concept");
-    }
-
-    #[test]
-    fn embedding_level_2_returns_content() {
-        let node = TreeNode {
-            id: "learning-atom-abc".into(),
-            parent_id: Some("learning-type-concept".into()),
-            node_type: TreeNodeType::Text,
-            content: "Accepted: concept atom abc-123".into(),
-            title: None,
-            level: 2,
-            source_type: SourceType::Learning,
-            source_id: "abc-123".into(),
-            position: 2,
-            metadata: None,
-        };
-        assert_eq!(
-            compose_embedding_text(&node),
-            "Accepted: concept atom abc-123"
-        );
     }
 }

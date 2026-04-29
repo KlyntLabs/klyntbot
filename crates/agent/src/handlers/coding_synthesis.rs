@@ -98,49 +98,11 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
 
-    use providers::{LlmProvider, LlmResponse, ProviderCapabilities, ProviderHealth, Usage};
-    use serde_json::Value;
+    use crate::test_utils::MockProvider;
     use std::sync::Arc;
 
-    struct MockProvider {
-        response: String,
-    }
-
-    #[async_trait]
-    impl LlmProvider for MockProvider {
-        async fn chat(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[Value]>,
-            _params: &ChatParams,
-        ) -> Result<LlmResponse> {
-            Ok(LlmResponse {
-                content: Some(self.response.clone()),
-                tool_calls: vec![],
-                finish_reason: "stop".to_string(),
-                usage: Usage::default(),
-                reasoning_content: None,
-            })
-        }
-
-        fn default_model(&self) -> &str {
-            "mock"
-        }
-        fn name(&self) -> &str {
-            "mock"
-        }
-        fn capabilities(&self) -> ProviderCapabilities {
-            ProviderCapabilities::default()
-        }
-        async fn health_check(&self) -> Result<ProviderHealth> {
-            Ok(ProviderHealth::Healthy)
-        }
-    }
-
     fn mock_provider_returning(response: &str) -> DynProvider {
-        Arc::new(MockProvider {
-            response: response.to_string(),
-        })
+        Arc::new(MockProvider::with_text(response))
     }
 
     #[tokio::test]
