@@ -107,30 +107,26 @@ pub async fn session_list(
                 SUM(CASE WHEN kind = 'toolCall' THEN 1 ELSE 0 END) AS tool_call_count,
                 SUM(CASE WHEN kind = 'error' THEN 1 ELSE 0 END) AS error_count
          FROM ingest_event_log
-         WHERE occurred_at >= datetime('now', ?1)",
+         WHERE occurred_at >= datetime('now', ?)",
     );
     let since_clause = format!("-{} days", args.since_days);
-    let mut binds: Vec<String> = vec![since_clause];
-    if let Some(src) = args.source.as_ref() {
-        sql.push_str(" AND source = ?2");
-        binds.push(provider_id_to_db_slug(src));
+    if args.source.is_some() {
+        sql.push_str(" AND source = ?");
     }
-    if let Some(repo) = args.repo_id.as_ref() {
-        sql.push_str(if binds.len() == 2 {
-            " AND repo_id = ?3"
-        } else {
-            " AND repo_id = ?2"
-        });
-        binds.push(repo.clone());
+    if args.repo_id.is_some() {
+        sql.push_str(" AND repo_id = ?");
     }
     sql.push_str(" GROUP BY session_id, source ORDER BY last_event_at DESC LIMIT ? OFFSET ?");
-    binds.push(args.limit.to_string());
-    binds.push(args.offset.to_string());
 
-    let mut q = sqlx::query(&sql);
-    for b in &binds {
-        q = q.bind(b);
+    let mut q = sqlx::query(&sql).bind(since_clause);
+    if let Some(src) = args.source.as_ref() {
+        q = q.bind(provider_id_to_db_slug(src));
     }
+    if let Some(repo) = args.repo_id.as_ref() {
+        q = q.bind(repo.clone());
+    }
+    q = q.bind(args.limit as i64).bind(args.offset as i64);
+
     let rows = q
         .fetch_all(pool)
         .await
