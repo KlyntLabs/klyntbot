@@ -152,6 +152,10 @@ pub struct CognitiveConfig {
     /// Micro-Reforge timer config (KCA Track 4).
     #[serde(default)]
     pub micro_reforge: MicroReforgeConfig,
+
+    /// Model used for the extraction critic (KCA Track 5). Defaults to `model`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub critic_model: Option<String>,
 }
 
 impl Default for CognitiveConfig {
@@ -190,6 +194,7 @@ impl Default for CognitiveConfig {
             query_enhancement: QueryEnhancementConfig::default(),
             history_compression: HistoryCompressionConfig::default(),
             micro_reforge: MicroReforgeConfig::default(),
+            critic_model: None,
         }
     }
 }
