@@ -55,6 +55,8 @@ members = [
     "crates/coding-memory",
     "crates/mcp-bridge",
     "crates/desktop-macros",
+    "crates/kca-e2e",
+    "crates/kca-bench",
 ]
 
 [workspace.package]

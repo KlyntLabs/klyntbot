@@ -217,3 +217,14 @@ The system prompt sent to the LLM on every chat turn is built from `ContextEngin
 - **opencode adapter is poll-only** — no `klyntbot-hook opencode` subcommand fires; the daemon's `OpencodePoller` task drives ingestion. Disable via `coding_memory.opencode.enabled = false`.
 - **Coding-memory Phase 7 — multi-CLI ingest.** Four `IngestAdapter` implementations live under `crates/coding-ingest/src/adapters/`: `claude_code`, `codex`, `kimi_cli`, `opencode`. Codex + Kimi are hook-driven (TOML/JSON installers in `app-core/src/coding_memory/{codex,kimi}_installer.rs`); opencode is poll-only (SQLite WAL polled at 500ms by `OpencodePoller`, spawned in `crates/coding-ingest/src/daemon.rs` when `opencode_db_path` is set). All adapters emit `AgentEvent` tagged with `AgentSource` (`ClaudeCode`, `Codex`, `KimiCli`, `OpenCode`, `KlyntCli`). The cross-CLI normalization invariant (Inv 7 — `parse(serialize(event)) == event`) is enforced by the proptest in `crates/coding-ingest/tests/cross_cli_normalization.rs`. Reforge removal-side writes route through `coding_memory::reforge::ReforgeWriter` (re-exported from `reforge/mod.rs`) — raw `DELETE` is rejected; supersede via `valid_until + superseded_by` is the only sanctioned removal.
 - **Pre-release — no user data to migrate.** All schema changes can be made directly (alter tables, drop and recreate) without writing migration scripts. No need for backwards-compatible migrations until first release. When a migration is consolidated, update the `FeatureMigration` version and SQL in-place rather than adding incremental migration files. After first release, all schema changes require proper versioned migrations with `INSERT OR IGNORE` for idempotency.
+
+
+## KCA — Klynt Cognitive Architecture validation gates
+
+The memory system is governed by spec section 7 quality / perf / stability gates. Before any merge to main:
+
+`./scripts/run_kca_validation.sh`
+
+Any gate failure blocks merge. Soak test runs only on tagged release branches (`RUN_SOAK=1`).
+
+Auto-generated game-changer report lives at `docs/architecture/kca-game-changer.md`, refreshed every CI run, archived as artifact.
