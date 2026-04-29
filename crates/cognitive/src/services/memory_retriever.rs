@@ -131,19 +131,28 @@ impl UnifiedMemoryService {
     }
 
     /// KCA Track 6: enable PPR-based multi-hop retrieval expansion.
-    pub fn with_ppr_cache(mut self, cache: Arc<crate::services::ppr_retrieval::CachedPprGraph>) -> Self {
+    pub fn with_ppr_cache(
+        mut self,
+        cache: Arc<crate::services::ppr_retrieval::CachedPprGraph>,
+    ) -> Self {
         self.ppr_cache = Some(cache);
         self
     }
 
     /// KCA Track 7: enable predictive cache.
-    pub fn with_predictive_cache(mut self, cache: Arc<crate::services::predictive_cache::PredictiveCache>) -> Self {
+    pub fn with_predictive_cache(
+        mut self,
+        cache: Arc<crate::services::predictive_cache::PredictiveCache>,
+    ) -> Self {
         self.predictive_cache = Some(cache);
         self
     }
 
     /// KCA Track 13: enable temporal pruning.
-    pub fn with_temporal_pruner(mut self, pruner: Arc<dyn crate::services::temporal_pruner::TemporalPrunerHandler>) -> Self {
+    pub fn with_temporal_pruner(
+        mut self,
+        pruner: Arc<dyn crate::services::temporal_pruner::TemporalPrunerHandler>,
+    ) -> Self {
         self.temporal_pruner = Some(pruner);
         self
     }
@@ -430,24 +439,35 @@ impl UnifiedMemoryService {
         };
 
         // KCA Track 6: PPR expansion.
-        if let (Some(cache), Some(entity_repo)) = (self.ppr_cache.as_ref(), self.entity_repo.as_ref()) {
+        if let (Some(cache), Some(entity_repo)) =
+            (self.ppr_cache.as_ref(), self.entity_repo.as_ref())
+        {
             let ppr_results = crate::services::ppr_retrieval::retrieve_with_ppr_boost(
-                &self.fact_repo, entity_repo, cache, query, params.limit
-            ).await.unwrap_or_default();
+                &self.fact_repo,
+                entity_repo,
+                cache,
+                query,
+                params.limit,
+            )
+            .await
+            .unwrap_or_default();
             facts = rrf_merge_scored_facts(facts, ppr_results, 60);
         }
 
         // KCA Track 13: temporal prune.
         if let Some(pruner) = self.temporal_pruner.as_ref() {
             let input = crate::services::temporal_pruner::PruneInput {
-                facts: facts.iter().map(|s| crate::services::temporal_pruner::PruneFactRef {
-                    fact_id: s.fact.id.clone(),
-                    subject: s.fact.subject.clone(),
-                    predicate: s.fact.predicate.clone(),
-                    object: s.fact.object.clone(),
-                    valid_at: s.fact.valid_from.clone(),
-                    valid_until: s.fact.valid_until.clone(),
-                }).collect(),
+                facts: facts
+                    .iter()
+                    .map(|s| crate::services::temporal_pruner::PruneFactRef {
+                        fact_id: s.fact.id.clone(),
+                        subject: s.fact.subject.clone(),
+                        predicate: s.fact.predicate.clone(),
+                        object: s.fact.object.clone(),
+                        valid_at: s.fact.valid_from.clone(),
+                        valid_until: s.fact.valid_until.clone(),
+                    })
+                    .collect(),
                 query_time: jiff::Timestamp::now().to_string(),
             };
             match pruner.prune(input).await {
@@ -707,25 +727,34 @@ fn normalize_scores(scores: &[f64]) -> Vec<f64> {
 }
 
 /// RRF merge two ScoredFact lists. Dedupes by fact id.
-fn rrf_merge_scored_facts(
-    a: Vec<ScoredFact>,
-    b: Vec<ScoredFact>,
-    k: usize,
-) -> Vec<ScoredFact> {
+fn rrf_merge_scored_facts(a: Vec<ScoredFact>, b: Vec<ScoredFact>, k: usize) -> Vec<ScoredFact> {
     let mut by_id: std::collections::HashMap<String, (ScoredFact, f64)> = Default::default();
     for (rank, sf) in a.into_iter().enumerate() {
         let s = 1.0 / (k as f64 + (rank + 1) as f64);
-        by_id.entry(sf.fact.id.clone()).and_modify(|v| v.1 += s).or_insert((sf, s));
+        by_id
+            .entry(sf.fact.id.clone())
+            .and_modify(|v| v.1 += s)
+            .or_insert((sf, s));
     }
     for (rank, sf) in b.into_iter().enumerate() {
         let s = 1.0 / (k as f64 + (rank + 1) as f64);
-        by_id.entry(sf.fact.id.clone()).and_modify(|v| v.1 += s).or_insert((sf, s));
+        by_id
+            .entry(sf.fact.id.clone())
+            .and_modify(|v| v.1 += s)
+            .or_insert((sf, s));
     }
-    let mut out: Vec<_> = by_id.into_iter().map(|(_, (mut sf, score))| {
-        sf.score = score;
-        sf
-    }).collect();
-    out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    let mut out: Vec<_> = by_id
+        .into_iter()
+        .map(|(_, (mut sf, score))| {
+            sf.score = score;
+            sf
+        })
+        .collect();
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     out
 }
 

@@ -120,7 +120,10 @@ impl ClaudeCodeInstaller {
 /// reads from — regardless of which shell launches the CLI later.
 pub(crate) fn build_hook_command(hook_binary: &Path, source: &str, event: &str) -> String {
     let bin = hook_binary.display();
-    match std::env::var("KLYNTBOT_HOME").ok().filter(|v| !v.trim().is_empty()) {
+    match std::env::var("KLYNTBOT_HOME")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+    {
         Some(home) => {
             let home = shell_escape(&home);
             format!("/usr/bin/env KLYNTBOT_HOME={home} {bin} --hook {source} {event}")
@@ -130,7 +133,9 @@ pub(crate) fn build_hook_command(hook_binary: &Path, source: &str, event: &str) 
 }
 
 fn shell_escape(s: &str) -> String {
-    if s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-' | '.' | '~')) {
+    if s.chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-' | '.' | '~'))
+    {
         s.to_string()
     } else {
         format!("'{}'", s.replace('\'', "'\\''"))

@@ -37,7 +37,10 @@ fn ppr_concentrates_mass_on_seed_neighborhood() {
 
     // Sum of scores ≈ 1.0 (probability distribution).
     let total: f32 = scores.values().sum();
-    assert!((total - 1.0).abs() < 0.05, "scores sum should be ~1.0, got {total}");
+    assert!(
+        (total - 1.0).abs() < 0.05,
+        "scores sum should be ~1.0, got {total}"
+    );
 }
 
 #[test]
@@ -58,8 +61,16 @@ fn ppr_respects_alpha_teleportation_probability() {
     g.add_edge(a, b, 1.0);
     g.add_edge(b, a, 1.0);
 
-    let strict_seed = PprConfig { alpha: 0.05, max_iterations: 50, tolerance: 1e-6 };
-    let exploratory = PprConfig { alpha: 0.5, max_iterations: 50, tolerance: 1e-6 };
+    let strict_seed = PprConfig {
+        alpha: 0.05,
+        max_iterations: 50,
+        tolerance: 1e-6,
+    };
+    let exploratory = PprConfig {
+        alpha: 0.5,
+        max_iterations: 50,
+        tolerance: 1e-6,
+    };
 
     let s1 = personalized_pagerank(&g, &[a], &strict_seed);
     let s2 = personalized_pagerank(&g, &[a], &exploratory);
@@ -67,7 +78,10 @@ fn ppr_respects_alpha_teleportation_probability() {
     // Higher alpha = more teleportation back to seed = stronger A bias.
     let bias_strict = s1["A"] - s1["B"];
     let bias_exploratory = s2["A"] - s2["B"];
-    assert!(bias_exploratory > bias_strict,
+    assert!(
+        bias_exploratory > bias_strict,
         "alpha=0.5 ({}) should bias toward seed more than alpha=0.05 ({})",
-        bias_exploratory, bias_strict);
+        bias_exploratory,
+        bias_strict
+    );
 }

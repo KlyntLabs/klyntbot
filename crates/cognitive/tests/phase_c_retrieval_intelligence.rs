@@ -6,11 +6,13 @@
 //! - Track 8: Hierarchical rollup (hourly → daily → weekly)
 //! - Track 13: Temporal pruning at retrieval time
 
-use cognitive::services::predictive_cache::{PredictiveCache, query_hash};
-use cognitive::services::temporal_pruner::{PruneInput, PruneFactRef, NoopTemporalPruner, TemporalPrunerHandler};
-use cognitive::services::hierarchical_compressor::{roll_up_hourly, roll_up_daily, Tier};
+use cognitive::repos::{EntityRepo, EpisodicMemoryRepo, SemanticFactRepo};
 use cognitive::services::hierarchical_compressor::HierarchicalSummarizer;
-use cognitive::repos::{EpisodicMemoryRepo, SemanticFactRepo, EntityRepo};
+use cognitive::services::hierarchical_compressor::{roll_up_daily, roll_up_hourly, Tier};
+use cognitive::services::predictive_cache::{query_hash, PredictiveCache};
+use cognitive::services::temporal_pruner::{
+    NoopTemporalPruner, PruneFactRef, PruneInput, TemporalPrunerHandler,
+};
 use cognitive::types::{EpisodicMemory, SemanticFact};
 use std::sync::Arc;
 use std::time::Duration;
@@ -112,7 +114,9 @@ impl HierarchicalSummarizer for DummySummarizer {
 async fn hourly_rollup_groups_raw_episodes() {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
     let migrations = cognitive::repos::cognitive_migrations();
-    storage::StoragePool::run_feature_migrations(pool.inner(), &migrations).await.unwrap();
+    storage::StoragePool::run_feature_migrations(pool.inner(), &migrations)
+        .await
+        .unwrap();
     let repo = EpisodicMemoryRepo::new(pool.inner().clone());
 
     // Insert 5 raw episodics in the current hour.
@@ -142,7 +146,9 @@ async fn hourly_rollup_groups_raw_episodes() {
 async fn daily_rollup_groups_hourly_parents() {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
     let migrations = cognitive::repos::cognitive_migrations();
-    storage::StoragePool::run_feature_migrations(pool.inner(), &migrations).await.unwrap();
+    storage::StoragePool::run_feature_migrations(pool.inner(), &migrations)
+        .await
+        .unwrap();
     let repo = EpisodicMemoryRepo::new(pool.inner().clone());
 
     // Seed hourly parents directly (simulating prior rollup).
@@ -172,48 +178,90 @@ async fn daily_rollup_groups_hourly_parents() {
 async fn ppr_boost_retrieves_facts_for_related_entities() {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
     let migrations = cognitive::repos::cognitive_migrations();
-    storage::StoragePool::run_feature_migrations(pool.inner(), &migrations).await.unwrap();
+    storage::StoragePool::run_feature_migrations(pool.inner(), &migrations)
+        .await
+        .unwrap();
     let entity_repo = EntityRepo::new(pool.inner().clone());
     let fact_repo = SemanticFactRepo::new(pool.inner().clone());
 
     // Seed entities: Alice and Bob are connected (causal).
-    let alice = entity_repo.upsert_entity(&cognitive::repos::NewEntity {
-        name: "Alice".into(), entity_type: "person".into(), description: None,
-        source: "test".into(), source_id: None, metadata: None,
-    }).await.unwrap();
-    let bob = entity_repo.upsert_entity(&cognitive::repos::NewEntity {
-        name: "Bob".into(), entity_type: "person".into(), description: None,
-        source: "test".into(), source_id: None, metadata: None,
-    }).await.unwrap();
+    let alice = entity_repo
+        .upsert_entity(&cognitive::repos::NewEntity {
+            name: "Alice".into(),
+            entity_type: "person".into(),
+            description: None,
+            source: "test".into(),
+            source_id: None,
+            metadata: None,
+        })
+        .await
+        .unwrap();
+    let bob = entity_repo
+        .upsert_entity(&cognitive::repos::NewEntity {
+            name: "Bob".into(),
+            entity_type: "person".into(),
+            description: None,
+            source: "test".into(),
+            source_id: None,
+            metadata: None,
+        })
+        .await
+        .unwrap();
 
     // Link Alice → Bob with causal edge (strongest multiplier).
-    entity_repo.upsert_relationship_typed(&alice.id, &bob.id, "knows", "causal", 1.0, None, "test").await.unwrap();
+    entity_repo
+        .upsert_relationship_typed(&alice.id, &bob.id, "knows", "causal", 1.0, None, "test")
+        .await
+        .unwrap();
 
     // Seed a fact about Bob.
     let now = jiff::Timestamp::now().to_string();
     let bob_fact = SemanticFact {
-        id: "f1".into(), domain: "test".into(),
-        subject: "Bob".into(), predicate: "knows".into(), object: "Rust".into(),
-        confidence: 0.9, source: "test".into(),
-        valid_from: now.clone(), valid_until: None, recorded_at: now.clone(),
-        superseded_at: None, superseded_by: None,
-        stability: 1.0, last_accessed: None, access_count: 0,
-        convergence_score: 0.0, project_id: None, memory_type: "fact".into(),
-        scope_type: "user".into(), scope_id: None, scope_repo_id: None,
+        id: "f1".into(),
+        domain: "test".into(),
+        subject: "Bob".into(),
+        predicate: "knows".into(),
+        object: "Rust".into(),
+        confidence: 0.9,
+        source: "test".into(),
+        valid_from: now.clone(),
+        valid_until: None,
+        recorded_at: now.clone(),
+        superseded_at: None,
+        superseded_by: None,
+        stability: 1.0,
+        last_accessed: None,
+        access_count: 0,
+        convergence_score: 0.0,
+        project_id: None,
+        memory_type: "fact".into(),
+        scope_type: "user".into(),
+        scope_id: None,
+        scope_repo_id: None,
         metadata: None,
     };
     fact_repo.upsert(&bob_fact).await.unwrap();
 
     // Build PPR cache and retrieve with query mentioning "Alice".
     let ppr_cache = Arc::new(cognitive::services::ppr_retrieval::CachedPprGraph::new(
-        entity_repo.clone(), Duration::from_secs(60),
+        entity_repo.clone(),
+        Duration::from_secs(60),
     ));
     let results = cognitive::services::ppr_retrieval::retrieve_with_ppr_boost(
-        &fact_repo, &entity_repo, &ppr_cache, "What does Alice know?", 10,
-    ).await.unwrap();
+        &fact_repo,
+        &entity_repo,
+        &ppr_cache,
+        "What does Alice know?",
+        10,
+    )
+    .await
+    .unwrap();
 
     // PPR should boost Bob's fact because Alice is connected to Bob.
-    assert!(!results.is_empty(), "PPR should retrieve Bob's fact via Alice-Bob edge");
+    assert!(
+        !results.is_empty(),
+        "PPR should retrieve Bob's fact via Alice-Bob edge"
+    );
     assert_eq!(results[0].fact.subject, "Bob");
 }
 
@@ -221,13 +269,25 @@ async fn ppr_boost_retrieves_facts_for_related_entities() {
 
 fn raw_episode(id: &str, domain: &str, content: &str) -> EpisodicMemory {
     EpisodicMemory {
-        id: id.into(), domain: domain.into(), content: content.into(),
-        summary: None, importance: 0.5,
+        id: id.into(),
+        domain: domain.into(),
+        content: content.into(),
+        summary: None,
+        importance: 0.5,
         occurred_at: jiff::Timestamp::now().to_string(),
         recorded_at: jiff::Timestamp::now().to_string(),
-        stability: 1.0, last_accessed: None, access_count: 0,
-        project_id: None, scope_type: "user".into(), scope_id: None,
-        scope_repo_id: None, metadata: None, kind: None,
-        tier: "raw".into(), parent_id: None, child_count: 0, rolled_up_at: None,
+        stability: 1.0,
+        last_accessed: None,
+        access_count: 0,
+        project_id: None,
+        scope_type: "user".into(),
+        scope_id: None,
+        scope_repo_id: None,
+        metadata: None,
+        kind: None,
+        tier: "raw".into(),
+        parent_id: None,
+        child_count: 0,
+        rolled_up_at: None,
     }
 }

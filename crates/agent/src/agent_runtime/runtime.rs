@@ -528,12 +528,27 @@ impl AgentRuntime {
             tokio::spawn(async move {
                 let preds = match predictor.predict_next(&recent_turn_text, n).await {
                     Ok(p) => p,
-                    Err(e) => { tracing::debug!(error = %e, "predictor failed"); return; }
+                    Err(e) => {
+                        tracing::debug!(error = %e, "predictor failed");
+                        return;
+                    }
                 };
                 for q in preds {
                     let key = cognitive::services::predictive_cache::query_hash(&q);
-                    if cache.get(&key).await.is_some() { continue; }
-                    match retriever.retrieve_with_overrides(&q, 10, 0.55, [0.3, 0.2, 0.15, 0.1, 0.25, 0.05, 0.1, 0.05, 0.15, 0.1, 0.08, 0.06]).await {
+                    if cache.get(&key).await.is_some() {
+                        continue;
+                    }
+                    match retriever
+                        .retrieve_with_overrides(
+                            &q,
+                            10,
+                            0.55,
+                            [
+                                0.3, 0.2, 0.15, 0.1, 0.25, 0.05, 0.1, 0.05, 0.15, 0.1, 0.08, 0.06,
+                            ],
+                        )
+                        .await
+                    {
                         Ok(results) => cache.put(key, results).await,
                         Err(e) => tracing::debug!(error = %e, "predictive retrieve failed"),
                     }

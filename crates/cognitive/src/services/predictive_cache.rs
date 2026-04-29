@@ -16,7 +16,11 @@ pub struct CacheStats {
 impl CacheStats {
     pub fn hit_rate(&self) -> f64 {
         let total = self.hits + self.misses;
-        if total == 0 { 0.0 } else { self.hits as f64 / total as f64 }
+        if total == 0 {
+            0.0
+        } else {
+            self.hits as f64 / total as f64
+        }
     }
 }
 
@@ -62,7 +66,13 @@ impl PredictiveCache {
 
     pub async fn put(&self, key: String, value: Vec<ScoredFact>) {
         let mut g = self.inner.lock().await;
-        g.put(key, CacheEntry { inserted_at: Instant::now(), value });
+        g.put(
+            key,
+            CacheEntry {
+                inserted_at: Instant::now(),
+                value,
+            },
+        );
     }
 
     pub async fn get(&self, key: &str) -> Option<Vec<ScoredFact>> {
@@ -119,11 +129,15 @@ impl PredictiveCache {
     }
 
     async fn maybe_disable(&self) {
-        if self.min_hit_rate <= 0.0 { return; }
+        if self.min_hit_rate <= 0.0 {
+            return;
+        }
         let h = self.hits.load(Ordering::Relaxed);
         let m = self.misses.load(Ordering::Relaxed);
         let total = h + m;
-        if total < 100 { return; }
+        if total < 100 {
+            return;
+        }
         let rate = h as f64 / total as f64;
         if rate < self.min_hit_rate {
             self.disabled.store(true, Ordering::Relaxed);
@@ -146,30 +160,34 @@ mod tests {
     use crate::types::SemanticFact;
 
     fn sample(s: &str) -> Vec<ScoredFact> {
-        vec![ScoredFact { fact: SemanticFact {
-            id: format!("{s}_id"),
-            domain: "test".into(),
-            subject: s.into(),
-            predicate: "p".into(),
-            object: "o".into(),
-            confidence: 0.5,
-            source: "t".into(),
-            valid_from: "2026-01-01".into(),
-            valid_until: None,
-            recorded_at: "2026-01-01".into(),
-            superseded_at: None,
-            superseded_by: None,
-            stability: 1.0,
-            last_accessed: None,
-            access_count: 0,
-            convergence_score: 0.0,
-            project_id: None,
-            memory_type: "fact".into(),
-            scope_type: "system".into(),
-            scope_id: None,
-            scope_repo_id: None,
-            metadata: None,
-        }, score: 0.7, similarity: None }]
+        vec![ScoredFact {
+            fact: SemanticFact {
+                id: format!("{s}_id"),
+                domain: "test".into(),
+                subject: s.into(),
+                predicate: "p".into(),
+                object: "o".into(),
+                confidence: 0.5,
+                source: "t".into(),
+                valid_from: "2026-01-01".into(),
+                valid_until: None,
+                recorded_at: "2026-01-01".into(),
+                superseded_at: None,
+                superseded_by: None,
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                convergence_score: 0.0,
+                project_id: None,
+                memory_type: "fact".into(),
+                scope_type: "system".into(),
+                scope_id: None,
+                scope_repo_id: None,
+                metadata: None,
+            },
+            score: 0.7,
+            similarity: None,
+        }]
     }
 
     #[tokio::test]
@@ -199,7 +217,7 @@ mod tests {
         let stats = cache.stats().await;
         assert_eq!(stats.hits, 2);
         assert_eq!(stats.misses, 1);
-        assert!((stats.hit_rate() - 2.0/3.0).abs() < 1e-6);
+        assert!((stats.hit_rate() - 2.0 / 3.0).abs() < 1e-6);
     }
 
     #[tokio::test]

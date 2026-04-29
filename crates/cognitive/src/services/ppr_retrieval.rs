@@ -22,7 +22,11 @@ pub struct PprConfig {
 
 impl Default for PprConfig {
     fn default() -> Self {
-        Self { alpha: 0.15, max_iterations: 30, tolerance: 1e-4 }
+        Self {
+            alpha: 0.15,
+            max_iterations: 30,
+            tolerance: 1e-4,
+        }
     }
 }
 
@@ -43,7 +47,9 @@ pub fn personalized_pagerank(
     // Initial distribution: uniform over seeds.
     let mut current: Vec<f32> = vec![0.0; n];
     let seed_weight = 1.0 / seeds.len() as f32;
-    for &s in seeds { current[s.index()] = seed_weight; }
+    for &s in seeds {
+        current[s.index()] = seed_weight;
+    }
 
     // Personalization vector — same as initial; teleportation pulls toward seeds.
     let personalization: Vec<f32> = current.clone();
@@ -73,7 +79,9 @@ pub fn personalized_pagerank(
         // Random walk step (with damping (1-alpha)).
         for i in 0..n {
             let mass = current[i];
-            if mass == 0.0 { continue; }
+            if mass == 0.0 {
+                continue;
+            }
             let neighbors = &edges_out[i];
             if neighbors.is_empty() {
                 // Dangling: distribute back to personalization vector.
@@ -99,7 +107,11 @@ pub fn personalized_pagerank(
         }
 
         // Convergence check.
-        let l1: f32 = current.iter().zip(next.iter()).map(|(a, b)| (a - b).abs()).sum();
+        let l1: f32 = current
+            .iter()
+            .zip(next.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
         std::mem::swap(&mut current, &mut next);
         if l1 < cfg.tolerance {
             tracing::debug!(iter = iter + 1, "ppr converged");
@@ -123,7 +135,9 @@ pub async fn build_graph_from_entities(
     let mut idx_by_id: HashMap<String, NodeIndex> = HashMap::new();
     let mut name_by_idx: HashMap<String, NodeIndex> = HashMap::new();
 
-    let entities = repo.list_all_entities(5000).await
+    let entities = repo
+        .list_all_entities(5000)
+        .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
     for e in &entities {
         let i = g.add_node(e.name.clone());
@@ -131,11 +145,19 @@ pub async fn build_graph_from_entities(
         name_by_idx.insert(e.name.to_lowercase(), i);
     }
 
-    let edges = repo.list_all_edges(20000).await
+    let edges = repo
+        .list_all_edges(20000)
+        .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
     for edge in edges {
-        let src = match idx_by_id.get(&edge.source_id) { Some(i) => *i, None => continue };
-        let tgt = match idx_by_id.get(&edge.target_id) { Some(i) => *i, None => continue };
+        let src = match idx_by_id.get(&edge.source_id) {
+            Some(i) => *i,
+            None => continue,
+        };
+        let tgt = match idx_by_id.get(&edge.target_id) {
+            Some(i) => *i,
+            None => continue,
+        };
         let multiplier = match edge.edge_type.as_str() {
             "causal" => 1.5,
             "structural" => 1.2,
@@ -152,16 +174,28 @@ pub async fn build_graph_from_entities(
 
 pub struct CachedPprGraph {
     repo: crate::repos::EntityRepo,
-    cache: RwLock<Option<(DiGraph<String, f32, u32>, HashMap<String, NodeIndex>, Instant)>>,
+    cache: RwLock<
+        Option<(
+            DiGraph<String, f32, u32>,
+            HashMap<String, NodeIndex>,
+            Instant,
+        )>,
+    >,
     ttl: Duration,
 }
 
 impl CachedPprGraph {
     pub fn new(repo: crate::repos::EntityRepo, ttl: Duration) -> Self {
-        Self { repo, cache: RwLock::new(None), ttl }
+        Self {
+            repo,
+            cache: RwLock::new(None),
+            ttl,
+        }
     }
 
-    pub async fn get_or_rebuild(&self) -> common::Result<(DiGraph<String, f32, u32>, HashMap<String, NodeIndex>)> {
+    pub async fn get_or_rebuild(
+        &self,
+    ) -> common::Result<(DiGraph<String, f32, u32>, HashMap<String, NodeIndex>)> {
         {
             let r = self.cache.read().await;
             if let Some((g, n, when)) = r.as_ref() {
@@ -205,15 +239,26 @@ pub async fn retrieve_with_ppr_boost(
     // 3. Top-K entities by PPR.
     let mut by_score: Vec<(String, f32)> = scores.into_iter().collect();
     by_score.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    let top_entities: Vec<String> = by_score.iter().take(limit * 3).map(|(n, _)| n.clone()).collect();
+    let top_entities: Vec<String> = by_score
+        .iter()
+        .take(limit * 3)
+        .map(|(n, _)| n.clone())
+        .collect();
 
     // 4. Fetch facts for these entities.
     let mut out = Vec::new();
     for name in top_entities {
         if let Ok(nodes) = entity_repo.find_by_name(&name).await {
             if let Some(node) = nodes.first() {
-                let facts = fact_repo.find_facts_by_entity_id(&node.id, 5).await.unwrap_or_default();
-                let ppr_score = by_score.iter().find(|(n, _)| n == &name).map(|(_, s)| *s).unwrap_or(0.0);
+                let facts = fact_repo
+                    .find_facts_by_entity_id(&node.id, 5)
+                    .await
+                    .unwrap_or_default();
+                let ppr_score = by_score
+                    .iter()
+                    .find(|(n, _)| n == &name)
+                    .map(|(_, s)| *s)
+                    .unwrap_or(0.0);
                 for f in facts {
                     out.push(crate::services::retrieval::ScoredFact {
                         fact: f,
@@ -226,7 +271,11 @@ pub async fn retrieve_with_ppr_boost(
     }
 
     // 5. Dedup by fact.id, keep top-N.
-    out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let mut seen = std::collections::HashSet::new();
     out.retain(|s| seen.insert(s.fact.id.clone()));
     out.truncate(limit);
@@ -235,9 +284,13 @@ pub async fn retrieve_with_ppr_boost(
 
 fn extract_entity_names_from_query(query: &str) -> Vec<String> {
     // Heuristic: split on whitespace, keep tokens of length ≥3 that start with letter.
-    query.split_whitespace()
+    query
+        .split_whitespace()
         .filter(|t| t.len() >= 3 && t.chars().next().map_or(false, |c| c.is_alphabetic()))
-        .map(|t| t.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase())
+        .map(|t| {
+            t.trim_matches(|c: char| !c.is_alphanumeric())
+                .to_lowercase()
+        })
         .collect()
 }
 
@@ -251,20 +304,45 @@ mod tests {
     async fn build_graph_from_entity_repo() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         let repo = EntityRepo::new(pool.inner().clone());
-        let a = repo.upsert_entity(&NewEntity {
-            name: "A".into(), entity_type: "concept".into(), description: None,
-            source: "t".into(), source_id: None, metadata: None,
-        }).await.unwrap();
-        let b = repo.upsert_entity(&NewEntity {
-            name: "B".into(), entity_type: "concept".into(), description: None,
-            source: "t".into(), source_id: None, metadata: None,
-        }).await.unwrap();
-        let c = repo.upsert_entity(&NewEntity {
-            name: "C".into(), entity_type: "concept".into(), description: None,
-            source: "t".into(), source_id: None, metadata: None,
-        }).await.unwrap();
-        repo.upsert_relationship_typed(&a.id, &b.id, "x", "causal", 0.9, None, "t").await.unwrap();
-        repo.upsert_relationship_typed(&b.id, &c.id, "y", "correlational", 0.5, None, "t").await.unwrap();
+        let a = repo
+            .upsert_entity(&NewEntity {
+                name: "A".into(),
+                entity_type: "concept".into(),
+                description: None,
+                source: "t".into(),
+                source_id: None,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+        let b = repo
+            .upsert_entity(&NewEntity {
+                name: "B".into(),
+                entity_type: "concept".into(),
+                description: None,
+                source: "t".into(),
+                source_id: None,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+        let c = repo
+            .upsert_entity(&NewEntity {
+                name: "C".into(),
+                entity_type: "concept".into(),
+                description: None,
+                source: "t".into(),
+                source_id: None,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+        repo.upsert_relationship_typed(&a.id, &b.id, "x", "causal", 0.9, None, "t")
+            .await
+            .unwrap();
+        repo.upsert_relationship_typed(&b.id, &c.id, "y", "correlational", 0.5, None, "t")
+            .await
+            .unwrap();
 
         let (graph, name_to_idx) = build_graph_from_entities(&repo).await.unwrap();
         assert_eq!(graph.node_count(), 3);
@@ -275,7 +353,11 @@ mod tests {
         let b_idx = name_to_idx["B"];
         let edge = graph.find_edge(a_idx, b_idx).unwrap();
         let w = *graph.edge_weight(edge).unwrap();
-        assert!(w >= 0.9 * 1.5, "causal weight {} should be ≥ 0.9 * 1.5 (causal multiplier)", w);
+        assert!(
+            w >= 0.9 * 1.5,
+            "causal weight {} should be ≥ 0.9 * 1.5 (causal multiplier)",
+            w
+        );
     }
 
     #[tokio::test]
@@ -283,18 +365,34 @@ mod tests {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         let repo = EntityRepo::new(pool.inner().clone());
         repo.upsert_entity(&NewEntity {
-            name: "A".into(), entity_type: "c".into(), description: None,
-            source: "t".into(), source_id: None, metadata: None,
-        }).await.unwrap();
+            name: "A".into(),
+            entity_type: "c".into(),
+            description: None,
+            source: "t".into(),
+            source_id: None,
+            metadata: None,
+        })
+        .await
+        .unwrap();
         let cache = CachedPprGraph::new(repo.clone(), Duration::from_secs(60));
         let (g1, _) = cache.get_or_rebuild().await.unwrap();
 
         // Insert another entity; cache should NOT reflect it (within TTL).
         repo.upsert_entity(&NewEntity {
-            name: "B".into(), entity_type: "c".into(), description: None,
-            source: "t".into(), source_id: None, metadata: None,
-        }).await.unwrap();
+            name: "B".into(),
+            entity_type: "c".into(),
+            description: None,
+            source: "t".into(),
+            source_id: None,
+            metadata: None,
+        })
+        .await
+        .unwrap();
         let (g2, _) = cache.get_or_rebuild().await.unwrap();
-        assert_eq!(g1.node_count(), g2.node_count(), "cache should still report stale view");
+        assert_eq!(
+            g1.node_count(),
+            g2.node_count(),
+            "cache should still report stale view"
+        );
     }
 }

@@ -1071,7 +1071,6 @@ impl AppCore {
         Ok(result)
     }
 
-
     #[tracing::instrument(skip(self), err)]
     pub async fn chat_cancel(&self, session_key: String) -> Result<(), ApiError> {
         chat_cancel(

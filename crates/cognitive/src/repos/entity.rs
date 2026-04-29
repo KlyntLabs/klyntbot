@@ -821,7 +821,7 @@ impl EntityRepo {
     pub async fn list_all_entities(&self, limit: usize) -> Result<Vec<EntityRow>, sqlx::Error> {
         let lim = limit as i64;
         sqlx::query_as::<_, EntityRow>(
-            "SELECT * FROM entities ORDER BY mention_count DESC LIMIT ?1"
+            "SELECT * FROM entities ORDER BY mention_count DESC LIMIT ?1",
         )
         .bind(lim)
         .fetch_all(&self.pool)
@@ -834,7 +834,7 @@ impl EntityRepo {
         sqlx::query_as::<_, EdgeRow>(
             "SELECT source_entity_id as source_id, target_entity_id as target_id, \
              COALESCE(edge_type, 'correlational') as edge_type, strength \
-             FROM entity_relationships WHERE valid_until IS NULL LIMIT ?1"
+             FROM entity_relationships WHERE valid_until IS NULL LIMIT ?1",
         )
         .bind(lim)
         .fetch_all(&self.pool)

@@ -221,7 +221,11 @@ impl EpisodicMemoryRepo {
     }
 
     /// List unrolled episodics at a given tier (KCA Track 8).
-    pub async fn list_unrolled_at_tier(&self, tier: &str, limit: usize) -> Result<Vec<EpisodicMemory>, sqlx::Error> {
+    pub async fn list_unrolled_at_tier(
+        &self,
+        tier: &str,
+        limit: usize,
+    ) -> Result<Vec<EpisodicMemory>, sqlx::Error> {
         let lim = limit as i64;
         sqlx::query_as::<_, EpisodicMemory>(
             "SELECT * FROM episodic_memories WHERE tier = ?1 AND rolled_up_at IS NULL ORDER BY recorded_at ASC LIMIT ?2"
@@ -233,10 +237,14 @@ impl EpisodicMemoryRepo {
     }
 
     /// List episodics by tier (KCA Track 8).
-    pub async fn list_by_tier(&self, tier: &str, limit: usize) -> Result<Vec<EpisodicMemory>, sqlx::Error> {
+    pub async fn list_by_tier(
+        &self,
+        tier: &str,
+        limit: usize,
+    ) -> Result<Vec<EpisodicMemory>, sqlx::Error> {
         let lim = limit as i64;
         sqlx::query_as::<_, EpisodicMemory>(
-            "SELECT * FROM episodic_memories WHERE tier = ?1 ORDER BY recorded_at DESC LIMIT ?2"
+            "SELECT * FROM episodic_memories WHERE tier = ?1 ORDER BY recorded_at DESC LIMIT ?2",
         )
         .bind(tier)
         .bind(lim)
@@ -245,7 +253,11 @@ impl EpisodicMemoryRepo {
     }
 
     /// Mark an episodic as rolled up under a parent (KCA Track 8).
-    pub async fn set_parent_and_rolled_up(&self, id: &str, parent: &str) -> Result<(), sqlx::Error> {
+    pub async fn set_parent_and_rolled_up(
+        &self,
+        id: &str,
+        parent: &str,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query(
             "UPDATE episodic_memories SET parent_id = ?1, rolled_up_at = datetime('now') WHERE id = ?2"
         )

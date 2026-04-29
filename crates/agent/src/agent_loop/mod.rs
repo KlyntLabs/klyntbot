@@ -733,10 +733,7 @@ impl AgentLoop {
         let system_msg_content = format!("[System: {}] {}", msg.sender_id, msg.content);
 
         // Get or create session and mutate under the per-session lock
-        let session_arc = self
-            .session_manager
-            .get_or_create(&session_key)
-            .await?;
+        let session_arc = self.session_manager.get_or_create(&session_key).await?;
         let history = {
             let mut session = session_arc.lock().await;
             session.add_message("system", &system_msg_content);
@@ -949,10 +946,7 @@ impl AgentLoop {
         };
         debug!("Processing {} message: {}", label, preview);
 
-        let session_arc = self
-            .session_manager
-            .get_or_create(session_key)
-            .await?;
+        let session_arc = self.session_manager.get_or_create(session_key).await?;
         let (history, embed_msg_id) = {
             let mut session = session_arc.lock().await;
             session.add_message("user", content);
@@ -1035,8 +1029,7 @@ impl AgentLoop {
             if let Some(ref original) = last_assistant_content {
                 if cooldown_after_decrement == 0 {
                     // Set cooldown under a fresh lock (mirrors process_message's second lock)
-                    if let Ok(session_arc) =
-                        self.session_manager.get_or_create(&session_key).await
+                    if let Ok(session_arc) = self.session_manager.get_or_create(&session_key).await
                     {
                         let mut session = session_arc.lock().await;
                         session.correction_cooldown = 3;

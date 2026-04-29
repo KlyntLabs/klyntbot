@@ -1,8 +1,8 @@
 //! Repository for the `insight_reviews` table — versioned insight storage.
+use crate::types::{InsightReviewRow, ScopeConfig};
 use jiff::Timestamp;
 use sqlx::SqlitePool;
 use uuid::Uuid;
-use crate::types::{InsightReviewRow, ScopeConfig};
 #[derive(Debug, Clone)]
 pub struct InsightReviewRepo {
     pool: SqlitePool,
@@ -156,36 +156,18 @@ mod tests {
         let repo = InsightReviewRepo::new(pool);
         let scope = ScopeConfig::default();
         let v1 = repo
-            .insert(
-                "note-1",
-                r#"{"synthesis":"v1"}"#,
-                "hash-1",
-                &scope,
-                None,
-            )
+            .insert("note-1", r#"{"synthesis":"v1"}"#, "hash-1", &scope, None)
             .await
             .unwrap();
         assert_eq!(v1.version, 1);
         let v2 = repo
-            .insert(
-                "note-1",
-                r#"{"synthesis":"v2"}"#,
-                "hash-2",
-                &scope,
-                None,
-            )
+            .insert("note-1", r#"{"synthesis":"v2"}"#, "hash-2", &scope, None)
             .await
             .unwrap();
         assert_eq!(v2.version, 2);
         // Different note starts at 1
         let other = repo
-            .insert(
-                "note-2",
-                r#"{"synthesis":"v1"}"#,
-                "hash-3",
-                &scope,
-                None,
-            )
+            .insert("note-2", r#"{"synthesis":"v1"}"#, "hash-3", &scope, None)
             .await
             .unwrap();
         assert_eq!(other.version, 1);
@@ -195,24 +177,12 @@ mod tests {
         let pool = setup().await;
         let repo = InsightReviewRepo::new(pool);
         let scope = ScopeConfig::default();
-        repo.insert(
-            "note-1",
-            r#"{"synthesis":"v1"}"#,
-            "hash-1",
-            &scope,
-            None,
-        )
-        .await
-        .unwrap();
-        repo.insert(
-            "note-1",
-            r#"{"synthesis":"v2"}"#,
-            "hash-2",
-            &scope,
-            None,
-        )
-        .await
-        .unwrap();
+        repo.insert("note-1", r#"{"synthesis":"v1"}"#, "hash-1", &scope, None)
+            .await
+            .unwrap();
+        repo.insert("note-1", r#"{"synthesis":"v2"}"#, "hash-2", &scope, None)
+            .await
+            .unwrap();
         let latest = repo.get_latest("note-1").await.unwrap().unwrap();
         assert_eq!(latest.version, 2);
         let versions = repo.list_versions("note-1").await.unwrap();
@@ -225,15 +195,9 @@ mod tests {
         let pool = setup().await;
         let repo = InsightReviewRepo::new(pool);
         let scope = ScopeConfig::default();
-        repo.insert(
-            "note-1",
-            r#"{"synthesis":"v1"}"#,
-            "hash-abc",
-            &scope,
-            None,
-        )
-        .await
-        .unwrap();
+        repo.insert("note-1", r#"{"synthesis":"v1"}"#, "hash-abc", &scope, None)
+            .await
+            .unwrap();
         let found = repo.get_by_hash("note-1", "hash-abc").await.unwrap();
         assert!(found.is_some());
         let not_found = repo.get_by_hash("note-1", "wrong-hash").await.unwrap();
@@ -245,13 +209,7 @@ mod tests {
         let repo = InsightReviewRepo::new(pool);
         let scope = ScopeConfig::default();
         let v1 = repo
-            .insert(
-                "note-1",
-                r#"{"synthesis":"v1"}"#,
-                "hash-1",
-                &scope,
-                None,
-            )
+            .insert("note-1", r#"{"synthesis":"v1"}"#, "hash-1", &scope, None)
             .await
             .unwrap();
         repo.supersede(&v1.id).await.unwrap();

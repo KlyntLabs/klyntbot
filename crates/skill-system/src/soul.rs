@@ -90,7 +90,11 @@ impl ContextSource for SoulContextSource {
                         *cached = fresh.clone();
                     }
                 }
-                if fresh.is_empty() { None } else { Some(fresh) }
+                if fresh.is_empty() {
+                    None
+                } else {
+                    Some(fresh)
+                }
             }
             Err(_) => {
                 let cached = self.content.read().await;
