@@ -1310,15 +1310,23 @@ impl LlmQueryPredictorHandler {
     }
 
     pub async fn predict_next(&self, recent_turn: &str, n: u32) -> common::Result<Vec<String>> {
-        let user = format!("RECENT TURN:\n{}\n\nPredict {n} follow-up questions.", recent_turn);
+        let user = format!(
+            "RECENT TURN:\n{}\n\nPredict {n} follow-up questions.",
+            recent_turn
+        );
         let messages = vec![
             providers::Message::system(QUERY_PREDICTOR_SYSTEM_PROMPT),
             providers::Message::user(user),
         ];
-        let resp = self.provider.chat(&messages, None, &self.params).await
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
             .map_err(|e| crate::provider_err("query_predictor", e))?;
         #[derive(serde::Deserialize)]
-        struct R { predictions: Vec<String> }
+        struct R {
+            predictions: Vec<String>,
+        }
         let parsed: R = serde_json::from_str(&resp.content.unwrap_or_default())
             .map_err(|e| common::KlyntbotError::Json(e))?;
         Ok(parsed.predictions.into_iter().take(n as usize).collect())
@@ -1366,24 +1374,46 @@ impl LlmHierarchicalSummarizer {
 }
 
 #[async_trait::async_trait]
-impl cognitive::services::hierarchical_compressor::HierarchicalSummarizer for LlmHierarchicalSummarizer {
-    async fn summarize(&self, items: &[cognitive::types::EpisodicMemory], tier: cognitive::services::hierarchical_compressor::Tier) -> common::Result<String> {
-        if items.is_empty() { return Ok(String::new()); }
+impl cognitive::services::hierarchical_compressor::HierarchicalSummarizer
+    for LlmHierarchicalSummarizer
+{
+    async fn summarize(
+        &self,
+        items: &[cognitive::types::EpisodicMemory],
+        tier: cognitive::services::hierarchical_compressor::Tier,
+    ) -> common::Result<String> {
+        if items.is_empty() {
+            return Ok(String::new());
+        }
         let system = match tier {
             cognitive::services::hierarchical_compressor::Tier::Raw => "Return content unchanged.",
-            cognitive::services::hierarchical_compressor::Tier::Hourly => HIERARCHICAL_HOURLY_PROMPT,
+            cognitive::services::hierarchical_compressor::Tier::Hourly => {
+                HIERARCHICAL_HOURLY_PROMPT
+            }
             cognitive::services::hierarchical_compressor::Tier::Daily => HIERARCHICAL_DAILY_PROMPT,
-            cognitive::services::hierarchical_compressor::Tier::Weekly => HIERARCHICAL_WEEKLY_PROMPT,
+            cognitive::services::hierarchical_compressor::Tier::Weekly => {
+                HIERARCHICAL_WEEKLY_PROMPT
+            }
         };
-        let user = items.iter()
-            .map(|e| format!("[{}] {}", e.recorded_at, e.summary.as_deref().unwrap_or(&e.content)))
+        let user = items
+            .iter()
+            .map(|e| {
+                format!(
+                    "[{}] {}",
+                    e.recorded_at,
+                    e.summary.as_deref().unwrap_or(&e.content)
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n");
         let messages = vec![
             providers::Message::system(system),
             providers::Message::user(user),
         ];
-        let resp = self.provider.chat(&messages, None, &self.params).await
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
             .map_err(|e| crate::provider_err("hier_summarize", e))?;
         Ok(resp.content.unwrap_or_default())
     }
@@ -1416,17 +1446,26 @@ impl LlmTemporalPrunerHandler {
 
 #[async_trait::async_trait]
 impl cognitive::services::temporal_pruner::TemporalPrunerHandler for LlmTemporalPrunerHandler {
-    async fn prune(&self, input: cognitive::services::temporal_pruner::PruneInput) -> common::Result<cognitive::services::temporal_pruner::PruneOutput> {
-        if input.facts.is_empty() { return Ok(Default::default()); }
-        let user = serde_json::to_string(&input)
-            .map_err(|e| common::KlyntbotError::Json(e))?;
+    async fn prune(
+        &self,
+        input: cognitive::services::temporal_pruner::PruneInput,
+    ) -> common::Result<cognitive::services::temporal_pruner::PruneOutput> {
+        if input.facts.is_empty() {
+            return Ok(Default::default());
+        }
+        let user = serde_json::to_string(&input).map_err(|e| common::KlyntbotError::Json(e))?;
         let messages = vec![
             providers::Message::system(TEMPORAL_PRUNE_SYSTEM_PROMPT),
             providers::Message::user(user),
         ];
-        let resp = self.provider.chat(&messages, None, &self.params).await
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
             .map_err(|e| crate::provider_err("temporal_prune", e))?;
-        match serde_json::from_str::<cognitive::services::temporal_pruner::PruneOutput>(&resp.content.unwrap_or_default()) {
+        match serde_json::from_str::<cognitive::services::temporal_pruner::PruneOutput>(
+            &resp.content.unwrap_or_default(),
+        ) {
             Ok(o) => Ok(o),
             Err(_) => Ok(cognitive::services::temporal_pruner::PruneOutput {
                 keep: input.facts.iter().map(|f| f.fact_id.clone()).collect(),
@@ -1444,7 +1483,7 @@ mod tests {
     use std::sync::Arc;
 
     use cognitive::situation::UserSituation;
-    use cognitive::types::{SemanticFact, DEFAULT_MEMORY_TYPE};
+    use cognitive::types::{DEFAULT_MEMORY_TYPE, SemanticFact};
     use feature_coaching::signal_accumulator::TriggerFired;
     use providers::{LlmResponse, LlmStream, ProviderCapabilities, ProviderHealth, Usage};
 
@@ -2136,10 +2175,15 @@ mod tests {
         });
         let handler = LlmQueryPredictorHandler::new(
             Arc::new(provider),
-            providers::ChatParams::new("m").with_max_tokens(256).with_response_format(providers::ResponseFormat::JsonObject),
+            providers::ChatParams::new("m")
+                .with_max_tokens(256)
+                .with_response_format(providers::ResponseFormat::JsonObject),
         );
 
-        let preds = handler.predict_next("user just asked about Rust", 3).await.unwrap();
+        let preds = handler
+            .predict_next("user just asked about Rust", 3)
+            .await
+            .unwrap();
         assert_eq!(preds.len(), 3);
     }
 
@@ -2147,7 +2191,8 @@ mod tests {
     async fn llm_temporal_pruner_drops_facts_with_explicit_supersede() {
         use cognitive::services::temporal_pruner::*;
 
-        let json = r#"{"keep": ["f2"], "drop": [{"fact_id": "f1", "reason": "f2 supersedes by date"}]}"#;
+        let json =
+            r#"{"keep": ["f2"], "drop": [{"fact_id": "f1", "reason": "f2 supersedes by date"}]}"#;
         let provider = MockProvider::new(LlmResponse {
             content: Some(json.to_string()),
             tool_calls: vec![],
@@ -2157,13 +2202,29 @@ mod tests {
         });
         let handler = LlmTemporalPrunerHandler::new(
             Arc::new(provider),
-            providers::ChatParams::new("m").with_max_tokens(512).with_response_format(providers::ResponseFormat::JsonObject),
+            providers::ChatParams::new("m")
+                .with_max_tokens(512)
+                .with_response_format(providers::ResponseFormat::JsonObject),
         );
 
         let input = PruneInput {
             facts: vec![
-                PruneFactRef { fact_id: "f1".into(), subject: "Alice".into(), predicate: "works_at".into(), object: "Google".into(), valid_at: "2023-01-01T00:00:00Z".into(), valid_until: None },
-                PruneFactRef { fact_id: "f2".into(), subject: "Alice".into(), predicate: "works_at".into(), object: "Anthropic".into(), valid_at: "2025-06-01T00:00:00Z".into(), valid_until: None },
+                PruneFactRef {
+                    fact_id: "f1".into(),
+                    subject: "Alice".into(),
+                    predicate: "works_at".into(),
+                    object: "Google".into(),
+                    valid_at: "2023-01-01T00:00:00Z".into(),
+                    valid_until: None,
+                },
+                PruneFactRef {
+                    fact_id: "f2".into(),
+                    subject: "Alice".into(),
+                    predicate: "works_at".into(),
+                    object: "Anthropic".into(),
+                    valid_at: "2025-06-01T00:00:00Z".into(),
+                    valid_until: None,
+                },
             ],
             query_time: "2026-04-29T00:00:00Z".into(),
         };

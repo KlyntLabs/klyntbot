@@ -180,7 +180,8 @@ impl CodexPoller {
             .unwrap_or_else(Timestamp::now);
         match env.envelope_type.as_str() {
             "session_meta" => {
-                let payload: SessionMetaPayload = match serde_json::from_value(env.payload.clone()) {
+                let payload: SessionMetaPayload = match serde_json::from_value(env.payload.clone())
+                {
                     Ok(v) => v,
                     Err(e) => {
                         tracing::warn!(error = %e, payload = ?env.payload, "codex session_meta parse failed");
@@ -351,9 +352,10 @@ async fn walk(dir: &Path, out: &mut Vec<PathBuf>, depth: usize) -> Result<()> {
         .map_err(|e| common::KlyntbotError::Storage(format!("codex readdir: {e}")))?
     {
         let path = entry.path();
-        let ty = entry.file_type().await.map_err(|e| {
-            common::KlyntbotError::Storage(format!("codex file_type: {e}"))
-        })?;
+        let ty = entry
+            .file_type()
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("codex file_type: {e}")))?;
         if ty.is_dir() {
             Box::pin(walk(&path, out, depth + 1)).await?;
         } else if ty.is_file() && path.extension().and_then(|s| s.to_str()) == Some("jsonl") {

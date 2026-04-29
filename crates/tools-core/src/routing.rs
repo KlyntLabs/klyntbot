@@ -111,11 +111,4 @@ impl RoutingContext {
             champion_params: None,
         }
     }
-
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
 }

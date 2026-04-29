@@ -28,7 +28,8 @@ pub fn message_to_events(message: MessageRow, parts: Vec<PartRow>) -> Result<Vec
         .map(|p| PathBuf::from(&p.cwd))
         .unwrap_or_else(|| PathBuf::from("/"));
     let repo = resolve_scope(&cwd);
-    let occurred_at = Timestamp::from_millisecond(message.time_created).unwrap_or_else(|_| Timestamp::now());
+    let occurred_at =
+        Timestamp::from_millisecond(message.time_created).unwrap_or_else(|_| Timestamp::now());
 
     let mut events: Vec<AgentEventV1> = Vec::new();
     for part in parts {
@@ -54,7 +55,11 @@ pub fn message_to_events(message: MessageRow, parts: Vec<PartRow>) -> Result<Vec
                 let args_preview = serde_json::to_string(&state).unwrap_or_default();
                 let args_preview = args_preview.chars().take(512).collect();
                 EventKind::ToolCall {
-                    tool: if tool.is_empty() { "opencode_tool".into() } else { tool },
+                    tool: if tool.is_empty() {
+                        "opencode_tool".into()
+                    } else {
+                        tool
+                    },
                     args_preview,
                     ok: true,
                     duration_ms: 0,

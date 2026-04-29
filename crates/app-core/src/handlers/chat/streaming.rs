@@ -1005,6 +1005,9 @@ pub async fn relay_chat_stream(
                     | AgentEvent::EnrichmentStarted { .. }
                     | AgentEvent::EnrichmentComplete { .. }
                     | AgentEvent::TurnComplete { .. } => {}
+                    // Coding-in-chat additive variants ignored here;
+                    // chat-channel handlers will subscribe explicitly in later plans.
+                    _ => {}
                 }
             }
             else => break,
@@ -1070,7 +1073,6 @@ impl AppCore {
 
         Ok(result)
     }
-
 
     #[tracing::instrument(skip(self), err)]
     pub async fn chat_cancel(&self, session_key: String) -> Result<(), ApiError> {

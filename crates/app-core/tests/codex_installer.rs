@@ -7,7 +7,10 @@ fn install_is_noop_when_no_config_exists() {
     let tmp = tempfile::tempdir().unwrap();
     let cfg = tmp.path().join("config.toml");
     CodexInstaller::install(&cfg, std::path::Path::new("/usr/local/bin/hook")).unwrap();
-    assert!(!cfg.exists(), "codex install must not create config; it is poll-only");
+    assert!(
+        !cfg.exists(),
+        "codex install must not create config; it is poll-only"
+    );
 }
 
 #[test]

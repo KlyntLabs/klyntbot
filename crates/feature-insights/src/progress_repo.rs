@@ -1,8 +1,8 @@
 //! Repository for the `insight_progress_snapshots` table.
+use crate::types::{ProgressSnapshotRow, ProgressWeights};
 use jiff::Timestamp;
 use sqlx::SqlitePool;
 use uuid::Uuid;
-use crate::types::{ProgressSnapshotRow, ProgressWeights};
 #[derive(Debug, Clone)]
 pub struct InsightProgressRepo {
     pool: SqlitePool,
@@ -123,13 +123,7 @@ mod tests {
         let scope = ScopeConfig::default();
         let weights = ProgressWeights::default();
         let insight = insight_repo
-            .insert(
-                "note-1",
-                r#"{"synthesis":"v1"}"#,
-                "hash-1",
-                &scope,
-                None,
-            )
+            .insert("note-1", r#"{"synthesis":"v1"}"#, "hash-1", &scope, None)
             .await
             .unwrap();
         let snapshot = progress_repo
@@ -150,23 +144,11 @@ mod tests {
         let scope = ScopeConfig::default();
         let weights = ProgressWeights::default();
         let v1 = insight_repo
-            .insert(
-                "note-1",
-                r#"{"synthesis":"v1"}"#,
-                "hash-1",
-                &scope,
-                None,
-            )
+            .insert("note-1", r#"{"synthesis":"v1"}"#, "hash-1", &scope, None)
             .await
             .unwrap();
         let v2 = insight_repo
-            .insert(
-                "note-1",
-                r#"{"synthesis":"v2"}"#,
-                "hash-2",
-                &scope,
-                None,
-            )
+            .insert("note-1", r#"{"synthesis":"v2"}"#, "hash-2", &scope, None)
             .await
             .unwrap();
         progress_repo

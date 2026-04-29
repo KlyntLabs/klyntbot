@@ -126,7 +126,9 @@ mod tests {
     async fn finds_best_community_via_co_activation() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         let migrations = crate::repos::cognitive_migrations();
-        StoragePool::run_feature_migrations(pool.inner(), &migrations).await.unwrap();
+        StoragePool::run_feature_migrations(pool.inner(), &migrations)
+            .await
+            .unwrap();
         let entity_repo = EntityRepo::new(pool.inner().clone());
         let community_repo = CommunityRepo::new(pool.inner().clone());
 

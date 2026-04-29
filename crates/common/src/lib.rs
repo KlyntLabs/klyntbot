@@ -30,8 +30,8 @@ pub use prompts::{
     Answer, AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question,
 };
 pub use types::{
-    AppMode, ChannelName, ChatId, MessageRole, SessionKey, CLI_CHANNEL, MCP_CHANNEL,
-    SYSTEM_CHANNEL, TELEGRAM_RESET_SENDER,
+    AppMode, ChannelName, ChatId, MessageRole, SessionKey, CLI_CHANNEL, CODING_CHANNEL,
+    MCP_CHANNEL, SYSTEM_CHANNEL, TELEGRAM_RESET_SENDER,
 };
 
 // ── Re-exports: commonly used utilities ─────────────────────────────────

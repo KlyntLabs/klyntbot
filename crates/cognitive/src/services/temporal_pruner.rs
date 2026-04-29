@@ -1,7 +1,7 @@
 //! KCA Track 13 — temporal pruning at retrieval time.
 
-use serde::{Deserialize, Serialize};
 use crate::services::retrieval::ScoredFact;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PruneInput {
@@ -41,14 +41,21 @@ pub struct NoopTemporalPruner;
 #[async_trait::async_trait]
 impl TemporalPrunerHandler for NoopTemporalPruner {
     async fn prune(&self, input: PruneInput) -> common::Result<PruneOutput> {
-        Ok(PruneOutput { keep: input.facts.iter().map(|f| f.fact_id.clone()).collect(), drop: vec![] })
+        Ok(PruneOutput {
+            keep: input.facts.iter().map(|f| f.fact_id.clone()).collect(),
+            drop: vec![],
+        })
     }
 }
 
 /// Filter scored facts by the pruner's keep list.
 pub fn apply_prune(facts: Vec<ScoredFact>, output: &PruneOutput) -> Vec<ScoredFact> {
-    let drop_set: std::collections::HashSet<&str> = output.drop.iter().map(|d| d.fact_id.as_str()).collect();
-    facts.into_iter().filter(|s| !drop_set.contains(s.fact.id.as_str())).collect()
+    let drop_set: std::collections::HashSet<&str> =
+        output.drop.iter().map(|d| d.fact_id.as_str()).collect();
+    facts
+        .into_iter()
+        .filter(|s| !drop_set.contains(s.fact.id.as_str()))
+        .collect()
 }
 
 #[cfg(test)]
@@ -58,26 +65,69 @@ mod tests {
 
     #[test]
     fn apply_prune_filters_dropped_facts() {
-        let f1 = ScoredFact { fact: SemanticFact {
-            id: "f1".into(), domain: "test".into(), subject: "a".into(), predicate: "p".into(),
-            object: "b".into(), confidence: 0.5, source: "t".into(), valid_from: "2026-01-01".into(),
-            valid_until: None, recorded_at: "2026-01-01".into(), superseded_at: None, superseded_by: None,
-            stability: 1.0, last_accessed: None, access_count: 0, convergence_score: 0.0,
-            project_id: None, memory_type: "fact".into(), scope_type: "system".into(),
-            scope_id: None, scope_repo_id: None, metadata: None,
-        }, score: 0.7, similarity: None };
-        let f2 = ScoredFact { fact: SemanticFact {
-            id: "f2".into(), domain: "test".into(), subject: "c".into(), predicate: "p".into(),
-            object: "d".into(), confidence: 0.5, source: "t".into(), valid_from: "2026-01-01".into(),
-            valid_until: None, recorded_at: "2026-01-01".into(), superseded_at: None, superseded_by: None,
-            stability: 1.0, last_accessed: None, access_count: 0, convergence_score: 0.0,
-            project_id: None, memory_type: "fact".into(), scope_type: "system".into(),
-            scope_id: None, scope_repo_id: None, metadata: None,
-        }, score: 0.6, similarity: None };
+        let f1 = ScoredFact {
+            fact: SemanticFact {
+                id: "f1".into(),
+                domain: "test".into(),
+                subject: "a".into(),
+                predicate: "p".into(),
+                object: "b".into(),
+                confidence: 0.5,
+                source: "t".into(),
+                valid_from: "2026-01-01".into(),
+                valid_until: None,
+                recorded_at: "2026-01-01".into(),
+                superseded_at: None,
+                superseded_by: None,
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                convergence_score: 0.0,
+                project_id: None,
+                memory_type: "fact".into(),
+                scope_type: "system".into(),
+                scope_id: None,
+                scope_repo_id: None,
+                metadata: None,
+            },
+            score: 0.7,
+            similarity: None,
+        };
+        let f2 = ScoredFact {
+            fact: SemanticFact {
+                id: "f2".into(),
+                domain: "test".into(),
+                subject: "c".into(),
+                predicate: "p".into(),
+                object: "d".into(),
+                confidence: 0.5,
+                source: "t".into(),
+                valid_from: "2026-01-01".into(),
+                valid_until: None,
+                recorded_at: "2026-01-01".into(),
+                superseded_at: None,
+                superseded_by: None,
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                convergence_score: 0.0,
+                project_id: None,
+                memory_type: "fact".into(),
+                scope_type: "system".into(),
+                scope_id: None,
+                scope_repo_id: None,
+                metadata: None,
+            },
+            score: 0.6,
+            similarity: None,
+        };
 
         let out = PruneOutput {
             keep: vec!["f2".into()],
-            drop: vec![DropDecision { fact_id: "f1".into(), reason: "stale".into() }],
+            drop: vec![DropDecision {
+                fact_id: "f1".into(),
+                reason: "stale".into(),
+            }],
         };
 
         let kept = apply_prune(vec![f1, f2], &out);

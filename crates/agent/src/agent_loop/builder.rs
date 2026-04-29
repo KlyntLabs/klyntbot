@@ -29,9 +29,8 @@ use tools::{
 use tools_core::FeaturePackage;
 
 use super::super::context_sources::{
-    AreaSource, BootstrapSource, IdentitySource, PageContextSource,
-    ProductivityContextSource, ProjectContextSource, SessionContextSource,
-    SessionMemoryContextSource, TodoSource,
+    AreaSource, BootstrapSource, IdentitySource, PageContextSource, ProductivityContextSource,
+    ProjectContextSource, SessionContextSource, SessionMemoryContextSource, TodoSource,
 };
 use super::super::{CronHandlerAdapter, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
@@ -729,7 +728,9 @@ impl AgentLoopBuilder {
         let mut tree_builder_token: Option<CancellationToken> = None;
         let mut memory_service_for_shadow: Option<Arc<cognitive::UnifiedMemoryService>> = None;
         let mut memory_retriever_for_prf: Option<Arc<dyn context_engine::MemoryRetriever>> = None;
-        let mut predictive_cache: Option<Arc<cognitive::services::predictive_cache::PredictiveCache>> = None;
+        let mut predictive_cache: Option<
+            Arc<cognitive::services::predictive_cache::PredictiveCache>,
+        > = None;
         let context_engine = if let Some(fact_repo) = cognitive_fact_repo {
             let mut retriever = cognitive::UnifiedMemoryService::new(fact_repo)
                 .with_recall_opt(recall_service.clone())
@@ -768,22 +769,41 @@ impl AgentLoopBuilder {
                 retriever = retriever.with_ppr_cache(ppr_cache);
             }
             // KCA Track 7: predictive cache
-            let predictive_cache_inner = Arc::new(cognitive::services::predictive_cache::PredictiveCache::new(
-                100,
-                std::time::Duration::from_secs(config.cognitive.predictive_cache.ttl_seconds as u64),
-            ));
+            let predictive_cache_inner =
+                Arc::new(cognitive::services::predictive_cache::PredictiveCache::new(
+                    100,
+                    std::time::Duration::from_secs(
+                        config.cognitive.predictive_cache.ttl_seconds as u64,
+                    ),
+                ));
             predictive_cache = Some(predictive_cache_inner.clone());
             retriever = retriever.with_predictive_cache(predictive_cache_inner);
             // KCA Track 13: temporal pruner
-            let temporal_pruner: Option<Arc<dyn cognitive::services::temporal_pruner::TemporalPrunerHandler>> =
-                self.cognitive_provider.as_ref().map(|p| {
-                    let model = config.cognitive.temporal_prune_model.clone()
-                        .unwrap_or_else(|| config.cognitive.model.clone().unwrap_or_else(|| config.agents.defaults.model.clone()));
-                    Arc::new(crate::adapters::cognitive_handlers::LlmTemporalPrunerHandler::new(
+            let temporal_pruner: Option<
+                Arc<dyn cognitive::services::temporal_pruner::TemporalPrunerHandler>,
+            > = self.cognitive_provider.as_ref().map(|p| {
+                let model = config
+                    .cognitive
+                    .temporal_prune_model
+                    .clone()
+                    .unwrap_or_else(|| {
+                        config
+                            .cognitive
+                            .model
+                            .clone()
+                            .unwrap_or_else(|| config.agents.defaults.model.clone())
+                    });
+                Arc::new(
+                    crate::adapters::cognitive_handlers::LlmTemporalPrunerHandler::new(
                         p.clone(),
-                        providers::ChatParams::new(&model).with_max_tokens(512).with_temperature(0.0).with_response_format(providers::ResponseFormat::JsonObject),
-                    )) as Arc<dyn cognitive::services::temporal_pruner::TemporalPrunerHandler>
-                });
+                        providers::ChatParams::new(&model)
+                            .with_max_tokens(512)
+                            .with_temperature(0.0)
+                            .with_response_format(providers::ResponseFormat::JsonObject),
+                    ),
+                )
+                    as Arc<dyn cognitive::services::temporal_pruner::TemporalPrunerHandler>
+            });
             if let Some(ref pruner) = temporal_pruner {
                 retriever = retriever.with_temporal_pruner(pruner.clone());
             }
@@ -1835,20 +1855,33 @@ impl AgentLoopBuilder {
 
         // KCA Track 7: wire predictive cache + query predictor into runtime.
         if let Some(ref pc) = predictive_cache {
-            runtime = runtime.with_predictive_cache(pc.clone())
+            runtime = runtime
+                .with_predictive_cache(pc.clone())
                 .with_predictions_per_turn(config.cognitive.predictive_cache.predictions_per_turn);
         }
         if let Some(ref cp) = self.cognitive_provider {
             if config.cognitive.predictive_cache.enabled {
-                let model = config.cognitive.predictive_cache.model.clone()
-                    .unwrap_or_else(|| config.cognitive.model.clone().unwrap_or_else(|| config.agents.defaults.model.clone()));
-                let predictor = Arc::new(crate::adapters::cognitive_handlers::LlmQueryPredictorHandler::new(
-                    cp.clone(),
-                    providers::ChatParams::new(&model)
-                        .with_max_tokens(256)
-                        .with_temperature(0.5)
-                        .with_response_format(providers::ResponseFormat::JsonObject),
-                ));
+                let model = config
+                    .cognitive
+                    .predictive_cache
+                    .model
+                    .clone()
+                    .unwrap_or_else(|| {
+                        config
+                            .cognitive
+                            .model
+                            .clone()
+                            .unwrap_or_else(|| config.agents.defaults.model.clone())
+                    });
+                let predictor = Arc::new(
+                    crate::adapters::cognitive_handlers::LlmQueryPredictorHandler::new(
+                        cp.clone(),
+                        providers::ChatParams::new(&model)
+                            .with_max_tokens(256)
+                            .with_temperature(0.5)
+                            .with_response_format(providers::ResponseFormat::JsonObject),
+                    ),
+                );
                 runtime = runtime.with_query_predictor(predictor);
             }
         }

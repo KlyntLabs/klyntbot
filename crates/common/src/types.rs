@@ -12,6 +12,7 @@ use crate::KlyntbotError;
 pub const SYSTEM_CHANNEL: &str = "system";
 pub const CLI_CHANNEL: &str = "cli";
 pub const MCP_CHANNEL: &str = "mcp";
+pub const CODING_CHANNEL: &str = "coding";
 pub const TELEGRAM_RESET_SENDER: &str = "telegram_reset";
 
 /// Channel name (e.g., "telegram", "discord")
@@ -261,5 +262,16 @@ mod tests {
         let (parsed_channel, parsed_chat_id) = session_key.split().unwrap();
         assert_eq!(parsed_channel, channel);
         assert_eq!(parsed_chat_id, chat_id);
+    }
+
+    #[test]
+    fn coding_channel_constant_value() {
+        assert_eq!(CODING_CHANNEL, "coding");
+    }
+
+    #[test]
+    fn coding_channel_round_trips_through_channel_name() {
+        let channel = ChannelName::new(CODING_CHANNEL);
+        assert_eq!(channel.as_str(), "coding");
     }
 }
