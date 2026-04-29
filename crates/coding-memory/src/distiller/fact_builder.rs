@@ -83,6 +83,7 @@ pub fn build_prepared(
                     scope_repo_id: effective_scope_repo.clone(),
                     metadata: None,
                     kind: Some("fix_attempt".into()),
+                    actor_id: None,
                     tier: "raw".into(),
                     parent_id: None,
                     child_count: 0,

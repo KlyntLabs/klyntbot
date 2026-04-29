@@ -1,8 +1,11 @@
 pub mod collector;
 pub mod feedback;
 pub mod service;
+pub mod skill_discovery;
 pub mod skill_files;
 pub mod types;
+
+pub use skill_discovery::{cluster_rules_for_skill_discovery, RuleCluster};
 
 use std::collections::HashMap;
 
@@ -125,6 +128,30 @@ pub trait CodingPhaseRunner: Send + Sync {
     async fn run_selective_delete(&self) -> common::Result<CodingPhaseRunnerOutcome>;
     /// Phase 6.5b — Reforge deep symbol validation (Phase 6).
     async fn run_symbol_validation(&self) -> common::Result<CodingPhaseRunnerOutcome>;
+}
+
+// ---------------------------------------------------------------------------
+// CrossCliPhaseRunner — KCA Track 10
+// ---------------------------------------------------------------------------
+
+/// Bridge trait for cross-CLI cognitive transfer (Phase 2.6).
+#[async_trait]
+pub trait CrossCliPhaseRunner: Send + Sync {
+    /// Phase 2.6: detect transferable rules and apply promotions.
+    /// Returns count of rules promoted.
+    async fn run_cross_cli_transfer(&self, run_id: &str) -> common::Result<u32>;
+}
+
+// ---------------------------------------------------------------------------
+// SkillDiscoveryRunner — KCA Track 12
+// ---------------------------------------------------------------------------
+
+/// Bridge trait for memory-grounded skill discovery (Phase 3.6).
+#[async_trait]
+pub trait SkillDiscoveryRunner: Send + Sync {
+    /// Phase 3.6: cluster rules and propose skills.
+    /// Returns count of skills proposed.
+    async fn run_skill_discovery(&self, run_id: &str) -> common::Result<u32>;
 }
 
 /// Dispatch helper for the unit test in `tests/run_reforge_with_coding.rs`.

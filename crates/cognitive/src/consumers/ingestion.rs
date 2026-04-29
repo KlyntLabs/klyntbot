@@ -108,6 +108,7 @@ impl SignalConsumer for IngestionConsumer {
                 kind: None,
                 scope_repo_id: None,
                 metadata: None,
+                actor_id: None,
                 tier: "raw".to_string(),
                 parent_id: None,
                 child_count: 0,

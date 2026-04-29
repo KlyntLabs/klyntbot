@@ -727,6 +727,8 @@ fn register_cron_callbacks(
                             Some(&co_activation_repo),
                             Some(domain_event_bus),
                             Some(&coding_runner),
+                            Some(&coding_runner),
+                            Some(&coding_runner),
                         )
                         .await
                         {

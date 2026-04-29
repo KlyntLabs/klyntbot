@@ -53,6 +53,8 @@ pub struct CodingPhaseRunnerImpl {
         coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo,
     synthesis_handler: Option<Arc<dyn CodingSynthesisHandler>>,
     rule_artifacts_handler: Option<Arc<dyn RuleArtifactsHandler>>,
+    cross_cli_handler: Option<Arc<agent::adapters::reforge_handlers::LlmCrossCliSynthesisHandler>>,
+    skill_discovery_handler: Option<Arc<agent::adapters::reforge_handlers::LlmSkillDiscoveryHandler>>,
     enabled_artifacts: Vec<String>,
     bus: Option<Arc<bus::DomainEventBus>>,
     cross_session_dedup_threshold: f32,
@@ -103,6 +105,8 @@ impl CodingPhaseRunnerImpl {
             pattern_effectiveness_log,
             synthesis_handler,
             rule_artifacts_handler,
+            cross_cli_handler: None,
+            skill_discovery_handler: None,
             enabled_artifacts,
             bus,
             cross_session_dedup_threshold,
@@ -145,6 +149,26 @@ impl CodingPhaseRunnerImpl {
         r: Option<Arc<coding_memory::causal::CausalEdgeRepo>>,
     ) -> Self {
         self.causal_repo = r;
+        self
+    }
+
+    /// Attach the cross-CLI synthesis handler (KCA Track 10).
+    #[must_use]
+    pub fn with_cross_cli_handler(
+        mut self,
+        h: Option<Arc<agent::adapters::reforge_handlers::LlmCrossCliSynthesisHandler>>,
+    ) -> Self {
+        self.cross_cli_handler = h;
+        self
+    }
+
+    /// Attach the skill discovery handler (KCA Track 12).
+    #[must_use]
+    pub fn with_skill_discovery_handler(
+        mut self,
+        h: Option<Arc<agent::adapters::reforge_handlers::LlmSkillDiscoveryHandler>>,
+    ) -> Self {
+        self.skill_discovery_handler = h;
         self
     }
 
@@ -241,5 +265,139 @@ impl cognitive::services::reforge::CodingPhaseRunner for CodingPhaseRunnerImpl {
                 outcome.invalidated, outcome.marked_stale, outcome.untouched
             )),
         })
+    }
+}
+
+#[async_trait::async_trait]
+impl cognitive::services::reforge::CrossCliPhaseRunner for CodingPhaseRunnerImpl {
+    async fn run_cross_cli_transfer(&self, run_id: &str) -> common::Result<u32> {
+        let candidates = coding_memory::reforge::cross_cli_synthesis::find_transferable_rules(
+            &self.rule_repo,
+            &self.episodic_repo,
+            0.7,
+        )
+        .await?;
+        if candidates.is_empty() {
+            return Ok(0);
+        }
+
+        let handler = match self.cross_cli_handler.as_ref() {
+            Some(h) => h,
+            None => return Ok(0),
+        };
+
+        let decision = handler.confirm_promotions(candidates.clone()).await?;
+        let mut promoted = 0u32;
+        for cand in &candidates {
+            let approved = decision.approved_rule_ids.contains(&cand.rule_id);
+            let from_sources_json =
+                serde_json::to_string(&cand.supporting_sources).unwrap_or_default();
+            let promoted_to_json = if approved {
+                from_sources_json.clone()
+            } else {
+                "[]".into()
+            };
+            let decision_str = if approved { "approved" } else { "rejected" };
+            let log_id = uuid::Uuid::new_v4().to_string();
+            sqlx::query!(
+                r#"INSERT INTO cross_cli_transfer_log (id, rule_id, rule_text_snapshot, from_sources, promoted_to_sources, support_strength, decision, reforge_run_id)
+                   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
+                log_id,
+                cand.rule_id,
+                cand.rule_text,
+                from_sources_json,
+                promoted_to_json,
+                cand.support_strength as i64,
+                decision_str,
+                run_id
+            )
+            .execute(self.pool.inner())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+
+            if approved {
+                let mut all = self
+                    .rule_repo
+                    .list_observed_sources(&cand.rule_id)
+                    .await
+                    .unwrap_or_default();
+                for s in &cand.supporting_sources {
+                    if !all.iter().any(|x| x.eq_ignore_ascii_case(s)) {
+                        all.push(s.clone());
+                    }
+                }
+                let refs: Vec<&str> = all.iter().map(|s| s.as_str()).collect();
+                self.rule_repo
+                    .set_observed_sources(&cand.rule_id, &refs)
+                    .await?;
+                promoted += 1;
+            }
+        }
+        Ok(promoted)
+    }
+}
+
+#[async_trait::async_trait]
+impl cognitive::services::reforge::SkillDiscoveryRunner for CodingPhaseRunnerImpl {
+    async fn run_skill_discovery(&self, run_id: &str) -> common::Result<u32> {
+        use cognitive::services::reforge::skill_discovery::*;
+
+        let clusters = cluster_rules_for_skill_discovery(&self.rule_repo, 0.4).await?;
+        if clusters.is_empty() {
+            return Ok(0);
+        }
+
+        // Resolve rule_text per cluster.
+        let mut clusters_with_text = Vec::new();
+        for c in clusters.into_iter().filter(|c| c.avg_confidence >= 0.7) {
+            let mut texts = Vec::new();
+            for id in &c.rule_ids {
+                if let Ok(Some(r)) = self.rule_repo.find_by_id(id).await {
+                    texts.push(r.rule_text);
+                }
+            }
+            clusters_with_text.push((c, texts));
+        }
+
+        let handler = match self.skill_discovery_handler.as_ref() {
+            Some(h) => h.clone(),
+            None => return Ok(0),
+        };
+        let out = handler.propose_skills(clusters_with_text).await?;
+
+        let mut written = 0u32;
+        for s in &out.skills {
+            // Dedup against pending or approved with same name.
+            let exists = sqlx::query!(
+                "SELECT id FROM skill_proposals WHERE name = ?1 AND status IN ('pending', 'approved') LIMIT 1",
+                s.name
+            )
+            .fetch_optional(self.pool.inner())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            if exists.is_some() {
+                continue;
+            }
+
+            let id = uuid::Uuid::new_v4().to_string();
+            let source_ids = serde_json::to_string(&s.source_rule_ids).unwrap_or_default();
+            sqlx::query!(
+                r#"INSERT INTO skill_proposals (id, name, description, yaml_frontmatter, body_markdown, source_rule_ids, avg_confidence, status, reforge_run_id)
+                   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8)"#,
+                id,
+                s.name,
+                s.description,
+                s.yaml_frontmatter,
+                s.body_markdown,
+                source_ids,
+                s.avg_confidence,
+                run_id
+            )
+            .execute(self.pool.inner())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            written += 1;
+        }
+        Ok(written)
     }
 }

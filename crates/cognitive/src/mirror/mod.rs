@@ -14,6 +14,7 @@ pub use sources::{
     ConfigArchiverSource, FinanceSpendingDriftSource, MetaRuleSignalSource, RoutingSignalSource,
     TaskFocusPatternSource, TrialPreviewSource,
 };
+pub use facade::SkillProposalRow;
 pub use types::{
     AutotunerBridge, BrainVersion, CategorySpend, EarlyTrialEvaluator, FeedbackTarget,
     FinanceDriftSnapshot, GeneratedNarrative, MetaRule, MetaRuleAction, MetaRuleSource,
