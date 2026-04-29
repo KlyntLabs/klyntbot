@@ -165,6 +165,41 @@ impl From<&str> for ToolOutput {
     }
 }
 
+impl ToolOutput {
+    /// Get the text representation (summary for Structured, raw text for Text).
+    pub fn as_text(&self) -> &str {
+        match self {
+            ToolOutput::Text(s) => s,
+            ToolOutput::Structured { summary, .. } => summary,
+        }
+    }
+
+    /// Consume into the text representation.
+    pub fn into_string(self) -> String {
+        match self {
+            ToolOutput::Text(s) => s,
+            ToolOutput::Structured { summary, .. } => summary,
+        }
+    }
+
+    /// Try to parse a tool result string into a `ToolOutput`.
+    /// Detects the `__STRUCTURED__` prefix convention.
+    pub fn parse(result: &str) -> Self {
+        if let Some(stripped) = result.strip_prefix("__STRUCTURED__") {
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(stripped) {
+                if let (Some(summary), Some(data)) = (value["summary"].as_str(), value.get("data"))
+                {
+                    return ToolOutput::Structured {
+                        summary: summary.to_string(),
+                        data: data.clone(),
+                    };
+                }
+            }
+        }
+        ToolOutput::Text(result.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,40 +256,5 @@ mod tests {
     fn is_concurrency_safe_can_be_overridden_to_true() {
         let t = ReadOnlyTool;
         assert!(t.is_concurrency_safe(&json!({})));
-    }
-}
-
-impl ToolOutput {
-    /// Get the text representation (summary for Structured, raw text for Text).
-    pub fn as_text(&self) -> &str {
-        match self {
-            ToolOutput::Text(s) => s,
-            ToolOutput::Structured { summary, .. } => summary,
-        }
-    }
-
-    /// Consume into the text representation.
-    pub fn into_string(self) -> String {
-        match self {
-            ToolOutput::Text(s) => s,
-            ToolOutput::Structured { summary, .. } => summary,
-        }
-    }
-
-    /// Try to parse a tool result string into a `ToolOutput`.
-    /// Detects the `__STRUCTURED__` prefix convention.
-    pub fn parse(result: &str) -> Self {
-        if let Some(stripped) = result.strip_prefix("__STRUCTURED__") {
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(stripped) {
-                if let (Some(summary), Some(data)) = (value["summary"].as_str(), value.get("data"))
-                {
-                    return ToolOutput::Structured {
-                        summary: summary.to_string(),
-                        data: data.clone(),
-                    };
-                }
-            }
-        }
-        ToolOutput::Text(result.to_string())
     }
 }

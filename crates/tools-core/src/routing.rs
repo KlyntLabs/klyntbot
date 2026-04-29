@@ -112,8 +112,3 @@ impl RoutingContext {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-}
