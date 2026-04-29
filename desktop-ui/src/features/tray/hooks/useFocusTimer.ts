@@ -92,7 +92,7 @@ export function useFocusTimer() {
   const takeBreakMut = useTauriMutation<boolean, Record<string, never>>({
     command: "focus_session_take_break",
   });
-  const logDistractionMut = useTauriMutation<void, { app_name: string }>({
+  const logDistractionMut = useTauriMutation<void, { appName: string }>({
     command: "distraction_dismiss",
   });
 
@@ -222,15 +222,17 @@ export function useFocusTimer() {
     setShowWarning(false);
     setDndHint(null);
     await startMut.mutate({
-      work_secs: settings.focusDuration * 60,
-      short_break_secs: settings.shortBreak * 60,
-      long_break_secs: settings.longBreak * 60,
-      long_break_after: settings.longBreakAfter,
-      action_id: selectedTask?.id,
-      action_title: selectedTask?.title,
-      dnd_enabled: settings.dndEnabled,
-      sound_enabled: settings.soundEnabled,
-      notification_enabled: settings.notificationEnabled,
+      params: {
+        workSecs: settings.focusDuration * 60,
+        shortBreakSecs: settings.shortBreak * 60,
+        longBreakSecs: settings.longBreak * 60,
+        longBreakAfter: settings.longBreakAfter,
+        actionId: selectedTask?.id ?? null,
+        actionTitle: selectedTask?.title ?? null,
+        dndEnabled: settings.dndEnabled,
+        soundEnabled: settings.soundEnabled,
+        notificationEnabled: settings.notificationEnabled,
+      },
     });
     refetch();
   }, [startMut, refetch, settings, selectedTask]);
@@ -285,7 +287,7 @@ export function useFocusTimer() {
 
   const logDistraction = useCallback(
     async (category: string) => {
-      await logDistractionMut.mutate({ app_name: category });
+      await logDistractionMut.mutate({ appName: category });
     },
     [logDistractionMut],
   );
