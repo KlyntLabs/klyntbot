@@ -103,10 +103,133 @@ impl KimiPoller {
         Ok(())
     }
 
-    /// Tail one wire.jsonl. Implementation lives in Task 8.
-    async fn tail_file(&self, _path: &Path) -> Result<()> {
-        // Filled in by Task 8.
+    async fn tail_file(&self, path: &Path) -> Result<()> {
+        let file_size = match tokio::fs::metadata(path).await {
+            Ok(m) => m.len(),
+            Err(_) => return Ok(()),
+        };
+        let last_offset = {
+            let guard = self.offsets.lock().await;
+            *guard.get(path).unwrap_or(&0)
+        };
+        if file_size <= last_offset {
+            return Ok(());
+        }
+
+        let session_id = match path
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|s| s.to_str())
+        {
+            Some(s) => s.to_string(),
+            None => return Ok(()),
+        };
+        let work_dir_hash = match path
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.file_name())
+            .and_then(|s| s.to_str())
+        {
+            Some(s) => s.to_string(),
+            None => return Ok(()),
+        };
+        let cwd = match self.workdir_index.get(&work_dir_hash).await {
+            Some(p) => p,
+            None => {
+                // One-shot refresh on miss before falling back.
+                let _ = self.workdir_index.refresh(&self.kimi_json_path).await;
+                self.workdir_index
+                    .get(&work_dir_hash)
+                    .await
+                    .unwrap_or_else(|| PathBuf::from("/"))
+            }
+        };
+
+        let mut file = tokio::fs::File::open(path).await.map_err(|e| {
+            common::KlyntbotError::Storage(format!("kimi open {}: {e}", path.display()))
+        })?;
+        file.seek(std::io::SeekFrom::Start(last_offset))
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("kimi seek: {e}")))?;
+        let mut reader = BufReader::new(file);
+        let mut line = String::new();
+        let mut new_offset = last_offset;
+        loop {
+            line.clear();
+            let n = reader
+                .read_line(&mut line)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(format!("kimi read: {e}")))?;
+            if n == 0 {
+                break;
+            }
+            // Skip trailing partial line if file is being written.
+            if !line.ends_with('\n') {
+                break;
+            }
+            new_offset += n as u64;
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            self.process_line(trimmed, &session_id, &cwd).await;
+        }
+        let mut guard = self.offsets.lock().await;
+        guard.insert(path.to_path_buf(), new_offset);
         Ok(())
+    }
+
+    async fn process_line(&self, raw: &str, session_id: &str, cwd: &Path) {
+        let parsed = match parse_line(raw) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(error = %e, "kimi parse_line failed");
+                return;
+            }
+        };
+        let record = match parsed {
+            WireLine::Metadata(_) => return,
+            WireLine::Record(r) => r,
+        };
+        let collected = collect_events(&record.message);
+
+        // Compute all events under the per-session lock, then release it
+        // before doing any awaiting work — never hold a mutex across await.
+        let to_dispatch: Vec<crate::event::AgentEventV1> = {
+            let mut sessions = self.sessions.lock().await;
+            let state = sessions.entry(session_id.to_string()).or_default();
+            let mut out = Vec::new();
+
+            if !state.session_start_emitted {
+                let ts = jiff::Timestamp::new(record.timestamp.trunc() as i64, 0)
+                    .unwrap_or_else(|_| jiff::Timestamp::now());
+                let model_hint = state.last_model.clone();
+                if let Some(evt) =
+                    maybe_emit_session_start(state, session_id, cwd, ts, model_hint)
+                {
+                    out.push(evt);
+                }
+            }
+
+            for c in &collected {
+                out.extend(map_event(state, c, &record, session_id, cwd));
+            }
+            out
+        };
+
+        for evt in to_dispatch {
+            self.dispatch(evt).await;
+        }
+    }
+
+    async fn dispatch(&self, event: crate::event::AgentEventV1) {
+        let envelope = AgentEvent::V1(event);
+        if let Err(e) = self.repo.insert(&envelope).await {
+            tracing::warn!(error = %e, "kimi repo.insert failed");
+        }
+        if self.event_tx.send(envelope).is_err() {
+            tracing::warn!("kimi event_tx send failed (channel closed)");
+        }
     }
 }
 
