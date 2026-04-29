@@ -12,6 +12,7 @@ pub mod enhancement_trace;
 pub mod enrichment;
 pub mod entity;
 pub mod episodic_memory;
+pub mod extraction_critic_log;
 pub mod event_log;
 pub mod fact_changelog;
 pub mod failed_observation;
@@ -48,6 +49,7 @@ pub use entity::{
     EntityRepo, EntityRow, GraphNeighborhood, NewEntity, NewRelationship, RelationshipRow,
 };
 pub use episodic_memory::EpisodicMemoryRepo;
+pub use extraction_critic_log::{ExtractionCriticLogRepo, ExtractionCriticLogEntry};
 pub use event_log::EventLogRepo;
 pub use fact_changelog::FactChangelogRepo;
 pub use failed_observation::FailedObservationRepo;
