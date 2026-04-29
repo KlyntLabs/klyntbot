@@ -148,6 +148,10 @@ pub struct CognitiveConfig {
     /// Tiered history compression configuration.
     #[serde(default)]
     pub history_compression: HistoryCompressionConfig,
+
+    /// Micro-Reforge timer config (KCA Track 4).
+    #[serde(default)]
+    pub micro_reforge: MicroReforgeConfig,
 }
 
 impl Default for CognitiveConfig {
@@ -185,6 +189,7 @@ impl Default for CognitiveConfig {
             intelligence_mode: IntelligenceMode::Standard,
             query_enhancement: QueryEnhancementConfig::default(),
             history_compression: HistoryCompressionConfig::default(),
+            micro_reforge: MicroReforgeConfig::default(),
         }
     }
 }
@@ -515,6 +520,35 @@ fn default_rerank_top_n() -> usize {
     10
 }
 
+/// Micro-Reforge timer config (KCA Track 4).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MicroReforgeConfig {
+    /// Enabled by default.
+    pub enabled: bool,
+    /// Fire after this many chat turns since the last run.
+    pub turn_threshold: u32,
+    /// Fire after this many minutes since the last run, regardless of turn count.
+    pub minute_threshold: u32,
+    /// Minimum LLM confidence required to actually write a rule.
+    pub min_confidence: f64,
+    /// LLM model override (defaults to cognitive.model).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+impl Default for MicroReforgeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            turn_threshold: 10,
+            minute_threshold: 30,
+            min_confidence: 0.65,
+            model: None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -535,5 +569,29 @@ mod tests {
         let json = r#"{"model": "claude-haiku-4-5-20251001"}"#;
         let cfg: CognitiveConfig = serde_json::from_str(json).unwrap();
         assert!(cfg.graph_linker_model.is_none());
+    }
+
+    #[test]
+    fn micro_reforge_config_defaults() {
+        let cfg: CognitiveConfig = serde_json::from_str("{}").unwrap();
+        assert!(cfg.micro_reforge.enabled);
+        assert_eq!(cfg.micro_reforge.turn_threshold, 10);
+        assert_eq!(cfg.micro_reforge.minute_threshold, 30);
+        assert_eq!(cfg.micro_reforge.min_confidence, 0.65);
+    }
+
+    #[test]
+    fn micro_reforge_config_overrides() {
+        let json = r#"{
+            "microReforge": {
+                "enabled": false,
+                "turnThreshold": 20,
+                "minuteThreshold": 60,
+                "minConfidence": 0.8
+            }
+        }"#;
+        let cfg: CognitiveConfig = serde_json::from_str(json).unwrap();
+        assert!(!cfg.micro_reforge.enabled);
+        assert_eq!(cfg.micro_reforge.turn_threshold, 20);
     }
 }
