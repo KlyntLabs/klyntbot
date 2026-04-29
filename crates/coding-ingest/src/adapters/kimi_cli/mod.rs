@@ -13,6 +13,8 @@ pub mod workdir;
 pub mod wire_file;
 /// `WireRecord` → `AgentEventV1` mapping.
 pub mod mapper;
+/// Poller that tails per-session `wire.jsonl` files.
+pub mod poller;
 
 /// Deprecated tier-2 stub — removed in Task 9.7.
 #[allow(deprecated)]
