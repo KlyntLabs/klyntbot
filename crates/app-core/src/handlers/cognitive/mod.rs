@@ -61,16 +61,25 @@ pub(crate) fn build_micro_reforge_handler(
     config: &config::Config,
 ) -> std::sync::Arc<dyn cognitive::services::micro_reforge::MicroReforgeHandler> {
     if let Some(ref cp) = cognitive_provider {
-        let model = config.cognitive.micro_reforge.model.clone()
-            .unwrap_or_else(|| config.cognitive.model.clone().unwrap_or_else(|| config.agents.defaults.model.clone()));
+        let model = config
+            .cognitive
+            .micro_reforge
+            .model
+            .clone()
+            .unwrap_or_else(|| {
+                config
+                    .cognitive
+                    .model
+                    .clone()
+                    .unwrap_or_else(|| config.agents.defaults.model.clone())
+            });
         let params = providers::ChatParams::new(model)
             .with_temperature(0.2)
             .with_max_tokens(4096)
             .with_response_format(providers::ResponseFormat::JsonObject);
-        std::sync::Arc::new(agent::adapters::cognitive_handlers::LlmMicroReforgeHandler::new(
-            cp.clone(),
-            params,
-        ))
+        std::sync::Arc::new(
+            agent::adapters::cognitive_handlers::LlmMicroReforgeHandler::new(cp.clone(), params),
+        )
     } else {
         std::sync::Arc::new(cognitive::services::micro_reforge::NoopMicroReforgeHandler)
     }

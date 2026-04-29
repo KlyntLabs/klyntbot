@@ -2523,6 +2523,7 @@ dependencies = [
  "hex",
  "jiff",
  "petgraph 0.7.1",
+ "proptest",
  "providers",
  "serde",
  "serde_json",

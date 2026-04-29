@@ -17,7 +17,9 @@ pub struct ExtractionCriticLogRepo {
 }
 
 impl ExtractionCriticLogRepo {
-    pub fn new(pool: StoragePool) -> Self { Self { pool } }
+    pub fn new(pool: StoragePool) -> Self {
+        Self { pool }
+    }
 
     pub async fn insert(&self, fact_id: &str, verdict: &str, reason: &str) -> common::Result<()> {
         let id = uuid::Uuid::new_v4().to_string();
@@ -34,7 +36,10 @@ impl ExtractionCriticLogRepo {
         Ok(())
     }
 
-    pub async fn list_unreviewed(&self, limit: usize) -> common::Result<Vec<ExtractionCriticLogEntry>> {
+    pub async fn list_unreviewed(
+        &self,
+        limit: usize,
+    ) -> common::Result<Vec<ExtractionCriticLogEntry>> {
         let lim = limit as i64;
         let rows = sqlx::query_as::<_, (String, String, String, String, String)>(
             "SELECT id, fact_id, verdict, reason, created_at FROM extraction_critic_log WHERE reviewed_by_reforge_at IS NULL ORDER BY created_at DESC LIMIT ?1",
@@ -43,9 +48,18 @@ impl ExtractionCriticLogRepo {
         .fetch_all(self.pool.inner())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(rows.into_iter().map(|(id, fact_id, verdict, reason, created_at)| ExtractionCriticLogEntry {
-            id, fact_id, verdict, reason, created_at,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(
+                |(id, fact_id, verdict, reason, created_at)| ExtractionCriticLogEntry {
+                    id,
+                    fact_id,
+                    verdict,
+                    reason,
+                    created_at,
+                },
+            )
+            .collect())
     }
 
     pub async fn mark_reviewed(&self, ids: &[String]) -> common::Result<()> {
@@ -84,9 +98,14 @@ mod tests {
             stability: 1.0,
             ..Default::default()
         };
-        crate::repos::SemanticFactRepo::new(pool.inner().clone()).upsert(&f).await.unwrap();
+        crate::repos::SemanticFactRepo::new(pool.inner().clone())
+            .upsert(&f)
+            .await
+            .unwrap();
 
-        repo.insert(&f.id, "hallucinated", "no anchor").await.unwrap();
+        repo.insert(&f.id, "hallucinated", "no anchor")
+            .await
+            .unwrap();
         let list = repo.list_unreviewed(10).await.unwrap();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].verdict, "hallucinated");

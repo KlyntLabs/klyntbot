@@ -196,20 +196,28 @@ pub async fn run_critic_judgment(
     log_repo: &crate::repos::ExtractionCriticLogRepo,
 ) {
     use crate::services::extraction_critic_types::*;
-    if facts.is_empty() { return; }
+    if facts.is_empty() {
+        return;
+    }
 
     let input = ExtractionCriticInput {
         turn_text: turn_text.to_string(),
-        extracted_facts: facts.iter().map(|f| FactRef {
-            fact_id: f.id.clone(),
-            subject: f.subject.clone(),
-            predicate: f.predicate.clone(),
-            object: f.object.clone(),
-        }).collect(),
+        extracted_facts: facts
+            .iter()
+            .map(|f| FactRef {
+                fact_id: f.id.clone(),
+                subject: f.subject.clone(),
+                predicate: f.predicate.clone(),
+                object: f.object.clone(),
+            })
+            .collect(),
     };
     let out = match handler.judge(input).await {
         Ok(o) => o,
-        Err(e) => { tracing::warn!(error = %e, "critic call failed"); return; }
+        Err(e) => {
+            tracing::warn!(error = %e, "critic call failed");
+            return;
+        }
     };
 
     for v in &out.verdicts {
@@ -258,7 +266,8 @@ pub struct BackgroundServiceConfig {
     /// Optional graph link handler — fire-and-forget LLM enrichment for newly written facts.
     pub graph_link_handler: Option<Arc<dyn crate::services::graph_linker::GraphLinkHandler>>,
     /// Optional extraction critic handler — KCA Track 5.
-    pub critic_handler: Option<Arc<dyn crate::services::extraction_critic::ExtractionCriticHandler>>,
+    pub critic_handler:
+        Option<Arc<dyn crate::services::extraction_critic::ExtractionCriticHandler>>,
     /// Optional extraction critic log repo — KCA Track 5.
     pub critic_log_repo: Option<crate::repos::ExtractionCriticLogRepo>,
 }
@@ -552,12 +561,17 @@ impl BackgroundConsolidationService {
                     if let Some(critic) = critic_handler.as_ref() {
                         let critic = critic.clone();
                         let facts_clone = extracted_facts.clone();
-                        let turn_text = to_extract.iter().map(|o| o.content.as_str()).collect::<Vec<_>>().join("\n");
+                        let turn_text = to_extract
+                            .iter()
+                            .map(|o| o.content.as_str())
+                            .collect::<Vec<_>>()
+                            .join("\n");
                         let fr = repo.clone();
                         let lg = critic_log_repo.clone();
                         tokio::spawn(async move {
                             if let Some(lg) = lg {
-                                run_critic_judgment(&turn_text, facts_clone, critic, &fr, &lg).await;
+                                run_critic_judgment(&turn_text, facts_clone, critic, &fr, &lg)
+                                    .await;
                             }
                         });
                     }
@@ -1595,13 +1609,25 @@ mod tests {
         struct FakeCritic;
         #[async_trait::async_trait]
         impl ExtractionCriticHandler for FakeCritic {
-            async fn judge(&self, input: ExtractionCriticInput) -> common::Result<ExtractionCriticOutput> {
+            async fn judge(
+                &self,
+                input: ExtractionCriticInput,
+            ) -> common::Result<ExtractionCriticOutput> {
                 Ok(ExtractionCriticOutput {
-                    verdicts: input.extracted_facts.iter().enumerate().map(|(i, f)| Verdict {
-                        fact_id: f.fact_id.clone(),
-                        verdict: if i % 2 == 0 { "grounded".into() } else { "hallucinated".into() },
-                        reason: "test".into(),
-                    }).collect(),
+                    verdicts: input
+                        .extracted_facts
+                        .iter()
+                        .enumerate()
+                        .map(|(i, f)| Verdict {
+                            fact_id: f.fact_id.clone(),
+                            verdict: if i % 2 == 0 {
+                                "grounded".into()
+                            } else {
+                                "hallucinated".into()
+                            },
+                            reason: "test".into(),
+                        })
+                        .collect(),
                     missed_facts: vec![],
                 })
             }
@@ -1609,17 +1635,35 @@ mod tests {
 
         let pool = crate::repos::cognitive_test_pool().await;
         let fact_repo = crate::repos::SemanticFactRepo::new(pool.clone());
-        let crit_log = crate::repos::ExtractionCriticLogRepo::new(storage::StoragePool::from_existing(pool.clone()));
+        let crit_log = crate::repos::ExtractionCriticLogRepo::new(
+            storage::StoragePool::from_existing(pool.clone()),
+        );
 
         let f1 = crate::types::SemanticFact {
-            id: "f1".into(), domain: "t".into(), subject: "A".into(), predicate: "p".into(), object: "B".into(),
-            confidence: 0.8, source: "t".into(), valid_from: "2026-04-29".into(), recorded_at: "2026-04-29".into(),
-            stability: 1.0, ..Default::default()
+            id: "f1".into(),
+            domain: "t".into(),
+            subject: "A".into(),
+            predicate: "p".into(),
+            object: "B".into(),
+            confidence: 0.8,
+            source: "t".into(),
+            valid_from: "2026-04-29".into(),
+            recorded_at: "2026-04-29".into(),
+            stability: 1.0,
+            ..Default::default()
         };
         let f2 = crate::types::SemanticFact {
-            id: "f2".into(), domain: "t".into(), subject: "X".into(), predicate: "p".into(), object: "Y".into(),
-            confidence: 0.8, source: "t".into(), valid_from: "2026-04-29".into(), recorded_at: "2026-04-29".into(),
-            stability: 1.0, ..Default::default()
+            id: "f2".into(),
+            domain: "t".into(),
+            subject: "X".into(),
+            predicate: "p".into(),
+            object: "Y".into(),
+            confidence: 0.8,
+            source: "t".into(),
+            valid_from: "2026-04-29".into(),
+            recorded_at: "2026-04-29".into(),
+            stability: 1.0,
+            ..Default::default()
         };
         fact_repo.upsert(&f1).await.unwrap();
         fact_repo.upsert(&f2).await.unwrap();
@@ -1630,13 +1674,18 @@ mod tests {
             std::sync::Arc::new(FakeCritic),
             &fact_repo,
             &crit_log,
-        ).await;
+        )
+        .await;
 
         // f2 should have stability halved.
         let f2_after = fact_repo.get(&f2.id).await.unwrap().unwrap();
         let f1_after = fact_repo.get(&f1.id).await.unwrap().unwrap();
-        assert!(f2_after.stability < f1_after.stability,
-            "hallucinated fact stability {} should be < grounded {}", f2_after.stability, f1_after.stability);
+        assert!(
+            f2_after.stability < f1_after.stability,
+            "hallucinated fact stability {} should be < grounded {}",
+            f2_after.stability,
+            f1_after.stability
+        );
         let log = crit_log.list_unreviewed(10).await.unwrap();
         assert_eq!(log.len(), 2);
     }

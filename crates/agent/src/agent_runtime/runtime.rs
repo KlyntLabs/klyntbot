@@ -469,7 +469,9 @@ impl AgentRuntime {
         // KCA Track 4: bump micro-Reforge turn counter (fire-and-forget).
         if let Some(svc) = self.micro_reforge_service.as_ref() {
             let svc = svc.clone();
-            tokio::spawn(async move { let _ = svc.note_turn().await; });
+            tokio::spawn(async move {
+                let _ = svc.note_turn().await;
+            });
         }
 
         let final_content = std::mem::take(&mut validation.filtered_content);

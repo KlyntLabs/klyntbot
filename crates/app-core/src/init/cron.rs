@@ -795,7 +795,10 @@ fn register_cron_callbacks(
                         let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
                         let ep_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
                         let obs_repo = cognitive::AccumulatedObservationRepo::new(pool.clone());
-                        match svc.run("minute_threshold", handler, &rule_repo, &ep_repo, &obs_repo).await {
+                        match svc
+                            .run("minute_threshold", handler, &rule_repo, &ep_repo, &obs_repo)
+                            .await
+                        {
                             Ok(n) => {
                                 info!(accepted = n, "micro_reforge ran");
                                 Ok(Some(format!("Micro-Reforge: {} rules promoted", n)))

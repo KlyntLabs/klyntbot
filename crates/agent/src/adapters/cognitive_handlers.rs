@@ -5,14 +5,13 @@
 //! for higher-quality results, falling back to heuristics on failure.
 
 use async_trait::async_trait;
-use serde_json::json;
 
 use cognitive::extraction::ExtractedFact;
-use cognitive::types::{MemoryOp, Observation};
 use cognitive::services::extraction_critic::ExtractionCriticHandler;
 use cognitive::services::extraction_critic_types::*;
 use cognitive::services::micro_reforge::MicroReforgeHandler;
 use cognitive::services::micro_reforge_types::{MicroReforgeInput, MicroReforgeOutput};
+use cognitive::types::{MemoryOp, Observation};
 use cognitive::{ConsolidationHandler, ExtractionHandler};
 use feature_coaching::reasoner::{
     CoachingDecision, CoachingReasonerHandler, InterventionType, ReasonerInput,
@@ -1102,15 +1101,31 @@ impl LlmExtractionCriticHandler {
 #[async_trait]
 impl ExtractionCriticHandler for LlmExtractionCriticHandler {
     async fn judge(&self, input: ExtractionCriticInput) -> common::Result<ExtractionCriticOutput> {
-        if input.extracted_facts.is_empty() { return Ok(Default::default()); }
-        let user = serde_json::to_string(&input)
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("critic serialize: {e}"))))?;
+        if input.extracted_facts.is_empty() {
+            return Ok(Default::default());
+        }
+        let user = serde_json::to_string(&input).map_err(|e| {
+            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                "critic serialize: {e}"
+            )))
+        })?;
         let messages = vec![
-            Message::System { content: EXTRACTION_CRITIC_SYSTEM_PROMPT.to_string() },
-            Message::User { content: providers::UserContent::Text(user) },
+            Message::System {
+                content: EXTRACTION_CRITIC_SYSTEM_PROMPT.to_string(),
+            },
+            Message::User {
+                content: providers::UserContent::Text(user),
+            },
         ];
-        let resp = self.provider.chat(&messages, None, &self.params).await
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("critic: {e}"))))?;
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| {
+                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                    "critic: {e}"
+                )))
+            })?;
         match serde_json::from_str::<ExtractionCriticOutput>(&resp.content.unwrap_or_default()) {
             Ok(o) => Ok(o),
             Err(e) => {
@@ -1144,6 +1159,14 @@ pub struct LlmCommunityMembershipHandler {
     params: ChatParams,
 }
 
+impl std::fmt::Debug for LlmCommunityMembershipHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LlmCommunityMembershipHandler")
+            .field("params", &self.params)
+            .finish_non_exhaustive()
+    }
+}
+
 impl LlmCommunityMembershipHandler {
     pub fn new(provider: DynProvider, params: ChatParams) -> Self {
         Self { provider, params }
@@ -1162,25 +1185,57 @@ impl LlmCommunityMembershipHandler {
             entity_name, entity_type, community_name, community_summary, score
         );
         let messages = vec![
-            Message::System { content: COMMUNITY_MEMBERSHIP_SYSTEM_PROMPT.to_string() },
-            Message::User { content: providers::UserContent::Text(user) },
+            Message::System {
+                content: COMMUNITY_MEMBERSHIP_SYSTEM_PROMPT.to_string(),
+            },
+            Message::User {
+                content: providers::UserContent::Text(user),
+            },
         ];
-        let resp = self.provider.chat(&messages, None, &self.params).await
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("community_membership: {e}"))))?;
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| {
+                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                    "community_membership: {e}"
+                )))
+            })?;
 
         #[derive(serde::Deserialize)]
-        struct R { confirm: bool, reason: String }
+        struct R {
+            confirm: bool,
+            reason: String,
+        }
         match serde_json::from_str::<R>(&resp.content.unwrap_or_default()) {
-            Ok(r) => Ok(CommunityMembershipDecision { confirm: r.confirm, reason: r.reason }),
-            Err(_) => Ok(CommunityMembershipDecision { confirm: false, reason: "parse failed".into() }),
+            Ok(r) => Ok(CommunityMembershipDecision {
+                confirm: r.confirm,
+                reason: r.reason,
+            }),
+            Err(_) => Ok(CommunityMembershipDecision {
+                confirm: false,
+                reason: "parse failed".into(),
+            }),
         }
     }
 }
 
 #[async_trait::async_trait]
-impl cognitive::services::community_membership_online::AsyncConfirmFn for LlmCommunityMembershipHandler {
-    async fn confirm(&self, entity_name: &str, entity_type: &str, community_name: &str, summary: &str, score: f64) -> bool {
-        match self.confirm_membership(entity_name, entity_type, community_name, summary, score).await {
+impl cognitive::services::community_membership_online::AsyncConfirmFn
+    for LlmCommunityMembershipHandler
+{
+    async fn confirm(
+        &self,
+        entity_name: &str,
+        entity_type: &str,
+        community_name: &str,
+        summary: &str,
+        score: f64,
+    ) -> bool {
+        match self
+            .confirm_membership(entity_name, entity_type, community_name, summary, score)
+            .await
+        {
             Ok(decision) => decision.confirm,
             Err(e) => {
                 tracing::warn!(error = %e, "community_membership confirm failed");
@@ -1221,8 +1276,11 @@ impl LlmMicroReforgeHandler {
 #[async_trait]
 impl MicroReforgeHandler for LlmMicroReforgeHandler {
     async fn synthesize(&self, input: MicroReforgeInput) -> common::Result<MicroReforgeOutput> {
-        let user = serde_json::to_string(&input)
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("micro_reforge serialize: {e}"))))?;
+        let user = serde_json::to_string(&input).map_err(|e| {
+            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                "micro_reforge serialize: {e}"
+            )))
+        })?;
         let messages = vec![
             Message::System {
                 content: MICRO_REFORGE_SYSTEM_PROMPT.to_string(),
@@ -1235,7 +1293,11 @@ impl MicroReforgeHandler for LlmMicroReforgeHandler {
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("micro_reforge: {e}"))))?;
+            .map_err(|e| {
+                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                    "micro_reforge: {e}"
+                )))
+            })?;
         let text = resp.content.unwrap_or_default();
         match serde_json::from_str::<MicroReforgeOutput>(&text) {
             Ok(out) => Ok(out),
@@ -1806,8 +1868,8 @@ mod tests {
 
     #[tokio::test]
     async fn llm_micro_reforge_handler_extracts_high_confidence_rules() {
-        use cognitive::services::micro_reforge_types::*;
         use cognitive::services::micro_reforge::MicroReforgeHandler;
+        use cognitive::services::micro_reforge_types::*;
 
         let json = r#"{
             "proposed_rules": [
@@ -1821,7 +1883,13 @@ mod tests {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
-            usage: Usage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cache_read_tokens: 0, cache_write_tokens: 0 },
+            usage: Usage {
+                prompt_tokens: 10,
+                completion_tokens: 5,
+                total_tokens: 15,
+                cache_read_tokens: 0,
+                cache_write_tokens: 0,
+            },
             reasoning_content: None,
         });
         let handler = LlmMicroReforgeHandler::new(
@@ -1831,8 +1899,10 @@ mod tests {
 
         let input = MicroReforgeInput {
             recent_episodics: vec![EpisodicRef {
-                id: "ep1".into(), domain: "coding".into(),
-                summary: "user ran cargo nextest".into(), importance: 0.7,
+                id: "ep1".into(),
+                domain: "coding".into(),
+                summary: "user ran cargo nextest".into(),
+                importance: 0.7,
                 recorded_at: "2026-04-29T00:00:00Z".into(),
             }],
             recent_observations: vec![],
@@ -1853,7 +1923,13 @@ mod tests {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
-            usage: Usage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cache_read_tokens: 0, cache_write_tokens: 0 },
+            usage: Usage {
+                prompt_tokens: 10,
+                completion_tokens: 5,
+                total_tokens: 15,
+                cache_read_tokens: 0,
+                cache_write_tokens: 0,
+            },
             reasoning_content: None,
         });
         let handler = LlmCommunityMembershipHandler::new(
@@ -1861,16 +1937,17 @@ mod tests {
             ChatParams::new("m").with_max_tokens(256),
         );
 
-        let result = handler.confirm_membership(
-            "C", "concept", "alpha", "topic about α-particles", 0.85
-        ).await.unwrap();
+        let result = handler
+            .confirm_membership("C", "concept", "alpha", "topic about α-particles", 0.85)
+            .await
+            .unwrap();
         assert!(result.confirm);
     }
 
     #[tokio::test]
     async fn llm_extraction_critic_marks_hallucinated_facts() {
-        use cognitive::services::extraction_critic_types::*;
         use cognitive::services::extraction_critic::ExtractionCriticHandler;
+        use cognitive::services::extraction_critic_types::*;
 
         let json = r#"{
             "verdicts": [
@@ -1883,7 +1960,13 @@ mod tests {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
-            usage: Usage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cache_read_tokens: 0, cache_write_tokens: 0 },
+            usage: Usage {
+                prompt_tokens: 10,
+                completion_tokens: 5,
+                total_tokens: 15,
+                cache_read_tokens: 0,
+                cache_write_tokens: 0,
+            },
             reasoning_content: None,
         });
         let handler = LlmExtractionCriticHandler::new(
@@ -1894,8 +1977,18 @@ mod tests {
         let input = ExtractionCriticInput {
             turn_text: "I love Rust.".into(),
             extracted_facts: vec![
-                FactRef { fact_id: "f1".into(), subject: "user".into(), predicate: "loves".into(), object: "Rust".into() },
-                FactRef { fact_id: "f2".into(), subject: "user".into(), predicate: "hates".into(), object: "Java".into() },
+                FactRef {
+                    fact_id: "f1".into(),
+                    subject: "user".into(),
+                    predicate: "loves".into(),
+                    object: "Rust".into(),
+                },
+                FactRef {
+                    fact_id: "f2".into(),
+                    subject: "user".into(),
+                    predicate: "hates".into(),
+                    object: "Java".into(),
+                },
             ],
         };
 

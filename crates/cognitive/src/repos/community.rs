@@ -98,7 +98,12 @@ impl CommunityRepo {
     }
 
     /// Create a new community and return it.
-    pub async fn create(&self, name: &str, summary: &str, _metadata: Option<&str>) -> Result<CommunityRow> {
+    pub async fn create(
+        &self,
+        name: &str,
+        summary: &str,
+        _metadata: Option<&str>,
+    ) -> Result<CommunityRow> {
         let id = uuid::Uuid::new_v4().to_string();
         let now = jiff::Timestamp::now().to_string();
         let row = CommunityRow {
@@ -137,7 +142,7 @@ impl CommunityRepo {
         sqlx::query_as::<_, CommunityRow>(
             "SELECT c.* FROM communities c \
              INNER JOIN entity_community_members ecm ON c.id = ecm.community_id \
-             WHERE ecm.entity_id = ?1"
+             WHERE ecm.entity_id = ?1",
         )
         .bind(entity_id)
         .fetch_all(&self.pool)
@@ -147,11 +152,12 @@ impl CommunityRepo {
 
     /// Get community summary text.
     pub async fn get_summary(&self, community_id: &str) -> Result<Option<String>> {
-        let row: Option<(String,)> = sqlx::query_as("SELECT summary FROM communities WHERE id = ?1")
-            .bind(community_id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(map_sqlx)?;
+        let row: Option<(String,)> =
+            sqlx::query_as("SELECT summary FROM communities WHERE id = ?1")
+                .bind(community_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(map_sqlx)?;
         Ok(row.map(|r| r.0))
     }
 

@@ -79,12 +79,11 @@ impl MicroReforgeService {
     ) -> common::Result<()> {
         let id = uuid::Uuid::new_v4().to_string();
         let started = Timestamp::now().to_string();
-        let row: (i64,) = sqlx::query_as(
-            "SELECT turns_since_last_run FROM micro_reforge_state WHERE id = 1",
-        )
-        .fetch_one(self.pool.inner())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let row: (i64,) =
+            sqlx::query_as("SELECT turns_since_last_run FROM micro_reforge_state WHERE id = 1")
+                .fetch_one(self.pool.inner())
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         let turn_count_at_run = row.0;
         let pc = proposed_count as i64;
         let ac = accepted_count as i64;
@@ -129,30 +128,32 @@ impl MicroReforgeService {
         observation_repo: &crate::repos::AccumulatedObservationRepo,
     ) -> common::Result<u32> {
         // 1. Collect input.
-        let recent_episodics: Vec<crate::services::micro_reforge_types::EpisodicRef> = episodic_repo
-            .list_recent(50)
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|e| crate::services::micro_reforge_types::EpisodicRef {
-                id: e.id,
-                domain: e.domain,
-                summary: e.summary.unwrap_or_default(),
-                importance: e.importance,
-                recorded_at: e.recorded_at,
-            })
-            .collect();
+        let recent_episodics: Vec<crate::services::micro_reforge_types::EpisodicRef> =
+            episodic_repo
+                .list_recent(50)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|e| crate::services::micro_reforge_types::EpisodicRef {
+                    id: e.id,
+                    domain: e.domain,
+                    summary: e.summary.unwrap_or_default(),
+                    importance: e.importance,
+                    recorded_at: e.recorded_at,
+                })
+                .collect();
 
-        let recent_observations: Vec<crate::services::micro_reforge_types::ObservationRef> = observation_repo
-            .list_recent(100)
-            .await
-            .into_iter()
-            .map(|o| crate::services::micro_reforge_types::ObservationRef {
-                content_truncated: truncate(&o.content, 200),
-                domain: o.domain,
-                importance: o.importance,
-            })
-            .collect();
+        let recent_observations: Vec<crate::services::micro_reforge_types::ObservationRef> =
+            observation_repo
+                .list_recent(100)
+                .await
+                .into_iter()
+                .map(|o| crate::services::micro_reforge_types::ObservationRef {
+                    content_truncated: truncate(&o.content, 200),
+                    domain: o.domain,
+                    importance: o.importance,
+                })
+                .collect();
 
         let existing_rules: Vec<crate::services::micro_reforge_types::RuleSummary> = rule_repo
             .list_all_active()
@@ -167,12 +168,11 @@ impl MicroReforgeService {
             })
             .collect();
 
-        let turn_row: (i64,) = sqlx::query_as(
-            "SELECT turns_since_last_run FROM micro_reforge_state WHERE id = 1",
-        )
-        .fetch_one(self.pool.inner())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let turn_row: (i64,) =
+            sqlx::query_as("SELECT turns_since_last_run FROM micro_reforge_state WHERE id = 1")
+                .fetch_one(self.pool.inner())
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
 
         let input = crate::services::micro_reforge_types::MicroReforgeInput {
             recent_episodics,
@@ -222,7 +222,8 @@ impl MicroReforgeService {
         }
 
         // 4. Record run.
-        self.record_run(trigger, out.proposed_rules.len() as u32, accepted, None).await?;
+        self.record_run(trigger, out.proposed_rules.len() as u32, accepted, None)
+            .await?;
         Ok(accepted)
     }
 }
@@ -240,11 +241,18 @@ async fn rule_text_already_exists(
 }
 
 fn normalize(s: &str) -> String {
-    s.to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ")
+    s.to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn truncate(s: &str, n: usize) -> String {
-    if s.len() <= n { s.to_string() } else { format!("{}…", &s[..n]) }
+    if s.len() <= n {
+        s.to_string()
+    } else {
+        format!("{}…", &s[..n])
+    }
 }
 
 #[cfg(test)]
@@ -281,8 +289,10 @@ mod tests {
     async fn should_run_returns_false_when_disabled() {
         let pool = cognitive_test_pool().await;
         let pool = StoragePool::from_existing(pool);
-        let mut cfg = MicroReforgeConfig::default();
-        cfg.enabled = false;
+        let cfg = MicroReforgeConfig {
+            enabled: false,
+            ..Default::default()
+        };
         let service = MicroReforgeService::new(pool.clone(), cfg);
 
         for _ in 0..50 {
@@ -291,16 +301,19 @@ mod tests {
         assert!(!service.should_run().await.unwrap());
     }
 
-    use std::sync::Arc;
-    use crate::repos::ProceduralRuleRepo;
-    use crate::repos::EpisodicMemoryRepo;
     use crate::repos::AccumulatedObservationRepo;
+    use crate::repos::EpisodicMemoryRepo;
+    use crate::repos::ProceduralRuleRepo;
+    use std::sync::Arc;
 
     struct ScriptedHandler(MicroReforgeOutput);
 
     #[async_trait]
     impl MicroReforgeHandler for ScriptedHandler {
-        async fn synthesize(&self, _input: MicroReforgeInput) -> common::Result<MicroReforgeOutput> {
+        async fn synthesize(
+            &self,
+            _input: MicroReforgeInput,
+        ) -> common::Result<MicroReforgeOutput> {
             Ok(self.0.clone())
         }
     }
@@ -324,7 +337,16 @@ mod tests {
             notes: None,
         }));
 
-        let accepted = service.run("manual", handler, &rule_repo, &EpisodicMemoryRepo::new(pool_sqlite.clone()), &AccumulatedObservationRepo::new(pool_sqlite.clone())).await.unwrap();
+        let accepted = service
+            .run(
+                "manual",
+                handler,
+                &rule_repo,
+                &EpisodicMemoryRepo::new(pool_sqlite.clone()),
+                &AccumulatedObservationRepo::new(pool_sqlite.clone()),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(accepted, 1);
         let rules = rule_repo.list_by_domain("coding", 100).await.unwrap();
@@ -336,8 +358,10 @@ mod tests {
     async fn run_skips_rule_below_confidence_threshold() {
         let pool_sqlite = cognitive_test_pool().await;
         let pool = StoragePool::from_existing(pool_sqlite.clone());
-        let mut cfg = MicroReforgeConfig::default();
-        cfg.min_confidence = 0.8;
+        let cfg = MicroReforgeConfig {
+            min_confidence: 0.8,
+            ..Default::default()
+        };
         let service = MicroReforgeService::new(pool.clone(), cfg);
         let rule_repo = ProceduralRuleRepo::new(pool_sqlite.clone());
 
@@ -352,7 +376,16 @@ mod tests {
             notes: None,
         }));
 
-        let accepted = service.run("manual", handler, &rule_repo, &EpisodicMemoryRepo::new(pool_sqlite.clone()), &AccumulatedObservationRepo::new(pool_sqlite.clone())).await.unwrap();
+        let accepted = service
+            .run(
+                "manual",
+                handler,
+                &rule_repo,
+                &EpisodicMemoryRepo::new(pool_sqlite.clone()),
+                &AccumulatedObservationRepo::new(pool_sqlite.clone()),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(accepted, 0);
         let rules = rule_repo.list_by_domain("coding", 100).await.unwrap();
