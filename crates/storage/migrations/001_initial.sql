@@ -147,7 +147,7 @@ CREATE TABLE session_messages (
     timestamp   INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     request_id  TEXT,
     tool_calls  TEXT,
-    metadata    TEXT,
+    metadata    TEXT
 );
 CREATE INDEX idx_session_messages_key_ts ON session_messages(session_key, timestamp);
 

@@ -1,7 +1,7 @@
 # Klynt CLI — Design
 
 **Date:** 2026-04-23
-**Status:** Draft (pre-implementation)
+**Status:** Superseded by [`docs/superpowers/specs/2026-04-29-klynt-coding-in-chat-design.md`](./2026-04-29-klynt-coding-in-chat-design.md). The "coding capability in a separate `klynt` TUI binary" approach has been replaced with "coding capability inside the existing desktop chat surface." The architectural decisions here (3-layer approval, sandbox model, hook engine, skills, event vocabulary, coding-memory coordination) carry forward; the TUI/binary/Wire/multi-process-coordination chapters are obsolete. Body left intact for historical reference.
 **Scope:** Single design. Implementation plan will be derived via `writing-plans`.
 **Pre-release policy:** Per CLAUDE.md — no user data to migrate, no backward-compat shims, no feature-flag gating. Schema changes consolidated into Phase 1.
 **Companion spec:** `docs/superpowers/specs/2026-04-22-coding-memory-design.md` (amendments listed in §14).
