@@ -1787,6 +1787,13 @@ impl AgentLoopBuilder {
         let rule_repo = cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone());
         runtime = runtime.with_procedural_rule_repo(rule_repo);
 
+        // KCA Track 4: micro-Reforge turn counter.
+        let micro_reforge_svc = Arc::new(cognitive::services::micro_reforge::MicroReforgeService::new(
+            storage_pool.clone(),
+            config.cognitive.micro_reforge.clone(),
+        ));
+        runtime = runtime.with_micro_reforge(micro_reforge_svc);
+
         // Inject user situation for RetrievalContext
         if let Some(ref sit) = self.user_situation {
             runtime = runtime.with_user_situation(Arc::clone(sit));
