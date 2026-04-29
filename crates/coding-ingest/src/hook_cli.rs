@@ -77,14 +77,10 @@ pub fn run(args: Vec<String>) -> i32 {
                 return 1;
             }
         },
-        "kimi-cli" => match crate::adapters::kimi_cli::KimiAdapter.parse(&hook_event, &raw) {
-            Ok(Some(e)) => e,
-            Ok(None) => return 0,
-            Err(e) => {
-                eprintln!("klyntbot-hook: parse: {e}");
-                return 1;
-            }
-        },
+        "kimi-cli" => {
+            eprintln!("klyntbot-hook: kimi-cli is poll-only (Phase 7); no hook dispatch");
+            return 0;
+        }
         "opencode" => {
             eprintln!("klyntbot-hook: opencode is poll-only (Phase 7); no hook dispatch");
             return 0;
