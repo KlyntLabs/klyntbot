@@ -1,21 +1,16 @@
 //! Repository for the `insight_progress_snapshots` table.
-
 use jiff::Timestamp;
 use sqlx::SqlitePool;
 use uuid::Uuid;
-
 use crate::types::{ProgressSnapshotRow, ProgressWeights};
-
 #[derive(Debug, Clone)]
 pub struct InsightProgressRepo {
     pool: SqlitePool,
 }
-
 impl InsightProgressRepo {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
-
     /// Insert or update a progress snapshot for a specific insight version.
     #[allow(clippy::too_many_arguments)]
     pub async fn upsert(
@@ -30,12 +25,10 @@ impl InsightProgressRepo {
     ) -> Result<ProgressSnapshotRow, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
         let now = Timestamp::now().to_string();
-
         let overall = weights.flashcard * flashcard_success
             + weights.drift * (1.0 - semantic_drift)
             + weights.gap * gap_closure
             + weights.quiz * quiz_score;
-
         sqlx::query(
             r#"
             INSERT INTO insight_progress_snapshots
@@ -62,7 +55,6 @@ impl InsightProgressRepo {
         .bind(&now)
         .execute(&self.pool)
         .await?;
-
         let row = sqlx::query_as::<_, ProgressSnapshotRow>(
             "SELECT * FROM insight_progress_snapshots WHERE insight_review_id = ?1 AND version = ?2",
         )
@@ -70,10 +62,8 @@ impl InsightProgressRepo {
         .bind(version)
         .fetch_one(&self.pool)
         .await?;
-
         Ok(row)
     }
-
     /// Get the progress timeline for a note (all versions, ordered by version).
     pub async fn get_timeline(
         &self,
@@ -91,7 +81,6 @@ impl InsightProgressRepo {
         .fetch_all(&self.pool)
         .await
     }
-
     /// Get the latest progress snapshot for a specific insight.
     pub async fn get_latest(
         &self,
@@ -105,13 +94,11 @@ impl InsightProgressRepo {
         .await
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::repo::InsightReviewRepo;
     use crate::types::ScopeConfig;
-
     async fn setup() -> SqlitePool {
         let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
         sqlx::query("PRAGMA foreign_keys=ON;")
@@ -128,7 +115,6 @@ mod tests {
             .unwrap();
         pool
     }
-
     #[tokio::test]
     async fn test_upsert_and_get() {
         let pool = setup().await;
@@ -136,31 +122,26 @@ mod tests {
         let progress_repo = InsightProgressRepo::new(pool);
         let scope = ScopeConfig::default();
         let weights = ProgressWeights::default();
-
         let insight = insight_repo
             .insert(
                 "note-1",
                 r#"{"synthesis":"v1"}"#,
                 "hash-1",
                 &scope,
-                &[],
                 None,
             )
             .await
             .unwrap();
-
         let snapshot = progress_repo
             .upsert(&insight.id, 1, 0.8, 0.1, 0.5, 0.7, &weights)
             .await
             .unwrap();
-
         assert_eq!(snapshot.insight_review_id, insight.id);
         assert!((snapshot.flashcard_success - 0.8).abs() < f64::EPSILON);
         // overall = 0.40*0.8 + 0.25*(1-0.1) + 0.20*0.5 + 0.15*0.7
         //         = 0.32 + 0.225 + 0.10 + 0.105 = 0.75
         assert!((snapshot.overall_progress - 0.75).abs() < 0.01);
     }
-
     #[tokio::test]
     async fn test_timeline() {
         let pool = setup().await;
@@ -168,14 +149,12 @@ mod tests {
         let progress_repo = InsightProgressRepo::new(pool);
         let scope = ScopeConfig::default();
         let weights = ProgressWeights::default();
-
         let v1 = insight_repo
             .insert(
                 "note-1",
                 r#"{"synthesis":"v1"}"#,
                 "hash-1",
                 &scope,
-                &[],
                 None,
             )
             .await
@@ -186,12 +165,10 @@ mod tests {
                 r#"{"synthesis":"v2"}"#,
                 "hash-2",
                 &scope,
-                &[],
                 None,
             )
             .await
             .unwrap();
-
         progress_repo
             .upsert(&v1.id, 1, 0.5, 0.0, 0.0, 0.3, &weights)
             .await
@@ -200,7 +177,6 @@ mod tests {
             .upsert(&v2.id, 2, 0.8, 0.2, 0.6, 0.7, &weights)
             .await
             .unwrap();
-
         let timeline = progress_repo.get_timeline("note-1").await.unwrap();
         assert_eq!(timeline.len(), 2);
         assert_eq!(timeline[0].version, 1);

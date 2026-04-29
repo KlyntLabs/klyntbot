@@ -20,13 +20,6 @@ pub struct ChatThreadResponse {
     pub area_name: Option<String>,
     pub project_id: Option<String>,
     pub project_name: Option<String>,
-    // Squad fields (resolved from session.squad_id)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub squad_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub squad_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub squad_icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -41,10 +34,6 @@ pub struct ChatMessageResponse {
     pub segments: Option<Vec<MessageSegment>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transparency: Option<TransparencyData>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub persona_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub persona_name: Option<String>,
 }
 
 /// Detailed session response for `chat_get_session`.
@@ -61,8 +50,6 @@ pub struct ChatSessionResponse {
     pub project_id: Option<String>,
     pub conversation_type: Option<String>,
     pub pinned: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub squad_id: Option<String>,
 }
 
 /// Optional session context sent from the frontend alongside a chat message.
@@ -73,5 +60,4 @@ pub struct SessionContextInput {
     pub entity_id: Option<String>,
     pub context_type: Option<String>,
     pub is_ephemeral: Option<bool>,
-    pub squad_id: Option<String>,
 }

@@ -196,7 +196,7 @@ impl SemanticFactRepo {
         }
     }
 
-    /// List active facts visible to a scope chain (e.g., system + squad + persona).
+    /// List active facts visible to a scope chain (e.g., system + project).
     /// Returns facts matching ANY tier in the chain, deduplicated by ID.
     ///
     /// Uses N separate `list_by_scope()` calls + dedup to avoid dynamic SQL bind issues.

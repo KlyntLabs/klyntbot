@@ -143,7 +143,6 @@ mod tests {
                     project_id: None,
                     conversation_type: None,
                     pinned: false,
-                    squad_id: None,
                 })
                 .unwrap(),
             ),
@@ -158,7 +157,6 @@ mod tests {
                     request_id: None,
                     tool_calls: None,
                     metadata: None,
-                    persona_id: None,
                 })
                 .unwrap(),
             ),
@@ -173,7 +171,6 @@ mod tests {
                     project_id: None,
                     conversation_type: None,
                     pinned: false,
-                    squad_id: None,
                 })
                 .unwrap(),
             ),

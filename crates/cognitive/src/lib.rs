@@ -32,7 +32,6 @@ pub use extraction::{
 };
 pub use memory_retriever::UnifiedMemoryService;
 pub use repos::event_log::{DomainEventRow, PipelineEventRecord, PipelineEventRow};
-pub use repos::persona_accuracy::alignment_to_fsrs_rating;
 pub use repos::semantic_fact::DomainHealthRow;
 pub use repos::AtomExtractionCache;
 pub use repos::FsrsParamsRepo;
@@ -42,7 +41,6 @@ pub use repos::{
     EventLogRepo, FactChangelogRepo, FailedObservationRepo, IndexedSignal, KnowledgeSnapshotRepo,
     MetricRepo, ProceduralRuleRepo, SemanticFactRepo,
 };
-pub use repos::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use repos::{
     CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewLogEntry, ReviewQuality,
 };
@@ -50,9 +48,6 @@ pub use repos::{DailyRetentionPoint, DomainRetentionHistory, RetentionHistoryRep
 pub use repos::{DailyReviewStat, DomainRetentionStat, ReviewStatsRepo};
 pub use repos::{DeckPreferenceRepo, DeckPreferenceRow};
 pub use repos::{KnowledgeAtomRepo, KnowledgeAtomRow, KnowledgeTopicRow, NewKnowledgeAtom};
-pub use repos::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
-pub use repos::{NewSquad, ResolvedSquad, SquadMemberRow, SquadRepo, SquadRow};
-pub use repos::{PersonaAccuracy, PersonaAccuracyRepo};
 pub use repos::{ReviewSessionRepo, ReviewSessionRow};
 pub use session_memory::{SessionMemoryConfig, SessionMemoryService};
 pub use situation::{compute_situation, SituationInputs, UserSituation};

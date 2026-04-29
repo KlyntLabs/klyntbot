@@ -185,7 +185,7 @@ mod tests {
     /// Helper: create a session so foreign key constraint is satisfied.
     async fn create_session(session_repo: &crate::repos::SessionRepo, key: &str) {
         session_repo
-            .upsert_session(key, &serde_json::json!({}), None)
+            .upsert_session(key, &serde_json::json!({}))
             .await
             .unwrap();
     }

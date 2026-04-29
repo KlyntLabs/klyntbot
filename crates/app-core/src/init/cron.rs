@@ -162,7 +162,6 @@ const JOB_WEEKLY_KNOWLEDGE_DIGEST: &str = "__klyntbot_weekly_knowledge_digest";
 const JOB_SESSION_CLEANUP: &str = "__klyntbot_session_cleanup";
 const JOB_MEMORY_MAINTENANCE: &str = "__klyntbot_memory_maintenance";
 const JOB_ANALYTICS_CLEANUP: &str = "__klyntbot_analytics_cleanup";
-const JOB_BLACKBOARD_CLEANUP: &str = "__klyntbot_blackboard_cleanup";
 const JOB_RECURRING_TASKS: &str = "__klyntbot_recurring_tasks";
 pub(super) const JOB_INSIGHT_REFRESH: &str = "__klyntbot_insight_refresh";
 pub(super) const JOB_LEARNING_ANALYSIS: &str = "__klyntbot_learning_analysis";
@@ -958,37 +957,6 @@ fn register_cron_callbacks(
         );
     }
 
-    // ── blackboard_cleanup ─────────────────────────────────────────────────
-    {
-        let pool = repos.pool().clone();
-        let rt = rt.clone();
-        cron_executor.register(
-            JOB_BLACKBOARD_CLEANUP,
-            Arc::new(move |_job: &scheduling::CronJob| {
-                let pool = pool.clone();
-                tokio::task::block_in_place(|| {
-                    rt.block_on(async move {
-                        let repo = cognitive::BlackboardRepo::new(pool);
-                        match repo
-                            .cleanup_stale(jiff::SignedDuration::from_secs(30 * 86400))
-                            .await
-                        {
-                            Ok(0) => Ok(Some("No stale blackboard entries".to_string())),
-                            Ok(n) => {
-                                info!(deleted = n, "Blackboard cleanup: removed stale entries");
-                                Ok(Some(format!("Deleted {n} stale blackboard entries")))
-                            }
-                            Err(e) => {
-                                warn!(error = %e, "Blackboard cleanup failed");
-                                Ok(Some(format!("Blackboard cleanup failed: {e}")))
-                            }
-                        }
-                    })
-                })
-            }),
-        );
-    }
-
     // ── memory_maintenance ────────────────────────────────────────────────
     if let Some(vs) = vector_store {
         let max_age_days = config.conversation.memory.max_age_days;
@@ -1351,15 +1319,6 @@ async fn ensure_cron_jobs(
             every_ms: config.conversation.session.cleanup_interval_hours as u64 * 60 * 60 * 1000,
         },
         "Delete stale sessions",
-        "system"
-    );
-    ensure_job!(
-        JOB_BLACKBOARD_CLEANUP,
-        scheduling::CronSchedule::Cron {
-            expr: "0 0 4 * * SUN".to_string(),
-            tz: Some(config.timezone.clone()),
-        },
-        "Clean stale blackboard entries",
         "system"
     );
     ensure_job!(

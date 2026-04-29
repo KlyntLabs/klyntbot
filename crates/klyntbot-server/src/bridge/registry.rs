@@ -109,7 +109,6 @@ impl ToolRegistryBridge {
             delegation_depth: 0,
             entity_tx: None,
             interaction_channel: None,
-            squad_id: None,
             champion_params: None,
         };
 

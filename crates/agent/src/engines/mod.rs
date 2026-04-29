@@ -2,17 +2,13 @@
 //!
 //! Direct and Reactive engines have been unified into `execution::execute_loop`.
 //! This module retains the `ExecutionEngine` trait and `EngineResult` for
-//! specialized engines (debate, interaction) that haven't been unified yet.
+//! specialized engines that haven't been unified yet.
 
 use async_trait::async_trait;
 use providers::Usage;
 use tools::RoutingContext;
 
 use crate::execution::{ExecutionParams, ReasoningTrace};
-
-pub mod debate;
-pub mod debate_types;
-pub mod interaction;
 
 /// Result from an execution engine.
 pub enum EngineResult {

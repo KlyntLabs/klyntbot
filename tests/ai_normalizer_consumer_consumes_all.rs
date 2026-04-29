@@ -3,8 +3,6 @@
 //! Constructs a representative `AiSignal` for every event kind the translator
 //! produces, feeds each through the consumer, and asserts no error.
 
-use std::sync::Arc;
-
 use ai_core::{AiSignal, RecallDomain, SalienceVerdict};
 use jiff::Timestamp;
 
@@ -54,10 +52,10 @@ fn signal_with_entity(
 
 #[tokio::test]
 async fn normalizer_consumes_every_translator_signal() {
-    let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+    let _pool = storage::StoragePool::connect_in_memory().await.unwrap();
     activity_log::activity_log_migrations()
         .into_iter()
-        .for_each(|m| {
+        .for_each(|_m| {
             // We can't easily run migrations here without async block_in_place,
             // but the integration test pool helper isn't public. Instead we rely
             // on the consumer not requiring the table to exist for consume().

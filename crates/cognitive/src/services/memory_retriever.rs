@@ -286,8 +286,7 @@ impl UnifiedMemoryService {
 
     /// Retrieve memories visible to a specific scope chain.
     ///
-    /// `scope_chain` is e.g. `[("system", None), ("squad", Some("squad-id")), ("persona", Some("persona-id"))]`.
-    /// Each persona sees global + its squad's + its own memories.
+    /// `scope_chain` is e.g. `[("system", None)]`.
     pub async fn retrieve_scoped(
         &self,
         query: &str,

@@ -15,7 +15,6 @@ pub struct SessionRow {
     pub project_id: Option<String>,
     pub conversation_type: Option<String>,
     pub pinned: bool,
-    pub squad_id: Option<String>,
 }
 
 /// Row struct for the `session_messages` table.
@@ -30,7 +29,6 @@ pub struct SessionMessageRow {
     pub request_id: Option<String>,
     pub tool_calls: Option<serde_json::Value>,
     pub metadata: Option<serde_json::Value>,
-    pub persona_id: Option<String>,
 }
 
 /// Row struct for session listing with message count (aggregated query).
@@ -45,5 +43,4 @@ pub struct SessionListRow {
     pub project_id: Option<String>,
     pub conversation_type: Option<String>,
     pub pinned: bool,
-    pub squad_id: Option<String>,
 }

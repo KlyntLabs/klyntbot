@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use desktop_macros::{klynt_command, klynt_raw_command};
 use desktop_shared::commands::{
-    BacklinkResponse, ChangesSummaryResponse, CreatePersonaParams, DeckPreferenceResponse,
+    BacklinkResponse, ChangesSummaryResponse, DeckPreferenceResponse,
     DeckSummaryResponse, FlashcardCreateParams, FlashcardDistractorParams,
     FlashcardDistractorResponse, FlashcardExplainParams, FlashcardExplainResponse,
     FlashcardGenerateParams, FlashcardGenerateResponse, FlashcardListParams, FlashcardResponse,
@@ -13,10 +13,10 @@ use desktop_shared::commands::{
     InsightSaveFlashcardsParams, InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams,
     NoteEditingFinishedParams, NoteLinkResponse, NoteListItem, NoteResponse,
     NoteRetentionHealthResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
-    NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaChatParams,
-    PersonaChatResponse, PersonaResponse, RatePersonaParams, RecentLearningSession,
-    ScenarioChallengeResponse, ScopePreviewParams, ScopePreviewResponse, SetPersonaPinsParams,
-    StrugglingCardResponse, TabContent, UpdatePersonaParams,
+    NotebookCreateParams, NotebookResponse, NotebookUpdateParams,
+    RecentLearningSession,
+    ScenarioChallengeResponse, ScopePreviewParams, ScopePreviewResponse,
+    StrugglingCardResponse, TabContent,
 };
 use desktop_shared::{errors::ApiError, CommandResult};
 use tauri::{Emitter, State};
@@ -275,10 +275,9 @@ pub async fn inbox_delete(id: String) -> () {
 pub async fn note_insight_review(
     note_id: String,
     scope_config: Option<desktop_shared::commands::InsightScopeConfigParams>,
-    squad_id: Option<String>,
 ) -> InsightReviewStarted {
     state
-        .note_insight_review(&note_id, scope_config.as_ref(), squad_id.as_deref(), None)
+        .note_insight_review(&note_id, scope_config.as_ref(), None)
         .await
 }
 
@@ -302,13 +301,6 @@ pub async fn note_insight_submit_quiz(params: InsightQuizSubmitParams) -> () {
 #[klynt_command]
 pub async fn note_insight_regenerate_tab(note_id: String, tab: String) -> TabContent {
     state.note_insight_regenerate_tab(&note_id, &tab).await
-}
-
-#[klynt_command]
-pub async fn note_insight_debate(note_id: String, squad_id: Option<String>) -> () {
-    state
-        .note_insight_debate(&note_id, squad_id.as_deref())
-        .await
 }
 
 #[klynt_command]
@@ -339,53 +331,6 @@ pub async fn note_insight_changes_summary(note_id: String) -> Option<ChangesSumm
 #[klynt_command]
 pub async fn note_insight_knowledge_growth(days: Option<u32>) -> KnowledgeGrowthResponse {
     state.note_insight_knowledge_growth(days.unwrap_or(7)).await
-}
-
-// ── Persona Management commands ───────────────────────────────────
-
-#[klynt_command]
-pub async fn note_insight_list_personas() -> Vec<PersonaResponse> {
-    state.note_insight_list_personas().await
-}
-
-#[klynt_command]
-pub async fn note_insight_create_persona(params: CreatePersonaParams) -> PersonaResponse {
-    state.note_insight_create_persona(params).await
-}
-
-#[klynt_command]
-pub async fn note_insight_update_persona(params: UpdatePersonaParams) -> PersonaResponse {
-    state.note_insight_update_persona(params).await
-}
-
-#[klynt_command]
-pub async fn note_insight_delete_persona(id: String) -> () {
-    state.note_insight_delete_persona(&id).await
-}
-
-#[klynt_command]
-pub async fn note_insight_toggle_persona(id: String, active: bool) -> () {
-    state.note_insight_toggle_persona(&id, active).await
-}
-
-#[klynt_command]
-pub async fn note_insight_set_pins(params: SetPersonaPinsParams) -> () {
-    state.note_insight_set_pins(params).await
-}
-
-#[klynt_command]
-pub async fn note_insight_rate_persona(params: RatePersonaParams) -> () {
-    state.note_insight_rate_persona(params).await
-}
-
-#[klynt_command]
-pub async fn note_insight_auto_generate_persona(note_id: String) -> PersonaResponse {
-    state.note_insight_auto_generate_persona(&note_id).await
-}
-
-#[klynt_command]
-pub async fn note_insight_persona_chat(params: PersonaChatParams) -> PersonaChatResponse {
-    state.note_insight_persona_chat(&params).await
 }
 
 #[klynt_command]
@@ -724,14 +669,6 @@ pub(crate) async fn dispatch_dev(
             let tab = try_field!(dev::get_str(body, "tab"));
             dev::val(core.note_insight_regenerate_tab(&id, &tab).await)
         }
-        "note_insight_debate" => {
-            let id = try_field!(dev::get_str(body, "noteId"));
-            let squad_id = body
-                .get("squadId")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            dev::val(core.note_insight_debate(&id, squad_id.as_deref()).await)
-        }
         "note_insight_list_versions" => {
             let id = try_field!(dev::get_str(body, "noteId"));
             dev::val(core.note_insight_list_versions(&id).await)
@@ -755,40 +692,6 @@ pub(crate) async fn dispatch_dev(
         "note_insight_knowledge_growth" => {
             let days: Option<u32> = dev::get(body, "days");
             dev::val(core.note_insight_knowledge_growth(days.unwrap_or(7)).await)
-        }
-        "note_insight_list_personas" => dev::val(core.note_insight_list_personas().await),
-        "note_insight_create_persona" => dev::val(
-            core.note_insight_create_persona(try_field!(dev::parse_params(body)))
-                .await,
-        ),
-        "note_insight_update_persona" => dev::val(
-            core.note_insight_update_persona(try_field!(dev::parse_params(body)))
-                .await,
-        ),
-        "note_insight_delete_persona" => {
-            let id = try_field!(dev::get_str(body, "id"));
-            dev::val(core.note_insight_delete_persona(&id).await)
-        }
-        "note_insight_toggle_persona" => {
-            let id = try_field!(dev::get_str(body, "id"));
-            let active = body.get("active").and_then(|v| v.as_bool()).unwrap_or(true);
-            dev::val(core.note_insight_toggle_persona(&id, active).await)
-        }
-        "note_insight_set_pins" => dev::val(
-            core.note_insight_set_pins(try_field!(dev::parse_params(body)))
-                .await,
-        ),
-        "note_insight_rate_persona" => dev::val(
-            core.note_insight_rate_persona(try_field!(dev::parse_params(body)))
-                .await,
-        ),
-        "note_insight_auto_generate_persona" => {
-            let note_id = try_field!(dev::get_str(body, "noteId"));
-            dev::val(core.note_insight_auto_generate_persona(&note_id).await)
-        }
-        "note_insight_persona_chat" => {
-            let params: PersonaChatParams = try_field!(dev::parse_params(body));
-            dev::val(core.note_insight_persona_chat(&params).await)
         }
         "note_insight_preview_scope" => dev::val(
             core.note_insight_preview_scope(try_field!(dev::parse_params::<
