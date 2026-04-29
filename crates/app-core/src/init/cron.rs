@@ -170,6 +170,7 @@ pub(super) const JOB_CROSS_DOMAIN_NIGHTLY: &str = "__klyntbot_cross_domain_night
 const JOB_LAUNCHER_USAGE_PRUNE: &str = "__klyntbot_launcher_usage_prune";
 const JOB_LAUNCHER_ATTENTION_REBUILD: &str = "__klyntbot_launcher_attention_rebuild";
 const JOB_REFORGE_NIGHTLY: &str = "__klyntbot_reforge_nightly";
+const JOB_MICRO_REFORGE: &str = "__klyntbot_micro_reforge";
 const JOB_FSRS_OPTIMIZE: &str = "__klyntbot_fsrs_optimize_weekly";
 
 /// Register individual cron handlers.
@@ -763,6 +764,56 @@ fn register_cron_callbacks(
         );
     }
 
+    // ── micro_reforge ────────────────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let cog_config = config.clone();
+        let cog_provider = cognitive_provider.clone();
+        let rt = rt.clone();
+        cron_executor.register(
+            JOB_MICRO_REFORGE,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                let cog_config = cog_config.clone();
+                let cog_provider = cog_provider.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        if !cog_config.cognitive.micro_reforge.enabled {
+                            return Ok(None);
+                        }
+                        let svc = cognitive::services::micro_reforge::MicroReforgeService::new(
+                            storage::StoragePool::from_existing(pool.clone()),
+                            cog_config.cognitive.micro_reforge.clone(),
+                        );
+                        if !svc.should_run().await.unwrap_or(false) {
+                            return Ok(None);
+                        }
+                        let handler = crate::handlers::cognitive::build_micro_reforge_handler(
+                            &cog_provider,
+                            &cog_config,
+                        );
+                        let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
+                        let ep_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
+                        let obs_repo = cognitive::AccumulatedObservationRepo::new(pool.clone());
+                        match svc
+                            .run("minute_threshold", handler, &rule_repo, &ep_repo, &obs_repo)
+                            .await
+                        {
+                            Ok(n) => {
+                                info!(accepted = n, "micro_reforge ran");
+                                Ok(Some(format!("Micro-Reforge: {} rules promoted", n)))
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "micro_reforge failed");
+                                Ok(Some(format!("Micro-Reforge failed: {e}")))
+                            }
+                        }
+                    })
+                })
+            }),
+        );
+    }
+
     // ── atom_extraction_catchall ─────────────────────────────────────
     {
         let pool = repos.pool().clone();
@@ -1241,6 +1292,16 @@ async fn ensure_cron_jobs(
         "Nightly Reforge: knowledge synthesis, skill improvement, compaction",
         "system"
     );
+    if config.cognitive.micro_reforge.enabled {
+        ensure_job!(
+            JOB_MICRO_REFORGE,
+            scheduling::CronSchedule::Every {
+                every_ms: 5 * 60 * 1000, // every 5 minutes
+            },
+            "Micro-Reforge timer (KCA Track 4)",
+            "system"
+        );
+    }
     ensure_job!(
         JOB_ATOM_DECAY,
         scheduling::CronSchedule::Cron {
@@ -1377,6 +1438,14 @@ async fn set_default_intent_windows(cron_repo: &storage::repos::cron::CronRepo) 
             IntentWindow {
                 trigger: IntentTrigger::UserIdle { min_idle_secs: 300 },
                 tolerance: Duration::from_secs(14400),
+                catch_up: CatchUpPriority::WhenIdle,
+            },
+        ),
+        (
+            JOB_MICRO_REFORGE,
+            IntentWindow {
+                trigger: IntentTrigger::UserIdle { min_idle_secs: 60 },
+                tolerance: Duration::from_secs(300),
                 catch_up: CatchUpPriority::WhenIdle,
             },
         ),

@@ -68,6 +68,7 @@ pub struct AgentRuntime {
     warning_repo: Option<storage::ResponseWarningRepo>,
     enhancement_budget_overrides: config::schema::BudgetOverrides,
     enhancement_param_sink: Option<Arc<std::sync::RwLock<Option<common::TrialParams>>>>,
+    micro_reforge_service: Option<Arc<cognitive::services::micro_reforge::MicroReforgeService>>,
 }
 
 impl AgentRuntime {
@@ -101,6 +102,7 @@ impl AgentRuntime {
             warning_repo: None,
             enhancement_budget_overrides: config::schema::BudgetOverrides::default(),
             enhancement_param_sink: None,
+            micro_reforge_service: None,
         }
     }
 
@@ -191,6 +193,14 @@ impl AgentRuntime {
         sink: Arc<std::sync::RwLock<Option<common::TrialParams>>>,
     ) -> Self {
         self.enhancement_param_sink = Some(sink);
+        self
+    }
+
+    pub fn with_micro_reforge(
+        mut self,
+        svc: Arc<cognitive::services::micro_reforge::MicroReforgeService>,
+    ) -> Self {
+        self.micro_reforge_service = Some(svc);
         self
     }
 
@@ -453,6 +463,14 @@ impl AgentRuntime {
                             .await;
                     }
                 }
+            });
+        }
+
+        // KCA Track 4: bump micro-Reforge turn counter (fire-and-forget).
+        if let Some(svc) = self.micro_reforge_service.as_ref() {
+            let svc = svc.clone();
+            tokio::spawn(async move {
+                let _ = svc.note_turn().await;
             });
         }
 

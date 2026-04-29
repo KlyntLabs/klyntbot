@@ -68,7 +68,7 @@ pub struct EpisodicMemory {
 }
 
 /// A procedural rule learned from reflection.
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ProceduralRule {
     pub id: String,
     pub domain: String,

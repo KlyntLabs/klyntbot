@@ -5,9 +5,12 @@
 //! for higher-quality results, falling back to heuristics on failure.
 
 use async_trait::async_trait;
-use serde_json::json;
 
 use cognitive::extraction::ExtractedFact;
+use cognitive::services::extraction_critic::ExtractionCriticHandler;
+use cognitive::services::extraction_critic_types::*;
+use cognitive::services::micro_reforge::MicroReforgeHandler;
+use cognitive::services::micro_reforge_types::{MicroReforgeInput, MicroReforgeOutput};
 use cognitive::types::{MemoryOp, Observation};
 use cognitive::{ConsolidationHandler, ExtractionHandler};
 use feature_coaching::reasoner::{
@@ -1068,6 +1071,244 @@ impl CoachingReasonerHandler for LlmCoachingReasonerHandler {
     }
 }
 
+// ── Extraction critic handler (KCA Track 5) ────────────────────────────────
+
+pub(crate) const EXTRACTION_CRITIC_SYSTEM_PROMPT: &str = r#"You are a fact-extraction critic.
+
+You receive a turn of conversation and a list of facts that another system extracted from it. For each fact, decide:
+- "grounded": the fact is directly stated or strongly implied in the turn text.
+- "hallucinated": the fact contains information not present in the turn text. Includes invented entity names, fabricated numbers, or claims the user did not make.
+- "ambiguous": evidence is partial or could be read either way; do not penalize.
+
+Also report any FACTS that the extractor MISSED — but only those clearly stated in the turn (≤3 missed facts).
+
+Output JSON:
+{"verdicts": [{"fact_id": "...", "verdict": "grounded|hallucinated|ambiguous", "reason": "..."}], "missed_facts": [{"subject": "...", "predicate": "...", "object": "...", "confidence": 0.0-1.0}]}
+
+Be strict on hallucinated but conservative on missed_facts — only include the obvious ones."#;
+
+pub struct LlmExtractionCriticHandler {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmExtractionCriticHandler {
+    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
+        Self { provider, params }
+    }
+}
+
+#[async_trait]
+impl ExtractionCriticHandler for LlmExtractionCriticHandler {
+    async fn judge(&self, input: ExtractionCriticInput) -> common::Result<ExtractionCriticOutput> {
+        if input.extracted_facts.is_empty() {
+            return Ok(Default::default());
+        }
+        let user = serde_json::to_string(&input).map_err(|e| {
+            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                "critic serialize: {e}"
+            )))
+        })?;
+        let messages = vec![
+            Message::System {
+                content: EXTRACTION_CRITIC_SYSTEM_PROMPT.to_string(),
+            },
+            Message::User {
+                content: providers::UserContent::Text(user),
+            },
+        ];
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| {
+                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                    "critic: {e}"
+                )))
+            })?;
+        match serde_json::from_str::<ExtractionCriticOutput>(&resp.content.unwrap_or_default()) {
+            Ok(o) => Ok(o),
+            Err(e) => {
+                tracing::warn!(error = %e, "critic: parse failed");
+                Ok(Default::default())
+            }
+        }
+    }
+}
+
+// ── Community membership handler (KCA Track 11) ─────────────────────────────
+
+pub(crate) const COMMUNITY_MEMBERSHIP_SYSTEM_PROMPT: &str = r#"You are a knowledge-graph cluster membership confirmer.
+
+You are given a candidate entity, a community summary, and a co-activation score. Decide:
+- confirm = true: this entity belongs in the community.
+- confirm = false: it does not, the heuristic was misleading.
+
+Output JSON: {"confirm": true|false, "reason": "short reason"}.
+
+Be conservative: confirm only when the entity clearly fits the community theme."#;
+
+#[derive(Debug, Clone)]
+pub struct CommunityMembershipDecision {
+    pub confirm: bool,
+    pub reason: String,
+}
+
+pub struct LlmCommunityMembershipHandler {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl std::fmt::Debug for LlmCommunityMembershipHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LlmCommunityMembershipHandler")
+            .field("params", &self.params)
+            .finish_non_exhaustive()
+    }
+}
+
+impl LlmCommunityMembershipHandler {
+    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
+        Self { provider, params }
+    }
+
+    pub async fn confirm_membership(
+        &self,
+        entity_name: &str,
+        entity_type: &str,
+        community_name: &str,
+        community_summary: &str,
+        score: f64,
+    ) -> common::Result<CommunityMembershipDecision> {
+        let user = format!(
+            "Entity: {} (type: {})\nCommunity: {}\nSummary: {}\nCo-activation score: {:.2}\n\nConfirm membership?",
+            entity_name, entity_type, community_name, community_summary, score
+        );
+        let messages = vec![
+            Message::System {
+                content: COMMUNITY_MEMBERSHIP_SYSTEM_PROMPT.to_string(),
+            },
+            Message::User {
+                content: providers::UserContent::Text(user),
+            },
+        ];
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| {
+                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                    "community_membership: {e}"
+                )))
+            })?;
+
+        #[derive(serde::Deserialize)]
+        struct R {
+            confirm: bool,
+            reason: String,
+        }
+        match serde_json::from_str::<R>(&resp.content.unwrap_or_default()) {
+            Ok(r) => Ok(CommunityMembershipDecision {
+                confirm: r.confirm,
+                reason: r.reason,
+            }),
+            Err(_) => Ok(CommunityMembershipDecision {
+                confirm: false,
+                reason: "parse failed".into(),
+            }),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl cognitive::services::community_membership_online::AsyncConfirmFn
+    for LlmCommunityMembershipHandler
+{
+    async fn confirm(
+        &self,
+        entity_name: &str,
+        entity_type: &str,
+        community_name: &str,
+        summary: &str,
+        score: f64,
+    ) -> bool {
+        match self
+            .confirm_membership(entity_name, entity_type, community_name, summary, score)
+            .await
+        {
+            Ok(decision) => decision.confirm,
+            Err(e) => {
+                tracing::warn!(error = %e, "community_membership confirm failed");
+                false
+            }
+        }
+    }
+}
+
+// ── Micro-Reforge handler (KCA Track 4) ────────────────────────────────────
+
+pub(crate) const MICRO_REFORGE_SYSTEM_PROMPT: &str = r#"You are a procedural-rule synthesizer running mid-session.
+
+You are given recent episodic memories, recent low-level observations, and a summary of existing procedural rules. Your job: identify NEW stable behavioral patterns worth promoting to a rule. Rules are short imperative statements ("When X, do Y").
+
+Conservative criteria — only propose a rule when ALL of the following hold:
+1. The pattern appears in ≥3 recent episodic memories.
+2. The pattern is not already represented in existing_rules_summary (paraphrasing counts as duplicate).
+3. The rule is actionable for an AI assistant (not a description; not a fact about the user).
+4. Confidence ≥ 0.6.
+
+Output JSON exactly:
+{"proposed_rules": [{"domain": "...", "rule_text": "...", "confidence": 0.0-1.0, "signal_count": N, "evidence_episodic_ids": ["..."]}], "notes": "optional"}
+
+If nothing meets the bar, return {"proposed_rules": [], "notes": "no stable patterns this cycle"}. Never invent episodic ids; reference only those provided in the input."#;
+
+pub struct LlmMicroReforgeHandler {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmMicroReforgeHandler {
+    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
+        Self { provider, params }
+    }
+}
+
+#[async_trait]
+impl MicroReforgeHandler for LlmMicroReforgeHandler {
+    async fn synthesize(&self, input: MicroReforgeInput) -> common::Result<MicroReforgeOutput> {
+        let user = serde_json::to_string(&input).map_err(|e| {
+            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                "micro_reforge serialize: {e}"
+            )))
+        })?;
+        let messages = vec![
+            Message::System {
+                content: MICRO_REFORGE_SYSTEM_PROMPT.to_string(),
+            },
+            Message::User {
+                content: providers::UserContent::Text(user),
+            },
+        ];
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| {
+                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                    "micro_reforge: {e}"
+                )))
+            })?;
+        let text = resp.content.unwrap_or_default();
+        match serde_json::from_str::<MicroReforgeOutput>(&text) {
+            Ok(out) => Ok(out),
+            Err(e) => {
+                tracing::warn!(error = %e, raw = %text, "micro_reforge: parse failed; returning empty");
+                Ok(MicroReforgeOutput::default())
+            }
+        }
+    }
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -1623,5 +1864,136 @@ mod tests {
         assert!(msg.contains("knows -> Bob"));
         assert!(msg.contains("CROSS-ENTITY FACTS"));
         assert!(msg.contains("works_at"));
+    }
+
+    #[tokio::test]
+    async fn llm_micro_reforge_handler_extracts_high_confidence_rules() {
+        use cognitive::services::micro_reforge::MicroReforgeHandler;
+        use cognitive::services::micro_reforge_types::*;
+
+        let json = r#"{
+            "proposed_rules": [
+                {"domain": "coding", "rule_text": "When user runs cargo nextest, also run clippy.",
+                 "confidence": 0.85, "signal_count": 4,
+                 "evidence_episodic_ids": ["ep1", "ep2"]}
+            ],
+            "notes": null
+        }"#;
+        let provider = MockProvider::new(LlmResponse {
+            content: Some(json.to_string()),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage {
+                prompt_tokens: 10,
+                completion_tokens: 5,
+                total_tokens: 15,
+                cache_read_tokens: 0,
+                cache_write_tokens: 0,
+            },
+            reasoning_content: None,
+        });
+        let handler = LlmMicroReforgeHandler::new(
+            Arc::new(provider),
+            ChatParams::new("m").with_max_tokens(2048),
+        );
+
+        let input = MicroReforgeInput {
+            recent_episodics: vec![EpisodicRef {
+                id: "ep1".into(),
+                domain: "coding".into(),
+                summary: "user ran cargo nextest".into(),
+                importance: 0.7,
+                recorded_at: "2026-04-29T00:00:00Z".into(),
+            }],
+            recent_observations: vec![],
+            existing_rules_summary: vec![],
+            session_count: 3,
+            turn_count_since_last_run: 10,
+        };
+
+        let out = handler.synthesize(input).await.unwrap();
+        assert_eq!(out.proposed_rules.len(), 1);
+        assert!(out.proposed_rules[0].confidence > 0.8);
+    }
+
+    #[tokio::test]
+    async fn llm_community_membership_confirms_match() {
+        let json = r#"{"confirm": true, "reason": "C aligns with alpha by topic"}"#;
+        let provider = MockProvider::new(LlmResponse {
+            content: Some(json.to_string()),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage {
+                prompt_tokens: 10,
+                completion_tokens: 5,
+                total_tokens: 15,
+                cache_read_tokens: 0,
+                cache_write_tokens: 0,
+            },
+            reasoning_content: None,
+        });
+        let handler = LlmCommunityMembershipHandler::new(
+            Arc::new(provider),
+            ChatParams::new("m").with_max_tokens(256),
+        );
+
+        let result = handler
+            .confirm_membership("C", "concept", "alpha", "topic about α-particles", 0.85)
+            .await
+            .unwrap();
+        assert!(result.confirm);
+    }
+
+    #[tokio::test]
+    async fn llm_extraction_critic_marks_hallucinated_facts() {
+        use cognitive::services::extraction_critic::ExtractionCriticHandler;
+        use cognitive::services::extraction_critic_types::*;
+
+        let json = r#"{
+            "verdicts": [
+                {"fact_id": "f1", "verdict": "grounded", "reason": "directly stated"},
+                {"fact_id": "f2", "verdict": "hallucinated", "reason": "not in turn text"}
+            ],
+            "missed_facts": []
+        }"#;
+        let provider = MockProvider::new(LlmResponse {
+            content: Some(json.to_string()),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage {
+                prompt_tokens: 10,
+                completion_tokens: 5,
+                total_tokens: 15,
+                cache_read_tokens: 0,
+                cache_write_tokens: 0,
+            },
+            reasoning_content: None,
+        });
+        let handler = LlmExtractionCriticHandler::new(
+            Arc::new(provider),
+            ChatParams::new("m").with_max_tokens(1024),
+        );
+
+        let input = ExtractionCriticInput {
+            turn_text: "I love Rust.".into(),
+            extracted_facts: vec![
+                FactRef {
+                    fact_id: "f1".into(),
+                    subject: "user".into(),
+                    predicate: "loves".into(),
+                    object: "Rust".into(),
+                },
+                FactRef {
+                    fact_id: "f2".into(),
+                    subject: "user".into(),
+                    predicate: "hates".into(),
+                    object: "Java".into(),
+                },
+            ],
+        };
+
+        let out = handler.judge(input).await.unwrap();
+        assert_eq!(out.verdicts.len(), 2);
+        assert_eq!(out.verdicts[1].verdict, "hallucinated");
     }
 }

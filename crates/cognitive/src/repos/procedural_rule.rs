@@ -105,6 +105,21 @@ impl ProceduralRuleRepo {
         .await
     }
 
+    /// List active rules for a domain with a limit.
+    pub async fn list_by_domain(
+        &self,
+        domain: &str,
+        limit: i64,
+    ) -> Result<Vec<ProceduralRule>, sqlx::Error> {
+        sqlx::query_as::<_, ProceduralRule>(
+            "SELECT * FROM procedural_rules WHERE domain = ?1 AND active = 1 ORDER BY confidence DESC LIMIT ?2",
+        )
+        .bind(domain)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     /// Increment the signal count for a rule (pattern reinforcement).
     pub async fn increment_signal_count(&self, id: &str) -> Result<(), sqlx::Error> {
         sqlx::query(

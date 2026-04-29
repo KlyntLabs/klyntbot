@@ -37,3 +37,4 @@ petgraph = "0.7"
 tempfile = { workspace = true }
 feature-tasks = { workspace = true }
 feature-finance = { workspace = true }
+proptest = { workspace = true }

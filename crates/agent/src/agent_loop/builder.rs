@@ -483,6 +483,24 @@ impl AgentLoopBuilder {
                                 )
                                     as Arc<dyn cognitive::services::graph_linker::GraphLinkHandler>
                             }),
+                            critic_handler: self.cognitive_provider.as_ref().map(|cp| {
+                                let model = config.cognitive.critic_model.clone()
+                                    .unwrap_or_else(|| config.cognitive.model.clone().unwrap_or_else(|| config.agents.defaults.model.clone()));
+                                let params = providers::ChatParams::new(model)
+                                    .with_max_tokens(1024)
+                                    .with_temperature(0.0)
+                                    .with_response_format(providers::ResponseFormat::JsonObject);
+                                Arc::new(
+                                    crate::adapters::cognitive_handlers::LlmExtractionCriticHandler::new(
+                                        cp.clone(),
+                                        params,
+                                    ),
+                                )
+                                    as Arc<dyn cognitive::services::extraction_critic::ExtractionCriticHandler>
+                            }),
+                            critic_log_repo: Some(cognitive::repos::ExtractionCriticLogRepo::new(
+                                storage::StoragePool::from_existing(pool.clone()),
+                            )),
                         },
                     );
                     info!("Cognitive background consolidation service started");
@@ -1786,6 +1804,15 @@ impl AgentLoopBuilder {
         // Inject procedural rule repo for transparency (L5 cognitive rules)
         let rule_repo = cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone());
         runtime = runtime.with_procedural_rule_repo(rule_repo);
+
+        // KCA Track 4: micro-Reforge turn counter.
+        let micro_reforge_svc = Arc::new(
+            cognitive::services::micro_reforge::MicroReforgeService::new(
+                storage_pool.clone(),
+                config.cognitive.micro_reforge.clone(),
+            ),
+        );
+        runtime = runtime.with_micro_reforge(micro_reforge_svc);
 
         // Inject user situation for RetrievalContext
         if let Some(ref sit) = self.user_situation {

@@ -187,6 +187,52 @@ fn looks_like_entity_name(s: &str) -> bool {
             .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
 }
 
+/// Run the extraction critic on a batch of facts (KCA Track 5).
+pub async fn run_critic_judgment(
+    turn_text: &str,
+    facts: Vec<crate::types::SemanticFact>,
+    handler: std::sync::Arc<dyn crate::services::extraction_critic::ExtractionCriticHandler>,
+    fact_repo: &SemanticFactRepo,
+    log_repo: &crate::repos::ExtractionCriticLogRepo,
+) {
+    use crate::services::extraction_critic_types::*;
+    if facts.is_empty() {
+        return;
+    }
+
+    let input = ExtractionCriticInput {
+        turn_text: turn_text.to_string(),
+        extracted_facts: facts
+            .iter()
+            .map(|f| FactRef {
+                fact_id: f.id.clone(),
+                subject: f.subject.clone(),
+                predicate: f.predicate.clone(),
+                object: f.object.clone(),
+            })
+            .collect(),
+    };
+    let out = match handler.judge(input).await {
+        Ok(o) => o,
+        Err(e) => {
+            tracing::warn!(error = %e, "critic call failed");
+            return;
+        }
+    };
+
+    for v in &out.verdicts {
+        if let Err(e) = log_repo.insert(&v.fact_id, &v.verdict, &v.reason).await {
+            tracing::warn!(error = %e, "critic log insert failed");
+        }
+        if v.verdict == "hallucinated" {
+            // Demote stability ×0.5 instead of supersede; nightly Reforge re-evaluates.
+            if let Err(e) = fact_repo.scale_stability(&v.fact_id, 0.5).await {
+                tracing::warn!(error = %e, "stability scale failed");
+            }
+        }
+    }
+}
+
 /// Configuration for starting the background consolidation service (avoids too-many-arguments).
 pub struct BackgroundServiceConfig {
     pub event_rx: broadcast::Receiver<DomainEvent>,
@@ -219,6 +265,11 @@ pub struct BackgroundServiceConfig {
     pub pending_repo: Option<crate::repos::PendingMemoryRepo>,
     /// Optional graph link handler — fire-and-forget LLM enrichment for newly written facts.
     pub graph_link_handler: Option<Arc<dyn crate::services::graph_linker::GraphLinkHandler>>,
+    /// Optional extraction critic handler — KCA Track 5.
+    pub critic_handler:
+        Option<Arc<dyn crate::services::extraction_critic::ExtractionCriticHandler>>,
+    /// Optional extraction critic log repo — KCA Track 5.
+    pub critic_log_repo: Option<crate::repos::ExtractionCriticLogRepo>,
 }
 
 /// Background service that processes domain events into cognitive memory.
@@ -252,6 +303,8 @@ impl BackgroundConsolidationService {
             density_repo,
             pending_repo,
             graph_link_handler,
+            critic_handler,
+            critic_log_repo,
         } = config;
         // Cognitive collectors are SignalConsumers wired by the app-core init
         // layer; the legacy broadcast-collector startup that lived here is
@@ -503,6 +556,26 @@ impl BackgroundConsolidationService {
                             })
                         })
                         .collect();
+
+                    // KCA Track 5: fire-and-forget extraction critic.
+                    if let Some(critic) = critic_handler.as_ref() {
+                        let critic = critic.clone();
+                        let facts_clone = extracted_facts.clone();
+                        let turn_text = to_extract
+                            .iter()
+                            .map(|o| o.content.as_str())
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        let fr = repo.clone();
+                        let lg = critic_log_repo.clone();
+                        tokio::spawn(async move {
+                            if let Some(lg) = lg {
+                                run_critic_judgment(&turn_text, facts_clone, critic, &fr, &lg)
+                                    .await;
+                            }
+                        });
+                    }
+
                     let entity_repo = crate::repos::EntityRepo::new(repo.pool().clone());
                     let candidates = prefetch_existing(&repo, &entity_repo, extracted_facts).await;
 
@@ -1526,5 +1599,94 @@ mod tests {
         assert!(cap[0].subject_neighborhood.is_empty());
         assert!(cap[0].object_neighborhood.is_empty());
         assert!(cap[0].candidate_facts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn critic_demotes_stability_for_hallucinated_facts() {
+        use crate::services::extraction_critic::ExtractionCriticHandler;
+        use crate::services::extraction_critic_types::*;
+
+        struct FakeCritic;
+        #[async_trait::async_trait]
+        impl ExtractionCriticHandler for FakeCritic {
+            async fn judge(
+                &self,
+                input: ExtractionCriticInput,
+            ) -> common::Result<ExtractionCriticOutput> {
+                Ok(ExtractionCriticOutput {
+                    verdicts: input
+                        .extracted_facts
+                        .iter()
+                        .enumerate()
+                        .map(|(i, f)| Verdict {
+                            fact_id: f.fact_id.clone(),
+                            verdict: if i % 2 == 0 {
+                                "grounded".into()
+                            } else {
+                                "hallucinated".into()
+                            },
+                            reason: "test".into(),
+                        })
+                        .collect(),
+                    missed_facts: vec![],
+                })
+            }
+        }
+
+        let pool = crate::repos::cognitive_test_pool().await;
+        let fact_repo = crate::repos::SemanticFactRepo::new(pool.clone());
+        let crit_log = crate::repos::ExtractionCriticLogRepo::new(
+            storage::StoragePool::from_existing(pool.clone()),
+        );
+
+        let f1 = crate::types::SemanticFact {
+            id: "f1".into(),
+            domain: "t".into(),
+            subject: "A".into(),
+            predicate: "p".into(),
+            object: "B".into(),
+            confidence: 0.8,
+            source: "t".into(),
+            valid_from: "2026-04-29".into(),
+            recorded_at: "2026-04-29".into(),
+            stability: 1.0,
+            ..Default::default()
+        };
+        let f2 = crate::types::SemanticFact {
+            id: "f2".into(),
+            domain: "t".into(),
+            subject: "X".into(),
+            predicate: "p".into(),
+            object: "Y".into(),
+            confidence: 0.8,
+            source: "t".into(),
+            valid_from: "2026-04-29".into(),
+            recorded_at: "2026-04-29".into(),
+            stability: 1.0,
+            ..Default::default()
+        };
+        fact_repo.upsert(&f1).await.unwrap();
+        fact_repo.upsert(&f2).await.unwrap();
+
+        run_critic_judgment(
+            "User said A is B.",
+            vec![f1.clone(), f2.clone()],
+            std::sync::Arc::new(FakeCritic),
+            &fact_repo,
+            &crit_log,
+        )
+        .await;
+
+        // f2 should have stability halved.
+        let f2_after = fact_repo.get(&f2.id).await.unwrap().unwrap();
+        let f1_after = fact_repo.get(&f1.id).await.unwrap().unwrap();
+        assert!(
+            f2_after.stability < f1_after.stability,
+            "hallucinated fact stability {} should be < grounded {}",
+            f2_after.stability,
+            f1_after.stability
+        );
+        let log = crit_log.list_unreviewed(10).await.unwrap();
+        assert_eq!(log.len(), 2);
     }
 }

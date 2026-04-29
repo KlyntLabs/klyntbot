@@ -13,6 +13,7 @@ pub mod enrichment;
 pub mod entity;
 pub mod episodic_memory;
 pub mod event_log;
+pub mod extraction_critic_log;
 pub mod fact_changelog;
 pub mod failed_observation;
 pub mod flashcard;
@@ -49,6 +50,7 @@ pub use entity::{
 };
 pub use episodic_memory::EpisodicMemoryRepo;
 pub use event_log::EventLogRepo;
+pub use extraction_critic_log::{ExtractionCriticLogEntry, ExtractionCriticLogRepo};
 pub use fact_changelog::FactChangelogRepo;
 pub use failed_observation::FailedObservationRepo;
 pub use flashcard::{
@@ -162,6 +164,24 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             description: "Edge typing for entity_relationships (causal/correlational/temporal/structural)"
                 .to_string(),
             sql: include_str!("../../migrations/009_edge_types.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 7,
+            description: "Micro-Reforge state and run audit log (KCA Track 4)".to_string(),
+            sql: include_str!("../../migrations/011_micro_reforge_state.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 8,
+            description: "Extraction critic log for nightly re-evaluation (KCA Track 5)".to_string(),
+            sql: include_str!("../../migrations/012_extraction_critic_log.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 9,
+            description: "Entity-community membership for online clustering (KCA Track 11)".to_string(),
+            sql: include_str!("../../migrations/013_entity_community_members.sql").to_string(),
         },
     ]
 }

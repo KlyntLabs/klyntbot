@@ -201,6 +201,14 @@ impl EntityRepo {
         .await
     }
 
+    /// Find a single entity by its ID.
+    pub async fn find_by_id(&self, id: &str) -> Result<Option<EntityRow>, sqlx::Error> {
+        sqlx::query_as::<_, EntityRow>("SELECT * FROM entities WHERE id = ?1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+    }
+
     /// Get all relationships for a given entity (both directions).
     pub async fn get_relationships(
         &self,

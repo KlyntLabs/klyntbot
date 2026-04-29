@@ -29,6 +29,7 @@ fn map_sqlx(e: sqlx::Error) -> common::KlyntbotError {
     common::KlyntbotError::Storage(e.to_string())
 }
 
+#[derive(Debug, Clone)]
 pub struct CommunityRepo {
     pool: SqlitePool,
 }
@@ -94,6 +95,70 @@ impl CommunityRepo {
             .fetch_optional(&self.pool)
             .await
             .map_err(map_sqlx)
+    }
+
+    /// Create a new community and return it.
+    pub async fn create(
+        &self,
+        name: &str,
+        summary: &str,
+        _metadata: Option<&str>,
+    ) -> Result<CommunityRow> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = jiff::Timestamp::now().to_string();
+        let row = CommunityRow {
+            id: id.clone(),
+            name: name.into(),
+            summary: summary.into(),
+            member_count: 0,
+            modularity_score: None,
+            stability: 1.0,
+            top_entities: None,
+            representative_paths: None,
+            source_note_count: None,
+            created_at: now.clone(),
+            updated_at: now,
+            last_restructured_at: None,
+        };
+        self.upsert_community(&row).await?;
+        Ok(row)
+    }
+
+    /// Add an entity as a member of a community.
+    pub async fn add_member(&self, community_id: &str, entity_id: &str) -> Result<()> {
+        sqlx::query(
+            "INSERT OR IGNORE INTO entity_community_members (community_id, entity_id) VALUES (?1, ?2)"
+        )
+        .bind(community_id)
+        .bind(entity_id)
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx)?;
+        Ok(())
+    }
+
+    /// List communities that contain a given entity.
+    pub async fn list_for_entity(&self, entity_id: &str) -> Result<Vec<CommunityRow>> {
+        sqlx::query_as::<_, CommunityRow>(
+            "SELECT c.* FROM communities c \
+             INNER JOIN entity_community_members ecm ON c.id = ecm.community_id \
+             WHERE ecm.entity_id = ?1",
+        )
+        .bind(entity_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx)
+    }
+
+    /// Get community summary text.
+    pub async fn get_summary(&self, community_id: &str) -> Result<Option<String>> {
+        let row: Option<(String,)> =
+            sqlx::query_as("SELECT summary FROM communities WHERE id = ?1")
+                .bind(community_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(map_sqlx)?;
+        Ok(row.map(|r| r.0))
     }
 
     pub async fn list_active_communities(&self) -> Result<Vec<CommunityRow>> {

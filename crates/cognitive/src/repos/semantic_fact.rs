@@ -272,6 +272,16 @@ impl SemanticFactRepo {
         Ok(())
     }
 
+    /// Scale stability by a factor (e.g., 0.5 for hallucinated facts).
+    pub async fn scale_stability(&self, id: &str, factor: f64) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE semantic_facts SET stability = stability * ?1 WHERE id = ?2")
+            .bind(factor)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Count active facts with the same subject in the same domain (excluding self).
     pub async fn count_related(
         &self,

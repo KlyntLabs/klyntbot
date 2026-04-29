@@ -195,6 +195,25 @@ impl CoActivationRepo {
             .await?;
         Ok(count)
     }
+
+    /// Return the top N co-activated fact IDs for a given fact ID, ordered by strength DESC.
+    pub async fn top_for_entity(
+        &self,
+        fact_id: &str,
+        limit: i64,
+    ) -> Result<Vec<(String, f64)>, sqlx::Error> {
+        let rows: Vec<(String, f64)> = sqlx::query_as(
+            "SELECT fact_id_b, strength FROM co_activation WHERE fact_id_a = ?1 \
+             UNION ALL \
+             SELECT fact_id_a, strength FROM co_activation WHERE fact_id_b = ?1 \
+             ORDER BY strength DESC LIMIT ?2",
+        )
+        .bind(fact_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
 }
 
 #[cfg(test)]
