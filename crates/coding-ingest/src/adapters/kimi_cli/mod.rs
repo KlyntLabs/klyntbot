@@ -11,6 +11,8 @@
 pub mod workdir;
 /// Wire-file frame parser (`metadata` header + `WireRecord` lines).
 pub mod wire_file;
+/// `WireRecord` → `AgentEventV1` mapping.
+pub mod mapper;
 
 /// Deprecated tier-2 stub — removed in Task 9.7.
 #[allow(deprecated)]
