@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "klyntbot": {
+      "type": "stdio",
+      "command": "/Users/jayden/Projects/Klynt/bot/target/debug/desktop",
+      "args": [
+        "mcp",
+        "serve",
+        "--stdio"
+      ],
+      "env": {
+        "KLYNTBOT_HOME": "/Users/jayden/.klyntbot-dev"
+      }
+    }
+  }
+}
