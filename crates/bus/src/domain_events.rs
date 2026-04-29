@@ -622,6 +622,14 @@ pub enum DomainEvent {
         previous: u32,
         current: u32,
     },
+
+    /// Escape-hatch for events that don't have a dedicated variant.
+    /// Used by `fan_out_event` to publish `AgentEvent` values to the
+    /// cognitive-ingest bus without creating a circular crate dependency.
+    Generic {
+        kind: String,
+        payload: serde_json::Value,
+    },
 }
 
 impl DomainEvent {
@@ -724,6 +732,7 @@ impl DomainEvent {
             Self::CodingMemoryUpdated { .. } => Self::KIND_CODING_MEMORY_UPDATED,
             Self::LauncherItemExecuted { .. } => Self::KIND_LAUNCHER_ITEM_EXECUTED,
             Self::DataVersionBumped { .. } => Self::KIND_DATA_VERSION_BUMPED,
+            Self::Generic { .. } => "Generic",
         }
     }
 
@@ -992,6 +1001,8 @@ impl DomainEvent {
             Self::LauncherItemExecuted { .. } => D::Launcher,
 
             Self::DataVersionBumped { .. } => D::General,
+
+            Self::Generic { .. } => D::General,
         }
     }
 }
