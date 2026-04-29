@@ -169,6 +169,12 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             description: "Micro-Reforge state and run audit log (KCA Track 4)".to_string(),
             sql: include_str!("../../migrations/011_micro_reforge_state.sql").to_string(),
         },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 8,
+            description: "Extraction critic log for nightly re-evaluation (KCA Track 5)".to_string(),
+            sql: include_str!("../../migrations/012_extraction_critic_log.sql").to_string(),
+        },
     ]
 }
 
