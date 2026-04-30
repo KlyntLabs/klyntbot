@@ -18,14 +18,27 @@ use crate::situation::UserSituation;
 /// RRF constant — same as used in retrieval.rs BM25 merge.
 const RRF_K: f64 = 60.0;
 /// Minimum relevance score for a fact to be included in results.
-const MIN_FACT_SCORE: f64 = 0.3;
+///
+/// Lowered from 0.3 to 0.15: with `last_accessed = None`, the retrievability
+/// fallback in `retrieval.rs` caps at ~0.25 for fresh facts. The original
+/// 0.3 threshold silently dropped legitimate cold-start facts before they
+/// could ever be recalled. 0.15 still filters noise while admitting fresh
+/// extractions on first query.
+const MIN_FACT_SCORE: f64 = 0.15;
 
 /// Returns a freshness label for a semantic fact based on convergence score,
 /// confidence, and recency of last access.
 fn freshness_label(fact: &crate::types::SemanticFact) -> &'static str {
-    let days_old = fact
+    // A just-recorded fact has `last_accessed = None`. Treat that as fresh
+    // by falling back to `recorded_at` — otherwise every newly extracted
+    // fact would be labeled `"weak"` and the LLM, seeing every retrieved
+    // fact tagged "weak -- verify", would refuse to use it ("you may want
+    // to verify"). Mirrors the same fix in `context_source.rs`.
+    let reference_ts = fact
         .last_accessed
-        .as_ref()
+        .as_deref()
+        .or(Some(fact.recorded_at.as_str()));
+    let days_old = reference_ts
         .and_then(|ts| ts.parse::<jiff::Timestamp>().ok())
         .map(|ts| (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()) / 86_400_000)
         .unwrap_or(90);
@@ -283,7 +296,28 @@ impl UnifiedMemoryService {
         )
         .await
         {
-            Ok(facts) => {
+            Ok(mut facts) => {
+                // KCA Track 6: PPR multi-hop expansion in the live recall
+                // path. Without this, queries like "What does Max love?"
+                // can't chain `Alice has_pet Max` + `Max loves pizza` —
+                // BM25/vector only score against direct token matches.
+                if let (Some(cache), Some(entity_repo)) =
+                    (self.ppr_cache.as_ref(), self.entity_repo.as_ref())
+                {
+                    let ppr_results = crate::services::ppr_retrieval::retrieve_with_ppr_boost(
+                        &self.fact_repo,
+                        entity_repo,
+                        cache,
+                        query,
+                        params.limit,
+                    )
+                    .await
+                    .unwrap_or_default();
+                    if !ppr_results.is_empty() {
+                        facts = rrf_merge_scored_facts(facts, ppr_results, 60);
+                    }
+                }
+
                 // Store for feedback detection
                 {
                     let tuples: Vec<(String, String, String)> = facts
