@@ -1066,6 +1066,16 @@ impl AppCore {
             } else {
                 None
             };
+            let kimi_sessions_dir = if config.coding_memory.cli.kimi_cli.enabled {
+                dirs::home_dir().map(|h| h.join(".kimi").join("sessions"))
+            } else {
+                None
+            };
+            let kimi_json_path = if config.coding_memory.cli.kimi_cli.enabled {
+                dirs::home_dir().map(|h| h.join(".kimi").join("kimi.json"))
+            } else {
+                None
+            };
             let daemon_cfg = coding_ingest::daemon::IngestDaemonConfig {
                 socket_path: data_dir.join("ingest.sock"),
                 buffer_path: data_dir.join("ingest-buffer.jsonl"),
@@ -1080,7 +1090,9 @@ impl AppCore {
                 git_invalidation_handler: Some(git_handler),
                 opencode_db_path,
                 opencode_poll_interval: None,
-                kimi_wire_socket: None,
+                kimi_sessions_dir,
+                kimi_poll_interval: None,
+                kimi_json_path,
                 codex_sessions_dir,
                 codex_poll_interval: None,
             };

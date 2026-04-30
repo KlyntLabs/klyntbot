@@ -8,8 +8,7 @@ pub mod git_hook_installer;
 pub mod handlers;
 /// Claude Code settings.json installer.
 pub mod installer;
-/// Kimi hooks.json installer.
-pub mod kimi_installer;
+
 /// Phase-5 mirror source wiring.
 pub mod mirror;
 /// Opencode opt-in marker (poll-only, no hook install).
@@ -153,24 +152,7 @@ impl crate::AppCore {
                 .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
                 .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
             }
-            "kimi-cli" => {
-                let cfg = dirs::home_dir()
-                    .ok_or_else(|| ApiError::new("INTERNAL_ERROR", "no home dir"))?
-                    .join(".kimi/config.toml");
-                let binary = hook_binary_path()?;
-                if enabled {
-                    tokio::task::spawn_blocking(move || {
-                        crate::coding_memory::kimi_installer::KimiInstaller::install(&cfg, &binary)
-                    })
-                } else {
-                    tokio::task::spawn_blocking(move || {
-                        crate::coding_memory::kimi_installer::KimiInstaller::uninstall(&cfg)
-                    })
-                }
-                .await
-                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
-                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
-            }
+
             "opencode" => {
                 let db = dirs::home_dir()
                     .ok_or_else(|| ApiError::new("INTERNAL_ERROR", "no home dir"))?
@@ -310,14 +292,10 @@ impl crate::AppCore {
                 .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
                 Ok(diagnose_to_result(outcome))
             }
-            "kimi-cli" => {
-                let outcome = tokio::task::spawn_blocking(move || {
-                    crate::coding_memory::kimi_installer::KimiInstaller::diagnose(&binary)
-                })
-                .await
-                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
-                Ok(diagnose_to_result(outcome))
-            }
+            "kimi-cli" => Ok(desktop_shared::commands::coding_memory::DiagnoseResult {
+                ok: true,
+                message: "kimi-cli is poll-only (no hooks to install)".into(),
+            }),
             "opencode" => {
                 let db = dirs::home_dir()
                     .ok_or_else(|| ApiError::new("INTERNAL_ERROR", "no home dir"))?

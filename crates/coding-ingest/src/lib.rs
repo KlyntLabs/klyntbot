@@ -34,7 +34,7 @@ pub mod warn;
 
 pub use adapters::codex::CodexAdapter;
 pub use adapters::git_post_commit::GitPostCommitAdapter;
-pub use adapters::kimi_cli::KimiAdapter;
+// kimi-cli is poll-only — see adapters::kimi_cli::poller::KimiPoller (added in Task 7).
 pub use adapters::opencode::poller::OpencodePoller;
 pub use adapters::opencode::OpencodeAdapter;
 pub use daemon::OpHandler;
