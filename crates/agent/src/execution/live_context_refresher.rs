@@ -6,7 +6,7 @@ use std::sync::Arc;
 use bus::{ContextUpdateQueue, UpdatePriority};
 use context_engine::TokenCounter;
 use providers::Message;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tracing::info;
 
 /// Standard updates reserve 20% of remaining context for the LLM response.
@@ -15,7 +15,7 @@ const STANDARD_RESPONSE_RESERVE_PCT: usize = 20;
 /// High-priority updates reserve only 10%, allowing more aggressive injection.
 const HIGH_PRIORITY_RESPONSE_RESERVE_PCT: usize = 10;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextReassembledUpdate {
     pub reason: String,
     pub summary: String,

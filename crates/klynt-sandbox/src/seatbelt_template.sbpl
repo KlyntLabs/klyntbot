@@ -1,0 +1,12 @@
+(version 1)
+(deny default)
+(allow process-fork)
+(allow process-exec)
+(allow signal (target self))
+(allow sysctl-read)
+(allow mach-lookup)
+(allow ipc-posix-shm-read*)
+(allow file-read-data file-read-metadata)
+(allow file-write* (subpath "{{CWD}}"))
+{{EXTRA_WRITES}}
+{{NETWORK}}

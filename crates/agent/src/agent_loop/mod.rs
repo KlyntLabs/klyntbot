@@ -897,13 +897,28 @@ impl AgentLoop {
     ) -> Result<String> {
         let history_messages = Self::convert_history(&history);
         let (tool_defs, _tool_names) = self.get_tool_info().await;
+        let channel = common::coding_channel::Channel::from_name(routing_ctx.channel.as_str());
+        let filtered_defs: Arc<Vec<serde_json::Value>> = Arc::new(
+            tool_defs
+                .iter()
+                .filter(|def| {
+                    let name = def
+                        .get("function")
+                        .and_then(|f| f.get("name"))
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("");
+                    common::available_for_channel(name, channel)
+                })
+                .cloned()
+                .collect(),
+        );
 
         let result = self
             .runtime
             .process_message(
                 content,
                 history_messages,
-                &tool_defs,
+                &filtered_defs,
                 routing_ctx,
                 event_tx.clone(),
                 cancel_token,
@@ -1086,7 +1101,7 @@ impl AgentLoop {
 
         // Routing context with interaction channel for ask_user tool
         let routing_ctx = RoutingContext::with_interaction(
-            "cli".into(),
+            "desktop".into(),
             session_key.clone().into(),
             interaction_tx,
         );

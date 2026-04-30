@@ -139,6 +139,32 @@ export type ConversationItem =
       collabReceiver?: CollabAgentRef;
       collabReceivers?: CollabAgentRef[];
       collabStatuses?: CollabAgentStatus[];
+    }
+  | {
+      id: string;
+      kind: "approval";
+      requestId: string;
+      tool: string;
+      args: Record<string, unknown>;
+      cwd: string;
+      sandboxSummary: string;
+      layer:
+        | "privacy"
+        | "layer1_declarative"
+        | "layer2_starlark"
+        | "layer3_mirror"
+        | "default_mode";
+      layerReason: string;
+      mirrorHistory?: { approvalCount: number; denialCount: number };
+      status:
+        | "pending"
+        | "approved-once"
+        | "approved-always"
+        | "denied"
+        | "timed-out"
+        | "cancelled";
+      decidedAt?: string;
+      decidedBy?: "user" | "auto_allow" | "auto_deny" | "timeout" | "cancelled";
     };
 
 export type ThreadSummary = {

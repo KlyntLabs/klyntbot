@@ -201,6 +201,7 @@ pub async fn chat_send(
     session_key: String,
     context: Option<SessionContextInput>,
     is_voice: bool,
+    mode: Option<String>,
 ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
     // 1. Ensure session exists (title derived from first message, truncated to 60 chars)
     let title: String = content
@@ -220,6 +221,15 @@ pub async fn chat_send(
         .await
         .map_err(map_storage_err)?;
     let is_new_session = session_row.created_at == session_row.updated_at;
+
+    // Set conversation_type based on mode if provided
+    if let Some(ref m) = mode {
+        repos
+            .sessions
+            .update_conversation_type(&session_key, m)
+            .await
+            .map_err(map_storage_err)?;
+    }
 
     // 2. Upsert session_context if provided
     let has_context = context.is_some();
@@ -435,6 +445,37 @@ pub async fn relay_chat_stream(
         };
     }
 
+    // Merge pipeline events and domain-bus agent events into a single stream
+    // so that tools (e.g. BashTool) that publish via the domain bus are relayed
+    // to the UI just like native pipeline events.
+    let (merged_tx, mut merged_rx) = mpsc::channel::<AgentEvent>(64);
+    let merged_tx2 = merged_tx.clone();
+
+    tokio::spawn(async move {
+        while let Some(evt) = event_rx.recv().await {
+            if merged_tx.send(evt).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    if let Some(ref bus) = domain_event_bus {
+        let mut rx = bus.subscribe();
+        tokio::spawn(async move {
+            while let Ok(evt) = rx.recv().await {
+                if let bus::DomainEvent::Generic { kind, payload } = evt {
+                    if kind == "agent_event" {
+                        if let Ok(agent_evt) = serde_json::from_value::<AgentEvent>(payload) {
+                            if merged_tx2.send(agent_evt).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     loop {
         tokio::select! {
             biased;
@@ -450,7 +491,7 @@ pub async fn relay_chat_stream(
                 );
                 pending_interactions.insert(sk.clone(), (request_id, bundle.response_tx));
             }
-            Some(event) = event_rx.recv() => {
+            Some(event) = merged_rx.recv() => {
                 match event {
                     AgentEvent::ContentChunk { data } => {
                         current_text.push_str(&data);
@@ -1005,6 +1046,47 @@ pub async fn relay_chat_stream(
                     | AgentEvent::EnrichmentStarted { .. }
                     | AgentEvent::EnrichmentComplete { .. }
                     | AgentEvent::TurnComplete { .. } => {}
+                    AgentEvent::ApprovalRequested { requires_user_input, .. } if !requires_user_input => {
+                        // Auto-allow / auto-deny / privacy: telemetry only — UI doesn't need them.
+                    }
+                    AgentEvent::ApprovalRequested { ref request_id, ref tool, ref args_hash, ref layer, ref rule_matched, ref mirror_history, ref sandbox_summary, requires_user_input, ref args, ref cwd, ref layer_reason } => {
+                        let payload = serde_json::json!({
+                            "request_id": request_id,
+                            "tool": tool,
+                            "args_hash": args_hash,
+                            "layer": layer,
+                            "rule_matched": rule_matched,
+                            "mirror_history": mirror_history,
+                            "sandbox_summary": sandbox_summary,
+                            "requires_user_input": requires_user_input,
+                            "args": args,
+                            "cwd": cwd,
+                            "layer_reason": layer_reason,
+                        });
+                        emitter.emit_event("agent:approval_requested", payload);
+                    }
+                    AgentEvent::ApprovalResolved { ref request_id, ref decision, ref decision_reason, ref latency_ms, ref persisted_rule, ref decided_by } => {
+                        let payload = serde_json::json!({
+                            "request_id": request_id,
+                            "decision": decision,
+                            "decision_reason": decision_reason,
+                            "latency_ms": latency_ms,
+                            "persisted_rule": persisted_rule,
+                            "decided_by": decided_by,
+                        });
+                        emitter.emit_event("agent:approval_resolved", payload);
+                    }
+                    AgentEvent::SandboxPolicyApplied { ref tool, ref policy_summary, ref policy_hash, fallback_unsandboxed, ref fs_constraints, ref network_constraints } => {
+                        let payload = serde_json::json!({
+                            "tool": tool,
+                            "policy_summary": policy_summary,
+                            "policy_hash": policy_hash,
+                            "fallback_unsandboxed": fallback_unsandboxed,
+                            "fs_constraints": fs_constraints,
+                            "network_constraints": network_constraints,
+                        });
+                        emitter.emit_event("agent:sandbox_policy_applied", payload);
+                    }
                     // Coding-in-chat additive variants ignored here;
                     // chat-channel handlers will subscribe explicitly in later plans.
                     _ => {}
@@ -1031,6 +1113,7 @@ impl AppCore {
         content: String,
         session_key: String,
         context: Option<SessionContextInput>,
+        mode: Option<String>,
     ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
         let result = chat_send(
             &self.repos,
@@ -1040,6 +1123,7 @@ impl AppCore {
             session_key.clone(),
             context,
             false,
+            mode,
         )
         .await?;
 
@@ -1065,6 +1149,7 @@ impl AppCore {
             session_key.clone(),
             None,
             true,
+            None,
         )
         .await?;
 

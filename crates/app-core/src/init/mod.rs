@@ -1224,6 +1224,7 @@ impl AppCore {
             causal_edge_repo: None,
             symbol_extractor: None,
             repo_roots: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
+            pending_approvals: Arc::new(klynt_core::approval::PendingApprovalsMap::new()),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────
@@ -1766,6 +1767,47 @@ impl AppCore {
                 tools::MirrorTool::new(Arc::clone(facade)).with_coding_alerts(coding_alerts),
             );
             info!("Mirror tool registered");
+        }
+
+        // ── Register BashTool in agent's tool registry (post-init) ──────
+        {
+            let config_guard = core.config.read().await;
+            let perms = &config_guard.coding.permissions;
+            let layer1 =
+                Arc::new(klynt_core::approval::Layer1::compile(perms).expect(
+                    "Layer 1 rules failed to compile; fix coding.permissions in config.json",
+                ));
+            let exclude_globs: Vec<&str> = config_guard
+                .coding_memory
+                .ingest
+                .exclude_paths
+                .iter()
+                .map(String::as_str)
+                .collect();
+            let privacy = Arc::new(
+                klynt_core::privacy::PrivacyGuard::from_globs(&exclude_globs)
+                    .expect("privacy globs"),
+            );
+            let policy = Arc::new(
+                dirs::home_dir()
+                    .map(|h| h.join(".klyntbot/rules"))
+                    .and_then(|p| klynt_execpolicy::Policy::load_from_dir(&p).ok())
+                    .unwrap_or_else(klynt_execpolicy::Policy::empty),
+            );
+            let pending = core.pending_approvals.clone();
+            let bus = core
+                .domain_event_bus
+                .clone()
+                .unwrap_or_else(|| Arc::new(bus::DomainEventBus::new(64)));
+
+            let bash_tool = klynt_core::tools::bash::BashTool::new(
+                layer1, policy, privacy, pending, None, bus,
+            );
+
+            let reg = core.agent.tool_registry();
+            let mut registry = reg.write().await;
+            registry.register(bash_tool);
+            info!("BashTool registered");
         }
 
         // ── Register TemporalTool in agent's tool registry (post-init) ────

@@ -5,7 +5,7 @@ use serde::Serialize;
 use sqlx::FromRow;
 
 /// Row struct for the `sessions` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionRow {
     pub key: String,

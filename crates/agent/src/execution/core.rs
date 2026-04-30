@@ -613,6 +613,7 @@ impl ExecutionCore {
                     let args = tc.arguments.clone();
                     let mut ctx = routing_ctx.clone();
                     ctx.entity_tx = Some(entity_tx.clone());
+                    ctx.cancel_token = params.cancel_token.clone();
                     let id = tc.id.clone();
                     let timeout_dur = if name == ASK_USER_TOOL_NAME {
                         INTERACTIVE_TOOL_TIMEOUT

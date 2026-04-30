@@ -54,7 +54,8 @@ pub struct CodingPhaseRunnerImpl {
     synthesis_handler: Option<Arc<dyn CodingSynthesisHandler>>,
     rule_artifacts_handler: Option<Arc<dyn RuleArtifactsHandler>>,
     cross_cli_handler: Option<Arc<agent::adapters::reforge_handlers::LlmCrossCliSynthesisHandler>>,
-    skill_discovery_handler: Option<Arc<agent::adapters::reforge_handlers::LlmSkillDiscoveryHandler>>,
+    skill_discovery_handler:
+        Option<Arc<agent::adapters::reforge_handlers::LlmSkillDiscoveryHandler>>,
     enabled_artifacts: Vec<String>,
     bus: Option<Arc<bus::DomainEventBus>>,
     cross_session_dedup_threshold: f32,

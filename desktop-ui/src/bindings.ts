@@ -343,6 +343,22 @@ async chatRespondInteraction(sessionKey: string, requestId: string, response: un
     else return { status: "error", error: e  as any };
 }
 },
+async chatRespondApproval(sessionKey: string, requestId: string, decision: AppApprovalDecision) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_respond_approval", { sessionKey, requestId, decision }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatSetMode(sessionKey: string, mode: ChatMode) : Promise<Result<SessionRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_set_mode", { sessionKey, mode }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async codingMemoryStatus() : Promise<Result<CodingMemoryStatusResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_memory_status") };
@@ -978,6 +994,27 @@ async distractionLearnedRules() : Promise<Result<LearnedRuleResponse[], ApiError
 async distractionDeleteRule(id: number) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("distraction_delete_rule", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Pulled by the overlay's React layer on mount to recover the latest
+ * alert if the push event was emitted before the listener was wired.
+ * Returns `None` once the overlay has acked via `clear_pending`.
+ */
+async distractionGetPendingIntervention() : Promise<Result<InterventionPayload | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("distraction_get_pending_intervention") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async distractionClearPendingIntervention() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("distraction_clear_pending_intervention") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2029,9 +2066,9 @@ async inboxDelete(id: string) : Promise<Result<null, ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async noteInsightReview(noteId: string, scopeConfig: InsightScopeConfigParams | null, squadId: string | null) : Promise<Result<InsightReviewStarted, ApiError>> {
+async noteInsightReview(noteId: string, scopeConfig: InsightScopeConfigParams | null) : Promise<Result<InsightReviewStarted, ApiError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("note_insight_review", { noteId, scopeConfig, squadId }) };
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_review", { noteId, scopeConfig }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2064,14 +2101,6 @@ async noteInsightSubmitQuiz(params: InsightQuizSubmitParams) : Promise<Result<nu
 async noteInsightRegenerateTab(noteId: string, tab: string) : Promise<Result<TabContent, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("note_insight_regenerate_tab", { noteId, tab }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async noteInsightDebate(noteId: string, squadId: string | null) : Promise<Result<null, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("note_insight_debate", { noteId, squadId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -2120,78 +2149,6 @@ async noteInsightChangesSummary(noteId: string) : Promise<Result<ChangesSummaryR
 async noteInsightKnowledgeGrowth(days: number | null) : Promise<Result<KnowledgeGrowthResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("note_insight_knowledge_growth", { days }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async noteInsightListPersonas() : Promise<Result<PersonaResponse[], ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("note_insight_list_personas") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async noteInsightCreatePersona(params: CreatePersonaParams) : Promise<Result<PersonaResponse, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("note_insight_create_persona", { params }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async noteInsightUpdatePersona(params: UpdatePersonaParams) : Promise<Result<PersonaResponse, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("note_insight_update_persona", { params }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async noteInsightDeletePersona(id: string) : Promise<Result<null, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("note_insight_delete_persona", { id }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async noteInsightTogglePersona(id: string, active: boolean) : Promise<Result<null, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("note_insight_toggle_persona", { id, active }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async noteInsightSetPins(params: SetPersonaPinsParams) : Promise<Result<null, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("note_insight_set_pins", { params }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async noteInsightRatePersona(params: RatePersonaParams) : Promise<Result<null, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("note_insight_rate_persona", { params }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async noteInsightAutoGeneratePersona(noteId: string) : Promise<Result<PersonaResponse, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("note_insight_auto_generate_persona", { noteId }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async noteInsightPersonaChat(params: PersonaChatParams) : Promise<Result<PersonaChatResponse, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("note_insight_persona_chat", { params }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3251,62 +3208,6 @@ async shortcutsUpdate(launcher: string, tray: string) : Promise<Result<Shortcuts
     else return { status: "error", error: e  as any };
 }
 },
-async listSquads() : Promise<Result<SquadResponse[], ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("list_squads") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async getSquad(id: string) : Promise<Result<SquadResponse, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("get_squad", { id }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async createSquad(params: CreateSquadParams) : Promise<Result<SquadResponse, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("create_squad", { params }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async updateSquad(params: UpdateSquadParams) : Promise<Result<SquadResponse, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("update_squad", { params }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async deleteSquad(id: string) : Promise<Result<null, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("delete_squad", { id }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async addSquadMember(params: SquadMemberParams) : Promise<Result<null, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("add_squad_member", { params }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async removeSquadMember(squadId: string, personaId: string) : Promise<Result<null, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("remove_squad_member", { squadId, personaId }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
 async agentStatus() : Promise<Result<AgentStatusResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("agent_status") };
@@ -3842,13 +3743,9 @@ budgetWarningPayload: BudgetWarningPayload,
 chatMessageAdded: ChatMessagePayload,
 classificationCompletePayload: ClassificationCompletePayload,
 confidenceAssessedPayload: ConfidenceAssessedPayload,
-consensusReachedPayload: ConsensusReachedPayload,
 contentChunkPayload: ContentChunkPayload,
 contextAssembledPayload: ContextAssembledPayload,
 dataVersionBumpedPayload: DataVersionBumpedPayload,
-debateJudgeDecisionPayload: DebateJudgeDecisionPayload,
-debateRoundCompletedPayload: DebateRoundCompletedPayload,
-debateRoundStartedPayload: DebateRoundStartedPayload,
 delegationCompletedPayload: DelegationCompletedPayload,
 delegationStartedPayload: DelegationStartedPayload,
 distractionDetected: DistractionDetectedPayload,
@@ -3873,7 +3770,6 @@ mcpServerStatus: McpServerStatusPayload,
 mcpStartupComplete: McpStartupCompletePayload,
 memoryAccessPayload: MemoryAccessPayload,
 messageSegment: MessageSegment,
-personaPerspectivePayload: PersonaPerspectivePayload,
 pipelineStartedPayload: PipelineStartedPayload,
 planGeneratedPayload: PlanGeneratedPayload,
 planStepCompletedPayload: PlanStepCompletedPayload,
@@ -3912,13 +3808,9 @@ budgetWarningPayload: "budget-warning-payload",
 chatMessageAdded: "chat:message_added",
 classificationCompletePayload: "classification-complete-payload",
 confidenceAssessedPayload: "confidence-assessed-payload",
-consensusReachedPayload: "consensus-reached-payload",
 contentChunkPayload: "content-chunk-payload",
 contextAssembledPayload: "context-assembled-payload",
 dataVersionBumpedPayload: "data-version-bumped-payload",
-debateJudgeDecisionPayload: "debate-judge-decision-payload",
-debateRoundCompletedPayload: "debate-round-completed-payload",
-debateRoundStartedPayload: "debate-round-started-payload",
 delegationCompletedPayload: "delegation-completed-payload",
 delegationStartedPayload: "delegation-started-payload",
 distractionDetected: "distraction:detected",
@@ -3943,7 +3835,6 @@ mcpServerStatus: "mcp:server_status",
 mcpStartupComplete: "mcp:startup_complete",
 memoryAccessPayload: "memory-access-payload",
 messageSegment: "message-segment",
-personaPerspectivePayload: "persona-perspective-payload",
 pipelineStartedPayload: "pipeline-started-payload",
 planGeneratedPayload: "plan-generated-payload",
 planStepCompletedPayload: "plan-step-completed-payload",
@@ -4086,6 +3977,7 @@ code: string;
  * Human-readable error message
  */
 message: string }
+export type AppApprovalDecision = { kind: "allow_once" } | { kind: "allow_always"; rule: string | null } | { kind: "deny" } | { kind: "add_rule"; starlark_source: string }
 export type AppInfoResponse = { version: string; dataDir: string; setupCompleted: boolean }
 export type AppUsageResponse = { appName: string; durationSecs: number; category: string | null }
 export type AreaCreateParams = { name: string; color: string | null; icon: string | null }
@@ -4135,12 +4027,13 @@ export type ChatMessagePayload = { sessionKey: string;
  * Source that produced the message (e.g., "chat", "voice", "mcp", "cron").
  */
 source: string }
-export type ChatMessageResponse = { id: string; role: string; content: string; timestamp: string; segments?: MessageSegment[] | null; transparency?: TransparencyData | null; personaId?: string | null; personaName?: string | null }
+export type ChatMessageResponse = { id: string; role: string; content: string; timestamp: string; segments?: MessageSegment[] | null; transparency?: TransparencyData | null }
+export type ChatMode = "chat" | "coding"
 /**
  * Detailed session response for `chat_get_session`.
  */
-export type ChatSessionResponse = { sessionKey: string; title: string; messageCount: number; createdAt: string; updatedAt: string; projectId: string | null; conversationType: string | null; pinned: boolean; squadId?: string | null }
-export type ChatThreadResponse = { sessionKey: string; title: string; messageCount: number; updatedAt: string; contextType: string | null; entityKind: string | null; entityId: string | null; areaId: string | null; areaName: string | null; projectId: string | null; projectName: string | null; squadId?: string | null; squadName?: string | null; squadIcon?: string | null }
+export type ChatSessionResponse = { sessionKey: string; title: string; messageCount: number; createdAt: string; updatedAt: string; projectId: string | null; conversationType: string | null; pinned: boolean }
+export type ChatThreadResponse = { sessionKey: string; title: string; messageCount: number; updatedAt: string; contextType: string | null; entityKind: string | null; entityId: string | null; areaId: string | null; areaName: string | null; projectId: string | null; projectName: string | null }
 export type ClassificationCompletePayload = { sessionKey: string; strategy: string; confidence: number; source: string }
 export type CliHealthRow = { cli: string; enabled: boolean; lastEventAt: string | null; eventCount24H: number }
 export type ClipboardContentType = "text" | "image" | "file"
@@ -4156,7 +4049,6 @@ export type CompactionResultResponse = { archivedCount: number; deletedEpisodic:
 export type ComponentStatusResponse = { name: string; status: string; handlerType: string; notes: string }
 export type ConfidenceAssessedPayload = { sessionKey: string; score: number; action: string }
 export type ConfusableResponse = { hasConfusable: boolean; confusableWord: string | null; confusableMeaning: string | null; explanation: string | null }
-export type ConsensusReachedPayload = { sessionKey: string; round: number; consensusScore: number; summary: string }
 export type ContentChunkPayload = { sessionKey: string; data: string }
 export type ContextAssembledPayload = { sessionKey: string; totalTokens: number; durationMs: number }
 export type ContextResumeResponse = { contextId: string; contextTitle: string; summary: string; suggestedPrompt: string; recentResources: string[] }
@@ -4219,8 +4111,6 @@ source: string;
  * Number of assistant messages (only meaningful for `source = "hooks"`).
  */
 requests: number; inputTokens: number; outputTokens: number; cachedTokens: number; inputCostUsd: number; outputCostUsd: number; totalCostUsd: number }
-export type CreatePersonaParams = { name: string; role: string; expertise: string; perspective: string; tone: string; icon: string; domains: string[] }
-export type CreateSquadParams = { name: string; description: string; icon: string; orchestratorSkill: string; domains: string[]; memberPersonaIds: string[] }
 export type CronJobCreateParams = { name: string; schedule: unknown; message: string; deliver?: boolean; channel: string | null; to: string | null; deleteAfterRun?: boolean }
 export type CronJobResponse = { id: string; name: string; enabled: boolean; origin: string; schedule: unknown; payload: CronPayloadResponse; state: CronJobStateResponse; createdAtMs: number; updatedAtMs: number; deleteAfterRun: boolean }
 export type CronJobStateResponse = { nextRunAtMs?: number | null; lastRunAtMs?: number | null; lastStatus?: string | null; lastError?: string | null }
@@ -4235,9 +4125,6 @@ export type DashboardData = { calendar: CalendarDashboard[]; tasks: TaskDashboar
 export type DashboardIntelligenceResponse = { activeContext: WorkContextSummary | null; focusRecommendation: string | null; sessionSummary: SessionBlock[]; contextSwitches: number; switchQuality: string; productivityScore: number; scoreTrend: number; patterns: string[]; nudges: DashboardNudge[]; resourceClusters: ResourceCluster[] }
 export type DashboardNudge = { message: string; nudgeType: string; priority: string }
 export type DataVersionBumpedPayload = { previous: number; current: number }
-export type DebateJudgeDecisionPayload = { sessionKey: string; round: number; consensusScore: number; decision: string; speakingOrder: string[]; reasoning: string }
-export type DebateRoundCompletedPayload = { sessionKey: string; round: number; consensusScore: number }
-export type DebateRoundStartedPayload = { sessionKey: string; round: number; totalRounds: number; phase: string }
 export type DeckPreferenceResponse = { deck: string; answerMode: string }
 export type DeckSummaryResponse = { name: string; cardCount: number; dueCount: number }
 export type DelegationCompletedPayload = { sessionKey: string; fromAgent: string; toAgent: string; success: boolean; durationMs: number }
@@ -4434,17 +4321,13 @@ export type InboxItemResponse = { id: string; content: string; status: string; c
 export type InferenceConfigUpdate = { assignmentThreshold: number | null; mergeThreshold: number | null; semanticWeight: number | null; temporalWeight: number | null; resourceWeight: number | null; inferenceIntervalMins: number | null; maxDormancyDays: number | null; maxActiveContexts: number | null }
 export type InferenceStatsResponse = { activeContextCount: number; archivedContextCount: number; eventsLastHour: number; eventsLast24H: number; assignmentRate: number; avgConfidence: number; mergesLast24H: number; lastRunAt: string | null }
 export type InsightCardResponse = { id: string; insightType: string; title: string; body: string; sentiment: string; metricValue: number | null; baselineValue: number | null; date: string; dismissed: boolean; generatedAt: string }
-export type InsightChatParams = { noteId: string; tabName: string; userMessage: string; sessionKey: string; squadId: string | null }
+export type InsightChatParams = { noteId: string; tabName: string; userMessage: string; sessionKey: string }
 export type InsightChatStarted = { sessionKey: string; messageId: string }
 export type InsightEvolutionPoint = { version: number; generatedAt: string; flashcardSuccess: number; semanticDrift: number; gapClosure: number; quizScore: number; overallProgress: number; changeNote: string }
 export type InsightEvolutionResponse = { noteId: string; noteTitle: string; versions: InsightEvolutionPoint[] }
 export type InsightPayload = { id: string; insightType: string; title: string; sentiment: string }
 export type InsightQuizSubmitParams = { insightReviewId: string; score: number; total: number }
-export type InsightReviewResponse = { insightReviewId: string; noteId: string; version: number; generatedAt: string; synthesis: string | null; gapAnalysis: string | null; selfAssessment: QuizQuestion[] | null; conceptMap: string | null; perspectives: string | null; personaIds: string[] | null; 
-/**
- * Full persona metadata resolved from persona_ids (for frontend PersonaCard rendering).
- */
-personas?: PersonaMetaResponse[] }
+export type InsightReviewResponse = { insightReviewId: string; noteId: string; version: number; generatedAt: string; synthesis: string | null; gapAnalysis: string | null; selfAssessment: QuizQuestion[] | null; conceptMap: string | null; perspectives: string | null }
 export type InsightReviewStarted = { insightReviewId: string; contentHash: string; cached: boolean }
 export type InsightSaveFlashcardsParams = { noteId: string; insightReviewId: string; deckName: string; questions: QuizQuestion[] }
 export type InsightScopeConfigParams = { scopeType?: string | null; radius: number | null; nodeIds?: string[] | null; includeCognitive: boolean | null; deepDive: boolean | null; mergeThreshold: number | null }
@@ -4454,6 +4337,7 @@ export type InteractionRequestPayload = { sessionKey: string; requestId: string;
 export type InterventionLogResponse = { id: string; interventionType: string; message: string; triggerName: string; feedback: string | null; deliveredAt: string; feedbackAt: string | null }
 export type InterventionPayload = { appName: string; windowTitle: string | null; sessionId: string; needsLlm: boolean; heuristicVerdict: string }
 export type IterationStartPayload = { sessionKey: string; iteration: number; maxIterations: number }
+export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type KeyResultCreateParams = { objectiveId: string; title: string; targetValue: number | null; unit: string | null; trackingMode: string | null }
 export type KeyResultResponse = { id: string; title: string; progress: number; current: number; target: number; unit: string }
 export type KeyResultSummaryResponse = { id: string; title: string; progress: number }
@@ -4640,12 +4524,6 @@ export type ObjectiveResponse = { id: string; title: string; status: string; pro
 export type ObjectiveSummaryResponse = { id: string; title: string; progress: number; status: string }
 export type ObjectiveUpdateParams = { id: string; title: string | null; description: string | null; status: string | null; priority: number | null; dueDate: string | null }
 export type PendingMemoryResponse = { id: string; fact: unknown; reason: string; createdAt: string }
-export type PersonaChatMessage = { role: string; content: string }
-export type PersonaChatParams = { noteId: string; personaId: string; personaName: string; personaRole: string; personaTone: string; userMessage: string; history: PersonaChatMessage[] }
-export type PersonaChatResponse = { reply: string }
-export type PersonaMetaResponse = { id: string; name: string; role: string; icon: string; tone: string }
-export type PersonaPerspectivePayload = { sessionKey: string; personaId: string; personaName: string; personaIcon: string; personaRole: string; content: string; challenge: string | null }
-export type PersonaResponse = { id: string; name: string; role: string; expertise: string; perspective: string; tone: string; icon: string; source: string; domains: string[]; isActive: boolean; relevanceScore: number; createdAt: string; updatedAt: string }
 export type Pin = { item_id: string; kind: string; position: number }
 /**
  * A persisted pipeline event row.
@@ -4720,7 +4598,6 @@ export type ProjectUsageResponse = { projectId: string; displayName: string; dur
 export type QuickTranslateParams = { text: string; sourceLang: string; targetLang: string }
 export type QuickTranslateResponse = { translation: string; words: WordBreakdown[] }
 export type QuizQuestion = { id: string; type: string; question: string; choices: string[] | null; correctAnswer: string; explanation: string; sourceNotes: string[]; difficulty: string; difficultyScore: number }
-export type RatePersonaParams = { id: string; helpful: boolean }
 /**
  * Args for `coding_memory_recall_log`.
  */
@@ -4826,7 +4703,7 @@ export type SessionBlock = { contextType: string; totalDurationMins: number; ses
 /**
  * Optional session context sent from the frontend alongside a chat message.
  */
-export type SessionContextInput = { entityKind: string | null; entityId: string | null; contextType: string | null; isEphemeral: boolean | null; squadId: string | null }
+export type SessionContextInput = { entityKind: string | null; entityId: string | null; contextType: string | null; isEphemeral: boolean | null }
 /**
  * Filters for `coding_memory_session_list`.
  */
@@ -4849,6 +4726,10 @@ sinceDays?: number; limit?: number; offset?: number }
 export type SessionRecallOverlayArgs = { sessionId: string; limit?: number; offset?: number }
 export type SessionReplayEntry = { id: string; source: string; sessionId: string; kind: string; occurredAt: string; payload: string }
 /**
+ * Row struct for the `sessions` table.
+ */
+export type SessionRow = { key: string; metadata: JsonValue; createdAt: string; updatedAt: string; projectId: string | null; conversationType: string | null; pinned: boolean; cwd: string | null; repoId: string | null; repoBranch: string | null; toolProfile: string | null; approvalMode: string; totalCostUsd: number; totalTokens: number; parentSessionId: string | null }
+/**
  * One row in the Plugins → Coding Memory session list.
  */
 export type SessionSummaryDto = { sessionId: string; source: string; cwd: string | null; repoId: string | null; startedAt: string; lastEventAt: string; eventCount: number; turnCount: number; toolCallCount: number; errorCount: number; totalInputTokens: number; totalOutputTokens: number; totalCostUsd: number }
@@ -4870,7 +4751,6 @@ focusedEntity: string | null;
  * Used by the LLM rewriter for context.
  */
 description: string | null }
-export type SetPersonaPinsParams = { noteId: string; personaIds: string[] }
 export type ShellHookStatusResponse = { installed: boolean; shell: string; rcFile: string }
 export type ShortcutsConfig = { launcher: string; tray: string }
 export type SignalResponse = { eventType: string; timestamp: string; metadata: string }
@@ -4882,9 +4762,6 @@ export type SkillVersionDetailResponse = { id: string; skillName: string; versio
 export type SkillVersionResponse = { id: string; skillName: string; version: number; filePath: string; diff: string | null; source: string; reason: string | null; createdAt: string }
 export type SkippedFile = { path: string; reason: string }
 export type SourceBreakdown = { source: TimelineSource; durationSecs: number; count: number }
-export type SquadMemberParams = { squadId: string; personaId: string; roleInSquad: string | null; sortOrder: number | null }
-export type SquadMemberResponse = { personaId: string; personaName: string; personaIcon: string; personaRole: string; roleInSquad: string; sortOrder: number }
-export type SquadResponse = { id: string; name: string; description: string; icon: string; orchestratorSkill: string; defaultInteractionMode: string; source: string; domains: string[]; isActive: boolean; members: SquadMemberResponse[]; createdAt: string; updatedAt: string }
 export type StatusLabelResponse = { id: string; workflowId: string; name: string; color: string; statusGroup: string; position: number }
 export type StatusWorkflowResponse = { id: string; name: string; isTemplate: boolean; isGlobalDefault: boolean; labels: StatusLabelResponse[] }
 export type StrategyFeedbackResponse = { strategyType: string; domain: string; timesUsed: number; acceptanceRate: number; effectiveness: number; behavioralPositive: number; behavioralNegative: number }
@@ -4893,11 +4770,7 @@ export type SubagentSpawnedPayload = { sessionKey: string; label: string; profil
 export type SuggestedAction = { BoostSkill: { skill: string } } | "ViewDetails" | { ApproveMetaRule: { rule_id: string } } | { DismissMetaRule: { rule_id: string } } | { KillTrial: { trial_id: string } } | { ContinueTrial: { trial_id: string } } | { RevertBrainVersion: { version: number } } | "Unknown"
 export type SystemAction = "lockScreen" | "sleep" | "restart" | "shutdown" | "emptyTrash" | "toggleDarkMode" | "toggleDoNotDisturb" | "ejectAll"
 export type SystemStatusResponse = { domainBusSubscribers: number; domainBusPublished: number; backgroundServiceRunning: boolean; backgroundEventsProcessed: number; activeFacts: number; episodicCount: number; rulesCount: number; components: ComponentStatusResponse[] }
-export type TabContent = { tab: string; content: string; 
-/**
- * Persona metadata — only populated when tab == "perspectives".
- */
-personas: PersonaMetaResponse[] }
+export type TabContent = { tab: string; content: string }
 /**
  * Row struct for the `task_attachments` table.
  */
@@ -4963,8 +4836,6 @@ export type TrialEarlySignals = { correctionRateDelta: number; confidenceTrend: 
  */
 export type TrialPreview = { id: string; trialId: string; startedAt: string; previewAt: string; messagesScored: number; earlySignals: TrialEarlySignals; recommendation: PreviewRecommendation; narrative: string }
 export type TriggerConditionResponse = { name: string; cooldownRemainingSecs: number; lastFired: string | null }
-export type UpdatePersonaParams = { id: string; name: string | null; role: string | null; expertise: string | null; perspective: string | null; tone: string | null; icon: string | null; domains: string[] | null }
-export type UpdateSquadParams = { id: string; name: string | null; description: string | null; icon: string | null; domains: string[] | null; orchestratorSkill: string | null; defaultInteractionMode: string | null }
 export type UsageReportPayload = { sessionKey: string; promptTokens: number; completionTokens: number; cacheReadTokens: number; cacheWriteTokens: number; estimatedCostUsd: number; model: string; responseTimeMs: number }
 export type UserFeedback = "Helpful" | "NotHelpful" | "Dismissed"
 export type UserModelSummaryResponse = { identityCount: number; energyCount: number; workCount: number; financeCount: number; learningCount: number; preferencesCount: number; identityPreview: string[]; energyPreview: string[]; workPreview: string[]; financePreview: string[]; learningPreview: string[]; preferencesPreview: string[] }

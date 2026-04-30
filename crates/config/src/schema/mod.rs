@@ -18,6 +18,7 @@ mod agents;
 mod autotuner;
 mod capture;
 mod channels;
+mod coding;
 mod coding_memory;
 mod cognitive;
 mod confidence;
@@ -56,6 +57,7 @@ pub use self::agents::*;
 pub use self::autotuner::*;
 pub use self::capture::*;
 pub use self::channels::*;
+pub use self::coding::*;
 pub use self::coding_memory::{
     CodingCliEntry, CodingCliToggles, CodingDistillerConfig, CodingIngestConfig,
     CodingMemoryConfig, CodingPrivacyConfig, CodingRecallConfig, CodingReforgeConfig,

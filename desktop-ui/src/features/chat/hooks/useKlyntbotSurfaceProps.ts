@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Composer } from "@/features/composer/components/Composer";
 import type { Messages } from "@/features/messages/components/Messages";
 import type {
@@ -8,6 +8,7 @@ import type {
   ConversationItem,
 } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
+import { chatStreamStore } from "../store/chatStreamStore";
 import { useChatSession } from "./useChatSession";
 import type {
   ChatMessage,
@@ -67,6 +68,7 @@ export type KlyntbotSurfaceOverrides = {
 function buildItems(
   messages: ChatMessage[],
   segments: MessageSegment[],
+  approvals: ConversationItem[],
 ): ConversationItem[] {
   const items: ConversationItem[] = messages.map((msg) => ({
     id: msg.id,
@@ -113,6 +115,10 @@ function buildItems(
       role: "assistant",
       text: textBuffer,
     });
+  }
+
+  if (approvals.length > 0) {
+    items.push(...approvals);
   }
 
   return items;
@@ -208,9 +214,14 @@ export function useKlyntbotSurfaceProps(
     return null;
   }
 
+  const approvals = useSyncExternalStore(
+    chatStreamStore.subscribe,
+    useCallback(() => chatStreamStore.getApprovals(sessionKey ?? ""), [sessionKey]),
+  );
+
   return {
     messagesProps: {
-      items: buildItems(chat.messages, chat.segments),
+      items: buildItems(chat.messages, chat.segments, approvals),
       threadId: sessionKey,
       isThinking: chat.isStreaming,
       processingStartedAt: processingStartedAtRef.current,

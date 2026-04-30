@@ -719,10 +719,7 @@ impl LlmSkillDiscoveryHandler {
                 .collect(),
         };
         let user = serde_json::to_string(&payload)?;
-        let messages = vec![
-            Message::system(SKILL_DISCOVERY_PROMPT),
-            Message::user(user),
-        ];
+        let messages = vec![Message::system(SKILL_DISCOVERY_PROMPT), Message::user(user)];
         let resp = self.provider.chat(&messages, None, &self.params).await?;
         let text = resp.content.unwrap_or_default();
         Ok(serde_json::from_str(&text).unwrap_or_default())
