@@ -7743,6 +7743,7 @@ dependencies = [
  "tools-core",
  "tools-core-macros",
  "tracing",
+ "url",
  "uuid",
  "walkdir",
 ]

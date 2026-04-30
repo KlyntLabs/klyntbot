@@ -1816,6 +1816,7 @@ impl AppCore {
                 .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
             let event_tx: Option<tokio::sync::mpsc::Sender<agent::events::AgentEvent>> = None;
             let non_ui_policy = config_guard.tools.approval_policy.non_ui_channels;
+            let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
 
             let reg = core.agent.tool_registry();
             let mut registry = reg.write().await;
@@ -1843,6 +1844,7 @@ impl AppCore {
             registry.register(kt::WebFetchTool::new(
                 layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
                 non_ui_policy,
+                host_cache,
             ));
             registry.register(kt::EnterPlanModeTool::new(
                 core.repos.clone(), event_tx.clone(), bus.clone(),
