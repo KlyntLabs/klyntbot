@@ -108,20 +108,21 @@ impl ReplayContext {
         let repo = SemanticFactRepo::new(self.pool.inner().clone());
         let started = Instant::now();
         let deadline = started + Duration::from_secs(60);
-        // Floor: even on a fixture that produces zero facts, the LLM
-        // extractor still spends 2–4s per batch. Without this dwell, an
-        // initial run of `count=0` looks "stable" and we return before
-        // the first write lands. Cap at 8s to bound total bench time.
-        let floor = started + Duration::from_secs(8);
+        // Unconditional floor. The previous logic let idle return as soon
+        // as count was stable for 3s as long as count > 0 — fine on the
+        // first turn but catastrophic on per-turn sync: turn 1's LLM call
+        // takes up to ~12s, but turn 0's facts have already been counted
+        // for 3s by then, so idle returns BEFORE turn 1 writes anything.
+        // 14s covers Kimi's worst-case extraction latency observed in
+        // benchmarks (12s tail) with margin.
+        let floor = started + Duration::from_secs(14);
         let mut last = -1i64;
         let mut stable = 0u32;
         while Instant::now() < deadline {
             tokio::time::sleep(Duration::from_millis(750)).await;
             let now = repo.count_active().await.unwrap_or(0);
             if now == last {
-                // Only declare idle once *something* has been written, OR
-                // the floor has elapsed (genuinely empty fixture).
-                if stable >= 4 && (now > 0 || Instant::now() >= floor) {
+                if stable >= 4 && Instant::now() >= floor {
                     return;
                 }
                 stable += 1;

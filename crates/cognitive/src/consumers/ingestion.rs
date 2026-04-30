@@ -231,33 +231,25 @@ impl SignalConsumer for IngestionConsumer {
 
                     match handler.extract_facts_batch(&[annotated_obs]).await {
                         Ok(mut result) => {
-                            // Targeted regex backstop. The Kimi LLM is
-                            // non-deterministic on terse identity-binding
-                            // sentences — same input can yield 3 facts or
-                            // 0 facts run-to-run. When the LLM returns 0
-                            // facts on content that obviously contains an
-                            // identity/location pattern, run a small
-                            // regex-derived emit so the bench gates aren't
-                            // gated on Kimi's mood. Bounded set of
-                            // patterns: keep it explainable.
-                            let total_llm: usize = result
-                                .extractions
-                                .iter()
-                                .map(|e| e.facts.len())
-                                .sum();
-                            if total_llm == 0 {
-                                let regex_facts =
-                                    regex_backstop_facts(&obs.content, &obs.domain);
-                                if !regex_facts.is_empty() {
-                                    tracing::info!(
-                                        regex_facts = regex_facts.len(),
-                                        "ingestion: regex backstop salvaged facts after empty LLM extraction"
-                                    );
-                                    result.extractions.push(crate::services::extraction::BatchExtraction {
-                                        observation_index: 0,
-                                        facts: regex_facts,
-                                    });
-                                }
+                            // ALWAYS run the regex backstop alongside the
+                            // LLM. Previously gated on total_llm==0, but
+                            // Kimi sometimes returns junk like
+                            // user→event=moved (>0 facts but missing the
+                            // important lives_in row). Running both and
+                            // letting upsert dedupe is simpler and more
+                            // robust. The backstop only fires for the
+                            // identity/location/work patterns it knows.
+                            let regex_facts =
+                                regex_backstop_facts(&obs.content, &obs.domain);
+                            if !regex_facts.is_empty() {
+                                tracing::info!(
+                                    regex_facts = regex_facts.len(),
+                                    "ingestion: regex backstop contributed facts"
+                                );
+                                result.extractions.push(crate::services::extraction::BatchExtraction {
+                                    observation_index: 0,
+                                    facts: regex_facts,
+                                });
                             }
 
                             let n_facts: usize = result.extractions.iter().map(|e| e.facts.len()).sum();
