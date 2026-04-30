@@ -42,6 +42,7 @@ pub struct BashTool {
     pending: Arc<PendingApprovalsMap>,
     event_tx: Option<mpsc::Sender<AgentEvent>>,
     bus: Arc<DomainEventBus>,
+    non_ui_policy: common::tool_channel::NonUiPolicy,
 }
 
 impl BashTool {
@@ -52,6 +53,7 @@ impl BashTool {
         pending: Arc<PendingApprovalsMap>,
         event_tx: Option<mpsc::Sender<AgentEvent>>,
         bus: Arc<DomainEventBus>,
+        non_ui_policy: common::tool_channel::NonUiPolicy,
     ) -> Self {
         Self {
             layer1,
@@ -60,6 +62,7 @@ impl BashTool {
             pending,
             event_tx,
             bus,
+            non_ui_policy,
         }
     }
 }
@@ -81,6 +84,8 @@ impl ToolExecute for BashTool {
             request_id,
             args: Some(serde_json::to_value(&args).unwrap_or(serde_json::Value::Null)),
             cwd: args.cwd.clone(),
+            channel: common::tool_channel::Channel::from_name(ctx.channel.as_str()),
+            non_ui_policy: self.non_ui_policy,
         };
         let decision = evaluate(guard_ctx, "bash", &args.command).await;
         if !decision.allowed() {

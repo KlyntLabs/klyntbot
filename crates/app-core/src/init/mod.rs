@@ -1815,6 +1815,7 @@ impl AppCore {
             let cwd = config_guard.coding_memory.workspace_root.clone()
                 .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
             let event_tx: Option<tokio::sync::mpsc::Sender<agent::events::AgentEvent>> = None;
+            let non_ui_policy = config_guard.tools.approval_policy.non_ui_channels;
 
             let reg = core.agent.tool_registry();
             let mut registry = reg.write().await;
@@ -1822,21 +1823,26 @@ impl AppCore {
 
             registry.register(kt::BashTool::new(
                 layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
+                non_ui_policy,
             ));
             registry.register(kt::ReadTool::new(cwd.clone(), privacy.clone()));
             registry.register(kt::GlobTool::new(cwd.clone(), privacy.clone()));
             registry.register(kt::GrepTool::new(cwd.clone(), privacy.clone()));
             registry.register(kt::WriteTool::new(
                 cwd.clone(), layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
+                non_ui_policy,
             ));
             registry.register(kt::EditTool::new(
                 cwd.clone(), layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
+                non_ui_policy,
             ));
             registry.register(kt::ApplyPatchTool::new(
                 cwd.clone(), layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
+                non_ui_policy,
             ));
             registry.register(kt::WebFetchTool::new(
                 layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
+                non_ui_policy,
             ));
             registry.register(kt::EnterPlanModeTool::new(
                 core.repos.clone(), event_tx.clone(), bus.clone(),
@@ -1846,6 +1852,7 @@ impl AppCore {
             ));
             registry.register(kt::NotebookEditTool::new(
                 cwd.clone(), layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
+                non_ui_policy,
             ));
             registry.register(kt::ToolSearchTool::new());
             info!("Coding tool kit registered (12 tools)");

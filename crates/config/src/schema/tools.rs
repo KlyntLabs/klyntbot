@@ -5,6 +5,8 @@ use std::collections::HashMap;
 
 use super::core::Secret;
 
+pub use common::tool_channel::NonUiPolicy;
+
 /// Tools configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +27,10 @@ pub struct ToolsConfig {
     /// When absent, all tools are allowed on all channels.
     #[serde(default)]
     pub permissions: Option<PermissionsConfig>,
+
+    /// Approval policy for channels that cannot render approval UI.
+    #[serde(default)]
+    pub approval_policy: ApprovalPolicyConfig,
 }
 
 /// Permission configuration for tool access control.
@@ -103,6 +109,13 @@ impl Default for BrowserConfig {
             session_timeout_secs: default_session_timeout_secs(),
         }
     }
+}
+
+/// Approval policy configuration.
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ApprovalPolicyConfig {
+    pub non_ui_channels: NonUiPolicy,
 }
 
 fn default_session_timeout_secs() -> u64 {

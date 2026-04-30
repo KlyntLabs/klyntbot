@@ -44,6 +44,7 @@ pub struct WebFetchTool {
     event_tx: Option<mpsc::Sender<AgentEvent>>,
     bus: Arc<DomainEventBus>,
     client: reqwest::Client,
+    non_ui_policy: common::tool_channel::NonUiPolicy,
 }
 
 impl WebFetchTool {
@@ -51,12 +52,13 @@ impl WebFetchTool {
         layer1: Arc<Layer1>, policy: Arc<Policy>, privacy: Arc<PrivacyGuard>,
         pending: Arc<PendingApprovalsMap>, event_tx: Option<mpsc::Sender<AgentEvent>>,
         bus: Arc<DomainEventBus>,
+        non_ui_policy: common::tool_channel::NonUiPolicy,
     ) -> Self {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("reqwest client construction");
-        Self { layer1, policy, privacy, pending, event_tx, bus, client }
+        Self { layer1, policy, privacy, pending, event_tx, bus, client, non_ui_policy }
     }
 }
 
@@ -70,6 +72,8 @@ impl ToolExecute for WebFetchTool {
             self.bus.clone(),
             ctx.cancel_token.clone().unwrap_or_else(CancellationToken::new),
             self.client.clone(),
+            common::tool_channel::Channel::from_name(ctx.channel.as_str()),
+            self.non_ui_policy,
         ).await
     }
 }
@@ -85,6 +89,8 @@ pub async fn run_for_test(
     bus: Arc<DomainEventBus>,
     cancel: CancellationToken,
     client: reqwest::Client,
+    channel: common::tool_channel::Channel,
+    non_ui_policy: common::tool_channel::NonUiPolicy,
 ) -> Result<String> {
     let request_id = Uuid::new_v4().to_string();
     let guard_ctx = GuardCtx {
@@ -93,6 +99,8 @@ pub async fn run_for_test(
         cancel: cancel.clone(), request_id,
         args: Some(serde_json::to_value(&args).unwrap_or_default()),
         cwd: None,
+        channel,
+        non_ui_policy,
     };
     let decision = evaluate(guard_ctx, "web_fetch", &args.url).await;
     if !decision.allowed() {

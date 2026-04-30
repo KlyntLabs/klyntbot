@@ -44,6 +44,7 @@ pub struct WriteTool {
     pending: Arc<PendingApprovalsMap>,
     event_tx: Option<mpsc::Sender<AgentEvent>>,
     bus: Arc<DomainEventBus>,
+    non_ui_policy: common::tool_channel::NonUiPolicy,
 }
 
 impl WriteTool {
@@ -52,8 +53,9 @@ impl WriteTool {
         cwd: PathBuf, layer1: Arc<Layer1>, policy: Arc<Policy>, privacy: Arc<PrivacyGuard>,
         pending: Arc<PendingApprovalsMap>, event_tx: Option<mpsc::Sender<AgentEvent>>,
         bus: Arc<DomainEventBus>,
+        non_ui_policy: common::tool_channel::NonUiPolicy,
     ) -> Self {
-        Self { cwd, layer1, policy, privacy, pending, event_tx, bus }
+        Self { cwd, layer1, policy, privacy, pending, event_tx, bus, non_ui_policy }
     }
 }
 
@@ -68,6 +70,8 @@ impl ToolExecute for WriteTool {
             self.event_tx.clone().unwrap_or_else(|| mpsc::channel(1).0),
             self.bus.clone(),
             ctx.cancel_token.clone().unwrap_or_else(CancellationToken::new),
+            common::tool_channel::Channel::from_name(ctx.channel.as_str()),
+            self.non_ui_policy,
         ).await
     }
 }
@@ -84,6 +88,8 @@ pub async fn run_for_test(
     event_tx: mpsc::Sender<AgentEvent>,
     bus: Arc<DomainEventBus>,
     cancel: CancellationToken,
+    channel: common::tool_channel::Channel,
+    non_ui_policy: common::tool_channel::NonUiPolicy,
 ) -> Result<String> {
     let resolved = resolve_under_cwd(&args.path, &cwd, &privacy)
         .map_err(|e| KlyntbotError::Tool(ToolError::PermissionDenied(e.to_string())))?;
@@ -96,6 +102,8 @@ pub async fn run_for_test(
         cancel: cancel.clone(), request_id,
         args: Some(serde_json::to_value(&args).unwrap_or_default()),
         cwd: Some(cwd.to_string_lossy().into_owned()),
+        channel,
+        non_ui_policy,
     };
     let decision = evaluate(guard_ctx, "write", &path_str).await;
     if !decision.allowed() {

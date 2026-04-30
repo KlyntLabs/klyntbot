@@ -65,6 +65,17 @@ impl ChannelMask {
     }
 }
 
+/// Policy for headless channels that cannot render approval UI.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NonUiPolicy {
+    /// Automatically allow the tool (default).
+    #[default]
+    Allow,
+    /// Deny with an error explaining the configuration option.
+    DenyWithError,
+}
+
 /// Look up channel visibility for a named tool, falling back to ALL if the
 /// registry doesn't know the tool. Replaces the old `available_for_channel`
 /// signature for compatibility during the migration; once all callers use

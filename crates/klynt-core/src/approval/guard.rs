@@ -26,6 +26,8 @@ pub struct GuardCtx<'a> {
     pub request_id: String,
     pub args: Option<serde_json::Value>,
     pub cwd: Option<String>,
+    pub channel: common::tool_channel::Channel,
+    pub non_ui_policy: common::tool_channel::NonUiPolicy,
 }
 
 pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> ApprovalDecision {
@@ -51,6 +53,37 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
 
     // 1. Layer 1 declarative
     let l1 = ctx.layer1.evaluate(tool, payload);
+
+    // Channel-aware degradation: if Layer1 says "ask" but the channel can't
+    // surface an approval card (Telegram/Discord/Slack/Email), fall back to
+    // the configured policy.
+    let l1 = match l1 {
+        ApprovalDecision::Ask { .. } if !ctx.channel.supports_approval_ui() => {
+            match ctx.non_ui_policy {
+                common::tool_channel::NonUiPolicy::Allow => ApprovalDecision::Auto {
+                    allowed: true,
+                    layer: ApprovalLayer::Layer1Declarative,
+                    reason: format!(
+                        "non-UI channel ({:?}) fallback: allow per tools.approvalPolicy.nonUiChannels",
+                        ctx.channel
+                    ),
+                    rule_matched: None,
+                },
+                common::tool_channel::NonUiPolicy::DenyWithError => ApprovalDecision::Auto {
+                    allowed: false,
+                    layer: ApprovalLayer::Layer1Declarative,
+                    reason: format!(
+                        "non-UI channel ({:?}) deny: tool '{}' requires approval; \
+                         set tools.approvalPolicy.nonUiChannels = \"allow\" to permit",
+                        ctx.channel, tool
+                    ),
+                    rule_matched: None,
+                },
+            }
+        }
+        other => other,
+    };
+
     if matches!(l1, ApprovalDecision::Auto { .. }) {
         emit_pair(&ctx, tool, payload, &l1, false).await;
         return l1;
