@@ -7,13 +7,17 @@ description = "Klynt sandbox — Seatbelt (.sbpl) for macOS, Landlock+bwrap for 
 
 [dependencies]
 common = { path = "../common" }
-serde = { workspace = true }
-thiserror = "1"
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+sha2 = "0.10"
+async-trait = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# Add Seatbelt-specific deps in Plan 2.
+tokio = { workspace = true, features = ["process", "rt", "macros", "time"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Add Landlock + bwrap deps in Plan 2.
 
 [dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "process"] }
+tempfile = { workspace = true }

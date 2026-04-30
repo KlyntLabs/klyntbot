@@ -9,6 +9,7 @@ use super::autotuner::AutoTunerConfig;
 
 use super::capture::CaptureConfig;
 use super::channels::ChannelsConfig;
+use super::coding::CodingConfig;
 use super::coding_memory::CodingMemoryConfig;
 use super::cognitive::CognitiveConfig;
 use super::confidence::ConfidenceConfig;
@@ -165,6 +166,9 @@ pub struct Config {
     pub coding_memory: CodingMemoryConfig,
 
     /// Cognitive memory & coaching configuration.
+    #[serde(default)]
+    pub coding: CodingConfig,
+
     #[serde(default)]
     pub cognitive: CognitiveConfig,
 

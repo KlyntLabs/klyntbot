@@ -8,8 +8,8 @@
 
 use cognitive::repos::{EntityRepo, EpisodicMemoryRepo, SemanticFactRepo};
 use cognitive::services::hierarchical_compressor::HierarchicalSummarizer;
-use cognitive::services::hierarchical_compressor::{Tier, roll_up_daily, roll_up_hourly};
-use cognitive::services::predictive_cache::{PredictiveCache, query_hash};
+use cognitive::services::hierarchical_compressor::{roll_up_daily, roll_up_hourly, Tier};
+use cognitive::services::predictive_cache::{query_hash, PredictiveCache};
 use cognitive::services::temporal_pruner::{
     NoopTemporalPruner, PruneFactRef, PruneInput, TemporalPrunerHandler,
 };

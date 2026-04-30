@@ -15,14 +15,18 @@ export function getActiveItemsForThread({
   activeThreadId,
   itemsByThread,
   threads,
+  approvals,
 }: {
   activeThreadId: string | null;
   itemsByThread: Record<string, ConversationItem[]>;
   threads: ThreadSummary[] | undefined;
+  approvals?: ConversationItem[];
 }) {
   if (!activeThreadId) {
     return [];
   }
   const items = itemsByThread[activeThreadId] ?? [];
-  return enrichConversationItemsWithThreads(items, threads ?? []);
+  const enriched = enrichConversationItemsWithThreads(items, threads ?? []);
+  if (!approvals || approvals.length === 0) return enriched;
+  return [...enriched, ...approvals];
 }

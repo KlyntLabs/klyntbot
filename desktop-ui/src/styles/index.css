@@ -39,3 +39,4 @@
 @import "./git-init-modal.css";
 @import "./settings.css";
 @import "./plugins.css";
+@import "../features/coding/coding.css";

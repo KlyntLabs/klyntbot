@@ -367,6 +367,8 @@ dependencies = [
  "feature-tasks",
  "futures-util",
  "jiff",
+ "klynt-core",
+ "klynt-execpolicy",
  "notifications",
  "notify",
  "notify-debouncer-mini",
@@ -382,6 +384,7 @@ dependencies = [
  "sqlx",
  "storage",
  "tempfile",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-util",
  "tools",
@@ -7642,26 +7645,37 @@ dependencies = [
 name = "klynt-core"
 version = "0.0.1"
 dependencies = [
+ "agent",
  "async-trait",
+ "bus",
  "common",
+ "config",
+ "dashmap",
+ "dirs",
+ "globset",
  "klynt-execpolicy",
- "klynt-hooks",
  "klynt-protocol",
  "klynt-sandbox",
- "klynt-skill-loader",
+ "proptest",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.18",
  "tokio",
+ "tokio-util",
  "tools-core",
+ "tools-core-macros",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
 name = "klynt-execpolicy"
 version = "0.0.1"
 dependencies = [
- "common",
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -7680,15 +7694,20 @@ version = "0.0.1"
 dependencies = [
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "klynt-sandbox"
 version = "0.0.1"
 dependencies = [
+ "async-trait",
  "common",
  "serde",
- "thiserror 1.0.69",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]
@@ -7735,9 +7754,12 @@ dependencies = [
  "feature-productivity",
  "feature-tasks",
  "jiff",
+ "klynt-core",
+ "klynt-execpolicy",
  "mcp",
  "notifications",
  "plugin-runtime",
+ "proptest",
  "providers",
  "scheduling",
  "serde",
@@ -13256,6 +13278,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab7f01e9310a820edd31c80fde3cae445295adde21a3f9416517d7d65015b971"
 dependencies = [
  "paste",
+ "serde_json",
  "specta-macros",
  "thiserror 1.0.69",
  "uuid",
