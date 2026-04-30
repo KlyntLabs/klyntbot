@@ -35,11 +35,16 @@ fn freshness_label(fact: &crate::types::SemanticFact) -> &'static str {
         .map(|ts| (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()) / 86_400_000)
         .unwrap_or(90);
     if fact.convergence_score >= 0.4 || (fact.confidence >= 0.8 && days_old <= 7) {
-        "strong"
+        "trusted"
     } else if fact.confidence >= 0.5 && days_old <= 30 {
-        "moderate"
+        "noted"
     } else {
-        "weak -- verify"
+        // Was "weak -- verify" — but the LLM, seeing "verify" in the
+        // label, would reflexively hedge ("you may want to verify this")
+        // even when the fact was right in front of it. Use a neutral
+        // descriptor; the LLM can still reason about confidence from
+        // explicit numeric scores when needed.
+        "low-confidence"
     }
 }
 

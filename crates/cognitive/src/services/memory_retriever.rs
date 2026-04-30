@@ -43,11 +43,13 @@ fn freshness_label(fact: &crate::types::SemanticFact) -> &'static str {
         .map(|ts| (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()) / 86_400_000)
         .unwrap_or(90);
     if fact.convergence_score >= 0.4 || (fact.confidence >= 0.8 && days_old <= 7) {
-        "strong"
+        "trusted"
     } else if fact.confidence >= 0.5 && days_old <= 30 {
-        "moderate"
+        "noted"
     } else {
-        "weak -- verify"
+        // Match `context_source.rs`: avoid the imperative "verify"
+        // suffix, which the LLM was treating as an instruction.
+        "low-confidence"
     }
 }
 

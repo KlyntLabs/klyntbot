@@ -95,22 +95,24 @@ fn enforce_gates(r: &game_changer_report::GameChangerReport) -> common::Result<(
             r.lmb.accuracy()
         ));
     }
-    if r.locobench.single_hop_acc < 0.92 {
+    // Skip 0-sample categories so a fixture that happens to have only
+    // single-hop queries doesn't fail Q-3/Q-4 with a false negative.
+    if r.locobench.single_hop_total > 0 && r.locobench.single_hop_acc < 0.92 {
         failures.push(format!(
-            "Q-2: LoCoBench single {:.2} < 0.92",
-            r.locobench.single_hop_acc
+            "Q-2: LoCoBench single {:.2} < 0.92 (n={})",
+            r.locobench.single_hop_acc, r.locobench.single_hop_total
         ));
     }
-    if r.locobench.multi_hop_acc < 0.70 {
+    if r.locobench.multi_hop_total > 0 && r.locobench.multi_hop_acc < 0.70 {
         failures.push(format!(
-            "Q-3: LoCoBench multi {:.2} < 0.70",
-            r.locobench.multi_hop_acc
+            "Q-3: LoCoBench multi {:.2} < 0.70 (n={})",
+            r.locobench.multi_hop_acc, r.locobench.multi_hop_total
         ));
     }
-    if r.locobench.temporal_acc < 0.85 {
+    if r.locobench.temporal_total > 0 && r.locobench.temporal_acc < 0.85 {
         failures.push(format!(
-            "Q-4: LoCoBench temporal {:.2} < 0.85",
-            r.locobench.temporal_acc
+            "Q-4: LoCoBench temporal {:.2} < 0.85 (n={})",
+            r.locobench.temporal_acc, r.locobench.temporal_total
         ));
     }
     if r.klynt_coding.dead_end_recall < 0.80 {
