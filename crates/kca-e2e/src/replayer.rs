@@ -88,29 +88,59 @@ impl ReplayContext {
     }
 
     /// Block until the cognitive fact store stops growing, indicating that
-    /// the background extraction pipeline has caught up. Polls every 500ms,
-    /// returns when the count is unchanged across two consecutive polls or
-    /// the safety timeout (45s) elapses.
+    /// the background extraction pipeline has caught up.
+    ///
+    /// Polls every 750ms; returns once the count is unchanged across **four
+    /// consecutive** polls (≈3s of quiet) or the 60s safety timeout fires.
+    /// The longer stability window matters because two extraction paths
+    /// run concurrently: the heuristic SPO extractor persists in <500ms,
+    /// while the LLM-based `LlmExtractionHandler` takes 2-4s per batch.
+    /// A shorter window declares idle after the heuristic finishes but
+    /// before LLM-extracted (identity-bound) facts hit the repo, so the
+    /// bench would query a half-populated store.
     pub async fn await_cognitive_idle(&self) {
         use cognitive::repos::SemanticFactRepo;
         use std::time::{Duration, Instant};
         let repo = SemanticFactRepo::new(self.pool.inner().clone());
-        let deadline = Instant::now() + Duration::from_secs(45);
+        let started = Instant::now();
+        let deadline = started + Duration::from_secs(60);
+        // Floor: even on a fixture that produces zero facts, the LLM
+        // extractor still spends 2–4s per batch. Without this dwell, an
+        // initial run of `count=0` looks "stable" and we return before
+        // the first write lands. Cap at 8s to bound total bench time.
+        let floor = started + Duration::from_secs(8);
         let mut last = -1i64;
         let mut stable = 0u32;
         while Instant::now() < deadline {
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            tokio::time::sleep(Duration::from_millis(750)).await;
             let now = repo.count_active().await.unwrap_or(0);
             if now == last {
-                stable += 1;
-                if stable >= 2 {
+                // Only declare idle once *something* has been written, OR
+                // the floor has elapsed (genuinely empty fixture).
+                if stable >= 4 && (now > 0 || Instant::now() >= floor) {
                     return;
                 }
+                stable += 1;
             } else {
                 stable = 0;
             }
             last = now;
         }
+    }
+
+    /// Diagnostic: dump every active semantic fact in the store as
+    /// `(subject, predicate, object)` tuples. Used by bench harnesses to
+    /// verify what the extraction pipeline actually persisted.
+    pub async fn dump_facts(&self) -> Vec<(String, String, String)> {
+        let pool = self.pool.inner().clone();
+        let rows: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT subject, predicate, object FROM semantic_facts \
+             WHERE superseded_at IS NULL ORDER BY recorded_at",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap_or_default();
+        rows
     }
 
     /// Send a user message and block until the agent's full streamed reply is
@@ -124,9 +154,10 @@ impl ReplayContext {
         content: String,
         session_key: String,
     ) -> common::Result<String> {
+        let user_message = content.clone();
         let (_user_msg, mut info) = self
             .app
-            .chat_send(content, session_key, None)
+            .chat_send(content, session_key.clone(), None)
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("chat_send failed: {e}")))?;
         let mut answer = String::new();
@@ -134,6 +165,19 @@ impl ReplayContext {
             if let agent::AgentEvent::ContentChunk { data } = ev {
                 answer.push_str(&data);
             }
+        }
+        // The bench harness drains `event_rx` directly, bypassing
+        // `relay_chat_stream` — the function that normally publishes
+        // `ChatTurnCompleted` to the cognitive pipeline. Without this
+        // event, `IngestionConsumer` never fires and `semantic_facts`
+        // stays empty even though the agent itself answered correctly
+        // from session history. Publish it manually here to wire the
+        // memory pipeline back up for benchmarks.
+        if let Ok(bus) = self.app.domain_event_bus() {
+            bus.publish(bus::DomainEvent::ChatTurnCompleted {
+                session_key,
+                user_message: Some(user_message),
+            });
         }
         Ok(answer)
     }
