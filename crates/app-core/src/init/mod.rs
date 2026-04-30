@@ -1105,6 +1105,19 @@ impl AppCore {
             }
         };
 
+        // ── Tracing registry ─────────────────────────────────────────────
+        let tracing_registry = {
+            let home = dirs::home_dir().expect("home dir");
+            let data_dir = config.data_dir_path();
+            let widx = Arc::new(coding_ingest::adapters::kimi_cli::workdir::WorkdirIndex::new());
+            let _ = widx.refresh(&home.join(".kimi/kimi.json")).await;
+            let mut registry = crate::tracing::TracingRegistry::new();
+            registry.register(Arc::new(crate::tracing::providers::kimi::KimiTracingProvider::new(
+                &home, &data_dir, widx,
+            )));
+            Arc::new(registry)
+        };
+
         // ── Snapshot lifecycle config before moving config into Arc ──────
         let lifecycle_config_snapshot = config.lifecycle.clone();
 
@@ -1237,6 +1250,7 @@ impl AppCore {
             symbol_extractor: None,
             repo_roots: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
             pending_approvals: Arc::new(klynt_core::approval::PendingApprovalsMap::new()),
+            tracing_registry,
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────
