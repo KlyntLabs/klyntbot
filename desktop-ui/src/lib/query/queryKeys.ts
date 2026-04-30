@@ -100,6 +100,15 @@ export const qk = {
     memoryBrowser: () => ["codingMemory", "memoryBrowser"] as const,
     status: () => ["codingMemory", "status"] as const,
   },
+  dashboard: {
+    all: () => ["dashboard"] as const,
+    timeline: (startDate: string, endDate: string, sources: readonly string[]) =>
+      ["dashboard", "timeline", startDate, endDate, [...sources].sort().join(",")] as const,
+  },
+  calendarSync: {
+    all: () => ["calendarSync"] as const,
+    status: () => ["calendarSync", "status"] as const,
+  },
 } as const;
 
 type QkType = typeof qk;

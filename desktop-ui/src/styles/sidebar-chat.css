@@ -57,6 +57,11 @@
   background: var(--surface-hover);
 }
 
+.sidebar-chat__nav-item--active {
+  background: var(--surface-active);
+  color: var(--ds-text-strong);
+}
+
 .sidebar-chat__nav-icon {
   display: inline-flex;
   align-items: center;

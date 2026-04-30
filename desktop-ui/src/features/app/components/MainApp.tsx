@@ -63,6 +63,7 @@ import { useCollaborationModes } from "@/features/collaboration/hooks/useCollabo
 import { useComposerEditorState } from "@/features/composer/hooks/useComposerEditorState";
 import { useComposerMenuActions } from "@/features/composer/hooks/useComposerMenuActions";
 import { useComposerShortcuts } from "@/features/composer/hooks/useComposerShortcuts";
+import { Dashboard } from "@/features/dashboard";
 import { useAutoExitEmptyDiff } from "@/features/git/hooks/useAutoExitEmptyDiff";
 import { useBranchSwitcherShortcut } from "@/features/git/hooks/useBranchSwitcherShortcut";
 import { usePullRequestComposer } from "@/features/git/hooks/usePullRequestComposer";
@@ -324,7 +325,7 @@ export default function MainApp() {
     setSelectedServiceTier(preferredServiceTier);
   }, [preferredServiceTier, threadCodexSelectionKey]);
 
-  const [appView, setAppView] = useState<"home" | "chat" | "plugins">("home");
+  const [appView, setAppView] = useState<"home" | "chat" | "plugins" | "calendar">("home");
   const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);
   const { threads: chatThreads, refetch: refetchChatThreads } = useChatThreads();
 
@@ -335,6 +336,10 @@ export default function MainApp() {
 
   const onSelectPlugins = useCallback(() => {
     setAppView("plugins");
+  }, []);
+
+  const onSelectCalendar = useCallback(() => {
+    setAppView("calendar");
   }, []);
 
   const onSelectThread = useCallback((sessionKey: string) => {
@@ -1732,6 +1737,8 @@ export default function MainApp() {
       onNewChat,
       onSelectThread,
       onSelectPlugins,
+      onSelectCalendar,
+      activeNavId: appView === "calendar" ? "calendar" : appView === "plugins" ? "plugins" : null,
       chatThreads,
       refetchChatThreads,
     },
@@ -1811,12 +1818,22 @@ export default function MainApp() {
       selectedPullRequestNumber: selectedPullRequest?.number ?? null,
     },
     appLayout: {
-      showHome: showHome && appView !== "chat" && appView !== "plugins",
-      centerMode: appView === "chat" ? "chat" : appView === "plugins" ? "plugins" : centerMode,
+      showHome: showHome && appView !== "chat" && appView !== "plugins" && appView !== "calendar",
+      centerMode:
+        appView === "chat"
+          ? "chat"
+          : appView === "plugins"
+            ? "plugins"
+            : appView === "calendar"
+              ? "calendar"
+              : centerMode,
       preloadGitDiffs: appSettings.preloadGitDiffs,
       splitChatDiffView: appSettings.splitChatDiffView,
       hasActivePlan: hasActivePlan,
-      activeWorkspace: (Boolean(activeWorkspace) || appView === "chat") && appView !== "plugins",
+      activeWorkspace:
+        (Boolean(activeWorkspace) || appView === "chat") &&
+        appView !== "plugins" &&
+        appView !== "calendar",
       sidebarNode,
       messagesNode: mainMessagesNode,
       composerNode,
@@ -1825,6 +1842,7 @@ export default function MainApp() {
       errorToastsNode,
       homeNode,
       pluginsNode: appView === "plugins" ? <PluginsView /> : null,
+      dashboardNode: appView === "calendar" ? <Dashboard /> : null,
       gitDiffPanelNode,
       gitDiffViewerNode,
       planPanelNode,
