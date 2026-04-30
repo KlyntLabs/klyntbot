@@ -271,8 +271,23 @@ impl SignalConsumer for IngestionConsumer {
                             // exist in memory and never reach the FTS5
                             // index used by recall.
                             if let Some(repo) = fact_repo {
-                                // Reuse `user_name` from the pre-extraction
-                                // lookup above for cross-turn mirroring.
+                                // RE-lookup user_name AFTER extraction. The
+                                // pre-extraction lookup is best-effort for
+                                // prompt context, but turn N's spawn often
+                                // races ahead of turn N-1's write — so the
+                                // pre-lookup returns None and the mirror
+                                // skips. By re-querying here, the natural
+                                // 2-4s LLM call gave turn N-1 time to land.
+                                let user_name = repo
+                                    .find_by_subject_predicate("user", "name")
+                                    .await
+                                    .ok()
+                                    .and_then(|rows| {
+                                        rows.into_iter()
+                                            .find(|f| f.superseded_at.is_none())
+                                            .map(|f| f.object)
+                                    })
+                                    .or(user_name);
                                 let mut written = 0usize;
                                 for ext in &result.extractions {
                                     for f in &ext.facts {

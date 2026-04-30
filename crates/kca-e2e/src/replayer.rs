@@ -78,11 +78,15 @@ impl ReplayContext {
             self.turn_latencies_ms.push(elapsed);
             measurements.turn_latencies_ms.push(elapsed);
             measurements.turns_replayed += 1;
+            // Per-turn sync: wait for THIS turn's extraction to land
+            // before publishing the next. Without this, turn N+1's
+            // IngestionConsumer races ahead of turn N's `user→name`
+            // write and the cross-turn identity-binding mirror skips,
+            // losing facts like `Alice→lives_in=SF` even though the
+            // raw `user→lives_in=SF` is in the store.
+            self.await_cognitive_idle().await;
         }
-        // Cognitive extraction runs on a 3s background batch window. The
-        // streaming reply finishes long before facts are persisted, so a
-        // bench query fired immediately would race against the extractor.
-        // Wait until the fact store stops growing before returning.
+        // One final settle in case the last turn left work in flight.
         self.await_cognitive_idle().await;
         Ok(measurements)
     }

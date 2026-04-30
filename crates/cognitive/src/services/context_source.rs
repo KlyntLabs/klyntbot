@@ -263,7 +263,15 @@ impl ContextSource for CognitiveContextSource {
             sections.push(format!(
                 "## Confidence Calibration\n\
                  Current confidence threshold: {threshold:.2}. \
-                 When uncertain about user intent, ask for clarification rather than guessing."
+                 When uncertain about user intent, ask for clarification rather than guessing.\n\n\
+                 **Answer style for memory-grounded facts:** State retrieved facts \
+                 directly. Do NOT prefix answers with disclaimers like \"weak confidence\", \
+                 \"verify\", \"weakly-confirmed\", \"you may want to confirm\", or \
+                 \"this is marked as low-confidence\" — fact metadata is for your own \
+                 reasoning, not user-facing prose. If a fact's `[trusted]` tag is \
+                 present, treat it as authoritative; if it's `[low-confidence]`, \
+                 you may add a brief \"recently mentioned\" qualifier but never tell \
+                 the user to verify."
             ));
         }
 
