@@ -169,7 +169,7 @@ async fn streaming_emits_done_event() {
     let agent_loop = Arc::new(build_test_agent(bus, provider, config).await);
 
     let streaming_handle = agent_loop
-        .process_direct_streaming("Hello".to_string(), "test:stream1".to_string())
+        .process_direct_streaming("Hello".to_string(), "test:stream1".to_string(), None)
         .await
         .unwrap();
 
@@ -210,7 +210,7 @@ async fn streaming_emits_error_on_failure() {
     let agent_loop = Arc::new(build_test_agent(bus, provider, config).await);
 
     let streaming_handle = agent_loop
-        .process_direct_streaming("Hello".to_string(), "test:stream2".to_string())
+        .process_direct_streaming("Hello".to_string(), "test:stream2".to_string(), None)
         .await
         .unwrap();
 

@@ -126,6 +126,7 @@ linkme = "0.3"
 
 # Shared external dependencies (version pinned at workspace level)
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "time", "sync", "io-util", "net", "signal", "fs", "process"] }
+tokio-test = "0.4"
 sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "sqlite", "migrate", "uuid", "json"] }
 quick-xml = "0.36"
 async-trait = "0.1.89"
@@ -261,6 +262,7 @@ serde.workspace = true
 klynt-core.workspace = true
 klynt-execpolicy.workspace = true
 proptest.workspace = true
+tokio-test.workspace = true
 
 [profile.dev]
 opt-level = 0

@@ -44,6 +44,7 @@ import type {
 const DEV_SSE_BASE = "http://127.0.0.1:3456";
 
 type ApprovalItem = Extract<ConversationItem, { kind: "approval" }>;
+type DiffItem = Extract<ConversationItem, { kind: "diff" }>;
 const EMPTY_APPROVALS: ApprovalItem[] = [];
 
 function qualifiedToolName(name: string, action?: string): string {
@@ -152,6 +153,7 @@ class ChatStreamStore {
   private rafIds = new Map<string, number>();
   private onDoneCallbacks = new Map<string, Set<() => void>>();
   private approvalsBySession = new Map<string, ApprovalItem[]>();
+  private fileEditsBySession = new Map<string, DiffItem[]>();
   private listenersInitialized = false;
 
   constructor() {
@@ -221,6 +223,18 @@ class ChatStreamStore {
   /** Get pending approvals for a session. */
   getApprovals(sessionKey: string): ApprovalItem[] {
     return this.approvalsBySession.get(sessionKey) ?? EMPTY_APPROVALS;
+  }
+
+  /** Get file edit diffs for a session. */
+  getFileEdits(sessionKey: string): DiffItem[] {
+    return this.fileEditsBySession.get(sessionKey) ?? [];
+  }
+
+  /** Insert a file edit diff for a session. */
+  upsertFileEdit(sessionKey: string, item: DiffItem): void {
+    const existing = this.fileEditsBySession.get(sessionKey) ?? [];
+    this.fileEditsBySession.set(sessionKey, [...existing, item]);
+    this.notify();
   }
 
   /** Insert or update an approval request for a session. */
@@ -410,6 +424,9 @@ class ChatStreamStore {
     on<DebateJudgeDecisionPayload>("agent:debate_judge_decision", (p) =>
       this.onDebateJudgeDecision(p),
     );
+    on<{ path: string; op: string; bytes: number; diff: string }>("agent:file_edit_with_symbols", (p) =>
+      this.onFileEditWithSymbols(p),
+    );
   }
 
   private initTauriListeners(): void {
@@ -471,6 +488,9 @@ class ChatStreamStore {
       );
       register<DebateJudgeDecisionPayload>("agent:debate_judge_decision", (p) =>
         this.onDebateJudgeDecision(p),
+      );
+      register<{ path: string; op: string; bytes: number; diff: string }>("agent:file_edit_with_symbols", (p) =>
+        this.onFileEditWithSymbols(p),
       );
     });
   }
@@ -949,6 +969,30 @@ class ChatStreamStore {
         },
       ],
     }));
+  }
+
+  private onFileEditWithSymbols(payload: { path: string; op: string; bytes: number; diff: string }): void {
+    // File edits are shown even when not actively streaming (they're historical)
+    const id = `diff-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const item: DiffItem = {
+      id, kind: "diff",
+      title: payload.path.split("/").pop() ?? payload.path,
+      diff: payload.diff,
+      path: payload.path,
+      op: payload.op as DiffItem["op"],
+      bytes: payload.bytes,
+    };
+    // Attach to the most recent active session if we can infer one;
+    // otherwise the hook will route by sessionKey explicitly.
+    const sessionKey = this.inferActiveSessionKey() ?? "global";
+    this.upsertFileEdit(sessionKey, item);
+  }
+
+  private inferActiveSessionKey(): string | null {
+    for (const [key, state] of this.states) {
+      if (state.isStreaming) return key;
+    }
+    return null;
   }
 }
 

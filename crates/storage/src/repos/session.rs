@@ -520,4 +520,14 @@ impl SessionRepo {
             .await?;
         Ok(())
     }
+
+    /// Update the approval mode for a session.
+    pub async fn update_approval_mode(&self, key: &str, mode: &str) -> Result<(), StorageError> {
+        sqlx::query("UPDATE sessions SET approval_mode = ?1 WHERE key = ?2")
+            .bind(mode)
+            .bind(key)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
 }

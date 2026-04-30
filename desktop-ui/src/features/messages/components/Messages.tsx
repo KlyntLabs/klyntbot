@@ -4,6 +4,7 @@ import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import { memo, useCallback } from "react";
 import { useApprovalQueue } from "@/features/coding/hooks/useApprovalQueue";
+import { useFileEditEvents } from "@/features/coding/hooks/useFileEditEvents";
 import type {
   ConversationItem,
   OpenAppTarget,
@@ -76,6 +77,7 @@ export const Messages = memo(function Messages({
   onApprovalRespond,
 }: MessagesProps) {
   const { respond: approvalRespond } = useApprovalQueue(threadId ?? "");
+  useFileEditEvents(threadId ?? "");
   const handleApprovalRespond = onApprovalRespond ?? approvalRespond;
   const activeUserInputRequestId =
     threadId && userInputRequests.length

@@ -667,7 +667,7 @@ impl VoiceConversationManager {
 
         let streaming_handle = match self
             .agent
-            .process_direct_streaming(transcript_text, session_key_str.clone())
+            .process_direct_streaming(transcript_text, session_key_str.clone(), None)
             .await
         {
             Ok(handle) => handle,
