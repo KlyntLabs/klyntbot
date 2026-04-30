@@ -1826,9 +1826,8 @@ impl AppCore {
                 .clone()
                 .unwrap_or_else(|| Arc::new(bus::DomainEventBus::new(64)));
 
-            let cwd = config_guard.coding_memory.workspace_root.clone()
-                .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
-            let event_tx: Option<tokio::sync::mpsc::Sender<agent::events::AgentEvent>> = None;
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let event_tx: Option<tokio::sync::mpsc::Sender<::agent::events::AgentEvent>> = None;
 
             let reg = core.agent.tool_registry();
             let mut registry = reg.write().await;

@@ -271,9 +271,9 @@ async chatMessages(sessionKey: string, limit: number | null) : Promise<Result<Ch
     else return { status: "error", error: e  as any };
 }
 },
-async chatSend(content: string, sessionKey: string, context: SessionContextInput | null) : Promise<Result<ChatMessageResponse, ApiError>> {
+async chatSend(content: string, sessionKey: string, context: SessionContextInput | null, mode: string | null) : Promise<Result<ChatMessageResponse, ApiError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("chat_send", { content, sessionKey, context }) };
+    return { status: "ok", data: await TAURI_INVOKE("chat_send", { content, sessionKey, context, mode }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -5001,9 +5001,9 @@ export type WindowAction = "leftHalf" | "rightHalf" | "topHalf" | "bottomHalf" |
  */
 export type WireEventDto = { id: string; source: string; sessionId: string; kind: string; occurredAt: string; 
 /**
- * Structured payload when `payload` parsed as JSON; empty string otherwise.
+ * Structured payload when `payload` parsed as JSON; `null` otherwise.
  */
-payloadDecoded: string; 
+payloadDecoded: unknown; 
 /**
  * Raw JSON string (always present, exactly as stored in `ingest_event_log`).
  */
