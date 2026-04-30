@@ -897,7 +897,8 @@ impl AgentLoop {
     ) -> Result<String> {
         let history_messages = Self::convert_history(&history);
         let (tool_defs, _tool_names) = self.get_tool_info().await;
-        let channel = common::coding_channel::Channel::from_name(routing_ctx.channel.as_str());
+        let channel = common::tool_channel::Channel::from_name(routing_ctx.channel.as_str());
+        let registry = self.tool_registry.read().await;
         let filtered_defs: Arc<Vec<serde_json::Value>> = Arc::new(
             tool_defs
                 .iter()
@@ -907,11 +908,15 @@ impl AgentLoop {
                         .and_then(|f| f.get("name"))
                         .and_then(|n| n.as_str())
                         .unwrap_or("");
-                    common::available_for_channel(name, channel)
+                    registry
+                        .get(name)
+                        .map(|tool| tool.allowed_channels().allows(channel))
+                        .unwrap_or(true)
                 })
                 .cloned()
                 .collect(),
         );
+        drop(registry);
 
         let result = self
             .runtime

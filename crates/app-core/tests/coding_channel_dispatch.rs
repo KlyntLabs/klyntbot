@@ -1,4 +1,4 @@
-use common::coding_channel::Channel;
+use common::tool_channel::Channel;
 use common::{ChannelName, CODING_CHANNEL};
 
 #[test]

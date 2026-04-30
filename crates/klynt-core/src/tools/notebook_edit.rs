@@ -35,7 +35,8 @@ pub struct NotebookEditArgs {
     permission = "elevated",
     category = "FileSystem",
     cost = "Free",
-    tags = "notebook,jupyter,coding"
+    tags = "notebook,jupyter,coding",
+    allowed_channels = "coding_only"
 )]
 pub struct NotebookEditTool {
     cwd: PathBuf,

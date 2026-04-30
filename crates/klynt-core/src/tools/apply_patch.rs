@@ -34,7 +34,8 @@ pub struct ApplyPatchArgs {
     permission = "elevated",
     category = "FileSystem",
     cost = "Free",
-    tags = "fs,patch,coding"
+    tags = "fs,patch,coding",
+    allowed_channels = "coding_only"
 )]
 pub struct ApplyPatchTool {
     cwd: PathBuf,

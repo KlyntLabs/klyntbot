@@ -32,7 +32,8 @@ pub struct BashArgs {
     description = "Run a shell command in a sandboxed bash session. \
                    Approval and sandbox rules apply. Output is captured and \
                    truncated to 50KB.",
-    params = "BashArgs"
+    params = "BashArgs",
+    allowed_channels = "coding_only"
 )]
 pub struct BashTool {
     layer1: Arc<Layer1>,

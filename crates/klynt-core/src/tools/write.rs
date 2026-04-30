@@ -33,7 +33,8 @@ pub struct WriteArgs {
     permission = "elevated",
     category = "FileSystem",
     cost = "Free",
-    tags = "fs,write,coding"
+    tags = "fs,write,coding",
+    allowed_channels = "coding_only"
 )]
 pub struct WriteTool {
     cwd: PathBuf,

@@ -30,6 +30,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut tags: Option<String> = None;
     let mut cost: Option<String> = None;
     let mut concurrency_safe: Option<bool> = None;
+    let mut allowed_channels: Option<String> = None;
 
     for attr in &input.attrs {
         if attr.path().is_ident("tool") {
@@ -88,6 +89,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
                                     concurrency_safe = Some(matches!(s.value().as_str(), "true" | "1"));
                                 }
                             }
+                        } else if nv.path.is_ident("allowed_channels") {
+                            if let syn::Expr::Lit(lit) = &nv.value {
+                                if let Lit::Str(s) = &lit.lit {
+                                    allowed_channels = Some(s.value());
+                                }
+                            }
                         }
                     }
                 }
@@ -131,6 +138,26 @@ pub fn derive(input: TokenStream) -> TokenStream {
         _ => quote! {},
     };
 
+    let allowed_channels_impl = if let Some(channels) = allowed_channels {
+        let mask_expr = match channels.as_str() {
+            "coding_only"   => quote! { ::common::ChannelMask::CODING_ONLY },
+            "desktop_only"  => quote! { ::common::ChannelMask::DESKTOP_ONLY },
+            "non_coding"    => quote! { ::common::ChannelMask::NON_CODING },
+            "all"           => quote! { ::common::ChannelMask::ALL },
+            other => panic!(
+                "#[tool(allowed_channels = \"{}\")] is invalid. Use \"all\", \"coding_only\", \"desktop_only\", or \"non_coding\"",
+                other
+            ),
+        };
+        quote! {
+            fn allowed_channels(&self) -> ::common::ChannelMask {
+                #mask_expr
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let expanded = quote! {
         #[::async_trait::async_trait]
         impl ::tools_core::Tool for #name {
@@ -158,6 +185,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
             #permission_impl
             #metadata_impl
             #concurrency_impl
+            #allowed_channels_impl
         }
     };
 

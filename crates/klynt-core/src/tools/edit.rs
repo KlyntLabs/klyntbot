@@ -35,7 +35,8 @@ pub struct EditArgs {
     permission = "elevated",
     category = "FileSystem",
     cost = "Free",
-    tags = "fs,edit,coding"
+    tags = "fs,edit,coding",
+    allowed_channels = "coding_only"
 )]
 pub struct EditTool {
     cwd: PathBuf,
