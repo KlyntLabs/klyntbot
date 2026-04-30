@@ -1,0 +1,10 @@
+{
+  "agent_id": "sub-aaa",
+  "subagent_type": "coder",
+  "status": "idle",
+  "description": "Fixture subagent",
+  "created_at": 1777454500.0,
+  "updated_at": 1777454510.0,
+  "last_task_id": null,
+  "launch_spec": {"agent_id":"sub-aaa","subagent_type":"coder","model_override":null,"effective_model":null,"created_at":1777454500.0}
+}

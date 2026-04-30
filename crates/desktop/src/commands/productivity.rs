@@ -282,7 +282,7 @@ pub async fn distraction_respond(
             let _ = state.productivity_focus_end(None).await;
         }
         other => {
-            tracing::warn!("unknown distraction_respond action: {other}");
+            ::tracing::warn!("unknown distraction_respond action: {other}");
         }
     }
     Ok(())

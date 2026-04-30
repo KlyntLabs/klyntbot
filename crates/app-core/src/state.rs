@@ -182,6 +182,7 @@ pub struct AppCore {
     pub repo_roots: Arc<std::sync::RwLock<std::collections::HashMap<String, std::path::PathBuf>>>,
     /// Pending coding approval requests keyed by request_id.
     pub pending_approvals: Arc<klynt_core::approval::PendingApprovalsMap>,
+    pub tracing_registry: std::sync::Arc<crate::tracing::TracingRegistry>,
 }
 
 impl AppCore {
@@ -352,6 +353,10 @@ impl AppCore {
         self.pending_memory_repo
             .as_ref()
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Pending memory repo not available"))
+    }
+
+    pub fn tracing_registry(&self) -> &std::sync::Arc<crate::tracing::TracingRegistry> {
+        &self.tracing_registry
     }
 
     /// Approve a pending memory: deserialize fact, upsert to semantic_facts, remove from pending.

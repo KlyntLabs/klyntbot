@@ -1,0 +1,5 @@
+{"role":"_system_prompt","content":"You are Kimi Code CLI."}
+{"role":"user","content":"hello fixture"}
+{"role":"assistant","content":"all done"}
+{"role":"_usage","input_tokens":11706,"output_tokens":106}
+{"role":"_checkpoint","at_message_index":3}

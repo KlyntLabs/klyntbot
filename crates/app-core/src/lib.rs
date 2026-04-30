@@ -10,6 +10,8 @@ pub mod infrastructure;
 pub mod init;
 pub mod journey;
 pub mod state;
+pub mod tracing;
+pub mod tracing_handlers;
 pub mod wake_orchestrator;
 
 pub use events::AppEventEmitter;

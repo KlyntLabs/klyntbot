@@ -69,6 +69,17 @@ impl WorkdirIndex {
     pub async fn get(&self, hash: &str) -> Option<PathBuf> {
         self.map.read().await.get(hash).cloned()
     }
+
+    /// Snapshot of `(hash, cwd)` entries. Cheap clone for callers that
+    /// want to iterate without holding the read lock.
+    pub async fn entries(&self) -> Vec<(String, std::path::PathBuf)> {
+        self.map
+            .read()
+            .await
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
 }
 
 /// Compute the directory-name hash kimi assigns to a `(work_dir, kaos)` pair.
@@ -131,5 +142,24 @@ mod tests {
             idx.get(&h).await.unwrap(),
             std::path::PathBuf::from("/tmp/kimi-fixture-repo")
         );
+    }
+
+    #[tokio::test]
+    async fn entries_returns_loaded_pairs() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("kimi.json");
+        std::fs::write(
+            &path,
+            r#"{"work_dirs":[
+                {"path":"/tmp/a","kaos":"local","last_session_id":null},
+                {"path":"/tmp/b","kaos":"local","last_session_id":null}
+            ]}"#,
+        )
+        .unwrap();
+        let idx = WorkdirIndex::new();
+        idx.refresh(&path).await.unwrap();
+        let mut e = idx.entries().await;
+        e.sort();
+        assert_eq!(e.len(), 2);
     }
 }
