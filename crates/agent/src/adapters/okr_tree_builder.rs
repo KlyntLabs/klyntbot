@@ -18,39 +18,33 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, info, warn};
 
-use bus::{
-    ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, DomainEventBus,
-    UpdatePriority,
-};
-use cognitive::TextEmbedder;
+use bus::{ContextUpdateReason, DomainEvent};
+
 use context_engine::book_index::types::{SourceType, TreeNode, TreeNodeType};
-use context_engine::book_index::BookTreeRepo;
+
+use super::tree_builder_base::{run_event_loop, TreeBuilderCore};
 
 pub struct OkrTreeBuilder {
-    tree_repo: Arc<dyn BookTreeRepo>,
-    vector_store: Arc<storage::VectorStore>,
-    embedder: Arc<dyn TextEmbedder>,
-    context_update_queue: Option<Arc<ContextUpdateQueue>>,
-    #[allow(dead_code)]
-    domain_event_bus: Option<Arc<DomainEventBus>>,
+    core: TreeBuilderCore,
 }
 
 impl OkrTreeBuilder {
     pub fn new(
-        tree_repo: Arc<dyn BookTreeRepo>,
+        tree_repo: Arc<dyn context_engine::book_index::BookTreeRepo>,
         vector_store: Arc<storage::VectorStore>,
-        embedder: Arc<dyn TextEmbedder>,
-        context_update_queue: Option<Arc<ContextUpdateQueue>>,
-        domain_event_bus: Option<Arc<DomainEventBus>>,
+        embedder: Arc<dyn cognitive::TextEmbedder>,
+        context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
+        domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     ) -> Self {
         Self {
-            tree_repo,
-            vector_store,
-            embedder,
-            context_update_queue,
-            domain_event_bus,
+            core: TreeBuilderCore::new(
+                tree_repo,
+                vector_store,
+                embedder,
+                context_update_queue,
+                domain_event_bus,
+            ),
         }
     }
 
@@ -58,33 +52,13 @@ impl OkrTreeBuilder {
     /// appends tree nodes for each progress update.
     pub async fn run(
         self: Arc<Self>,
-        mut rx: broadcast::Receiver<DomainEvent>,
+        rx: broadcast::Receiver<DomainEvent>,
         shutdown: CancellationToken,
     ) {
-        info!("OkrTreeBuilder: subscriber started");
-
-        loop {
-            tokio::select! {
-                _ = shutdown.cancelled() => {
-                    info!("OkrTreeBuilder: shutdown received");
-                    break;
-                }
-                result = rx.recv() => {
-                    match result {
-                        Ok(_) => {
-                            // Not an OKR event — ignore.
-                        }
-                        Err(broadcast::error::RecvError::Lagged(n)) => {
-                            warn!("OkrTreeBuilder: lagged, skipped {n} events");
-                        }
-                        Err(broadcast::error::RecvError::Closed) => {
-                            info!("OkrTreeBuilder: event channel closed");
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        // Currently no events are handled; the loop preserves the subscription
+        // so future OKR event wiring can be added here without changing the
+        // outer shell.
+        run_event_loop("OkrTreeBuilder", rx, shutdown, |_event| async {}).await
     }
 
     /// Handle a goal progress event: upsert the global OKR root and per-objective
@@ -99,7 +73,7 @@ impl OkrTreeBuilder {
         let obj_id = format!("okr-obj-{objective_id}");
         let progress_id = format!("okr-progress-{objective_id}-{date}");
 
-        debug!(
+        tracing::debug!(
             objective_id = %objective_id,
             progress,
             target,
@@ -110,95 +84,18 @@ impl OkrTreeBuilder {
         let nodes =
             build_goal_progress_nodes(objective_id, &obj_id, &progress_id, progress, target);
 
-        self.persist_nodes(&nodes, objective_id).await
-    }
-
-    /// Persist nodes: insert each one (ignoring duplicate-ID errors for
-    /// idempotent root/objective nodes), embed leaf nodes, push context update,
-    /// and emit TreeNodesRebuilt.
-    async fn persist_nodes(&self, nodes: &[TreeNode], source_id: &str) -> common::Result<()> {
-        let mut inserted = Vec::new();
-
-        for node in nodes {
-            match self.tree_repo.insert_node(node).await {
-                Ok(()) => inserted.push(node),
-                Err(_) => {
-                    // Duplicate key — node already exists. Expected for the global
-                    // OKR root and per-objective section nodes.
-                    debug!(
-                        node_id = %node.id,
-                        "OkrTreeBuilder: node already exists, skipping insert"
-                    );
-                }
-            }
-        }
-
-        // Embed newly inserted nodes.
-        let mut embedded_count = 0_usize;
-        for node in &inserted {
-            let embed_text = compose_embedding_text(node);
-            if embed_text.is_empty() {
-                continue;
-            }
-            match self.embedder.embed(&embed_text).await {
-                Ok(embedding) => {
-                    let level_str = node.level.to_string();
-                    if let Err(e) = self
-                        .vector_store
-                        .upsert_tree_node_embedding(
-                            &node.id,
-                            &embedding,
-                            source_id,
-                            &level_str,
-                            node.source_type.as_str(),
-                        )
-                        .await
-                    {
-                        warn!(
-                            node_id = %node.id,
-                            "OkrTreeBuilder: failed to upsert embedding: {e}"
-                        );
-                    } else {
-                        embedded_count += 1;
-                    }
-                }
-                Err(e) => {
-                    warn!(
-                        node_id = %node.id,
-                        "OkrTreeBuilder: failed to generate embedding: {e}"
-                    );
-                }
-            }
-        }
-
-        // TreeNodesRebuilt variant deleted; EntityTreeLinker no-op.
-
-        // Push context update for live injection.
-        if let Some(queue) = &self.context_update_queue {
-            queue.push(ContextUpdate {
-                reason: ContextUpdateReason::Custom("goal_progress_updated".to_string()),
-                content: Some(format!(
-                    "OKR tree updated: {} new node(s) for objective {source_id}",
-                    inserted.len()
+        self.core
+            .persist_nodes(
+                "OkrTreeBuilder",
+                &nodes,
+                objective_id,
+                ContextUpdateReason::Custom("goal_progress_updated".to_string()),
+                Some(format!(
+                    "OKR tree updated: {} new node(s) for objective {objective_id}",
+                    nodes.len()
                 )),
-                metadata: Some(serde_json::json!({
-                    "source_id": source_id,
-                    "inserted_count": inserted.len(),
-                    "embedded_count": embedded_count,
-                })),
-                priority: UpdatePriority::Low,
-                timestamp: jiff::Timestamp::now(),
-            });
-        }
-
-        info!(
-            source_id = %source_id,
-            inserted_count = inserted.len(),
-            embedded_count,
-            "OkrTreeBuilder: nodes persisted"
-        );
-
-        Ok(())
+            )
+            .await
     }
 }
 
@@ -271,26 +168,69 @@ pub fn build_goal_progress_nodes(
 }
 
 // ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-/// Compose embedding text for an OKR tree node.
-/// Level 0: title only; Level 1: objective title; Level 2+: progress content.
-fn compose_embedding_text(node: &TreeNode) -> String {
-    match node.level {
-        0 => node.title.as_deref().unwrap_or("").to_string(),
-        1 => node.title.as_deref().unwrap_or(&node.content).to_string(),
-        _ => node.content.clone(),
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::tree_builder_base::compose_embedding_text;
+
+    // --- compose_embedding_text ---
+
+    #[test]
+    fn embedding_level_0_returns_title() {
+        let node = TreeNode {
+            id: "okr-root".into(),
+            parent_id: None,
+            node_type: TreeNodeType::Section,
+            content: "okr-root".into(),
+            title: Some("Goals & Objectives".into()),
+            level: 0,
+            source_type: SourceType::Okr,
+            source_id: "okr-root".into(),
+            position: 0,
+            metadata: None,
+        };
+        assert_eq!(compose_embedding_text(&node), "Goals & Objectives");
+    }
+
+    #[test]
+    fn embedding_level_1_returns_objective_title() {
+        let node = TreeNode {
+            id: "okr-obj-foo".into(),
+            parent_id: Some("okr-root".into()),
+            node_type: TreeNodeType::Section,
+            content: "foo-objective".into(),
+            title: Some("foo-objective".into()),
+            level: 1,
+            source_type: SourceType::Okr,
+            source_id: "foo-objective".into(),
+            position: 1,
+            metadata: None,
+        };
+        assert_eq!(compose_embedding_text(&node), "foo-objective");
+    }
+
+    #[test]
+    fn embedding_level_2_returns_content() {
+        let node = TreeNode {
+            id: "okr-progress-foo-2024-01-15".into(),
+            parent_id: Some("okr-obj-foo".into()),
+            node_type: TreeNodeType::Text,
+            content: "Progress: 75% toward 1 (current: 0.75)".into(),
+            title: None,
+            level: 2,
+            source_type: SourceType::Okr,
+            source_id: "foo-objective".into(),
+            position: 2,
+            metadata: None,
+        };
+        assert_eq!(
+            compose_embedding_text(&node),
+            "Progress: 75% toward 1 (current: 0.75)"
+        );
+    }
 
     // --- build_goal_progress_nodes ---
 
@@ -385,61 +325,5 @@ mod tests {
         for node in &nodes {
             assert_eq!(node.source_type.as_str(), "okr");
         }
-    }
-
-    // --- compose_embedding_text ---
-
-    #[test]
-    fn embedding_level_0_returns_title() {
-        let node = TreeNode {
-            id: "okr-root".into(),
-            parent_id: None,
-            node_type: TreeNodeType::Section,
-            content: "okr-root".into(),
-            title: Some("Goals & Objectives".into()),
-            level: 0,
-            source_type: SourceType::Okr,
-            source_id: "okr-root".into(),
-            position: 0,
-            metadata: None,
-        };
-        assert_eq!(compose_embedding_text(&node), "Goals & Objectives");
-    }
-
-    #[test]
-    fn embedding_level_1_returns_objective_title() {
-        let node = TreeNode {
-            id: "okr-obj-foo".into(),
-            parent_id: Some("okr-root".into()),
-            node_type: TreeNodeType::Section,
-            content: "foo-objective".into(),
-            title: Some("foo-objective".into()),
-            level: 1,
-            source_type: SourceType::Okr,
-            source_id: "foo-objective".into(),
-            position: 1,
-            metadata: None,
-        };
-        assert_eq!(compose_embedding_text(&node), "foo-objective");
-    }
-
-    #[test]
-    fn embedding_level_2_returns_content() {
-        let node = TreeNode {
-            id: "okr-progress-foo-2024-01-15".into(),
-            parent_id: Some("okr-obj-foo".into()),
-            node_type: TreeNodeType::Text,
-            content: "Progress: 75% toward 1 (current: 0.75)".into(),
-            title: None,
-            level: 2,
-            source_type: SourceType::Okr,
-            source_id: "foo-objective".into(),
-            position: 2,
-            metadata: None,
-        };
-        assert_eq!(
-            compose_embedding_text(&node),
-            "Progress: 75% toward 1 (current: 0.75)"
-        );
     }
 }

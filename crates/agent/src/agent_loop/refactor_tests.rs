@@ -12,50 +12,12 @@ mod tests {
 
     use async_trait::async_trait;
     use bus::MessageBus;
-    use providers::{ChatParams, LlmResponse, Message, Usage};
+    use providers::ChatParams;
     use tempfile::TempDir;
 
     use crate::agent_loop::AgentLoop;
+    use crate::test_utils::MockProvider;
     use crate::AgentEvent;
-
-    /// Minimal mock LLM provider for unit tests.
-    struct MockProvider {
-        response: String,
-    }
-
-    impl MockProvider {
-        fn new(response: &str) -> Self {
-            Self {
-                response: response.to_string(),
-            }
-        }
-    }
-
-    #[async_trait]
-    impl providers::LlmProvider for MockProvider {
-        async fn chat(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[serde_json::Value]>,
-            _params: &ChatParams,
-        ) -> common::Result<LlmResponse> {
-            Ok(LlmResponse {
-                content: Some(self.response.clone()),
-                tool_calls: vec![],
-                finish_reason: "stop".to_string(),
-                usage: Usage::default(),
-                reasoning_content: None,
-            })
-        }
-
-        fn default_model(&self) -> &str {
-            "mock"
-        }
-
-        fn name(&self) -> &str {
-            "mock"
-        }
-    }
 
     /// Helper: build a minimal AgentLoop for tests.
     /// Returns (agent, bus, tempdir). The builder has already consumed bus.inbound_rx.
@@ -64,7 +26,7 @@ mod tests {
         std::env::set_var("HOME", temp_dir.path());
 
         let bus = Arc::new(MessageBus::new(10));
-        let provider: providers::DynProvider = Arc::new(MockProvider::new(response));
+        let provider: providers::DynProvider = Arc::new(MockProvider::with_text(response));
 
         let mut config = config::Config::default();
         config.agents.defaults.workspace = temp_dir

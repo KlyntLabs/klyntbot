@@ -762,38 +762,10 @@ mod tests {
         }
     }
 
-    struct MockProvider {
-        response: String,
-    }
-
-    #[async_trait::async_trait]
-    impl providers::LlmProvider for MockProvider {
-        async fn chat(
-            &self,
-            _messages: &[providers::Message],
-            _tools: Option<&[serde_json::Value]>,
-            _params: &ChatParams,
-        ) -> std::result::Result<LlmResponse, common::KlyntbotError> {
-            Ok(text_response(&self.response))
-        }
-
-        fn name(&self) -> &str {
-            "mock"
-        }
-
-        fn default_model(&self) -> &str {
-            "mock-model"
-        }
-
-        fn context_window(&self) -> usize {
-            128_000
-        }
-    }
+    use crate::test_utils::MockProvider;
 
     async fn make_runtime(response: &str) -> (AgentRuntime, Arc<RwLock<ToolRegistry>>) {
-        let provider: DynProvider = Arc::new(MockProvider {
-            response: response.to_string(),
-        });
+        let provider: DynProvider = Arc::new(MockProvider::with_text(response).context_window(128_000));
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
         let core = Arc::new(crate::execution::ExecutionCore::new(
             provider,

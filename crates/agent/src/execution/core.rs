@@ -813,67 +813,11 @@ impl ExecutionCore {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use providers::{ChatParams, LlmProvider, LlmResponse, ToolCall, Usage};
+    use crate::test_utils::MockProvider;
+    use providers::{LlmResponse, ToolCall, Usage};
     use serde_json::Value;
-    use std::sync::Mutex;
     use std::time::Duration;
     use tools::Tool;
-
-    // ── Mock provider ────────────────────────────────────────────
-
-    struct MockProvider {
-        responses: Mutex<Vec<LlmResponse>>,
-    }
-
-    impl MockProvider {
-        fn with_text(text: &str) -> Arc<Self> {
-            Arc::new(Self {
-                responses: Mutex::new(vec![LlmResponse {
-                    content: Some(text.to_string()),
-                    tool_calls: vec![],
-                    finish_reason: "stop".to_string(),
-                    usage: Usage::default(),
-                    reasoning_content: None,
-                }]),
-            })
-        }
-
-        fn with_tool_call(name: &str, args: Value) -> Arc<Self> {
-            Arc::new(Self {
-                responses: Mutex::new(vec![LlmResponse {
-                    content: None,
-                    tool_calls: vec![ToolCall {
-                        id: "call_1".to_string(),
-                        name: name.to_string(),
-                        arguments: args,
-                    }],
-                    finish_reason: "tool_calls".to_string(),
-                    usage: Usage::default(),
-                    reasoning_content: None,
-                }]),
-            })
-        }
-    }
-
-    #[async_trait]
-    impl LlmProvider for MockProvider {
-        async fn chat(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[Value]>,
-            _params: &ChatParams,
-        ) -> common::Result<LlmResponse> {
-            let mut responses = self.responses.lock().unwrap();
-            Ok(responses.remove(0))
-        }
-
-        fn default_model(&self) -> &str {
-            "mock"
-        }
-        fn name(&self) -> &str {
-            "mock"
-        }
-    }
 
     // ── Mock tool (fast) ─────────────────────────────────────────
 
@@ -932,7 +876,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_final_response() {
-        let provider = MockProvider::with_text("Hello world");
+        let provider = Arc::new(MockProvider::with_text("Hello world"));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -955,7 +899,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_tool_execution() {
-        let provider = MockProvider::with_tool_call("echo", serde_json::json!({"msg": "test"}));
+        let provider = Arc::new(MockProvider::with_tool_call("echo", serde_json::json!({"msg": "test"})));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -984,7 +928,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_timeout() {
-        let provider = MockProvider::with_tool_call("slow_tool", serde_json::json!({}));
+        let provider = Arc::new(MockProvider::with_tool_call("slow_tool", serde_json::json!({})));
         let registry = make_registry_with(SlowTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -1095,15 +1039,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_empty_response() {
-        let provider = Arc::new(MockProvider {
-            responses: Mutex::new(vec![LlmResponse {
-                content: Some("".to_string()),
-                tool_calls: vec![],
-                finish_reason: "stop".to_string(),
-                usage: Usage::default(),
-                reasoning_content: None,
-            }]),
-        });
+        let provider = Arc::new(MockProvider::with_response(LlmResponse {
+            content: Some("".to_string()),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage::default(),
+            reasoning_content: None,
+        }));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -1124,17 +1066,15 @@ mod tests {
     #[tokio::test]
     async fn test_cycle_detects_fabricated_response() {
         // Provider returns text that looks like a fabricated todo result
-        let provider = Arc::new(MockProvider {
-            responses: Mutex::new(vec![LlmResponse {
-                content: Some(
-                    "I've created the task for you:\n\n**Task Created:** Buy groceries (ID: 9c4e5f3b)\n- **Priority:** P3\n- **Due Date:** Tomorrow".to_string()
-                ),
-                tool_calls: vec![],
-                finish_reason: "stop".to_string(),
-                usage: Usage::default(),
-                reasoning_content: None,
-            }]),
-        });
+        let provider = Arc::new(MockProvider::with_response(LlmResponse {
+            content: Some(
+                "I've created the task for you:\n\n**Task Created:** Buy groceries (ID: 9c4e5f3b)\n- **Priority:** P3\n- **Due Date:** Tomorrow".to_string()
+            ),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage::default(),
+            reasoning_content: None,
+        }));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -1160,7 +1100,7 @@ mod tests {
     #[tokio::test]
     async fn test_cycle_normal_text_not_flagged() {
         let provider =
-            MockProvider::with_text("Sure, I can help you create a task. What would you like?");
+            Arc::new(MockProvider::with_text("Sure, I can help you create a task. What would you like?"));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -1216,19 +1156,17 @@ mod tests {
     #[tokio::test]
     async fn test_content_preserved_with_tool_calls() {
         // Provider returns BOTH content and tool calls
-        let provider = Arc::new(MockProvider {
-            responses: Mutex::new(vec![LlmResponse {
-                content: Some("Let me search for that...".to_string()),
-                tool_calls: vec![ToolCall {
-                    id: "call_1".to_string(),
-                    name: "echo".to_string(),
-                    arguments: serde_json::json!({}),
-                }],
-                finish_reason: "tool_calls".to_string(),
-                usage: Usage::default(),
-                reasoning_content: None,
-            }]),
-        });
+        let provider = Arc::new(MockProvider::with_response(LlmResponse {
+            content: Some("Let me search for that...".to_string()),
+            tool_calls: vec![ToolCall {
+                id: "call_1".to_string(),
+                name: "echo".to_string(),
+                arguments: serde_json::json!({}),
+            }],
+            finish_reason: "tool_calls".to_string(),
+            usage: Usage::default(),
+            reasoning_content: None,
+        }));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 

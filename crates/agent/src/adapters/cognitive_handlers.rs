@@ -1485,82 +1485,8 @@ mod tests {
     use cognitive::situation::UserSituation;
     use cognitive::types::{DEFAULT_MEMORY_TYPE, SemanticFact};
     use feature_coaching::signal_accumulator::TriggerFired;
-    use providers::{LlmResponse, LlmStream, ProviderCapabilities, ProviderHealth, Usage};
-
-    // ── MockProvider ──
-
-    struct MockProvider {
-        response: Result<LlmResponse, String>,
-    }
-
-    impl MockProvider {
-        fn new(response: LlmResponse) -> Self {
-            Self {
-                response: Ok(response),
-            }
-        }
-
-        fn new_error(msg: &str) -> Self {
-            Self {
-                response: Err(msg.into()),
-            }
-        }
-    }
-
-    #[async_trait]
-    impl providers::LlmProvider for MockProvider {
-        async fn chat(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[serde_json::Value]>,
-            _params: &ChatParams,
-        ) -> common::Result<LlmResponse> {
-            match &self.response {
-                Ok(r) => Ok(r.clone()),
-                Err(e) => Err(common::KlyntbotError::Provider(
-                    common::ProviderError::InvalidResponse(e.clone()),
-                )),
-            }
-        }
-
-        async fn chat_stream(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[serde_json::Value]>,
-            _params: &ChatParams,
-        ) -> common::Result<LlmStream> {
-            unimplemented!("mock doesn't support streaming")
-        }
-
-        fn supports_streaming(&self) -> bool {
-            false
-        }
-        fn default_model(&self) -> &str {
-            "mock"
-        }
-        fn name(&self) -> &str {
-            "mock"
-        }
-        fn capabilities(&self) -> ProviderCapabilities {
-            ProviderCapabilities::default()
-        }
-        fn context_window(&self) -> usize {
-            128000
-        }
-        async fn health_check(&self) -> common::Result<ProviderHealth> {
-            Ok(ProviderHealth::Healthy)
-        }
-    }
-
-    fn mock_response(content: &str) -> LlmResponse {
-        LlmResponse {
-            content: Some(content.into()),
-            tool_calls: vec![],
-            finish_reason: "stop".into(),
-            usage: Usage::default(),
-            reasoning_content: None,
-        }
-    }
+    use crate::test_utils::MockProvider;
+    use providers::LlmResponse;
 
     // ── Test helpers ──
 
@@ -1725,9 +1651,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_extraction_parses_json_response() {
-        let mock = Arc::new(MockProvider::new(mock_response(
+        let mock = Arc::new(MockProvider::with_text(
             r#"{"results":[{"observation_index":1,"facts":[{"domain":"energy","subject":"user","predicate":"peak_hours","object":"10am-12pm","confidence":0.85,"source":"observed"}]}]}"#,
-        )));
+        ));
         let params = ChatParams::new("test-model")
             .with_temperature(0.2)
             .with_max_tokens(1024);
@@ -1754,7 +1680,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_extraction_falls_back_on_error() {
-        let mock = Arc::new(MockProvider::new_error("LLM unavailable"));
+        let mock = Arc::new(MockProvider::with_error("LLM unavailable"));
         let params = ChatParams::new("test-model");
         let handler = LlmExtractionHandler::new(mock, params);
 
@@ -1879,7 +1805,7 @@ mod tests {
         use cognitive::services::graph_linker::GraphLinkHandler;
         use cognitive::services::graph_linker_types::*;
 
-        let mock = Arc::new(MockProvider::new(mock_response("not json")));
+        let mock = Arc::new(MockProvider::with_text("not json"));
         let params = ChatParams::new("test-model");
         let handler = LlmGraphLinkHandler::new(mock, params);
 
@@ -1941,7 +1867,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_coaching_reasoner_falls_back() {
-        let mock = Arc::new(MockProvider::new_error("LLM down"));
+        let mock = Arc::new(MockProvider::with_error("LLM down"));
         let params = ChatParams::new("test-model");
         let handler = LlmCoachingReasonerHandler::new(mock, params);
 
@@ -2045,7 +1971,7 @@ mod tests {
             ],
             "notes": null
         }"#;
-        let provider = MockProvider::new(LlmResponse {
+        let provider = MockProvider::with_response(LlmResponse {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
