@@ -271,7 +271,13 @@ impl ContextSource for CognitiveContextSource {
                  reasoning, not user-facing prose. If a fact's `[trusted]` tag is \
                  present, treat it as authoritative; if it's `[low-confidence]`, \
                  you may add a brief \"recently mentioned\" qualifier but never tell \
-                 the user to verify."
+                 the user to verify.\n\n\
+                 **CRITICAL — never claim ignorance about facts shown above.** \
+                 If a fact like `Alice lives_in SF` appears under \"User Understanding\", \
+                 you MUST use it to answer questions about Alice. Saying \"I don't have \
+                 information about where Alice lives\" while that fact is in your context \
+                 is a serious hallucination. Trust the User Understanding section as \
+                 ground truth — it is your memory."
             ));
         }
 

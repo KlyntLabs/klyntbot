@@ -1,6 +1,6 @@
 # KCA Game-Changer Report
 
-Generated: 2026-04-30T02:54:16.997657Z
+Generated: 2026-04-30T04:45:27.787134Z
 
 *Run config: `KCA_BENCH_LIMIT=5`, model from `~/.klyntbot/config.json`, scoring = substring + 80% token-overlap recall.*
 
@@ -24,9 +24,9 @@ Generated: 2026-04-30T02:54:16.997657Z
 
 ## Performance
 
-- Hot-path P50 turn latency: **4066ms**
-- Hot-path P95 turn latency: **8849ms**
-- Long-mem query P95: **8849ms** (real cloud LLM round-trip)
+- Hot-path P50 turn latency: **2773ms**
+- Hot-path P95 turn latency: **8564ms**
+- Long-mem query P95: **8564ms** (real cloud LLM round-trip)
 
 ## Methodology
 

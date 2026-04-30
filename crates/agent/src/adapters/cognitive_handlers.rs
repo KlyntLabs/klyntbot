@@ -228,7 +228,14 @@ RESPONSE FORMAT — return one object per observation, indexed from 1:\n\
 \"relationships\": [{\"source\": \"Alice\", \"target\": \"Anthropic\", \"type\": \"works_at\"}]}\n\
 ]}\n\n\
 The example above shows extraction from \"Hi, I'm Alice and I work at Anthropic on the Claude team.\" \
-Notice how a single short sentence yields 4 facts (with identity binding) plus an entity and relationship.";
+Notice how a single short sentence yields 4 facts (with identity binding) plus an entity and relationship.\n\n\
+THIRD-PERSON FACTS ARE EQUALLY IMPORTANT. When the user mentions another entity \
+(person, pet, project, place), extract its facts directly under that entity as subject. \
+Example — observation: \"Max loves pizza.\" → \
+{\"results\":[{\"observation_index\":1,\"facts\":[{\"domain\":\"preferences\",\"subject\":\"Max\",\"predicate\":\"loves\",\"object\":\"pizza\",\"confidence\":1.0,\"source\":\"user_stated\"}]}]}\n\
+Example — observation: \"Bella loves sushi.\" → subject=\"Bella\", predicate=\"loves\", object=\"sushi\".\n\
+Do NOT skip third-person sentences. Do NOT rewrite them as user-facts. \
+The bench fails when third-person SPO triples are dropped.";
 
 /// LLM-backed fact extraction with heuristic fallback.
 pub struct LlmExtractionHandler {

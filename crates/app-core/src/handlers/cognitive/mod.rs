@@ -112,6 +112,8 @@ pub(crate) fn build_hierarchical_summarizer(
             agent::adapters::cognitive_handlers::LlmHierarchicalSummarizer::new(cp.clone(), params),
         )
     } else {
-        std::sync::Arc::new(cognitive::services::hierarchical_compressor::NoopHierarchicalSummarizer)
+        std::sync::Arc::new(
+            cognitive::services::hierarchical_compressor::NoopHierarchicalSummarizer,
+        )
     }
 }

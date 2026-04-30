@@ -841,8 +841,7 @@ fn register_cron_callbacks(
                             &cog_config,
                         );
                         match cognitive::services::hierarchical_compressor::roll_up_hourly(
-                            &repo,
-                            summarizer,
+                            &repo, summarizer,
                         )
                         .await
                         {
@@ -884,8 +883,7 @@ fn register_cron_callbacks(
                             &cog_config,
                         );
                         match cognitive::services::hierarchical_compressor::roll_up_daily(
-                            &repo,
-                            summarizer,
+                            &repo, summarizer,
                         )
                         .await
                         {
@@ -927,8 +925,7 @@ fn register_cron_callbacks(
                             &cog_config,
                         );
                         match cognitive::services::hierarchical_compressor::roll_up_weekly(
-                            &repo,
-                            summarizer,
+                            &repo, summarizer,
                         )
                         .await
                         {

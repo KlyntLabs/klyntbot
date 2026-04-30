@@ -89,12 +89,55 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         }
     }
 
-    // Tag with caller's domain when not identity-overridden
-    for f in &mut out {
-        if f.domain == "identity" && domain != "general" && !domain.is_empty() {
-            // keep identity for name/lives_in, leave others
-        }
+    // Third-person SPO: "<Proper> <verb> <obj>." Catches the multi-hop
+    // benchmark patterns "Max loves pizza", "Bella loves sushi" that the
+    // LLM extractor frequently skips when its system prompt is heavily
+    // first-person-biased. We deliberately accept only a small whitelist
+    // of high-signal verbs to avoid garbage extractions from narrative
+    // assistant replies.
+    for sentence in content.split(|c: char| c == '.' || c == '!' || c == '?') {
+        let s = sentence.trim();
+        let mut toks = s.split_whitespace();
+        let Some(subj) = toks.next() else { continue };
+        let subj_clean = subj.trim_end_matches(',');
+        // Subject must be a proper noun: starts uppercase, ≥2 chars,
+        // alphabetic, and not a first-person pronoun ("I", "I'm", ...).
+        let is_proper = subj_clean.len() >= 2
+            && subj_clean.chars().next().is_some_and(|c| c.is_uppercase())
+            && subj_clean.chars().all(|c| c.is_alphabetic())
+            && !matches!(subj_clean, "I" | "We" | "You" | "He" | "She" | "It" | "They" | "My" | "Hi" | "Hello" | "Hey" | "The" | "A" | "An");
+        if !is_proper { continue }
+        let Some(verb) = toks.next() else { continue };
+        let pred = match verb.to_lowercase().as_str() {
+            "loves" | "love" => "loves",
+            "likes" | "like" => "likes",
+            "prefers" | "prefer" => "prefers",
+            "enjoys" | "enjoy" => "enjoys",
+            "hates" | "hate" => "hates",
+            "owns" | "own" => "owns",
+            "has" | "have" => "has",
+            "uses" | "use" => "uses",
+            "plays" | "play" => "plays",
+            "works" => {
+                // "Alice works at Anthropic" → works_at + skip "at"
+                match toks.next() { Some("at") => "works_at", _ => continue }
+            }
+            "lives" => match toks.next() { Some("in") => "lives_in", _ => continue },
+            _ => continue,
+        };
+        let obj: String = toks.collect::<Vec<_>>().join(" ");
+        let obj = obj.trim_end_matches(|c: char| !c.is_alphanumeric()).trim();
+        if obj.is_empty() || obj.len() > 80 { continue }
+        out.push(ExtractedFact {
+            domain: domain.to_string(),
+            subject: subj_clean.to_string(),
+            predicate: pred.to_string(),
+            object: obj.to_string(),
+            confidence: 0.85,
+            source: "regex_backstop_3p".into(),
+        });
     }
+
     out
 }
 

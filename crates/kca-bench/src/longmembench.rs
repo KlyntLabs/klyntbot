@@ -33,9 +33,17 @@ pub async fn run_longmembench(path: &Path) -> common::Result<LongMemBenchReport>
     let mut report = LongMemBenchReport::default();
     let mut latencies = Vec::new();
 
+    let debug = std::env::var("KCA_BENCH_DEBUG").is_ok();
     for f in fixtures.iter().take(limit) {
         let mut ctx = ReplayContext::new().await?;
         ctx.replay(f).await?;
+        if debug {
+            let facts = ctx.dump_facts().await;
+            eprintln!("[DEBUG] fixture {} stored {} facts:", f.id, facts.len());
+            for (s, p, o) in &facts {
+                eprintln!("  {s} | {p} | {o}");
+            }
+        }
         for q in &f.queries {
             let started = std::time::Instant::now();
             let answer = ctx
@@ -46,6 +54,12 @@ pub async fn run_longmembench(path: &Path) -> common::Result<LongMemBenchReport>
                 .await?;
             let elapsed = started.elapsed().as_millis() as u64;
             latencies.push(elapsed);
+            if debug {
+                eprintln!(
+                    "[DEBUG] q={:?} gold={:?} answer={:?}",
+                    q.query, q.gold_answer, answer
+                );
+            }
             let correct = scoring::is_answer_correct(&answer, &q.gold_answer);
             let entry = report
                 .by_hop_type
