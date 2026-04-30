@@ -31,7 +31,8 @@ pub struct GrepArgs {
     category = "Search",
     cost = "Free",
     tags = "search,grep,coding",
-    concurrency_safe = "true"
+    concurrency_safe = "true",
+    allowed_channels = "coding_only"
 )]
 pub struct GrepTool {
     cwd: PathBuf,

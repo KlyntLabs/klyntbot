@@ -33,7 +33,8 @@ pub struct WebFetchArgs {
     permission = "standard",
     category = "Web",
     cost = "Low",
-    tags = "web,fetch,coding"
+    tags = "web,fetch,coding",
+    allowed_channels = "coding_only"
 )]
 pub struct WebFetchTool {
     layer1: Arc<Layer1>,

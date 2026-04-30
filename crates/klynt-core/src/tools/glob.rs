@@ -28,7 +28,8 @@ pub struct GlobArgs {
     category = "Search",
     cost = "Free",
     tags = "fs,search,coding",
-    concurrency_safe = "true"
+    concurrency_safe = "true",
+    allowed_channels = "coding_only"
 )]
 pub struct GlobTool {
     cwd: PathBuf,

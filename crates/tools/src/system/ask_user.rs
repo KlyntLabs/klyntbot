@@ -34,6 +34,10 @@ impl Tool for AskUserTool {
          tools in the same turn - it blocks execution until the user responds."
     }
 
+    fn allowed_channels(&self) -> common::ChannelMask {
+        common::ChannelMask::CODING_ONLY
+    }
+
     fn metadata(&self) -> tools_core::ToolMetadata {
         tools_core::ToolMetadata {
             category: tools_core::ToolCategory::Communication,
