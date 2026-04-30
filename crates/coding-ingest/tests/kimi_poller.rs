@@ -69,7 +69,7 @@ async fn poller_ingests_fixture_session() {
     let body = concat!(
         r#"{"timestamp":1777096658.4,"message":{"type":"TurnBegin","payload":{"user_input":[{"type":"text","text":"hi"}]}}}"#,
         "\n",
-        r#"{"timestamp":1777096659.0,"message":{"type":"TextPart","payload":{"text":"hello back"}}}"#,
+        r#"{"timestamp":1777096659.0,"message":{"type":"ContentPart","payload":{"type":"text","text":"hello back"}}}"#,
         "\n",
         r#"{"timestamp":1777096660.0,"message":{"type":"ToolCall","payload":{"id":"c1","function":{"name":"Read","arguments":"{\"path\":\"/x\"}"}}}}"#,
         "\n",

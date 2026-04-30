@@ -92,11 +92,10 @@ mod tests {
 
     #[test]
     fn hash_for_local_is_md5_hex() {
-        // md5("/tmp/kimi-fixture-repo") computed once with `md5sum` for the
-        // golden value — DON'T regenerate, this is a contract test.
+        // md5("/tmp/kimi-fixture-repo") = 5ac861883e2a4565a455cf1bc7fed83e
+        // Golden value computed once with `md5sum` — DON'T regenerate.
         let h = hash_for("/tmp/kimi-fixture-repo", "local");
-        assert_eq!(h.len(), 32);
-        assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_eq!(h, "5ac861883e2a4565a455cf1bc7fed83e");
     }
 
     #[test]

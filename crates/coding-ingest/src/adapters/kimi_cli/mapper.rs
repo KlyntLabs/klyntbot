@@ -51,7 +51,9 @@ pub fn map_event(
     let payload = &collected.payload;
     match collected.kind.as_str() {
         "TurnBegin" => map_turn_begin(payload, &repo, turn_id, session_id, cwd, occurred_at),
-        "TextPart" => map_text_part(state, payload, &repo, turn_id, session_id, cwd, occurred_at),
+        "TextPart" | "ContentPart" => {
+            map_text_part(state, payload, &repo, turn_id, session_id, cwd, occurred_at)
+        }
         "ToolCall" => {
             buffer_tool_call(state, payload, occurred_at);
             vec![]
@@ -63,7 +65,11 @@ pub fn map_event(
             update_status(state, payload);
             vec![]
         }
-        "TurnEnd" | "StepBegin" | "StepInterrupted" | "CompactionBegin" | "CompactionEnd"
+        "TurnEnd" => {
+            state.pending_tools.clear();
+            vec![]
+        }
+        "StepBegin" | "StepInterrupted" | "CompactionBegin" | "CompactionEnd"
         | "MCPLoadingBegin" | "MCPLoadingEnd" | "HookTriggered" | "HookResolved" | "BtwBegin"
         | "BtwEnd" | "PlanDisplay" | "ImageURLPart" | "AudioURLPart" | "VideoURLPart"
         | "ThinkPart" | "ToolCallPart" | "Notification" | "ApprovalRequest"
@@ -256,10 +262,10 @@ fn update_status(_state: &mut SessionState, payload: &Value) {
                 .and_then(Value::as_u64)
                 .map(|v| v as u32),
         };
-        // Token-usage attachment to the prior AssistantMsg is post-emission
-        // (the row is already in ingest_event_log). Distiller-side enrichment
-        // is parked — recording the parse here keeps the door open without
-        // breaking anything if usage shape drifts.
+        // TODO(distiller): attach token usage to the prior AssistantMsg row.
+        // Token-usage attachment is post-emission (the row is already in
+        // ingest_event_log). Recording the parse here keeps the door open
+        // without breaking anything if usage shape drifts.
     }
 }
 
@@ -291,7 +297,11 @@ fn truncate_preview(s: &str) -> String {
     if s.len() <= PREVIEW_MAX {
         s.to_string()
     } else {
-        format!("{}…[{} bytes]", &s[..PREVIEW_MAX], s.len())
+        let cut = s
+            .char_indices()
+            .nth(PREVIEW_MAX)
+            .map_or(s.len(), |(i, _)| i);
+        format!("{}…[{} bytes]", &s[..cut], s.len())
     }
 }
 
@@ -381,6 +391,77 @@ mod tests {
         let out = map_event(&mut state, &c, &r, "s", Path::new("/tmp"));
         assert_eq!(out.len(), 1);
         assert!(matches!(out[0].kind, EventKind::AssistantMsg { .. }));
+    }
+
+    #[test]
+    fn content_part_emits_assistant_msg() {
+        // Real kimi wire files use "ContentPart" with payload shape
+        // {"type": "text", "text": "..."}.
+        let mut state = SessionState::default();
+        let c = collected(
+            "ContentPart",
+            serde_json::json!({"type": "text", "text": "real assistant text"}),
+        );
+        let r = record(
+            WireEnvelope {
+                kind: "ContentPart".into(),
+                payload: c.payload.clone(),
+            },
+            1.0,
+        );
+        let out = map_event(&mut state, &c, &r, "s", Path::new("/tmp"));
+        assert_eq!(out.len(), 1);
+        match &out[0].kind {
+            EventKind::AssistantMsg { text, .. } => {
+                assert_eq!(text, "real assistant text");
+            }
+            other => panic!("expected AssistantMsg, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn truncate_preview_does_not_panic_on_multibyte() {
+        // 1024-byte boundary falls inside a 3-byte UTF-8 char (€ = 0xe2 0x82 0xac).
+        let s = "€".repeat(600); // 1800 bytes, 600 chars
+        let result = truncate_preview(&s);
+        assert!(result.ends_with("…[1800 bytes]"));
+        // Should not panic — the old &s[..1024] would panic here.
+    }
+
+    #[test]
+    fn turn_end_clears_pending_tools() {
+        let mut state = SessionState::default();
+        // Buffer a ToolCall that will never get a ToolResult.
+        let c1 = collected(
+            "ToolCall",
+            serde_json::json!({"id":"orphan","function":{"name":"Read","arguments":"{}"}}),
+        );
+        let r1 = record(
+            WireEnvelope {
+                kind: "ToolCall".into(),
+                payload: c1.payload.clone(),
+            },
+            1.0,
+        );
+        let out1 = map_event(&mut state, &c1, &r1, "s", Path::new("/tmp"));
+        assert!(out1.is_empty());
+        assert_eq!(state.pending_tools.len(), 1);
+
+        // TurnEnd should clear the orphan so the map doesn't grow forever.
+        let c2 = collected("TurnEnd", serde_json::json!({}));
+        let r2 = record(
+            WireEnvelope {
+                kind: "TurnEnd".into(),
+                payload: c2.payload.clone(),
+            },
+            2.0,
+        );
+        let out2 = map_event(&mut state, &c2, &r2, "s", Path::new("/tmp"));
+        assert!(out2.is_empty());
+        assert!(
+            state.pending_tools.is_empty(),
+            "TurnEnd must flush pending_tools"
+        );
     }
 
     #[test]

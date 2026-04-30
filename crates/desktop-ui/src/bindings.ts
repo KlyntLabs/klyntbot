@@ -4844,9 +4844,9 @@ export type WindowAction = "leftHalf" | "rightHalf" | "topHalf" | "bottomHalf" |
  */
 export type WireEventDto = { id: string; source: string; sessionId: string; kind: string; occurredAt: string; 
 /**
- * Structured payload when `payload` parsed as JSON; empty string otherwise.
+ * Structured payload when `payload` parsed as JSON; `null` otherwise.
  */
-payloadDecoded: string; 
+payloadDecoded: unknown; 
 /**
  * Raw JSON string (always present, exactly as stored in `ingest_event_log`).
  */
