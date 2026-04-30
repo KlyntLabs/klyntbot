@@ -1,6 +1,6 @@
 # KCA Game-Changer Report
 
-Generated: 2026-04-30T02:54:16.997657Z
+Generated: 2026-04-30T03:43:50.008227Z
 
 *Run config: `KCA_BENCH_LIMIT=5`, model from `~/.klyntbot/config.json`, scoring = substring + 80% token-overlap recall.*
 
@@ -10,10 +10,10 @@ Generated: 2026-04-30T02:54:16.997657Z
 |---|---|---|
 | Long-memory | **20.0%** | 2/10 queries correct |
 | LoCoBench single-hop | **0.0%** | — |
-| LoCoBench multi-hop | **0.0%** | — |
+| LoCoBench multi-hop | **20.0%** | — |
 | LoCoBench temporal | **0.0%** | — |
-| Klynt-coding dead-end | **50.0%** | 1/2 |
-| Klynt-coding fix-attempt | **50.0%** | 1/2 |
+| Klynt-coding dead-end | **100.0%** | 2/2 |
+| Klynt-coding fix-attempt | **0.0%** | 0/2 |
 | Klynt-coding multi-CLI | **0.0%** | 0/2 |
 
 ### Long-memory by hop type
@@ -24,9 +24,9 @@ Generated: 2026-04-30T02:54:16.997657Z
 
 ## Performance
 
-- Hot-path P50 turn latency: **4066ms**
-- Hot-path P95 turn latency: **8849ms**
-- Long-mem query P95: **8849ms** (real cloud LLM round-trip)
+- Hot-path P50 turn latency: **3458ms**
+- Hot-path P95 turn latency: **6575ms**
+- Long-mem query P95: **6575ms** (real cloud LLM round-trip)
 
 ## Methodology
 
