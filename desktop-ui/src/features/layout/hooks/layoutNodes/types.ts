@@ -44,9 +44,11 @@ export type SidebarChatProps = {
   onOpenSettings: () => void;
   onNewChat: () => void;
   onSelectPlugins: () => void;
+  onSelectCalendar?: () => void;
   threads: import("@/features/chat/types").ChatThread[];
   selectedSessionKey: string | null;
   onSelectThread: (sessionKey: string) => void;
+  activeNavId?: string | null;
 };
 
 export type LayoutPrimarySurface = {
