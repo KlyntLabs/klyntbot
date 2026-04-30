@@ -271,9 +271,9 @@ async chatMessages(sessionKey: string, limit: number | null) : Promise<Result<Ch
     else return { status: "error", error: e  as any };
 }
 },
-async chatSend(content: string, sessionKey: string, context: SessionContextInput | null) : Promise<Result<ChatMessageResponse, ApiError>> {
+async chatSend(content: string, sessionKey: string, context: SessionContextInput | null, mode: string | null) : Promise<Result<ChatMessageResponse, ApiError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("chat_send", { content, sessionKey, context }) };
+    return { status: "ok", data: await TAURI_INVOKE("chat_send", { content, sessionKey, context, mode }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3224,6 +3224,86 @@ async showStatusBadge(text: string, kind: BadgeKind, durationMs: number | null) 
     else return { status: "error", error: e  as any };
 }
 },
+async tracingListProviders() : Promise<Result<ProviderInfo[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_list_providers") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingListSessions(providerId: string) : Promise<Result<SessionSummary[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_list_sessions", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingLoadSession(providerId: string, sessionId: string, scope: Scope) : Promise<Result<SessionDetail, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_load_session", { providerId, sessionId, scope }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingLoadContext(providerId: string, sessionId: string, scope: Scope) : Promise<Result<ContextMessage[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_load_context", { providerId, sessionId, scope }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingLoadState(providerId: string, sessionId: string) : Promise<Result<SessionState, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_load_state", { providerId, sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingListSubagents(providerId: string, sessionId: string) : Promise<Result<SubagentSummary[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_list_subagents", { providerId, sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingImport(providerId: string, filePath: string) : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_import", { providerId, filePath }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingGetDir(providerId: string, sessionId: string) : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_get_dir", { providerId, sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingOpenDir(providerId: string, sessionId: string) : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_open_dir", { providerId, sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingStats(providerId: string) : Promise<Result<StatsBundle, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_stats", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async taskGet(id: string) : Promise<Result<TaskResponse | null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("task_get", { id }) };
@@ -4051,6 +4131,7 @@ export type ConfidenceAssessedPayload = { sessionKey: string; score: number; act
 export type ConfusableResponse = { hasConfusable: boolean; confusableWord: string | null; confusableMeaning: string | null; explanation: string | null }
 export type ContentChunkPayload = { sessionKey: string; data: string }
 export type ContextAssembledPayload = { sessionKey: string; totalTokens: number; durationMs: number }
+export type ContextMessage = { index: number; role: string; content: unknown }
 export type ContextResumeResponse = { contextId: string; contextTitle: string; summary: string; suggestedPrompt: string; recentResources: string[] }
 export type ContextSummary = { totalNotes: number; totalWords: number; strongAtoms: number; fadingAtoms: number; 
 /**
@@ -4190,6 +4271,7 @@ export type EntityResponse = { id: string; name: string; entityType: string; des
 export type EntitySearchParams = { query: string; entityType: string | null; limit: number | null }
 export type EntityUpdatedPayload = { entityKind: EntityKind; id: string }
 export type EpisodicMemoryResponse = { id: string; domain: string; content: string; summary: string | null; importance: number; occurredAt: string; recordedAt: string; stability: number; accessCount: number }
+export type ErrorByTool = { tool: string; errorCount: number }
 export type EvalGrades = { meaning: string; grammar: string; naturalness: string; wordChoice: string }
 export type EvaluateTranslationParams = { sourceText: string; userTranslation: string; sourceLang: string; targetLang: string }
 export type ExecStatus = { kind: "ok" } | { kind: "err"; message: string }
@@ -4314,6 +4396,7 @@ export type GoalProgressResponse = { id: number; goalType: string; metric: strin
 export type GradeResultResponse = { score: number | null; suggestedRating: string; gradingMethod: string; explanation: string | null; diffHighlights: DiffSegmentResponse[]; expectedAnswer: string; coachingNudge: string | null; socraticSuggestion: string | null; keyConceptsPresent: string[]; keyConceptsMissing: string[] }
 export type GrammarPattern = { pattern: string; explanation: string; patternType: string | null }
 export type GraphStats = { totalFacts: number; totalTopics: number; totalEdges: number; totalCommunities: number; avgConvergence: number }
+export type HeaderStats = { turnCount: number; stepCount: number; toolCallCount: number; errorCount: number; compactionCount: number; agentCount: number; totalDurationMs: number; totalInputTokens: number; totalOutputTokens: number; cacheReadTokens: number; cacheHitPct: number; model: string | null }
 export type HourlyBreakdownResponse = { hour: number; productiveSecs: number; neutralSecs: number; distractingSecs: number; idleSecs: number; totalSecs: number; productiveRatio: number }
 export type HybridSearchResponse = { exact: NoteResponse[]; related: NoteResponse[] }
 export type InboxCreateParams = { content: string }
@@ -4342,6 +4425,7 @@ export type KeyResultCreateParams = { objectiveId: string; title: string; target
 export type KeyResultResponse = { id: string; title: string; progress: number; current: number; target: number; unit: string }
 export type KeyResultSummaryResponse = { id: string; title: string; progress: number }
 export type KeyResultUpdateParams = { id: string; title: string | null; description: string | null; status: string | null; dueDate: string | null }
+export type KimiTodo = { title: string; status: string }
 export type KnowledgeAtomResponse = { id: string; subject: string; atomType: string; domain: string; sourceNoteId: string | null; sourceRange: string | null; sourceContext: string | null; semanticFactId: string | null; retentionPct: number; personalImportance: number; status: string; salience: number; lastInteractionTs: string | null; metadata: string | null; topicName: string | null; linkedCardCount: number; createdAt: string }
 export type KnowledgeGrowthResponse = { newFactsCount: number; updatedFactsCount: number; supersededFactsCount: number; byDomain: DomainCount[]; periodDays: number }
 export type KnowledgeHealthSummary = { totalAtoms: number; activeAtoms: number; avgRetention: number; topics: TopicHealthResponse[] }
@@ -4593,8 +4677,10 @@ status: string;
 effectiveness: number }
 export type ProjectSourceCreateParams = { projectId: string; sourceType: string; title: string; content: string | null; url: string | null; filePath: string | null; metadata: unknown | null; tags: string[] | null }
 export type ProjectSourceResponse = { id: string; projectId: string; sourceType: string; title: string; content: string | null; url: string | null; filePath: string | null; metadata: unknown | null; tags: string[]; createdAt: string; updatedAt: string }
+export type ProjectTotals = { projectBasename: string; cwd: string; sessionCount: number; turnCount: number; toolCallCount: number; errorCount: number; totalInputTokens: number; totalOutputTokens: number; cacheReadTokens: number }
 export type ProjectUpdateParams = { id: string; name: string | null; areaId: string | null; color: string | null; description: string | null; tags: string[] | null; status: string | null; workflowId: string | null; instructions: unknown | null; aiPersonality: string | null; userRole: string | null; startDate: string | null; targetEndDate: string | null; settings: unknown | null }
 export type ProjectUsageResponse = { projectId: string; displayName: string; durationSecs: number; color: string | null }
+export type ProviderInfo = { id: string; displayName: string; sessionCount: number }
 export type QuickTranslateParams = { text: string; sourceLang: string; targetLang: string }
 export type QuickTranslateResponse = { translation: string; words: WordBreakdown[] }
 export type QuizQuestion = { id: string; type: string; question: string; choices: string[] | null; correctAnswer: string; explanation: string; sourceNotes: string[]; difficulty: string; difficultyScore: number }
@@ -4675,6 +4761,10 @@ export type RoutingSnapshot = { id: string; capturedAt: string; windowHours: num
 export type RuleCreateParams = { domain: string; ruleText: string; confidence: number }
 export type RuleNode = { id: string; ruleText: string; domain: string; signalCount: number; confidence: number }
 export type ScenarioChallengeResponse = { title: string; situation: string; questions: string[]; modelAnswer: string; sourceNotes: string[]; difficultyScore: number }
+/**
+ * Selector for "main agent" vs a specific subagent within a session.
+ */
+export type Scope = { kind: "main" } | { kind: "subagent"; agentId: string }
 export type ScopePreviewLink = { sourceId: string; targetId: string }
 export type ScopePreviewNote = { id: string; title: string; notebookId: string | null; 
 /**
@@ -4689,6 +4779,10 @@ export type ScopePreviewResponse = { notes: ScopePreviewNote[]; links: ScopePrev
 contextSummary: ContextSummary }
 export type ScorePayload = { score: number; productiveSecs: number; distractingSecs: number }
 export type ScoredNoteResponse = { note: NoteResponse; score: number; reason: string }
+/**
+ * Closed semantic category the UI dispatches per event card.
+ */
+export type SemanticCategory = "turnBegin" | "turnEnd" | "stepBegin" | "stepInterrupted" | "thinking" | "assistantText" | "userInput" | "toolCall" | "toolCallStream" | "toolResult" | "statusUpdate" | "subagent" | "compactionBegin" | "compactionEnd" | "error" | "other"
 export type SemanticFactResponse = { id: string; domain: string; subject: string; predicate: string; object: string; confidence: number; source: string; validFrom: string; validUntil: string | null; stability: number; retrievability: number; lastAccessed: string | null; accessCount: number; status: string }
 /**
  * One row in the Sensitivity Inspector panel.
@@ -4704,6 +4798,11 @@ export type SessionBlock = { contextType: string; totalDurationMins: number; ses
  * Optional session context sent from the frontend alongside a chat message.
  */
 export type SessionContextInput = { entityKind: string | null; entityId: string | null; contextType: string | null; isEphemeral: boolean | null }
+export type SessionDetail = { sessionId: string; providerId: string; scope: Scope; stats: HeaderStats; events: TraceEvent[]; 
+/**
+ * `true` when events were truncated due to file-size guardrail.
+ */
+truncated: boolean; totalEventCount: number }
 /**
  * Filters for `coding_memory_session_list`.
  */
@@ -4729,6 +4828,12 @@ export type SessionReplayEntry = { id: string; source: string; sessionId: string
  * Row struct for the `sessions` table.
  */
 export type SessionRow = { key: string; metadata: JsonValue; createdAt: string; updatedAt: string; projectId: string | null; conversationType: string | null; pinned: boolean; cwd: string | null; repoId: string | null; repoBranch: string | null; toolProfile: string | null; approvalMode: string; totalCostUsd: number; totalTokens: number; parentSessionId: string | null }
+export type SessionState = { customTitle: string | null; planMode: boolean; archived: boolean; todos: KimiTodo[]; 
+/**
+ * Verbatim parsed state.json for the State tab's "raw" view.
+ */
+raw: unknown }
+export type SessionSummary = { sessionId: string; providerId: string; sourceDir: string; cwd: string | null; projectBasename: string | null; customTitle: string | null; startedAt: string; lastEventAt: string; sizeBytes: number; turnCount: number; stepCount: number; toolCallCount: number; errorCount: number; subagentCount: number; hasWire: boolean; hasContext: boolean; imported: boolean }
 /**
  * One row in the Plugins → Coding Memory session list.
  */
@@ -4762,11 +4867,14 @@ export type SkillVersionDetailResponse = { id: string; skillName: string; versio
 export type SkillVersionResponse = { id: string; skillName: string; version: number; filePath: string; diff: string | null; source: string; reason: string | null; createdAt: string }
 export type SkippedFile = { path: string; reason: string }
 export type SourceBreakdown = { source: TimelineSource; durationSecs: number; count: number }
+export type StatsBundle = { perProject: ProjectTotals[]; toolUsage: ToolUsage[]; errorsByTool: ErrorByTool[]; tokenSeries: TokenSeriesPoint[]; subagentTypes: SubagentTypeCount[]; cacheHitPct: number }
 export type StatusLabelResponse = { id: string; workflowId: string; name: string; color: string; statusGroup: string; position: number }
 export type StatusWorkflowResponse = { id: string; name: string; isTemplate: boolean; isGlobalDefault: boolean; labels: StatusLabelResponse[] }
 export type StrategyFeedbackResponse = { strategyType: string; domain: string; timesUsed: number; acceptanceRate: number; effectiveness: number; behavioralPositive: number; behavioralNegative: number }
 export type StrugglingCardResponse = { id: string; front: string; back: string; deck: string; lapses: number; reviewCount: number; sourceNoteId: string | null }
 export type SubagentSpawnedPayload = { sessionKey: string; label: string; profile: string }
+export type SubagentSummary = { agentId: string; subagentType: string; status: string; description: string | null; createdAt: string; updatedAt: string; eventCount: number }
+export type SubagentTypeCount = { subagentType: string; count: number }
 export type SuggestedAction = { BoostSkill: { skill: string } } | "ViewDetails" | { ApproveMetaRule: { rule_id: string } } | { DismissMetaRule: { rule_id: string } } | { KillTrial: { trial_id: string } } | { ContinueTrial: { trial_id: string } } | { RevertBrainVersion: { version: number } } | "Unknown"
 export type SystemAction = "lockScreen" | "sleep" | "restart" | "shutdown" | "emptyTrash" | "toggleDarkMode" | "toggleDoNotDisturb" | "ejectAll"
 export type SystemStatusResponse = { domainBusSubscribers: number; domainBusPublished: number; backgroundServiceRunning: boolean; backgroundEventsProcessed: number; activeFacts: number; episodicCount: number; rulesCount: number; components: ComponentStatusResponse[] }
@@ -4794,8 +4902,14 @@ export type TimelineResponse = { entries: TimelineEntry[]; summary: TimelineSumm
 export type TimelineSource = "productivity" | "focus" | "task" | "todo" | "note" | "finance" | "system" | "calendar"
 export type TimelineSummary = { totalTrackedSecs: number; focusSecs: number; tasksCompleted: number; tasksCreated: number; notesTouched: number; transactionsCount: number; topApps: TopAppSummary[]; sourceBreakdown: SourceBreakdown[] }
 export type TodayTaskResponse = { id: string; title: string; priority: string | null; status: string; completed: boolean; isOverdue: boolean; isDueToday: boolean; dueDisplay: string | null }
+export type TokenSeriesPoint = { 
+/**
+ * Day key in `YYYY-MM-DD`.
+ */
+day: string; inputTokens: number; outputTokens: number }
 export type ToolEndPayload = { sessionKey: string; name: string; action?: string | null; success: boolean; durationMs: number; result?: string | null; estimatedTokens?: number | null; agent?: string | null }
 export type ToolStartPayload = { sessionKey: string; name: string; action?: string | null; agent?: string | null }
+export type ToolUsage = { tool: string; callCount: number; errorCount: number }
 export type TopAppSummary = { appName: string; durationSecs: number; percentage: number }
 export type TopicDetail = { topicId: string; facts: FactNode[] }
 export type TopicDetailParams = { topicId: string }
@@ -4805,6 +4919,26 @@ export type TopicExpandParams = { subject: string; domain: string }
 export type TopicHealthResponse = { id: string; name: string; domain: string; atomCount: number; avgRetention: number }
 export type TopicNode = { id: string; subject: string; domain: string; factCount: number; avgConvergence: number; maxConfidence: number; totalAccessCount: number; lastAccessed: string | null; communityId: string | null }
 export type TopicSummary = { name: string; avgRetention: number; atomCount: number }
+/**
+ * One event in a session's wire stream, in provider-agnostic form.
+ */
+export type TraceEvent = { 
+/**
+ * Per-session-monotonic sequence (line index in wire.jsonl, skipping metadata).
+ */
+seq: number; 
+/**
+ * Provider id ("kimi", "claudeCode", …).
+ */
+providerId: string; 
+/**
+ * Verbatim raw kind string from the source ("TurnBegin", "ContentPart", …).
+ */
+rawKind: string; 
+/**
+ * Verbatim payload from the source.
+ */
+payload: unknown; occurredAt: string; category: SemanticCategory; turnIndex: number | null; stepIndex: number | null; parentSubagentId: string | null }
 export type TrackedAppResponse = { displayName: string; appName: string; siteName: string | null; categoryId: string | null; categoryName: string | null; totalSecs: number; eventCount: number }
 export type TranslateBreakdownParams = { text: string; sourceLang: string; targetLang: string; noteId?: string | null; isSelection?: boolean }
 export type TranslateBreakdownResponse = { translation: string; words: WordBreakdown[]; grammarPatterns: GrammarPattern[] }
@@ -4867,9 +5001,9 @@ export type WindowAction = "leftHalf" | "rightHalf" | "topHalf" | "bottomHalf" |
  */
 export type WireEventDto = { id: string; source: string; sessionId: string; kind: string; occurredAt: string; 
 /**
- * Structured payload when `payload` parsed as JSON; empty string otherwise.
+ * Structured payload when `payload` parsed as JSON; `null` otherwise.
  */
-payloadDecoded: string; 
+payloadDecoded: unknown; 
 /**
  * Raw JSON string (always present, exactly as stored in `ingest_event_log`).
  */

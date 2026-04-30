@@ -3,6 +3,7 @@ import { ProviderChips } from "./ProviderChips";
 import { SessionList } from "./SessionList";
 import { WireViewer } from "./WireViewer";
 import { ReforgeCycleDiff } from "./ReforgeCycleDiff";
+import { TracingTab } from "./tracing/TracingTab";
 import { listCodingSessions } from "@/api/endpoints/codingMemory";
 import type { ProviderId, SessionSummaryDto } from "./types";
 
@@ -14,7 +15,7 @@ export function CodingMemoryPlugin() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [secondaryTab, setSecondaryTab] = useState<"sessions" | "reforge">("sessions");
+  const [secondaryTab, setSecondaryTab] = useState<"sessions" | "reforge" | "tracing">("sessions");
   const [live, setLive] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const initialLoadRef = useRef(true);
@@ -111,6 +112,13 @@ export function CodingMemoryPlugin() {
         >
           Reforge
         </button>
+        <button
+          type="button"
+          className={"cm-plugin__sec-tab" + (secondaryTab === "tracing" ? " cm-plugin__sec-tab--active" : "")}
+          onClick={() => setSecondaryTab("tracing")}
+        >
+          Tracing
+        </button>
       </div>
       <div className="cm-plugin__body">
         {secondaryTab === "sessions" ? (
@@ -124,9 +132,13 @@ export function CodingMemoryPlugin() {
                 : <div className="cm-state cm-state--empty">Select a session to inspect.</div>}
             </main>
           </>
-        ) : (
+        ) : secondaryTab === "reforge" ? (
           <main className="cm-plugin__main">
             <ReforgeCycleDiff />
+          </main>
+        ) : (
+          <main className="cm-plugin__main">
+            <TracingTab />
           </main>
         )}
       </div>

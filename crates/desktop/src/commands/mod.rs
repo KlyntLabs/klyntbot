@@ -41,6 +41,7 @@ pub mod shortcuts;
 pub mod status;
 pub mod status_badge;
 pub mod tasks;
+pub mod tracing;
 pub mod timeline;
 pub mod view;
 pub mod voice;
@@ -69,6 +70,6 @@ pub fn emit_entity_updated(app: &tauri::AppHandle, kind: EntityKind, id: &str) {
         id: id.to_string(),
     };
     if let Err(e) = payload.emit(app) {
-        tracing::warn!("failed to emit entity:updated event: {e}");
+        ::tracing::warn!("failed to emit entity:updated event: {e}");
     }
 }

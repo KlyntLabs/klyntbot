@@ -1,0 +1,5 @@
+{"type":"metadata","protocol_version":"1.9"}
+{"timestamp":1777454500.5,"message":{"type":"TurnBegin","payload":{"user_input":"sub task"}}}
+{"timestamp":1777454501.0,"message":{"type":"StepBegin","payload":{"n":1}}}
+{"timestamp":1777454501.5,"message":{"type":"ContentPart","payload":{"type":"text","text":"sub done"}}}
+{"timestamp":1777454501.6,"message":{"type":"TurnEnd","payload":{}}}
