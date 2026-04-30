@@ -203,33 +203,37 @@ pub(crate) async fn dispatch_dev(
             let request_id = try_field!(dev::get_str(body, "requestId"));
             let decision: app_core::coding::approval_handler::AppApprovalDecision =
                 try_field!(dev::require(body, "decision"));
-            app_core::coding::approval_handler::respond_approval(
+            let result = app_core::coding::approval_handler::respond_approval(
                 &core.pending_approvals,
                 &request_id,
                 decision,
             )
             .await
+            .map(|_| serde_json::Value::Null)
             .map_err(
                 |e: app_core::coding::approval_handler::ApprovalHandlerError| {
                     desktop_shared::errors::ApiError::new("NOT_FOUND", e.to_string())
                 },
-            )?;
-            dev::val(serde_json::Value::Null)
+            );
+            dev::val(result)
         }
         "chat_set_mode" => {
             let session_key = try_field!(dev::get_str(body, "sessionKey"));
             let mode: app_core::coding::mode_handler::ChatMode =
                 try_field!(dev::require(body, "mode"));
-            let row = app_core::coding::mode_handler::set_mode(&core.repos, &session_key, mode)
-                .await
-                .map_err(|e| {
-                    let code = match &e {
-                        app_core::coding::mode_handler::ModeError::NotFound(_) => "NOT_FOUND",
-                        app_core::coding::mode_handler::ModeError::Storage(_) => "STORAGE_ERROR",
-                    };
-                    desktop_shared::errors::ApiError::new(code, e.to_string())
-                })?;
-            dev::val(row)
+            let result =
+                app_core::coding::mode_handler::set_mode(&core.repos, &session_key, mode)
+                    .await
+                    .map_err(|e| {
+                        let code = match &e {
+                            app_core::coding::mode_handler::ModeError::NotFound(_) => "NOT_FOUND",
+                            app_core::coding::mode_handler::ModeError::Storage(_) => {
+                                "STORAGE_ERROR"
+                            }
+                        };
+                        desktop_shared::errors::ApiError::new(code, e.to_string())
+                    });
+            dev::val(result)
         }
         _ => return None,
     })

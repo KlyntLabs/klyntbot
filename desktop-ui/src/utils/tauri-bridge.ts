@@ -42,7 +42,16 @@ export async function listen<T = unknown>(
   handler: (payload: T) => void,
 ): Promise<() => void> {
   const i = internals();
-  if (!i) return () => {};
+  if (!i) {
+    // Browser dev mode: bridge to BrainEventBridge's window CustomEvents.
+    if (typeof window === "undefined") return () => {};
+    const wrapped = (e: Event) => {
+      const ce = e as CustomEvent<T>;
+      handler(ce.detail);
+    };
+    window.addEventListener(event, wrapped as EventListener);
+    return () => window.removeEventListener(event, wrapped as EventListener);
+  }
   const cb = i.transformCallback((evt) => {
     const e = evt as EventPayload<T>;
     handler(e.payload);

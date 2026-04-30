@@ -6,6 +6,7 @@
 **Pre-release policy:** Per CLAUDE.md — no user data to migrate, no backward-compat shims, no feature-flag gating. Schema changes consolidated into Phase 1.
 **Supersedes:** [`docs/superpowers/specs/2026-04-23-klynt-cli-design.md`](./2026-04-23-klynt-cli-design.md). That design assumed a separate `klynt` TUI binary with desktop coordination via `~/.klyntbot/desktop.lock`. This design replaces the TUI binary with the existing desktop chat surface — coding becomes a first-class chat mode rather than a separate process.
 **Companion spec:** [`docs/superpowers/specs/2026-04-22-coding-memory-design.md`](./2026-04-22-coding-memory-design.md) (amendments listed in §12).
+**Amendments to this spec:** [`docs/superpowers/specs/2026-04-30-tool-layer-consolidation-design.md`](./2026-04-30-tool-layer-consolidation-design.md) — completes Phase 1 by retiring `crates/tools/src/system/`, replacing the static `CODING_ONLY` filter with per-tool `Tool::allowed_channels() -> ChannelMask`, adding per-host approval deduplication (Codex-derived), and wiring `event_tx` so `FileEditWithSymbols` reaches the UI. Cross-reference summary in Appendix F below.
 **Related (already shipped):**
 - [`docs/superpowers/specs/2026-04-26-klyntbot-chat-mvp-design.md`](./2026-04-26-klyntbot-chat-mvp-design.md) — initial chat MVP wiring.
 - [`docs/superpowers/specs/2026-04-27-chat-surface-integration-design.md`](./2026-04-27-chat-surface-integration-design.md) — promoted klyntbot chat to render through the rich `Messages` + `Composer` surface.
@@ -596,6 +597,8 @@ Everything in this page maps 1-to-1 to a slash command (so power users never nee
 
 ## 6. Tool surface + curation model
 
+> **Amendment 2026-04-30:** Per-tool visibility via `Tool::allowed_channels() -> ChannelMask` replaces the static `CODING_ONLY` const. Pool 1 tools split per-tool: `read`, `glob`, `grep`, `ask_user`, `web_fetch`, `tool_search` graduate to `ChannelMask::ALL`; `bash`, `edit`, `write`, `apply_patch`, `notebook_edit`, `enter_plan_mode`, `exit_plan_mode` stay `ChannelMask::CODING_ONLY`. Coding-mode curated default (24 tools) is unchanged. Regular-chat default = 6 graduated klynt-core tools + 15 domain tools (Pool 3) = 21. Full model in [`2026-04-30-tool-layer-consolidation-design.md`](./2026-04-30-tool-layer-consolidation-design.md) §3.
+
 ### Tool inventory (the universe)
 
 **Pool 1 — Coding tool kit (new, in `klynt-core::tools`):**
@@ -683,6 +686,8 @@ Naming hygiene unchanged: short verbs for the coding kit; `recall_` / `trace_` /
 ---
 
 ## 7. Approval + sandbox model (3-layer)
+
+> **Amendment 2026-04-30:** Adds two enhancements. (1) *Channel-aware degradation* in `Layer1::evaluate` — when `ctx.channel.supports_approval_ui()` is false (Telegram, Discord, Slack, Email), `RequiresApproval` falls back to the configured `tools.approvalPolicy.nonUiChannels` (default `Allow`). (2) *Per-host approval deduplication* via `HostApprovalCache` (Codex-derived) — concurrent fetches to the same `(scheme, host, port)` coalesce onto one approval prompt; decisions cached per-session as `AllowOnce` / `AllowForSession` / `Deny`. Full model in [`2026-04-30-tool-layer-consolidation-design.md`](./2026-04-30-tool-layer-consolidation-design.md) §4 and §5.
 
 ### Decision flow (unchanged from the superseded spec)
 
@@ -1083,6 +1088,8 @@ export function useSlashCommands() {
 
 ## 10. Event vocabulary: AgentEvent extensions
 
+> **Amendment 2026-04-30:** `agent:file_edit_with_symbols` and `agent:plan_mode_changed` go live by closing the `event_tx: None` gap at `app-core/src/init/mod.rs:1817` via a new `AgentRuntime::event_sender()` accessor passed through `klynt_core::ToolKitBuilder`. Wiring detail in [`2026-04-30-tool-layer-consolidation-design.md`](./2026-04-30-tool-layer-consolidation-design.md) §8.
+
 ### Two enums, one event story
 
 | Enum | Crate | Role |
@@ -1365,6 +1372,7 @@ Coding-memory spec's 9 invariants + this spec's 11 (next section) = **20 invaria
 - Distiller subscriber + Mirror signal subscriber spawned at AppCore init; consume coding-channel events.
 - Settings → Coding page (read-only or edit-then-save for declarative permissions, sandbox toggle, skill list).
 - 9 of 11 K-invariants under proptest (K1-K4, K6-K9; K5 via integration test, K10-K11 deferred to Phase 2) plus all 5 translator invariants (E1-E5). See §14.
+- **Tool layer consolidation** (per [`2026-04-30-tool-layer-consolidation-design.md`](./2026-04-30-tool-layer-consolidation-design.md)) — completes Phase 1 by retiring `crates/tools/src/system/` (7 OLD tools: `ask_user`, `browser`, `filesystem`, `glob_tool`, `grep`, `message`, `web`), unifying around `klynt-core` as the single source of truth for primitive tools across coding and regular chat. Adds `Tool::allowed_channels() -> ChannelMask`, `klynt_core::ToolKitBuilder` (DI for main agent + sub-agents), `HostApprovalCache` (Codex-derived per-host dedup), and channel-aware approval degradation. 9-commit migration; deletion is the final atomic commit. Adds invariants K12-K15.
 
 **Stubs / deferred:**
 - Mirror-learned approval (Layer 3): config flag accepted; layer skipped.
@@ -1760,9 +1768,74 @@ For the single-PR coordination per §12:
 
 Already marked superseded. No further edits required.
 
-### This spec
+### This spec — amendment log
 
-Created. Amendments to this spec follow the same single-PR pattern when needed.
+| Date | Amendment | Spec |
+|---|---|---|
+| 2026-04-29 | Created. | This spec. |
+| 2026-04-30 | Tool layer consolidation — retires `crates/tools/src/system/`, unifies on klynt-core, adds ChannelMask + HostApprovalCache + ToolKitBuilder + channel-aware approval. | [`2026-04-30-tool-layer-consolidation-design.md`](./2026-04-30-tool-layer-consolidation-design.md). See Appendix F. |
+
+Future amendments append to this table with the same single-PR pattern.
+
+---
+
+## Appendix F — 2026-04-30 Tool layer consolidation amendment
+
+Cross-reference summary for the consolidation specified in [`docs/superpowers/specs/2026-04-30-tool-layer-consolidation-design.md`](./2026-04-30-tool-layer-consolidation-design.md). Phase 1 progress at the time of amendment: ~50% (Plans 1-3 of the original 6-plan suite landed; this consolidation completes the remaining tool-layer scope before Plans 4-6).
+
+### What changed in this spec
+
+| Section | Change |
+|---|---|
+| §3 Crate layout | `klynt-core`'s purpose extended from "Coding tool registry" to "Primitive tool registry for both coding and regular chat". |
+| §3 Surgical changes | Adds: rename `coding_channel.rs` → `tool_channel.rs`; `Tool::allowed_channels()` trait method; `bitflags = "2"` workspace dep; retire `crates/tools/src/system/`. |
+| §6 Tool surface | Static `CODING_ONLY` const replaced by per-tool `Tool::allowed_channels()`. Pool 1 tools split: 6 graduate to `ChannelMask::ALL`, 7 stay `CODING_ONLY`. |
+| §7 Approval | Adds channel-aware degradation in `Layer1::evaluate` and `HostApprovalCache` for per-host dedup. |
+| §10 Event vocabulary | `agent:file_edit_with_symbols` and `agent:plan_mode_changed` go live; `event_tx: None` gap closes. |
+| §13 Phase 1 | Adds tool-layer consolidation deliverable — the final pre-Phase-2 work. |
+| Appendix A | Adds 5 locked decisions (#13-#17 in the amendment spec). |
+| Appendix B | Adds the surgical-change rows enumerated above. |
+| Appendix C | Adds invariants K12 (filter idempotence), K13 (host dedup correctness), K14 (channel-aware approval safety), K15 (retirement compile-gate). |
+
+### What's retired
+
+- `crates/tools/src/system/ask_user.rs` (922 lines) — moved to `crates/klynt-core/src/tools/ask_user.rs`.
+- `crates/tools/src/system/browser.rs` (740) — DELETE; future MCP browser tools as replacement.
+- `crates/tools/src/system/filesystem.rs` (640) — DELETE; klynt-core's `read`/`write`/`edit` cover the surface.
+- `crates/tools/src/system/glob_tool.rs` (189) — DELETE; klynt-core's `glob` (with the new `path` param port) replaces.
+- `crates/tools/src/system/grep.rs` (316) — DELETE; klynt-core's `grep` (with the new `context_lines` param port) replaces.
+- `crates/tools/src/system/message.rs` (79) — DELETE; outbound dispatch is the chat surface itself.
+- `crates/tools/src/system/web.rs` (272) — DELETE; klynt-core's `web_fetch` covers the surface; `WebSearchTool` retires (LLM uses `web_fetch` plus reasoning).
+
+Net diff: ~−3500 LOC retired, ~+1700 LOC added (ToolKitBuilder, HostApprovalCache, ChannelMask, sweep), net **~−1800 LOC**.
+
+### What's reused
+
+- `crates/tools/src/domain/` (15 domain tools — `tasks`, `project`, `area`, `notes`, `memory`, `okr`, `finance`, `productivity`, `work_context`, `agent`, `annotate`, `learning`, `cron`, `mirror`, `temporal`) is unchanged. The domain tools were never duplicated.
+- All Pool 2 (recall) tools are unchanged.
+- All Pool 4 (MCP gateway) wiring is unchanged.
+- The 24-tool curated coding-mode default in §6 stands; the per-tool visibility shift only affects what's seen *outside* coding mode.
+
+### Migration sequencing (9 commits)
+
+```
+Phase A — Foundation (additive, no UX change)
+  1. ChannelMask + Tool::allowed_channels() + per-tool overrides + rename
+  2. Channel-aware approval policy
+  3. HostApprovalCache
+  4. event_tx wiring
+
+Phase B — Builder + sub-agent (refactor only)
+  5. ToolKitBuilder + main agent rewiring
+  6. Sub-agent rewiring
+  7. Param-shape ports (grep.context_lines, glob.path)
+
+Phase C — Cutover (user-visible change)
+  8. Tool graduation (6 klynt-core tools → ChannelMask::ALL)
+  9. DELETION of crates/tools/src/system/ + prompt sweep + test rewrite
+```
+
+Each commit independently revertible until #9. KCA validation gates apply on the deletion PR.
 
 ---
 
