@@ -123,14 +123,15 @@ pub async fn execute_loop(
         }
 
         // ── Emit turn start ──────────────────────────────────
-        if let Some(ref tx) = event_tx {
-            let _ = tx
-                .send(AgentEvent::IterationStart {
-                    iteration: budget.turns_used() as usize + 1,
-                    max: budget.max_turns() as usize,
-                })
-                .await;
-        }
+        crate::execution::core::fan_out_event(
+            event_tx.as_ref(),
+            core.domain_event_bus.as_ref(),
+            AgentEvent::IterationStart {
+                iteration: budget.turns_used() as usize + 1,
+                max: budget.max_turns() as usize,
+            },
+        )
+        .await;
 
         // ── LLM call (streaming) ─────────────────────────────
         let (outcome, cycle_usage) = core
@@ -153,14 +154,15 @@ pub async fn execute_loop(
             CycleOutcome::FinalResponse { content }
             | CycleOutcome::FabricatedResponse { content } => {
                 // Model decided it's done — no tool calls, return response
-                if let Some(ref tx) = event_tx {
-                    let _ = tx
-                        .send(AgentEvent::TurnComplete {
-                            turn: budget.turns_used(),
-                            budget_remaining_pct: budget.remaining_pct(),
-                        })
-                        .await;
-                }
+                crate::execution::core::fan_out_event(
+                    event_tx.as_ref(),
+                    core.domain_event_bus.as_ref(),
+                    AgentEvent::TurnComplete {
+                        turn: budget.turns_used(),
+                        budget_remaining_pct: budget.remaining_pct(),
+                    },
+                )
+                .await;
                 return Ok(ExecuteLoopResult {
                     content,
                     usage: accumulated_usage,
@@ -209,15 +211,16 @@ pub async fn execute_loop(
 
         // ── Mid-loop compression ─────────────────────────────
         if let Some((before_tokens, after_tokens)) = compressor.compress_if_needed(&mut messages) {
-            if let Some(ref tx) = event_tx {
-                let _ = tx
-                    .send(AgentEvent::ContextCompressed {
-                        before_tokens,
-                        after_tokens,
-                        iteration: budget.turns_used() as usize,
-                    })
-                    .await;
-            }
+            crate::execution::core::fan_out_event(
+                event_tx.as_ref(),
+                core.domain_event_bus.as_ref(),
+                AgentEvent::ContextCompressed {
+                    before_tokens,
+                    after_tokens,
+                    iteration: budget.turns_used() as usize,
+                },
+            )
+            .await;
         }
 
         // ── Live context refresh ─────────────────────────────
@@ -226,36 +229,41 @@ pub async fn execute_loop(
                 let updates = refresher.inject_pending(&mut messages, params.context_window);
                 if !updates.is_empty() {
                     let tokens_added: usize = updates.iter().map(|u| u.tokens).sum();
-                    if let Some(ref tx) = event_tx {
-                        let _ = tx
-                            .send(AgentEvent::ContextReassembled {
-                                updates,
-                                tokens_added,
-                            })
-                            .await;
-                    }
+                    crate::execution::core::fan_out_event(
+                        event_tx.as_ref(),
+                        core.domain_event_bus.as_ref(),
+                        AgentEvent::ContextReassembled {
+                            updates,
+                            tokens_added,
+                        },
+                    )
+                    .await;
                 }
             }
         }
 
         // ── Emit budget update ───────────────────────────────
-        if let Some(ref tx) = event_tx {
-            let _ = tx
-                .send(AgentEvent::BudgetUpdate {
-                    tokens_remaining_pct: budget.remaining_pct(),
-                    turns_used: budget.turns_used(),
-                    max_turns: budget.max_turns(),
-                    cost_usd: budget.cost_usd(),
-                    depth: budget.depth.to_string(),
-                })
-                .await;
-            let _ = tx
-                .send(AgentEvent::TurnComplete {
-                    turn: budget.turns_used(),
-                    budget_remaining_pct: budget.remaining_pct(),
-                })
-                .await;
-        }
+        crate::execution::core::fan_out_event(
+            event_tx.as_ref(),
+            core.domain_event_bus.as_ref(),
+            AgentEvent::BudgetUpdate {
+                tokens_remaining_pct: budget.remaining_pct(),
+                turns_used: budget.turns_used(),
+                max_turns: budget.max_turns(),
+                cost_usd: budget.cost_usd(),
+                depth: budget.depth.to_string(),
+            },
+        )
+        .await;
+        crate::execution::core::fan_out_event(
+            event_tx.as_ref(),
+            core.domain_event_bus.as_ref(),
+            AgentEvent::TurnComplete {
+                turn: budget.turns_used(),
+                budget_remaining_pct: budget.remaining_pct(),
+            },
+        )
+        .await;
 
         // ── Budget exhausted after this turn ─────────────────
         if budget.exhausted() {

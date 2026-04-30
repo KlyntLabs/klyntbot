@@ -43,9 +43,7 @@ impl OpencodeInstaller {
                 .acquire_timeout(std::time::Duration::from_secs(2))
                 .connect_with(opts)
                 .await
-                .map_err(|e| {
-                    common::KlyntbotError::Storage(format!("opencode DB open: {e}"))
-                })?;
+                .map_err(|e| common::KlyntbotError::Storage(format!("opencode DB open: {e}")))?;
             let _count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM message")
                 .fetch_one(&pool)
                 .await

@@ -71,7 +71,7 @@ impl AgentBridge {
         // Call AppCore's chat pipeline
         let (_msg_response, stream_info) = self
             .app
-            .chat_send(message, session_key, None)
+            .chat_send(message, session_key, None, None)
             .await
             .map_err(|e| McpError::internal_error(e.to_string(), None))?;
 

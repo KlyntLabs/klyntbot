@@ -158,6 +158,13 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
         },
         FeatureMigration {
             feature_name: "cognitive".to_string(),
+            version: 13,
+            description: "Entity merge proposals from per-turn graph linker (KCA Track 2)"
+                .to_string(),
+            sql: include_str!("../../migrations/010_entity_merge_proposals.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
             version: 7,
             description: "Micro-Reforge state and run audit log (KCA Track 4)".to_string(),
             sql: include_str!("../../migrations/011_micro_reforge_state.sql").to_string(),
@@ -179,6 +186,18 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             version: 10,
             description: "Hierarchical episodic compression columns (KCA Track 8)".to_string(),
             sql: include_str!("../../migrations/014_hierarchical_episodics.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 11,
+            description: "Skill proposals table for memory-grounded skill discovery (KCA Track 12)".to_string(),
+            sql: include_str!("../../migrations/015_skill_proposals.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 12,
+            description: "Episodic actor_id for cross-CLI transfer (KCA Track 10/12)".to_string(),
+            sql: include_str!("../../migrations/016_episodic_actor_id.sql").to_string(),
         },
     ]
 }

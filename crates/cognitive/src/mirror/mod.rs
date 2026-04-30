@@ -7,6 +7,7 @@ pub mod sources;
 pub mod types;
 pub use engine::MirrorEngine;
 pub use facade::MirrorFacade;
+pub use facade::SkillProposalRow;
 pub use narratives::{snippet_from_alert, NarrativeHandler};
 pub use repo::MirrorRepo;
 pub use retention::{MirrorRetentionConfig, MirrorRetentionService};

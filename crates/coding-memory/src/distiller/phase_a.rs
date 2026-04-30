@@ -214,6 +214,7 @@ pub async fn persist_turn_trace(
         scope_repo_id: scope_repo_id.map(str::to_string),
         metadata: None,
         kind: Some("turn_trace".into()),
+        actor_id: None,
         tier: "raw".into(),
         parent_id: None,
         child_count: 0,

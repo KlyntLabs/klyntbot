@@ -279,7 +279,7 @@ impl MirrorRepo {
         Self { pool }
     }
 
-    fn db(&self) -> &sqlx::SqlitePool {
+    pub(crate) fn db(&self) -> &sqlx::SqlitePool {
         self.pool.inner()
     }
 

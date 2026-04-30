@@ -584,7 +584,13 @@ pub struct PredictiveCacheConfig {
 
 impl Default for PredictiveCacheConfig {
     fn default() -> Self {
-        Self { enabled: true, predictions_per_turn: 3, ttl_seconds: 300, min_hit_rate_for_keep_alive: 0.20, model: None }
+        Self {
+            enabled: true,
+            predictions_per_turn: 3,
+            ttl_seconds: 300,
+            min_hit_rate_for_keep_alive: 0.20,
+            model: None,
+        }
     }
 }
 

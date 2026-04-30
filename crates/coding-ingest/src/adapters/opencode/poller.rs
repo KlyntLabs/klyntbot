@@ -103,7 +103,10 @@ impl OpencodePoller {
         // Bucket parts by message_id.
         let mut parts_by_msg: HashMap<String, Vec<super::schema::PartRow>> = HashMap::new();
         for p in parts {
-            parts_by_msg.entry(p.message_id.clone()).or_default().push(p);
+            parts_by_msg
+                .entry(p.message_id.clone())
+                .or_default()
+                .push(p);
         }
 
         let mut max_ms = last;

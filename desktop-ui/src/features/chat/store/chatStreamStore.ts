@@ -6,6 +6,7 @@
  */
 
 import { isTauri } from "@tauri-apps/api/core";
+import type { ConversationItem } from "@/types";
 import type {
   ActiveInteraction,
   AgentDonePayload,
@@ -41,6 +42,9 @@ import type {
 } from "../types";
 
 const DEV_SSE_BASE = "http://127.0.0.1:3456";
+
+type ApprovalItem = Extract<ConversationItem, { kind: "approval" }>;
+const EMPTY_APPROVALS: ApprovalItem[] = [];
 
 function qualifiedToolName(name: string, action?: string): string {
   return action ? `${name}:${action}` : name;
@@ -147,6 +151,7 @@ class ChatStreamStore {
   private textBuffers = new Map<string, string>();
   private rafIds = new Map<string, number>();
   private onDoneCallbacks = new Map<string, Set<() => void>>();
+  private approvalsBySession = new Map<string, ApprovalItem[]>();
   private listenersInitialized = false;
 
   constructor() {
@@ -211,6 +216,44 @@ class ChatStreamStore {
       this.states.set(sessionKey, { ...state, needsRefetch: false });
       this.notify();
     }
+  }
+
+  /** Get pending approvals for a session. */
+  getApprovals(sessionKey: string): ApprovalItem[] {
+    return this.approvalsBySession.get(sessionKey) ?? EMPTY_APPROVALS;
+  }
+
+  /** Insert or update an approval request for a session. */
+  upsertApproval(sessionKey: string, item: ApprovalItem): void {
+    const existing = this.approvalsBySession.get(sessionKey) ?? [];
+    const index = existing.findIndex((a) => a.requestId === item.requestId);
+    const next =
+      index >= 0
+        ? [...existing.slice(0, index), item, ...existing.slice(index + 1)]
+        : [...existing, item];
+    this.approvalsBySession.set(sessionKey, next);
+    this.notify();
+  }
+
+  /** Resolve an approval request with a final status. */
+  resolveApproval(
+    sessionKey: string,
+    requestId: string,
+    status: ApprovalItem["status"],
+    decidedBy: ApprovalItem["decidedBy"],
+  ): void {
+    const existing = this.approvalsBySession.get(sessionKey) ?? [];
+    const index = existing.findIndex((a) => a.requestId === requestId);
+    if (index < 0) return;
+    const next = [...existing];
+    next[index] = {
+      ...next[index],
+      status,
+      decidedBy,
+      decidedAt: new Date().toISOString(),
+    };
+    this.approvalsBySession.set(sessionKey, next);
+    this.notify();
   }
 
   clearSegments(sessionKey: string): void {

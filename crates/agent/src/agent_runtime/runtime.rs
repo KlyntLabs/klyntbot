@@ -528,12 +528,27 @@ impl AgentRuntime {
             tokio::spawn(async move {
                 let preds = match predictor.predict_next(&recent_turn_text, n).await {
                     Ok(p) => p,
-                    Err(e) => { tracing::debug!(error = %e, "predictor failed"); return; }
+                    Err(e) => {
+                        tracing::debug!(error = %e, "predictor failed");
+                        return;
+                    }
                 };
                 for q in preds {
                     let key = cognitive::services::predictive_cache::query_hash(&q);
-                    if cache.get(&key).await.is_some() { continue; }
-                    match retriever.retrieve_with_overrides(&q, 10, 0.55, [0.3, 0.2, 0.15, 0.1, 0.25, 0.05, 0.1, 0.05, 0.15, 0.1, 0.08, 0.06]).await {
+                    if cache.get(&key).await.is_some() {
+                        continue;
+                    }
+                    match retriever
+                        .retrieve_with_overrides(
+                            &q,
+                            10,
+                            0.55,
+                            [
+                                0.3, 0.2, 0.15, 0.1, 0.25, 0.05, 0.1, 0.05, 0.15, 0.1, 0.08, 0.06,
+                            ],
+                        )
+                        .await
+                    {
                         Ok(results) => cache.put(key, results).await,
                         Err(e) => tracing::debug!(error = %e, "predictive retrieve failed"),
                     }
@@ -747,38 +762,10 @@ mod tests {
         }
     }
 
-    struct MockProvider {
-        response: String,
-    }
-
-    #[async_trait::async_trait]
-    impl providers::LlmProvider for MockProvider {
-        async fn chat(
-            &self,
-            _messages: &[providers::Message],
-            _tools: Option<&[serde_json::Value]>,
-            _params: &ChatParams,
-        ) -> std::result::Result<LlmResponse, common::KlyntbotError> {
-            Ok(text_response(&self.response))
-        }
-
-        fn name(&self) -> &str {
-            "mock"
-        }
-
-        fn default_model(&self) -> &str {
-            "mock-model"
-        }
-
-        fn context_window(&self) -> usize {
-            128_000
-        }
-    }
+    use crate::test_utils::MockProvider;
 
     async fn make_runtime(response: &str) -> (AgentRuntime, Arc<RwLock<ToolRegistry>>) {
-        let provider: DynProvider = Arc::new(MockProvider {
-            response: response.to_string(),
-        });
+        let provider: DynProvider = Arc::new(MockProvider::with_text(response).context_window(128_000));
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
         let core = Arc::new(crate::execution::ExecutionCore::new(
             provider,

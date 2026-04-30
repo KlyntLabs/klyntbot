@@ -8,6 +8,7 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
+use tokio_util::sync::CancellationToken;
 
 use common::{ChannelName, ChatId, FormResponse, InteractionRequest, Result};
 
@@ -77,6 +78,8 @@ pub struct RoutingContext {
     pub interaction_channel: Option<Arc<dyn InteractionChannel>>,
     /// Autotuner champion parameters for the current trial (if any).
     pub champion_params: Option<common::TrialParams>,
+    /// Cancellation token for interrupting long-running tool operations.
+    pub cancel_token: Option<CancellationToken>,
 }
 
 impl RoutingContext {
@@ -91,6 +94,7 @@ impl RoutingContext {
             entity_tx: None,
             interaction_channel: None,
             champion_params: None,
+            cancel_token: None,
         }
     }
 
@@ -109,13 +113,7 @@ impl RoutingContext {
             entity_tx: None,
             interaction_channel: None,
             champion_params: None,
+            cancel_token: None,
         }
     }
-
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
 }

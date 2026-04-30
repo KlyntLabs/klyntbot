@@ -3,6 +3,7 @@ import { RequestUserInputMessage } from "@app/components/RequestUserInputMessage
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import { memo, useCallback } from "react";
+import { useApprovalQueue } from "@/features/coding/hooks/useApprovalQueue";
 import type {
   ConversationItem,
   OpenAppTarget,
@@ -12,6 +13,7 @@ import type {
 import { useFileLinkOpener } from "../hooks/useFileLinkOpener";
 import { formatCount, parseReasoning } from "../utils/messageRenderUtils";
 import {
+  ApprovalRow,
   DiffRow,
   ExploreRow,
   MessageRow,
@@ -47,6 +49,7 @@ type MessagesProps = {
   onPlanSubmitChanges?: (changes: string) => void;
   onOpenThreadLink?: (threadId: string, workspaceId?: string | null) => void;
   onQuoteMessage?: (text: string) => void;
+  onApprovalRespond?: (requestId: string, decision: import("@/features/coding/hooks/useApprovalQueue").ApprovalDecision) => void;
 };
 
 export const Messages = memo(function Messages({
@@ -70,7 +73,10 @@ export const Messages = memo(function Messages({
   onPlanSubmitChanges,
   onOpenThreadLink,
   onQuoteMessage,
+  onApprovalRespond,
 }: MessagesProps) {
+  const { respond: approvalRespond } = useApprovalQueue(threadId ?? "");
+  const handleApprovalRespond = onApprovalRespond ?? approvalRespond;
   const activeUserInputRequestId =
     threadId && userInputRequests.length
       ? (userInputRequests.find(
@@ -222,6 +228,9 @@ export const Messages = memo(function Messages({
     }
     if (item.kind === "explore") {
       return <ExploreRow key={item.id} item={item} />;
+    }
+    if (item.kind === "approval") {
+      return <ApprovalRow key={item.id} item={item} onRespond={handleApprovalRespond} />;
     }
     return null;
   };

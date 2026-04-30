@@ -133,7 +133,16 @@ CREATE TABLE sessions (
     pinned            INTEGER DEFAULT 0,
     compressed_prefix      TEXT,
     compressed_through_idx INTEGER,
-    compressed_at          INTEGER
+    compressed_at          INTEGER,
+    -- Coding-in-chat columns (added 2026-04-29 per spec 2026-04-29-klynt-coding-in-chat-design.md §11)
+    cwd                    TEXT,
+    repo_id                TEXT,
+    repo_branch            TEXT,
+    tool_profile           TEXT,
+    approval_mode          TEXT NOT NULL DEFAULT 'default',
+    total_cost_usd         REAL NOT NULL DEFAULT 0,
+    total_tokens           INTEGER NOT NULL DEFAULT 0,
+    parent_session_id      TEXT
 );
 
 -- ============================================================

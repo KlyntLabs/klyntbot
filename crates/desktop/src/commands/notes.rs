@@ -2,21 +2,19 @@ use std::sync::Arc;
 
 use desktop_macros::{klynt_command, klynt_raw_command};
 use desktop_shared::commands::{
-    BacklinkResponse, ChangesSummaryResponse, DeckPreferenceResponse,
-    DeckSummaryResponse, FlashcardCreateParams, FlashcardDistractorParams,
-    FlashcardDistractorResponse, FlashcardExplainParams, FlashcardExplainResponse,
-    FlashcardGenerateParams, FlashcardGenerateResponse, FlashcardListParams, FlashcardResponse,
-    FlashcardReviewParams, FlashcardSaveGeneratedParams, FlashcardSubmitAnswerParams,
-    FlashcardUpdateParams, GradeResultResponse, HybridSearchResponse, InboxCreateParams,
-    InboxItemResponse, InsightChatParams, InsightChatStarted, InsightEvolutionResponse,
-    InsightQuizSubmitParams, InsightReviewResponse, InsightReviewStarted,
-    InsightSaveFlashcardsParams, InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams,
-    NoteEditingFinishedParams, NoteLinkResponse, NoteListItem, NoteResponse,
-    NoteRetentionHealthResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
-    NotebookCreateParams, NotebookResponse, NotebookUpdateParams,
-    RecentLearningSession,
-    ScenarioChallengeResponse, ScopePreviewParams, ScopePreviewResponse,
-    StrugglingCardResponse, TabContent,
+    BacklinkResponse, ChangesSummaryResponse, DeckPreferenceResponse, DeckSummaryResponse,
+    FlashcardCreateParams, FlashcardDistractorParams, FlashcardDistractorResponse,
+    FlashcardExplainParams, FlashcardExplainResponse, FlashcardGenerateParams,
+    FlashcardGenerateResponse, FlashcardListParams, FlashcardResponse, FlashcardReviewParams,
+    FlashcardSaveGeneratedParams, FlashcardSubmitAnswerParams, FlashcardUpdateParams,
+    GradeResultResponse, HybridSearchResponse, InboxCreateParams, InboxItemResponse,
+    InsightChatParams, InsightChatStarted, InsightEvolutionResponse, InsightQuizSubmitParams,
+    InsightReviewResponse, InsightReviewStarted, InsightSaveFlashcardsParams,
+    InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams, NoteEditingFinishedParams,
+    NoteLinkResponse, NoteListItem, NoteResponse, NoteRetentionHealthResponse,
+    NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
+    NotebookResponse, NotebookUpdateParams, RecentLearningSession, ScenarioChallengeResponse,
+    ScopePreviewParams, ScopePreviewResponse, StrugglingCardResponse, TabContent,
 };
 use desktop_shared::{errors::ApiError, CommandResult};
 use tauri::{Emitter, State};

@@ -55,6 +55,7 @@ async fn pass_dedups_same_problem_hash_fix_attempts() {
             kind: Some("fix_attempt".into()),
             scope_repo_id: Some("repo:test".into()),
             metadata: Some(r#"{"problem_hash":"abc123"}"#.into()),
+            actor_id: None,
             tier: "raw".into(),
             parent_id: None,
             child_count: 0,

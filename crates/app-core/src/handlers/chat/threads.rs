@@ -14,9 +14,7 @@ use crate::state::AppCore;
 // ── Public free functions ────────────────────────────────────────────────
 
 #[tracing::instrument(skip(repos), err)]
-pub async fn chat_threads(
-    repos: &Repos,
-) -> Result<Vec<ChatThreadResponse>, ApiError> {
+pub async fn chat_threads(repos: &Repos) -> Result<Vec<ChatThreadResponse>, ApiError> {
     let default_filter = ProjectFilter::default();
     let (sessions, visible_contexts, all_areas, all_projects) = tokio::join!(
         repos.sessions.list_sessions(),

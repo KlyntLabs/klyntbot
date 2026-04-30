@@ -19,6 +19,33 @@ use providers::Usage;
 
 use crate::execution::types::{CycleOutcome, ExecutionParams, ToolExecutionResult};
 
+/// Fan out a runtime AgentEvent to both the UI-streaming channel (single-
+/// consumer mpsc::Sender) and the cognitive-ingest broadcast bus.
+///
+/// - `event_tx`: Optional. When `Some`, sends to the chat-streaming pipeline
+///   that emits Tauri `agent:*` events. Drops are ignored (UI may close).
+/// - `domain_bus`: Optional. Used by Distiller and Mirror subscribers.
+///
+/// This is the preferred replacement for direct `event_tx.send(evt).await`
+/// at every existing emit site in `core.rs` and `execute_loop.rs`.
+pub async fn fan_out_event(
+    event_tx: Option<&tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
+    domain_bus: Option<&Arc<bus::DomainEventBus>>,
+    evt: crate::events::AgentEvent,
+) {
+    if let Some(tx) = event_tx {
+        let _ = tx.send(evt.clone()).await;
+    }
+    if let Some(bus) = domain_bus {
+        let payload =
+            serde_json::to_value(&evt).unwrap_or_else(|_| serde_json::json!({"type": "unknown"}));
+        bus.publish(bus::DomainEvent::Generic {
+            kind: "agent_event".into(),
+            payload,
+        });
+    }
+}
+
 /// Extended timeout for interactive tools that wait on user input.
 const INTERACTIVE_TOOL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
 
@@ -29,6 +56,32 @@ const MAX_CONCURRENT_TOOLS: usize = 10;
 /// Tool results accumulate across 500+ messages per session, so this
 /// limit directly bounds session cache footprint.
 const MAX_TOOL_RESULT_LENGTH: usize = 50_000;
+
+/// Partition tool calls by `Tool::is_concurrency_safe`.
+///
+/// Returns `(safe_calls, unsafe_calls)` where safe calls can be run in
+/// parallel via `futures::future::join_all` and unsafe calls must run
+/// sequentially to avoid side-effect races.
+pub fn partition_by_concurrency_safety<'a>(
+    tool_calls: &'a [providers::ToolCall],
+    registry: &'a tools::registry::ToolRegistry,
+) -> (Vec<&'a providers::ToolCall>, Vec<&'a providers::ToolCall>) {
+    let mut safe = Vec::new();
+    let mut unsafe_ = Vec::new();
+    for tc in tool_calls {
+        if let Some(tool) = registry.get(&tc.name) {
+            if tool.is_concurrency_safe(&tc.arguments) {
+                safe.push(tc);
+            } else {
+                unsafe_.push(tc);
+            }
+        } else {
+            // Unknown tools default to unsafe.
+            unsafe_.push(tc);
+        }
+    }
+    (safe, unsafe_)
+}
 
 /// Sanitize tool result string before injecting into conversation messages.
 ///
@@ -188,6 +241,7 @@ async fn call_provider_streaming(
     tools: &[serde_json::Value],
     params: &providers::ChatParams,
     event_tx: &tokio::sync::mpsc::Sender<crate::events::AgentEvent>,
+    domain_bus: Option<&Arc<bus::DomainEventBus>>,
 ) -> Result<providers::LlmResponse> {
     let mut stream = provider.chat_stream(messages, Some(tools), params).await?;
 
@@ -205,9 +259,12 @@ async fn call_provider_streaming(
         if let Some(text) = chunk.content {
             if !text.is_empty() {
                 content.push_str(&text);
-                let _ = event_tx
-                    .send(crate::events::AgentEvent::ContentChunk { data: text })
-                    .await;
+                fan_out_event(
+                    Some(event_tx),
+                    domain_bus,
+                    crate::events::AgentEvent::ContentChunk { data: text },
+                )
+                .await;
             }
         }
 
@@ -415,8 +472,15 @@ impl ExecutionCore {
         // `chat_stream()` impl that wraps `chat()` into a single-chunk stream,
         // so this works uniformly for all providers.
         let response = if let Some(tx) = event_tx {
-            call_provider_streaming(&*self.provider, messages, tools, &params.chat_params, tx)
-                .await?
+            call_provider_streaming(
+                &*self.provider,
+                messages,
+                tools,
+                &params.chat_params,
+                tx,
+                self.domain_event_bus.as_ref(),
+            )
+            .await?
         } else {
             self.provider
                 .chat(messages, Some(tools), &params.chat_params)
@@ -549,6 +613,7 @@ impl ExecutionCore {
                     let args = tc.arguments.clone();
                     let mut ctx = routing_ctx.clone();
                     ctx.entity_tx = Some(entity_tx.clone());
+                    ctx.cancel_token = params.cancel_token.clone();
                     let id = tc.id.clone();
                     let timeout_dur = if name == ASK_USER_TOOL_NAME {
                         INTERACTIVE_TOOL_TIMEOUT
@@ -562,15 +627,16 @@ impl ExecutionCore {
                         let _permit = semaphore.acquire().await.expect("semaphore closed");
 
                         // Emit ToolStart BEFORE executing
-                        if let Some(ref tx) = tx {
-                            let _ = tx
-                                .send(crate::events::AgentEvent::ToolStart {
-                                    name: name.clone(),
-                                    args: args.clone(),
-                                    agent: None,
-                                })
-                                .await;
-                        }
+                        fan_out_event(
+                            tx.as_ref(),
+                            self.domain_event_bus.as_ref(),
+                            crate::events::AgentEvent::ToolStart {
+                                name: name.clone(),
+                                args: args.clone(),
+                                agent: None,
+                            },
+                        )
+                        .await;
 
                         let start = Instant::now();
                         let args_snapshot = args.clone();
@@ -606,30 +672,31 @@ impl ExecutionCore {
                         };
 
                         // Emit ToolEnd AFTER executing
-                        if let Some(ref tx) = tx {
-                            // Truncate result to 2KB to avoid huge WebSocket payloads
-                            let truncated = if result_str.len() > 2048 {
-                                // Find a valid UTF-8 char boundary at or before 2048
-                                let end = (0..=2048)
-                                    .rev()
-                                    .find(|&i| result_str.is_char_boundary(i))
-                                    .unwrap_or(0);
-                                let mut s = result_str[..end].to_string();
-                                s.push_str("…[truncated]");
-                                Some(s)
-                            } else {
-                                Some(result_str.clone())
-                            };
-                            let _ = tx
-                                .send(crate::events::AgentEvent::ToolEnd {
-                                    name: name.clone(),
-                                    success,
-                                    duration_ms,
-                                    result: truncated,
-                                    agent: None,
-                                })
-                                .await;
-                        }
+                        // Truncate result to 2KB to avoid huge WebSocket payloads
+                        let truncated = if result_str.len() > 2048 {
+                            // Find a valid UTF-8 char boundary at or before 2048
+                            let end = (0..=2048)
+                                .rev()
+                                .find(|&i| result_str.is_char_boundary(i))
+                                .unwrap_or(0);
+                            let mut s = result_str[..end].to_string();
+                            s.push_str("…[truncated]");
+                            Some(s)
+                        } else {
+                            Some(result_str.clone())
+                        };
+                        fan_out_event(
+                            tx.as_ref(),
+                            self.domain_event_bus.as_ref(),
+                            crate::events::AgentEvent::ToolEnd {
+                                name: name.clone(),
+                                success,
+                                duration_ms,
+                                result: truncated,
+                                agent: None,
+                            },
+                        )
+                        .await;
 
                         ToolExecutionResult {
                             tool_call_id: id,
@@ -648,12 +715,13 @@ impl ExecutionCore {
             let results = join_all(futures).await;
 
             // Emit EntityCreated events for any entities tools created
-            if let Some(tx) = event_tx {
-                while let Ok(card) = entity_rx.try_recv() {
-                    let _ = tx
-                        .send(crate::events::AgentEvent::EntityCreated(card))
-                        .await;
-                }
+            while let Ok(card) = entity_rx.try_recv() {
+                fan_out_event(
+                    event_tx,
+                    self.domain_event_bus.as_ref(),
+                    crate::events::AgentEvent::EntityCreated(card),
+                )
+                .await;
             }
 
             // Record tool outcomes for learning (best-effort)
@@ -746,67 +814,11 @@ impl ExecutionCore {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use providers::{ChatParams, LlmProvider, LlmResponse, ToolCall, Usage};
+    use crate::test_utils::MockProvider;
+    use providers::{LlmResponse, ToolCall, Usage};
     use serde_json::Value;
-    use std::sync::Mutex;
     use std::time::Duration;
     use tools::Tool;
-
-    // ── Mock provider ────────────────────────────────────────────
-
-    struct MockProvider {
-        responses: Mutex<Vec<LlmResponse>>,
-    }
-
-    impl MockProvider {
-        fn with_text(text: &str) -> Arc<Self> {
-            Arc::new(Self {
-                responses: Mutex::new(vec![LlmResponse {
-                    content: Some(text.to_string()),
-                    tool_calls: vec![],
-                    finish_reason: "stop".to_string(),
-                    usage: Usage::default(),
-                    reasoning_content: None,
-                }]),
-            })
-        }
-
-        fn with_tool_call(name: &str, args: Value) -> Arc<Self> {
-            Arc::new(Self {
-                responses: Mutex::new(vec![LlmResponse {
-                    content: None,
-                    tool_calls: vec![ToolCall {
-                        id: "call_1".to_string(),
-                        name: name.to_string(),
-                        arguments: args,
-                    }],
-                    finish_reason: "tool_calls".to_string(),
-                    usage: Usage::default(),
-                    reasoning_content: None,
-                }]),
-            })
-        }
-    }
-
-    #[async_trait]
-    impl LlmProvider for MockProvider {
-        async fn chat(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[Value]>,
-            _params: &ChatParams,
-        ) -> common::Result<LlmResponse> {
-            let mut responses = self.responses.lock().unwrap();
-            Ok(responses.remove(0))
-        }
-
-        fn default_model(&self) -> &str {
-            "mock"
-        }
-        fn name(&self) -> &str {
-            "mock"
-        }
-    }
 
     // ── Mock tool (fast) ─────────────────────────────────────────
 
@@ -865,7 +877,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_final_response() {
-        let provider = MockProvider::with_text("Hello world");
+        let provider = Arc::new(MockProvider::with_text("Hello world"));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -888,7 +900,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_tool_execution() {
-        let provider = MockProvider::with_tool_call("echo", serde_json::json!({"msg": "test"}));
+        let provider = Arc::new(MockProvider::with_tool_call("echo", serde_json::json!({"msg": "test"})));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -917,7 +929,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_timeout() {
-        let provider = MockProvider::with_tool_call("slow_tool", serde_json::json!({}));
+        let provider = Arc::new(MockProvider::with_tool_call("slow_tool", serde_json::json!({})));
         let registry = make_registry_with(SlowTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -1028,15 +1040,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_empty_response() {
-        let provider = Arc::new(MockProvider {
-            responses: Mutex::new(vec![LlmResponse {
-                content: Some("".to_string()),
-                tool_calls: vec![],
-                finish_reason: "stop".to_string(),
-                usage: Usage::default(),
-                reasoning_content: None,
-            }]),
-        });
+        let provider = Arc::new(MockProvider::with_response(LlmResponse {
+            content: Some("".to_string()),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage::default(),
+            reasoning_content: None,
+        }));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -1057,17 +1067,15 @@ mod tests {
     #[tokio::test]
     async fn test_cycle_detects_fabricated_response() {
         // Provider returns text that looks like a fabricated todo result
-        let provider = Arc::new(MockProvider {
-            responses: Mutex::new(vec![LlmResponse {
-                content: Some(
-                    "I've created the task for you:\n\n**Task Created:** Buy groceries (ID: 9c4e5f3b)\n- **Priority:** P3\n- **Due Date:** Tomorrow".to_string()
-                ),
-                tool_calls: vec![],
-                finish_reason: "stop".to_string(),
-                usage: Usage::default(),
-                reasoning_content: None,
-            }]),
-        });
+        let provider = Arc::new(MockProvider::with_response(LlmResponse {
+            content: Some(
+                "I've created the task for you:\n\n**Task Created:** Buy groceries (ID: 9c4e5f3b)\n- **Priority:** P3\n- **Due Date:** Tomorrow".to_string()
+            ),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage::default(),
+            reasoning_content: None,
+        }));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -1093,7 +1101,7 @@ mod tests {
     #[tokio::test]
     async fn test_cycle_normal_text_not_flagged() {
         let provider =
-            MockProvider::with_text("Sure, I can help you create a task. What would you like?");
+            Arc::new(MockProvider::with_text("Sure, I can help you create a task. What would you like?"));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -1149,19 +1157,17 @@ mod tests {
     #[tokio::test]
     async fn test_content_preserved_with_tool_calls() {
         // Provider returns BOTH content and tool calls
-        let provider = Arc::new(MockProvider {
-            responses: Mutex::new(vec![LlmResponse {
-                content: Some("Let me search for that...".to_string()),
-                tool_calls: vec![ToolCall {
-                    id: "call_1".to_string(),
-                    name: "echo".to_string(),
-                    arguments: serde_json::json!({}),
-                }],
-                finish_reason: "tool_calls".to_string(),
-                usage: Usage::default(),
-                reasoning_content: None,
-            }]),
-        });
+        let provider = Arc::new(MockProvider::with_response(LlmResponse {
+            content: Some("Let me search for that...".to_string()),
+            tool_calls: vec![ToolCall {
+                id: "call_1".to_string(),
+                name: "echo".to_string(),
+                arguments: serde_json::json!({}),
+            }],
+            finish_reason: "tool_calls".to_string(),
+            usage: Usage::default(),
+            reasoning_content: None,
+        }));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 

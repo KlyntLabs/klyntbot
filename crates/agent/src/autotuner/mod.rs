@@ -655,9 +655,7 @@ impl AutoTunerOrchestrator {
             cron_repo
                 .upsert(&updated)
                 .await
-                .map_err(|e| {
-                    common::KlyntbotError::Storage(format!("cron upsert failed: {e}"))
-                })?;
+                .map_err(|e| common::KlyntbotError::Storage(format!("cron upsert failed: {e}")))?;
             info!("updated autotuner nightly cron schedule to {schedule_expr}");
             return Ok(());
         }
@@ -1167,6 +1165,7 @@ mod tests {
                 scope_repo_id: None,
                 metadata: None,
                 kind: None,
+                actor_id: None,
                 tier: "raw".into(),
                 parent_id: None,
                 child_count: 0,
@@ -1189,6 +1188,7 @@ mod tests {
                 scope_repo_id: None,
                 metadata: None,
                 kind: None,
+                actor_id: None,
                 tier: "raw".into(),
                 parent_id: None,
                 child_count: 0,

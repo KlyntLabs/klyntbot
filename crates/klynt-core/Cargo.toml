@@ -1,0 +1,34 @@
+[package]
+name = "klynt-core"
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+description = "Klynt core — coding-tool registry (bash/read/edit/...), execpolicy/sandbox/hooks glue, slash-command direct dispatch."
+
+[dependencies]
+common = { workspace = true }
+agent = { workspace = true }
+tools-core = { workspace = true }
+tools-core-macros = { workspace = true }
+config = { workspace = true }
+bus = { workspace = true }
+klynt-protocol = { workspace = true }
+klynt-execpolicy = { workspace = true }
+klynt-sandbox = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["sync", "process", "macros", "rt", "time"] }
+tokio-util = { workspace = true }
+dashmap = { workspace = true }
+globset = { workspace = true }
+sha2 = "0.10"
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+dirs = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }
+proptest = { workspace = true }
+tempfile = { workspace = true }

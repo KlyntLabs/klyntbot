@@ -27,6 +27,15 @@ use super::AgentEvent;
 /// Window (in minutes) to retroactively mark shadow log entries as corrected.
 const CORRECTION_WINDOW_MINUTES: i32 = 15;
 
+/// Truncate `content` to `max` bytes, appending "..." if truncated.
+fn preview_text(content: &str, max: usize) -> String {
+    if content.len() > max {
+        format!("{}...", truncate_at_boundary(content, max))
+    } else {
+        content.to_string()
+    }
+}
+
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
     /// Agent events (content chunks, tool status).
@@ -544,11 +553,7 @@ impl AgentLoop {
             *last_active.write().await = Some((msg.channel.clone(), msg.chat_id.clone()));
         }
 
-        let preview = if msg.content.len() > 80 {
-            format!("{}...", truncate_at_boundary(&msg.content, 80))
-        } else {
-            msg.content.clone()
-        };
+        let preview = preview_text(&msg.content, 80);
 
         info!(
             "Processing message from {}:{}: {}",
@@ -733,10 +738,7 @@ impl AgentLoop {
         let system_msg_content = format!("[System: {}] {}", msg.sender_id, msg.content);
 
         // Get or create session and mutate under the per-session lock
-        let session_arc = self
-            .session_manager
-            .get_or_create(&session_key)
-            .await?;
+        let session_arc = self.session_manager.get_or_create(&session_key).await?;
         let history = {
             let mut session = session_arc.lock().await;
             session.add_message("system", &system_msg_content);
@@ -895,13 +897,28 @@ impl AgentLoop {
     ) -> Result<String> {
         let history_messages = Self::convert_history(&history);
         let (tool_defs, _tool_names) = self.get_tool_info().await;
+        let channel = common::coding_channel::Channel::from_name(routing_ctx.channel.as_str());
+        let filtered_defs: Arc<Vec<serde_json::Value>> = Arc::new(
+            tool_defs
+                .iter()
+                .filter(|def| {
+                    let name = def
+                        .get("function")
+                        .and_then(|f| f.get("name"))
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("");
+                    common::available_for_channel(name, channel)
+                })
+                .cloned()
+                .collect(),
+        );
 
         let result = self
             .runtime
             .process_message(
                 content,
                 history_messages,
-                &tool_defs,
+                &filtered_defs,
                 routing_ctx,
                 event_tx.clone(),
                 cancel_token,
@@ -942,17 +959,10 @@ impl AgentLoop {
         session_key: &str,
         label: &str,
     ) -> Result<Vec<session::SessionMessage>> {
-        let preview = if content.len() > 80 {
-            format!("{}...", truncate_at_boundary(content, 80))
-        } else {
-            content.to_string()
-        };
+        let preview = preview_text(content, 80);
         debug!("Processing {} message: {}", label, preview);
 
-        let session_arc = self
-            .session_manager
-            .get_or_create(session_key)
-            .await?;
+        let session_arc = self.session_manager.get_or_create(session_key).await?;
         let (history, embed_msg_id) = {
             let mut session = session_arc.lock().await;
             session.add_message("user", content);
@@ -1035,8 +1045,7 @@ impl AgentLoop {
             if let Some(ref original) = last_assistant_content {
                 if cooldown_after_decrement == 0 {
                     // Set cooldown under a fresh lock (mirrors process_message's second lock)
-                    if let Ok(session_arc) =
-                        self.session_manager.get_or_create(&session_key).await
+                    if let Ok(session_arc) = self.session_manager.get_or_create(&session_key).await
                     {
                         let mut session = session_arc.lock().await;
                         session.correction_cooldown = 3;
@@ -1092,7 +1101,7 @@ impl AgentLoop {
 
         // Routing context with interaction channel for ask_user tool
         let routing_ctx = RoutingContext::with_interaction(
-            "cli".into(),
+            "desktop".into(),
             session_key.clone().into(),
             interaction_tx,
         );

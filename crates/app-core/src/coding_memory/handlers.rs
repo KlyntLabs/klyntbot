@@ -278,6 +278,14 @@ pub async fn cost_breakdown(pool: &sqlx::SqlitePool, days: i64) -> Result<CostBr
         let req: i64 = r.try_get("req").unwrap_or(0);
         let (in_cost, out_cost) =
             common::pricing::cost_for(&model, in_tok as u64, out_tok as u64).unwrap_or((0.0, 0.0));
+        let total_cost = common::pricing::cost_with_cache_for(
+            &model,
+            in_tok as u64,
+            out_tok as u64,
+            cache_tok as u64,
+            0,
+        )
+        .unwrap_or(0.0);
         rows.push(CostBreakdownRow {
             date: r.try_get("d").unwrap_or_default(),
             model,
@@ -288,7 +296,7 @@ pub async fn cost_breakdown(pool: &sqlx::SqlitePool, days: i64) -> Result<CostBr
             cached_tokens: cache_tok,
             input_cost_usd: in_cost,
             output_cost_usd: out_cost,
-            total_cost_usd: in_cost + out_cost,
+            total_cost_usd: total_cost,
         });
     }
 

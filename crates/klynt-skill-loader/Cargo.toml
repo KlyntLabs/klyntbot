@@ -1,0 +1,15 @@
+[package]
+name = "klynt-skill-loader"
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+description = "Klynt skill discovery + paths-conditional activation + dynamic discovery. Extends skill-system."
+
+[dependencies]
+common = { path = "../common" }
+skill-system = { path = "../skill-system" }
+serde = { workspace = true }
+serde_yaml = "0.9"
+globset = "0.4"
+
+[dev-dependencies]

@@ -30,8 +30,7 @@ static DATA_VERSION_WATCHER: OnceLock<tokio_util::sync::CancellationToken> = Onc
 /// `DistractionAlert` is forwarded; cleared when the overlay's React layer
 /// acks via `distraction_clear_pending_intervention`. This survives the
 /// emit-before-mount race for the lazily-created overlay window.
-static PENDING_INTERVENTION: OnceLock<Mutex<Option<events::InterventionPayload>>> =
-    OnceLock::new();
+static PENDING_INTERVENTION: OnceLock<Mutex<Option<events::InterventionPayload>>> = OnceLock::new();
 
 fn pending_intervention_slot() -> &'static Mutex<Option<events::InterventionPayload>> {
     PENDING_INTERVENTION.get_or_init(|| Mutex::new(None))

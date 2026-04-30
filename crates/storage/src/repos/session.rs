@@ -510,4 +510,14 @@ impl SessionRepo {
         .await?;
         Ok(())
     }
+
+    /// Update the conversation type for a session.
+    pub async fn update_conversation_type(&self, key: &str, t: &str) -> Result<(), StorageError> {
+        sqlx::query("UPDATE sessions SET conversation_type = ?1 WHERE key = ?2")
+            .bind(t)
+            .bind(key)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
 }

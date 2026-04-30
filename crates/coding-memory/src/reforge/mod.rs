@@ -6,6 +6,7 @@
 //! and `app-core::coding_memory::reforge` link against.
 
 pub mod coding_synthesis;
+pub mod cross_cli_synthesis;
 pub mod cross_session_dedup;
 pub mod managed_block;
 pub mod rule_artifacts;
@@ -19,6 +20,7 @@ pub mod types;
 pub mod writer;
 
 pub use coding_synthesis::CodingSynthesisPhase;
+pub use cross_cli_synthesis::{find_transferable_rules, TransferableCandidate};
 pub use cross_session_dedup::CrossSessionDedup;
 pub use managed_block::{ManagedBlock, ManagedBlockError};
 pub use rule_artifacts::RuleArtifactGenerationPhase;

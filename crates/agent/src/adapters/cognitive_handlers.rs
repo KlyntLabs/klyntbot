@@ -682,11 +682,7 @@ impl cognitive::services::graph_linker::GraphLinkHandler for LlmGraphLinkHandler
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| {
-                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                    "graph_link: {e}"
-                )))
-            })?;
+            .map_err(|e| crate::provider_err("graph_link", e))?;
 
         let text = resp.content.unwrap_or_default();
         match serde_json::from_str::<cognitive::services::graph_linker_types::GraphLinkOutput>(
@@ -851,11 +847,8 @@ impl cognitive::pipeline::DeepConsolidationHandler for LlmDeepConsolidationHandl
         let response = self.provider.chat(&messages, None, &self.params).await?;
         let content = response.content.unwrap_or_default();
 
-        let parsed: DeepConsolidationResponse = serde_json::from_str(&content).map_err(|e| {
-            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                "Deep consolidation JSON parse: {e}"
-            )))
-        })?;
+        let parsed: DeepConsolidationResponse = serde_json::from_str(&content)
+            .map_err(|e| crate::provider_err("Deep consolidation JSON parse", e))?;
 
         let mut ops = Vec::new();
         for decision in parsed.decisions {
@@ -1104,11 +1097,8 @@ impl ExtractionCriticHandler for LlmExtractionCriticHandler {
         if input.extracted_facts.is_empty() {
             return Ok(Default::default());
         }
-        let user = serde_json::to_string(&input).map_err(|e| {
-            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                "critic serialize: {e}"
-            )))
-        })?;
+        let user = serde_json::to_string(&input)
+            .map_err(|e| crate::provider_err("critic serialize", e))?;
         let messages = vec![
             Message::System {
                 content: EXTRACTION_CRITIC_SYSTEM_PROMPT.to_string(),
@@ -1121,11 +1111,7 @@ impl ExtractionCriticHandler for LlmExtractionCriticHandler {
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| {
-                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                    "critic: {e}"
-                )))
-            })?;
+            .map_err(|e| crate::provider_err("critic", e))?;
         match serde_json::from_str::<ExtractionCriticOutput>(&resp.content.unwrap_or_default()) {
             Ok(o) => Ok(o),
             Err(e) => {
@@ -1196,11 +1182,7 @@ impl LlmCommunityMembershipHandler {
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| {
-                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                    "community_membership: {e}"
-                )))
-            })?;
+            .map_err(|e| crate::provider_err("community_membership", e))?;
 
         #[derive(serde::Deserialize)]
         struct R {
@@ -1276,11 +1258,8 @@ impl LlmMicroReforgeHandler {
 #[async_trait]
 impl MicroReforgeHandler for LlmMicroReforgeHandler {
     async fn synthesize(&self, input: MicroReforgeInput) -> common::Result<MicroReforgeOutput> {
-        let user = serde_json::to_string(&input).map_err(|e| {
-            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                "micro_reforge serialize: {e}"
-            )))
-        })?;
+        let user = serde_json::to_string(&input)
+            .map_err(|e| crate::provider_err("micro_reforge serialize", e))?;
         let messages = vec![
             Message::System {
                 content: MICRO_REFORGE_SYSTEM_PROMPT.to_string(),
@@ -1293,11 +1272,7 @@ impl MicroReforgeHandler for LlmMicroReforgeHandler {
             .provider
             .chat(&messages, None, &self.params)
             .await
-            .map_err(|e| {
-                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                    "micro_reforge: {e}"
-                )))
-            })?;
+            .map_err(|e| crate::provider_err("micro_reforge", e))?;
         let text = resp.content.unwrap_or_default();
         match serde_json::from_str::<MicroReforgeOutput>(&text) {
             Ok(out) => Ok(out),
@@ -1335,15 +1310,23 @@ impl LlmQueryPredictorHandler {
     }
 
     pub async fn predict_next(&self, recent_turn: &str, n: u32) -> common::Result<Vec<String>> {
-        let user = format!("RECENT TURN:\n{}\n\nPredict {n} follow-up questions.", recent_turn);
+        let user = format!(
+            "RECENT TURN:\n{}\n\nPredict {n} follow-up questions.",
+            recent_turn
+        );
         let messages = vec![
             providers::Message::system(QUERY_PREDICTOR_SYSTEM_PROMPT),
             providers::Message::user(user),
         ];
-        let resp = self.provider.chat(&messages, None, &self.params).await
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("query_predictor: {e}"))))?;
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| crate::provider_err("query_predictor", e))?;
         #[derive(serde::Deserialize)]
-        struct R { predictions: Vec<String> }
+        struct R {
+            predictions: Vec<String>,
+        }
         let parsed: R = serde_json::from_str(&resp.content.unwrap_or_default())
             .map_err(|e| common::KlyntbotError::Json(e))?;
         Ok(parsed.predictions.into_iter().take(n as usize).collect())
@@ -1391,25 +1374,47 @@ impl LlmHierarchicalSummarizer {
 }
 
 #[async_trait::async_trait]
-impl cognitive::services::hierarchical_compressor::HierarchicalSummarizer for LlmHierarchicalSummarizer {
-    async fn summarize(&self, items: &[cognitive::types::EpisodicMemory], tier: cognitive::services::hierarchical_compressor::Tier) -> common::Result<String> {
-        if items.is_empty() { return Ok(String::new()); }
+impl cognitive::services::hierarchical_compressor::HierarchicalSummarizer
+    for LlmHierarchicalSummarizer
+{
+    async fn summarize(
+        &self,
+        items: &[cognitive::types::EpisodicMemory],
+        tier: cognitive::services::hierarchical_compressor::Tier,
+    ) -> common::Result<String> {
+        if items.is_empty() {
+            return Ok(String::new());
+        }
         let system = match tier {
             cognitive::services::hierarchical_compressor::Tier::Raw => "Return content unchanged.",
-            cognitive::services::hierarchical_compressor::Tier::Hourly => HIERARCHICAL_HOURLY_PROMPT,
+            cognitive::services::hierarchical_compressor::Tier::Hourly => {
+                HIERARCHICAL_HOURLY_PROMPT
+            }
             cognitive::services::hierarchical_compressor::Tier::Daily => HIERARCHICAL_DAILY_PROMPT,
-            cognitive::services::hierarchical_compressor::Tier::Weekly => HIERARCHICAL_WEEKLY_PROMPT,
+            cognitive::services::hierarchical_compressor::Tier::Weekly => {
+                HIERARCHICAL_WEEKLY_PROMPT
+            }
         };
-        let user = items.iter()
-            .map(|e| format!("[{}] {}", e.recorded_at, e.summary.as_deref().unwrap_or(&e.content)))
+        let user = items
+            .iter()
+            .map(|e| {
+                format!(
+                    "[{}] {}",
+                    e.recorded_at,
+                    e.summary.as_deref().unwrap_or(&e.content)
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n");
         let messages = vec![
             providers::Message::system(system),
             providers::Message::user(user),
         ];
-        let resp = self.provider.chat(&messages, None, &self.params).await
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("hier_summarize: {e}"))))?;
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| crate::provider_err("hier_summarize", e))?;
         Ok(resp.content.unwrap_or_default())
     }
 }
@@ -1441,17 +1446,26 @@ impl LlmTemporalPrunerHandler {
 
 #[async_trait::async_trait]
 impl cognitive::services::temporal_pruner::TemporalPrunerHandler for LlmTemporalPrunerHandler {
-    async fn prune(&self, input: cognitive::services::temporal_pruner::PruneInput) -> common::Result<cognitive::services::temporal_pruner::PruneOutput> {
-        if input.facts.is_empty() { return Ok(Default::default()); }
-        let user = serde_json::to_string(&input)
-            .map_err(|e| common::KlyntbotError::Json(e))?;
+    async fn prune(
+        &self,
+        input: cognitive::services::temporal_pruner::PruneInput,
+    ) -> common::Result<cognitive::services::temporal_pruner::PruneOutput> {
+        if input.facts.is_empty() {
+            return Ok(Default::default());
+        }
+        let user = serde_json::to_string(&input).map_err(|e| common::KlyntbotError::Json(e))?;
         let messages = vec![
             providers::Message::system(TEMPORAL_PRUNE_SYSTEM_PROMPT),
             providers::Message::user(user),
         ];
-        let resp = self.provider.chat(&messages, None, &self.params).await
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!("temporal_prune: {e}"))))?;
-        match serde_json::from_str::<cognitive::services::temporal_pruner::PruneOutput>(&resp.content.unwrap_or_default()) {
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| crate::provider_err("temporal_prune", e))?;
+        match serde_json::from_str::<cognitive::services::temporal_pruner::PruneOutput>(
+            &resp.content.unwrap_or_default(),
+        ) {
             Ok(o) => Ok(o),
             Err(_) => Ok(cognitive::services::temporal_pruner::PruneOutput {
                 keep: input.facts.iter().map(|f| f.fact_id.clone()).collect(),
@@ -1471,82 +1485,8 @@ mod tests {
     use cognitive::situation::UserSituation;
     use cognitive::types::{SemanticFact, DEFAULT_MEMORY_TYPE};
     use feature_coaching::signal_accumulator::TriggerFired;
-    use providers::{LlmResponse, LlmStream, ProviderCapabilities, ProviderHealth, Usage};
-
-    // ── MockProvider ──
-
-    struct MockProvider {
-        response: Result<LlmResponse, String>,
-    }
-
-    impl MockProvider {
-        fn new(response: LlmResponse) -> Self {
-            Self {
-                response: Ok(response),
-            }
-        }
-
-        fn new_error(msg: &str) -> Self {
-            Self {
-                response: Err(msg.into()),
-            }
-        }
-    }
-
-    #[async_trait]
-    impl providers::LlmProvider for MockProvider {
-        async fn chat(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[serde_json::Value]>,
-            _params: &ChatParams,
-        ) -> common::Result<LlmResponse> {
-            match &self.response {
-                Ok(r) => Ok(r.clone()),
-                Err(e) => Err(common::KlyntbotError::Provider(
-                    common::ProviderError::InvalidResponse(e.clone()),
-                )),
-            }
-        }
-
-        async fn chat_stream(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[serde_json::Value]>,
-            _params: &ChatParams,
-        ) -> common::Result<LlmStream> {
-            unimplemented!("mock doesn't support streaming")
-        }
-
-        fn supports_streaming(&self) -> bool {
-            false
-        }
-        fn default_model(&self) -> &str {
-            "mock"
-        }
-        fn name(&self) -> &str {
-            "mock"
-        }
-        fn capabilities(&self) -> ProviderCapabilities {
-            ProviderCapabilities::default()
-        }
-        fn context_window(&self) -> usize {
-            128000
-        }
-        async fn health_check(&self) -> common::Result<ProviderHealth> {
-            Ok(ProviderHealth::Healthy)
-        }
-    }
-
-    fn mock_response(content: &str) -> LlmResponse {
-        LlmResponse {
-            content: Some(content.into()),
-            tool_calls: vec![],
-            finish_reason: "stop".into(),
-            usage: Usage::default(),
-            reasoning_content: None,
-        }
-    }
+    use crate::test_utils::MockProvider;
+    use providers::LlmResponse;
 
     // ── Test helpers ──
 
@@ -1711,9 +1651,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_extraction_parses_json_response() {
-        let mock = Arc::new(MockProvider::new(mock_response(
+        let mock = Arc::new(MockProvider::with_text(
             r#"{"results":[{"observation_index":1,"facts":[{"domain":"energy","subject":"user","predicate":"peak_hours","object":"10am-12pm","confidence":0.85,"source":"observed"}]}]}"#,
-        )));
+        ));
         let params = ChatParams::new("test-model")
             .with_temperature(0.2)
             .with_max_tokens(1024);
@@ -1740,7 +1680,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_extraction_falls_back_on_error() {
-        let mock = Arc::new(MockProvider::new_error("LLM unavailable"));
+        let mock = Arc::new(MockProvider::with_error("LLM unavailable"));
         let params = ChatParams::new("test-model");
         let handler = LlmExtractionHandler::new(mock, params);
 
@@ -1865,7 +1805,7 @@ mod tests {
         use cognitive::services::graph_linker::GraphLinkHandler;
         use cognitive::services::graph_linker_types::*;
 
-        let mock = Arc::new(MockProvider::new(mock_response("not json")));
+        let mock = Arc::new(MockProvider::with_text("not json"));
         let params = ChatParams::new("test-model");
         let handler = LlmGraphLinkHandler::new(mock, params);
 
@@ -1927,7 +1867,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_coaching_reasoner_falls_back() {
-        let mock = Arc::new(MockProvider::new_error("LLM down"));
+        let mock = Arc::new(MockProvider::with_error("LLM down"));
         let params = ChatParams::new("test-model");
         let handler = LlmCoachingReasonerHandler::new(mock, params);
 
@@ -2031,7 +1971,7 @@ mod tests {
             ],
             "notes": null
         }"#;
-        let provider = MockProvider::new(LlmResponse {
+        let provider = MockProvider::with_response(LlmResponse {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
@@ -2161,10 +2101,15 @@ mod tests {
         });
         let handler = LlmQueryPredictorHandler::new(
             Arc::new(provider),
-            providers::ChatParams::new("m").with_max_tokens(256).with_response_format(providers::ResponseFormat::JsonObject),
+            providers::ChatParams::new("m")
+                .with_max_tokens(256)
+                .with_response_format(providers::ResponseFormat::JsonObject),
         );
 
-        let preds = handler.predict_next("user just asked about Rust", 3).await.unwrap();
+        let preds = handler
+            .predict_next("user just asked about Rust", 3)
+            .await
+            .unwrap();
         assert_eq!(preds.len(), 3);
     }
 
@@ -2172,7 +2117,8 @@ mod tests {
     async fn llm_temporal_pruner_drops_facts_with_explicit_supersede() {
         use cognitive::services::temporal_pruner::*;
 
-        let json = r#"{"keep": ["f2"], "drop": [{"fact_id": "f1", "reason": "f2 supersedes by date"}]}"#;
+        let json =
+            r#"{"keep": ["f2"], "drop": [{"fact_id": "f1", "reason": "f2 supersedes by date"}]}"#;
         let provider = MockProvider::new(LlmResponse {
             content: Some(json.to_string()),
             tool_calls: vec![],
@@ -2182,13 +2128,29 @@ mod tests {
         });
         let handler = LlmTemporalPrunerHandler::new(
             Arc::new(provider),
-            providers::ChatParams::new("m").with_max_tokens(512).with_response_format(providers::ResponseFormat::JsonObject),
+            providers::ChatParams::new("m")
+                .with_max_tokens(512)
+                .with_response_format(providers::ResponseFormat::JsonObject),
         );
 
         let input = PruneInput {
             facts: vec![
-                PruneFactRef { fact_id: "f1".into(), subject: "Alice".into(), predicate: "works_at".into(), object: "Google".into(), valid_at: "2023-01-01T00:00:00Z".into(), valid_until: None },
-                PruneFactRef { fact_id: "f2".into(), subject: "Alice".into(), predicate: "works_at".into(), object: "Anthropic".into(), valid_at: "2025-06-01T00:00:00Z".into(), valid_until: None },
+                PruneFactRef {
+                    fact_id: "f1".into(),
+                    subject: "Alice".into(),
+                    predicate: "works_at".into(),
+                    object: "Google".into(),
+                    valid_at: "2023-01-01T00:00:00Z".into(),
+                    valid_until: None,
+                },
+                PruneFactRef {
+                    fact_id: "f2".into(),
+                    subject: "Alice".into(),
+                    predicate: "works_at".into(),
+                    object: "Anthropic".into(),
+                    valid_at: "2025-06-01T00:00:00Z".into(),
+                    valid_until: None,
+                },
             ],
             query_time: "2026-04-29T00:00:00Z".into(),
         };

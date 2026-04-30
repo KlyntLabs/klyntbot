@@ -16,42 +16,35 @@ use tracing::{debug, info, warn};
 /// Tree rebuild + LanceDB embed is expensive — avoid redundant work during rapid edits.
 const DEBOUNCE_SECS: u64 = 3;
 
-use bus::{
-    ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, DomainEventBus,
-    UpdatePriority,
-};
-use cognitive::TextEmbedder;
-use common::truncate_at_boundary;
+use bus::{ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, UpdatePriority};
 use context_engine::book_index::types::SourceType;
-use context_engine::book_index::BookTreeRepo;
+
+use super::tree_builder_base::{compose_embedding_text_with_truncate, TreeBuilderCore};
 
 /// Subscribes to `NoteContentChanged` events and rebuilds the tree index for
 /// the affected note: parse -> SQLite -> LanceDB embeddings -> context update.
 pub struct NoteTreeBuilder {
-    tree_repo: Arc<dyn BookTreeRepo>,
-    vector_store: Arc<storage::VectorStore>,
-    embedder: Arc<dyn TextEmbedder>,
-    context_update_queue: Option<Arc<ContextUpdateQueue>>,
-    #[allow(dead_code)]
-    domain_event_bus: Option<Arc<DomainEventBus>>,
+    core: TreeBuilderCore,
     note_repo: feature_notes::repo::NoteRepo,
 }
 
 impl NoteTreeBuilder {
     pub fn new(
-        tree_repo: Arc<dyn BookTreeRepo>,
+        tree_repo: Arc<dyn context_engine::book_index::BookTreeRepo>,
         vector_store: Arc<storage::VectorStore>,
-        embedder: Arc<dyn TextEmbedder>,
+        embedder: Arc<dyn cognitive::TextEmbedder>,
         context_update_queue: Option<Arc<ContextUpdateQueue>>,
-        domain_event_bus: Option<Arc<DomainEventBus>>,
+        domain_event_bus: Option<Arc<bus::DomainEventBus>>,
         note_repo: feature_notes::repo::NoteRepo,
     ) -> Self {
         Self {
-            tree_repo,
-            vector_store,
-            embedder,
-            context_update_queue,
-            domain_event_bus,
+            core: TreeBuilderCore::new(
+                tree_repo,
+                vector_store,
+                embedder,
+                context_update_queue,
+                domain_event_bus,
+            ),
             note_repo,
         }
     }
@@ -144,6 +137,7 @@ impl NoteTreeBuilder {
 
         // 2. Delete existing tree nodes for this note (full rebuild).
         if let Err(e) = self
+            .core
             .tree_repo
             .delete_by_source(&SourceType::Note, note_id)
             .await
@@ -153,6 +147,7 @@ impl NoteTreeBuilder {
 
         // Delete old vector embeddings for this note.
         if let Err(e) = self
+            .core
             .vector_store
             .delete_tree_node_embeddings_by_note(note_id)
             .await
@@ -161,7 +156,7 @@ impl NoteTreeBuilder {
         }
 
         // 3. Insert new tree nodes into SQLite.
-        self.tree_repo.insert_nodes(&nodes).await?;
+        self.core.tree_repo.insert_nodes(&nodes).await?;
 
         debug!(
             note_id = %note_id,
@@ -172,15 +167,16 @@ impl NoteTreeBuilder {
         // 4. Embed each node and upsert to LanceDB.
         let mut embedded_count = 0_usize;
         for node in &nodes {
-            let embed_text = compose_embedding_text(node);
+            let embed_text = compose_embedding_text_with_truncate(node);
             if embed_text.is_empty() {
                 continue;
             }
 
-            match self.embedder.embed(&embed_text).await {
+            match self.core.embedder.embed(&embed_text).await {
                 Ok(embedding) => {
                     let level_str = node.level.to_string();
                     if let Err(e) = self
+                        .core
                         .vector_store
                         .upsert_tree_node_embedding(
                             &node.id,
@@ -215,7 +211,7 @@ impl NoteTreeBuilder {
         );
 
         // 5. Push context update for live injection.
-        if let Some(queue) = &self.context_update_queue {
+        if let Some(queue) = &self.core.context_update_queue {
             let section_titles: Vec<&str> =
                 nodes.iter().filter_map(|n| n.title.as_deref()).collect();
 
@@ -239,8 +235,6 @@ impl NoteTreeBuilder {
             });
         }
 
-        // TreeNodesRebuilt variant deleted; EntityTreeLinker no-op.
-
         info!(
             note_id = %note_id,
             node_count = nodes.len(),
@@ -252,28 +246,9 @@ impl NoteTreeBuilder {
     }
 }
 
-/// Compose embedding text for a tree node based on its level:
-/// - Level 0: title only (root/document node)
-/// - Level 1-6: title + content preview (300 chars)
-/// - Level 7+: content only (300 chars) — list items, deep nodes
-fn compose_embedding_text(node: &context_engine::book_index::types::TreeNode) -> String {
-    let title = node.title.as_deref().unwrap_or("");
-    let content_preview = truncate_at_boundary(&node.content, 300);
-
-    match node.level {
-        0 => title.to_string(),
-        1..=6 => {
-            if title.is_empty() {
-                content_preview.to_string()
-            } else if content_preview.is_empty() || content_preview == title {
-                title.to_string()
-            } else {
-                format!("{title} {content_preview}")
-            }
-        }
-        _ => content_preview.to_string(),
-    }
-}
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -294,7 +269,7 @@ mod tests {
             position: 0,
             metadata: None,
         };
-        assert_eq!(compose_embedding_text(&node), "My Document");
+        assert_eq!(compose_embedding_text_with_truncate(&node), "My Document");
     }
 
     #[test]
@@ -312,7 +287,7 @@ mod tests {
             metadata: None,
         };
         // title == content, so just title
-        assert_eq!(compose_embedding_text(&node), "Introduction");
+        assert_eq!(compose_embedding_text_with_truncate(&node), "Introduction");
     }
 
     #[test]
@@ -330,7 +305,7 @@ mod tests {
             metadata: None,
         };
         assert_eq!(
-            compose_embedding_text(&node),
+            compose_embedding_text_with_truncate(&node),
             "Subsection A This is a paragraph with some text."
         );
     }
@@ -349,24 +324,9 @@ mod tests {
             position: 3,
             metadata: None,
         };
-        assert_eq!(compose_embedding_text(&node), "Item 1\nItem 2\nItem 3");
-    }
-
-    #[test]
-    fn truncate_respects_char_boundary() {
-        let s = "hello world";
-        assert_eq!(truncate_at_boundary(s, 5), "hello");
-
-        let unicode = "cafe\u{0301}"; // "cafe" + combining accent = "cafe\u{0301}"
-                                      // The combining accent is 2 bytes at position 4..6
-        let result = truncate_at_boundary(unicode, 5);
-        assert!(result.len() <= 5);
-        assert!(result.is_char_boundary(result.len()));
-    }
-
-    #[test]
-    fn truncate_short_string_unchanged() {
-        let s = "short";
-        assert_eq!(truncate_at_boundary(s, 300), "short");
+        assert_eq!(
+            compose_embedding_text_with_truncate(&node),
+            "Item 1\nItem 2\nItem 3"
+        );
     }
 }

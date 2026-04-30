@@ -54,6 +54,7 @@ async fn phase_b_session_drives_micro_reforge_critic_and_community() {
                 importance: 0.75,
                 stability: 1.0,
                 scope_type: "project".into(),
+                tier: "raw".into(),
                 ..Default::default()
             })
             .await

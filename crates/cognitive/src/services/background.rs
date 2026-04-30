@@ -480,6 +480,7 @@ impl BackgroundConsolidationService {
                                     kind: None,
                                     scope_repo_id: None,
                                     metadata: None,
+                                    actor_id: None,
                                     tier: "raw".to_string(),
                                     parent_id: None,
                                     child_count: 0,
@@ -1033,12 +1034,21 @@ async fn apply_graph_link_output(
         }
     }
 
-    // 3. Apply merges (entity merges). Conservative: only emit a merge_log row.
+    // 3. Apply merges (entity merges). Conservative: only emit a merge_proposal row.
     // Actual merging happens in nightly Reforge Phase 6.5 to avoid corrupting in-flight state.
-    for _merge in &out.merges {
-        // merge_proposals table will be added in Track 9 if needed.
-        // For now, log only.
-        tracing::debug!("linker: merge proposal skipped (nightly reforge handles merges)");
+    for merge in &out.merges {
+        if let Err(e) = entity_repo
+            .record_merge_proposal(
+                &merge.entity_a_id,
+                &merge.entity_b_id,
+                &merge.canonical_name,
+                &merge.reason,
+                "graph_linker",
+            )
+            .await
+        {
+            tracing::debug!(error = %e, "linker: record_merge_proposal failed");
+        }
     }
 
     Ok(())

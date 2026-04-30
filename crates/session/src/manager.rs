@@ -277,10 +277,7 @@ impl SessionManager {
     ///
     /// Returns an `Arc<TokioMutex<Session>>` — the caller locks it per-session.
     /// Concurrent calls for *different* keys proceed without blocking each other.
-    pub async fn get_or_create(
-        &self,
-        key: impl Into<String>,
-    ) -> Result<Arc<TokioMutex<Session>>> {
+    pub async fn get_or_create(&self, key: impl Into<String>) -> Result<Arc<TokioMutex<Session>>> {
         let key = key.into();
 
         // Update LRU order and collect keys to evict (sync, brief hold).
@@ -365,9 +362,7 @@ impl SessionManager {
             }
             Err(storage::StorageError::NotFound(_)) => {
                 let metadata = serde_json::Value::Object(serde_json::Map::new());
-                self.sql_repo
-                    .upsert_session(&key, &metadata)
-                    .await?;
+                self.sql_repo.upsert_session(&key, &metadata).await?;
                 debug!("Creating new session in SQL: {}", key);
                 Session::new(key.clone())
             }

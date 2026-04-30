@@ -37,4 +37,5 @@ pub mod reforge_handlers;
 pub mod signal_enrichment;
 pub mod task_embedding;
 pub mod task_tree_builder;
+pub mod tree_builder_base;
 pub mod tree_node_search;

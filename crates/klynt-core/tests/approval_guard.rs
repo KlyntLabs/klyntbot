@@ -1,0 +1,135 @@
+use agent::events::AgentEvent;
+use bus::DomainEventBus;
+use config::schema::CodingPermissions;
+use klynt_core::approval::{
+    decision::{ApprovalDecision, ApprovalLayer},
+    guard::{evaluate, GuardCtx, APPROVAL_TIMEOUT},
+    round_trip::PendingApprovalsMap,
+    Layer1,
+};
+use klynt_core::privacy::PrivacyGuard;
+use klynt_execpolicy::Policy;
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
+
+#[tokio::test]
+async fn privacy_blocks_first() {
+    let perms = CodingPermissions {
+        allow: vec!["Bash(*)".into()],
+        ..Default::default()
+    };
+    let l1 = Layer1::compile(&perms).unwrap();
+    let privacy = PrivacyGuard::from_globs(&["**/.env"]).unwrap();
+    let policy = Policy::empty();
+    let bus = Arc::new(DomainEventBus::new(64));
+    let (tx, mut rx) = mpsc::channel::<AgentEvent>(32);
+    let pending = Arc::new(PendingApprovalsMap::new());
+
+    let ctx = GuardCtx {
+        layer1: &l1,
+        policy: &policy,
+        privacy: &privacy,
+        pending: &pending,
+        event_tx: Some(&tx),
+        domain_bus: &bus,
+        cancel: CancellationToken::new(),
+        request_id: "r1".into(),
+        args: None,
+        cwd: None,
+    };
+    let d = evaluate(ctx, "bash", "cat .env").await;
+    assert!(matches!(d, ApprovalDecision::PrivacyDenied { .. }));
+    let evt = rx.recv().await.unwrap();
+    assert!(matches!(evt, AgentEvent::ApprovalRequested { .. }));
+    let resolved = rx.recv().await.unwrap();
+    assert!(matches!(resolved, AgentEvent::ApprovalResolved { .. }));
+}
+
+#[tokio::test]
+async fn auto_allow_emits_pair_no_user_input() {
+    let perms = CodingPermissions {
+        allow: vec!["Bash(echo *)".into()],
+        default_if_no_match: "ask".into(),
+        ..Default::default()
+    };
+    let l1 = Layer1::compile(&perms).unwrap();
+    let privacy = PrivacyGuard::from_globs(&[]).unwrap();
+    let policy = Policy::empty();
+    let bus = Arc::new(DomainEventBus::new(64));
+    let (tx, mut rx) = mpsc::channel(32);
+    let pending = Arc::new(PendingApprovalsMap::new());
+
+    let ctx = GuardCtx {
+        layer1: &l1,
+        policy: &policy,
+        privacy: &privacy,
+        pending: &pending,
+        event_tx: Some(&tx),
+        domain_bus: &bus,
+        cancel: CancellationToken::new(),
+        request_id: "r2".into(),
+        args: None,
+        cwd: None,
+    };
+    let d = evaluate(ctx, "bash", "echo hi").await;
+    assert!(d.allowed());
+    let req = rx.recv().await.unwrap();
+    if let AgentEvent::ApprovalRequested {
+        requires_user_input,
+        ..
+    } = req
+    {
+        assert!(!requires_user_input);
+    } else {
+        panic!("expected ApprovalRequested");
+    }
+    assert!(matches!(
+        rx.recv().await.unwrap(),
+        AgentEvent::ApprovalResolved { .. }
+    ));
+}
+
+#[tokio::test]
+async fn ask_path_awaits_user_decision() {
+    let perms = CodingPermissions {
+        ask: vec!["Bash(*)".into()],
+        default_if_no_match: "ask".into(),
+        ..Default::default()
+    };
+    let l1 = Layer1::compile(&perms).unwrap();
+    let privacy = PrivacyGuard::from_globs(&[]).unwrap();
+    let policy = Policy::empty();
+    let bus = Arc::new(DomainEventBus::new(64));
+    let (tx, _rx) = mpsc::channel(32);
+    let pending = Arc::new(PendingApprovalsMap::new());
+
+    let pending2 = pending.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        pending2.resolve(
+            "r3",
+            ApprovalDecision::Auto {
+                allowed: true,
+                layer: ApprovalLayer::Layer1Declarative,
+                reason: "user click".into(),
+                rule_matched: None,
+            },
+        );
+    });
+
+    let ctx = GuardCtx {
+        layer1: &l1,
+        policy: &policy,
+        privacy: &privacy,
+        pending: &pending,
+        event_tx: Some(&tx),
+        domain_bus: &bus,
+        cancel: CancellationToken::new(),
+        request_id: "r3".into(),
+        args: None,
+        cwd: None,
+    };
+    let d = evaluate(ctx, "bash", "rm something").await;
+    assert!(d.allowed());
+}

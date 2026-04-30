@@ -1,0 +1,23 @@
+[package]
+name = "klynt-sandbox"
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0"
+description = "Klynt sandbox — Seatbelt (.sbpl) for macOS, Landlock+bwrap for Linux. Adapted from codex-rs/sandboxing/."
+
+[dependencies]
+common = { path = "../common" }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+sha2 = "0.10"
+async-trait = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+tokio = { workspace = true, features = ["process", "rt", "macros", "time"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Add Landlock + bwrap deps in Plan 2.
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "process"] }
+tempfile = { workspace = true }

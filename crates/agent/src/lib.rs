@@ -27,6 +27,8 @@ pub mod execution;
 pub mod learning;
 #[cfg(test)]
 mod notes_integration_tests;
+#[cfg(test)]
+pub mod test_utils;
 pub mod output;
 pub mod subagent;
 
@@ -57,3 +59,10 @@ pub use productivity::ProductivityHandlerImpl;
 pub use progress::ProgressHandlerImpl;
 pub use recurring_tasks::RecurringTaskSpawner;
 pub use subagent::{SubagentManager, SubagentProfile};
+
+/// Helper: wrap an error into `KlyntbotError::Provider(InvalidResponse(...))`.
+pub(crate) fn provider_err(label: &str, e: impl std::fmt::Display) -> common::KlyntbotError {
+    common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+        "{label}: {e}"
+    )))
+}

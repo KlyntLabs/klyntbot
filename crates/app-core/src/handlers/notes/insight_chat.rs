@@ -192,7 +192,6 @@ impl AppCore {
             String::new()
         };
 
-
         // Ensure session exists.
         let session_metadata = serde_json::json!({
             "title": format!("{} · {}", note.title, &params.tab_name),

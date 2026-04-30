@@ -44,6 +44,10 @@ pub struct ModelPricing {
     pub input_per_mtok: f64,
     /// USD per 1M output tokens (base tier).
     pub output_per_mtok: f64,
+    /// USD per 1M cache-read tokens.
+    pub cache_read_per_mtok: f64,
+    /// USD per 1M cache-write tokens.
+    pub cache_write_per_mtok: f64,
     /// Long-context premium tier, if the model supports one.
     pub long_context: Option<LongContextTier>,
     /// Human-readable label for display.
@@ -69,6 +73,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "opus-4-7[1m]",
         input_per_mtok: 15.0,
         output_per_mtok: 75.0,
+        cache_read_per_mtok: 1.50,
+        cache_write_per_mtok: 18.75,
         long_context: Some(ANTHROPIC_1M_TIER),
         display_name: "Claude Opus 4.7 (1M context)",
     },
@@ -76,6 +82,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "opus-4-7",
         input_per_mtok: 15.0,
         output_per_mtok: 75.0,
+        cache_read_per_mtok: 1.50,
+        cache_write_per_mtok: 18.75,
         long_context: None,
         display_name: "Claude Opus 4.7",
     },
@@ -83,6 +91,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "opus-4-6",
         input_per_mtok: 15.0,
         output_per_mtok: 75.0,
+        cache_read_per_mtok: 1.50,
+        cache_write_per_mtok: 18.75,
         long_context: None,
         display_name: "Claude Opus 4.6",
     },
@@ -90,6 +100,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "opus-4",
         input_per_mtok: 15.0,
         output_per_mtok: 75.0,
+        cache_read_per_mtok: 1.50,
+        cache_write_per_mtok: 18.75,
         long_context: None,
         display_name: "Claude Opus 4.x",
     },
@@ -97,6 +109,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "opus-3",
         input_per_mtok: 15.0,
         output_per_mtok: 75.0,
+        cache_read_per_mtok: 1.50,
+        cache_write_per_mtok: 18.75,
         long_context: None,
         display_name: "Claude Opus 3",
     },
@@ -105,6 +119,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "sonnet-4-7",
         input_per_mtok: 3.0,
         output_per_mtok: 15.0,
+        cache_read_per_mtok: 0.30,
+        cache_write_per_mtok: 3.75,
         long_context: Some(ANTHROPIC_1M_TIER),
         display_name: "Claude Sonnet 4.7",
     },
@@ -112,6 +128,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "sonnet-4-6",
         input_per_mtok: 3.0,
         output_per_mtok: 15.0,
+        cache_read_per_mtok: 0.30,
+        cache_write_per_mtok: 3.75,
         long_context: Some(ANTHROPIC_1M_TIER),
         display_name: "Claude Sonnet 4.6",
     },
@@ -119,6 +137,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "sonnet",
         input_per_mtok: 3.0,
         output_per_mtok: 15.0,
+        cache_read_per_mtok: 0.30,
+        cache_write_per_mtok: 3.75,
         long_context: None,
         display_name: "Claude Sonnet",
     },
@@ -127,6 +147,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "haiku-4-5",
         input_per_mtok: 1.0,
         output_per_mtok: 5.0,
+        cache_read_per_mtok: 0.08,
+        cache_write_per_mtok: 1.0,
         long_context: None,
         display_name: "Claude Haiku 4.5",
     },
@@ -134,13 +156,27 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "haiku-4",
         input_per_mtok: 1.0,
         output_per_mtok: 5.0,
+        cache_read_per_mtok: 0.08,
+        cache_write_per_mtok: 1.0,
         long_context: None,
         display_name: "Claude Haiku 4",
+    },
+    // Legacy Claude 3 Haiku — specific match before the generic "haiku" fallback.
+    ModelPricing {
+        model_pattern: "claude-3-haiku-20240307",
+        input_per_mtok: 0.25,
+        output_per_mtok: 1.25,
+        cache_read_per_mtok: 0.03,
+        cache_write_per_mtok: 0.30,
+        long_context: None,
+        display_name: "Claude 3 Haiku (legacy)",
     },
     ModelPricing {
         model_pattern: "haiku",
         input_per_mtok: 0.80,
         output_per_mtok: 4.0,
+        cache_read_per_mtok: 0.08,
+        cache_write_per_mtok: 1.0,
         long_context: None,
         display_name: "Claude Haiku 3.x",
     },
@@ -149,6 +185,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "gpt-4o-mini",
         input_per_mtok: 0.15,
         output_per_mtok: 0.60,
+        cache_read_per_mtok: 0.075,
+        cache_write_per_mtok: 0.0,
         long_context: None,
         display_name: "GPT-4o mini",
     },
@@ -156,6 +194,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "gpt-4-mini",
         input_per_mtok: 0.15,
         output_per_mtok: 0.60,
+        cache_read_per_mtok: 0.075,
+        cache_write_per_mtok: 0.0,
         long_context: None,
         display_name: "GPT-4 mini",
     },
@@ -163,6 +203,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "gpt-4o",
         input_per_mtok: 2.50,
         output_per_mtok: 10.0,
+        cache_read_per_mtok: 1.25,
+        cache_write_per_mtok: 0.0,
         long_context: None,
         display_name: "GPT-4o",
     },
@@ -170,6 +212,8 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "gpt-4",
         input_per_mtok: 2.50,
         output_per_mtok: 10.0,
+        cache_read_per_mtok: 1.25,
+        cache_write_per_mtok: 0.0,
         long_context: None,
         display_name: "GPT-4",
     },
@@ -178,21 +222,83 @@ pub static MODEL_PRICING: &[ModelPricing] = &[
         model_pattern: "deepseek-coder",
         input_per_mtok: 0.27,
         output_per_mtok: 1.10,
+        cache_read_per_mtok: 0.07,
+        cache_write_per_mtok: 0.0,
         long_context: None,
         display_name: "DeepSeek Coder",
+    },
+    ModelPricing {
+        model_pattern: "deepseek-reasoner",
+        input_per_mtok: 0.55,
+        output_per_mtok: 2.19,
+        cache_read_per_mtok: 0.14,
+        cache_write_per_mtok: 0.0,
+        long_context: None,
+        display_name: "DeepSeek Reasoner",
     },
     ModelPricing {
         model_pattern: "deepseek",
         input_per_mtok: 0.27,
         output_per_mtok: 1.10,
+        cache_read_per_mtok: 0.07,
+        cache_write_per_mtok: 0.0,
         long_context: None,
         display_name: "DeepSeek Chat",
+    },
+    // === Google Gemini ===
+    ModelPricing {
+        model_pattern: "gemini-2.0-flash",
+        input_per_mtok: 0.10,
+        output_per_mtok: 0.40,
+        cache_read_per_mtok: 0.025,
+        cache_write_per_mtok: 0.0,
+        long_context: None,
+        display_name: "Gemini 2.0 Flash",
+    },
+    ModelPricing {
+        model_pattern: "gemini-1.5-pro",
+        input_per_mtok: 1.25,
+        output_per_mtok: 5.0,
+        cache_read_per_mtok: 0.315,
+        cache_write_per_mtok: 0.0,
+        long_context: None,
+        display_name: "Gemini 1.5 Pro",
+    },
+    ModelPricing {
+        model_pattern: "gemini-1.5-flash",
+        input_per_mtok: 0.075,
+        output_per_mtok: 0.30,
+        cache_read_per_mtok: 0.01875,
+        cache_write_per_mtok: 0.0,
+        long_context: None,
+        display_name: "Gemini 1.5 Flash",
+    },
+    // === Mistral ===
+    ModelPricing {
+        model_pattern: "mistral-large",
+        input_per_mtok: 2.0,
+        output_per_mtok: 6.0,
+        cache_read_per_mtok: 0.0,
+        cache_write_per_mtok: 0.0,
+        long_context: None,
+        display_name: "Mistral Large",
+    },
+    ModelPricing {
+        model_pattern: "mistral-small",
+        input_per_mtok: 0.10,
+        output_per_mtok: 0.30,
+        cache_read_per_mtok: 0.0,
+        cache_write_per_mtok: 0.0,
+        long_context: None,
+        display_name: "Mistral Small",
     },
     // === Moonshot Kimi ===
     ModelPricing {
         model_pattern: "kimi",
         input_per_mtok: 0.15,
         output_per_mtok: 2.50,
+        cache_read_per_mtok: 0.0,
+        cache_write_per_mtok: 0.0,
         long_context: None,
         display_name: "Kimi",
     },
@@ -224,6 +330,33 @@ pub fn cost_for(model: &str, input_tokens: u64, output_tokens: u64) -> Option<(f
         input_tokens as f64 * in_rate / 1_000_000.0,
         output_tokens as f64 * out_rate / 1_000_000.0,
     ))
+}
+
+/// Compute total cost (input + output + cache read + cache write) for a model.
+/// Applies the long-context tier when input tokens exceed its threshold.
+/// Returns `None` for unrecognized models.
+#[must_use]
+pub fn cost_with_cache_for(
+    model: &str,
+    input_tokens: u64,
+    output_tokens: u64,
+    cache_read_tokens: u64,
+    cache_write_tokens: u64,
+) -> Option<f64> {
+    let p = lookup(model)?;
+    let (in_rate, out_rate) = match p.long_context {
+        Some(lc) if input_tokens > lc.input_threshold_tokens => (
+            p.input_per_mtok * lc.input_multiplier,
+            p.output_per_mtok * lc.output_multiplier,
+        ),
+        _ => (p.input_per_mtok, p.output_per_mtok),
+    };
+    Some(
+        input_tokens as f64 * in_rate / 1_000_000.0
+            + output_tokens as f64 * out_rate / 1_000_000.0
+            + cache_read_tokens as f64 * p.cache_read_per_mtok / 1_000_000.0
+            + cache_write_tokens as f64 * p.cache_write_per_mtok / 1_000_000.0,
+    )
 }
 
 #[cfg(test)]
@@ -308,5 +441,50 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn cache_costs_included_in_total() {
+        let cost =
+            cost_with_cache_for("claude-sonnet-4", 1_000_000, 100_000, 50_000, 20_000).unwrap();
+        // input: 1M * $3  = $3.00
+        // output: 0.1M * $15 = $1.50
+        // cache read: 0.05M * $0.30 = $0.015
+        // cache write: 0.02M * $3.75 = $0.075
+        // total = $4.59
+        assert!((cost - 4.59).abs() < 1e-6, "expected $4.59, got ${cost}");
+    }
+
+    #[test]
+    fn legacy_claude_3_haiku_has_lower_price() {
+        let p = lookup("claude-3-haiku-20240307").unwrap();
+        assert_eq!(p.display_name, "Claude 3 Haiku (legacy)");
+        assert!((p.input_per_mtok - 0.25).abs() < 1e-6);
+        assert!((p.output_per_mtok - 1.25).abs() < 1e-6);
+    }
+
+    #[test]
+    fn gemini_models_present() {
+        assert!(lookup("gemini-2.0-flash").is_some());
+        assert!(lookup("gemini-1.5-pro").is_some());
+        assert!(lookup("gemini-1.5-flash").is_some());
+    }
+
+    #[test]
+    fn mistral_models_present() {
+        assert!(lookup("mistral-large-latest").is_some());
+        assert!(lookup("mistral-small-latest").is_some());
+    }
+
+    #[test]
+    fn deepseek_reasoner_matches_before_generic_deepseek() {
+        let p = lookup("deepseek-reasoner").unwrap();
+        assert_eq!(p.display_name, "DeepSeek Reasoner");
+        assert!((p.input_per_mtok - 0.55).abs() < 1e-6);
+    }
+
+    #[test]
+    fn unknown_model_returns_none_for_cache_cost() {
+        assert!(cost_with_cache_for("totally-unknown", 1000, 500, 100, 50).is_none());
     }
 }

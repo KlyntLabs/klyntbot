@@ -107,5 +107,137 @@ Non-blocking issues deferred for later. Not part of any active plan; pick up onc
 3. Plumb the value from `launcher_system_command(args: HashMap<String,String>)` by parsing `args.get("duration_secs").and_then(|s| s.parse().ok())`.
 4. Once stable, drop the frontend-side `focus_activate` workaround in `useExecuteItem.ts:86-97`.
 
+## 10. Agent: `AgentLoopBuilder::build()` is a ~1,750-line god function
 
+**Observed (2026-04-29):** `crates/agent/src/agent_loop/builder.rs:214` assembles the entire dependency graph inline — context sources, cognitive background services, tree builder subscribers, tool registration, runtime wiring, and learning services. Nested `if let` blocks reach 4–5 levels deep, making unit testing impossible.
+
+**Scope:** Critical readability and testability issue. The builder works correctly today; the problem is maintainability.
+
+**Next steps:**
+1. Split `build()` into private phase methods: `build_context_engine()`, `build_tree_builders()`, `build_tool_registry()`, `build_runtime()`, etc.
+2. Each phase returns its intermediate product, making individual phases testable.
+3. Use early-return guards (`if x.is_none() { return Ok(...); }`) to flatten deep nesting.
+
+---
+
+## 11. Agent: correction handling logic duplicated in `agent_loop/mod.rs`
+
+**Observed (2026-04-29):** The exact same two-phase correction detection is copy-pasted in `process_message` (lines 559–654) and `process_direct_streaming` (lines 998–1083):
+1. `detect_correction_prefix()` / `detect_memory_miss()`
+2. Read last assistant message + decrement cooldown under session lock
+3. Rate-limited `emit_correction_signal()` call
+4. Build `CorrectionContext` for query rewriting
+
+**Scope:** ~100 lines of duplicated logic. Any bug fix or tuning would need to be applied in both places.
+
+**Next steps:**
+1. Introduce a `CorrectionState { strength, skill, original, emitted }` struct.
+2. Extract a single `handle_correction(&self, msg, session_arc) -> CorrectionState` helper.
+3. Call it from both `process_message` and `process_direct_streaming`.
+
+---
+
+## 12. Agent: parameter sprawl across hot paths
+
+**Observed (2026-04-29):** Multiple functions carry 5+ parameters that travel together:
+
+| Function | File | Line | Params |
+|---|---|---|---|
+| `process_message` | `agent_runtime/runtime.rs` | 245 | 8 (`&self`, `message`, `history`, `tool_definitions`, `ctx`, `event_tx`, `cancel_token`, `depth`) |
+| `emit_correction_signal` | `agent_loop/mod.rs` | 207 | 7 |
+| `run_pipeline` | `agent_loop/mod.rs` | 887 | 7 |
+| `run_cycle` | `execution/core.rs` | 404 | 6 |
+| `init_agent` | `app-core/src/init/agent.rs` | 27 | 13 |
+| `relay_chat_stream` | `app-core/src/handlers/chat/streaming.rs` | 371 | 10 |
+
+**Scope:** `#[allow(clippy::too_many_arguments)]` is used to silence the lint rather than fix the underlying design.
+
+**Next steps:**
+1. Introduce `CycleContext { messages, tools, params, routing_ctx }` for `run_cycle` and downstream callers.
+2. Introduce `CorrectionSignal` struct for `emit_correction_signal`.
+3. Convert `init_agent` to builder-style (`AgentInit::new().with_autotuner(...).build()`).
+4. Remove `#[allow(clippy::too_many_arguments)]` annotations once resolved.
+
+---
+
+## 13. Agent: stringly-typed event fields where enums would be safer
+
+**Observed (2026-04-29):** `crates/agent/src/events.rs` uses `String` for discriminant-like fields:
+
+| Line | Field | Better Type |
+|---|---|---|
+| 96 | `ConfidenceAssessed { action: String }` | `enum ConfidenceAction { Retry, Escalate, Continue, … }` |
+| 151 | `LearningEvent { event_type: String, … }` | `enum LearningEventType { ThresholdAdjusted, PatternDetected, … }` |
+| 187 | `McpServerStatus { status: String, … }` | `enum McpStatus { Starting, Ready, Failed, Skipped }` |
+
+Also in `agent_runtime/runtime.rs`:
+- `mode_used: String` — always `"normal"`, `"deep_think"`, or `"ultra"`. Should be `DepthMode`.
+- `agent_name: String` — always `"klyntbot"` in flat runtime. Should be a const or `AgentName` enum.
+
+**Scope:** Serialization compatibility risk. Changing these to enums may break downstream consumers (desktop-ui, MCP clients) that rely on the current string values.
+
+**Next steps:**
+1. Audit all consumers of these structs to confirm string expectations.
+2. Add enums with `#[serde(rename_all = "snake_case")]` or equivalent to preserve wire format.
+3. Migrate fields incrementally, starting with internal-only structs.
+
+---
+
+## 14. Agent: leaky abstractions — internal details exposed via public accessors
+
+**Observed (2026-04-29):** `crates/agent/src/agent_loop/mod.rs:99–113` exposes:
+- `pub fn tool_registry(&self) -> Arc<RwLock<ToolRegistry>>`
+- `pub fn skill_store(&self) -> Arc<RwLock<SkillStore>>`
+- `pub fn hot_config(&self) -> Arc<RwLock<HotConfig>>`
+
+These exist solely so `klyntbot-server/src/handler.rs` and `app-core` can mutate agent internals directly.
+
+**Scope:** Architectural encapsulation break. The server should interact with the agent via messages/commands, not by directly mutating the tool registry.
+
+**Next steps:**
+1. Design a command channel or message-based API for tool registry mutations (register, unregister, list).
+2. Migrate `klyntbot-server` and `app-core` call sites to use the new API.
+3. Make the accessors `pub(crate)` or remove them entirely.
+
+---
+
+## 15. Agent: `MockProvider` duplicated in 6 test modules
+
+**Observed (2026-04-29):** Every test module defines its own `MockProvider` implementing `LlmProvider`:
+- `handlers/coding_synthesis.rs` — single `String` response
+- `handlers/rule_artifacts.rs` — single `String` response
+- `execution/core.rs` — `Mutex<Vec<LlmResponse>>` with `with_text` / `with_tool_call` helpers
+- `agent_runtime/runtime.rs` — single `String` response + `context_window()`
+- `adapters/cognitive_handlers.rs` — `Result<LlmResponse, String>` + streaming stubs
+- `agent_loop/refactor_tests.rs` — single `String` response
+
+**Scope:** ~250 lines of duplicated mock code. Changes to the `LlmProvider` trait require updating all 6 copies.
+
+**Next steps:**
+1. Design a unified `MockProvider` in `agent/src/test_utils.rs` (behind `#[cfg(test)]`) that supports all observed variants: queued responses, error injection, streaming stubs, tool calls.
+2. Provide constructors: `MockProvider::with_text()`, `MockProvider::with_tool_call()`, `MockProvider::with_error()`, `MockProvider::with_responses(vec)`.
+3. Replace all 6 local copies with the shared mock.
+
+---
+
+## 16. Agent: redundant / derived state in `RuntimeResult`
+
+**Observed (2026-04-29):** `crates/agent/src/agent_runtime/runtime.rs:34–36`:
+```rust
+pub struct RuntimeResult {
+    pub content: String,
+    pub mode_used: String,   // always depth.to_string()
+    pub agent_name: String,  // always "klyntbot"
+    …
+}
+```
+
+Both fields are derivable constants. `agent_name` never changes in the flat runtime; `mode_used` is identical to the `DepthMode` input.
+
+**Scope:** Low-severity noise. Every call site that constructs `RuntimeResult` must supply these redundant values.
+
+**Next steps:**
+1. Change `mode_used` to `DepthMode` (its source type) or derive it automatically.
+2. Replace `agent_name: String` with a `const DEFAULT_AGENT_NAME: &str` or an `AgentName` enum with a `Default` impl.
+3. Update all construction sites. Check downstream consumers (desktop-ui, server) for breakage.
 

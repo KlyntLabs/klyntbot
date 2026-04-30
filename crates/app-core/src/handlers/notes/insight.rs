@@ -995,7 +995,6 @@ impl AppCore {
         }
         notes
     }
-
 }
 
 struct InsightPipelineArgs {
