@@ -1,6 +1,6 @@
+use crate::approval::host_cache::{HostApprovalCache, HostCheckResult, HostDecision, HostKey};
 use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
-use agent::events::AgentEvent;
 use async_trait::async_trait;
 use bus::DomainEventBus;
 use common::{KlyntbotError, Result, ToolError};
@@ -10,6 +10,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tools_core::{RoutingContext, ToolExecute};
+use tools_core::events::ToolEvent;
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 use uuid::Uuid;
 
@@ -33,29 +34,32 @@ pub struct WebFetchArgs {
     permission = "standard",
     category = "Web",
     cost = "Low",
-    tags = "web,fetch,coding"
+    tags = "web,fetch,coding",
 )]
 pub struct WebFetchTool {
     layer1: Arc<Layer1>,
     policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
     pending: Arc<PendingApprovalsMap>,
-    event_tx: Option<mpsc::Sender<AgentEvent>>,
     bus: Arc<DomainEventBus>,
     client: reqwest::Client,
+    non_ui_policy: common::tool_channel::NonUiPolicy,
+    host_cache: Arc<HostApprovalCache>,
 }
 
 impl WebFetchTool {
     pub fn new(
         layer1: Arc<Layer1>, policy: Arc<Policy>, privacy: Arc<PrivacyGuard>,
-        pending: Arc<PendingApprovalsMap>, event_tx: Option<mpsc::Sender<AgentEvent>>,
+        pending: Arc<PendingApprovalsMap>,
         bus: Arc<DomainEventBus>,
+        non_ui_policy: common::tool_channel::NonUiPolicy,
+        host_cache: Arc<HostApprovalCache>,
     ) -> Self {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("reqwest client construction");
-        Self { layer1, policy, privacy, pending, event_tx, bus, client }
+        Self { layer1, policy, privacy, pending, bus, client, non_ui_policy, host_cache }
     }
 }
 
@@ -65,10 +69,13 @@ impl ToolExecute for WebFetchTool {
     async fn execute(&self, args: WebFetchArgs, ctx: &RoutingContext) -> Result<String> {
         run_for_test(args, self.layer1.clone(), self.policy.clone(),
             self.privacy.clone(), self.pending.clone(),
-            self.event_tx.clone().unwrap_or_else(|| mpsc::channel(1).0),
+            ctx.event_tx.clone(),
             self.bus.clone(),
             ctx.cancel_token.clone().unwrap_or_else(CancellationToken::new),
             self.client.clone(),
+            common::tool_channel::Channel::from_name(ctx.channel.as_str()),
+            self.non_ui_policy,
+            self.host_cache.clone(),
         ).await
     }
 }
@@ -80,22 +87,48 @@ pub async fn run_for_test(
     policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
     pending: Arc<PendingApprovalsMap>,
-    event_tx: mpsc::Sender<AgentEvent>,
+    event_tx: Option<mpsc::Sender<ToolEvent>>,
     bus: Arc<DomainEventBus>,
     cancel: CancellationToken,
     client: reqwest::Client,
+    channel: common::tool_channel::Channel,
+    non_ui_policy: common::tool_channel::NonUiPolicy,
+    host_cache: Arc<HostApprovalCache>,
 ) -> Result<String> {
-    let request_id = Uuid::new_v4().to_string();
-    let guard_ctx = GuardCtx {
-        layer1: &layer1, policy: &policy, privacy: &privacy,
-        pending: &pending, event_tx: Some(&event_tx), domain_bus: &bus,
-        cancel: cancel.clone(), request_id,
-        args: Some(serde_json::to_value(&args).unwrap_or_default()),
-        cwd: None,
+    let host_key = HostKey::from_url(&args.url)?;
+    let host_decision = match host_cache.check_or_register(host_key.clone()) {
+        HostCheckResult::Cached(d) => d,
+        HostCheckResult::AwaitPending(mut rx) => {
+            rx.changed().await.map_err(|_| KlyntbotError::Tool(
+                ToolError::ExecutionFailed("host approval cancelled".into())))?;
+            rx.borrow().expect("decision set on resolution")
+        }
+        HostCheckResult::NewlyRegistered { tx } => {
+            let request_id = Uuid::new_v4().to_string();
+            let guard_ctx = GuardCtx {
+                layer1: &layer1, policy: &policy, privacy: &privacy,
+                pending: &pending, event_tx: event_tx.as_ref(), domain_bus: &bus,
+                cancel: cancel.clone(), request_id,
+                args: Some(serde_json::to_value(&args).unwrap_or_default()),
+                cwd: None,
+                channel,
+                non_ui_policy,
+            };
+            let approval = evaluate(guard_ctx, "web_fetch", &args.url).await;
+            let host_decision = if approval.allowed() {
+                HostDecision::AllowForSession
+            } else {
+                HostDecision::Deny
+            };
+            let _ = tx.send(Some(host_decision));
+            host_cache.resolve(host_key.clone(), host_decision);
+            host_decision
+        }
     };
-    let decision = evaluate(guard_ctx, "web_fetch", &args.url).await;
-    if !decision.allowed() {
-        return Err(KlyntbotError::Tool(ToolError::PermissionDenied(format!("{decision:?}"))));
+
+    if host_decision == HostDecision::Deny {
+        return Err(KlyntbotError::Tool(ToolError::PermissionDenied(
+            format!("host {} previously denied", host_key.host))));
     }
 
     let max_bytes = args.max_bytes.unwrap_or(200_000) as usize;

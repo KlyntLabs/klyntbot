@@ -7,14 +7,15 @@ use config::schema::CodingPermissions;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use common::tool_channel::{Channel, NonUiPolicy};
 
-const NB: &str = r#"{
+const NB: &str = r##"{
   "cells": [
     {"cell_type":"code","source":["print('hi')\n"],"outputs":[],"execution_count":null,"metadata":{}},
     {"cell_type":"markdown","source":["# Title\n"],"metadata":{}}
   ],
   "metadata":{},"nbformat":4,"nbformat_minor":5
-}"#;
+}"##;
 
 #[tokio::test]
 async fn replaces_cell_source() {
@@ -33,7 +34,8 @@ async fn replaces_cell_source() {
             cell_index: 0,
             new_source: "print('updated')\n".into(),
         },
-        dir.path().to_path_buf(), l1, pol, pri, pen, tx, bus, CancellationToken::new(),
+        dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
+        Channel::Coding, NonUiPolicy::Allow,
     ).await.unwrap();
     let saved = std::fs::read_to_string(dir.path().join("nb.ipynb")).unwrap();
     let v: serde_json::Value = serde_json::from_str(&saved).unwrap();
@@ -54,7 +56,8 @@ async fn rejects_out_of_range_index() {
     let (tx, _rx) = mpsc::channel(32);
     let r = nb_run(
         NotebookEditArgs { path: "nb.ipynb".into(), cell_index: 99, new_source: "x".into() },
-        dir.path().to_path_buf(), l1, pol, pri, pen, tx, bus, CancellationToken::new(),
+        dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
+        Channel::Coding, NonUiPolicy::Allow,
     ).await;
     assert!(r.is_err());
 }

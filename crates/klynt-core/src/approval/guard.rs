@@ -4,7 +4,7 @@ use super::{
     round_trip::{await_decision, PendingApprovalsMap},
 };
 use crate::privacy::PrivacyGuard;
-use agent::events::AgentEvent;
+use tools_core::events::ToolEvent;
 use bus::DomainEventBus;
 use klynt_execpolicy::{Decision as ExecDecision, Policy};
 use sha2::{Digest, Sha256};
@@ -20,12 +20,14 @@ pub struct GuardCtx<'a> {
     pub policy: &'a Policy,
     pub privacy: &'a PrivacyGuard,
     pub pending: &'a Arc<PendingApprovalsMap>,
-    pub event_tx: Option<&'a mpsc::Sender<AgentEvent>>,
+    pub event_tx: Option<&'a mpsc::Sender<ToolEvent>>,
     pub domain_bus: &'a Arc<DomainEventBus>,
     pub cancel: CancellationToken,
     pub request_id: String,
     pub args: Option<serde_json::Value>,
     pub cwd: Option<String>,
+    pub channel: common::tool_channel::Channel,
+    pub non_ui_policy: common::tool_channel::NonUiPolicy,
 }
 
 pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> ApprovalDecision {
@@ -51,6 +53,37 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
 
     // 1. Layer 1 declarative
     let l1 = ctx.layer1.evaluate(tool, payload);
+
+    // Channel-aware degradation: if Layer1 says "ask" but the channel can't
+    // surface an approval card (Telegram/Discord/Slack/Email), fall back to
+    // the configured policy.
+    let l1 = match l1 {
+        ApprovalDecision::Ask { .. } if !ctx.channel.supports_approval_ui() => {
+            match ctx.non_ui_policy {
+                common::tool_channel::NonUiPolicy::Allow => ApprovalDecision::Auto {
+                    allowed: true,
+                    layer: ApprovalLayer::Layer1Declarative,
+                    reason: format!(
+                        "non-UI channel ({:?}) fallback: allow per tools.approvalPolicy.nonUiChannels",
+                        ctx.channel
+                    ),
+                    rule_matched: None,
+                },
+                common::tool_channel::NonUiPolicy::DenyWithError => ApprovalDecision::Auto {
+                    allowed: false,
+                    layer: ApprovalLayer::Layer1Declarative,
+                    reason: format!(
+                        "non-UI channel ({:?}) deny: tool '{}' requires approval; \
+                         set tools.approvalPolicy.nonUiChannels = \"allow\" to permit",
+                        ctx.channel, tool
+                    ),
+                    rule_matched: None,
+                },
+            }
+        }
+        other => other,
+    };
+
     if matches!(l1, ApprovalDecision::Auto { .. }) {
         emit_pair(&ctx, tool, payload, &l1, false).await;
         return l1;
@@ -112,7 +145,7 @@ async fn emit_pair<'a>(
     let mut h = Sha256::new();
     h.update(payload.as_bytes());
     let args_hash = format!("{:x}", h.finalize());
-    let req = AgentEvent::ApprovalRequested {
+    let req = ToolEvent::ApprovalRequested {
         request_id: ctx.request_id.clone(),
         tool: tool.into(),
         args_hash,
@@ -125,14 +158,14 @@ async fn emit_pair<'a>(
         cwd: ctx.cwd.clone(),
         layer_reason: Some(reason_of(decision)),
     };
-    agent::execution::core::fan_out_event(ctx.event_tx, Some(ctx.domain_bus), req).await;
+    fan_out_tool_event(ctx.event_tx, Some(ctx.domain_bus), req).await;
     if !requires_user_input {
         emit_resolved(ctx, decision).await;
     }
 }
 
 async fn emit_resolved<'a>(ctx: &GuardCtx<'a>, decision: &ApprovalDecision) {
-    let res = AgentEvent::ApprovalResolved {
+    let res = ToolEvent::ApprovalResolved {
         request_id: ctx.request_id.clone(),
         decision: format!("{:?}", decision),
         decision_reason: reason_of(decision),
@@ -140,7 +173,7 @@ async fn emit_resolved<'a>(ctx: &GuardCtx<'a>, decision: &ApprovalDecision) {
         persisted_rule: None,
         decided_by: decided_by(decision).into(),
     };
-    agent::execution::core::fan_out_event(ctx.event_tx, Some(ctx.domain_bus), res).await;
+    fan_out_tool_event(ctx.event_tx, Some(ctx.domain_bus), res).await;
 }
 
 fn layer_of(d: &ApprovalDecision) -> ApprovalLayer {
@@ -175,5 +208,22 @@ fn decided_by(d: &ApprovalDecision) -> &'static str {
         ApprovalDecision::PrivacyDenied { .. } => "auto_deny",
         ApprovalDecision::Cancelled => "cancelled",
         ApprovalDecision::TimedOut => "timeout",
+    }
+}
+
+pub(crate) async fn fan_out_tool_event(
+    event_tx: Option<&mpsc::Sender<ToolEvent>>,
+    domain_bus: Option<&Arc<DomainEventBus>>,
+    evt: ToolEvent,
+) {
+    if let Some(tx) = event_tx {
+        let _ = tx.send(evt.clone()).await;
+    }
+    if let Some(bus) = domain_bus {
+        let payload = serde_json::to_value(&evt).unwrap_or_else(|_| serde_json::json!({"type": "unknown"}));
+        bus.publish(bus::DomainEvent::Generic {
+            kind: "agent_event".into(),
+            payload,
+        });
     }
 }

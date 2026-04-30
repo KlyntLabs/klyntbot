@@ -1,6 +1,5 @@
 #![cfg(target_os = "macos")]
 
-use agent::events::AgentEvent;
 use bus::DomainEventBus;
 use common::{ChannelName, ChatId};
 use config::schema::CodingPermissions;
@@ -11,6 +10,7 @@ use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tools_core::{RoutingContext, ToolExecute};
+use common::tool_channel::NonUiPolicy;
 
 #[tokio::test]
 async fn echo_hi_runs_and_emits_sandbox_event() {
@@ -23,9 +23,11 @@ async fn echo_hi_runs_and_emits_sandbox_event() {
     let privacy = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
     let pending = Arc::new(PendingApprovalsMap::new());
     let bus = Arc::new(DomainEventBus::new(64));
-    let (tx, mut rx) = mpsc::channel(32);
+    let (tx, mut rx) = mpsc::channel::<tools_core::events::ToolEvent>(32);
 
-    let tool = BashTool::new(layer1, policy, privacy, pending, Some(tx.clone()), bus);
+    let tool = BashTool::new(layer1, policy, privacy, pending, bus, NonUiPolicy::Allow);
+    let mut ctx = RoutingContext::new(ChannelName::new("coding"), ChatId::new("test"));
+    ctx.event_tx = Some(tx.clone());
     let result = tool
         .execute(
             klynt_core::tools::bash::BashArgs {
@@ -33,7 +35,7 @@ async fn echo_hi_runs_and_emits_sandbox_event() {
                 cwd: Some("/tmp".into()),
                 timeout_ms: Some(5000),
             },
-            &RoutingContext::new(ChannelName::new("coding"), ChatId::new("test")),
+            &ctx,
         )
         .await
         .unwrap();
@@ -44,7 +46,7 @@ async fn echo_hi_runs_and_emits_sandbox_event() {
     drop(tx);
     let mut saw_sandbox = false;
     while let Some(e) = rx.recv().await {
-        if matches!(e, AgentEvent::SandboxPolicyApplied { .. }) {
+        if matches!(e, tools_core::events::ToolEvent::SandboxPolicyApplied { .. }) {
             saw_sandbox = true;
         }
     }
@@ -63,8 +65,8 @@ async fn denied_command_returns_error_and_does_not_run() {
     let privacy = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
     let pending = Arc::new(PendingApprovalsMap::new());
     let bus = Arc::new(DomainEventBus::new(64));
-    let (tx, _rx) = mpsc::channel(32);
-    let tool = BashTool::new(layer1, policy, privacy, pending, Some(tx), bus);
+    let (tx, _rx) = mpsc::channel::<tools_core::events::ToolEvent>(32);
+    let tool = BashTool::new(layer1, policy, privacy, pending, bus, NonUiPolicy::Allow);
     let r = tool
         .execute(
             klynt_core::tools::bash::BashArgs {

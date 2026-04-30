@@ -1,4 +1,3 @@
-use agent::events::AgentEvent;
 use async_trait::async_trait;
 use bus::DomainEventBus;
 use common::{KlyntbotError, Result, ToolError};
@@ -7,6 +6,7 @@ use std::sync::Arc;
 use storage::Repos;
 use tokio::sync::mpsc;
 use tools_core::{RoutingContext, ToolExecute};
+use tools_core::events::ToolEvent;
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
@@ -29,11 +29,11 @@ pub struct ExitPlanModeArgs {
     permission = "standard",
     category = "System",
     cost = "Free",
-    tags = "plan,coding"
+    tags = "plan,coding",
+    allowed_channels = "coding_only"
 )]
 pub struct EnterPlanModeTool {
     repos: Repos,
-    event_tx: Option<mpsc::Sender<AgentEvent>>,
     bus: Arc<DomainEventBus>,
 }
 
@@ -46,22 +46,22 @@ pub struct EnterPlanModeTool {
     permission = "standard",
     category = "System",
     cost = "Free",
-    tags = "plan,coding"
+    tags = "plan,coding",
+    allowed_channels = "coding_only"
 )]
 pub struct ExitPlanModeTool {
     repos: Repos,
-    event_tx: Option<mpsc::Sender<AgentEvent>>,
     bus: Arc<DomainEventBus>,
 }
 
 impl EnterPlanModeTool {
-    pub fn new(repos: Repos, event_tx: Option<mpsc::Sender<AgentEvent>>, bus: Arc<DomainEventBus>) -> Self {
-        Self { repos, event_tx, bus }
+    pub fn new(repos: Repos, bus: Arc<DomainEventBus>) -> Self {
+        Self { repos, bus }
     }
 }
 impl ExitPlanModeTool {
-    pub fn new(repos: Repos, event_tx: Option<mpsc::Sender<AgentEvent>>, bus: Arc<DomainEventBus>) -> Self {
-        Self { repos, event_tx, bus }
+    pub fn new(repos: Repos, bus: Arc<DomainEventBus>) -> Self {
+        Self { repos, bus }
     }
 }
 
@@ -71,7 +71,7 @@ impl ToolExecute for EnterPlanModeTool {
     async fn execute(&self, _args: EnterPlanModeArgs, ctx: &RoutingContext) -> Result<String> {
         let key = ctx.chat_id.as_str().to_string();
         run_enter_for_test(&self.repos, &key,
-            self.event_tx.clone().unwrap_or_else(|| mpsc::channel(1).0),
+            ctx.event_tx.clone(),
             self.bus.clone()).await
     }
 }
@@ -81,33 +81,35 @@ impl ToolExecute for ExitPlanModeTool {
     async fn execute(&self, _args: ExitPlanModeArgs, ctx: &RoutingContext) -> Result<String> {
         let key = ctx.chat_id.as_str().to_string();
         run_exit_for_test(&self.repos, &key,
-            self.event_tx.clone().unwrap_or_else(|| mpsc::channel(1).0),
+            ctx.event_tx.clone(),
             self.bus.clone()).await
     }
 }
 
 pub async fn run_enter_for_test(
     repos: &Repos, session_key: &str,
-    event_tx: mpsc::Sender<AgentEvent>, bus: Arc<DomainEventBus>,
+    event_tx: Option<mpsc::Sender<ToolEvent>>, bus: Arc<DomainEventBus>,
 ) -> Result<String> {
     repos.sessions.update_approval_mode(session_key, "plan").await
         .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(e.to_string())))?;
-    let evt = AgentEvent::PlanModeChanged {
-        session_key: session_key.into(), active: true, requested_by: "tool".into(),
+    let evt = ToolEvent::PlanModeChanged {
+        in_plan_mode: true,
+        plan_id: Some(session_key.into()),
     };
-    agent::execution::core::fan_out_event(Some(&event_tx), Some(&bus), evt).await;
+    crate::approval::guard::fan_out_tool_event(event_tx.as_ref(), Some(&bus), evt).await;
     Ok("entered plan mode (writes and exec are now denied)".into())
 }
 
 pub async fn run_exit_for_test(
     repos: &Repos, session_key: &str,
-    event_tx: mpsc::Sender<AgentEvent>, bus: Arc<DomainEventBus>,
+    event_tx: Option<mpsc::Sender<ToolEvent>>, bus: Arc<DomainEventBus>,
 ) -> Result<String> {
     repos.sessions.update_approval_mode(session_key, "default").await
         .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(e.to_string())))?;
-    let evt = AgentEvent::PlanModeChanged {
-        session_key: session_key.into(), active: false, requested_by: "tool".into(),
+    let evt = ToolEvent::PlanModeChanged {
+        in_plan_mode: false,
+        plan_id: Some(session_key.into()),
     };
-    agent::execution::core::fan_out_event(Some(&event_tx), Some(&bus), evt).await;
+    crate::approval::guard::fan_out_tool_event(event_tx.as_ref(), Some(&bus), evt).await;
     Ok("exited plan mode".into())
 }

@@ -150,7 +150,7 @@ impl AgentProfile {
             return None;
         }
         let mut set: HashSet<String> = self.tools.iter().cloned().collect();
-        set.insert(tools::ask_user::ASK_USER_TOOL_NAME.to_string());
+        set.insert(klynt_core::tools::ask_user::ASK_USER_TOOL_NAME.to_string());
         Some(set)
     }
 

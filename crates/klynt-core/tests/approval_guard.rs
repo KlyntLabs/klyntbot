@@ -1,5 +1,6 @@
-use agent::events::AgentEvent;
 use bus::DomainEventBus;
+use common::tool_channel::{Channel, NonUiPolicy};
+use tools_core::events::ToolEvent;
 use config::schema::CodingPermissions;
 use klynt_core::approval::{
     decision::{ApprovalDecision, ApprovalLayer},
@@ -23,7 +24,7 @@ async fn privacy_blocks_first() {
     let privacy = PrivacyGuard::from_globs(&["**/.env"]).unwrap();
     let policy = Policy::empty();
     let bus = Arc::new(DomainEventBus::new(64));
-    let (tx, mut rx) = mpsc::channel::<AgentEvent>(32);
+    let (tx, mut rx) = mpsc::channel::<ToolEvent>(32);
     let pending = Arc::new(PendingApprovalsMap::new());
 
     let ctx = GuardCtx {
@@ -37,13 +38,15 @@ async fn privacy_blocks_first() {
         request_id: "r1".into(),
         args: None,
         cwd: None,
+        channel: Channel::Coding,
+        non_ui_policy: NonUiPolicy::Allow,
     };
     let d = evaluate(ctx, "bash", "cat .env").await;
     assert!(matches!(d, ApprovalDecision::PrivacyDenied { .. }));
     let evt = rx.recv().await.unwrap();
-    assert!(matches!(evt, AgentEvent::ApprovalRequested { .. }));
+    assert!(matches!(evt, ToolEvent::ApprovalRequested { .. }));
     let resolved = rx.recv().await.unwrap();
-    assert!(matches!(resolved, AgentEvent::ApprovalResolved { .. }));
+    assert!(matches!(resolved, ToolEvent::ApprovalResolved { .. }));
 }
 
 #[tokio::test]
@@ -51,13 +54,14 @@ async fn auto_allow_emits_pair_no_user_input() {
     let perms = CodingPermissions {
         allow: vec!["Bash(echo *)".into()],
         default_if_no_match: "ask".into(),
+        mirror_learning: false,
         ..Default::default()
     };
     let l1 = Layer1::compile(&perms).unwrap();
     let privacy = PrivacyGuard::from_globs(&[]).unwrap();
     let policy = Policy::empty();
     let bus = Arc::new(DomainEventBus::new(64));
-    let (tx, mut rx) = mpsc::channel(32);
+    let (tx, mut rx) = mpsc::channel::<ToolEvent>(32);
     let pending = Arc::new(PendingApprovalsMap::new());
 
     let ctx = GuardCtx {
@@ -71,11 +75,13 @@ async fn auto_allow_emits_pair_no_user_input() {
         request_id: "r2".into(),
         args: None,
         cwd: None,
+        channel: Channel::Coding,
+        non_ui_policy: NonUiPolicy::Allow,
     };
     let d = evaluate(ctx, "bash", "echo hi").await;
     assert!(d.allowed());
     let req = rx.recv().await.unwrap();
-    if let AgentEvent::ApprovalRequested {
+    if let ToolEvent::ApprovalRequested {
         requires_user_input,
         ..
     } = req
@@ -86,7 +92,7 @@ async fn auto_allow_emits_pair_no_user_input() {
     }
     assert!(matches!(
         rx.recv().await.unwrap(),
-        AgentEvent::ApprovalResolved { .. }
+        ToolEvent::ApprovalResolved { .. }
     ));
 }
 
@@ -101,7 +107,7 @@ async fn ask_path_awaits_user_decision() {
     let privacy = PrivacyGuard::from_globs(&[]).unwrap();
     let policy = Policy::empty();
     let bus = Arc::new(DomainEventBus::new(64));
-    let (tx, _rx) = mpsc::channel(32);
+    let (tx, _rx) = mpsc::channel::<ToolEvent>(32);
     let pending = Arc::new(PendingApprovalsMap::new());
 
     let pending2 = pending.clone();
@@ -129,6 +135,8 @@ async fn ask_path_awaits_user_decision() {
         request_id: "r3".into(),
         args: None,
         cwd: None,
+        channel: Channel::Coding,
+        non_ui_policy: NonUiPolicy::Allow,
     };
     let d = evaluate(ctx, "bash", "rm something").await;
     assert!(d.allowed());

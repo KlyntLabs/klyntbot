@@ -1,5 +1,6 @@
-use agent::events::AgentEvent;
 use bus::DomainEventBus;
+use common::tool_channel::{Channel, NonUiPolicy};
+use tools_core::events::ToolEvent;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::write::{run_for_test as write_run, WriteArgs};
@@ -29,8 +30,9 @@ async fn writes_file_and_emits_event() {
     let cwd = dir.path().to_path_buf();
     let res = write_run(
         WriteArgs { path: "out.txt".into(), content: "hello write".into() },
-        cwd.clone(), layer1, policy, privacy, pending, tx.clone(), bus,
+        cwd.clone(), layer1, policy, privacy, pending, Some(tx.clone()), bus,
         CancellationToken::new(),
+        Channel::Coding, NonUiPolicy::Allow,
     ).await.unwrap();
 
     assert!(res.contains("wrote"));
@@ -39,7 +41,7 @@ async fn writes_file_and_emits_event() {
     drop(tx);
     let mut saw_edit = false;
     while let Some(e) = rx.recv().await {
-        if let AgentEvent::FileEditWithSymbols { op, path, .. } = e {
+        if let ToolEvent::FileEditWithSymbols { op, path, .. } = e {
             assert_eq!(op, "write");
             assert!(path.ends_with("out.txt"));
             saw_edit = true;
@@ -59,8 +61,9 @@ async fn outside_cwd_denied_no_write_no_event() {
     let (tx, _rx) = mpsc::channel(32);
     let r = write_run(
         WriteArgs { path: "/etc/passwd".into(), content: "x".into() },
-        dir.path().to_path_buf(), layer1, policy, privacy, pending, tx, bus,
+        dir.path().to_path_buf(), layer1, policy, privacy, pending, Some(tx), bus,
         CancellationToken::new(),
+        Channel::Coding, NonUiPolicy::Allow,
     ).await;
     assert!(r.is_err());
 }

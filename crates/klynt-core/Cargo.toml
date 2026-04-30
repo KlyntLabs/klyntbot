@@ -7,7 +7,6 @@ description = "Klynt core — coding-tool registry (bash/read/edit/...), execpol
 
 [dependencies]
 common = { workspace = true }
-agent = { workspace = true }
 tools-core = { workspace = true }
 tools-core-macros = { workspace = true }
 config = { workspace = true }
@@ -30,6 +29,7 @@ dirs = { workspace = true }
 shellexpand = "3"
 walkdir = "2"
 regex = { workspace = true }
+url = { workspace = true }
 bstr = "1"
 diffy = "0.4"
 reqwest = { workspace = true, default-features = false, features = ["rustls", "json"] }

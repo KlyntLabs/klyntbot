@@ -15,16 +15,12 @@ use providers::DynProvider;
 use session::SessionManager;
 use tools::{
     area_tool::AreaTool,
-    browser::BrowserTool,
     cron_tool::CronTool,
-    filesystem::register_fs_tools,
     learning_tool::{LearningHandler, LearningTool},
-    message::MessageTool,
     okr_tool::OkrTool,
     project_tool::ProjectTool,
     registry::ToolRegistry,
     spawn::SpawnTool,
-    web::{WebFetchTool, WebSearchTool},
 };
 use tools_core::FeaturePackage;
 
@@ -602,16 +598,13 @@ impl AgentLoopBuilder {
         .await;
 
         // ── Subagent manager ──────────────────────────────────────────────
-        let brave_api_key = (!config.tools.web.brave_api_key.is_empty())
+        let _brave_api_key = (!config.tools.web.brave_api_key.is_empty())
             .then(|| config.tools.web.brave_api_key.expose().clone());
 
         let subagent_manager = Arc::new(
             SubagentManager::builder(Arc::clone(&provider), workspace.clone())
                 .inbound_sender(bus.inbound_sender())
                 .model(config.agents.defaults.model.clone())
-                .brave_api_key(brave_api_key.clone())
-                .web_max_results(config.tools.web.max_results)
-                .restrict_to_workspace(config.tools.restrict_to_workspace)
                 .max_concurrent_subagents(config.agents.defaults.max_concurrent_subagents)
                 .agent_task_repo(repos.agent_tasks.clone())
                 .build(),
@@ -619,43 +612,6 @@ impl AgentLoopBuilder {
 
         // ── Tool registry ─────────────────────────────────────────────────
         let mut tool_registry = ToolRegistry::new();
-
-        // Filesystem tools
-        let allowed_dir = if config.tools.restrict_to_workspace {
-            Some(workspace.clone())
-        } else {
-            None
-        };
-        register_fs_tools(&mut tool_registry, allowed_dir.clone());
-
-        // Search tools
-        tool_registry.register(tools::grep::GrepTool::new(allowed_dir.clone()));
-        tool_registry.register(tools::glob_tool::GlobTool::new(allowed_dir.clone()));
-
-        // Web tools
-        tool_registry.register(WebSearchTool::new(
-            brave_api_key,
-            config.tools.web.max_results,
-        ));
-        tool_registry.register(WebFetchTool::new());
-
-        if config.tools.browser.enabled {
-            match BrowserTool::new(config.tools.browser.trust_level.clone()) {
-                Ok(tool) => {
-                    tool_registry.register(tool);
-                    info!("Browser tool registered");
-                }
-                Err(e) => {
-                    warn!("Browser tool unavailable: {}", e);
-                }
-            }
-        }
-
-        // Message tool
-        tool_registry.register(MessageTool::new(bus.outbound_sender()));
-
-        // Ask-user tool
-        tool_registry.register(tools::ask_user::AskUserTool);
 
         // Spawn tool
         tool_registry.register(SpawnTool::with_handler(
@@ -1998,6 +1954,7 @@ impl AgentLoopBuilder {
             activity_svc: self.activity_svc,
             skill_store,
             hot_config,
+            subagent_manager: Some(subagent_manager),
         })
     }
 }

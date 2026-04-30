@@ -11,6 +11,7 @@ pub mod ask_user;
 pub mod plan_mode;
 pub mod notebook_edit;
 pub mod tool_search;
+pub mod list_dir;
 
 pub use bash::{BashArgs, BashTool};
 pub use read::{ReadArgs, ReadTool};
@@ -24,3 +25,4 @@ pub use ask_user::AskUserTool;
 pub use plan_mode::{EnterPlanModeArgs, EnterPlanModeTool, ExitPlanModeArgs, ExitPlanModeTool};
 pub use notebook_edit::{NotebookEditArgs, NotebookEditTool};
 pub use tool_search::{ToolSearchArgs, ToolSearchTool};
+pub use list_dir::{ListDirArgs, ListDirTool};

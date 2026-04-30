@@ -11,6 +11,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 use common::{ChannelName, ChatId, FormResponse, InteractionRequest, Result};
+use crate::events::ToolEvent;
 
 /// Bundle sent from ask_user tool to the CLI.
 /// Each request carries its own response channel.
@@ -80,6 +81,10 @@ pub struct RoutingContext {
     pub champion_params: Option<common::TrialParams>,
     /// Cancellation token for interrupting long-running tool operations.
     pub cancel_token: Option<CancellationToken>,
+    /// Per-call streaming event channel. Tools push ToolEvent variants here
+    /// (e.g., FileEditWithSymbols, SandboxPolicyApplied) for the relay to
+    /// translate into Tauri events. May be None for non-streaming contexts.
+    pub event_tx: Option<mpsc::Sender<ToolEvent>>,
 }
 
 impl RoutingContext {
@@ -95,6 +100,7 @@ impl RoutingContext {
             interaction_channel: None,
             champion_params: None,
             cancel_token: None,
+            event_tx: None,
         }
     }
 
@@ -114,6 +120,7 @@ impl RoutingContext {
             interaction_channel: None,
             champion_params: None,
             cancel_token: None,
+            event_tx: None,
         }
     }
 }
