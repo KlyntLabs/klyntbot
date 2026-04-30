@@ -24,6 +24,8 @@ pub struct GuardCtx<'a> {
     pub domain_bus: &'a Arc<DomainEventBus>,
     pub cancel: CancellationToken,
     pub request_id: String,
+    pub args: Option<serde_json::Value>,
+    pub cwd: Option<String>,
 }
 
 pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> ApprovalDecision {
@@ -119,6 +121,9 @@ async fn emit_pair<'a>(
         mirror_history: None,
         sandbox_summary: String::new(),
         requires_user_input,
+        args: ctx.args.clone(),
+        cwd: ctx.cwd.clone(),
+        layer_reason: Some(reason_of(decision)),
     };
     agent::execution::core::fan_out_event(ctx.event_tx, Some(ctx.domain_bus), req).await;
     if !requires_user_input {

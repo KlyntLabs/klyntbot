@@ -1,11 +1,11 @@
 //! Entity card data emitted when tools create entities.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Card data for an entity created by a tool.
 /// Sent through RoutingContext to the agent event stream.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EntityCard {
     pub entity_type: String,

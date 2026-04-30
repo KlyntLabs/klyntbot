@@ -70,25 +70,40 @@ export function useApprovalQueue(sessionKey: string) {
   useEffect(() => {
     if (!sessionKey) return;
     const unlistens: Array<() => void> = [];
-    listen<ApprovalPayload>("agent:approval_requested", (e) => {
-      if (!e.payload.requires_user_input) return;
-      chatStreamStore.upsertApproval(sessionKey, toItem(e.payload));
-    })
-      .then((un) => unlistens.push(un))
-      .catch(() => {});
+    let cancelled = false;
 
-    listen<ResolvedPayload>("agent:approval_resolved", (e) => {
-      chatStreamStore.resolveApproval(
-        sessionKey,
-        e.payload.request_id,
-        mapStatus(e.payload.decided_by),
-        e.payload.decided_by,
-      );
-    })
-      .then((un) => unlistens.push(un))
-      .catch(() => {});
+    (async () => {
+      try {
+        const un = await listen<ApprovalPayload>("agent:approval_requested", (e) => {
+          if (!e.payload.requires_user_input) return;
+          chatStreamStore.upsertApproval(sessionKey, toItem(e.payload));
+        });
+        if (cancelled) {
+          un();
+        } else {
+          unlistens.push(un);
+        }
+      } catch { }
+
+      try {
+        const un = await listen<ResolvedPayload>("agent:approval_resolved", (e) => {
+          chatStreamStore.resolveApproval(
+            sessionKey,
+            e.payload.request_id,
+            mapStatus(e.payload.decided_by),
+            e.payload.decided_by,
+          );
+        });
+        if (cancelled) {
+          un();
+        } else {
+          unlistens.push(un);
+        }
+      } catch { }
+    })();
 
     return () => {
+      cancelled = true;
       for (const f of unlistens) {
         f();
       }

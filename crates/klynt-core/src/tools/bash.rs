@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 use tools_core::{RoutingContext, ToolExecute, ToolParams};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, ToolParams)]
+#[derive(Debug, Clone, serde::Serialize, ToolParams)]
 pub struct BashArgs {
     /// Shell command to run via /bin/bash -c.
     #[param(required)]
@@ -39,7 +39,7 @@ pub struct BashTool {
     policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
     pending: Arc<PendingApprovalsMap>,
-    event_tx: mpsc::Sender<AgentEvent>,
+    event_tx: Option<mpsc::Sender<AgentEvent>>,
     bus: Arc<DomainEventBus>,
 }
 
@@ -49,7 +49,7 @@ impl BashTool {
         policy: Arc<Policy>,
         privacy: Arc<PrivacyGuard>,
         pending: Arc<PendingApprovalsMap>,
-        event_tx: mpsc::Sender<AgentEvent>,
+        event_tx: Option<mpsc::Sender<AgentEvent>>,
         bus: Arc<DomainEventBus>,
     ) -> Self {
         Self {
@@ -67,19 +67,21 @@ impl BashTool {
 impl ToolExecute for BashTool {
     type Params = BashArgs;
 
-    async fn execute(&self, args: BashArgs, _ctx: &RoutingContext) -> common::Result<String> {
+    async fn execute(&self, args: BashArgs, ctx: &RoutingContext) -> common::Result<String> {
         let request_id = Uuid::new_v4().to_string();
-        let ctx = GuardCtx {
+        let guard_ctx = GuardCtx {
             layer1: &self.layer1,
             policy: &self.policy,
             privacy: &self.privacy,
             pending: &self.pending,
-            event_tx: Some(&self.event_tx),
+            event_tx: self.event_tx.as_ref(),
             domain_bus: &self.bus,
-            cancel: CancellationToken::new(),
+            cancel: ctx.cancel_token.clone().unwrap_or_else(CancellationToken::new),
             request_id,
+            args: Some(serde_json::to_value(&args).unwrap_or(serde_json::Value::Null)),
+            cwd: args.cwd.clone(),
         };
-        let decision = evaluate(ctx, "bash", &args.command).await;
+        let decision = evaluate(guard_ctx, "bash", &args.command).await;
         if !decision.allowed() {
             return Err(common::KlyntbotError::Tool(
                 common::ToolError::PermissionDenied(format!("bash denied: {:?}", decision)),
@@ -100,17 +102,19 @@ impl ToolExecute for BashTool {
                 .map(PathBuf::from)
                 .unwrap_or_else(|| std::env::current_dir().unwrap());
             let sandbox_policy = klynt_sandbox::SandboxPolicy::cwd_writes_only(cwd.clone());
-            let _ = self
-                .event_tx
-                .send(AgentEvent::SandboxPolicyApplied {
+            agent::execution::core::fan_out_event(
+                self.event_tx.as_ref(),
+                Some(&self.bus),
+                AgentEvent::SandboxPolicyApplied {
                     tool: "bash".into(),
                     policy_summary: sandbox_policy.summary(),
                     policy_hash: sandbox_policy.policy_hash(),
                     fallback_unsandboxed: false,
                     fs_constraints: vec![format!("{:?}", sandbox_policy.fs)],
                     network_constraints: vec![format!("{:?}", sandbox_policy.network)],
-                })
-                .await;
+                },
+            )
+            .await;
             let runner = klynt_sandbox::MacOsSeatbeltRunner::new();
             let timeout = Duration::from_millis(args.timeout_ms.unwrap_or(60_000));
             let out = runner

@@ -30,7 +30,7 @@ async fn k4_sandbox_event_emitted_before_exec() {
         outside.display()
     );
 
-    let tool = BashTool::new(layer1, policy, privacy, pending, tx.clone(), bus);
+    let tool = BashTool::new(layer1, policy, privacy, pending, Some(tx.clone()), bus);
     let r = ToolExecute::execute(
         &tool,
         BashArgs {

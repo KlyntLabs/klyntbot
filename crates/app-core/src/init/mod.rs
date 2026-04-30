@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use ::agent::cognitive_handlers::LlmExtractionHandler;
 use ::agent::cognitive_handlers::{HeuristicCoachingReasonerHandler, LlmCoachingReasonerHandler};
-use ::agent::{AgentEvent, AgentLoop};
+use ::agent::AgentLoop;
 use ::channels::ChannelManager;
 use ::cognitive::pipeline::{
     AtomCollector, ChatTurnCollector, CoachingCollector, RecallCollector, SessionCollector,
@@ -1789,10 +1789,10 @@ impl AppCore {
                     .expect("privacy globs"),
             );
             let policy = Arc::new(
-                klynt_execpolicy::Policy::load_from_dir(
-                    &dirs::home_dir().unwrap().join(".klyntbot/rules"),
-                )
-                .unwrap_or_else(|_| klynt_execpolicy::Policy::empty()),
+                dirs::home_dir()
+                    .map(|h| h.join(".klyntbot/rules"))
+                    .and_then(|p| klynt_execpolicy::Policy::load_from_dir(&p).ok())
+                    .unwrap_or_else(klynt_execpolicy::Policy::empty),
             );
             let pending = core.pending_approvals.clone();
             let bus = core
@@ -1800,12 +1800,8 @@ impl AppCore {
                 .clone()
                 .unwrap_or_else(|| Arc::new(bus::DomainEventBus::new(64)));
 
-            // Create an mpsc channel for BashTool to emit events
-            let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<AgentEvent>(64);
-            tokio::spawn(async move { while let Some(_evt) = event_rx.recv().await {} });
-
             let bash_tool = klynt_core::tools::bash::BashTool::new(
-                layer1, policy, privacy, pending, event_tx, bus,
+                layer1, policy, privacy, pending, None, bus,
             );
 
             let reg = core.agent.tool_registry();

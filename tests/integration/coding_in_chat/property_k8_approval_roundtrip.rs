@@ -35,6 +35,8 @@ proptest! {
                     pending: &pending, event_tx: Some(&tx), domain_bus: &bus,
                     cancel: CancellationToken::new(),
                     request_id: format!("r-{i}"),
+                    args: None,
+                    cwd: None,
                 };
                 let _ = evaluate(ctx, "bash", "echo k8").await;
             }

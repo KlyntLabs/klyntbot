@@ -3,10 +3,10 @@
 //! These events are emitted by the agent loop during processing,
 //! allowing consumers (like the CLI) to display real-time progress.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Events emitted by the agent loop during processing.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum AgentEvent {
@@ -375,6 +375,9 @@ pub enum AgentEvent {
         sandbox_summary: String,
         #[serde(rename = "requiresUserInput")]
         requires_user_input: bool,
+        args: Option<serde_json::Value>,
+        cwd: Option<String>,
+        layer_reason: Option<String>,
     },
 
     /// Approval gate resolved (paired with ApprovalRequested by request_id).
@@ -566,6 +569,9 @@ mod approval_sandbox_variant_tests {
             mirror_history: None,
             sandbox_summary: "Seatbelt cwd-only".into(),
             requires_user_input: true,
+            args: None,
+            cwd: None,
+            layer_reason: None,
         };
         let v = serde_json::to_value(&event).unwrap();
         assert_eq!(v["type"], "approvalRequested");

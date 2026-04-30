@@ -23,7 +23,7 @@ async fn bash_happy_path() {
     let bus = Arc::new(DomainEventBus::new(256));
     let (tx, mut rx) = mpsc::channel(256);
 
-    let tool = BashTool::new(layer1, policy, privacy, pending, tx, bus);
+    let tool = BashTool::new(layer1, policy, privacy, pending, Some(tx), bus);
     let result = ToolExecute::execute(
         &tool,
         BashArgs {

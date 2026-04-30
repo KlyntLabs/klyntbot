@@ -35,6 +35,8 @@ async fn privacy_blocks_first() {
         domain_bus: &bus,
         cancel: CancellationToken::new(),
         request_id: "r1".into(),
+        args: None,
+        cwd: None,
     };
     let d = evaluate(ctx, "bash", "cat .env").await;
     assert!(matches!(d, ApprovalDecision::PrivacyDenied { .. }));
@@ -67,6 +69,8 @@ async fn auto_allow_emits_pair_no_user_input() {
         domain_bus: &bus,
         cancel: CancellationToken::new(),
         request_id: "r2".into(),
+        args: None,
+        cwd: None,
     };
     let d = evaluate(ctx, "bash", "echo hi").await;
     assert!(d.allowed());
@@ -123,6 +127,8 @@ async fn ask_path_awaits_user_decision() {
         domain_bus: &bus,
         cancel: CancellationToken::new(),
         request_id: "r3".into(),
+        args: None,
+        cwd: None,
     };
     let d = evaluate(ctx, "bash", "rm something").await;
     assert!(d.allowed());

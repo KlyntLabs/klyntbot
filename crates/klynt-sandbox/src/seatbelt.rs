@@ -67,15 +67,40 @@ impl SandboxRunner for MacOsSeatbeltRunner {
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
 
-        let child = cmd.spawn()?;
-        let out = match tokio::time::timeout(timeout, child.wait_with_output()).await {
-            Ok(r) => r?,
-            Err(_) => return Err(SandboxError::ChildExit(124)),
+        let mut child = cmd.spawn()?;
+        let mut stdout_pipe = child.stdout.take().unwrap();
+        let mut stderr_pipe = child.stderr.take().unwrap();
+
+        let stdout_fut = async move {
+            let mut buf = Vec::new();
+            tokio::io::AsyncReadExt::read_to_end(&mut stdout_pipe, &mut buf).await.ok();
+            buf
         };
-        Ok(CommandOutput {
-            stdout: String::from_utf8_lossy(&out.stdout).into_owned()
-                + &String::from_utf8_lossy(&out.stderr),
-            exit_code: out.status.code().unwrap_or(-1),
+        let stderr_fut = async move {
+            let mut buf = Vec::new();
+            tokio::io::AsyncReadExt::read_to_end(&mut stderr_pipe, &mut buf).await.ok();
+            buf
+        };
+
+        let timeout_result = tokio::time::timeout(timeout, async {
+            let (status, stdout_bytes, stderr_bytes) =
+                tokio::join!(child.wait(), stdout_fut, stderr_fut);
+            let status = status?;
+            Ok::<_, std::io::Error>((status, stdout_bytes, stderr_bytes))
         })
+        .await;
+
+        match timeout_result {
+            Ok(Ok((status, stdout_bytes, stderr_bytes))) => Ok(CommandOutput {
+                stdout: String::from_utf8_lossy(&stdout_bytes).into_owned()
+                    + &String::from_utf8_lossy(&stderr_bytes),
+                exit_code: status.code().unwrap_or(-1),
+            }),
+            Ok(Err(e)) => Err(SandboxError::Spawn(e)),
+            Err(_) => {
+                let _ = child.kill().await;
+                Err(SandboxError::ChildExit(124))
+            }
+        }
     }
 }

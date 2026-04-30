@@ -25,7 +25,7 @@ async fn echo_hi_runs_and_emits_sandbox_event() {
     let bus = Arc::new(DomainEventBus::new(64));
     let (tx, mut rx) = mpsc::channel(32);
 
-    let tool = BashTool::new(layer1, policy, privacy, pending, tx.clone(), bus);
+    let tool = BashTool::new(layer1, policy, privacy, pending, Some(tx.clone()), bus);
     let result = tool
         .execute(
             klynt_core::tools::bash::BashArgs {
@@ -64,7 +64,7 @@ async fn denied_command_returns_error_and_does_not_run() {
     let pending = Arc::new(PendingApprovalsMap::new());
     let bus = Arc::new(DomainEventBus::new(64));
     let (tx, _rx) = mpsc::channel(32);
-    let tool = BashTool::new(layer1, policy, privacy, pending, tx, bus);
+    let tool = BashTool::new(layer1, policy, privacy, pending, Some(tx), bus);
     let r = tool
         .execute(
             klynt_core::tools::bash::BashArgs {

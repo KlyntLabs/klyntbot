@@ -224,10 +224,11 @@ pub async fn chat_send(
 
     // Set conversation_type based on mode if provided
     if let Some(ref m) = mode {
-        let _ = repos
+        repos
             .sessions
             .update_conversation_type(&session_key, m)
-            .await;
+            .await
+            .map_err(map_storage_err)?;
     }
 
     // 2. Upsert session_context if provided
@@ -444,6 +445,37 @@ pub async fn relay_chat_stream(
         };
     }
 
+    // Merge pipeline events and domain-bus agent events into a single stream
+    // so that tools (e.g. BashTool) that publish via the domain bus are relayed
+    // to the UI just like native pipeline events.
+    let (merged_tx, mut merged_rx) = mpsc::channel::<AgentEvent>(64);
+    let merged_tx2 = merged_tx.clone();
+
+    tokio::spawn(async move {
+        while let Some(evt) = event_rx.recv().await {
+            if merged_tx.send(evt).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    if let Some(ref bus) = domain_event_bus {
+        let mut rx = bus.subscribe();
+        tokio::spawn(async move {
+            while let Ok(evt) = rx.recv().await {
+                if let bus::DomainEvent::Generic { kind, payload } = evt {
+                    if kind == "agent_event" {
+                        if let Ok(agent_evt) = serde_json::from_value::<AgentEvent>(payload) {
+                            if merged_tx2.send(agent_evt).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     loop {
         tokio::select! {
             biased;
@@ -459,7 +491,7 @@ pub async fn relay_chat_stream(
                 );
                 pending_interactions.insert(sk.clone(), (request_id, bundle.response_tx));
             }
-            Some(event) = event_rx.recv() => {
+            Some(event) = merged_rx.recv() => {
                 match event {
                     AgentEvent::ContentChunk { data } => {
                         current_text.push_str(&data);
@@ -1017,7 +1049,7 @@ pub async fn relay_chat_stream(
                     AgentEvent::ApprovalRequested { requires_user_input, .. } if !requires_user_input => {
                         // Auto-allow / auto-deny / privacy: telemetry only — UI doesn't need them.
                     }
-                    AgentEvent::ApprovalRequested { ref request_id, ref tool, ref args_hash, ref layer, ref rule_matched, ref mirror_history, ref sandbox_summary, requires_user_input } => {
+                    AgentEvent::ApprovalRequested { ref request_id, ref tool, ref args_hash, ref layer, ref rule_matched, ref mirror_history, ref sandbox_summary, requires_user_input, ref args, ref cwd, ref layer_reason } => {
                         let payload = serde_json::json!({
                             "request_id": request_id,
                             "tool": tool,
@@ -1027,6 +1059,9 @@ pub async fn relay_chat_stream(
                             "mirror_history": mirror_history,
                             "sandbox_summary": sandbox_summary,
                             "requires_user_input": requires_user_input,
+                            "args": args,
+                            "cwd": cwd,
+                            "layer_reason": layer_reason,
                         });
                         emitter.emit_event("agent:approval_requested", payload);
                     }

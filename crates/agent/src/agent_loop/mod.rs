@@ -1101,7 +1101,7 @@ impl AgentLoop {
 
         // Routing context with interaction channel for ask_user tool
         let routing_ctx = RoutingContext::with_interaction(
-            "cli".into(),
+            "desktop".into(),
             session_key.clone().into(),
             interaction_tx,
         );

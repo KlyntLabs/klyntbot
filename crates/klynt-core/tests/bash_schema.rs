@@ -16,7 +16,7 @@ fn bash_tool_metadata() {
     let (tx, _rx) = mpsc::channel(1);
     let bus = Arc::new(DomainEventBus::new(1));
 
-    let t = BashTool::new(layer1, policy, privacy, pending, tx, bus);
+    let t = BashTool::new(layer1, policy, privacy, pending, Some(tx), bus);
     assert_eq!(t.name(), "bash");
     assert!(!t.description().is_empty());
     let schema = t.parameters();
