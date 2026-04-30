@@ -12,7 +12,8 @@ use tokio::sync::{RwLock, Semaphore};
 use common::{helpers::tool_def_name, Result};
 use context_engine::TokenCounter;
 use providers::{tool_calls_to_messages, DynProvider, Message};
-use tools::{ask_user::ASK_USER_TOOL_NAME, registry::ToolRegistry, RoutingContext};
+use tools::{registry::ToolRegistry, RoutingContext};
+use klynt_core::tools::ask_user::ASK_USER_TOOL_NAME;
 use tracing::debug;
 
 use providers::Usage;

@@ -7,6 +7,7 @@ use config::schema::CodingPermissions;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use common::tool_channel::{Channel, NonUiPolicy};
 
 #[tokio::test]
 async fn fetches_text_from_local_server() {
@@ -40,7 +41,9 @@ async fn fetches_text_from_local_server() {
         .unwrap();
     let out = fetch_run(
         WebFetchArgs { url, format: Some("text".into()), max_bytes: Some(8192) },
-        l1, pol, pri, pen, tx, bus, CancellationToken::new(), client,
+        l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(), client,
+        Channel::Coding, NonUiPolicy::Allow,
+        Arc::new(klynt_core::approval::HostApprovalCache::default()),
     ).await.unwrap();
     server.await.ok();
     assert!(out.contains("Hello world"));

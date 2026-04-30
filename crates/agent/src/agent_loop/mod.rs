@@ -101,6 +101,8 @@ pub struct AgentLoop {
     pub(crate) skill_store: Arc<RwLock<skill_system::SkillStore>>,
     /// Shared hot-reloadable config — updated by ConfigWatcherService without restart.
     pub(crate) hot_config: Arc<RwLock<config::HotConfig>>,
+    /// Subagent manager for background task spawning (kept alive for tool_kit injection).
+    pub(crate) subagent_manager: Option<Arc<crate::SubagentManager>>,
 }
 
 impl AgentLoop {
@@ -108,6 +110,10 @@ impl AgentLoop {
     /// Used by `klyntbot-server` to bridge internal tools to MCP.
     pub fn tool_registry(&self) -> Arc<RwLock<tools::registry::ToolRegistry>> {
         Arc::clone(&self.tool_registry)
+    }
+
+    pub fn runtime(&self) -> Arc<crate::agent_runtime::AgentRuntime> {
+        Arc::clone(&self.runtime)
     }
 
     /// Public accessor for the skill store.
@@ -119,6 +125,13 @@ impl AgentLoop {
     /// Public accessor for the shared hot-reloadable config.
     pub fn hot_config(&self) -> Arc<RwLock<config::HotConfig>> {
         Arc::clone(&self.hot_config)
+    }
+
+    /// Inject the tool-kit builder into the subagent manager (called by app-core init).
+    pub fn set_subagent_tool_kit(&self, kit: Arc<klynt_core::ToolKitBuilder>) {
+        if let Some(ref mgr) = self.subagent_manager {
+            mgr.set_tool_kit(kit);
+        }
     }
 
     /// Reload skill files from disk (hot-reload after UI edits).

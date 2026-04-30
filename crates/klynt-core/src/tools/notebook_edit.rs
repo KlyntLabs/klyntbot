@@ -2,7 +2,6 @@ use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
 use crate::tools::shared::fs_resolve::resolve_under_cwd;
 use crate::tools::shared::file_edit_event::{emit_file_edit, unified_diff, FileEditEvent};
-use agent::events::AgentEvent;
 use async_trait::async_trait;
 use bus::DomainEventBus;
 use common::{KlyntbotError, Result, ToolError};
@@ -13,6 +12,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tools_core::{RoutingContext, ToolExecute};
+use tools_core::events::ToolEvent;
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 use uuid::Uuid;
 
@@ -44,20 +44,18 @@ pub struct NotebookEditTool {
     policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
     pending: Arc<PendingApprovalsMap>,
-    event_tx: Option<mpsc::Sender<AgentEvent>>,
     bus: Arc<DomainEventBus>,
     non_ui_policy: common::tool_channel::NonUiPolicy,
 }
 
 impl NotebookEditTool {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         cwd: PathBuf, layer1: Arc<Layer1>, policy: Arc<Policy>, privacy: Arc<PrivacyGuard>,
-        pending: Arc<PendingApprovalsMap>, event_tx: Option<mpsc::Sender<AgentEvent>>,
+        pending: Arc<PendingApprovalsMap>,
         bus: Arc<DomainEventBus>,
         non_ui_policy: common::tool_channel::NonUiPolicy,
     ) -> Self {
-        Self { cwd, layer1, policy, privacy, pending, event_tx, bus, non_ui_policy }
+        Self { cwd, layer1, policy, privacy, pending, bus, non_ui_policy }
     }
 }
 
@@ -67,7 +65,7 @@ impl ToolExecute for NotebookEditTool {
     async fn execute(&self, args: NotebookEditArgs, ctx: &RoutingContext) -> Result<String> {
         run_for_test(args, self.cwd.clone(), self.layer1.clone(), self.policy.clone(),
             self.privacy.clone(), self.pending.clone(),
-            self.event_tx.clone().unwrap_or_else(|| mpsc::channel(1).0),
+            ctx.event_tx.clone(),
             self.bus.clone(),
             ctx.cancel_token.clone().unwrap_or_else(CancellationToken::new),
             common::tool_channel::Channel::from_name(ctx.channel.as_str()),
@@ -84,7 +82,7 @@ pub async fn run_for_test(
     policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
     pending: Arc<PendingApprovalsMap>,
-    event_tx: mpsc::Sender<AgentEvent>,
+    event_tx: Option<mpsc::Sender<ToolEvent>>,
     bus: Arc<DomainEventBus>,
     cancel: CancellationToken,
     channel: common::tool_channel::Channel,
@@ -96,7 +94,7 @@ pub async fn run_for_test(
     let request_id = Uuid::new_v4().to_string();
     let guard_ctx = GuardCtx {
         layer1: &layer1, policy: &policy, privacy: &privacy,
-        pending: &pending, event_tx: Some(&event_tx), domain_bus: &bus,
+        pending: &pending, event_tx: event_tx.as_ref(), domain_bus: &bus,
         cancel, request_id,
         args: Some(serde_json::to_value(&args).unwrap_or_default()),
         cwd: Some(cwd.to_string_lossy().into_owned()),
@@ -132,7 +130,7 @@ pub async fn run_for_test(
     tokio::fs::write(&resolved, after.as_bytes()).await
         .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("write: {e}"))))?;
     let diff = unified_diff(&path_str, &before, &after);
-    emit_file_edit(&Some(event_tx), &bus, FileEditEvent {
+    emit_file_edit(&event_tx, &bus, FileEditEvent {
         op: "notebook_edit", path: &path_str, bytes: after.len() as u64, diff_full: diff,
     }).await;
     Ok(format!("edited cell {} in {}", idx, path_str))

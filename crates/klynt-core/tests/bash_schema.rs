@@ -6,6 +6,7 @@ use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tools_core::Tool;
+use common::tool_channel::NonUiPolicy;
 
 #[test]
 fn bash_tool_metadata() {
@@ -13,10 +14,10 @@ fn bash_tool_metadata() {
     let policy = Arc::new(Policy::empty());
     let privacy = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
     let pending = Arc::new(PendingApprovalsMap::new());
-    let (tx, _rx) = mpsc::channel(1);
+    let (tx, _rx) = mpsc::channel::<tools_core::events::ToolEvent>(1);
     let bus = Arc::new(DomainEventBus::new(1));
 
-    let t = BashTool::new(layer1, policy, privacy, pending, Some(tx), bus);
+    let t = BashTool::new(layer1, policy, privacy, pending, bus, NonUiPolicy::Allow);
     assert_eq!(t.name(), "bash");
     assert!(!t.description().is_empty());
     let schema = t.parameters();

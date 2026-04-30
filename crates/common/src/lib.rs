@@ -23,7 +23,7 @@ pub mod types;
 // ── Re-exports: domain types ────────────────────────────────────────────
 
 pub use autotuner::TrialParams;
-pub use tool_channel::{available_for_channel, Channel, ChannelMask};
+pub use tool_channel::{Channel, ChannelMask};
 pub use entity_card::EntityCard;
 pub use error::{
     ChannelError, ConfigError, KlyntbotError, ProviderError, Result, SessionError, ToolError,

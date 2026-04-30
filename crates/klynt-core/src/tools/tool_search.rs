@@ -24,7 +24,6 @@ pub struct ToolSearchArgs {
     cost = "Free",
     tags = "tools,coding,stub",
     concurrency_safe = "true",
-    allowed_channels = "coding_only"
 )]
 pub struct ToolSearchTool;
 

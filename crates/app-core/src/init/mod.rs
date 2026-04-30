@@ -1812,52 +1812,30 @@ impl AppCore {
                 .clone()
                 .unwrap_or_else(|| Arc::new(bus::DomainEventBus::new(64)));
 
-            let cwd = config_guard.coding_memory.workspace_root.clone()
-                .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
-            let event_tx: Option<tokio::sync::mpsc::Sender<agent::events::AgentEvent>> = None;
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
             let non_ui_policy = config_guard.tools.approval_policy.non_ui_channels;
             let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
 
-            let reg = core.agent.tool_registry();
-            let mut registry = reg.write().await;
-            use klynt_core::tools as kt;
-
-            registry.register(kt::BashTool::new(
-                layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
-                non_ui_policy,
-            ));
-            registry.register(kt::ReadTool::new(cwd.clone(), privacy.clone()));
-            registry.register(kt::GlobTool::new(cwd.clone(), privacy.clone()));
-            registry.register(kt::GrepTool::new(cwd.clone(), privacy.clone()));
-            registry.register(kt::WriteTool::new(
-                cwd.clone(), layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
-                non_ui_policy,
-            ));
-            registry.register(kt::EditTool::new(
-                cwd.clone(), layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
-                non_ui_policy,
-            ));
-            registry.register(kt::ApplyPatchTool::new(
-                cwd.clone(), layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
-                non_ui_policy,
-            ));
-            registry.register(kt::WebFetchTool::new(
-                layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
-                non_ui_policy,
+            let kit = klynt_core::ToolKitBuilder {
+                cwd: cwd.clone(),
+                layer1: layer1.clone(),
+                policy: policy.clone(),
+                privacy: privacy.clone(),
+                pending: pending.clone(),
+                bus: bus.clone(),
+                repos: core.repos.clone(),
                 host_cache,
-            ));
-            registry.register(kt::EnterPlanModeTool::new(
-                core.repos.clone(), event_tx.clone(), bus.clone(),
-            ));
-            registry.register(kt::ExitPlanModeTool::new(
-                core.repos.clone(), event_tx.clone(), bus.clone(),
-            ));
-            registry.register(kt::NotebookEditTool::new(
-                cwd.clone(), layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
                 non_ui_policy,
-            ));
-            registry.register(kt::ToolSearchTool::new());
-            info!("Coding tool kit registered (12 tools)");
+            };
+            {
+                let reg = core.agent.tool_registry();
+                let mut registry = reg.write().await;
+                kit.register_all(&mut registry);
+                info!("Coding tool kit registered (13 tools)");
+            }
+            let kit_arc = Arc::new(kit);
+            core.agent.runtime().set_tool_kit(Arc::clone(&kit_arc));
+            core.agent.set_subagent_tool_kit(Arc::clone(&kit_arc));
         }
 
         // ── Register TemporalTool in agent's tool registry (post-init) ────

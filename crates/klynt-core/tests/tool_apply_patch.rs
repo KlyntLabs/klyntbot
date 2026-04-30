@@ -7,6 +7,7 @@ use config::schema::CodingPermissions;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use common::tool_channel::{Channel, NonUiPolicy};
 
 #[tokio::test]
 async fn applies_unified_diff() {
@@ -22,7 +23,8 @@ async fn applies_unified_diff() {
     let (tx, _rx) = mpsc::channel(32);
     patch_run(
         ApplyPatchArgs { path: "f.txt".into(), patch: patch.into() },
-        dir.path().to_path_buf(), l1, pol, pri, pen, tx, bus, CancellationToken::new(),
+        dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
+        Channel::Coding, NonUiPolicy::Allow,
     ).await.unwrap();
     assert_eq!(std::fs::read_to_string(dir.path().join("f.txt")).unwrap(), "line1\nLINE2\nline3\n");
 }
@@ -40,7 +42,8 @@ async fn rejects_malformed_patch() {
     let (tx, _rx) = mpsc::channel(32);
     let r = patch_run(
         ApplyPatchArgs { path: "f.txt".into(), patch: "not a patch".into() },
-        dir.path().to_path_buf(), l1, pol, pri, pen, tx, bus, CancellationToken::new(),
+        dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
+        Channel::Coding, NonUiPolicy::Allow,
     ).await;
     assert!(r.is_err());
 }

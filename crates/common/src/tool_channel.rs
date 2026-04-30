@@ -76,16 +76,3 @@ pub enum NonUiPolicy {
     DenyWithError,
 }
 
-/// Look up channel visibility for a named tool, falling back to ALL if the
-/// registry doesn't know the tool. Replaces the old `available_for_channel`
-/// signature for compatibility during the migration; once all callers use
-/// `Tool::allowed_channels()` directly, this helper can be deleted.
-pub fn available_for_channel(_tool_name: &str, _channel: Channel) -> bool {
-    // Compatibility shim retained ONLY for code that hasn't migrated yet.
-    // Returns true unconditionally — the real per-tool gate now lives on the
-    // Tool trait. Callers MUST migrate to ChannelMask::allows() in Task 1.
-    //
-    // After Task 1 completes (filter site updated), this fn has no remaining
-    // callers and can be deleted in Task 9 alongside the rest of the cleanup.
-    true
-}

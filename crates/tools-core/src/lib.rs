@@ -7,6 +7,7 @@
 // ── Modules ─────────────────────────────────────────────────────────────
 
 pub mod config_persistence;
+pub mod events;
 pub mod feature;
 pub mod interceptor;
 pub mod metadata;
@@ -25,6 +26,7 @@ pub use tools_core_macros::{tool_actions, ActionParams, DomainEnum, Tool, ToolPa
 // ── Re-exports: submodule types ─────────────────────────────────────────
 
 pub use config_persistence::ConfigPersistence;
+pub use events::ToolEvent;
 pub use feature::{FeatureMigration, FeaturePackage, HealthStatus};
 pub use interceptor::{InterceptorChain, ToolCallInterceptor};
 pub use metadata::{CostHint, ToolCategory, ToolMetadata, ToolSource};

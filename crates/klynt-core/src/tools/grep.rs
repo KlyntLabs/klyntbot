@@ -19,6 +19,8 @@ pub struct GrepArgs {
     pub case_insensitive: Option<bool>,
     /// Maximum result lines (default 200).
     pub max_results: Option<u64>,
+    /// Lines of context around each match (0-5; clamped).
+    pub context_lines: Option<u8>,
 }
 
 #[derive(ToolDerive)]
@@ -32,7 +34,6 @@ pub struct GrepArgs {
     cost = "Free",
     tags = "search,grep,coding",
     concurrency_safe = "true",
-    allowed_channels = "coding_only"
 )]
 pub struct GrepTool {
     cwd: PathBuf,
@@ -49,6 +50,7 @@ impl ToolExecute for GrepTool {
 
     async fn execute(&self, args: GrepArgs, _ctx: &RoutingContext) -> Result<String> {
         let max = args.max_results.unwrap_or(200) as usize;
+        let ctx = args.context_lines.unwrap_or(0).min(5) as usize;
         let re = RegexBuilder::new(&args.pattern)
             .case_insensitive(args.case_insensitive.unwrap_or(false))
             .build()
@@ -64,23 +66,32 @@ impl ToolExecute for GrepTool {
             let mut out: Vec<String> = Vec::new();
             'outer: for entry in WalkDir::new(&cwd).follow_links(false) {
                 let Ok(entry) = entry else { continue };
-                if !entry.file_type().is_file() { continue; }
+                if !entry.file_type().is_file() { continue }
                 let rel = entry.path().strip_prefix(&cwd).unwrap_or(entry.path());
-                if !glob.is_match(rel) { continue; }
-                if privacy.is_excluded(entry.path()) { continue; }
+                if !glob.is_match(rel) { continue }
+                if privacy.is_excluded(entry.path()) { continue }
                 let file = match std::fs::File::open(entry.path()) {
                     Ok(f) => f,
                     Err(_) => continue,
                 };
                 let reader = std::io::BufReader::new(file);
-                for (i, line_result) in std::io::BufRead::lines(reader).enumerate() {
-                    let line = match line_result {
-                        Ok(l) => l,
-                        Err(_) => break,
-                    };
-                    if re.is_match(&line) {
-                        out.push(format!("{}:{}:{}",
-                            rel.display(), i + 1, line));
+                let file_lines: Vec<String> = std::io::BufRead::lines(reader)
+                    .filter_map(|l| l.ok())
+                    .collect();
+                let mut last_hi = 0usize;
+                for (i, line) in file_lines.iter().enumerate() {
+                    if re.is_match(line) {
+                        let lo = i.saturating_sub(ctx);
+                        let hi = (i + ctx + 1).min(file_lines.len());
+                        if lo > last_hi && !out.is_empty() {
+                            out.push("--".into());
+                        }
+                        for j in lo..hi {
+                            let marker = if j == i { ":" } else { "-" };
+                            out.push(format!("{}:{}{}:{}",
+                                rel.display(), j + 1, marker, file_lines[j]));
+                        }
+                        last_hi = hi;
                         if out.len() >= max { break 'outer; }
                     }
                 }

@@ -75,6 +75,8 @@ pub struct AgentRuntime {
     query_predictor: Option<Arc<crate::adapters::cognitive_handlers::LlmQueryPredictorHandler>>,
     /// KCA Track 7: number of predictions to generate per turn.
     predictions_per_turn: u32,
+    /// Tool-kit builder for constructing tool registries (main agent + sub-agents).
+    tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
 }
 
 impl AgentRuntime {
@@ -112,7 +114,16 @@ impl AgentRuntime {
             predictive_cache: None,
             query_predictor: None,
             predictions_per_turn: 3,
+            tool_kit: std::sync::Mutex::new(None),
         }
+    }
+
+    pub fn tool_kit(&self) -> Option<Arc<klynt_core::ToolKitBuilder>> {
+        self.tool_kit.lock().unwrap().clone()
+    }
+
+    pub fn set_tool_kit(&self, kit: Arc<klynt_core::ToolKitBuilder>) {
+        *self.tool_kit.lock().unwrap() = Some(kit);
     }
 
     // ── Builder methods ─────────────────────────────────────────
@@ -253,6 +264,46 @@ impl AgentRuntime {
         cancel_token: Option<tokio_util::sync::CancellationToken>,
         depth: DepthMode,
     ) -> Result<RuntimeResult> {
+        let mut ctx = ctx.clone();
+        // Bridge ToolEvent channel → AgentEvent channel so klynt-core tools
+        // can emit events without depending on the agent crate.
+        let tool_event_tx = event_tx.as_ref().map(|agent_tx| {
+            let (tool_tx, mut tool_rx) = tokio::sync::mpsc::channel::<tools_core::events::ToolEvent>(64);
+            let agent_tx = agent_tx.clone();
+            tokio::spawn(async move {
+                while let Some(tool_evt) = tool_rx.recv().await {
+                    let agent_evt = match tool_evt {
+                        tools_core::events::ToolEvent::FileEditWithSymbols { path, op, bytes, diff_full, anchored_symbols, lsp_diagnostics_delta } => {
+                            AgentEvent::FileEditWithSymbols { path, op, bytes, diff_full, anchored_symbols, lsp_diagnostics_delta }
+                        }
+                        tools_core::events::ToolEvent::SandboxPolicyApplied { tool, policy_summary, policy_hash, fallback_unsandboxed, fs_constraints, network_constraints } => {
+                            AgentEvent::SandboxPolicyApplied { tool, policy_summary, policy_hash, fallback_unsandboxed, fs_constraints, network_constraints }
+                        }
+                        tools_core::events::ToolEvent::PlanModeChanged { in_plan_mode, plan_id } => {
+                            AgentEvent::PlanModeChanged {
+                                session_key: plan_id.unwrap_or_default(),
+                                active: in_plan_mode,
+                                requested_by: "tool".into(),
+                            }
+                        }
+                        tools_core::events::ToolEvent::ApprovalRequested { request_id, tool, args_hash, layer, rule_matched, mirror_history, sandbox_summary, requires_user_input, args, cwd, layer_reason } => {
+                            AgentEvent::ApprovalRequested { request_id, tool, args_hash, layer, rule_matched, mirror_history, sandbox_summary, requires_user_input, args, cwd, layer_reason }
+                        }
+                        tools_core::events::ToolEvent::ApprovalResolved { request_id, decision, decision_reason, latency_ms, persisted_rule, decided_by } => {
+                            AgentEvent::ApprovalResolved { request_id, decision, decision_reason, latency_ms, persisted_rule, decided_by }
+                        }
+                        _ => continue,
+                    };
+                    let _ = agent_tx.send(agent_evt).await;
+                }
+            });
+            tool_tx
+        });
+        ctx.event_tx = tool_event_tx;
+        if let Some(t) = &cancel_token {
+            ctx.cancel_token = Some(t.clone());
+        }
+        let ctx = &ctx;
         let pipeline_start = Instant::now();
         let hot = self.hot_config.read().await;
         let safety_timeout_secs = hot.safety_timeout_secs;

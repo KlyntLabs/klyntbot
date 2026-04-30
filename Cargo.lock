@@ -80,6 +80,7 @@ dependencies = [
  "feature-tasks",
  "futures-util",
  "jiff",
+ "klynt-core",
  "mcp",
  "plugin-runtime",
  "providers",
@@ -7713,7 +7714,6 @@ dependencies = [
 name = "klynt-core"
 version = "0.0.1"
 dependencies = [
- "agent",
  "async-trait",
  "bstr",
  "bus",
@@ -15189,8 +15189,6 @@ dependencies = [
  "context_engine",
  "cron",
  "fastembed",
- "globset",
- "html2text",
  "jiff",
  "regex",
  "reqwest 0.13.3",
@@ -15204,9 +15202,7 @@ dependencies = [
  "tools-core",
  "tracing",
  "url",
- "urlencoding",
  "uuid",
- "walkdir",
 ]
 
 [[package]]

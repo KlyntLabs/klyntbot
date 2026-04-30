@@ -14,6 +14,8 @@ pub struct GlobArgs {
     /// Glob pattern relative to session cwd (e.g., `**/*.rs`, `src/**/*.ts`).
     #[param(required)]
     pub pattern: String,
+    /// Optional root directory to search in (defaults to session cwd).
+    pub path: Option<String>,
     /// Maximum number of paths to return (default 100).
     pub max_results: Option<u64>,
 }
@@ -29,7 +31,6 @@ pub struct GlobArgs {
     cost = "Free",
     tags = "fs,search,coding",
     concurrency_safe = "true",
-    allowed_channels = "coding_only"
 )]
 pub struct GlobTool {
     cwd: PathBuf,
@@ -52,16 +53,28 @@ impl ToolExecute for GlobTool {
         let set = builder.build()
             .map_err(|e| KlyntbotError::Tool(ToolError::InvalidParams(e.to_string())))?;
 
-        let cwd = self.cwd.clone();
+        let root = match args.path.as_deref() {
+            Some(p) => {
+                let resolved = self.cwd.join(p);
+                let canonical = std::fs::canonicalize(&resolved).unwrap_or(resolved);
+                if self.privacy.is_excluded(&canonical) {
+                    return Err(KlyntbotError::Tool(ToolError::PermissionDenied(
+                        format!("glob path '{}' is excluded by privacy policy", canonical.display()))));
+                }
+                canonical
+            }
+            None => self.cwd.clone(),
+        };
+
         let privacy = self.privacy.clone();
         let matches = tokio::task::spawn_blocking(move || -> Vec<(std::time::SystemTime, PathBuf)> {
             let mut out: Vec<(std::time::SystemTime, PathBuf)> = Vec::new();
-            for entry in WalkDir::new(&cwd).follow_links(false) {
+            for entry in WalkDir::new(&root).follow_links(false) {
                 let Ok(entry) = entry else { continue };
-                if !entry.file_type().is_file() { continue; }
-                let rel = entry.path().strip_prefix(&cwd).unwrap_or(entry.path());
-                if !set.is_match(rel) { continue; }
-                if privacy.is_excluded(entry.path()) { continue; }
+                if !entry.file_type().is_file() { continue }
+                let rel = entry.path().strip_prefix(&root).unwrap_or(entry.path());
+                if !set.is_match(rel) { continue }
+                if privacy.is_excluded(entry.path()) { continue }
                 let mtime = entry.metadata().ok().and_then(|m| m.modified().ok()).unwrap_or(std::time::SystemTime::UNIX_EPOCH);
                 out.push((mtime, entry.path().to_path_buf()));
             }

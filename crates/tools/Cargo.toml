@@ -26,16 +26,12 @@ reqwest = { workspace = true }
 tracing.workspace = true
 regex.workspace = true
 shellexpand.workspace = true
-html2text.workspace = true
 url.workspace = true
-urlencoding.workspace = true
 jiff = { workspace = true }
 cron.workspace = true
 uuid = { workspace = true }
 serde = { workspace = true }
 fastembed = { workspace = true, optional = true }
-walkdir = "2"
-globset = "0.4"
 
 [dev-dependencies]
 tempfile.workspace = true

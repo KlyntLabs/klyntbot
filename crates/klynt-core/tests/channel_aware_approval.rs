@@ -12,7 +12,7 @@ use klynt_core::privacy::PrivacyGuard;
 use klynt_execpolicy::Policy;
 use bus::DomainEventBus;
 use common::tool_channel::{Channel, NonUiPolicy};
-use agent::events::AgentEvent;
+use tools_core::events::ToolEvent;
 
 fn build_ask_layer1() -> Arc<Layer1> {
     // A Layer1 with no rules and default_if_no_match = "ask"
@@ -21,6 +21,7 @@ fn build_ask_layer1() -> Arc<Layer1> {
         deny: vec![],
         ask: vec![],
         default_if_no_match: "ask".to_string(),
+        mirror_learning: false,
     };
     Arc::new(Layer1::compile(&perms).expect("Layer1 compile"))
 }
@@ -30,7 +31,7 @@ fn build_ctx<'a>(
     policy: &'a Policy,
     privacy: &'a PrivacyGuard,
     pending: &'a Arc<PendingApprovalsMap>,
-    event_tx: Option<&'a mpsc::Sender<AgentEvent>>,
+    event_tx: Option<&'a mpsc::Sender<ToolEvent>>,
     bus: &'a Arc<DomainEventBus>,
     channel: Channel,
     non_ui_policy: NonUiPolicy,

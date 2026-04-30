@@ -7,7 +7,6 @@ description = "Klynt core — coding-tool registry (bash/read/edit/...), execpol
 
 [dependencies]
 common = { workspace = true }
-agent = { workspace = true }
 tools-core = { workspace = true }
 tools-core-macros = { workspace = true }
 config = { workspace = true }

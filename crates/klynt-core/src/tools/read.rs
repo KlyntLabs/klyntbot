@@ -31,7 +31,6 @@ pub struct ReadArgs {
     cost = "Free",
     tags = "fs,read,coding",
     concurrency_safe = "true",
-    allowed_channels = "coding_only"
 )]
 pub struct ReadTool {
     cwd: PathBuf,

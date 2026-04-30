@@ -1,7 +1,6 @@
 use crate::approval::host_cache::{HostApprovalCache, HostCheckResult, HostDecision, HostKey};
 use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
-use agent::events::AgentEvent;
 use async_trait::async_trait;
 use bus::DomainEventBus;
 use common::{KlyntbotError, Result, ToolError};
@@ -11,6 +10,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tools_core::{RoutingContext, ToolExecute};
+use tools_core::events::ToolEvent;
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 use uuid::Uuid;
 
@@ -35,14 +35,12 @@ pub struct WebFetchArgs {
     category = "Web",
     cost = "Low",
     tags = "web,fetch,coding",
-    allowed_channels = "coding_only"
 )]
 pub struct WebFetchTool {
     layer1: Arc<Layer1>,
     policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
     pending: Arc<PendingApprovalsMap>,
-    event_tx: Option<mpsc::Sender<AgentEvent>>,
     bus: Arc<DomainEventBus>,
     client: reqwest::Client,
     non_ui_policy: common::tool_channel::NonUiPolicy,
@@ -52,7 +50,7 @@ pub struct WebFetchTool {
 impl WebFetchTool {
     pub fn new(
         layer1: Arc<Layer1>, policy: Arc<Policy>, privacy: Arc<PrivacyGuard>,
-        pending: Arc<PendingApprovalsMap>, event_tx: Option<mpsc::Sender<AgentEvent>>,
+        pending: Arc<PendingApprovalsMap>,
         bus: Arc<DomainEventBus>,
         non_ui_policy: common::tool_channel::NonUiPolicy,
         host_cache: Arc<HostApprovalCache>,
@@ -61,7 +59,7 @@ impl WebFetchTool {
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("reqwest client construction");
-        Self { layer1, policy, privacy, pending, event_tx, bus, client, non_ui_policy, host_cache }
+        Self { layer1, policy, privacy, pending, bus, client, non_ui_policy, host_cache }
     }
 }
 
@@ -71,7 +69,7 @@ impl ToolExecute for WebFetchTool {
     async fn execute(&self, args: WebFetchArgs, ctx: &RoutingContext) -> Result<String> {
         run_for_test(args, self.layer1.clone(), self.policy.clone(),
             self.privacy.clone(), self.pending.clone(),
-            self.event_tx.clone().unwrap_or_else(|| mpsc::channel(1).0),
+            ctx.event_tx.clone(),
             self.bus.clone(),
             ctx.cancel_token.clone().unwrap_or_else(CancellationToken::new),
             self.client.clone(),
@@ -89,7 +87,7 @@ pub async fn run_for_test(
     policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
     pending: Arc<PendingApprovalsMap>,
-    event_tx: mpsc::Sender<AgentEvent>,
+    event_tx: Option<mpsc::Sender<ToolEvent>>,
     bus: Arc<DomainEventBus>,
     cancel: CancellationToken,
     client: reqwest::Client,
@@ -109,7 +107,7 @@ pub async fn run_for_test(
             let request_id = Uuid::new_v4().to_string();
             let guard_ctx = GuardCtx {
                 layer1: &layer1, policy: &policy, privacy: &privacy,
-                pending: &pending, event_tx: Some(&event_tx), domain_bus: &bus,
+                pending: &pending, event_tx: event_tx.as_ref(), domain_bus: &bus,
                 cancel: cancel.clone(), request_id,
                 args: Some(serde_json::to_value(&args).unwrap_or_default()),
                 cwd: None,
