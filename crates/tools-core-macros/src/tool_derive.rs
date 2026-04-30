@@ -29,6 +29,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut category: Option<String> = None;
     let mut tags: Option<String> = None;
     let mut cost: Option<String> = None;
+    let mut concurrency_safe: Option<bool> = None;
 
     for attr in &input.attrs {
         if attr.path().is_ident("tool") {
@@ -81,6 +82,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
                                     cost = Some(s.value());
                                 }
                             }
+                        } else if nv.path.is_ident("concurrency_safe") {
+                            if let syn::Expr::Lit(lit) = &nv.value {
+                                if let Lit::Str(s) = &lit.lit {
+                                    concurrency_safe = Some(matches!(s.value().as_str(), "true" | "1"));
+                                }
+                            }
                         }
                     }
                 }
@@ -117,6 +124,13 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     let metadata_impl = crate::helpers::gen_metadata_impl(&category, &tags, &cost);
 
+    let concurrency_impl = match concurrency_safe {
+        Some(true) => quote! {
+            fn is_concurrency_safe(&self, _args: &::serde_json::Value) -> bool { true }
+        },
+        _ => quote! {},
+    };
+
     let expanded = quote! {
         #[::async_trait::async_trait]
         impl ::tools_core::Tool for #name {
@@ -143,6 +157,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
             #permission_impl
             #metadata_impl
+            #concurrency_impl
         }
     };
 

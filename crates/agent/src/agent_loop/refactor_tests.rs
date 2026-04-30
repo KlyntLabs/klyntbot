@@ -163,7 +163,7 @@ mod tests {
 
         // Call on Arc<AgentLoop> — must compile without Mutex
         let streaming_handle = agent
-            .process_direct_streaming("hello".to_string(), "test:session".to_string())
+            .process_direct_streaming("hello".to_string(), "test:session".to_string(), None)
             .await
             .expect("process_direct_streaming should succeed");
 
@@ -187,7 +187,7 @@ mod tests {
         let agent = Arc::new(agent);
 
         let streaming_handle = agent
-            .process_direct_streaming("hello".to_string(), "test:session2".to_string())
+            .process_direct_streaming("hello".to_string(), "test:session2".to_string(), None)
             .await
             .expect("process_direct_streaming should succeed");
 

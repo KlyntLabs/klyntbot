@@ -55,3 +55,65 @@
     box-shadow: 0 0 0 4px var(--border-accent-soft);
   }
 }
+
+/* ── DiffPreview (coding-mode file edits) ───────────────────────────── */
+.diff-preview {
+  border: 1px solid var(--border-soft, var(--border-subtle));
+  border-radius: 6px;
+  margin: 8px 0;
+  overflow: hidden;
+}
+.diff-preview__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface-2, var(--surface-card));
+  border-bottom: 1px solid var(--border-soft, var(--border-subtle));
+  font-size: var(--fs-xs);
+}
+.diff-preview__path {
+  font-family: var(--code-font-family, monospace);
+  color: var(--text-muted);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diff-preview__op {
+  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-control);
+  color: var(--text-muted);
+}
+.diff-preview__op--edit {
+  background: var(--status-info-bg, #dbeafe);
+  color: var(--status-info-text, #1e40af);
+}
+.diff-preview__op--write {
+  background: var(--status-success-bg, #dcfce7);
+  color: var(--status-success-text, #166534);
+}
+.diff-preview__op--apply_patch {
+  background: var(--status-warning-bg, #fef3c7);
+  color: var(--status-warning-text, #92400e);
+}
+.diff-preview__op--notebook_edit {
+  background: var(--status-purple-bg, #f3e8ff);
+  color: var(--status-purple-text, #6b21a8);
+}
+.diff-preview__bytes {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.diff-preview pre {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: var(--fs-xs);
+  max-height: 320px;
+  overflow: auto;
+}

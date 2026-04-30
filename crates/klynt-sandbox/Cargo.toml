@@ -16,8 +16,11 @@ async-trait = { workspace = true }
 tokio = { workspace = true, features = ["process", "rt", "macros", "time"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-# Add Landlock + bwrap deps in Plan 2.
+base64 = { workspace = true }
+which = { workspace = true }
+tokio = { workspace = true, features = ["process", "rt", "macros", "time"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "process"] }
 tempfile = { workspace = true }
+uuid = { workspace = true }

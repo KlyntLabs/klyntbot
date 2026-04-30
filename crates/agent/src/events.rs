@@ -392,6 +392,13 @@ pub enum AgentEvent {
         decided_by: String,
     },
 
+    /// Plan mode changed for a session.
+    PlanModeChanged {
+        session_key: String,
+        active: bool,
+        requested_by: String,
+    },
+
     /// Sandbox policy applied for a tool invocation.
     SandboxPolicyApplied {
         tool: String,

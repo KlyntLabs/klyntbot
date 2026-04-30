@@ -20,7 +20,7 @@ impl Channel {
     }
 }
 
-const CODING_ONLY: &[&str] = &[
+pub const CODING_ONLY: &[&str] = &[
     "bash",
     "read",
     "glob",
@@ -33,6 +33,7 @@ const CODING_ONLY: &[&str] = &[
     "enter_plan_mode",
     "exit_plan_mode",
     "notebook_edit",
+    "tool_search",
 ];
 
 pub fn available_for_channel(tool_name: &str, channel: Channel) -> bool {

@@ -1812,14 +1812,43 @@ impl AppCore {
                 .clone()
                 .unwrap_or_else(|| Arc::new(bus::DomainEventBus::new(64)));
 
-            let bash_tool = klynt_core::tools::bash::BashTool::new(
-                layer1, policy, privacy, pending, None, bus,
-            );
+            let cwd = config_guard.coding_memory.workspace_root.clone()
+                .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+            let event_tx: Option<tokio::sync::mpsc::Sender<agent::events::AgentEvent>> = None;
 
             let reg = core.agent.tool_registry();
             let mut registry = reg.write().await;
-            registry.register(bash_tool);
-            info!("BashTool registered");
+            use klynt_core::tools as kt;
+
+            registry.register(kt::BashTool::new(
+                layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
+            ));
+            registry.register(kt::ReadTool::new(cwd.clone(), privacy.clone()));
+            registry.register(kt::GlobTool::new(cwd.clone(), privacy.clone()));
+            registry.register(kt::GrepTool::new(cwd.clone(), privacy.clone()));
+            registry.register(kt::WriteTool::new(
+                cwd.clone(), layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
+            ));
+            registry.register(kt::EditTool::new(
+                cwd.clone(), layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
+            ));
+            registry.register(kt::ApplyPatchTool::new(
+                cwd.clone(), layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
+            ));
+            registry.register(kt::WebFetchTool::new(
+                layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
+            ));
+            registry.register(kt::EnterPlanModeTool::new(
+                core.repos.clone(), event_tx.clone(), bus.clone(),
+            ));
+            registry.register(kt::ExitPlanModeTool::new(
+                core.repos.clone(), event_tx.clone(), bus.clone(),
+            ));
+            registry.register(kt::NotebookEditTool::new(
+                cwd.clone(), layer1.clone(), policy.clone(), privacy.clone(), pending.clone(), event_tx.clone(), bus.clone(),
+            ));
+            registry.register(kt::ToolSearchTool::new());
+            info!("Coding tool kit registered (12 tools)");
         }
 
         // ── Register TemporalTool in agent's tool registry (post-init) ────

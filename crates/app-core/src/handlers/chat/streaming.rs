@@ -254,7 +254,7 @@ pub async fn chat_send(
     let now = jiff::Timestamp::now();
     let user_message = content.clone();
     let streaming_handle = agent
-        .process_direct_streaming(content.clone(), session_key.clone())
+        .process_direct_streaming(content.clone(), session_key.clone(), mode.clone())
         .await
         .map_err(ApiError::from)?;
 
@@ -1086,6 +1086,21 @@ pub async fn relay_chat_stream(
                             "network_constraints": network_constraints,
                         });
                         emitter.emit_event("agent:sandbox_policy_applied", payload);
+                    }
+                    AgentEvent::FileEditWithSymbols { ref path, ref op, bytes, ref diff_full, .. } => {
+                        let payload = serde_json::json!({
+                            "path": path,
+                            "op": op,
+                            "bytes": bytes,
+                            "diff": diff_full,
+                        });
+                        emitter.emit_event("agent:file_edit_with_symbols", payload);
+                    }
+                    AgentEvent::PlanModeChanged { ref session_key, active, ref requested_by } => {
+                        let payload = serde_json::json!({
+                            "session_key": session_key, "active": active, "requested_by": requested_by,
+                        });
+                        emitter.emit_event("agent:plan_mode_changed", payload);
                     }
                     // Coding-in-chat additive variants ignored here;
                     // chat-channel handlers will subscribe explicitly in later plans.

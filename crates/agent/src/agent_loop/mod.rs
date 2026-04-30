@@ -1004,6 +1004,7 @@ impl AgentLoop {
         self: &Arc<Self>,
         content: String,
         session_key: String,
+        mode: Option<String>,
     ) -> Result<StreamingHandle> {
         // Detect correction prefix and memory miss BEFORE setup_session adds the user message
         let correction_strength = detect_correction_prefix(&content);
@@ -1099,9 +1100,14 @@ impl AgentLoop {
         let (event_tx, event_rx) = mpsc::channel(64);
         let (interaction_tx, interaction_rx) = mpsc::channel(4);
 
+        let channel: common::ChannelName = mode
+            .as_deref()
+            .map(|m| if m == "coding" { common::CODING_CHANNEL.into() } else { "desktop".into() })
+            .unwrap_or_else(|| "desktop".into());
+
         // Routing context with interaction channel for ask_user tool
         let routing_ctx = RoutingContext::with_interaction(
-            "desktop".into(),
+            channel,
             session_key.clone().into(),
             interaction_tx,
         );

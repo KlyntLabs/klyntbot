@@ -20,6 +20,7 @@ import { createPortal } from "react-dom";
 import { PierreDiffBlock } from "@/features/git/components/PierreDiffBlock";
 import type { ConversationItem } from "@/types";
 import { ApprovalCard } from "@/features/coding/components/ApprovalCard";
+import { DiffPreview } from "@/features/coding/components/DiffPreview";
 import type { ApprovalDecision } from "@/features/coding/hooks/useApprovalQueue";
 import {
   basename,
@@ -576,6 +577,9 @@ export const ReviewRow = memo(function ReviewRow({
 });
 
 export const DiffRow = memo(function DiffRow({ item }: DiffRowProps) {
+  if (item.path && item.op) {
+    return <DiffPreview item={item} />;
+  }
   return (
     <div className="item-card diff">
       <div className="diff-header">

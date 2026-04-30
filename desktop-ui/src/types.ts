@@ -117,7 +117,19 @@ export type ConversationItem =
       }[];
     }
   | { id: string; kind: "reasoning"; summary: string; content: string }
-  | { id: string; kind: "diff"; title: string; diff: string; status?: string }
+  | {
+    id: string;
+    kind: "diff";
+    title: string;
+    diff: string;
+    status?: string;
+    /** Coding-mode additions (Plan 3): the resolved file path. */
+    path?: string;
+    /** Coding-mode additions: the operation that produced the diff. */
+    op?: "edit" | "write" | "apply_patch" | "notebook_edit";
+    /** Coding-mode additions: post-write file size in bytes. */
+    bytes?: number;
+  }
   | { id: string; kind: "review"; state: "started" | "completed"; text: string }
   | {
       id: string;
