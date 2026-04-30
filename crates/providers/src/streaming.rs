@@ -45,9 +45,21 @@ where
                             continue;
                         }
 
-                        if let Some(event_type) = line.strip_prefix("event: ") {
-                            *current_event = event_type.to_string();
-                        } else if let Some(data) = line.strip_prefix("data: ") {
+                        // SSE spec allows zero-or-one space after the field
+                        // delimiter colon. Anthropic's official endpoint emits
+                        // "event: foo"; some compatible servers (e.g. Kimi)
+                        // emit "event:foo" without the space.
+                        let strip_field = |line: &str, field: &str| -> Option<String> {
+                            line.strip_prefix(field).and_then(|rest| {
+                                let rest = rest.strip_prefix(':')?;
+                                Some(rest.strip_prefix(' ').unwrap_or(rest).to_string())
+                            })
+                        };
+
+                        if let Some(event_type) = strip_field(line, "event") {
+                            *current_event = event_type;
+                        } else if let Some(data) = strip_field(line, "data") {
+                            let data = data.as_str();
                             let event_type = if current_event.is_empty() {
                                 None
                             } else {

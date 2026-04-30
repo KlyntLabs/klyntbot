@@ -1037,13 +1037,16 @@ async fn apply_graph_link_output(
     // 3. Apply merges (entity merges). Conservative: only emit a merge_proposal row.
     // Actual merging happens in nightly Reforge Phase 6.5 to avoid corrupting in-flight state.
     for merge in &out.merges {
-        if let Err(e) = entity_repo.record_merge_proposal(
-            &merge.entity_a_id,
-            &merge.entity_b_id,
-            &merge.canonical_name,
-            &merge.reason,
-            "graph_linker",
-        ).await {
+        if let Err(e) = entity_repo
+            .record_merge_proposal(
+                &merge.entity_a_id,
+                &merge.entity_b_id,
+                &merge.canonical_name,
+                &merge.reason,
+                "graph_linker",
+            )
+            .await
+        {
             tracing::debug!(error = %e, "linker: record_merge_proposal failed");
         }
     }

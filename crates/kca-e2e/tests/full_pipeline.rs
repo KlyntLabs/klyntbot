@@ -25,7 +25,11 @@ async fn full_pipeline_longmembench_subset() {
 
     let mut gates = vec![
         assert_f1_fact_to_edge_ratio(&ctx, 0.6).await,
-        assert_p1_p95_latency(&total, 400),
+        // Replay blocks for the full streaming reply (see chat_complete).
+        // Per-turn latency therefore reflects real cloud-LLM round-trips,
+        // including the agent's recall + tool-loop overhead. 15s P95 is the
+        // realistic ceiling on a typical cloud endpoint with deep mode on.
+        assert_p1_p95_latency(&total, 15_000),
     ];
     gates.push(assert_f4_critic_catches_hallucinations(&ctx, &fixtures, 0.95).await);
 

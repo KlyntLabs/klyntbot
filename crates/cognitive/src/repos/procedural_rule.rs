@@ -188,7 +188,11 @@ impl ProceduralRuleRepo {
     }
 
     /// Record which AgentSources have observed a rule. Persisted as JSON metadata.
-    pub async fn set_observed_sources(&self, id: &str, sources: &[&str]) -> Result<(), sqlx::Error> {
+    pub async fn set_observed_sources(
+        &self,
+        id: &str,
+        sources: &[&str],
+    ) -> Result<(), sqlx::Error> {
         let json = serde_json::to_string(sources).unwrap_or_else(|_| "[]".into());
         sqlx::query(
             "UPDATE procedural_rules SET metadata = json_set(COALESCE(metadata, '{}'), '$.observed_sources', json(?1)) WHERE id = ?2",
@@ -207,10 +211,15 @@ impl ProceduralRuleRepo {
         .bind(id)
         .fetch_optional(&self.pool)
         .await?;
-        Ok(row.and_then(|(r,)| serde_json::from_str(&r).ok()).unwrap_or_default())
+        Ok(row
+            .and_then(|(r,)| serde_json::from_str(&r).ok())
+            .unwrap_or_default())
     }
 
-    pub async fn find_by_id(&self, id: &str) -> Result<Option<crate::types::ProceduralRule>, sqlx::Error> {
+    pub async fn find_by_id(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::types::ProceduralRule>, sqlx::Error> {
         sqlx::query_as::<_, crate::types::ProceduralRule>(
             "SELECT * FROM procedural_rules WHERE id = ?1",
         )

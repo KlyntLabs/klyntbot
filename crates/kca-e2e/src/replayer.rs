@@ -71,18 +71,71 @@ impl ReplayContext {
         for turn in &fixture.turns {
             let session_key = common::SessionKey::from_parts("kca-e2e", &fixture.id);
             let started = Instant::now();
-            let _resp = self
-                .app
-                .chat_send(turn.user.clone(), session_key.to_string(), None)
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(format!("chat_send failed: {e}")))?;
+            let _ = self
+                .chat_complete(turn.user.clone(), session_key.to_string())
+                .await?;
             let elapsed = started.elapsed().as_millis() as u64;
             self.turn_latencies_ms.push(elapsed);
             measurements.turn_latencies_ms.push(elapsed);
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             measurements.turns_replayed += 1;
         }
+        // Cognitive extraction runs on a 3s background batch window. The
+        // streaming reply finishes long before facts are persisted, so a
+        // bench query fired immediately would race against the extractor.
+        // Wait until the fact store stops growing before returning.
+        self.await_cognitive_idle().await;
         Ok(measurements)
+    }
+
+    /// Block until the cognitive fact store stops growing, indicating that
+    /// the background extraction pipeline has caught up. Polls every 500ms,
+    /// returns when the count is unchanged across two consecutive polls or
+    /// the safety timeout (45s) elapses.
+    pub async fn await_cognitive_idle(&self) {
+        use cognitive::repos::SemanticFactRepo;
+        use std::time::{Duration, Instant};
+        let repo = SemanticFactRepo::new(self.pool.inner().clone());
+        let deadline = Instant::now() + Duration::from_secs(45);
+        let mut last = -1i64;
+        let mut stable = 0u32;
+        while Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            let now = repo.count_active().await.unwrap_or(0);
+            if now == last {
+                stable += 1;
+                if stable >= 2 {
+                    return;
+                }
+            } else {
+                stable = 0;
+            }
+            last = now;
+        }
+    }
+
+    /// Send a user message and block until the agent's full streamed reply is
+    /// received. Drains [`AgentEvent::ContentChunk`] events from the chat
+    /// stream and returns the concatenated assistant text.
+    ///
+    /// This is the bench-friendly counterpart to `chat_send`, which is
+    /// intentionally non-blocking for the streaming UI.
+    pub async fn chat_complete(
+        &self,
+        content: String,
+        session_key: String,
+    ) -> common::Result<String> {
+        let (_user_msg, mut info) = self
+            .app
+            .chat_send(content, session_key, None)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("chat_send failed: {e}")))?;
+        let mut answer = String::new();
+        while let Some(ev) = info.event_rx.recv().await {
+            if let agent::AgentEvent::ContentChunk { data } = ev {
+                answer.push_str(&data);
+            }
+        }
+        Ok(answer)
     }
 }
 

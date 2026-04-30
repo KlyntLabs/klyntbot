@@ -59,11 +59,19 @@ async fn main() -> common::Result<()> {
         kc.multi_cli_transfer_acc * 100.0
     );
 
+    // Hot-path P50/P95 = long-memory query latencies (already real LLM
+    // round-trips). LoCoBench / klynt-coding don't expose individual latency
+    // arrays today; long-mem is representative of per-turn latency.
+    let latency = latency::LatencyDashboard {
+        hot_path_p50_ms: lmb.p50_query_latency_ms,
+        hot_path_p95_ms: lmb.p95_query_latency_ms,
+        ..Default::default()
+    };
     let report = game_changer_report::GameChangerReport {
         lmb,
         locobench,
         klynt_coding: kc,
-        latency: latency::LatencyDashboard::default(),
+        latency,
         cost: cost::CostDashboard::default(),
     };
 

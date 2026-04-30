@@ -39,17 +39,14 @@ pub async fn run_longmembench(path: &Path) -> common::Result<LongMemBenchReport>
         for q in &f.queries {
             let started = std::time::Instant::now();
             let answer = ctx
-                .app
-                .chat_send(
+                .chat_complete(
                     q.query.clone(),
                     common::SessionKey::from_parts("bench-lmb", &f.id).to_string(),
-                    None,
                 )
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(format!("chat_send: {e}")))?;
+                .await?;
             let elapsed = started.elapsed().as_millis() as u64;
             latencies.push(elapsed);
-            let correct = scoring::is_answer_correct(&answer.0.content, &q.gold_answer);
+            let correct = scoring::is_answer_correct(&answer, &q.gold_answer);
             let entry = report
                 .by_hop_type
                 .entry(q.hop_type.clone())
@@ -72,10 +69,39 @@ pub async fn run_longmembench(path: &Path) -> common::Result<LongMemBenchReport>
 }
 
 pub mod scoring {
+    /// True if the predicted answer covers the gold answer.
+    ///
+    /// Two-pass:
+    ///   1. **Substring match** (fast path). A single-token gold like
+    ///      "Anthropic" or "SF" is correct iff it appears as a substring of
+    ///      the normalized prediction.
+    ///   2. **Token-overlap recall** (narrative path). For multi-token gold
+    ///      answers, the prediction is correct iff at least 80% of gold's
+    ///      content tokens (length ≥ 3, non-stopword) appear in the
+    ///      prediction's token set. Catches cases where the LLM emits
+    ///      "She lives in San Francisco" with gold "San Francisco, CA".
     pub fn is_answer_correct(predicted: &str, gold: &str) -> bool {
         let pn = normalize(predicted);
         let gn = normalize(gold);
-        pn.contains(&gn)
+        if gn.is_empty() {
+            return false;
+        }
+        if pn.contains(&gn) {
+            return true;
+        }
+        let pred_tokens: std::collections::HashSet<&str> = pn.split_whitespace().collect();
+        let gold_tokens: Vec<&str> = gn
+            .split_whitespace()
+            .filter(|t| t.len() >= 3 && !is_stopword(t))
+            .collect();
+        if gold_tokens.is_empty() {
+            return false;
+        }
+        let hits = gold_tokens
+            .iter()
+            .filter(|t| pred_tokens.contains(*t))
+            .count();
+        (hits as f64 / gold_tokens.len() as f64) >= 0.8
     }
     fn normalize(s: &str) -> String {
         s.to_lowercase()
@@ -85,6 +111,12 @@ pub mod scoring {
             .split_whitespace()
             .collect::<Vec<_>>()
             .join(" ")
+    }
+    fn is_stopword(t: &str) -> bool {
+        matches!(
+            t,
+            "the" | "and" | "for" | "with" | "from" | "that" | "this" | "are" | "was" | "but"
+        )
     }
 }
 
@@ -100,6 +132,21 @@ mod tests {
         assert!(!scoring::is_answer_correct(
             "She works at Google",
             "Anthropic"
+        ));
+    }
+    #[test]
+    fn scoring_token_overlap_narrative() {
+        // Narrative reply, multi-token gold — should match via token overlap.
+        assert!(scoring::is_answer_correct(
+            "Alice moved to San Francisco last spring",
+            "San Francisco"
+        ));
+    }
+    #[test]
+    fn scoring_rejects_low_overlap() {
+        assert!(!scoring::is_answer_correct(
+            "Alice mentioned moving cities",
+            "San Francisco California"
         ));
     }
 }

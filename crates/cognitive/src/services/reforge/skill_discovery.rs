@@ -80,8 +80,8 @@ pub async fn cluster_rules_for_skill_discovery(
             for &i in &idxs[1..] {
                 shared = shared.intersection(&kw[i]).cloned().collect();
             }
-            let conf: f64 = idxs.iter().map(|&i| rules[i].confidence).sum::<f64>()
-                / idxs.len() as f64;
+            let conf: f64 =
+                idxs.iter().map(|&i| rules[i].confidence).sum::<f64>() / idxs.len() as f64;
             Some(RuleCluster {
                 rule_ids: idxs.iter().map(|&i| rules[i].id.clone()).collect(),
                 shared_keywords: shared.into_iter().collect(),
@@ -93,8 +93,8 @@ pub async fn cluster_rules_for_skill_discovery(
 
 fn keywords_from(s: &str) -> Vec<String> {
     let stop = [
-        "with", "from", "this", "that", "have", "your", "their", "after", "before", "when",
-        "then", "user", "always", "should", "would", "into",
+        "with", "from", "this", "that", "have", "your", "their", "after", "before", "when", "then",
+        "user", "always", "should", "would", "into",
     ];
     s.to_lowercase()
         .split(|c: char| !c.is_alphanumeric())

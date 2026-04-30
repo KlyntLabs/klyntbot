@@ -2,6 +2,21 @@
 
 use sqlx::SqlitePool;
 
+/// Sanitize a free-form user query for FTS5 MATCH.
+///
+/// FTS5 treats characters like `'`, `,`, `(`, `)`, `*`, `:` as syntax tokens —
+/// passing raw user text causes "fts5: syntax error near …". We tokenize on
+/// non-alphanumeric characters and wrap each token as a quoted phrase so the
+/// MATCH expression is always syntactically valid. Empty input yields empty.
+fn sanitize_fts5_query(query: &str) -> String {
+    let tokens: Vec<String> = query
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|t| !t.is_empty())
+        .map(|t| format!("\"{}\"", t.replace('"', "\"\"")))
+        .collect();
+    tokens.join(" ")
+}
+
 /// A BM25 search result with its FTS5 rank score.
 #[derive(Debug, Clone)]
 pub struct Bm25Result {
@@ -29,8 +44,12 @@ pub async fn search_semantic_facts(
         ORDER BY fts.rank
         LIMIT ?3
     "#;
+    let sanitized = sanitize_fts5_query(query);
+    if sanitized.is_empty() {
+        return Ok(Vec::new());
+    }
     sqlx::query_as::<_, (String, f64)>(sql)
-        .bind(query)
+        .bind(&sanitized)
         .bind(domain)
         .bind(limit as i64)
         .fetch_all(pool)
@@ -62,8 +81,12 @@ pub async fn search_episodic_memories(
         ORDER BY fts.rank
         LIMIT ?3
     "#;
+    let sanitized = sanitize_fts5_query(query);
+    if sanitized.is_empty() {
+        return Ok(Vec::new());
+    }
     sqlx::query_as::<_, (String, f64)>(sql)
-        .bind(query)
+        .bind(&sanitized)
         .bind(domain)
         .bind(limit as i64)
         .fetch_all(pool)
@@ -96,8 +119,12 @@ pub async fn search_procedural_rules(
         ORDER BY fts.rank
         LIMIT ?3
     "#;
+    let sanitized = sanitize_fts5_query(query);
+    if sanitized.is_empty() {
+        return Ok(Vec::new());
+    }
     sqlx::query_as::<_, (String, f64)>(sql)
-        .bind(query)
+        .bind(&sanitized)
         .bind(domain)
         .bind(limit as i64)
         .fetch_all(pool)

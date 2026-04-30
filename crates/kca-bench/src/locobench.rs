@@ -22,16 +22,12 @@ pub async fn run_locobench(path: &Path) -> common::Result<LoCoBenchReport> {
         ctx.replay(f).await?;
         for q in &f.queries {
             let answer = ctx
-                .app
-                .chat_send(
+                .chat_complete(
                     q.query.clone(),
                     common::SessionKey::from_parts("bench-loco", &f.id).to_string(),
-                    None,
                 )
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(format!("chat_send: {e}")))?;
-            let correct =
-                super::longmembench::scoring::is_answer_correct(&answer.0.content, &q.gold_answer);
+                .await?;
+            let correct = super::longmembench::scoring::is_answer_correct(&answer, &q.gold_answer);
             let entry = by_hop.entry(q.hop_type.clone()).or_insert((0, 0));
             entry.1 += 1;
             if correct {

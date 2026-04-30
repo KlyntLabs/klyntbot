@@ -21,51 +21,81 @@ impl GameChangerReport {
         s.push_str("# KCA Game-Changer Report\n\n");
         s.push_str(&format!("Generated: {}\n\n", jiff::Timestamp::now()));
 
-        s.push_str("## Quality\n\n");
+        let bench_limit = std::env::var("KCA_BENCH_LIMIT").unwrap_or_else(|_| "all".into());
         s.push_str(&format!(
-            "- Long-memory accuracy: **{:.1}%**\n",
-            self.lmb.accuracy() * 100.0
+            "*Run config: `KCA_BENCH_LIMIT={}`, model from `~/.klyntbot/config.json`, scoring = substring + 80% token-overlap recall.*\n\n",
+            bench_limit
+        ));
+
+        s.push_str("## Quality\n\n");
+        s.push_str("| Benchmark | Accuracy | Sample size |\n|---|---|---|\n");
+        s.push_str(&format!(
+            "| Long-memory | **{:.1}%** | {}/{} queries correct |\n",
+            self.lmb.accuracy() * 100.0,
+            self.lmb.correct,
+            self.lmb.total_queries
         ));
         s.push_str(&format!(
-            "- LoCoBench single-hop: **{:.1}%**\n",
+            "| LoCoBench single-hop | **{:.1}%** | — |\n",
             self.locobench.single_hop_acc * 100.0
         ));
         s.push_str(&format!(
-            "- LoCoBench multi-hop: **{:.1}%**\n",
+            "| LoCoBench multi-hop | **{:.1}%** | — |\n",
             self.locobench.multi_hop_acc * 100.0
         ));
         s.push_str(&format!(
-            "- LoCoBench temporal: **{:.1}%**\n",
+            "| LoCoBench temporal | **{:.1}%** | — |\n",
             self.locobench.temporal_acc * 100.0
         ));
+        let kc = &self.klynt_coding;
         s.push_str(&format!(
-            "- Klynt-coding dead-end: **{:.1}%**\n",
-            self.klynt_coding.dead_end_recall * 100.0
+            "| Klynt-coding dead-end | **{:.1}%** | {}/{} |\n",
+            kc.dead_end_recall * 100.0,
+            kc.dead_end_counts.0,
+            kc.dead_end_counts.1
         ));
         s.push_str(&format!(
-            "- Klynt-coding fix-attempt: **{:.1}%**\n",
-            self.klynt_coding.fix_attempt_recall * 100.0
+            "| Klynt-coding fix-attempt | **{:.1}%** | {}/{} |\n",
+            kc.fix_attempt_recall * 100.0,
+            kc.fix_attempt_counts.0,
+            kc.fix_attempt_counts.1
         ));
         s.push_str(&format!(
-            "- Klynt-coding multi-CLI: **{:.1}%**\n\n",
-            self.klynt_coding.multi_cli_transfer_acc * 100.0
+            "| Klynt-coding multi-CLI | **{:.1}%** | {}/{} |\n",
+            kc.multi_cli_transfer_acc * 100.0,
+            kc.multi_cli_counts.0,
+            kc.multi_cli_counts.1
         ));
 
-        s.push_str("## Performance\n\n");
+        if !self.lmb.by_hop_type.is_empty() {
+            s.push_str("\n### Long-memory by hop type\n\n| Hop | Correct/Total | Accuracy |\n|---|---|---|\n");
+            let mut keys: Vec<&String> = self.lmb.by_hop_type.keys().collect();
+            keys.sort();
+            for k in keys {
+                let (c, t) = self.lmb.by_hop_type[k];
+                let acc = if t == 0 { 0.0 } else { c as f64 / t as f64 };
+                s.push_str(&format!("| {} | {}/{} | {:.1}% |\n", k, c, t, acc * 100.0));
+            }
+        }
+
+        s.push_str("\n## Performance\n\n");
         s.push_str(&format!(
-            "- Hot-path P95: **{}ms**\n",
+            "- Hot-path P50 turn latency: **{}ms**\n",
+            self.latency.hot_path_p50_ms
+        ));
+        s.push_str(&format!(
+            "- Hot-path P95 turn latency: **{}ms**\n",
             self.latency.hot_path_p95_ms
         ));
         s.push_str(&format!(
-            "- Retrieval P95: **{}ms**\n",
-            self.latency.retrieval_p95_ms
-        ));
-        s.push_str(&format!(
-            "- Hot-path cost: **${:.4}/turn**\n\n",
-            self.cost.hot_path_usd_per_turn
+            "- Long-mem query P95: **{}ms** (real cloud LLM round-trip)\n",
+            self.lmb.p95_query_latency_ms
         ));
 
-        s.push_str("## Comparison Matrix\n\n");
+        s.push_str("\n## Methodology\n\n");
+        s.push_str(METHODOLOGY);
+
+        s.push_str("\n## Comparison Matrix\n\n");
         s.push_str(COMPARISON_MATRIX);
         s.push_str("\n\n## Capabilities Klynt has that competitors lack\n\n");
         s.push_str(EXCLUSIVE_CAPABILITIES);
@@ -78,6 +108,15 @@ impl GameChangerReport {
         Ok(())
     }
 }
+
+const METHODOLOGY: &str = r#"
+- **Fixtures**: `tests/fixtures/kca/{longmembench,locobench,klynt_coding_bench}.jsonl`. Each fixture contains a multi-turn conversation followed by gold-answer queries. Klynt-coding fixtures are stratified across three buckets (`kcb_dead_*` dead-ends, `kcb_fix_*` fix attempts, `kcb_xcli_*` cross-CLI patterns).
+- **Pipeline**: each fixture instantiates a fresh `AppCore` over an ephemeral SQLite + LanceDB store. Conversation turns are replayed via `chat_complete` (drains the streaming reply). The replayer then waits for the cognitive extraction background task (3s batch window + LLM extraction call) to settle before queries fire — preventing race conditions between memory write and recall.
+- **Scoring**: two-pass match. First, normalized substring (handles short factual answers like `"Anthropic"`). Second, token-overlap recall ≥80% over content tokens (handles narrative replies where the LLM phrases the answer in a sentence).
+- **Memory layers exercised end-to-end**: FTS5 BM25 over semantic_facts + episodic_memories + procedural_rules; vector recall via Lance; PPR multi-hop expansion; conversation recall service. Reforge nightly cycle is *not* triggered during the bench (it requires real time progression).
+- **Latencies** include the full agent loop: system prompt assembly, recall, LLM call, response streaming. Cloud LLM round-trip dominates wall time.
+
+"#;
 
 const COMPARISON_MATRIX: &str = r#"
 | Capability | Klynt KCA | Graphiti | Mem0 v3 | HippoRAG-2 | GraphRAG | LightRAG | LangMem | Letta |

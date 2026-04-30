@@ -156,6 +156,15 @@ fn gen_locobench(out: &std::path::Path) {
             id: format!("loco_{i:03}"),
             source: "locobench".into(),
             turns: vec![
+                // Identity binding — without this turn, the conversation
+                // says "I have a dog" but the query asks "what pet does
+                // Alice have?", leaving the agent no way to bind I→Alice.
+                TurnFixture {
+                    user: format!("Hi, I'm {p}."),
+                    assistant: format!("Nice to meet you, {p}!"),
+                    ground_truth_facts: vec![],
+                    ..Default::default()
+                },
                 TurnFixture {
                     user: format!("I have a {pet} named {name}."),
                     assistant: "Cute!".into(),

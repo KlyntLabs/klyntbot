@@ -977,13 +977,18 @@ name: rust-test-then-lint
         ).bind(id)
         .execute(facade.repo.db()).await.unwrap();
 
-        let path = facade.approve_skill_proposal(id, tmpdir.path()).await.unwrap();
+        let path = facade
+            .approve_skill_proposal(id, tmpdir.path())
+            .await
+            .unwrap();
         assert!(path.exists(), "SKILL.md should be written");
 
         // Status should be approved.
         let row: (String,) = sqlx::query_as("SELECT status FROM skill_proposals WHERE id = ?1")
             .bind(id)
-            .fetch_one(facade.repo.db()).await.unwrap();
+            .fetch_one(facade.repo.db())
+            .await
+            .unwrap();
         assert_eq!(row.0, "approved");
     }
 }

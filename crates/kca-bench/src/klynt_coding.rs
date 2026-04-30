@@ -7,6 +7,38 @@ pub struct KlyntCodingReport {
     pub dead_end_recall: f64,
     pub fix_attempt_recall: f64,
     pub multi_cli_transfer_acc: f64,
+    /// (correct, total) counts per bucket — surfaced in the report so a 0/0
+    /// bucket (no fixtures sampled) is distinguishable from 0/N (real misses).
+    pub dead_end_counts: (u32, u32),
+    pub fix_attempt_counts: (u32, u32),
+    pub multi_cli_counts: (u32, u32),
+}
+
+/// Stratify fixtures across the three buckets (dead/fix/xcli) so a small
+/// `KCA_BENCH_LIMIT` still covers all categories. Without this, a flat
+/// `take(N)` only ever sees `kcb_dead_*` because the file groups them.
+fn stratified(fixtures: &[ConversationFixture], limit: usize) -> Vec<&ConversationFixture> {
+    fn prefix(id: &str) -> &str {
+        match id {
+            s if s.starts_with("kcb_dead") => "dead",
+            s if s.starts_with("kcb_fix") => "fix",
+            s if s.starts_with("kcb_xcli") => "xcli",
+            _ => "other",
+        }
+    }
+    let buckets = ["dead", "fix", "xcli"];
+    let per_bucket = limit.div_ceil(buckets.len()).max(1);
+    let mut out = Vec::new();
+    for b in buckets {
+        out.extend(
+            fixtures
+                .iter()
+                .filter(|f| prefix(&f.id) == b)
+                .take(per_bucket),
+        );
+    }
+    out.truncate(limit.max(out.len()));
+    out
 }
 
 pub async fn run_klynt_coding(path: &Path) -> common::Result<KlyntCodingReport> {
@@ -19,21 +51,18 @@ pub async fn run_klynt_coding(path: &Path) -> common::Result<KlyntCodingReport> 
     let mut fix_attempt = (0u32, 0u32);
     let mut multi_cli = (0u32, 0u32);
 
-    for f in fixtures.iter().take(limit) {
+    let sample = stratified(&fixtures, limit);
+    for f in sample.iter() {
         let mut ctx = ReplayContext::new().await?;
         ctx.replay(f).await?;
         for q in &f.queries {
             let answer = ctx
-                .app
-                .chat_send(
+                .chat_complete(
                     q.query.clone(),
                     common::SessionKey::from_parts("bench-kc", &f.id).to_string(),
-                    None,
                 )
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(format!("chat_send: {e}")))?;
-            let correct =
-                super::longmembench::scoring::is_answer_correct(&answer.0.content, &q.gold_answer);
+                .await?;
+            let correct = super::longmembench::scoring::is_answer_correct(&answer, &q.gold_answer);
             let bucket = match f.id.as_str() {
                 s if s.starts_with("kcb_dead") => &mut dead_end,
                 s if s.starts_with("kcb_fix") => &mut fix_attempt,
@@ -50,6 +79,9 @@ pub async fn run_klynt_coding(path: &Path) -> common::Result<KlyntCodingReport> 
         dead_end_recall: ratio(dead_end),
         fix_attempt_recall: ratio(fix_attempt),
         multi_cli_transfer_acc: ratio(multi_cli),
+        dead_end_counts: dead_end,
+        fix_attempt_counts: fix_attempt,
+        multi_cli_counts: multi_cli,
     })
 }
 
