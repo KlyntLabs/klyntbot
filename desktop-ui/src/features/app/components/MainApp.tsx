@@ -1,4 +1,3 @@
-import { PluginsView } from "@/features/plugins/components/PluginsView";
 import { useAppBootstrapOrchestration } from "@app/bootstrap/useAppBootstrapOrchestration";
 import { MainAppShell } from "@app/components/MainAppShell";
 import { useAccountSwitching } from "@app/hooks/useAccountSwitching";
@@ -72,6 +71,7 @@ import { isMissingRepo } from "@/features/git/utils/repoErrors";
 import { useMobileServerSetup } from "@/features/mobile/hooks/useMobileServerSetup";
 import { useModels } from "@/features/models/hooks/useModels";
 import { useErrorToasts } from "@/features/notifications/hooks/useErrorToasts";
+import { PluginsView } from "@/features/plugins/components/PluginsView";
 import { useCustomPrompts } from "@/features/prompts/hooks/useCustomPrompts";
 import { useSkills } from "@/features/skills/hooks/useSkills";
 import { useTerminalController } from "@/features/terminal/hooks/useTerminalController";
@@ -1744,9 +1744,7 @@ export default function MainApp() {
     },
   });
 
-  const klyntbotSurface = useKlyntbotSurfaceProps(
-    appView === "chat" ? selectedSessionKey : null,
-  );
+  const klyntbotSurface = useKlyntbotSurfaceProps(appView === "chat" ? selectedSessionKey : null);
 
   const finalLayoutSurfaces = klyntbotSurface
     ? {
@@ -1775,6 +1773,7 @@ export default function MainApp() {
     updateToastNode,
     errorToastsNode,
     homeNode,
+    codeLandingNode,
     desktopTopbarLeftNode,
     gitDiffPanelNode,
     gitDiffViewerNode,
@@ -1785,10 +1784,7 @@ export default function MainApp() {
 
   const chatMessagesNode = klyntbotSurface ? (
     <>
-      <ChatErrorBanner
-        error={klyntbotSurface.error}
-        onDismiss={klyntbotSurface.onDismissError}
-      />
+      <ChatErrorBanner error={klyntbotSurface.error} onDismiss={klyntbotSurface.onDismissError} />
       {messagesNode}
     </>
   ) : (
@@ -1841,6 +1837,7 @@ export default function MainApp() {
       updateToastNode,
       errorToastsNode,
       homeNode,
+      codeLandingNode,
       pluginsNode: appView === "plugins" ? <PluginsView /> : null,
       dashboardNode: appView === "calendar" ? <Dashboard /> : null,
       gitDiffPanelNode,

@@ -242,6 +242,7 @@ type MainAppLayoutSurfacesContext = UseMainAppLayoutSurfacesArgs;
 function buildPrimarySurface({
   appSettings,
   workspaces,
+  threadsByWorkspace,
   threadStatusById,
   threadResumeLoadingById,
   activeWorkspace,
@@ -535,6 +536,20 @@ function buildPrimarySurface({
         if (isCompact) {
         }
       },
+    },
+    codeLandingProps: {
+      // Only surface main workspaces; worktrees are accessed through their parent.
+      projects: workspaces
+        .filter((ws) => (ws.kind ?? "main") === "main")
+        .map((ws) => ({
+          id: ws.id,
+          name: ws.name,
+          branch: ws.worktree?.branch ?? null,
+          sessionCount: (threadsByWorkspace[ws.id] ?? []).length,
+        })),
+      onSelectProject: threadNavigation.selectWorkspace,
+      onAddProject: handleAddWorkspace,
+      onImportProject: openWorkspaceFromUrlPrompt,
     },
     mainHeaderProps: activeWorkspace
       ? {

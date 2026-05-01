@@ -1,0 +1,41 @@
+.app-mode-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-card-muted, rgba(255, 255, 255, 0.06));
+  border-radius: 7px;
+  position: relative;
+  z-index: 2;
+  -webkit-app-region: no-drag;
+}
+
+.app-mode-switch__btn {
+  height: 22px;
+  padding: 3px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--ds-dur-fast, 120ms) ease,
+    color var(--ds-dur-fast, 120ms) ease;
+}
+
+.app-mode-switch__btn:hover {
+  color: var(--text-strong);
+}
+
+.app-mode-switch__btn--active,
+.app-mode-switch__btn--active:hover {
+  background: color-mix(in srgb, var(--text-strong) 14%, transparent);
+  color: var(--text-strong);
+}
+
+.app-mode-switch__btn:focus-visible {
+  outline: 1px solid var(--border-accent, rgba(120, 200, 255, 0.85));
+  outline-offset: 1px;
+}

@@ -11,6 +11,7 @@
   --cm-color-pink-fg:    #f9a8d4;
   --cm-color-warning-fg: #fcd34d;
   --cm-color-danger-fg:  #fca5a5;
+  --text-accent-cyan: rgba(120, 205, 255, 0.85);
   --surface-sidebar: rgba(22, 24, 28, 0.5);
   --surface-sidebar-opaque: rgb(22, 24, 28);
   --surface-topbar: rgba(20, 22, 26, 0.96);
