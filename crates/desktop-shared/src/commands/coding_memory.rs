@@ -40,8 +40,9 @@ pub struct WireEventDto {
     pub session_id: String,
     pub kind: String,
     pub occurred_at: String,
-    /// Structured payload when `payload` parsed as JSON; empty string otherwise.
-    pub payload_decoded: String,
+    /// Structured payload when `payload` parsed as JSON; `null` otherwise.
+    #[specta(type = crate::specta_helpers::JsonValue)]
+    pub payload_decoded: serde_json::Value,
     /// Raw JSON string (always present, exactly as stored in `ingest_event_log`).
     pub raw_json: String,
 }
@@ -50,8 +51,7 @@ impl WireEventDto {
     pub fn from_replay_entry(entry: &SessionReplayEntry) -> Result<Self, std::convert::Infallible> {
         let payload_decoded = serde_json::from_str::<serde_json::Value>(&entry.payload)
             .ok()
-            .map(|v| v.to_string())
-            .unwrap_or_default();
+            .unwrap_or(serde_json::Value::Null);
         Ok(Self {
             id: entry.id.clone(),
             source: entry.source.clone(),
@@ -494,7 +494,7 @@ mod dto_tests {
         };
         let dto = WireEventDto::from_replay_entry(&entry).expect("falls back to raw");
         assert_eq!(dto.kind, "toolCall");
-        assert!(dto.payload_decoded.is_empty());
+        assert!(dto.payload_decoded.is_null());
         assert_eq!(dto.raw_json, "not json");
     }
 }

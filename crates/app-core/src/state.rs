@@ -9,6 +9,7 @@ use cognitive::situation::UserSituation;
 use common::FormResponse;
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
+use desktop_shared::HooksTomlSnapshot;
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_focus::DndManager;
 use feature_notes::repo::{NoteRepo, PracticeSessionRepo};
@@ -180,6 +181,19 @@ pub struct AppCore {
     pub symbol_extractor: Option<Arc<dyn coding_memory::symbols::SymbolExtractor>>,
     /// Map of repo_id → filesystem root (Phase 6 symbol validation).
     pub repo_roots: Arc<std::sync::RwLock<std::collections::HashMap<String, std::path::PathBuf>>>,
+    /// Pending coding approval requests keyed by request_id.
+    pub pending_approvals: Arc<klynt_core::approval::PendingApprovalsMap>,
+    pub tracing_registry: std::sync::Arc<crate::tracing::TracingRegistry>,
+    /// Tracks which sessions have already fired the SessionStart hook (coding mode).
+    pub session_start_fired: Arc<dashmap::DashMap<String, ()>>,
+    /// Tracks which sessions have already fired the SessionEnd hook (prevents double-fire on cancel).
+    pub session_end_fired: Arc<dashmap::DashMap<String, ()>>,
+    /// Skill activator for coding mode — path-conditional + dynamic discovery.
+    pub coding_skill_activator: Arc<tokio::sync::Mutex<Option<klynt_skill_loader::SkillActivator>>>,
+    /// Mirror-learned approval history repo (Phase 2 Layer 3).
+    pub coding_approval_history_repo: Option<Arc<storage::repos::CodingApprovalHistoryRepo>>,
+    /// File snapshot repo for /sessions rewind (Phase 2).
+    pub snapshot_repo: Option<Arc<klynt_core::snapshots::SnapshotRepo>>,
 }
 
 impl AppCore {
@@ -352,6 +366,10 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Pending memory repo not available"))
     }
 
+    pub fn tracing_registry(&self) -> &std::sync::Arc<crate::tracing::TracingRegistry> {
+        &self.tracing_registry
+    }
+
     /// Approve a pending memory: deserialize fact, upsert to semantic_facts, remove from pending.
     #[tracing::instrument(skip(self), err)]
     pub async fn approve_pending_memory(&self, id: &str) -> Result<(), ApiError> {
@@ -493,5 +511,116 @@ impl AppCore {
             tracing::warn!("SQLite PRAGMA optimize failed: {e}");
         }
         info!("app core stopped");
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn chat_save_starlark_rule(
+        &self,
+        _request_id: String,
+        rule_source: String,
+        suggested_filename: Option<String>,
+    ) -> common::Result<String> {
+        let _ = klynt_execpolicy::parse_to_policy(
+            &rule_source,
+            std::path::Path::new("inline.rules"),
+        )
+        .map_err(|e| common::KlyntbotError::NotImplemented(format!("invalid Starlark: {e}")))?;
+
+        let rules_dir = self.config.read().await.data_dir_path().join("rules");
+        std::fs::create_dir_all(&rules_dir).map_err(common::KlyntbotError::Io)?;
+
+        let filename = suggested_filename.unwrap_or_else(|| {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            format!("rule-{now}.rules")
+        });
+        let path = rules_dir.join(filename);
+        std::fs::write(&path, &rule_source).map_err(common::KlyntbotError::Io)?;
+
+        Ok(path.to_string_lossy().into_owned())
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_hooks_list(&self) -> common::Result<HooksTomlSnapshot> {
+        let path = self.config.read().await.data_dir_path().join("hooks.toml");
+        let exists = path.exists();
+        let content = if exists {
+            std::fs::read_to_string(&path).unwrap_or_default()
+        } else {
+            String::new()
+        };
+        Ok(HooksTomlSnapshot {
+            path: path.to_string_lossy().into_owned(),
+            exists,
+            content,
+        })
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_permissions_clear_mirror(&self, tool: String, repo_id: Option<String>) -> common::Result<u64> {
+        let repo = self.coding_approval_history_repo.clone()
+            .ok_or_else(|| common::KlyntbotError::Storage("approval history repo not initialized".into()))?;
+        repo.clear_for_tool(&tool, repo_id.as_deref()).await
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_sessions_rewind(&self, session_key: String, message_id: String) -> common::Result<desktop_shared::RewindResult> {
+        let snap_repo = self.snapshot_repo.clone()
+            .ok_or_else(|| common::KlyntbotError::Storage("snapshot repo not initialized".into()))?;
+        let snaps: Vec<klynt_core::snapshots::Snapshot> = snap_repo.list_after_message(&session_key, &message_id).await?;
+        let mut restored: usize = 0;
+        let mut deleted: usize = 0;
+        // Apply newest-first to undo in reverse order
+        for snap in snaps.iter().rev() {
+            if snap.file_existed {
+                tokio::fs::write(&snap.file_path, &snap.content_before).await?;
+                restored += 1;
+            } else {
+                // file didn't exist before — undo by deleting
+                let _ = tokio::fs::remove_file(&snap.file_path).await;
+                deleted += 1;
+            }
+        }
+        let removed = self.repos.sessions.rewind_to_message(&session_key, &message_id).await?;
+        Ok(desktop_shared::RewindResult { messages_removed: removed, files_restored: restored, files_deleted: deleted })
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_sessions_export(&self, session_key: String, format: desktop_shared::ExportFormat)
+        -> common::Result<desktop_shared::SessionExportResult>
+    {
+        let bytes = match format {
+            desktop_shared::ExportFormat::Md   => self.repos.sessions.export_session_md(&session_key).await?,
+            desktop_shared::ExportFormat::Json => self.repos.sessions.export_session_json(&session_key).await?,
+        };
+        let dir = self.config.read().await.data_dir_path().join("exports");
+        tokio::fs::create_dir_all(&dir).await?;
+        let ext = match format { desktop_shared::ExportFormat::Md => "md", desktop_shared::ExportFormat::Json => "json" };
+        let path = dir.join(format!("{session_key}.{ext}"));
+        tokio::fs::write(&path, &bytes).await?;
+        Ok(desktop_shared::SessionExportResult { path: path.to_string_lossy().into_owned(), bytes_written: bytes.len() })
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_sessions_fork(&self, session_key: String, up_to_message: Option<String>) -> common::Result<desktop_shared::SessionForkResult> {
+        let new_key = self.repos.sessions.fork_session(&session_key, up_to_message.as_deref()).await?;
+        Ok(desktop_shared::SessionForkResult { new_session_key: new_key })
+    }
+}
+
+impl AppCore {
+    /// Minimal AppCore for unit tests — uses in-memory storage and default config.
+    pub async fn for_test(data_dir: Option<std::path::PathBuf>) -> Result<Self, String> {
+        let mut config = config::Config::default();
+        if let Some(dir) = data_dir {
+            config.data_dir = Some(dir.to_string_lossy().into_owned());
+        } else if let Ok(home) = std::env::var("KLYNTBOT_HOME") {
+            config.data_dir = Some(home);
+        }
+        let (core, _channels) =
+            Self::init_with_sender(common::AppMode::Server, Some(config), None, None).await?;
+        Ok(core)
     }
 }

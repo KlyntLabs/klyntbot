@@ -1,6 +1,6 @@
 import type { CodexArgsOption } from "@threads/utils/codexArgsProfiles";
 import { BrainCog, SlidersHorizontal, Zap } from "lucide-react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { AccessMode, ServiceTier, ThreadTokenUsage } from "@/types";
 
 type ComposerMetaBarProps = {
@@ -22,6 +22,7 @@ type ComposerMetaBarProps = {
   selectedCodexArgsOverride?: string | null;
   onSelectCodexArgsOverride?: (value: string | null) => void;
   contextUsage?: ThreadTokenUsage | null;
+  children?: ReactNode;
 };
 
 export function ComposerMetaBar({
@@ -43,6 +44,7 @@ export function ComposerMetaBar({
   selectedCodexArgsOverride = null,
   onSelectCodexArgsOverride,
   contextUsage = null,
+  children,
 }: ComposerMetaBarProps) {
   const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
   const selectedModelLabel = selectedModel?.displayName || selectedModel?.model || "No models";
@@ -67,6 +69,7 @@ export function ComposerMetaBar({
   return (
     <div className="composer-bar">
       <div className="composer-meta">
+        {children}
         {collaborationModes.length > 0 &&
           (canUsePlanToggle ? (
             <div className="composer-select-wrap composer-plan-toggle-wrap">

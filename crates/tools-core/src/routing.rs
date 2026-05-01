@@ -8,8 +8,10 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
+use tokio_util::sync::CancellationToken;
 
-use common::{ChannelName, ChatId, FormResponse, InteractionRequest, Result};
+use crate::events::ToolEvent;
+use common::{ChannelName, ChatId, FormResponse, InteractionRequest, Result, SessionKey};
 
 /// Bundle sent from ask_user tool to the CLI.
 /// Each request carries its own response channel.
@@ -77,6 +79,17 @@ pub struct RoutingContext {
     pub interaction_channel: Option<Arc<dyn InteractionChannel>>,
     /// Autotuner champion parameters for the current trial (if any).
     pub champion_params: Option<common::TrialParams>,
+    /// Cancellation token for interrupting long-running tool operations.
+    pub cancel_token: Option<CancellationToken>,
+    /// Per-call streaming event channel. Tools push ToolEvent variants here
+    /// (e.g., FileEditWithSymbols, SandboxPolicyApplied) for the relay to
+    /// translate into Tauri events. May be None for non-streaming contexts.
+    pub event_tx: Option<mpsc::Sender<ToolEvent>>,
+    /// Hook engine for firing PreToolUse / PostToolUse / etc. at tool-execute
+    /// boundaries. None = hooks disabled (e.g., in unit tests).
+    pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    /// Session key for conversation continuity. Used by hook firing.
+    pub session_key: Option<SessionKey>,
 }
 
 impl RoutingContext {
@@ -91,6 +104,10 @@ impl RoutingContext {
             entity_tx: None,
             interaction_channel: None,
             champion_params: None,
+            cancel_token: None,
+            event_tx: None,
+            hook_engine: None,
+            session_key: None,
         }
     }
 
@@ -109,6 +126,10 @@ impl RoutingContext {
             entity_tx: None,
             interaction_channel: None,
             champion_params: None,
+            cancel_token: None,
+            event_tx: None,
+            hook_engine: None,
+            session_key: None,
         }
     }
 }

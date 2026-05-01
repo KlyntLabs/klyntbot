@@ -7,8 +7,8 @@ type UseAppShellOrchestrationOptions = {
   rightPanelCollapsed: boolean;
   shouldReduceTransparency: boolean;
   isWorkspaceDropActive: boolean;
-  centerMode: "chat" | "diff";
-  appView: "home" | "chat" | "plugins";
+  centerMode: "chat" | "diff" | "plugins" | "calendar";
+  appView: "home" | "chat" | "plugins" | "calendar";
   selectedDiffPath: string | null;
   showComposer: boolean;
   activeThreadId: string | null;

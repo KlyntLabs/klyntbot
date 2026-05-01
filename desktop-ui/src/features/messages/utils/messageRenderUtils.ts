@@ -547,6 +547,12 @@ export function scrollKeyForItems(items: ConversationItem[]) {
       return `${last.id}-${last.status ?? ""}-${last.diff.length}`;
     case "review":
       return `${last.id}-${last.state}-${last.text.length}`;
+    case "approval":
+      return `${last.id}-${last.status}`;
+    case "recall":
+      return `${last.id}-${last.coverage_score}`;
+    case "dead_end_warning":
+      return `${last.id}-${last.confidence}`;
     default: {
       const _exhaustive: never = last;
       return _exhaustive;

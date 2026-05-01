@@ -1,8 +1,9 @@
 import { MainTopbar } from "@app/components/MainTopbar";
+import { useAppMode } from "@app/hooks/useAppMode";
 import { type MouseEvent, type ReactNode, useEffect, useRef } from "react";
 import { ChatPane } from "./ChatPane";
 
-type CenterMode = "chat" | "diff" | "plugins";
+type CenterMode = "chat" | "diff" | "plugins" | "calendar";
 
 function shouldRenderDiffViewer({
   splitChatDiffView,
@@ -60,7 +61,9 @@ type DesktopLayoutProps = {
   approvalToastsNode: ReactNode;
   errorToastsNode: ReactNode;
   homeNode: ReactNode;
+  codeLandingNode: ReactNode;
   pluginsNode?: ReactNode;
+  dashboardNode?: ReactNode;
   showHome: boolean;
   showWorkspace: boolean;
   topbarLeftNode: ReactNode;
@@ -88,7 +91,9 @@ export function DesktopLayout({
   approvalToastsNode,
   errorToastsNode,
   homeNode,
+  codeLandingNode,
   pluginsNode,
+  dashboardNode,
   showHome,
   showWorkspace,
   topbarLeftNode,
@@ -112,6 +117,8 @@ export function DesktopLayout({
   const diffLayerRef = useRef<HTMLDivElement | null>(null);
   const chatLayerRef = useRef<HTMLDivElement | null>(null);
   const chatPaneNode = <ChatPane messagesNode={messagesNode} composerNode={composerNode} />;
+  const { mode } = useAppMode();
+  const homeOrCodeNode = mode === "code" ? codeLandingNode : homeNode;
   const diffLayerActive = isActiveLayer(centerMode, "diff");
   const chatLayerActive = isActiveLayer(centerMode, "chat");
   const showDiffViewer = shouldRenderDiffViewer({
@@ -155,8 +162,9 @@ export function DesktopLayout({
       <section className="main">
         {updateToastNode}
         {errorToastsNode}
-        {showHome && homeNode}
-      {centerMode === "plugins" && pluginsNode}
+        {showHome && homeOrCodeNode}
+        {centerMode === "plugins" && pluginsNode}
+        {centerMode === "calendar" && dashboardNode}
 
         {showWorkspace && (
           <>

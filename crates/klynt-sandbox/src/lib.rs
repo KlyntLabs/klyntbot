@@ -1,12 +1,19 @@
-//! Klynt sandbox — OS-level sandboxing for tool execution.
-//!
-//! macOS: Seatbelt via `sandbox-exec` + generated .sbpl policies.
-//! Linux: Landlock + bwrap via klynt-sandbox-helper child binary.
-//!
-//! Plan 1: skeleton. Plan 2: macOS Seatbelt lit up. Plan 3: Linux.
+#[cfg(target_os = "linux")]
+pub mod bwrap;
+pub mod error;
+#[cfg(target_os = "linux")]
+pub mod helper_proto;
+#[cfg(target_os = "linux")]
+pub mod linux;
+pub mod policy;
+pub mod runner;
+#[cfg(target_os = "macos")]
+pub mod seatbelt;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn crate_compiles() {}
-}
+pub use error::SandboxError;
+#[cfg(target_os = "linux")]
+pub use linux::LinuxSandboxRunner;
+pub use policy::{FsConstraints, NetworkConstraints, SandboxPolicy};
+pub use runner::{CommandOutput, SandboxRunner};
+#[cfg(target_os = "macos")]
+pub use seatbelt::MacOsSeatbeltRunner;

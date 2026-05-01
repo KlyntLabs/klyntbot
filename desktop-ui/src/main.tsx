@@ -1,7 +1,11 @@
+// MUST be first — installs window.__TAURI_INTERNALS__ before any
+// @tauri-apps/api/* import resolves it. No-op inside the real Tauri webview.
+import "./services/__mocks__/tauri-browser-shim";
 import * as Sentry from "@sentry/react";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { BrainEventBridge } from "./components/BrainEventBridge";
 import { isMobilePlatform } from "./utils/platformPaths";
 
 const sentryDsn =
@@ -101,6 +105,7 @@ syncMobileViewportHeight();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
+    <BrainEventBridge />
     <App />
   </React.StrictMode>,
 );

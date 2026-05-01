@@ -1,5 +1,6 @@
 pub mod adapters;
 pub mod brain_voice;
+pub mod coding;
 pub mod coding_memory;
 pub mod errors;
 pub mod events;
@@ -9,6 +10,8 @@ pub mod infrastructure;
 pub mod init;
 pub mod journey;
 pub mod state;
+pub mod tracing;
+pub mod tracing_handlers;
 pub mod wake_orchestrator;
 
 pub use events::AppEventEmitter;

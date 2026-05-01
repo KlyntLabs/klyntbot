@@ -3,6 +3,9 @@
 use ai_core::{MirrorSignalSource, MirrorSubscriberRunner, SignalConsumer};
 use coding_memory::mirror::coding_meta_rules::CodingMetaRulesSource;
 use coding_memory::mirror::coding_routing::CodingRoutingSource;
+use coding_memory::mirror::coding_signals::{
+    ApprovalHistorySignal, RecallCoverageSignal, SkillEffectivenessSignal,
+};
 use coding_memory::mirror::pattern_effectiveness::{
     PatternEffectivenessLogRepo, PatternEffectivenessSource,
 };
@@ -48,7 +51,10 @@ pub async fn register_coding_sources(
     register!(PatternEffectivenessSource::new(pool.clone(), log));
     register!(StaleMemorySource::new(pool.clone()));
     register!(CodingMetaRulesSource::new(mirror_repo.clone()));
-    register!(CodingRoutingSource::new(mirror_repo));
+    register!(CodingRoutingSource::new(mirror_repo.clone()));
+    register!(ApprovalHistorySignal::new(mirror_repo.clone()));
+    register!(SkillEffectivenessSignal::new(mirror_repo.clone()));
+    register!(RecallCoverageSignal::new(mirror_repo));
 
     Ok(RegisteredCodingSources {
         consumers,
@@ -68,6 +74,9 @@ pub async fn coding_sources_for_test(
         Arc::new(PatternEffectivenessSource::new(pool.clone(), log)) as Arc<dyn MirrorSignalSource>,
         Arc::new(StaleMemorySource::new(pool.clone())) as Arc<dyn MirrorSignalSource>,
         Arc::new(CodingMetaRulesSource::new(mirror_repo.clone())) as Arc<dyn MirrorSignalSource>,
-        Arc::new(CodingRoutingSource::new(mirror_repo)) as Arc<dyn MirrorSignalSource>,
+        Arc::new(CodingRoutingSource::new(mirror_repo.clone())) as Arc<dyn MirrorSignalSource>,
+        Arc::new(ApprovalHistorySignal::new(mirror_repo.clone())) as Arc<dyn MirrorSignalSource>,
+        Arc::new(SkillEffectivenessSignal::new(mirror_repo.clone())) as Arc<dyn MirrorSignalSource>,
+        Arc::new(RecallCoverageSignal::new(mirror_repo)) as Arc<dyn MirrorSignalSource>,
     ])
 }

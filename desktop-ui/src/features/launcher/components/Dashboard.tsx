@@ -19,32 +19,17 @@ function formatTime(iso: string): string {
 export function Dashboard({ onOpenTask }: DashboardProps) {
   const { data: dashboard } = useDashboardData();
 
-  if (!dashboard) {
-    return <div className="lc-dash-loading">Loading...</div>;
-  }
+  if (!dashboard) return null;
 
-  const hasContent =
-    dashboard.calendar.length > 0 ||
-    dashboard.tasks.length > 0 ||
-    dashboard.productivity.totalMinutes > 0;
+  const hasContent = dashboard.calendar.length > 0 || dashboard.tasks.length > 0;
 
-  if (!hasContent) {
-    return (
-      <div className="lc-dash-empty">
-        <p className="lc-muted-sm">No activity yet today</p>
-        <p className="lc-dim-xs">Start a focus session or search for anything</p>
-      </div>
-    );
-  }
+  if (!hasContent) return null;
 
   return (
     <div className="lc-dash">
       {dashboard.calendar.length > 0 && <CalendarWidget events={dashboard.calendar} />}
       {dashboard.tasks.length > 0 && (
         <TasksWidget tasks={dashboard.tasks} onOpenTask={onOpenTask} />
-      )}
-      {dashboard.productivity.totalMinutes > 0 && (
-        <ProductivityWidget productivity={dashboard.productivity} />
       )}
     </div>
   );
@@ -103,92 +88,6 @@ function TasksWidget({
             {task.status === "doing" && <span className="lc-task-active">Active</span>}
           </button>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function ScoreRing({ score, size = 44 }: { score: number; size?: number }) {
-  const stroke = 3;
-  const r = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * r;
-  const offset = circumference - (Math.min(score, 100) / 100) * circumference;
-  const color =
-    score >= 70
-      ? "var(--success, #4ade80)"
-      : score >= 40
-        ? "var(--brand, #6ea8fe)"
-        : "var(--destructive, #f87171)";
-  return (
-    <svg
-      width={size}
-      height={size}
-      className="lc-score-ring"
-      role="img"
-      aria-label={`Productivity score: ${score}`}
-    >
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke="rgba(255,255,255,0.06)"
-        strokeWidth={stroke}
-      />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth={stroke}
-        strokeLinecap="round"
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        style={{ transition: "stroke-dashoffset 0.8s ease-out" }}
-      />
-      <text
-        x={size / 2}
-        y={size / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="var(--text-primary)"
-        fontSize="13"
-        fontWeight="600"
-        style={{ transform: "rotate(90deg)", transformOrigin: "center" }}
-      >
-        {score}
-      </text>
-    </svg>
-  );
-}
-
-function ProductivityWidget({ productivity }: { productivity: DashboardData["productivity"] }) {
-  const hours = Math.floor(productivity.totalMinutes / 60);
-  const mins = productivity.totalMinutes % 60;
-  const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-  return (
-    <div className="lc-card">
-      <div className="lc-prod-row">
-        <ScoreRing score={productivity.score} />
-        <div className="lc-prod-body">
-          <div className="lc-prod-time">
-            <span className="lc-prod-time-value">{timeStr}</span>
-            <span className="lc-muted-xs">today</span>
-          </div>
-          <div className="lc-prod-cat">
-            <div className="lc-prod-cat-row">
-              <span className="lc-muted-xs">{productivity.topCategory}</span>
-              <span className="lc-dim-xs">{Math.round(productivity.topCategoryPct)}%</span>
-            </div>
-            <div className="lc-prod-bar">
-              <div
-                className="lc-prod-bar-fill"
-                style={{ width: `${productivity.topCategoryPct}%` }}
-              />
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

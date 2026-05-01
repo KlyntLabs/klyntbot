@@ -36,11 +36,35 @@ impl LauncherSearchEngine {
             if let Some(ref attention_repo) = self.entity_attention_repo {
                 match attention_repo.top_by_attention(None, 8).await {
                     Ok(rows) => {
-                        return Ok(rows
-                            .into_iter()
-                            .filter(|row| row.kind == "site")
-                            .map(|row| feature_launcher::search::attention::into_site_item(row))
-                            .collect());
+                        let mut defaults: Vec<LauncherItem> = Vec::with_capacity(rows.len());
+                        for row in rows {
+                            match row.kind.as_str() {
+                                "site" => {
+                                    defaults.push(
+                                        feature_launcher::search::attention::into_site_item(row),
+                                    );
+                                }
+                                "app" => {
+                                    // Look up the canonical Application item via the registry
+                                    // so we get the real bundle icon, running state, etc.
+                                    let score = row.attention_secs as f64;
+                                    let lookup = self.registry.search(&row.display_name, 1).await;
+                                    if let Some(mut item) = lookup.into_iter().next() {
+                                        item.score = score;
+                                        defaults.push(item);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        if !defaults.is_empty() {
+                            defaults.sort_by(|a, b| {
+                                b.score
+                                    .partial_cmp(&a.score)
+                                    .unwrap_or(std::cmp::Ordering::Equal)
+                            });
+                            return Ok(defaults);
+                        }
                     }
                     Err(e) => {
                         tracing::warn!(error = %e, "Attention defaults failed — falling back to frecency");

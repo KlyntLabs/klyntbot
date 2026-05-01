@@ -1,0 +1,4 @@
+{"type": "metadata", "protocol_version": "1.9"}
+{"timestamp": 1777380772.292007, "message": {"type": "TurnBegin", "payload": {"user_input": "/compact"}}}
+{"timestamp": 1777380772.295579, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "The context is empty."}}}
+{"timestamp": 1777380772.2964659, "message": {"type": "TurnEnd", "payload": {}}}

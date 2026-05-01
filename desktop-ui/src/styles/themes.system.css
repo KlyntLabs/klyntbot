@@ -48,6 +48,7 @@
     --border-accent: rgba(77, 153, 255, 0.5);
     --border-accent-soft: rgba(77, 153, 255, 0.28);
     --text-accent: rgba(45, 93, 170, 0.7);
+    --text-accent-cyan: rgba(45, 105, 190, 0.85);
     --message-link-color: rgba(109, 40, 217, 1);
     --shadow-accent: rgba(90, 140, 210, 0.18);
     --status-success: rgba(30, 155, 110, 0.9);

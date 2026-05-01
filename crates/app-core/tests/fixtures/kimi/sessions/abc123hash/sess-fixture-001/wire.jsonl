@@ -1,0 +1,10 @@
+{"type":"metadata","protocol_version":"1.9"}
+{"timestamp":1777454398.5,"message":{"type":"TurnBegin","payload":{"user_input":[{"type":"text","text":"hello fixture"}]}}}
+{"timestamp":1777454398.6,"message":{"type":"StepBegin","payload":{"n":1}}}
+{"timestamp":1777454399.0,"message":{"type":"ContentPart","payload":{"type":"think","think":"thinking about the request","encrypted":null}}}
+{"timestamp":1777454399.5,"message":{"type":"ToolCall","payload":{"type":"function","id":"tool_X","function":{"name":"ReadFile","arguments":"{\"path\":\"/tmp/x\"}"},"extras":null}}}
+{"timestamp":1777454399.6,"message":{"type":"StatusUpdate","payload":{"context_usage":0.045,"context_tokens":11706,"max_context_tokens":262144,"token_usage":{"input_other":2490,"output":106,"input_cache_read":9216,"input_cache_creation":0},"message_id":"chatcmpl-fixture","plan_mode":false,"mcp_status":null}}}
+{"timestamp":1777454400.0,"message":{"type":"ToolResult","payload":{"id":"tool_X","content":"ok content","is_error":false}}}
+{"timestamp":1777454400.5,"message":{"type":"StepBegin","payload":{"n":2}}}
+{"timestamp":1777454401.0,"message":{"type":"ContentPart","payload":{"type":"text","text":"all done"}}}
+{"timestamp":1777454401.2,"message":{"type":"TurnEnd","payload":{}}}

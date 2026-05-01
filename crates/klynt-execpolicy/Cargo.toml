@@ -6,8 +6,16 @@ license = "Apache-2.0"
 description = "Klynt execution policy — Starlark prefix-rule approval engine. Adapted from codex-rs/execpolicy/."
 
 [dependencies]
-common = { path = "../common" }
-serde = { workspace = true }
-thiserror = "1"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+multimap = { workspace = true }
+shlex = { workspace = true }
+starlark = { workspace = true }
+walkdir = { workspace = true }
+tracing = { workspace = true }
+parking_lot = "0.12"
 
 [dev-dependencies]
+tempfile = { workspace = true }

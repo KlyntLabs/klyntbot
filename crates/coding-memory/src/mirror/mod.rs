@@ -6,5 +6,6 @@ pub mod alerts;
 pub mod coding_alerts_query;
 pub mod coding_meta_rules;
 pub mod coding_routing;
+pub mod coding_signals;
 pub mod pattern_effectiveness;
 pub mod stale_memory;

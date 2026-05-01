@@ -126,6 +126,16 @@ impl ContextEngine {
         self
     }
 
+    /// Add a single context source after construction.
+    ///
+    /// Used when a source is built later than the initial `ContextEngine`
+    /// (e.g. `CodingRecallService` which needs the storage pool).
+    pub fn register_source(&mut self, source: Box<dyn ContextSource>) {
+        self.sources.push(source);
+        self.sources
+            .sort_by_key(|s| std::cmp::Reverse(s.priority()));
+    }
+
     /// Wire InsightForge for multi-dimensional context retrieval.
     /// All DomainSearchers must be added to the forge BEFORE calling this,
     /// since it wraps in Arc internally.

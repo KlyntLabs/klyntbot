@@ -19,6 +19,9 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PierreDiffBlock } from "@/features/git/components/PierreDiffBlock";
 import type { ConversationItem } from "@/types";
+import { ApprovalCard } from "@/features/coding/components/ApprovalCard";
+import { DiffPreview } from "@/features/coding/components/DiffPreview";
+import type { ApprovalDecision } from "@/features/coding/hooks/useApprovalQueue";
 import {
   basename,
   buildToolSummary,
@@ -92,6 +95,11 @@ type ToolRowProps = MarkdownFileLinkProps & {
 
 type ExploreRowProps = {
   item: Extract<ConversationItem, { kind: "explore" }>;
+};
+
+type ApprovalRowProps = {
+  item: Extract<ConversationItem, { kind: "approval" }>;
+  onRespond: (requestId: string, decision: ApprovalDecision) => void;
 };
 
 type CommandOutputProps = {
@@ -569,6 +577,9 @@ export const ReviewRow = memo(function ReviewRow({
 });
 
 export const DiffRow = memo(function DiffRow({ item }: DiffRowProps) {
+  if (item.path && item.op) {
+    return <DiffPreview item={item} />;
+  }
   return (
     <div className="item-card diff">
       <div className="diff-header">
@@ -841,6 +852,10 @@ export const ToolRow = memo(function ToolRow({
       </div>
     </div>
   );
+});
+
+export const ApprovalRow = memo(function ApprovalRow({ item, onRespond }: ApprovalRowProps) {
+  return <ApprovalCard item={item} onRespond={onRespond} />;
 });
 
 export const ExploreRow = memo(function ExploreRow({ item }: ExploreRowProps) {

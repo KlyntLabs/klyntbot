@@ -110,6 +110,10 @@ impl ToolRegistryBridge {
             entity_tx: None,
             interaction_channel: None,
             champion_params: None,
+            cancel_token: None,
+            event_tx: None,
+            hook_engine: None,
+            session_key: None,
         };
 
         // Acquire read lock, prepare (validate + clone Arc<dyn Tool>), then drop lock

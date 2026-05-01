@@ -31,7 +31,9 @@ async fn daemon_accepts_event_and_writes_row() {
         git_invalidation_handler: None,
         opencode_db_path: None,
         opencode_poll_interval: None,
-        kimi_wire_socket: None,
+        kimi_sessions_dir: None,
+        kimi_poll_interval: None,
+        kimi_json_path: None,
         codex_sessions_dir: None,
         codex_poll_interval: None,
     };

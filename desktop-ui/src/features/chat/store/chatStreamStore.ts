@@ -6,14 +6,18 @@
  */
 
 import { isTauri } from "@tauri-apps/api/core";
+import type { ConversationItem } from "@/types";
 import type {
   ActiveInteraction,
   AgentDonePayload,
   AgentErrorPayload,
   AgentSelectedPayload,
+  ApprovalRequestedPayload,
+  ApprovalResolvedPayload,
   ClassificationCompletePayload,
   ConsensusReachedPayload,
   ContentChunkPayload,
+  DeadEndWarningSurfacedPayload,
   DebateJudgeDecisionPayload,
   DebateRound,
   DebateRoundCompletedPayload,
@@ -31,7 +35,9 @@ import type {
   PersonaSegment,
   PlanGeneratedPayload,
   PlanStepCompletedPayload,
+  RecallInjectedPayload,
   RetrievalEnhancedPayload,
+  SandboxPolicyAppliedPayload,
   SkillLoadedPayload,
   SubagentSpawnedPayload,
   ToolEndPayload,
@@ -41,6 +47,10 @@ import type {
 } from "../types";
 
 const DEV_SSE_BASE = "http://127.0.0.1:3456";
+
+type ApprovalItem = Extract<ConversationItem, { kind: "approval" }>;
+type DiffItem = Extract<ConversationItem, { kind: "diff" }>;
+const EMPTY_APPROVALS: ApprovalItem[] = [];
 
 function qualifiedToolName(name: string, action?: string): string {
   return action ? `${name}:${action}` : name;
@@ -76,6 +86,11 @@ const SSE_AGENT_EVENTS = [
   "agent:context_assembled",
   "agent:retrieval_enhanced",
   "agent:memory_promoted",
+  "agent:approval_requested",
+  "agent:approval_resolved",
+  "agent:recall_injected",
+  "agent:dead_end_warning_surfaced",
+  "agent:sandbox_policy_applied",
   "entity:updated",
 ] as const;
 
@@ -147,6 +162,8 @@ class ChatStreamStore {
   private textBuffers = new Map<string, string>();
   private rafIds = new Map<string, number>();
   private onDoneCallbacks = new Map<string, Set<() => void>>();
+  private approvalsBySession = new Map<string, ApprovalItem[]>();
+  private fileEditsBySession = new Map<string, DiffItem[]>();
   private listenersInitialized = false;
 
   constructor() {
@@ -213,6 +230,56 @@ class ChatStreamStore {
     }
   }
 
+  /** Get pending approvals for a session. */
+  getApprovals(sessionKey: string): ApprovalItem[] {
+    return this.approvalsBySession.get(sessionKey) ?? EMPTY_APPROVALS;
+  }
+
+  /** Get file edit diffs for a session. */
+  getFileEdits(sessionKey: string): DiffItem[] {
+    return this.fileEditsBySession.get(sessionKey) ?? [];
+  }
+
+  /** Insert a file edit diff for a session. */
+  upsertFileEdit(sessionKey: string, item: DiffItem): void {
+    const existing = this.fileEditsBySession.get(sessionKey) ?? [];
+    this.fileEditsBySession.set(sessionKey, [...existing, item]);
+    this.notify();
+  }
+
+  /** Insert or update an approval request for a session. */
+  upsertApproval(sessionKey: string, item: ApprovalItem): void {
+    const existing = this.approvalsBySession.get(sessionKey) ?? [];
+    const index = existing.findIndex((a) => a.requestId === item.requestId);
+    const next =
+      index >= 0
+        ? [...existing.slice(0, index), item, ...existing.slice(index + 1)]
+        : [...existing, item];
+    this.approvalsBySession.set(sessionKey, next);
+    this.notify();
+  }
+
+  /** Resolve an approval request with a final status. */
+  resolveApproval(
+    sessionKey: string,
+    requestId: string,
+    status: ApprovalItem["status"],
+    decidedBy: ApprovalItem["decidedBy"],
+  ): void {
+    const existing = this.approvalsBySession.get(sessionKey) ?? [];
+    const index = existing.findIndex((a) => a.requestId === requestId);
+    if (index < 0) return;
+    const next = [...existing];
+    next[index] = {
+      ...next[index],
+      status,
+      decidedBy,
+      decidedAt: new Date().toISOString(),
+    };
+    this.approvalsBySession.set(sessionKey, next);
+    this.notify();
+  }
+
   clearSegments(sessionKey: string): void {
     this.textBuffers.set(sessionKey, "");
     this.cancelRaf(sessionKey);
@@ -229,6 +296,22 @@ class ChatStreamStore {
 
   clearPersonaMessages(sessionKey: string): void {
     this.updateState(sessionKey, (s) => ({ ...s, personaMessages: [] }));
+  }
+
+  /** Append a synthetic system segment to the stream. */
+  appendSystemItem(sessionKey: string, kind: string, item: unknown): void {
+    this.updateState(sessionKey, (s) => ({
+      ...s,
+      segments: [...s.segments, { type: "system" as const, kind, item }],
+    }));
+  }
+
+  /** Append a synthetic error segment to the stream. */
+  appendErrorItem(sessionKey: string, message: string): void {
+    this.updateState(sessionKey, (s) => ({
+      ...s,
+      segments: [...s.segments, { type: "error" as const, message }],
+    }));
   }
 
   // ── Internal helpers ────────────────────────────────────────────────
@@ -367,6 +450,19 @@ class ChatStreamStore {
     on<DebateJudgeDecisionPayload>("agent:debate_judge_decision", (p) =>
       this.onDebateJudgeDecision(p),
     );
+    on<{ path: string; op: string; bytes: number; diff: string }>(
+      "agent:file_edit_with_symbols",
+      (p) => this.onFileEditWithSymbols(p),
+    );
+    on<ApprovalRequestedPayload>("agent:approval_requested", (p) => this.onApprovalRequested(p));
+    on<ApprovalResolvedPayload>("agent:approval_resolved", (p) => this.onApprovalResolved(p));
+    on<RecallInjectedPayload>("agent:recall_injected", (p) => this.onRecallInjected(p));
+    on<DeadEndWarningSurfacedPayload>("agent:dead_end_warning_surfaced", (p) =>
+      this.onDeadEndWarningSurfaced(p),
+    );
+    on<SandboxPolicyAppliedPayload>("agent:sandbox_policy_applied", (p) =>
+      this.onSandboxPolicyApplied(p),
+    );
   }
 
   private initTauriListeners(): void {
@@ -428,6 +524,23 @@ class ChatStreamStore {
       );
       register<DebateJudgeDecisionPayload>("agent:debate_judge_decision", (p) =>
         this.onDebateJudgeDecision(p),
+      );
+      register<{ path: string; op: string; bytes: number; diff: string }>(
+        "agent:file_edit_with_symbols",
+        (p) => this.onFileEditWithSymbols(p),
+      );
+      register<ApprovalRequestedPayload>("agent:approval_requested", (p) =>
+        this.onApprovalRequested(p),
+      );
+      register<ApprovalResolvedPayload>("agent:approval_resolved", (p) =>
+        this.onApprovalResolved(p),
+      );
+      register<RecallInjectedPayload>("agent:recall_injected", (p) => this.onRecallInjected(p));
+      register<DeadEndWarningSurfacedPayload>("agent:dead_end_warning_surfaced", (p) =>
+        this.onDeadEndWarningSurfaced(p),
+      );
+      register<SandboxPolicyAppliedPayload>("agent:sandbox_policy_applied", (p) =>
+        this.onSandboxPolicyApplied(p),
       );
     });
   }
@@ -906,6 +1019,103 @@ class ChatStreamStore {
         },
       ],
     }));
+  }
+
+  private onApprovalRequested(payload: ApprovalRequestedPayload): void {
+    const item: ApprovalItem = {
+      id: `approval-${payload.request_id}`,
+      kind: "approval",
+      requestId: payload.request_id,
+      tool: payload.tool,
+      args: payload.args,
+      cwd: payload.cwd,
+      sandboxSummary: payload.sandbox_summary,
+      layer: payload.layer,
+      layerReason: payload.layer_reason,
+      mirrorHistory: payload.mirror_history
+        ? {
+            approvalCount: payload.mirror_history.approval_count,
+            denialCount: payload.mirror_history.denial_count,
+          }
+        : undefined,
+      status: "pending",
+    };
+    this.upsertApproval(payload.sessionKey, item);
+  }
+
+  private onApprovalResolved(payload: ApprovalResolvedPayload): void {
+    const status: ApprovalItem["status"] =
+      payload.decided_by === "auto_deny"
+        ? "denied"
+        : payload.decided_by === "timeout"
+          ? "timed-out"
+          : payload.decided_by === "cancelled"
+            ? "cancelled"
+            : "approved-once";
+    this.resolveApproval(payload.sessionKey, payload.request_id, status, payload.decided_by);
+  }
+
+  private onRecallInjected(payload: RecallInjectedPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.appendSystemItem(payload.sessionKey, "recall", {
+      memory_ids: payload.memory_ids,
+      coverage_score: payload.coverage_score,
+      dead_end_warning: payload.dead_end_warning,
+    });
+  }
+
+  private onDeadEndWarningSurfaced(payload: DeadEndWarningSurfacedPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.appendSystemItem(payload.sessionKey, "dead_end_warning", {
+      approach_summary: payload.approach_summary,
+      prior_attempt_id: payload.prior_attempt_id,
+      confidence: payload.confidence,
+    });
+  }
+
+  private onSandboxPolicyApplied(payload: SandboxPolicyAppliedPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.updateState(payload.sessionKey, (s) => ({
+      ...s,
+      transparency: {
+        ...s.transparency,
+        sandboxPolicy: {
+          tool: payload.tool,
+          policySummary: payload.policy_summary,
+          fallbackUnsandboxed: payload.fallback_unsandboxed,
+        },
+      },
+    }));
+  }
+
+  private onFileEditWithSymbols(payload: {
+    path: string;
+    op: string;
+    bytes: number;
+    diff: string;
+  }): void {
+    // File edits are shown even when not actively streaming (they're historical)
+    const id = `diff-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const item: DiffItem = {
+      id,
+      kind: "diff",
+      title: payload.path.split("/").pop() ?? payload.path,
+      diff: payload.diff,
+      path: payload.path,
+      op: payload.op as DiffItem["op"],
+      bytes: payload.bytes,
+    };
+    // Attach to the most recent active session if we can infer one;
+    // otherwise the hook will route by sessionKey explicitly.
+    const sessionKey = this.inferActiveSessionKey() ?? "global";
+    this.upsertFileEdit(sessionKey, item);
+  }
+
+  private inferActiveSessionKey(): string | null {
+    for (const [key, state] of this.states) {
+      if (state.isStreaming) return key;
+    }
+    return null;
   }
 }
 

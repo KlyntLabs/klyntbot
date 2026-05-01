@@ -40,10 +40,14 @@ pub(super) async fn dispatch_chat_send(
         Err(e) => return err(e),
     };
     let context: Option<desktop_shared::commands::SessionContextInput> = dev::get(body, "context");
+    let mode: Option<String> = dev::get(body, "mode");
 
     evict_stale_channels(sse_channels);
 
-    match core.chat_send(content, session_key.clone(), context).await {
+    match core
+        .chat_send(content, session_key.clone(), context, mode)
+        .await
+    {
         Ok((user_msg, stream_info)) => {
             let tx = sse_channels
                 .entry(session_key)

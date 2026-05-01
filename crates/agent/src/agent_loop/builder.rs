@@ -15,16 +15,12 @@ use providers::DynProvider;
 use session::SessionManager;
 use tools::{
     area_tool::AreaTool,
-    browser::BrowserTool,
     cron_tool::CronTool,
-    filesystem::register_fs_tools,
     learning_tool::{LearningHandler, LearningTool},
-    message::MessageTool,
     okr_tool::OkrTool,
     project_tool::ProjectTool,
     registry::ToolRegistry,
     spawn::SpawnTool,
-    web::{WebFetchTool, WebSearchTool},
 };
 use tools_core::FeaturePackage;
 
@@ -90,6 +86,7 @@ pub struct AgentLoopBuilder {
     hot_config: Option<Arc<RwLock<config::HotConfig>>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
+    coding_recall_service: Option<Arc<coding_memory::recall::CodingRecallService>>,
 }
 
 impl AgentLoopBuilder {
@@ -113,7 +110,15 @@ impl AgentLoopBuilder {
             hot_config: None,
             context_update_queue: None,
             embedding_engine: None,
+            coding_recall_service: None,
         }
+    }
+    pub fn with_coding_recall_service(
+        mut self,
+        service: Option<Arc<coding_memory::recall::CodingRecallService>>,
+    ) -> Self {
+        self.coding_recall_service = service;
+        self
     }
     pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
         self.embedding_engine = Some(engine);
@@ -588,11 +593,17 @@ impl AgentLoopBuilder {
             summary_model,
         ));
         let token_counter = context_engine::token_counter_for_model(&config.agents.defaults.model);
-        let context_engine =
+        let mut context_engine =
             context_engine::ContextEngine::new(config.cognitive.history_compression.clone())
                 .with_sources(sources)
                 .with_token_counter(Arc::clone(&token_counter))
                 .with_summary_provider(summary_provider);
+
+        if let Some(ref svc) = self.coding_recall_service {
+            context_engine.register_source(Box::new(
+                crate::context_sources::CodingRecallContextSource::new(Arc::clone(svc)),
+            ));
+        }
 
         // ── Session manager (SQL-backed) ──────────────────────────────────
         let session_manager = SessionManager::from_repo(
@@ -602,16 +613,13 @@ impl AgentLoopBuilder {
         .await;
 
         // ── Subagent manager ──────────────────────────────────────────────
-        let brave_api_key = (!config.tools.web.brave_api_key.is_empty())
+        let _brave_api_key = (!config.tools.web.brave_api_key.is_empty())
             .then(|| config.tools.web.brave_api_key.expose().clone());
 
         let subagent_manager = Arc::new(
             SubagentManager::builder(Arc::clone(&provider), workspace.clone())
                 .inbound_sender(bus.inbound_sender())
                 .model(config.agents.defaults.model.clone())
-                .brave_api_key(brave_api_key.clone())
-                .web_max_results(config.tools.web.max_results)
-                .restrict_to_workspace(config.tools.restrict_to_workspace)
                 .max_concurrent_subagents(config.agents.defaults.max_concurrent_subagents)
                 .agent_task_repo(repos.agent_tasks.clone())
                 .build(),
@@ -619,43 +627,6 @@ impl AgentLoopBuilder {
 
         // ── Tool registry ─────────────────────────────────────────────────
         let mut tool_registry = ToolRegistry::new();
-
-        // Filesystem tools
-        let allowed_dir = if config.tools.restrict_to_workspace {
-            Some(workspace.clone())
-        } else {
-            None
-        };
-        register_fs_tools(&mut tool_registry, allowed_dir.clone());
-
-        // Search tools
-        tool_registry.register(tools::grep::GrepTool::new(allowed_dir.clone()));
-        tool_registry.register(tools::glob_tool::GlobTool::new(allowed_dir.clone()));
-
-        // Web tools
-        tool_registry.register(WebSearchTool::new(
-            brave_api_key,
-            config.tools.web.max_results,
-        ));
-        tool_registry.register(WebFetchTool::new());
-
-        if config.tools.browser.enabled {
-            match BrowserTool::new(config.tools.browser.trust_level.clone()) {
-                Ok(tool) => {
-                    tool_registry.register(tool);
-                    info!("Browser tool registered");
-                }
-                Err(e) => {
-                    warn!("Browser tool unavailable: {}", e);
-                }
-            }
-        }
-
-        // Message tool
-        tool_registry.register(MessageTool::new(bus.outbound_sender()));
-
-        // Ask-user tool
-        tool_registry.register(tools::ask_user::AskUserTool);
 
         // Spawn tool
         tool_registry.register(SpawnTool::with_handler(
@@ -1132,7 +1103,9 @@ impl AgentLoopBuilder {
                                 }
                             });
                         } else {
-                            info!("Tree node backfill skipped. Set KLYNTBOT_BACKFILL=1 to re-index all data on startup.");
+                            info!(
+                                "Tree node backfill skipped. Set KLYNTBOT_BACKFILL=1 to re-index all data on startup."
+                            );
                         }
                     }
                 }
@@ -1830,6 +1803,10 @@ impl AgentLoopBuilder {
             config.cognitive.query_enhancement.budget_overrides.clone(),
         );
 
+        if let Some(ref bus) = self.domain_event_bus {
+            runtime = runtime.with_domain_event_bus(Arc::clone(bus));
+        }
+
         if let Some(ref orchestrator) = self.autotuner {
             if let Some(sink) = orchestrator.memory_param_sink() {
                 runtime = runtime.with_enhancement_param_sink(sink);
@@ -1998,6 +1975,7 @@ impl AgentLoopBuilder {
             activity_svc: self.activity_svc,
             skill_store,
             hot_config,
+            subagent_manager: Some(subagent_manager),
         })
     }
 }

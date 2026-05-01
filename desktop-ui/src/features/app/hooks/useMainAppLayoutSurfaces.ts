@@ -225,11 +225,13 @@ type UseMainAppLayoutSurfacesArgs = {
   showDebugButton: boolean;
   handleDebugClick: () => void;
   chatView: {
-    appView: "home" | "chat" | "plugins";
+    appView: "home" | "chat" | "plugins" | "calendar";
     selectedSessionKey: string | null;
     onNewChat: () => void;
     onSelectThread: (sessionKey: string) => void;
     onSelectPlugins: () => void;
+    onSelectCalendar: () => void;
+    activeNavId: string | null;
     chatThreads: import("@/features/chat/types").ChatThread[];
     refetchChatThreads: () => Promise<void>;
   };
@@ -240,6 +242,7 @@ type MainAppLayoutSurfacesContext = UseMainAppLayoutSurfacesArgs;
 function buildPrimarySurface({
   appSettings,
   workspaces,
+  threadsByWorkspace,
   threadStatusById,
   threadResumeLoadingById,
   activeWorkspace,
@@ -353,6 +356,8 @@ function buildPrimarySurface({
       onOpenSettings: sidebarHandlers.onOpenSettings,
       onNewChat: chatView.onNewChat,
       onSelectPlugins: chatView.onSelectPlugins,
+      onSelectCalendar: chatView.onSelectCalendar,
+      activeNavId: chatView.activeNavId,
       threads: chatView.chatThreads,
       selectedSessionKey: chatView.selectedSessionKey,
       onSelectThread: chatView.onSelectThread,
@@ -531,6 +536,20 @@ function buildPrimarySurface({
         if (isCompact) {
         }
       },
+    },
+    codeLandingProps: {
+      // Only surface main workspaces; worktrees are accessed through their parent.
+      projects: workspaces
+        .filter((ws) => (ws.kind ?? "main") === "main")
+        .map((ws) => ({
+          id: ws.id,
+          name: ws.name,
+          branch: ws.worktree?.branch ?? null,
+          sessionCount: (threadsByWorkspace[ws.id] ?? []).length,
+        })),
+      onSelectProject: threadNavigation.selectWorkspace,
+      onAddProject: handleAddWorkspace,
+      onImportProject: openWorkspaceFromUrlPrompt,
     },
     mainHeaderProps: activeWorkspace
       ? {

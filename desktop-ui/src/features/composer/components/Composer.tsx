@@ -14,6 +14,9 @@ import {
   connectorMentionSlug,
   resolveBoundAppMentions,
 } from "@/features/apps/utils/appMentions";
+import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
+import { useCodingMode } from "@/features/coding/hooks/useCodingMode";
+import { useSlashCommands } from "@/features/coding/hooks/useSlashCommands";
 import type {
   AppMention,
   AppOption,
@@ -31,6 +34,9 @@ import { useComposerDraftEffects } from "../hooks/useComposerDraftEffects";
 import { useComposerKeyDown } from "../hooks/useComposerKeyDown";
 import { useComposerSuggestionStyle } from "../hooks/useComposerSuggestionStyle";
 import { usePromptHistory } from "../hooks/usePromptHistory";
+import { CodingModePill } from "@/features/coding/components/CodingModePill";
+import { CostPill } from "@/features/coding/components/CostPill";
+import { SandboxStatusPill } from "@/features/coding/components/SandboxStatusPill";
 import { ComposerInput } from "./ComposerInput";
 import { ComposerMetaBar } from "./ComposerMetaBar";
 import { ComposerQueue } from "./ComposerQueue";
@@ -290,6 +296,10 @@ export const Composer = memo(function Composer({
     [],
   );
 
+  const { mode } = useCodingMode(historyKey);
+  const { dispatch } = useSlashCommands();
+  const slashEnabled = mode === "coding";
+
   const {
     isAutocompleteOpen,
     autocompleteMatches,
@@ -313,6 +323,7 @@ export const Composer = memo(function Composer({
     textareaRef,
     setText: setComposerText,
     setSelectionStart,
+    slashEnabled,
     onItemApplied: (item, context) => {
       if (context.triggerChar !== "$" || item.group !== "Apps" || !item.mentionPath) {
         return;
@@ -374,14 +385,37 @@ export const Composer = memo(function Composer({
   );
 
   const handleSend = useCallback(
-    (submitIntent: ComposerSendIntent = "default") => {
+    async (submitIntent: ComposerSendIntent = "default") => {
       if (disabled) {
         return;
       }
-      const trimmed = text.trim();
+      let trimmed = text.trim();
       if (!trimmed && attachedImages.length === 0) {
         return;
       }
+
+      // Slash command interception (coding mode only)
+      if (mode === "coding" && trimmed.startsWith("/")) {
+        const res = await dispatch(trimmed, historyKey ?? "");
+        if (res.kind === "render") {
+          chatStreamStore.appendSystemItem(historyKey ?? "", res.itemKind, res.item);
+          resetHistoryNavigation();
+          setComposerText("");
+          setAppMentionBindings([]);
+          return;
+        }
+        if (res.kind === "error") {
+          chatStreamStore.appendErrorItem(historyKey ?? "", res.message);
+          resetHistoryNavigation();
+          setComposerText("");
+          setAppMentionBindings([]);
+          return;
+        }
+        if (res.kind === "passthrough") {
+          trimmed = res.text.trim();
+        }
+      }
+
       if (trimmed) {
         recordHistory(trimmed);
       }
@@ -399,6 +433,9 @@ export const Composer = memo(function Composer({
       appMentionBindings,
       attachedImages,
       disabled,
+      dispatch,
+      historyKey,
+      mode,
       onSend,
       recordHistory,
       resetHistoryNavigation,
@@ -675,7 +712,11 @@ export const Composer = memo(function Composer({
         accessMode={accessMode}
         onSelectAccessMode={onSelectAccessMode}
         contextUsage={contextUsage}
-      />
+      >
+        <CodingModePill threadId={historyKey} />
+        <SandboxStatusPill threadId={historyKey} />
+        <CostPill threadId={historyKey} />
+      </ComposerMetaBar>
     </footer>
   );
 });

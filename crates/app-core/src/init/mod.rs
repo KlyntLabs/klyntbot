@@ -2,6 +2,10 @@ mod agent;
 pub mod ai_pipeline;
 mod channels;
 mod coaching;
+mod coding_recall;
+mod coding_retention;
+mod coding_skills;
+mod coding_subscribers;
 mod cognitive;
 mod cron;
 mod dnd;
@@ -201,7 +205,9 @@ impl AppCore {
         let embedding_provider = if config.embedding.provider == "openai" {
             let api_key = config.providers.openai.api_key.expose().to_string();
             if api_key.is_empty() {
-                tracing::warn!("Embedding provider set to 'openai' but no API key configured — falling back to local");
+                tracing::warn!(
+                    "Embedding provider set to 'openai' but no API key configured — falling back to local"
+                );
                 tools::embedding_engine::EmbeddingProvider::Local
             } else {
                 tracing::info!("Using OpenAI text-embedding-3-small for embeddings");
@@ -278,6 +284,11 @@ impl AppCore {
                 vector_store.clone(),
             ));
 
+        // ── Phase 2.5: Coding-memory recall (must be ready before AgentLoop) ─
+        let recall =
+            coding_recall::init_coding_recall(&storage_pool, &domain_event_bus, &causal_edges)
+                .await;
+
         // ── Phase 3: Agent ───────────────────────────────────────────────
         let agent::AgentResult {
             cognitive_provider,
@@ -302,6 +313,7 @@ impl AppCore {
             Arc::clone(&hot_config),
             Some(Arc::clone(&context_update_queue)),
             appcore_embedding_engine.clone(),
+            recall.clone(),
         )
         .await?;
 
@@ -483,6 +495,9 @@ impl AppCore {
         };
 
         // ── Phase 8: Mirror self-reflection layer (before SignalRouter so consumers can be wired in)
+        let coding_approval_history_repo = ::storage::repos::CodingApprovalHistoryRepo::new(
+            storage_pool.clone(),
+        );
         let (mirror_facade, mirror_consumers, mirror_flush_handles, mirror_shutdown) = {
             let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
             let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
@@ -522,6 +537,7 @@ impl AppCore {
                 episodic_repo,
                 rule_repo,
                 trial_evaluator,
+                Some(Arc::new(coding_approval_history_repo.clone())),
             );
 
             // Phase-5 coding mirror sources — pattern effectiveness, stale-memory,
@@ -960,78 +976,15 @@ impl AppCore {
             Arc::new(d)
         };
 
-        let recall = {
-            let fact_repo = Arc::new(::cognitive::SemanticFactRepo::new(
-                storage_pool.inner().clone(),
-            ));
-            let ep_repo = Arc::new(::cognitive::EpisodicMemoryRepo::new(
-                storage_pool.inner().clone(),
-            ));
-            let ums = Arc::new(::cognitive::UnifiedMemoryService::new((*fact_repo).clone()));
-            let telem = coding_memory::RecallInvocationRepo::new(storage_pool.clone());
-            let budgeter = coding_memory::recall::budget::default_budgeter();
-
-            let recall_weights = coding_memory::recall::load_recall_weights(&storage_pool)
-                .await
-                .unwrap_or_else(|e| {
-                    tracing::warn!(error = %e, "load_recall_weights failed, using defaults");
-                    coding_memory::recall::default_weights()
-                });
-
-            let skills: Vec<std::sync::Arc<dyn coding_memory::RetrievalSkill>> = {
-                use coding_memory::retrieval_skills::{QueryDecomposer, QueryRewriter};
-                let ums_for_retrieve = ums.clone();
-                let weights = recall_weights;
-                let retrieve: coding_memory::retrieval_skills::query_rewriter::RetrieveFn =
-                    std::sync::Arc::new(move |q: String| {
-                        let ums = ums_for_retrieve.clone();
-                        let weights = weights;
-                        Box::pin(async move {
-                            let scored = ums.retrieve_with_overrides(&q, 20, 0.0, weights).await?;
-                            let mut sims = Vec::with_capacity(scored.len());
-                            let mut ids = Vec::with_capacity(scored.len());
-                            for s in scored {
-                                sims.push(s.score as f32);
-                                if let Ok(u) = s.fact.id.parse::<uuid::Uuid>() {
-                                    ids.push(u);
-                                }
-                            }
-                            Ok((sims, ids))
-                        })
-                    });
-                vec![
-                    std::sync::Arc::new(QueryRewriter::new(retrieve.clone())),
-                    std::sync::Arc::new(QueryDecomposer::new(retrieve)),
-                ]
-            };
-            let registry = std::sync::Arc::new(coding_memory::RetrievalSkillRegistry::new(
-                skills,
-                domain_event_bus.clone(),
-            ));
-
-            Arc::new(
-                coding_memory::recall::CodingRecallService::new(
-                    coding_memory::recall::CodingRecallServiceConfig {
-                        weights: recall_weights,
-                        ..coding_memory::recall::CodingRecallServiceConfig::default()
-                    },
-                    ums,
-                    fact_repo,
-                    ep_repo,
-                    telem,
-                    budgeter,
-                )
-                .with_skills(registry)
-                .with_causal_repo(causal_edges.clone()),
-            )
-        };
-        let toolset = coding_memory::CodingMemoryToolset::new(recall.clone());
+        let toolset = recall
+            .as_ref()
+            .map(|r| coding_memory::CodingMemoryToolset::new(Arc::clone(r)));
 
         // ── Register coding-memory recall tools in agent's tool registry ──
-        {
+        if let Some(ref ts) = toolset {
             let reg = agent.tool_registry();
             let mut registry = reg.write().await;
-            for tool in toolset.mcp_tools() {
+            for tool in ts.mcp_tools() {
                 registry.register_dyn(tool);
             }
             info!("Coding-memory recall tools registered in MCP registry");
@@ -1075,6 +1028,16 @@ impl AppCore {
             } else {
                 None
             };
+            let kimi_sessions_dir = if config.coding_memory.cli.kimi_cli.enabled {
+                dirs::home_dir().map(|h| h.join(".kimi").join("sessions"))
+            } else {
+                None
+            };
+            let kimi_json_path = if config.coding_memory.cli.kimi_cli.enabled {
+                dirs::home_dir().map(|h| h.join(".kimi").join("kimi.json"))
+            } else {
+                None
+            };
             let daemon_cfg = coding_ingest::daemon::IngestDaemonConfig {
                 socket_path: data_dir.join("ingest.sock"),
                 buffer_path: data_dir.join("ingest-buffer.jsonl"),
@@ -1083,13 +1046,17 @@ impl AppCore {
                     storage_pool.inner().clone(),
                 )),
                 event_tx: Some(ingest_event_tx),
-                op_handler: Some(std::sync::Arc::new(
-                    crate::coding_memory::recall::RecallOpHandler::new(recall.clone()),
-                )),
+                op_handler: recall.as_ref().map(|r| {
+                    std::sync::Arc::new(crate::coding_memory::recall::RecallOpHandler::new(
+                        Arc::clone(r),
+                    )) as std::sync::Arc<dyn coding_ingest::daemon::OpHandler>
+                }),
                 git_invalidation_handler: Some(git_handler),
                 opencode_db_path,
                 opencode_poll_interval: None,
-                kimi_wire_socket: None,
+                kimi_sessions_dir,
+                kimi_poll_interval: None,
+                kimi_json_path,
                 codex_sessions_dir,
                 codex_poll_interval: None,
             };
@@ -1100,6 +1067,19 @@ impl AppCore {
                     None
                 }
             }
+        };
+
+        // ── Tracing registry ─────────────────────────────────────────────
+        let tracing_registry = {
+            let home = dirs::home_dir().expect("home dir");
+            let data_dir = config.data_dir_path();
+            let widx = Arc::new(coding_ingest::adapters::kimi_cli::workdir::WorkdirIndex::new());
+            let _ = widx.refresh(&home.join(".kimi/kimi.json")).await;
+            let mut registry = crate::tracing::TracingRegistry::new();
+            registry.register(Arc::new(
+                crate::tracing::providers::kimi::KimiTracingProvider::new(&home, &data_dir, widx),
+            ));
+            Arc::new(registry)
         };
 
         // ── Snapshot lifecycle config before moving config into Arc ──────
@@ -1227,12 +1207,21 @@ impl AppCore {
             feature_registry,
             ingest_daemon: std::sync::Mutex::new(ingest_daemon_handle),
             distiller: Some(distiller.clone()),
-            recall: Some(recall.clone()),
-            coding_toolset: Some(toolset),
+            recall: recall.clone(),
+            coding_toolset: toolset,
             session_end_pass: None,
             causal_edge_repo: None,
             symbol_extractor: None,
             repo_roots: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
+            pending_approvals: Arc::new(klynt_core::approval::PendingApprovalsMap::new()),
+            tracing_registry,
+            session_start_fired: Arc::new(dashmap::DashMap::new()),
+            session_end_fired: Arc::new(dashmap::DashMap::new()),
+            coding_skill_activator: Arc::new(tokio::sync::Mutex::new(None)),
+            coding_approval_history_repo: Some(Arc::new(coding_approval_history_repo)),
+            snapshot_repo: Some(Arc::new(klynt_core::snapshots::SnapshotRepo::new(
+                storage_pool.clone(),
+            ))),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────
@@ -1312,6 +1301,16 @@ impl AppCore {
                 });
             });
             info!("coding-memory Distiller wired — event receiver + sweepers started");
+
+            // Wire direct DomainEventBus subscribers for coding mirror signals.
+            if let Err(e) = coding_subscribers::init_coding_subscribers(
+                Arc::clone(&domain_event_bus),
+                &storage_pool,
+            )
+            .await
+            {
+                tracing::warn!(error = %e, "init_coding_subscribers failed");
+            }
 
             // Auto-install the Claude Code hook if enabled (default: true).
             // Idempotent — re-running over an existing install just refreshes
@@ -1777,6 +1776,85 @@ impl AppCore {
             info!("Mirror tool registered");
         }
 
+        // ── Register BashTool in agent's tool registry (post-init) ──────
+        {
+            let config_guard = core.config.read().await;
+            let perms = &config_guard.coding.permissions;
+            let layer1 =
+                Arc::new(klynt_core::approval::Layer1::compile(perms).expect(
+                    "Layer 1 rules failed to compile; fix coding.permissions in config.json",
+                ));
+            let exclude_globs: Vec<&str> = config_guard
+                .coding_memory
+                .ingest
+                .exclude_paths
+                .iter()
+                .map(String::as_str)
+                .collect();
+            let privacy = Arc::new(
+                klynt_core::privacy::PrivacyGuard::from_globs(&exclude_globs)
+                    .expect("privacy globs"),
+            );
+            let policy = Arc::new(
+                dirs::home_dir()
+                    .map(|h| h.join(".klyntbot/rules"))
+                    .and_then(|p| klynt_execpolicy::Policy::load_from_dir(&p).ok())
+                    .unwrap_or_else(klynt_execpolicy::Policy::empty),
+            );
+            let pending = core.pending_approvals.clone();
+            let bus = core
+                .domain_event_bus
+                .clone()
+                .unwrap_or_else(|| Arc::new(bus::DomainEventBus::new(64)));
+
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let non_ui_policy = config_guard.tools.approval_policy.non_ui_channels;
+            let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
+
+            let hook_engine: Option<Arc<klynt_hooks::HookEngine>> = {
+                let hooks_path = config_guard.data_dir_path().join("hooks.toml");
+                if hooks_path.exists() {
+                    match klynt_hooks::HookEngine::load_from_path(&hooks_path) {
+                        Ok(e) => Some(Arc::new(e)),
+                        Err(err) => {
+                            tracing::warn!("klynt-hooks: failed to load {hooks_path:?}: {err}");
+                            Some(Arc::new(klynt_hooks::HookEngine::empty()))
+                        }
+                    }
+                } else {
+                    Some(Arc::new(klynt_hooks::HookEngine::empty()))
+                }
+            };
+
+            let kit = klynt_core::ToolKitBuilder {
+                cwd: cwd.clone(),
+                layer1: layer1.clone(),
+                policy: policy.clone(),
+                privacy: privacy.clone(),
+                pending: pending.clone(),
+                bus: bus.clone(),
+                repos: core.repos.clone(),
+                host_cache,
+                non_ui_policy,
+                hook_engine: hook_engine.clone(),
+                snapshot_repo: core.snapshot_repo.clone(),
+                session_key: String::new(),
+            };
+            {
+                let reg = core.agent.tool_registry();
+                let mut registry = reg.write().await;
+                kit.register_all(&mut registry);
+                info!("Coding tool kit registered (13 tools)");
+            }
+            let kit_arc = Arc::new(kit);
+            core.agent.runtime().set_tool_kit(Arc::clone(&kit_arc));
+            core.agent.set_subagent_tool_kit(Arc::clone(&kit_arc));
+            if let Some(ref engine) = hook_engine {
+                core.agent.runtime().set_hook_engine(Arc::clone(engine));
+                core.agent.set_subagent_hook_engine(Arc::clone(engine));
+            }
+        }
+
         // ── Register TemporalTool in agent's tool registry (post-init) ────
         {
             let temporal_service = ::cognitive::TemporalService::new(
@@ -1866,6 +1944,11 @@ impl AppCore {
             dashboard_poll_interval_secs,
             distraction_alert_rx,
         };
+
+        coding_skills::init_coding_skills(&core)
+            .await
+            .map_err(|e| format!("init_coding_skills: {e}"))?;
+        coding_retention::init_coding_retention(&core);
 
         Ok((core, channels))
     }

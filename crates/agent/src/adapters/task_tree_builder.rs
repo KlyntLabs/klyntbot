@@ -10,40 +10,35 @@ use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
-use bus::{
-    ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, DomainEventBus,
-    UpdatePriority,
-};
-use cognitive::TextEmbedder;
-use common::truncate_at_boundary;
+use bus::{ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, UpdatePriority};
 use context_engine::book_index::types::SourceType;
-use context_engine::book_index::BookTreeRepo;
+
+use super::tree_builder_base::{
+    compose_embedding_text_with_truncate, run_event_loop, TreeBuilderCore,
+};
 
 pub struct TaskTreeBuilder {
-    tree_repo: Arc<dyn BookTreeRepo>,
-    vector_store: Arc<storage::VectorStore>,
-    embedder: Arc<dyn TextEmbedder>,
-    context_update_queue: Option<Arc<ContextUpdateQueue>>,
-    #[allow(dead_code)]
-    domain_event_bus: Option<Arc<DomainEventBus>>,
+    core: TreeBuilderCore,
     pool: SqlitePool,
 }
 
 impl TaskTreeBuilder {
     pub fn new(
-        tree_repo: Arc<dyn BookTreeRepo>,
+        tree_repo: Arc<dyn context_engine::book_index::BookTreeRepo>,
         vector_store: Arc<storage::VectorStore>,
-        embedder: Arc<dyn TextEmbedder>,
+        embedder: Arc<dyn cognitive::TextEmbedder>,
         context_update_queue: Option<Arc<ContextUpdateQueue>>,
-        domain_event_bus: Option<Arc<DomainEventBus>>,
+        domain_event_bus: Option<Arc<bus::DomainEventBus>>,
         pool: SqlitePool,
     ) -> Self {
         Self {
-            tree_repo,
-            vector_store,
-            embedder,
-            context_update_queue,
-            domain_event_bus,
+            core: TreeBuilderCore::new(
+                tree_repo,
+                vector_store,
+                embedder,
+                context_update_queue,
+                domain_event_bus,
+            ),
             pool,
         }
     }
@@ -52,31 +47,13 @@ impl TaskTreeBuilder {
     /// and rebuilds the task tree for the affected project.
     pub async fn run(
         self: Arc<Self>,
-        mut rx: broadcast::Receiver<DomainEvent>,
+        rx: broadcast::Receiver<DomainEvent>,
         shutdown: CancellationToken,
     ) {
-        info!("TaskTreeBuilder: subscriber started");
-
-        loop {
-            tokio::select! {
-                _ = shutdown.cancelled() => {
-                    info!("TaskTreeBuilder: shutdown received");
-                    break;
-                }
-                result = rx.recv() => {
-                    match result {
-                        Ok(_) => {}
-                        Err(broadcast::error::RecvError::Lagged(n)) => {
-                            warn!("TaskTreeBuilder: lagged, skipped {n} events");
-                        }
-                        Err(broadcast::error::RecvError::Closed) => {
-                            info!("TaskTreeBuilder: event channel closed");
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        // Currently no events are handled; the loop preserves the subscription
+        // so future task event wiring can be added here without changing the
+        // outer shell.
+        run_event_loop("TaskTreeBuilder", rx, shutdown, |_event| async {}).await
     }
 
     /// Rebuild the task tree for a project. Public for backfill use.
@@ -113,6 +90,7 @@ impl TaskTreeBuilder {
 
         // 4. Delete existing tree nodes + embeddings for this project
         if let Err(e) = self
+            .core
             .tree_repo
             .delete_by_source(&SourceType::Task, project_id)
             .await
@@ -120,6 +98,7 @@ impl TaskTreeBuilder {
             warn!(project_id = %project_id, "TaskTreeBuilder: failed to delete old tree nodes: {e}");
         }
         if let Err(e) = self
+            .core
             .vector_store
             .delete_tree_node_embeddings_by_note(project_id)
             .await
@@ -128,20 +107,21 @@ impl TaskTreeBuilder {
         }
 
         // 5. Insert new tree nodes
-        self.tree_repo.insert_nodes(&nodes).await?;
+        self.core.tree_repo.insert_nodes(&nodes).await?;
 
         // 6. Embed each node
         let mut embedded_count = 0_usize;
         for node in &nodes {
-            let embed_text = compose_embedding_text(node);
+            let embed_text = compose_embedding_text_with_truncate(node);
             if embed_text.is_empty() {
                 continue;
             }
 
-            match self.embedder.embed(&embed_text).await {
+            match self.core.embedder.embed(&embed_text).await {
                 Ok(embedding) => {
                     let level_str = node.level.to_string();
                     if let Err(e) = self
+                        .core
                         .vector_store
                         .upsert_tree_node_embedding(
                             &node.id,
@@ -163,10 +143,8 @@ impl TaskTreeBuilder {
             }
         }
 
-        // TreeNodesRebuilt variant deleted; EntityTreeLinker no-op.
-
         // 8. Push context update
-        if let Some(queue) = &self.context_update_queue {
+        if let Some(queue) = &self.core.context_update_queue {
             queue.push(ContextUpdate {
                 reason: ContextUpdateReason::NoteStructureChanged,
                 content: Some(format!(
@@ -196,25 +174,5 @@ impl TaskTreeBuilder {
 
     pub fn pool(&self) -> &SqlitePool {
         &self.pool
-    }
-}
-
-/// Compose embedding text for a tree node (reuse same logic as NoteTreeBuilder).
-fn compose_embedding_text(node: &context_engine::book_index::types::TreeNode) -> String {
-    let title = node.title.as_deref().unwrap_or("");
-    let content_preview = truncate_at_boundary(&node.content, 300);
-
-    match node.level {
-        0 => title.to_string(),
-        1..=6 => {
-            if title.is_empty() {
-                content_preview.to_string()
-            } else if content_preview.is_empty() || content_preview == title {
-                title.to_string()
-            } else {
-                format!("{title} {content_preview}")
-            }
-        }
-        _ => content_preview.to_string(),
     }
 }

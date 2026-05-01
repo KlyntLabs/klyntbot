@@ -1,10 +1,10 @@
-//! Klyntbot Tools - Core tool implementations and domain tool interfaces.
+//! Klyntbot Tools — Domain tools and shared infrastructure.
 //!
-//! This crate provides:
-//! - System tools: filesystem (x4), web (x2), browser, message, ask_user
+//! Primitive tools (read, write, edit, grep, glob, bash, web_fetch, etc.) now live
+//! in `klynt-core`. This crate retains:
 //! - Domain tools: learning, memory, project, area, okr, delegation, cron, etc.
 //! - Embedding infrastructure: engine (fastembed), store (LanceDB)
-//! - Tool registry and permissions
+//! - Tool registry and parameter utilities
 //!
 //! Feature-specific tools (tasks, finance) live in their own crates
 //! (`feature-tasks`, `feature-finance`) and depend on `tools-core` directly.
@@ -19,15 +19,13 @@ pub use tools_core::{
 // ── Grouped modules ─────────────────────────────────────────────────────────
 pub mod domain;
 pub mod embedding;
-pub mod system;
 
-// ── Module re-exports (backward-compatible paths) ───────────────────────────
+// ── Module re-exports ───────────────────────────────────────────────────────
 pub use domain::{
     agent_task_tool, annotate, area_tool, context_request, cron_tool, docs, learning_tool,
     memory_tool, mirror, okr_tool, project_tool, skill_reference, spawn, temporal,
 };
 pub use embedding::{embedding_engine, embedding_store};
-pub use system::{ask_user, browser, filesystem, glob_tool, grep, message, web};
 
 // ── Shared modules (root-level) ─────────────────────────────────────────────
 pub mod conversation_recall;
@@ -81,8 +79,6 @@ pub use progress_handler::ProgressHandler;
 // Search utilities
 pub use search_utils::{rrf_merge, SearchResult};
 
-// Browser
-pub use browser::BrowserTool;
 pub use config::TrustLevel;
 
 // Context request

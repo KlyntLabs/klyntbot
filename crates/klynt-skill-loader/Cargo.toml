@@ -7,9 +7,18 @@ description = "Klynt skill discovery + paths-conditional activation + dynamic di
 
 [dependencies]
 common = { path = "../common" }
+config = { path = "../config" }
 skill-system = { path = "../skill-system" }
 serde = { workspace = true }
 serde_yaml = "0.9"
 globset = "0.4"
+walkdir = "2.5"
+tracing = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
+tempfile = { workspace = true }
+proptest = { workspace = true }
+
+[features]
+test-helpers = []

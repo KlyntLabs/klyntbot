@@ -1,6 +1,7 @@
 import type { ApprovalToasts } from "@app/components/ApprovalToasts";
 import type { MainHeader } from "@app/components/MainHeader";
 import type { ComponentProps, ReactNode } from "react";
+import type { CodeLanding } from "@/features/coding/components/CodeLanding";
 import type { Composer } from "@/features/composer/components/Composer";
 import type { DebugPanel } from "@/features/debug/components/DebugPanel";
 import type { FileTreePanel } from "@/features/files/components/FileTreePanel";
@@ -44,9 +45,11 @@ export type SidebarChatProps = {
   onOpenSettings: () => void;
   onNewChat: () => void;
   onSelectPlugins: () => void;
+  onSelectCalendar?: () => void;
   threads: import("@/features/chat/types").ChatThread[];
   selectedSessionKey: string | null;
   onSelectThread: (sessionKey: string) => void;
+  activeNavId?: string | null;
 };
 
 export type LayoutPrimarySurface = {
@@ -57,6 +60,7 @@ export type LayoutPrimarySurface = {
   updateToastProps: ComponentProps<typeof UpdateToast>;
   errorToastsProps: ComponentProps<typeof ErrorToasts>;
   homeProps: ComponentProps<typeof Home>;
+  codeLandingProps: ComponentProps<typeof CodeLanding>;
   mainHeaderProps: ComponentProps<typeof MainHeader> | null;
   desktopTopbarProps: {
     showBackToChat: boolean;
@@ -99,6 +103,7 @@ export type LayoutNodesResult = {
   updateToastNode: ReactNode;
   errorToastsNode: ReactNode;
   homeNode: ReactNode;
+  codeLandingNode: ReactNode;
   mainHeaderNode: ReactNode;
   desktopTopbarLeftNode: ReactNode;
   gitDiffPanelNode: ReactNode;

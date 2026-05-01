@@ -445,8 +445,8 @@ mod tests {
 
     #[test]
     fn cache_costs_included_in_total() {
-        let cost = cost_with_cache_for("claude-sonnet-4", 1_000_000, 100_000, 50_000, 20_000)
-            .unwrap();
+        let cost =
+            cost_with_cache_for("claude-sonnet-4", 1_000_000, 100_000, 50_000, 20_000).unwrap();
         // input: 1M * $3  = $3.00
         // output: 0.1M * $15 = $1.50
         // cache read: 0.05M * $0.30 = $0.015

@@ -82,8 +82,10 @@ export const SETTINGS_SECTION_LABELS: Record<CodexSection, string> = {
   git: "Git",
   server: "Server",
   agents: "Agents",
+  hooks: "Hooks & Rules",
   codex: "Codex",
   features: "Features",
+  coding: "Coding",
 };
 
 export const SHORTCUT_DRAFT_KEY_BY_SETTING: Record<ShortcutSettingKey, ShortcutDraftKey> = {

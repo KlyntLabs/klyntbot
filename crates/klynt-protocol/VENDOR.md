@@ -12,3 +12,9 @@
 
 **Phase 1 (Plan 1):** Empty skeleton; only the package metadata exists.
 **Phase 1 (Plan 2):** Vendored sources land via the adapt script.
+
+# Vendoring notes
+
+Adapted from codex-rs/protocol/.
+Wire-protocol types (TCP observer) deleted per spec §3.
+Minimal subset: Op, Submission, SubmissionResult, CodingTraceEvent, ProtocolError.

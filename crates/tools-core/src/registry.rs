@@ -183,6 +183,13 @@ impl ToolRegistry {
         self.metadata.get(name)
     }
 
+    /// List all registered tools as (name, description, aliases) tuples.
+    pub fn list_meta(&self) -> Vec<(String, String, Vec<String>)> {
+        self.tools.iter().map(|(name, tool)| {
+            (name.clone(), tool.description().to_string(), vec![])
+        }).collect()
+    }
+
     /// Get tool names that belong to a given category.
     pub fn by_category(&self, category: &ToolCategory) -> Vec<&str> {
         self.metadata

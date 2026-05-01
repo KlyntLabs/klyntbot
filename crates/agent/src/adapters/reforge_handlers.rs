@@ -764,36 +764,8 @@ impl ReforgeHandler for NoopReforgeHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use providers::{ChatParams, LlmProvider, LlmResponse, Message, Usage};
-
-    struct MockProvider {
-        response: String,
-    }
-
-    #[async_trait::async_trait]
-    impl LlmProvider for MockProvider {
-        async fn chat(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[serde_json::Value]>,
-            _params: &ChatParams,
-        ) -> common::Result<LlmResponse> {
-            Ok(LlmResponse {
-                content: Some(self.response.clone()),
-                tool_calls: vec![],
-                finish_reason: "stop".to_string(),
-                usage: Usage::default(),
-                reasoning_content: None,
-            })
-        }
-
-        fn default_model(&self) -> &str {
-            "mock"
-        }
-        fn name(&self) -> &str {
-            "mock"
-        }
-    }
+    use crate::test_utils::MockProvider;
+    use providers::ChatParams;
 
     #[tokio::test]
     async fn cross_cli_synthesis_handler_confirms_strong_evidence() {

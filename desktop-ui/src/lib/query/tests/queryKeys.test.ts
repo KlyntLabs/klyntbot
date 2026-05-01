@@ -95,3 +95,20 @@ describe("codingMemory keys", () => {
     expect(qk.codingMemory.status()).toEqual(["codingMemory", "status"]);
   });
 });
+
+describe("dashboard keys", () => {
+  it("timeline key normalizes source order", () => {
+    const a = qk.dashboard.timeline("2026-04-30", "2026-04-30", ["task", "calendar"]);
+    const b = qk.dashboard.timeline("2026-04-30", "2026-04-30", ["calendar", "task"]);
+    expect(a).toEqual(b);
+    expect(a).toEqual(["dashboard", "timeline", "2026-04-30", "2026-04-30", "calendar,task"]);
+  });
+
+  it("dashboard.all is the namespace root", () => {
+    expect(qk.dashboard.all()).toEqual(["dashboard"]);
+  });
+
+  it("calendarSync.status is namespaced", () => {
+    expect(qk.calendarSync.status()).toEqual(["calendarSync", "status"]);
+  });
+});

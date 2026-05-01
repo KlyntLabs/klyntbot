@@ -1,12 +1,14 @@
-//! Klynt skill loader — extends `skill-system` with:
-//! - Discovery from `~/.klyntbot/skills/` and `~/.klyntbot/project-skills/`.
-//! - Path-conditional activation via `paths:` frontmatter glob.
-//! - Dynamic discovery on file-touch.
-//!
-//! Plan 1: skeleton. Plan 5: lit up.
+//! Klynt skill loader — extends `skill-system` with discovery + path-conditional + dynamic.
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn crate_compiles() {}
-}
+pub mod activator;
+pub mod frontmatter;
+pub mod replay;
+
+mod discovery;
+mod dynamic;
+mod index;
+
+pub use activator::{ActivationConfig, SkillActivator};
+pub use discovery::sanitize_repo_id;
+pub use frontmatter::{KlyntFrontmatter, Reference, ReferenceLoadMode};
+pub use index::{DiscoveryRoots, IndexedSkill, SkillIndex, SkillSource};

@@ -1,14 +1,18 @@
-import { Clock, FolderPlus, LayoutGrid, Search, Settings, SquarePen } from "lucide-react";
+import { Calendar, Clock, FolderPlus, LayoutGrid, Search, Settings, SquarePen } from "lucide-react";
 import { memo } from "react";
 import type { ChatThread } from "@/features/chat/types";
+import { useAppMode } from "../hooks/useAppMode";
+import { AppModeSwitch } from "./AppModeSwitch";
 
 type SidebarChatLayoutProps = {
   onOpenSettings: () => void;
   onNewChat: () => void;
   onSelectPlugins: () => void;
+  onSelectCalendar?: () => void;
   threads: ChatThread[];
   selectedSessionKey: string | null;
   onSelectThread: (sessionKey: string) => void;
+  activeNavId?: string | null;
 };
 
 type NavItem = {
@@ -22,13 +26,23 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   onOpenSettings,
   onNewChat,
   onSelectPlugins,
+  onSelectCalendar,
   threads,
   selectedSessionKey,
   onSelectThread,
+  activeNavId,
 }: SidebarChatLayoutProps) {
+  const { mode, setMode } = useAppMode();
+  const handleSelectCalendar = onSelectCalendar ?? (() => {});
   const navItems: NavItem[] = [
     { id: "new-chat", label: "New chat", icon: <SquarePen aria-hidden />, onClick: onNewChat },
     { id: "search", label: "Search", icon: <Search aria-hidden /> },
+    {
+      id: "calendar",
+      label: "Calendar",
+      icon: <Calendar aria-hidden />,
+      onClick: handleSelectCalendar,
+    },
     { id: "plugins", label: "Plugins", icon: <LayoutGrid aria-hidden />, onClick: onSelectPlugins },
     { id: "automations", label: "Automations", icon: <Clock aria-hidden /> },
     { id: "project", label: "Project", icon: <FolderPlus aria-hidden /> },
@@ -37,20 +51,23 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   return (
     <aside className="sidebar-chat">
       <div className="sidebar-chat__drag-strip" />
-      <div className="sidebar-chat__topbar" aria-hidden />
+      <div className="sidebar-chat__topbar">
+        <div className="sidebar-chat__topbar-traffic-reserve" aria-hidden />
+        <div className="sidebar-chat__topbar-spacer" />
+        <AppModeSwitch mode={mode} onChange={setMode} />
+      </div>
 
       <nav className="sidebar-chat__nav" aria-label="Primary">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className="sidebar-chat__nav-item"
-            onClick={item.onClick}
-          >
-            <span className="sidebar-chat__nav-icon">{item.icon}</span>
-            <span className="sidebar-chat__nav-label">{item.label}</span>
-          </button>
-        ))}
+        {navItems.map((item) => {
+          const isActive = activeNavId === item.id;
+          const cls = `sidebar-chat__nav-item${isActive ? " sidebar-chat__nav-item--active" : ""}`;
+          return (
+            <button key={item.id} type="button" className={cls} onClick={item.onClick}>
+              <span className="sidebar-chat__nav-icon">{item.icon}</span>
+              <span className="sidebar-chat__nav-label">{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       <div className="sidebar-chat__chats">

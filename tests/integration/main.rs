@@ -3,6 +3,7 @@ mod common;
 
 mod alarm_lifecycle;
 mod channels;
+mod coding_in_chat;
 mod coding_memory_phase2_desktop_off;
 mod coding_memory_phase2_roundtrip;
 mod coding_memory_phase4_c3_escalation;

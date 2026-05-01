@@ -162,7 +162,7 @@ impl ReplayContext {
         let user_message = content.clone();
         let (_user_msg, mut info) = self
             .app
-            .chat_send(content, session_key.clone(), None)
+            .chat_send(content, session_key.clone(), None, None)
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("chat_send failed: {e}")))?;
         let mut answer = String::new();

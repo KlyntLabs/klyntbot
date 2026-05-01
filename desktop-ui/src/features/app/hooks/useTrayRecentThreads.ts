@@ -106,8 +106,10 @@ export function useTrayRecentThreads({
 
     let cancelled = false;
     let timeoutId: number | null = null;
+    let retries = 0;
+    const MAX_RETRIES = 3;
 
-    timeoutId = window.setTimeout(() => {
+    const attemptSync = () => {
       timeoutId = null;
       void setTrayRecentThreads(syncEntries)
         .then(() => {
@@ -116,12 +118,18 @@ export function useTrayRecentThreads({
         })
         .catch((error) => {
           if (cancelled) return;
-          // Mark this payload as "attempted" so we don't loop. The next genuine
-          // change to entries will retry naturally via the effect dep.
-          lastSyncedEntriesRef.current = serializedEntries;
           console.warn("[tray] setTrayRecentThreads failed", error);
+          if (retries < MAX_RETRIES) {
+            retries++;
+            timeoutId = window.setTimeout(attemptSync, SYNC_DEBOUNCE_MS);
+          } else {
+            // Exhausted retries — mark as attempted so we don't loop forever.
+            lastSyncedEntriesRef.current = serializedEntries;
+          }
         });
-    }, SYNC_DEBOUNCE_MS);
+    };
+
+    timeoutId = window.setTimeout(attemptSync, SYNC_DEBOUNCE_MS);
 
     return () => {
       cancelled = true;

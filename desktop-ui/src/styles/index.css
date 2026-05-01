@@ -9,6 +9,7 @@
 @import "./buttons.css";
 @import "./sidebar.css";
 @import "./sidebar-chat.css";
+@import "./dashboard.css";
 @import "./home.css";
 @import "./workspace-home.css";
 @import "./main.css";
@@ -39,3 +40,7 @@
 @import "./git-init-modal.css";
 @import "./settings.css";
 @import "./plugins.css";
+@import "./coding.css";
+@import "./tracing.css";
+@import "./app-mode-switch.css";
+@import "./code-landing.css";

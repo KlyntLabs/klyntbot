@@ -6,6 +6,7 @@
 pub mod annotation;
 pub mod area;
 pub mod bootstrap;
+pub mod coding_recall;
 pub mod identity;
 pub mod page_context;
 pub mod productivity;
@@ -17,6 +18,7 @@ pub mod todo;
 pub use annotation::AnnotationContextSource;
 pub use area::AreaSource;
 pub use bootstrap::BootstrapSource;
+pub use coding_recall::CodingRecallContextSource;
 pub use identity::IdentitySource;
 pub use page_context::PageContextSource;
 pub use productivity::ProductivityContextSource;

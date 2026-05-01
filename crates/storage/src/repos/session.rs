@@ -454,7 +454,7 @@ impl SessionRepo {
     pub async fn delete_stale_sessions(&self, ttl_days: u32) -> Result<u64, StorageError> {
         let cutoff =
             jiff::Timestamp::now() - jiff::SignedDuration::from_hours((ttl_days as i64) * 24);
-        let result = sqlx::query("DELETE FROM sessions WHERE updated_at < ?1")
+        let result = sqlx::query("DELETE FROM sessions WHERE updated_at < ?1 AND pinned = 0")
             .bind(cutoff.as_millisecond())
             .execute(&self.pool)
             .await?;
@@ -509,5 +509,104 @@ impl SessionRepo {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    /// Update the conversation type for a session.
+    pub async fn update_conversation_type(&self, key: &str, t: &str) -> Result<(), StorageError> {
+        sqlx::query("UPDATE sessions SET conversation_type = ?1 WHERE key = ?2")
+            .bind(t)
+            .bind(key)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Update the approval mode for a session.
+    pub async fn update_approval_mode(&self, key: &str, mode: &str) -> Result<(), StorageError> {
+        sqlx::query("UPDATE sessions SET approval_mode = ?1 WHERE key = ?2")
+            .bind(mode)
+            .bind(key)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn rewind_to_message(&self, session_key: &str, anchor_id: &str) -> Result<u64, StorageError> {
+        let anchor_uuid = uuid::Uuid::parse_str(anchor_id)
+            .map_err(|e| StorageError::NotFound(format!("invalid anchor uuid: {e}")))?;
+        let res = sqlx::query(
+            "DELETE FROM session_messages WHERE session_key = ? AND id IN ( \
+                SELECT id FROM session_messages WHERE session_key = ? \
+                  AND timestamp > (SELECT timestamp FROM session_messages WHERE id = ? AND session_key = ?) \
+             )",
+        )
+        .bind(session_key).bind(session_key).bind(anchor_uuid).bind(session_key)
+        .execute(&self.pool).await?;
+        Ok(res.rows_affected())
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn export_session_md(&self, session_key: &str) -> Result<String, StorageError> {
+        let session = self.get_session(session_key).await?;
+        let messages = self.get_messages(session_key).await?;
+        let mut out = format!("# Session {}\n\n", session.key);
+        for m in messages {
+            out.push_str(&format!("### {}\n{}\n\n", m.role, m.content));
+        }
+        Ok(out)
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn export_session_json(&self, session_key: &str) -> Result<String, StorageError> {
+        let session = self.get_session(session_key).await?;
+        let messages = self.get_messages(session_key).await?;
+        let json = serde_json::json!({
+            "session": {
+                "key": session.key,
+                "metadata": session.metadata,
+                "created_at": session.created_at,
+                "updated_at": session.updated_at,
+            },
+            "messages": messages.iter().map(|m| serde_json::json!({
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "timestamp": m.timestamp,
+                "request_id": m.request_id,
+                "tool_calls": m.tool_calls,
+                "metadata": m.metadata,
+            })).collect::<Vec<_>>(),
+        });
+        Ok(json.to_string())
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn fork_session(&self, source_key: &str, up_to_message: Option<&str>) -> Result<String, StorageError> {
+        let new_key = format!("fork-{}", uuid::Uuid::new_v4());
+        let metadata = match self.get_session(source_key).await {
+            Ok(s) => s.metadata,
+            Err(_) => "{}".into(),
+        };
+        sqlx::query(
+            "INSERT INTO sessions (key, metadata, parent_session_id, conversation_type, approval_mode) \
+             SELECT ?, ?, key, conversation_type, approval_mode FROM sessions WHERE key = ?"
+        ).bind(&new_key).bind(&metadata).bind(source_key)
+            .execute(&self.pool).await?;
+        let cutoff_clause = match up_to_message {
+            Some(_) => "AND timestamp <= (SELECT timestamp FROM session_messages WHERE id = ? AND session_key = ?)",
+            None => "",
+        };
+        let q = format!(
+            "INSERT INTO session_messages (session_key, id, role, content, timestamp, request_id, tool_calls, metadata) \
+             SELECT ?, id || '-fork', role, content, timestamp, request_id, tool_calls, metadata \
+             FROM session_messages WHERE session_key = ? {cutoff_clause} ORDER BY timestamp ASC"
+        );
+        let mut query = sqlx::query(&q).bind(&new_key).bind(source_key);
+        if let Some(anchor) = up_to_message {
+            query = query.bind(anchor).bind(source_key);
+        }
+        query.execute(&self.pool).await?;
+        Ok(new_key)
     }
 }

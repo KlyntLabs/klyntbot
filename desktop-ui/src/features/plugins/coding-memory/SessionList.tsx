@@ -1,4 +1,3 @@
-import { eventChipColor } from "./eventHelpers";
 import type { SessionSummaryDto } from "./types";
 
 interface Props {

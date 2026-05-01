@@ -14,14 +14,7 @@ use bus::InboundMessage;
 use providers::{DynProvider, Message};
 use storage::AgentTaskRepo;
 use tools::{
-    agent_task_tool::AgentTaskTool,
-    filesystem::{register_fs_read_tools, register_fs_tools},
-    glob_tool::GlobTool,
-    grep::GrepTool,
-    registry::ToolRegistry,
-    spawn::SpawnHandler,
-    web::{WebFetchTool, WebSearchTool},
-    RoutingContext,
+    agent_task_tool::AgentTaskTool, registry::ToolRegistry, spawn::SpawnHandler, RoutingContext,
 };
 
 /// Specialized profiles for sub-agents with different tool sets and behaviors.
@@ -30,13 +23,13 @@ use tools::{
 /// Profiles control access to filesystem (read/write), web, and browser tools.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum SubagentProfile {
-    /// Full access: filesystem + web (default)
+    /// Read-only access: search, read files, web fetch, ask user (default)
     #[default]
-    General,
-    /// Web + filesystem read-only
-    Research,
-    /// Filesystem read-only only (pure reasoning)
-    Analyst,
+    ReadOnly,
+    /// Read-write access: read-only tools + bash, write, edit, apply_patch, notebook_edit
+    ReadWrite,
+    /// Full access: all read-write tools + plan-mode tools
+    Full,
 }
 
 impl FromStr for SubagentProfile {
@@ -44,9 +37,10 @@ impl FromStr for SubagentProfile {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Ok(match s.to_lowercase().as_str() {
-            "research" => Self::Research,
-            "analyst" => Self::Analyst,
-            _ => Self::General,
+            "read_only" | "readonly" | "analyst" | "research" => Self::ReadOnly,
+            "read_write" | "readwrite" | "general" => Self::ReadWrite,
+            "full" | "code" => Self::Full,
+            _ => Self::ReadWrite,
         })
     }
 }
@@ -54,9 +48,9 @@ impl FromStr for SubagentProfile {
 impl std::fmt::Display for SubagentProfile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::General => f.write_str("general"),
-            Self::Research => f.write_str("research"),
-            Self::Analyst => f.write_str("analyst"),
+            Self::ReadOnly => f.write_str("read_only"),
+            Self::ReadWrite => f.write_str("read_write"),
+            Self::Full => f.write_str("full"),
         }
     }
 }
@@ -65,27 +59,27 @@ impl SubagentProfile {
     /// Maximum iteration count for this profile.
     pub fn max_iterations(&self) -> u32 {
         match self {
-            Self::General => 15,
-            Self::Research => 10,
-            Self::Analyst => 5,
+            Self::ReadOnly => 5,
+            Self::ReadWrite => 10,
+            Self::Full => 15,
         }
     }
 
     /// System prompt role preamble for this profile.
     pub fn role_prompt(&self) -> &'static str {
         match self {
-            Self::General => "You are a general-purpose subagent. You have full access to filesystem and web tools.",
-            Self::Research => "You are a research specialist. Focus on finding and synthesizing information from web sources and files. You have read-only file access and web tools.",
-            Self::Analyst => "You are an analyst. Reason about the information provided. You have read-only file access but no web tools.",
+            Self::ReadOnly => "You are an analyst. Reason about the information provided. You have read-only file access and web fetch tools.",
+            Self::ReadWrite => "You are a research specialist. Focus on finding and synthesizing information from files. You have read and write file access.",
+            Self::Full => "You are a general-purpose subagent. You have full access to filesystem, web, and plan-mode tools.",
         }
     }
 
     /// Tool description for the system prompt.
     pub fn tool_description(&self) -> &'static str {
         match self {
-            Self::General => "- Read and write files in the workspace\n- Search file contents (grep) and find files by pattern (glob)\n- Search the web and fetch web pages",
-            Self::Research => "- Read files in the workspace (read-only)\n- Search file contents (grep) and find files by pattern (glob)\n- Search the web and fetch web pages",
-            Self::Analyst => "- Read files in the workspace (read-only)\n- Search file contents (grep) and find files by pattern (glob)",
+            Self::ReadOnly => "- Read files in the workspace (read-only)\n- Search file contents (grep) and find files by pattern (glob)\n- Fetch web pages",
+            Self::ReadWrite => "- Read and write files in the workspace\n- Search file contents (grep) and find files by pattern (glob)\n- Execute shell commands and apply patches",
+            Self::Full => "- Read and write files in the workspace\n- Search file contents (grep) and find files by pattern (glob)\n- Execute shell commands, apply patches, and manage plan mode",
         }
     }
 }
@@ -100,11 +94,8 @@ struct SubagentHandle {
 
 /// Configuration for subagent execution
 struct SubagentConfig {
-    brave_api_key: Option<String>,
-    web_max_results: u8,
     /// Timeout in seconds for the subagent task.
     task_timeout: u64,
-    restrict_to_workspace: bool,
     agent_task_repo: AgentTaskRepo,
     session_key: String,
     agent_id: String,
@@ -116,13 +107,12 @@ pub struct SubagentManager {
     workspace: PathBuf,
     inbound_tx: mpsc::Sender<InboundMessage>,
     model: String,
-    brave_api_key: Option<String>,
-    web_max_results: u8,
     task_timeout: u64,
-    restrict_to_workspace: bool,
     semaphore: Arc<Semaphore>,
     handles: Arc<Mutex<HashMap<String, SubagentHandle>>>,
     agent_task_repo: AgentTaskRepo,
+    tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
+    hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
 }
 
 /// Builder for SubagentManager
@@ -131,12 +121,11 @@ pub struct SubagentManagerBuilder {
     workspace: PathBuf,
     inbound_tx: Option<mpsc::Sender<InboundMessage>>,
     model: Option<String>,
-    brave_api_key: Option<String>,
-    web_max_results: u8,
     task_timeout: u64,
-    restrict_to_workspace: bool,
     max_concurrent_subagents: usize,
     agent_task_repo: Option<AgentTaskRepo>,
+    tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
+    hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
 }
 
 impl SubagentManagerBuilder {
@@ -147,13 +136,22 @@ impl SubagentManagerBuilder {
             workspace,
             inbound_tx: None,
             model: None,
-            brave_api_key: None,
-            web_max_results: 5,
             task_timeout: 60,
-            restrict_to_workspace: true,
             max_concurrent_subagents: 3,
             agent_task_repo: None,
+            tool_kit: None,
+            hook_engine: None,
         }
+    }
+
+    pub fn tool_kit(mut self, kit: Arc<klynt_core::ToolKitBuilder>) -> Self {
+        self.tool_kit = Some(kit);
+        self
+    }
+
+    pub fn hook_engine(mut self, engine: Arc<klynt_hooks::HookEngine>) -> Self {
+        self.hook_engine = Some(engine);
+        self
     }
 
     pub fn inbound_sender(mut self, tx: mpsc::Sender<InboundMessage>) -> Self {
@@ -166,23 +164,8 @@ impl SubagentManagerBuilder {
         self
     }
 
-    pub fn brave_api_key(mut self, key: Option<String>) -> Self {
-        self.brave_api_key = key;
-        self
-    }
-
-    pub fn web_max_results(mut self, max: u8) -> Self {
-        self.web_max_results = max;
-        self
-    }
-
     pub fn task_timeout(mut self, timeout: u64) -> Self {
         self.task_timeout = timeout;
-        self
-    }
-
-    pub fn restrict_to_workspace(mut self, restrict: bool) -> Self {
-        self.restrict_to_workspace = restrict;
         self
     }
 
@@ -202,13 +185,12 @@ impl SubagentManagerBuilder {
             workspace: self.workspace,
             inbound_tx: self.inbound_tx.expect("inbound_sender is required"),
             model: self.model.unwrap_or_else(|| "claude-sonnet-4".to_string()),
-            brave_api_key: self.brave_api_key,
-            web_max_results: self.web_max_results,
             task_timeout: self.task_timeout,
-            restrict_to_workspace: self.restrict_to_workspace,
             semaphore: Arc::new(Semaphore::new(self.max_concurrent_subagents)),
             handles: Arc::new(Mutex::new(HashMap::new())),
             agent_task_repo: self.agent_task_repo.expect("agent_task_repo is required"),
+            tool_kit: std::sync::Mutex::new(self.tool_kit),
+            hook_engine: std::sync::Mutex::new(self.hook_engine),
         }
     }
 }
@@ -217,6 +199,17 @@ impl SubagentManager {
     /// Create a new subagent manager builder
     pub fn builder(provider: DynProvider, workspace: PathBuf) -> SubagentManagerBuilder {
         SubagentManagerBuilder::new(provider, workspace)
+    }
+
+    /// Inject the shared tool-kit builder (called by app-core after AgentRuntime is built).
+    pub fn set_tool_kit(&self, kit: Arc<klynt_core::ToolKitBuilder>) {
+        let mut lock = self.tool_kit.lock().unwrap();
+        *lock = Some(kit);
+    }
+
+    pub fn set_hook_engine(&self, engine: Arc<klynt_hooks::HookEngine>) {
+        let mut lock = self.hook_engine.lock().unwrap();
+        *lock = Some(engine);
     }
 
     /// Returns the total semaphore permit count (max concurrent subagents).
@@ -244,7 +237,51 @@ impl SubagentManager {
 
         debug!("Spawning subagent {} for task: {}", subagent_id, task);
 
-        // Store handle for cancel/status tracking
+        let tool_kit = {
+            let lock = self.tool_kit.lock().unwrap();
+            lock.clone()
+        };
+        if tool_kit.is_none() {
+            return format!(
+                "Error: subagent tool kit not initialized (ID: {})",
+                short_id
+            );
+        }
+
+        let provider = Arc::clone(&self.provider);
+        let workspace = self.workspace.clone();
+        let inbound_tx = self.inbound_tx.clone();
+        let model = self.model.clone();
+        let origin_key = format!("{}:{}", origin_channel, origin_chat_id);
+
+        // Fire SubagentSpawn hook; abort if blocked.
+        let hook_engine = {
+            let lock = self.hook_engine.lock().unwrap();
+            lock.clone()
+        };
+        if let Some(ref engine) = hook_engine {
+            let input = klynt_hooks::events::subagent_spawn::SubagentSpawnInput {
+                session_id: origin_key.clone(),
+                parent_session_id: None,
+                profile: profile.to_string(),
+                task_summary: label_text.clone(),
+                base: Default::default(),
+            };
+            match engine
+                .fire(klynt_hooks::engine::HookFireInput::SubagentSpawn(input))
+                .await
+            {
+                klynt_hooks::HookOutcome::Block { reason } => {
+                    return format!(
+                        "Subagent spawn blocked by hook: {} (ID: {})",
+                        reason, short_id
+                    );
+                }
+                _ => {}
+            }
+        }
+
+        // Store handle for cancel/status tracking (only after hook allows)
         {
             let mut handles = self.handles.lock().await;
             handles.insert(
@@ -257,19 +294,10 @@ impl SubagentManager {
                 },
             );
         }
-
-        let provider = Arc::clone(&self.provider);
-        let workspace = self.workspace.clone();
-        let inbound_tx = self.inbound_tx.clone();
-        let model = self.model.clone();
-        let origin_key = format!("{}:{}", origin_channel, origin_chat_id);
         let subagent_id_clone = subagent_id.clone();
         let label_clone = label_text.clone();
         let config = SubagentConfig {
-            brave_api_key: self.brave_api_key.clone(),
-            web_max_results: self.web_max_results,
             task_timeout: self.task_timeout,
-            restrict_to_workspace: self.restrict_to_workspace,
             agent_task_repo: self.agent_task_repo.clone(),
             session_key: origin_key.clone(),
             agent_id: short_id.clone(),
@@ -293,7 +321,7 @@ impl SubagentManager {
                 _ = cancel_token.cancelled() => {
                     Err("Cancelled by user".into())
                 }
-                r = run_subagent_task(&provider, &workspace, &model, &task, config, profile) => {
+                r = run_subagent_task(&provider, &workspace, &model, &task, config, profile, tool_kit, hook_engine.clone(), origin_key.clone()) => {
                     r
                 }
             };
@@ -409,9 +437,9 @@ impl SpawnHandler for SubagentManager {
 /// Run an agent loop for a subagent task with profile-based tools.
 ///
 /// Tool access is determined by `SubagentProfile`:
-/// - General: filesystem + web (full access)
-/// - Research: read-only filesystem + web (no writes)
-/// - Analyst: read-only filesystem only (pure reasoning)
+/// - ReadOnly: read-only / network / interaction tools
+/// - ReadWrite: read-only + mutating tools
+/// - Full: all tools including plan-mode
 async fn run_subagent_task(
     provider: &DynProvider,
     workspace: &std::path::Path,
@@ -419,6 +447,9 @@ async fn run_subagent_task(
     task: &str,
     config: SubagentConfig,
     profile: SubagentProfile,
+    tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
+    hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    session_key: String,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
     use crate::execution::budget::{DepthMode, ExecutionBudget};
     use crate::execution::core::ExecutionCore;
@@ -426,38 +457,27 @@ async fn run_subagent_task(
     use crate::execution::types::ExecutionParams;
     use tokio::sync::RwLock;
 
+    let kit = tool_kit.ok_or_else(|| {
+        Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "subagent tool kit not initialized",
+        )) as Box<dyn std::error::Error + Send + Sync>
+    })?;
+    let kit = (*kit).clone().with_cwd(workspace.to_path_buf());
+
     // Build subagent tool registry based on profile
     let mut tools = ToolRegistry::new();
 
-    let allowed_dir = if config.restrict_to_workspace {
-        Some(workspace.to_path_buf())
-    } else {
-        None
-    };
-
-    // All profiles get search tools (read-only)
-    tools.register(GrepTool::new(allowed_dir.clone()));
-    tools.register(GlobTool::new(allowed_dir.clone()));
-
     match profile {
-        SubagentProfile::General => {
-            register_fs_tools(&mut tools, allowed_dir);
-            tools.register(WebSearchTool::new(
-                config.brave_api_key,
-                config.web_max_results,
-            ));
-            tools.register(WebFetchTool::new());
+        SubagentProfile::ReadOnly => {
+            kit.register_read_only(&mut tools);
         }
-        SubagentProfile::Research => {
-            register_fs_read_tools(&mut tools, allowed_dir);
-            tools.register(WebSearchTool::new(
-                config.brave_api_key,
-                config.web_max_results,
-            ));
-            tools.register(WebFetchTool::new());
+        SubagentProfile::ReadWrite => {
+            kit.register_read_only(&mut tools);
+            kit.register_mutating(&mut tools);
         }
-        SubagentProfile::Analyst => {
-            register_fs_read_tools(&mut tools, allowed_dir);
+        SubagentProfile::Full => {
+            kit.register_all(&mut tools);
         }
     }
 
@@ -487,7 +507,9 @@ async fn run_subagent_task(
 
     let params = ExecutionParams::new(model)
         .with_timeout(std::time::Duration::from_secs(config.task_timeout));
-    let routing_ctx = RoutingContext::new("subagent".into(), "background".into());
+    let mut routing_ctx = RoutingContext::new("subagent".into(), "background".into());
+    routing_ctx.hook_engine = hook_engine;
+    routing_ctx.session_key = Some(session_key.into());
 
     // Execute via unified execute loop with a fixed budget
     let mut budget = ExecutionBudget::with_limits(
@@ -645,6 +667,35 @@ mod tests {
             .build()
     }
 
+    fn make_tool_kit(pool: &storage::StoragePool) -> Arc<klynt_core::ToolKitBuilder> {
+        let layer1 = Arc::new(
+            klynt_core::approval::Layer1::compile(&config::schema::CodingPermissions::default())
+                .unwrap(),
+        );
+        let policy = Arc::new(klynt_execpolicy::Policy::empty());
+        let privacy = Arc::new(klynt_core::privacy::PrivacyGuard::from_globs(&[]).unwrap());
+        let pending = Arc::new(klynt_core::approval::PendingApprovalsMap::default());
+        let bus = Arc::new(bus::DomainEventBus::new(16));
+        let repos = storage::Repos::from_pool(pool);
+        let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
+        let non_ui_policy = common::tool_channel::NonUiPolicy::Allow;
+
+        Arc::new(klynt_core::ToolKitBuilder {
+            cwd: std::path::PathBuf::from("/tmp"),
+            layer1,
+            policy,
+            privacy,
+            pending,
+            bus,
+            repos,
+            host_cache,
+            non_ui_policy,
+            hook_engine: None,
+            snapshot_repo: None,
+            session_key: String::new(),
+        })
+    }
+
     #[tokio::test]
     async fn test_subagent_manager_has_semaphore() {
         let mgr = make_manager(5).await;
@@ -656,11 +707,9 @@ mod tests {
         let provider: DynProvider = Arc::new(NoOpProvider);
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let repo = storage::AgentTaskRepo::new(pool.inner().clone());
+        let kit = make_tool_kit(&pool);
         let config = SubagentConfig {
-            brave_api_key: None,
-            web_max_results: 5,
             task_timeout: 60,
-            restrict_to_workspace: false,
             agent_task_repo: repo,
             session_key: "test:session".to_string(),
             agent_id: "agent-1".to_string(),
@@ -671,7 +720,10 @@ mod tests {
             "no-op",
             "Say hello",
             config,
-            SubagentProfile::General,
+            SubagentProfile::ReadWrite,
+            Some(kit),
+            None,
+            "test:session".to_string(),
         )
         .await;
         assert!(result.is_ok());
@@ -700,41 +752,53 @@ mod tests {
     }
 
     #[test]
-    fn test_subagent_profile_default_is_general() {
+    fn test_subagent_profile_default_is_read_write() {
         let profile = SubagentProfile::default();
-        assert!(matches!(profile, SubagentProfile::General));
+        assert!(matches!(profile, SubagentProfile::ReadWrite));
     }
 
     #[test]
     fn test_subagent_profile_from_str() {
         assert!(matches!(
             SubagentProfile::from_str("research"),
-            Ok(SubagentProfile::Research)
+            Ok(SubagentProfile::ReadOnly)
         ));
         assert!(matches!(
             SubagentProfile::from_str("analyst"),
-            Ok(SubagentProfile::Analyst)
+            Ok(SubagentProfile::ReadOnly)
+        ));
+        assert!(matches!(
+            SubagentProfile::from_str("read_only"),
+            Ok(SubagentProfile::ReadOnly)
         ));
         assert!(matches!(
             SubagentProfile::from_str("general"),
-            Ok(SubagentProfile::General)
+            Ok(SubagentProfile::ReadWrite)
         ));
-        // Unknown profiles default to General
+        assert!(matches!(
+            SubagentProfile::from_str("read_write"),
+            Ok(SubagentProfile::ReadWrite)
+        ));
+        assert!(matches!(
+            SubagentProfile::from_str("full"),
+            Ok(SubagentProfile::Full)
+        ));
         assert!(matches!(
             SubagentProfile::from_str("code"),
-            Ok(SubagentProfile::General)
+            Ok(SubagentProfile::Full)
         ));
+        // Unknown profiles default to ReadWrite
         assert!(matches!(
             SubagentProfile::from_str("unknown"),
-            Ok(SubagentProfile::General)
+            Ok(SubagentProfile::ReadWrite)
         ));
     }
 
     #[test]
     fn test_subagent_profile_max_iterations() {
-        assert_eq!(SubagentProfile::General.max_iterations(), 15);
-        assert_eq!(SubagentProfile::Research.max_iterations(), 10);
-        assert_eq!(SubagentProfile::Analyst.max_iterations(), 5);
+        assert_eq!(SubagentProfile::Full.max_iterations(), 15);
+        assert_eq!(SubagentProfile::ReadWrite.max_iterations(), 10);
+        assert_eq!(SubagentProfile::ReadOnly.max_iterations(), 5);
     }
 
     #[test]
@@ -742,34 +806,32 @@ mod tests {
         let prompt = build_subagent_prompt(
             std::path::Path::new("/tmp"),
             "Research Rust patterns",
-            SubagentProfile::Research,
+            SubagentProfile::ReadOnly,
         );
-        assert!(prompt.contains("research specialist"));
+        assert!(prompt.contains("analyst"));
         assert!(prompt.contains("Research Rust patterns"));
         assert!(prompt.contains("read-only"));
     }
 
     #[test]
-    fn test_build_subagent_prompt_general_profile() {
+    fn test_build_subagent_prompt_read_write_profile() {
         let prompt = build_subagent_prompt(
             std::path::Path::new("/tmp"),
             "Do something",
-            SubagentProfile::General,
+            SubagentProfile::ReadWrite,
         );
-        assert!(prompt.contains("general-purpose subagent"));
-        assert!(prompt.contains("Search the web"));
+        assert!(prompt.contains("research specialist"));
+        assert!(prompt.contains("shell commands"));
     }
 
     #[test]
-    fn test_build_subagent_prompt_analyst_profile() {
+    fn test_build_subagent_prompt_full_profile() {
         let prompt = build_subagent_prompt(
             std::path::Path::new("/tmp"),
             "Analyze data",
-            SubagentProfile::Analyst,
+            SubagentProfile::Full,
         );
-        assert!(prompt.contains("analyst"));
-        assert!(prompt.contains("read-only"));
-        // "What You Can Do" section should NOT list shell capabilities
-        assert!(!prompt.contains("Execute shell commands"));
+        assert!(prompt.contains("general-purpose subagent"));
+        assert!(prompt.contains("plan mode"));
     }
 }

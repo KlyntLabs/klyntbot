@@ -107,24 +107,6 @@ Non-blocking issues deferred for later. Not part of any active plan; pick up onc
 3. Plumb the value from `launcher_system_command(args: HashMap<String,String>)` by parsing `args.get("duration_secs").and_then(|s| s.parse().ok())`.
 4. Once stable, drop the frontend-side `focus_activate` workaround in `useExecuteItem.ts:86-97`.
 
-## 9. Agent: tree builders are 6 near-identical copy-pasted files
-
-**Observed (2026-04-29):** `adapters/finance_tree_builder.rs`, `learning_tree_builder.rs`, `note_tree_builder.rs`, `okr_tree_builder.rs`, `productivity_tree_builder.rs`, and `task_tree_builder.rs` each duplicate:
-- Identical 5-field struct (`tree_repo`, `vector_store`, `embedder`, `context_update_queue`, `domain_event_bus`)
-- Identical `new()` constructor
-- Identical `tokio::select!` event loop (`shutdown` + `rx.recv()` + `Lagged`/`Closed` handling)
-- Identical `persist_nodes()` (SQLite insert + embedding upsert + `ContextUpdate` push)
-- Identical `compose_embedding_text()` helper
-
-**Scope:** ~2,600 lines across 6 files where only the event variant names and node constructors differ.
-
-**Next steps:**
-1. Extract a `TreeBuilderBase<S: EventSource>` trait or `TreeIndexer` struct that owns common fields, the `run()` loop, `persist_nodes()`, and `compose_embedding_text()`.
-2. Each domain file implements only event handling (`handle_transaction`, `handle_note_changed`, etc.) and domain-specific node construction.
-3. Estimated savings: ~600+ lines.
-
----
-
 ## 10. Agent: `AgentLoopBuilder::build()` is a ~1,750-line god function
 
 **Observed (2026-04-29):** `crates/agent/src/agent_loop/builder.rs:214` assembles the entire dependency graph inline — context sources, cognitive background services, tree builder subscribers, tool registration, runtime wiring, and learning services. Nested `if let` blocks reach 4–5 levels deep, making unit testing impossible.

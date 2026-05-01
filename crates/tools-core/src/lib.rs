@@ -7,6 +7,7 @@
 // ── Modules ─────────────────────────────────────────────────────────────
 
 pub mod config_persistence;
+pub mod events;
 pub mod feature;
 pub mod interceptor;
 pub mod metadata;
@@ -25,6 +26,7 @@ pub use tools_core_macros::{tool_actions, ActionParams, DomainEnum, Tool, ToolPa
 // ── Re-exports: submodule types ─────────────────────────────────────────
 
 pub use config_persistence::ConfigPersistence;
+pub use events::ToolEvent;
 pub use feature::{FeatureMigration, FeaturePackage, HealthStatus};
 pub use interceptor::{InterceptorChain, ToolCallInterceptor};
 pub use metadata::{CostHint, ToolCategory, ToolMetadata, ToolSource};
@@ -103,6 +105,12 @@ pub trait Tool: Send + Sync {
     /// run via `futures::future::join_all`; unsafe tools run sequentially.
     fn is_concurrency_safe(&self, _args: &Value) -> bool {
         false
+    }
+
+    /// Channels in which this tool is visible to the LLM. Default = ALL.
+    /// Override to restrict — tools that need approval UI return CODING_ONLY.
+    fn allowed_channels(&self) -> common::ChannelMask {
+        common::ChannelMask::ALL
     }
 
     /// Optional per-tool timeout override.

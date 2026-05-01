@@ -153,7 +153,7 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
     }
   }, [filtered]);
 
-  const handleEventSelect = useCallback((event: WireEventDto, index: number) => {
+  const handleEventSelect = useCallback((event: WireEventDto, _index: number) => {
     if (event.kind === "toolCall" || event.kind === "toolResult") {
       setSelectedToolEvent((prev) => (prev === event ? null : event));
     }

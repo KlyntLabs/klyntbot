@@ -39,6 +39,7 @@ pub(super) async fn init_agent(
     hot_config: Arc<RwLock<config::HotConfig>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
+    coding_recall: Option<Arc<coding_memory::recall::CodingRecallService>>,
 ) -> Result<AgentResult, String> {
     // Run activity-log migrations (unified activity log).
     StoragePool::run_feature_migrations(
@@ -94,6 +95,8 @@ pub(super) async fn init_agent(
     if let Some(queue) = context_update_queue {
         builder = builder.with_context_update_queue(queue);
     }
+
+    builder = builder.with_coding_recall_service(coding_recall);
 
     let mut agent_loop_raw = builder
         .build()

@@ -12,7 +12,7 @@ async fn chat_cancel_mid_turn_leaves_no_orphans() {
     let key_clone = key.clone();
     let h = tokio::spawn(async move {
         let _ = app
-            .chat_send("a".repeat(5000), key_clone.to_string(), None)
+            .chat_send("a".repeat(5000), key_clone.to_string(), None, None)
             .await;
     });
     sleep(Duration::from_millis(50)).await;
@@ -20,7 +20,7 @@ async fn chat_cancel_mid_turn_leaves_no_orphans() {
     let _ = h.await;
     let _ = ctx
         .app
-        .chat_send("hello".into(), key.to_string(), None)
+        .chat_send("hello".into(), key.to_string(), None, None)
         .await
         .unwrap();
 

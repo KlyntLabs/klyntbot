@@ -101,6 +101,8 @@ pub struct AgentLoop {
     pub(crate) skill_store: Arc<RwLock<skill_system::SkillStore>>,
     /// Shared hot-reloadable config — updated by ConfigWatcherService without restart.
     pub(crate) hot_config: Arc<RwLock<config::HotConfig>>,
+    /// Subagent manager for background task spawning (kept alive for tool_kit injection).
+    pub(crate) subagent_manager: Option<Arc<crate::SubagentManager>>,
 }
 
 impl AgentLoop {
@@ -108,6 +110,10 @@ impl AgentLoop {
     /// Used by `klyntbot-server` to bridge internal tools to MCP.
     pub fn tool_registry(&self) -> Arc<RwLock<tools::registry::ToolRegistry>> {
         Arc::clone(&self.tool_registry)
+    }
+
+    pub fn runtime(&self) -> Arc<crate::agent_runtime::AgentRuntime> {
+        Arc::clone(&self.runtime)
     }
 
     /// Public accessor for the skill store.
@@ -119,6 +125,20 @@ impl AgentLoop {
     /// Public accessor for the shared hot-reloadable config.
     pub fn hot_config(&self) -> Arc<RwLock<config::HotConfig>> {
         Arc::clone(&self.hot_config)
+    }
+
+    /// Inject the tool-kit builder into the subagent manager (called by app-core init).
+    pub fn set_subagent_tool_kit(&self, kit: Arc<klynt_core::ToolKitBuilder>) {
+        if let Some(ref mgr) = self.subagent_manager {
+            mgr.set_tool_kit(kit);
+        }
+    }
+
+    /// Inject the hook engine into the subagent manager (called by app-core init).
+    pub fn set_subagent_hook_engine(&self, engine: Arc<klynt_hooks::HookEngine>) {
+        if let Some(ref mgr) = self.subagent_manager {
+            mgr.set_hook_engine(engine);
+        }
     }
 
     /// Reload skill files from disk (hot-reload after UI edits).
@@ -897,13 +917,33 @@ impl AgentLoop {
     ) -> Result<String> {
         let history_messages = Self::convert_history(&history);
         let (tool_defs, _tool_names) = self.get_tool_info().await;
+        let channel = common::tool_channel::Channel::from_name(routing_ctx.channel.as_str());
+        let registry = self.tool_registry.read().await;
+        let filtered_defs: Arc<Vec<serde_json::Value>> = Arc::new(
+            tool_defs
+                .iter()
+                .filter(|def| {
+                    let name = def
+                        .get("function")
+                        .and_then(|f| f.get("name"))
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("");
+                    registry
+                        .get(name)
+                        .map(|tool| tool.allowed_channels().allows(channel))
+                        .unwrap_or(true)
+                })
+                .cloned()
+                .collect(),
+        );
+        drop(registry);
 
         let result = self
             .runtime
             .process_message(
                 content,
                 history_messages,
-                &tool_defs,
+                &filtered_defs,
                 routing_ctx,
                 event_tx.clone(),
                 cancel_token,
@@ -989,6 +1029,7 @@ impl AgentLoop {
         self: &Arc<Self>,
         content: String,
         session_key: String,
+        mode: Option<String>,
     ) -> Result<StreamingHandle> {
         // Detect correction prefix and memory miss BEFORE setup_session adds the user message
         let correction_strength = detect_correction_prefix(&content);
@@ -1084,12 +1125,20 @@ impl AgentLoop {
         let (event_tx, event_rx) = mpsc::channel(64);
         let (interaction_tx, interaction_rx) = mpsc::channel(4);
 
+        let channel: common::ChannelName = mode
+            .as_deref()
+            .map(|m| {
+                if m == "coding" {
+                    common::CODING_CHANNEL.into()
+                } else {
+                    "desktop".into()
+                }
+            })
+            .unwrap_or_else(|| "desktop".into());
+
         // Routing context with interaction channel for ask_user tool
-        let routing_ctx = RoutingContext::with_interaction(
-            "cli".into(),
-            session_key.clone().into(),
-            interaction_tx,
-        );
+        let routing_ctx =
+            RoutingContext::with_interaction(channel, session_key.clone().into(), interaction_tx);
 
         let cancel_token = CancellationToken::new();
         let cancel_clone = cancel_token.clone();
@@ -1146,6 +1195,25 @@ impl AgentLoop {
                             message_id,
                         })
                         .await;
+                    if let Some(engine) = agent.runtime.hook_engine() {
+                        let message_count = {
+                            if let Ok(session_arc) = agent.session_manager.get_or_create(&sk).await
+                            {
+                                let session = session_arc.lock().await;
+                                session.messages.len() as u64
+                            } else {
+                                0
+                            }
+                        };
+                        let stop_input = klynt_hooks::events::stop::StopInput {
+                            session_id: sk.clone(),
+                            message_count,
+                            base: Default::default(),
+                        };
+                        let _ = engine
+                            .fire(klynt_hooks::engine::HookFireInput::Stop(stop_input))
+                            .await;
+                    }
                     Ok(response)
                 }
                 Err(e) => {
@@ -1153,6 +1221,18 @@ impl AgentLoop {
                     // Without this, the session row exists (created by chat_send)
                     // but has zero messages — a ghost thread in the sidebar.
                     agent.persist_session(&sk).await;
+                    if let Some(engine) = agent.runtime.hook_engine() {
+                        let error_input = klynt_hooks::events::error::ErrorInput {
+                            session_id: sk.clone(),
+                            kind: "agent_loop_error".to_string(),
+                            message: e.to_string(),
+                            recoverable: false,
+                            base: Default::default(),
+                        };
+                        let _ = engine
+                            .fire(klynt_hooks::engine::HookFireInput::Error(error_input))
+                            .await;
+                    }
                     let _ = event_tx
                         .send(AgentEvent::Error {
                             message: e.to_string(),

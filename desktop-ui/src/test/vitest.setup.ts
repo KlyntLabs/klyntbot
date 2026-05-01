@@ -1,6 +1,17 @@
-import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { afterEach, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+
+// Mock Tauri APIs globally — several stores import them at module init time.
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async () => () => {}),
+}));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(),
+  convertFileSrc: (path: string) => `tauri://${path}`,
+  isTauri: vi.fn(() => true),
+}));
 
 afterEach(() => {
   cleanup();

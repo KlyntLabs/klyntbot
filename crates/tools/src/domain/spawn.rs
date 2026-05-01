@@ -97,8 +97,8 @@ impl Tool for SpawnTool {
                 },
                 "profile": {
                     "type": "string",
-                    "description": "Sub-agent specialization profile. Options: general (default, full access), research (web + read-only files), analyst (read-only files, pure reasoning)",
-                    "enum": ["general", "research", "analyst"]
+                    "description": "Sub-agent specialization profile. Options: read_only (default, read-only files + web fetch), read_write (read-write file access), full (all tools including plan mode)",
+                    "enum": ["read_only", "read_write", "full"]
                 },
                 "agent_id": {
                     "type": "string",
@@ -131,7 +131,7 @@ impl Tool for SpawnTool {
                 // "spawn" action (default)
                 let task = p.required_str("task")?;
                 let label = p.optional_str("label")?.map(|s| s.to_string());
-                let profile = p.str_or("profile", "general")?.to_string();
+                let profile = p.str_or("profile", "read_write")?.to_string();
 
                 debug!(
                     "Spawning subagent for task: {} (profile: {})",

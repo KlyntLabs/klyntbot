@@ -20,40 +20,35 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, info, warn};
+use tracing::warn;
 use uuid::Uuid;
 
-use bus::{
-    ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, DomainEventBus,
-    UpdatePriority,
-};
-use cognitive::TextEmbedder;
+use bus::{ContextUpdateReason, DomainEvent};
+
 use context_engine::book_index::types::{SourceType, TreeNode, TreeNodeType};
-use context_engine::book_index::BookTreeRepo;
+
+use super::tree_builder_base::{run_event_loop, TreeBuilderCore};
 
 pub struct ProductivityTreeBuilder {
-    tree_repo: Arc<dyn BookTreeRepo>,
-    vector_store: Arc<storage::VectorStore>,
-    embedder: Arc<dyn TextEmbedder>,
-    context_update_queue: Option<Arc<ContextUpdateQueue>>,
-    #[allow(dead_code)]
-    domain_event_bus: Option<Arc<DomainEventBus>>,
+    core: TreeBuilderCore,
 }
 
 impl ProductivityTreeBuilder {
     pub fn new(
-        tree_repo: Arc<dyn BookTreeRepo>,
+        tree_repo: Arc<dyn context_engine::book_index::BookTreeRepo>,
         vector_store: Arc<storage::VectorStore>,
-        embedder: Arc<dyn TextEmbedder>,
-        context_update_queue: Option<Arc<ContextUpdateQueue>>,
-        domain_event_bus: Option<Arc<DomainEventBus>>,
+        embedder: Arc<dyn cognitive::TextEmbedder>,
+        context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
+        domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     ) -> Self {
         Self {
-            tree_repo,
-            vector_store,
-            embedder,
-            context_update_queue,
-            domain_event_bus,
+            core: TreeBuilderCore::new(
+                tree_repo,
+                vector_store,
+                embedder,
+                context_update_queue,
+                domain_event_bus,
+            ),
         }
     }
 
@@ -90,65 +85,62 @@ impl ProductivityTreeBuilder {
     /// and appends tree nodes for each.
     pub async fn run(
         self: Arc<Self>,
-        mut rx: broadcast::Receiver<DomainEvent>,
+        rx: broadcast::Receiver<DomainEvent>,
         shutdown: CancellationToken,
     ) {
-        info!("ProductivityTreeBuilder: subscriber started");
-
-        loop {
-            tokio::select! {
-                _ = shutdown.cancelled() => {
-                    info!("ProductivityTreeBuilder: shutdown received");
-                    break;
-                }
-                result = rx.recv() => {
-                    match result {
-                        Ok(DomainEvent::FocusSessionEnded { duration_secs, quality, interruptions }) => {
-                            if let Err(e) = self.handle_focus_session_ended(duration_secs, quality, interruptions).await {
-                                warn!(
-                                    duration_secs,
-                                    "ProductivityTreeBuilder: failed to process focus session: {e}"
-                                );
-                            }
-                        }
-                        Ok(DomainEvent::ActivitySessionCompleted {
-                            date,
-                            total_active_secs,
-                            productive_secs,
-                            distracting_secs,
-                        }) => {
-                            if let Err(e) = self
-                                .handle_activity_session(&date, total_active_secs, productive_secs, distracting_secs)
-                                .await
-                            {
-                                warn!(
-                                    date = %date,
-                                    "ProductivityTreeBuilder: failed to process activity session: {e}"
-                                );
-                            }
-                        }
-                        Ok(DomainEvent::ProductivityScoreComputed { date, score }) => {
-                            if let Err(e) = self.handle_productivity_score(&date, score).await {
-                                warn!(
-                                    date = %date,
-                                    "ProductivityTreeBuilder: failed to process productivity score: {e}"
-                                );
-                            }
-                        }
-                        Ok(_) => {
-                            // Not a productivity event — ignore.
-                        }
-                        Err(broadcast::error::RecvError::Lagged(n)) => {
-                            warn!("ProductivityTreeBuilder: lagged, skipped {n} events");
-                        }
-                        Err(broadcast::error::RecvError::Closed) => {
-                            info!("ProductivityTreeBuilder: event channel closed");
-                            break;
+        run_event_loop("ProductivityTreeBuilder", rx, shutdown, |event| {
+            let this = Arc::clone(&self);
+            async move {
+                match event {
+                    DomainEvent::FocusSessionEnded {
+                        duration_secs,
+                        quality,
+                        interruptions,
+                    } => {
+                        if let Err(e) = this
+                            .handle_focus_session_ended(duration_secs, quality, interruptions)
+                            .await
+                        {
+                            warn!(
+                                duration_secs,
+                                "ProductivityTreeBuilder: failed to process focus session: {e}"
+                            );
                         }
                     }
+                    DomainEvent::ActivitySessionCompleted {
+                        date,
+                        total_active_secs,
+                        productive_secs,
+                        distracting_secs,
+                    } => {
+                        if let Err(e) = this
+                            .handle_activity_session(
+                                &date,
+                                total_active_secs,
+                                productive_secs,
+                                distracting_secs,
+                            )
+                            .await
+                        {
+                            warn!(
+                                date = %date,
+                                "ProductivityTreeBuilder: failed to process activity session: {e}"
+                            );
+                        }
+                    }
+                    DomainEvent::ProductivityScoreComputed { date, score } => {
+                        if let Err(e) = this.handle_productivity_score(&date, score).await {
+                            warn!(
+                                date = %date,
+                                "ProductivityTreeBuilder: failed to process productivity score: {e}"
+                            );
+                        }
+                    }
+                    _ => {}
                 }
             }
-        }
+        })
+        .await
     }
 
     /// Handle a focus session ended event: upsert the daily root node and
@@ -163,7 +155,7 @@ impl ProductivityTreeBuilder {
         let daily_id = format!("productivity-daily-{date}");
         let focus_id = format!("productivity-focus-{}", Uuid::new_v4());
 
-        debug!(
+        tracing::debug!(
             duration_secs,
             quality,
             interruptions,
@@ -180,7 +172,18 @@ impl ProductivityTreeBuilder {
             interruptions,
         );
 
-        self.persist_nodes(&nodes, &daily_id).await
+        self.core
+            .persist_nodes(
+                "ProductivityTreeBuilder",
+                &nodes,
+                &daily_id,
+                ContextUpdateReason::FocusSessionEnded,
+                Some(format!(
+                    "Productivity tree updated: {} new node(s) for {daily_id}",
+                    nodes.len()
+                )),
+            )
+            .await
     }
 
     /// Handle an activity session completed event: upsert the daily root node
@@ -195,7 +198,7 @@ impl ProductivityTreeBuilder {
         let daily_id = format!("productivity-daily-{date}");
         let activity_id = format!("productivity-activity-{date}");
 
-        debug!(
+        tracing::debug!(
             date = %date,
             total_active_secs,
             productive_secs,
@@ -213,7 +216,18 @@ impl ProductivityTreeBuilder {
             distracting_secs,
         );
 
-        self.persist_nodes(&nodes, &daily_id).await
+        self.core
+            .persist_nodes(
+                "ProductivityTreeBuilder",
+                &nodes,
+                &daily_id,
+                ContextUpdateReason::FocusSessionEnded,
+                Some(format!(
+                    "Productivity tree updated: {} new node(s) for {daily_id}",
+                    nodes.len()
+                )),
+            )
+            .await
     }
 
     /// Handle a productivity score computed event: upsert the daily root node
@@ -222,7 +236,7 @@ impl ProductivityTreeBuilder {
         let daily_id = format!("productivity-daily-{date}");
         let score_id = format!("productivity-score-{date}");
 
-        debug!(
+        tracing::debug!(
             date = %date,
             score,
             score_id = %score_id,
@@ -231,95 +245,18 @@ impl ProductivityTreeBuilder {
 
         let nodes = build_score_nodes(date, &daily_id, &score_id, score);
 
-        self.persist_nodes(&nodes, &daily_id).await
-    }
-
-    /// Persist nodes: insert each one (ignoring duplicate-ID errors for
-    /// idempotent root nodes), embed leaf nodes, push context update,
-    /// and emit TreeNodesRebuilt.
-    async fn persist_nodes(&self, nodes: &[TreeNode], source_id: &str) -> common::Result<()> {
-        let mut inserted = Vec::new();
-
-        for node in nodes {
-            match self.tree_repo.insert_node(node).await {
-                Ok(()) => inserted.push(node),
-                Err(_) => {
-                    // Duplicate key — node already exists. This is expected for
-                    // root nodes shared across multiple events on the same day.
-                    debug!(
-                        node_id = %node.id,
-                        "ProductivityTreeBuilder: node already exists, skipping insert"
-                    );
-                }
-            }
-        }
-
-        // Embed newly inserted nodes.
-        let mut embedded_count = 0_usize;
-        for node in &inserted {
-            let embed_text = compose_embedding_text(node);
-            if embed_text.is_empty() {
-                continue;
-            }
-            match self.embedder.embed(&embed_text).await {
-                Ok(embedding) => {
-                    let level_str = node.level.to_string();
-                    if let Err(e) = self
-                        .vector_store
-                        .upsert_tree_node_embedding(
-                            &node.id,
-                            &embedding,
-                            source_id,
-                            &level_str,
-                            node.source_type.as_str(),
-                        )
-                        .await
-                    {
-                        warn!(
-                            node_id = %node.id,
-                            "ProductivityTreeBuilder: failed to upsert embedding: {e}"
-                        );
-                    } else {
-                        embedded_count += 1;
-                    }
-                }
-                Err(e) => {
-                    warn!(
-                        node_id = %node.id,
-                        "ProductivityTreeBuilder: failed to generate embedding: {e}"
-                    );
-                }
-            }
-        }
-
-        // TreeNodesRebuilt variant deleted; EntityTreeLinker no-op.
-
-        // Push context update for live injection.
-        if let Some(queue) = &self.context_update_queue {
-            queue.push(ContextUpdate {
-                reason: ContextUpdateReason::FocusSessionEnded,
-                content: Some(format!(
-                    "Productivity tree updated: {} new node(s) for {source_id}",
-                    inserted.len()
+        self.core
+            .persist_nodes(
+                "ProductivityTreeBuilder",
+                &nodes,
+                &daily_id,
+                ContextUpdateReason::FocusSessionEnded,
+                Some(format!(
+                    "Productivity tree updated: {} new node(s) for {daily_id}",
+                    nodes.len()
                 )),
-                metadata: Some(serde_json::json!({
-                    "source_id": source_id,
-                    "inserted_count": inserted.len(),
-                    "embedded_count": embedded_count,
-                })),
-                priority: UpdatePriority::Low,
-                timestamp: jiff::Timestamp::now(),
-            });
-        }
-
-        info!(
-            source_id = %source_id,
-            inserted_count = inserted.len(),
-            embedded_count,
-            "ProductivityTreeBuilder: nodes persisted"
-        );
-
-        Ok(())
+            )
+            .await
     }
 }
 
@@ -475,24 +412,12 @@ pub fn build_score_nodes(date: &str, daily_id: &str, score_id: &str, score: f64)
 }
 
 // ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-/// Compose embedding text for a productivity tree node.
-/// Level 0: title only; Level 1+: content.
-fn compose_embedding_text(node: &TreeNode) -> String {
-    match node.level {
-        0 => node.title.as_deref().unwrap_or("").to_string(),
-        _ => node.content.clone(),
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
+    use super::tree_builder_base::compose_embedding_text;
     use super::*;
 
     // --- compose_embedding_text ---

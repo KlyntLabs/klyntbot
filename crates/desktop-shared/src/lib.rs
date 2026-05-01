@@ -10,6 +10,37 @@ pub mod types;
 pub use entity_link_types::*;
 pub use errors::{ApiError, CommandResult};
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct HooksTomlSnapshot {
+    pub path: String,
+    pub exists: bool,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct RewindResult {
+    pub messages_removed: u64,
+    pub files_restored: usize,
+    pub files_deleted: usize,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct SessionExportResult {
+    pub path: String,
+    pub bytes_written: usize,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub enum ExportFormat {
+    Md,
+    Json,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct SessionForkResult {
+    pub new_session_key: String,
+}
+
 #[cfg(test)]
 mod phase5_helper_tests {
     use crate::specta_helpers::{JsonValue, Timestamp};

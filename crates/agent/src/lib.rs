@@ -29,6 +29,8 @@ pub mod learning;
 mod notes_integration_tests;
 pub mod output;
 pub mod subagent;
+#[cfg(test)]
+pub mod test_utils;
 
 // ── Skill loader re-export (moved into agent_profile/) ──────────────────────
 pub use agent_profile::skill_loader;

@@ -12,6 +12,12 @@ use storage::{Repos, SessionContextParams};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
+use klynt_hooks::engine::HookFireInput;
+use klynt_hooks::events::{
+    notification::NotificationInput, session_end::SessionEndInput,
+    session_start::SessionStartInput, user_prompt_submit::UserPromptSubmitInput,
+};
+
 use crate::errors::map_storage_err;
 use crate::state::AppCore;
 
@@ -201,6 +207,7 @@ pub async fn chat_send(
     session_key: String,
     context: Option<SessionContextInput>,
     is_voice: bool,
+    mode: Option<String>,
 ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
     // 1. Ensure session exists (title derived from first message, truncated to 60 chars)
     let title: String = content
@@ -221,6 +228,15 @@ pub async fn chat_send(
         .map_err(map_storage_err)?;
     let is_new_session = session_row.created_at == session_row.updated_at;
 
+    // Set conversation_type based on mode if provided
+    if let Some(ref m) = mode {
+        repos
+            .sessions
+            .update_conversation_type(&session_key, m)
+            .await
+            .map_err(map_storage_err)?;
+    }
+
     // 2. Upsert session_context if provided
     let has_context = context.is_some();
     if let Some(ctx) = &context {
@@ -239,19 +255,29 @@ pub async fn chat_send(
             .map_err(map_storage_err)?;
     }
 
-    // 3. Call agent with streaming (agent loop stores user + assistant messages)
+    // 3. Fire UserPromptSubmit hook before entering the agent loop
+    if let Some(engine) = agent.runtime().hook_engine() {
+        let input = UserPromptSubmitInput {
+            session_id: session_key.clone(),
+            prompt: content.clone(),
+            base: Default::default(),
+        };
+        let _ = engine.fire(HookFireInput::UserPromptSubmit(input)).await;
+    }
+
+    // 4. Call agent with streaming (agent loop stores user + assistant messages)
     let msg_id = uuid::Uuid::new_v4();
     let now = jiff::Timestamp::now();
     let user_message = content.clone();
     let streaming_handle = agent
-        .process_direct_streaming(content.clone(), session_key.clone())
+        .process_direct_streaming(content.clone(), session_key.clone(), mode.clone())
         .await
         .map_err(ApiError::from)?;
 
-    // 4. Track the cancel token
+    // 5. Track the cancel token
     active_streams.insert(session_key.clone(), streaming_handle.cancel_token);
 
-    // 5. Build the user message response
+    // 6. Build the user message response
     let user_msg = ChatMessageResponse {
         id: msg_id.to_string(),
         role: common::MessageRole::User.to_string(),
@@ -261,7 +287,7 @@ pub async fn chat_send(
         transparency: None,
     };
 
-    // 6. Build stream info for the caller to wire up
+    // 7. Build stream info for the caller to wire up
     let stream_info = ChatStreamInfo {
         session_key,
         event_rx: streaming_handle.event_rx,
@@ -365,7 +391,8 @@ pub async fn chat_respond_interaction(
     emitter,
     journey_tracker,
     domain_event_bus,
-    user_message
+    user_message,
+    hook_engine
 ))]
 #[allow(clippy::too_many_arguments)]
 pub async fn relay_chat_stream(
@@ -380,6 +407,9 @@ pub async fn relay_chat_stream(
     journey_tracker: Option<crate::journey::JourneyTracker>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     user_message: Option<String>,
+    hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    session_start_fired: Arc<dashmap::DashMap<String, ()>>,
+    session_end_fired: Arc<dashmap::DashMap<String, ()>>,
 ) {
     // Guard ensures active_streams + pending_interactions cleanup even on panic
     struct StreamGuard {
@@ -435,6 +465,37 @@ pub async fn relay_chat_stream(
         };
     }
 
+    // Merge pipeline events and domain-bus agent events into a single stream
+    // so that tools (e.g. BashTool) that publish via the domain bus are relayed
+    // to the UI just like native pipeline events.
+    let (merged_tx, mut merged_rx) = mpsc::channel::<AgentEvent>(64);
+    let merged_tx2 = merged_tx.clone();
+
+    tokio::spawn(async move {
+        while let Some(evt) = event_rx.recv().await {
+            if merged_tx.send(evt).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    if let Some(ref bus) = domain_event_bus {
+        let mut rx = bus.subscribe();
+        tokio::spawn(async move {
+            while let Ok(evt) = rx.recv().await {
+                if let bus::DomainEvent::Generic { kind, payload } = evt {
+                    if kind == "agent_event" {
+                        if let Ok(agent_evt) = serde_json::from_value::<AgentEvent>(payload) {
+                            if merged_tx2.send(agent_evt).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     loop {
         tokio::select! {
             biased;
@@ -450,7 +511,7 @@ pub async fn relay_chat_stream(
                 );
                 pending_interactions.insert(sk.clone(), (request_id, bundle.response_tx));
             }
-            Some(event) = event_rx.recv() => {
+            Some(event) = merged_rx.recv() => {
                 match event {
                     AgentEvent::ContentChunk { data } => {
                         current_text.push_str(&data);
@@ -632,6 +693,19 @@ pub async fn relay_chat_stream(
                                 source: "chat".to_string(),
                             }
                         );
+                        if let Some(ref engine) = hook_engine {
+                            if !session_end_fired.contains_key(sk.as_str()) {
+                                session_end_fired.insert(sk.clone(), ());
+                                session_start_fired.remove(sk.as_str());
+                                let input = SessionEndInput {
+                                    session_id: sk.clone(),
+                                    reason: "complete".to_string(),
+                                    duration_ms: 0,
+                                    base: Default::default(),
+                                };
+                                let _ = engine.fire(HookFireInput::SessionEnd(input)).await;
+                            }
+                        }
                         break;
                     }
                     AgentEvent::Error { message } => {
@@ -1005,6 +1079,109 @@ pub async fn relay_chat_stream(
                     | AgentEvent::EnrichmentStarted { .. }
                     | AgentEvent::EnrichmentComplete { .. }
                     | AgentEvent::TurnComplete { .. } => {}
+                    AgentEvent::ApprovalRequested { requires_user_input, .. } if !requires_user_input => {
+                        // Auto-allow / auto-deny / privacy: telemetry only — UI doesn't need them.
+                    }
+                    AgentEvent::ApprovalRequested { ref request_id, ref tool, ref args_hash, ref layer, ref rule_matched, ref mirror_history, ref sandbox_summary, requires_user_input, ref args, ref cwd, ref layer_reason } => {
+                        if let Some(ref bus) = domain_event_bus {
+                            bus.publish(bus::DomainEvent::ApprovalRequested {
+                                request_id: request_id.clone(),
+                                tool: tool.clone(),
+                                args_hash: args_hash.clone(),
+                                layer: layer.clone(),
+                                repo_id: None,
+                            });
+                        }
+                        let payload = serde_json::json!({
+                            "request_id": request_id,
+                            "tool": tool,
+                            "args_hash": args_hash,
+                            "layer": layer,
+                            "rule_matched": rule_matched,
+                            "mirror_history": mirror_history,
+                            "sandbox_summary": sandbox_summary,
+                            "requires_user_input": requires_user_input,
+                            "args": args,
+                            "cwd": cwd,
+                            "layer_reason": layer_reason,
+                        });
+                        emitter.emit_event("agent:approval_requested", payload);
+                        if let Some(ref engine) = hook_engine {
+                            let input = NotificationInput {
+                                session_id: sk.clone(),
+                                kind: "approval_card_opened".to_string(),
+                                message: format!("Approval requested for {} (layer: {})", tool, layer),
+                                tool: Some(tool.clone()),
+                                base: Default::default(),
+                            };
+                            let _ = engine.fire(HookFireInput::Notification(input)).await;
+                        }
+                    }
+                    AgentEvent::ApprovalResolved { ref request_id, ref decision, ref decision_reason, ref latency_ms, ref persisted_rule, ref decided_by } => {
+                        if let Some(ref bus) = domain_event_bus {
+                            bus.publish(bus::DomainEvent::ApprovalResolved {
+                                request_id: request_id.clone(),
+                                decision: decision.clone(),
+                                decided_by: decided_by.clone(),
+                            });
+                        }
+                        let payload = serde_json::json!({
+                            "request_id": request_id,
+                            "decision": decision,
+                            "decision_reason": decision_reason,
+                            "latency_ms": latency_ms,
+                            "persisted_rule": persisted_rule,
+                            "decided_by": decided_by,
+                        });
+                        emitter.emit_event("agent:approval_resolved", payload);
+                    }
+                    AgentEvent::SandboxPolicyApplied { ref tool, ref policy_summary, ref policy_hash, fallback_unsandboxed, ref fs_constraints, ref network_constraints } => {
+                        let payload = serde_json::json!({
+                            "tool": tool,
+                            "policy_summary": policy_summary,
+                            "policy_hash": policy_hash,
+                            "fallback_unsandboxed": fallback_unsandboxed,
+                            "fs_constraints": fs_constraints,
+                            "network_constraints": network_constraints,
+                        });
+                        emitter.emit_event("agent:sandbox_policy_applied", payload);
+                    }
+                    AgentEvent::FileEditWithSymbols { ref path, ref op, bytes, ref diff_full, .. } => {
+                        let payload = serde_json::json!({
+                            "path": path,
+                            "op": op,
+                            "bytes": bytes,
+                            "diff": diff_full,
+                        });
+                        emitter.emit_event("agent:file_edit_with_symbols", payload);
+                    }
+                    AgentEvent::RecallInjected { ref memory_ids, coverage_score, ref escalation_chain, dead_end_warning, budget_used_tokens, budget_limit_tokens } => {
+                        let payload = serde_json::json!({
+                            "session_key": sk.clone(),
+                            "memory_ids": memory_ids,
+                            "coverage_score": coverage_score,
+                            "escalation_chain": escalation_chain,
+                            "dead_end_warning": dead_end_warning,
+                            "budget_used_tokens": budget_used_tokens,
+                            "budget_limit_tokens": budget_limit_tokens,
+                        });
+                        emitter.emit_event("agent:recall_injected", payload);
+                    }
+                    AgentEvent::DeadEndWarningSurfaced { ref approach_summary, ref prior_attempt_id, confidence } => {
+                        let payload = serde_json::json!({
+                            "session_key": sk.clone(),
+                            "approach_summary": approach_summary,
+                            "prior_attempt_id": prior_attempt_id,
+                            "confidence": confidence,
+                        });
+                        emitter.emit_event("agent:dead_end_warning_surfaced", payload);
+                    }
+                    AgentEvent::PlanModeChanged { ref session_key, active, ref requested_by } => {
+                        let payload = serde_json::json!({
+                            "session_key": session_key, "active": active, "requested_by": requested_by,
+                        });
+                        emitter.emit_event("agent:plan_mode_changed", payload);
+                    }
                     // Coding-in-chat additive variants ignored here;
                     // chat-channel handlers will subscribe explicitly in later plans.
                     _ => {}
@@ -1031,7 +1208,25 @@ impl AppCore {
         content: String,
         session_key: String,
         context: Option<SessionContextInput>,
+        mode: Option<String>,
     ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
+        // Fire SessionStart hook once per session on first coding-mode message.
+        if mode.as_deref() == Some("coding") && !self.session_start_fired.contains_key(&session_key)
+        {
+            if let Some(engine) = self.agent.runtime().hook_engine() {
+                let input = SessionStartInput {
+                    session_id: session_key.clone(),
+                    cwd: std::env::current_dir()
+                        .ok()
+                        .and_then(|p| p.to_str().map(String::from))
+                        .unwrap_or_default(),
+                    base: Default::default(),
+                };
+                let _ = engine.fire(HookFireInput::SessionStart(input)).await;
+            }
+            self.session_start_fired.insert(session_key.clone(), ());
+        }
+
         let result = chat_send(
             &self.repos,
             &self.agent,
@@ -1040,6 +1235,7 @@ impl AppCore {
             session_key.clone(),
             context,
             false,
+            mode,
         )
         .await?;
 
@@ -1065,6 +1261,7 @@ impl AppCore {
             session_key.clone(),
             None,
             true,
+            None,
         )
         .await?;
 
@@ -1076,6 +1273,19 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn chat_cancel(&self, session_key: String) -> Result<(), ApiError> {
+        if let Some(engine) = self.agent.runtime().hook_engine() {
+            if !self.session_end_fired.contains_key(&session_key) {
+                self.session_end_fired.insert(session_key.clone(), ());
+                self.session_start_fired.remove(&session_key);
+                let input = SessionEndInput {
+                    session_id: session_key.clone(),
+                    reason: "user_cancel".to_string(),
+                    duration_ms: 0,
+                    base: Default::default(),
+                };
+                let _ = engine.fire(HookFireInput::SessionEnd(input)).await;
+            }
+        }
         chat_cancel(
             &self.active_streams,
             &self.pending_interactions,
@@ -1114,6 +1324,7 @@ impl AppCore {
         let pending_interactions = Arc::clone(&self.pending_interactions);
         let journey_tracker = self.journey_tracker.clone();
         let domain_event_bus = self.domain_event_bus.clone();
+        let hook_engine = self.agent.runtime().hook_engine();
 
         tokio::spawn(relay_chat_stream(
             repos,
@@ -1127,6 +1338,9 @@ impl AppCore {
             journey_tracker,
             domain_event_bus,
             stream_info.user_message,
+            hook_engine,
+            Arc::clone(&self.session_start_fired),
+            Arc::clone(&self.session_end_fired),
         ));
     }
 }

@@ -195,6 +195,18 @@ pub enum DomainEvent {
         session_key: Option<String>,
         duration_ms: Option<i64>,
     },
+    ApprovalRequested {
+        request_id: String,
+        tool: String,
+        args_hash: String,
+        layer: String,
+        repo_id: Option<String>,
+    },
+    ApprovalResolved {
+        request_id: String,
+        decision: String,
+        decided_by: String,
+    },
 
     // -- Cross-domain --
     UserStatedFact {
@@ -669,6 +681,8 @@ impl DomainEvent {
             Self::NoteDeleted { .. } => "NoteDeleted",
             Self::ChatTurnCompleted { .. } => "ChatTurnCompleted",
             Self::ToolCallExecuted { .. } => "ToolCallExecuted",
+            Self::ApprovalRequested { .. } => "ApprovalRequested",
+            Self::ApprovalResolved { .. } => "ApprovalResolved",
             Self::UserStatedFact { .. } => "UserStatedFact",
             Self::UserCorrectedAI { .. } => "UserCorrectedAI",
             Self::AutotunerDecision { .. } => "AutotunerDecision",
@@ -927,7 +941,10 @@ impl DomainEvent {
             Self::CoachingFeedback { .. }
             | Self::CoachingStrategyApplied { .. }
             | Self::CoachingPatternDetected { .. } => D::Coaching,
-            Self::ChatTurnCompleted { .. } | Self::ToolCallExecuted { .. } => D::General,
+            Self::ChatTurnCompleted { .. }
+            | Self::ToolCallExecuted { .. }
+            | Self::ApprovalRequested { .. }
+            | Self::ApprovalResolved { .. } => D::General,
 
             Self::NoteCreated { .. }
             | Self::NoteUpdated { .. }

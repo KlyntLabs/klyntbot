@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+use tauri::Manager;
+
 use desktop_shared::commands::{
     ChatMessageResponse, ChatSessionResponse, ChatThreadResponse, SessionContextInput,
 };
@@ -37,8 +39,9 @@ pub async fn chat_send(
     content: String,
     session_key: String,
     context: Option<SessionContextInput>,
+    mode: Option<String>,
 ) -> ChatMessageResponse {
-    let (user_msg, stream_info) = state.chat_send(content, session_key, context).await?;
+    let (user_msg, stream_info) = state.chat_send(content, session_key, context, mode).await?;
 
     // Spawn background task to relay streaming events via Tauri emitter
     let emitter: Arc<dyn ::app_core::events::AppEventEmitter> = Arc::new(TauriEmitter(app));
@@ -94,6 +97,69 @@ pub async fn chat_delete_stale_sessions(before_days: u32) -> u64 {
 #[klynt_command]
 pub async fn chat_cancel(session_key: String) -> () {
     state.chat_cancel(session_key).await
+}
+
+#[klynt_command]
+pub async fn chat_respond_approval(
+    app: tauri::AppHandle,
+    session_key: String,
+    request_id: String,
+    decision: app_core::coding::approval_handler::AppApprovalDecision,
+) -> () {
+    let core = app.state::<std::sync::Arc<app_core::AppCore>>();
+    app_core::coding::approval_handler::respond_approval(
+        &core.pending_approvals,
+        &request_id,
+        decision,
+    )
+    .await
+    .map_err(
+        |e: app_core::coding::approval_handler::ApprovalHandlerError| {
+            desktop_shared::errors::ApiError::new("NOT_FOUND", e.to_string())
+        },
+    )?;
+    let _ = session_key; // session_key unused today; Plan 4 persists per-thread rules.
+    Ok(())
+}
+
+#[klynt_command]
+pub async fn chat_set_mode(
+    app: tauri::AppHandle,
+    session_key: String,
+    mode: app_core::coding::mode_handler::ChatMode,
+) -> storage::SessionRow {
+    let core = app.state::<std::sync::Arc<app_core::AppCore>>();
+    let row = app_core::coding::mode_handler::set_mode(&core.repos, &session_key, mode)
+        .await
+        .map_err(|e| {
+            let code = match &e {
+                app_core::coding::mode_handler::ModeError::NotFound(_) => "NOT_FOUND",
+                app_core::coding::mode_handler::ModeError::Storage(_) => "STORAGE_ERROR",
+            };
+            desktop_shared::errors::ApiError::new(code, e.to_string())
+        })?;
+    Ok(row)
+}
+
+#[klynt_command]
+pub async fn chat_save_starlark_rule(
+    app: tauri::AppHandle,
+    request_id: String,
+    rule_source: String,
+    suggested_filename: Option<String>,
+) -> String {
+    let core = app.state::<std::sync::Arc<app_core::AppCore>>();
+    core.chat_save_starlark_rule(request_id, rule_source, suggested_filename)
+        .await
+        .map_err(|e| desktop_shared::errors::ApiError::new("CONFIG_ERROR", e.to_string()))
+}
+
+#[klynt_command]
+pub async fn coding_hooks_list(app: tauri::AppHandle) -> desktop_shared::HooksTomlSnapshot {
+    let core = app.state::<std::sync::Arc<app_core::AppCore>>();
+    core.coding_hooks_list()
+        .await
+        .map_err(|e| desktop_shared::errors::ApiError::new("IO_ERROR", e.to_string()))
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
@@ -154,6 +220,57 @@ pub(crate) async fn dispatch_dev(
                     .await,
             )
         }
+        "chat_respond_approval" => {
+            let request_id = try_field!(dev::get_str(body, "requestId"));
+            let decision: app_core::coding::approval_handler::AppApprovalDecision =
+                try_field!(dev::require(body, "decision"));
+            let result = app_core::coding::approval_handler::respond_approval(
+                &core.pending_approvals,
+                &request_id,
+                decision,
+            )
+            .await
+            .map(|_| serde_json::Value::Null)
+            .map_err(
+                |e: app_core::coding::approval_handler::ApprovalHandlerError| {
+                    desktop_shared::errors::ApiError::new("NOT_FOUND", e.to_string())
+                },
+            );
+            dev::val(result)
+        }
+        "chat_set_mode" => {
+            let session_key = try_field!(dev::get_str(body, "sessionKey"));
+            let mode: app_core::coding::mode_handler::ChatMode =
+                try_field!(dev::require(body, "mode"));
+            let result = app_core::coding::mode_handler::set_mode(&core.repos, &session_key, mode)
+                .await
+                .map_err(|e| {
+                    let code = match &e {
+                        app_core::coding::mode_handler::ModeError::NotFound(_) => "NOT_FOUND",
+                        app_core::coding::mode_handler::ModeError::Storage(_) => "STORAGE_ERROR",
+                    };
+                    desktop_shared::errors::ApiError::new(code, e.to_string())
+                });
+            dev::val(result)
+        }
+        "chat_save_starlark_rule" => {
+            let request_id = try_field!(dev::get_str(body, "requestId"));
+            let rule_source = try_field!(dev::get_str(body, "ruleSource"));
+            let suggested_filename = body
+                .get("suggestedFilename")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            dev::val(
+                core.chat_save_starlark_rule(request_id, rule_source, suggested_filename)
+                    .await
+                    .map_err(desktop_shared::errors::ApiError::from),
+            )
+        }
+        "coding_hooks_list" => dev::val(
+            core.coding_hooks_list()
+                .await
+                .map_err(desktop_shared::errors::ApiError::from),
+        ),
         _ => return None,
     })
 }

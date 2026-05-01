@@ -117,7 +117,19 @@ export type ConversationItem =
       }[];
     }
   | { id: string; kind: "reasoning"; summary: string; content: string }
-  | { id: string; kind: "diff"; title: string; diff: string; status?: string }
+  | {
+      id: string;
+      kind: "diff";
+      title: string;
+      diff: string;
+      status?: string;
+      /** Coding-mode additions (Plan 3): the resolved file path. */
+      path?: string;
+      /** Coding-mode additions: the operation that produced the diff. */
+      op?: "edit" | "write" | "apply_patch" | "notebook_edit";
+      /** Coding-mode additions: post-write file size in bytes. */
+      bytes?: number;
+    }
   | { id: string; kind: "review"; state: "started" | "completed"; text: string }
   | {
       id: string;
@@ -139,6 +151,46 @@ export type ConversationItem =
       collabReceiver?: CollabAgentRef;
       collabReceivers?: CollabAgentRef[];
       collabStatuses?: CollabAgentStatus[];
+    }
+  | {
+      id: string;
+      kind: "approval";
+      requestId: string;
+      tool: string;
+      args: Record<string, unknown>;
+      cwd: string;
+      sandboxSummary: string;
+      layer:
+        | "privacy"
+        | "layer1_declarative"
+        | "layer2_starlark"
+        | "layer3_mirror"
+        | "default_mode";
+      layerReason: string;
+      mirrorHistory?: { approvalCount: number; denialCount: number };
+      status:
+        | "pending"
+        | "approved-once"
+        | "approved-always"
+        | "denied"
+        | "timed-out"
+        | "cancelled";
+      decidedAt?: string;
+      decidedBy?: "user" | "auto_allow" | "auto_deny" | "timeout" | "cancelled";
+    }
+  | {
+      id: string;
+      kind: "recall";
+      memory_ids: string[];
+      coverage_score: number;
+      snippets: Array<{ kind: string; summary: string; source: string }>;
+    }
+  | {
+      id: string;
+      kind: "dead_end_warning";
+      approach_summary: string;
+      prior_attempt_id: string;
+      confidence: number;
     };
 
 export type ThreadSummary = {

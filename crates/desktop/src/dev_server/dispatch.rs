@@ -189,6 +189,24 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::focus::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::coding_skills::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::coding_status::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::coding_doctor::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::coding_help::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::coding_resume::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::coding_sessions::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
 
     // ── chat_send (needs SSE channels, handled inline) ──────────────
     if cmd == "chat_send" {

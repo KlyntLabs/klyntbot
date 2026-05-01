@@ -19,40 +19,35 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, info, warn};
+use tracing::warn;
 use uuid::Uuid;
 
-use bus::{
-    ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, DomainEventBus,
-    UpdatePriority,
-};
-use cognitive::TextEmbedder;
+use bus::{ContextUpdateReason, DomainEvent};
+
 use context_engine::book_index::types::{SourceType, TreeNode, TreeNodeType};
-use context_engine::book_index::BookTreeRepo;
+
+use super::tree_builder_base::{run_event_loop, slugify, TreeBuilderCore};
 
 pub struct FinanceTreeBuilder {
-    tree_repo: Arc<dyn BookTreeRepo>,
-    vector_store: Arc<storage::VectorStore>,
-    embedder: Arc<dyn TextEmbedder>,
-    context_update_queue: Option<Arc<ContextUpdateQueue>>,
-    #[allow(dead_code)]
-    domain_event_bus: Option<Arc<DomainEventBus>>,
+    core: TreeBuilderCore,
 }
 
 impl FinanceTreeBuilder {
     pub fn new(
-        tree_repo: Arc<dyn BookTreeRepo>,
+        tree_repo: Arc<dyn context_engine::book_index::BookTreeRepo>,
         vector_store: Arc<storage::VectorStore>,
-        embedder: Arc<dyn TextEmbedder>,
-        context_update_queue: Option<Arc<ContextUpdateQueue>>,
-        domain_event_bus: Option<Arc<DomainEventBus>>,
+        embedder: Arc<dyn cognitive::TextEmbedder>,
+        context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
+        domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     ) -> Self {
         Self {
-            tree_repo,
-            vector_store,
-            embedder,
-            context_update_queue,
-            domain_event_bus,
+            core: TreeBuilderCore::new(
+                tree_repo,
+                vector_store,
+                embedder,
+                context_update_queue,
+                domain_event_bus,
+            ),
         }
     }
 
@@ -60,49 +55,45 @@ impl FinanceTreeBuilder {
     /// `BudgetAlert` events and appends tree nodes for each.
     pub async fn run(
         self: Arc<Self>,
-        mut rx: broadcast::Receiver<DomainEvent>,
+        rx: broadcast::Receiver<DomainEvent>,
         shutdown: CancellationToken,
     ) {
-        info!("FinanceTreeBuilder: subscriber started");
-
-        loop {
-            tokio::select! {
-                _ = shutdown.cancelled() => {
-                    info!("FinanceTreeBuilder: shutdown received");
-                    break;
-                }
-                result = rx.recv() => {
-                    match result {
-                        Ok(DomainEvent::TransactionRecorded { category, amount, is_over_budget }) => {
-                            if let Err(e) = self.handle_transaction(&category, amount, is_over_budget).await {
-                                warn!(
-                                    category = %category,
-                                    "FinanceTreeBuilder: failed to process transaction: {e}"
-                                );
-                            }
-                        }
-                        Ok(DomainEvent::BudgetAlert { category, spent, limit }) => {
-                            if let Err(e) = self.handle_budget_alert(&category, spent, limit).await {
-                                warn!(
-                                    category = %category,
-                                    "FinanceTreeBuilder: failed to process budget alert: {e}"
-                                );
-                            }
-                        }
-                        Ok(_) => {
-                            // Not a finance event — ignore.
-                        }
-                        Err(broadcast::error::RecvError::Lagged(n)) => {
-                            warn!("FinanceTreeBuilder: lagged, skipped {n} events");
-                        }
-                        Err(broadcast::error::RecvError::Closed) => {
-                            info!("FinanceTreeBuilder: event channel closed");
-                            break;
+        run_event_loop("FinanceTreeBuilder", rx, shutdown, |event| {
+            let this = Arc::clone(&self);
+            async move {
+                match event {
+                    DomainEvent::TransactionRecorded {
+                        category,
+                        amount,
+                        is_over_budget,
+                    } => {
+                        if let Err(e) = this
+                            .handle_transaction(&category, amount, is_over_budget)
+                            .await
+                        {
+                            warn!(
+                                category = %category,
+                                "FinanceTreeBuilder: failed to process transaction: {e}"
+                            );
                         }
                     }
+                    DomainEvent::BudgetAlert {
+                        category,
+                        spent,
+                        limit,
+                    } => {
+                        if let Err(e) = this.handle_budget_alert(&category, spent, limit).await {
+                            warn!(
+                                category = %category,
+                                "FinanceTreeBuilder: failed to process budget alert: {e}"
+                            );
+                        }
+                    }
+                    _ => {}
                 }
             }
-        }
+        })
+        .await
     }
 
     /// Handle a recorded transaction: upsert the daily root and category nodes,
@@ -118,7 +109,7 @@ impl FinanceTreeBuilder {
         let cat_id = format!("finance-cat-{date}-{}", slugify(category));
         let txn_id = format!("finance-txn-{}", Uuid::new_v4());
 
-        debug!(
+        tracing::debug!(
             category = %category,
             amount,
             txn_id = %txn_id,
@@ -135,7 +126,18 @@ impl FinanceTreeBuilder {
             is_over_budget,
         );
 
-        self.persist_nodes(&nodes, &daily_id).await
+        self.core
+            .persist_nodes(
+                "FinanceTreeBuilder",
+                &nodes,
+                &daily_id,
+                ContextUpdateReason::BudgetThresholdCrossed,
+                Some(format!(
+                    "Finance tree updated: {} new node(s) for {daily_id}",
+                    nodes.len()
+                )),
+            )
+            .await
     }
 
     /// Handle a budget alert: upsert the daily root and category nodes, then
@@ -151,7 +153,7 @@ impl FinanceTreeBuilder {
         let cat_id = format!("finance-cat-{date}-{}", slugify(category));
         let alert_id = format!("finance-alert-{date}-{}", slugify(category));
 
-        debug!(
+        tracing::debug!(
             category = %category,
             spent,
             limit,
@@ -161,96 +163,18 @@ impl FinanceTreeBuilder {
 
         let nodes = build_alert_nodes(&date, &daily_id, &cat_id, &alert_id, category, spent, limit);
 
-        self.persist_nodes(&nodes, &daily_id).await
-    }
-
-    /// Persist nodes: insert each one (ignoring duplicate-ID errors for
-    /// idempotent root/category nodes), embed leaf nodes, push context update,
-    /// and emit TreeNodesRebuilt.
-    async fn persist_nodes(&self, nodes: &[TreeNode], source_id: &str) -> common::Result<()> {
-        let mut inserted = Vec::new();
-
-        for node in nodes {
-            match self.tree_repo.insert_node(node).await {
-                Ok(()) => inserted.push(node),
-                Err(_) => {
-                    // Duplicate key — node already exists. This is expected for
-                    // root/category nodes shared across multiple events on the
-                    // same day.
-                    debug!(
-                        node_id = %node.id,
-                        "FinanceTreeBuilder: node already exists, skipping insert"
-                    );
-                }
-            }
-        }
-
-        // Embed newly inserted nodes.
-        let mut embedded_count = 0_usize;
-        for node in &inserted {
-            let embed_text = compose_embedding_text(node);
-            if embed_text.is_empty() {
-                continue;
-            }
-            match self.embedder.embed(&embed_text).await {
-                Ok(embedding) => {
-                    let level_str = node.level.to_string();
-                    if let Err(e) = self
-                        .vector_store
-                        .upsert_tree_node_embedding(
-                            &node.id,
-                            &embedding,
-                            source_id,
-                            &level_str,
-                            node.source_type.as_str(),
-                        )
-                        .await
-                    {
-                        warn!(
-                            node_id = %node.id,
-                            "FinanceTreeBuilder: failed to upsert embedding: {e}"
-                        );
-                    } else {
-                        embedded_count += 1;
-                    }
-                }
-                Err(e) => {
-                    warn!(
-                        node_id = %node.id,
-                        "FinanceTreeBuilder: failed to generate embedding: {e}"
-                    );
-                }
-            }
-        }
-
-        // TreeNodesRebuilt variant deleted; EntityTreeLinker no-op.
-
-        // Push context update for live injection.
-        if let Some(queue) = &self.context_update_queue {
-            queue.push(ContextUpdate {
-                reason: ContextUpdateReason::BudgetThresholdCrossed,
-                content: Some(format!(
-                    "Finance tree updated: {} new node(s) for {source_id}",
-                    inserted.len()
+        self.core
+            .persist_nodes(
+                "FinanceTreeBuilder",
+                &nodes,
+                &daily_id,
+                ContextUpdateReason::BudgetThresholdCrossed,
+                Some(format!(
+                    "Finance tree updated: {} new node(s) for {daily_id}",
+                    nodes.len()
                 )),
-                metadata: Some(serde_json::json!({
-                    "source_id": source_id,
-                    "inserted_count": inserted.len(),
-                    "embedded_count": embedded_count,
-                })),
-                priority: UpdatePriority::Low,
-                timestamp: jiff::Timestamp::now(),
-            });
-        }
-
-        info!(
-            source_id = %source_id,
-            inserted_count = inserted.len(),
-            embedded_count,
-            "FinanceTreeBuilder: nodes persisted"
-        );
-
-        Ok(())
+            )
+            .await
     }
 }
 
@@ -388,38 +312,12 @@ pub fn build_alert_nodes(
 }
 
 // ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-/// Slugify a category name for use in deterministic node IDs.
-/// Lowercases and replaces whitespace/special chars with hyphens.
-fn slugify(s: &str) -> String {
-    s.to_ascii_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .split('-')
-        .filter(|p| !p.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
-}
-
-/// Compose embedding text for a finance tree node.
-/// Level 0: title only; Level 1: category name; Level 2+: content.
-fn compose_embedding_text(node: &TreeNode) -> String {
-    match node.level {
-        0 => node.title.as_deref().unwrap_or("").to_string(),
-        1 => node.title.as_deref().unwrap_or(&node.content).to_string(),
-        _ => node.content.clone(),
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
+    use super::tree_builder_base::{compose_embedding_text, slugify};
     use super::*;
 
     // --- slugify ---

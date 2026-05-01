@@ -75,6 +75,12 @@ pub struct AgentRuntime {
     query_predictor: Option<Arc<crate::adapters::cognitive_handlers::LlmQueryPredictorHandler>>,
     /// KCA Track 7: number of predictions to generate per turn.
     predictions_per_turn: u32,
+    /// Tool-kit builder for constructing tool registries (main agent + sub-agents).
+    tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
+    /// Hook engine for firing lifecycle and tool-use hooks.
+    hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
+    /// Domain event bus for emitting cross-cutting events (e.g. Mirror alerts).
+    domain_event_bus: Option<Arc<bus::DomainEventBus>>,
 }
 
 impl AgentRuntime {
@@ -112,7 +118,26 @@ impl AgentRuntime {
             predictive_cache: None,
             query_predictor: None,
             predictions_per_turn: 3,
+            tool_kit: std::sync::Mutex::new(None),
+            hook_engine: std::sync::Mutex::new(None),
+            domain_event_bus: None,
         }
+    }
+
+    pub fn tool_kit(&self) -> Option<Arc<klynt_core::ToolKitBuilder>> {
+        self.tool_kit.lock().unwrap().clone()
+    }
+
+    pub fn set_tool_kit(&self, kit: Arc<klynt_core::ToolKitBuilder>) {
+        *self.tool_kit.lock().unwrap() = Some(kit);
+    }
+
+    pub fn hook_engine(&self) -> Option<Arc<klynt_hooks::HookEngine>> {
+        self.hook_engine.lock().unwrap().clone()
+    }
+
+    pub fn set_hook_engine(&self, engine: Arc<klynt_hooks::HookEngine>) {
+        *self.hook_engine.lock().unwrap() = Some(engine);
     }
 
     // ── Builder methods ─────────────────────────────────────────
@@ -166,6 +191,11 @@ impl AgentRuntime {
 
     pub fn with_context_update_queue(mut self, queue: Arc<bus::ContextUpdateQueue>) -> Self {
         self.context_update_queue = Some(queue);
+        self
+    }
+
+    pub fn with_domain_event_bus(mut self, bus: Arc<bus::DomainEventBus>) -> Self {
+        self.domain_event_bus = Some(bus);
         self
     }
 
@@ -253,6 +283,107 @@ impl AgentRuntime {
         cancel_token: Option<tokio_util::sync::CancellationToken>,
         depth: DepthMode,
     ) -> Result<RuntimeResult> {
+        let mut ctx = ctx.clone();
+        // Bridge ToolEvent channel → AgentEvent channel so klynt-core tools
+        // can emit events without depending on the agent crate.
+        let tool_event_tx = event_tx.as_ref().map(|agent_tx| {
+            let (tool_tx, mut tool_rx) =
+                tokio::sync::mpsc::channel::<tools_core::events::ToolEvent>(64);
+            let agent_tx = agent_tx.clone();
+            tokio::spawn(async move {
+                while let Some(tool_evt) = tool_rx.recv().await {
+                    let agent_evt = match tool_evt {
+                        tools_core::events::ToolEvent::FileEditWithSymbols {
+                            path,
+                            op,
+                            bytes,
+                            diff_full,
+                            anchored_symbols,
+                            lsp_diagnostics_delta,
+                        } => AgentEvent::FileEditWithSymbols {
+                            path,
+                            op,
+                            bytes,
+                            diff_full,
+                            anchored_symbols,
+                            lsp_diagnostics_delta,
+                        },
+                        tools_core::events::ToolEvent::SandboxPolicyApplied {
+                            tool,
+                            policy_summary,
+                            policy_hash,
+                            fallback_unsandboxed,
+                            fs_constraints,
+                            network_constraints,
+                        } => AgentEvent::SandboxPolicyApplied {
+                            tool,
+                            policy_summary,
+                            policy_hash,
+                            fallback_unsandboxed,
+                            fs_constraints,
+                            network_constraints,
+                        },
+                        tools_core::events::ToolEvent::PlanModeChanged {
+                            in_plan_mode,
+                            plan_id,
+                        } => AgentEvent::PlanModeChanged {
+                            session_key: plan_id.unwrap_or_default(),
+                            active: in_plan_mode,
+                            requested_by: "tool".into(),
+                        },
+                        tools_core::events::ToolEvent::ApprovalRequested {
+                            request_id,
+                            tool,
+                            args_hash,
+                            layer,
+                            rule_matched,
+                            mirror_history,
+                            sandbox_summary,
+                            requires_user_input,
+                            args,
+                            cwd,
+                            layer_reason,
+                        } => AgentEvent::ApprovalRequested {
+                            request_id,
+                            tool,
+                            args_hash,
+                            layer,
+                            rule_matched,
+                            mirror_history,
+                            sandbox_summary,
+                            requires_user_input,
+                            args,
+                            cwd,
+                            layer_reason,
+                        },
+                        tools_core::events::ToolEvent::ApprovalResolved {
+                            request_id,
+                            decision,
+                            decision_reason,
+                            latency_ms,
+                            persisted_rule,
+                            decided_by,
+                        } => AgentEvent::ApprovalResolved {
+                            request_id,
+                            decision,
+                            decision_reason,
+                            latency_ms,
+                            persisted_rule,
+                            decided_by,
+                        },
+                        _ => continue,
+                    };
+                    let _ = agent_tx.send(agent_evt).await;
+                }
+            });
+            tool_tx
+        });
+        ctx.event_tx = tool_event_tx;
+        if let Some(t) = &cancel_token {
+            ctx.cancel_token = Some(t.clone());
+        }
+        ctx.hook_engine = self.hook_engine();
+        let ctx = &ctx;
         let pipeline_start = Instant::now();
         let hot = self.hot_config.read().await;
         let safety_timeout_secs = hot.safety_timeout_secs;
@@ -359,6 +490,9 @@ impl AgentRuntime {
         }
         if let Some(ref queue) = self.context_update_queue {
             params = params.with_context_update_queue(Arc::clone(queue));
+        }
+        if let Some(ref engine) = self.hook_engine() {
+            params = params.with_hook_engine(Arc::clone(engine));
         }
 
         // ── Phase 2: Execute ─────────────────────────────────────
@@ -706,6 +840,34 @@ impl AgentRuntime {
             warn!("AgentRuntime: failed to record usage: {}", e);
         }
 
+        if let Some(ref session_key) = ctx.session_key {
+            self.cost_tracker.record_for_session(session_key.as_str(), usage, &self.execution_model);
+
+            // Per-session cost ceiling check → Mirror alert
+            let hot = self.hot_config.read().await;
+            let ceiling_usd = hot.per_thread_cost_ceiling_usd.unwrap_or(0.0);
+            let alert_at = hot.cost_alert_at_percent;
+            drop(hot);
+
+            if ceiling_usd > 0.0 {
+                if let Some(alert) = self.cost_tracker.check_session_ceiling(session_key.as_str(), ceiling_usd, alert_at) {
+                    if let Some(ref bus) = self.domain_event_bus {
+                        let payload = serde_json::json!({
+                            "session_key": &alert.session_key,
+                            "spend_usd": alert.spend_usd,
+                            "ceiling_usd": alert.ceiling_usd,
+                            "percent": alert.percent,
+                        });
+                        bus.publish(bus::DomainEvent::CodingMirrorAlert {
+                            kind: "costThresholdCrossed".to_string(),
+                            severity: "medium".to_string(),
+                            payload: payload.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+
         if let Some(ref tx) = event_tx {
             let _ = tx
                 .send(AgentEvent::UsageReport {
@@ -762,38 +924,11 @@ mod tests {
         }
     }
 
-    struct MockProvider {
-        response: String,
-    }
-
-    #[async_trait::async_trait]
-    impl providers::LlmProvider for MockProvider {
-        async fn chat(
-            &self,
-            _messages: &[providers::Message],
-            _tools: Option<&[serde_json::Value]>,
-            _params: &ChatParams,
-        ) -> std::result::Result<LlmResponse, common::KlyntbotError> {
-            Ok(text_response(&self.response))
-        }
-
-        fn name(&self) -> &str {
-            "mock"
-        }
-
-        fn default_model(&self) -> &str {
-            "mock-model"
-        }
-
-        fn context_window(&self) -> usize {
-            128_000
-        }
-    }
+    use crate::test_utils::MockProvider;
 
     async fn make_runtime(response: &str) -> (AgentRuntime, Arc<RwLock<ToolRegistry>>) {
-        let provider: DynProvider = Arc::new(MockProvider {
-            response: response.to_string(),
-        });
+        let provider: DynProvider =
+            Arc::new(MockProvider::with_text(response).context_window(128_000));
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
         let core = Arc::new(crate::execution::ExecutionCore::new(
             provider,

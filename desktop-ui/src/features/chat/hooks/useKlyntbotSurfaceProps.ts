@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Composer } from "@/features/composer/components/Composer";
 import type { Messages } from "@/features/messages/components/Messages";
 import type {
@@ -8,6 +8,7 @@ import type {
   ConversationItem,
 } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
+import { chatStreamStore } from "../store/chatStreamStore";
 import { useChatSession } from "./useChatSession";
 import type {
   ChatMessage,
@@ -67,6 +68,7 @@ export type KlyntbotSurfaceOverrides = {
 function buildItems(
   messages: ChatMessage[],
   segments: MessageSegment[],
+  approvals: ConversationItem[],
 ): ConversationItem[] {
   const items: ConversationItem[] = messages.map((msg) => ({
     id: msg.id,
@@ -82,6 +84,9 @@ function buildItems(
     if (seg.type === "text") {
       if (textBufferIndex === -1) textBufferIndex = idx;
       textBuffer += seg.content;
+      return;
+    }
+    if (seg.type !== "tool") {
       return;
     }
     if (textBuffer.length > 0) {
@@ -113,6 +118,10 @@ function buildItems(
       role: "assistant",
       text: textBuffer,
     });
+  }
+
+  if (approvals.length > 0) {
+    items.push(...approvals);
   }
 
   return items;
@@ -204,13 +213,18 @@ export function useKlyntbotSurfaceProps(
   }, [chat.error, dismissedError]);
   const visibleError = dismissedError === chat.error ? null : chat.error;
 
+  const approvals = useSyncExternalStore(
+    chatStreamStore.subscribe,
+    useCallback(() => chatStreamStore.getApprovals(sessionKey ?? ""), [sessionKey]),
+  );
+
   if (!sessionKey) {
     return null;
   }
 
   return {
     messagesProps: {
-      items: buildItems(chat.messages, chat.segments),
+      items: buildItems(chat.messages, chat.segments, approvals),
       threadId: sessionKey,
       isThinking: chat.isStreaming,
       processingStartedAt: processingStartedAtRef.current,
