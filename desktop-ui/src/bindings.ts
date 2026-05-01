@@ -359,6 +359,22 @@ async chatSetMode(sessionKey: string, mode: ChatMode) : Promise<Result<SessionRo
     else return { status: "error", error: e  as any };
 }
 },
+async chatSaveStarlarkRule(requestId: string, ruleSource: string, suggestedFilename: string | null) : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_save_starlark_rule", { requestId, ruleSource, suggestedFilename }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingHooksList() : Promise<Result<HooksTomlSnapshot, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_hooks_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async codingMemoryStatus() : Promise<Result<CodingMemoryStatusResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_memory_status") };
@@ -4397,6 +4413,7 @@ export type GradeResultResponse = { score: number | null; suggestedRating: strin
 export type GrammarPattern = { pattern: string; explanation: string; patternType: string | null }
 export type GraphStats = { totalFacts: number; totalTopics: number; totalEdges: number; totalCommunities: number; avgConvergence: number }
 export type HeaderStats = { turnCount: number; stepCount: number; toolCallCount: number; errorCount: number; compactionCount: number; agentCount: number; totalDurationMs: number; totalInputTokens: number; totalOutputTokens: number; cacheReadTokens: number; cacheHitPct: number; model: string | null }
+export type HooksTomlSnapshot = { path: string; exists: boolean; content: string }
 export type HourlyBreakdownResponse = { hour: number; productiveSecs: number; neutralSecs: number; distractingSecs: number; idleSecs: number; totalSecs: number; productiveRatio: number }
 export type HybridSearchResponse = { exact: NoteResponse[]; related: NoteResponse[] }
 export type InboxCreateParams = { content: string }
