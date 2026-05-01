@@ -51,6 +51,15 @@ async fn main() -> common::Result<()> {
         "p50 / p95 query latency: {} / {} ms",
         report.p50_query_latency_ms, report.p95_query_latency_ms
     );
+    println!(
+        "estimated cost (Kimi K2, ~chars/4 tokens): ${:.4} total, ${:.5}/QA",
+        report.estimated_cost_usd(),
+        report.estimated_cost_per_qa_usd()
+    );
+    println!(
+        "  ({} input chars, {} output chars across replay+QA)",
+        report.total_input_chars, report.total_output_chars
+    );
 
     println!("\nBy category (1=single-hop, 2=multi-hop/temporal, 3=open-domain, 4=adversarial, 5=abstention):");
     let mut cats: Vec<_> = report.by_category.iter().collect();

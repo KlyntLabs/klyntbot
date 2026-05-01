@@ -237,6 +237,29 @@ Example — observation: \"Bella loves sushi.\" → subject=\"Bella\", predicate
 Do NOT skip third-person sentences. Do NOT rewrite them as user-facts. \
 The bench fails when third-person SPO triples are dropped.";
 
+/// Phase 1 addendum — speaker-prefix transcripts.
+///
+/// Appended to `EXTRACTION_SYSTEM_PROMPT` only when `KCA_PHASE_1=1`. LoCoMo-
+/// style multi-party conversations format each turn as `Alice: text`,
+/// `Bob: text`. The base prompt's identity-binding only handles "Hi, I'm
+/// Alice" — not speaker labels — so without this addendum every speaker's
+/// facts collapse to `subject="user"` and FTS `MATCH "Alice"` finds nothing.
+///
+/// Frozen content: changes here re-train the extractor on the eval set.
+const SPEAKER_LABEL_ADDENDUM: &str = "\n\n\
+SPEAKER-PREFIX TRANSCRIPTS (CRITICAL when present): \
+When the observation contains lines formatted as `Alice: text`, `Bob: text`, etc. — \
+treat the prefix `Alice:` as a speaker label, NOT as part of the content. \
+Extract every fact from that line with `subject=\"Alice\"` (the speaker), \
+not `subject=\"user\"`. First-person statements inside Alice's text \
+(\"I love hiking\") become facts with `subject=\"Alice\"`, predicate from the \
+verb, object from the predicate's complement. \
+Do this for EVERY labeled line. Multi-party transcripts have NO single \"user\" — \
+every speaker is a distinct subject. \
+If you also see a session header like `[Session 3 — 2023-05-07]`, treat it as \
+metadata only — facts come from the speaker-labeled lines that follow. \
+Never collapse multiple speakers into one `user` subject.";
+
 /// LLM-backed fact extraction with heuristic fallback.
 pub struct LlmExtractionHandler {
     provider: DynProvider,
@@ -383,8 +406,21 @@ impl ExtractionHandler for LlmExtractionHandler {
              {\"results\": [{\"observation_index\": 1, \"facts\": [{\"domain\": \"...\", \"subject\": \"...\", \"predicate\": \"...\", \"object\": \"...\", \"confidence\": 0.0, \"source\": \"...\"}]}]}",
         );
 
+        // Phase 1 gate: when `KCA_PHASE_1=1`, append the speaker-label
+        // addendum so multi-party transcripts (`Alice: text\nBob: text`) get
+        // per-speaker subjects instead of collapsing to `subject="user"`.
+        // Default (off) preserves the canonical baseline.
+        let system_prompt: String = if matches!(
+            std::env::var("KCA_PHASE_1").ok().as_deref(),
+            Some("1") | Some("true") | Some("yes")
+        ) {
+            format!("{EXTRACTION_SYSTEM_PROMPT}{SPEAKER_LABEL_ADDENDUM}")
+        } else {
+            EXTRACTION_SYSTEM_PROMPT.to_string()
+        };
+
         let messages = vec![
-            Message::system(EXTRACTION_SYSTEM_PROMPT),
+            Message::system(system_prompt),
             Message::user(user_msg),
         ];
 

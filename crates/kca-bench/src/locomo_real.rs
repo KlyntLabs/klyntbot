@@ -23,6 +23,9 @@
 //! - `KCA_LOCOMO_QA_LIMIT=M` — only first M QA per conversation (default: all)
 //! - `KCA_LOCOMO_GRADER_MODEL=gpt-4.1` (default; matches Letta)
 
+use crate::trace::{
+    make_run_id, read_hit_counts, reset_hit_counts, PhaseFlags, QaTraceEvent, TraceWriter,
+};
 use kca_e2e::replayer::ReplayContext;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -121,6 +124,12 @@ pub struct LocoMoRealReport {
     pub p50_query_latency_ms: u64,
     pub p95_query_latency_ms: u64,
     pub conversations_replayed: u32,
+    /// Approximate input chars seen by `chat_complete` across replay + QA
+    /// (sum of session blobs and question strings). Used to estimate cost
+    /// without modifying the runtime to surface real token counts.
+    pub total_input_chars: u64,
+    /// Approximate output chars returned by `chat_complete` across all calls.
+    pub total_output_chars: u64,
 }
 
 impl LocoMoRealReport {
@@ -132,6 +141,17 @@ impl LocoMoRealReport {
     pub fn attempted_accuracy(&self) -> f64 {
         let attempted = self.correct + self.incorrect;
         if attempted == 0 { 0.0 } else { self.correct as f64 / attempted as f64 }
+    }
+    /// Rough USD cost estimate using `cost::KIMI_K2` pricing (our cognitive
+    /// default) and the chars÷4 ≈ tokens rule of thumb. Approximate — for
+    /// real per-turn cost we'd need the runtime to surface token usage.
+    pub fn estimated_cost_usd(&self) -> f64 {
+        let in_tok = self.total_input_chars / 4;
+        let out_tok = self.total_output_chars / 4;
+        crate::cost::cost_for(in_tok, out_tok, crate::cost::KIMI_K2)
+    }
+    pub fn estimated_cost_per_qa_usd(&self) -> f64 {
+        if self.total == 0 { 0.0 } else { self.estimated_cost_usd() / self.total as f64 }
     }
 }
 
@@ -222,6 +242,16 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
         .ok()
         .and_then(|s| s.parse::<usize>().ok());
 
+    let phase_flags = PhaseFlags::from_env();
+    let run_id = make_run_id();
+    let mut trace = TraceWriter::open_if_enabled(run_id.clone(), phase_flags.bitmask())
+        .map_err(|e| common::KlyntbotError::Storage(format!("trace open: {e}")))?;
+    eprintln!(
+        "[locomo-real] run_id={} phases={:04b}",
+        run_id,
+        phase_flags.bitmask()
+    );
+
     let mut report = LocoMoRealReport::default();
     let mut latencies: Vec<u64> = Vec::new();
 
@@ -249,23 +279,31 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
             for t in &turns {
                 blob.push_str(&format!("{}: {}\n", t.speaker, t.text));
             }
-            let _ = ctx
+            report.total_input_chars += blob.len() as u64;
+            let reply = ctx
                 .chat_complete(blob, session_key.to_string())
                 .await?;
+            report.total_output_chars += reply.len() as u64;
             ctx.await_cognitive_idle().await;
         }
 
         let qa_take = qa_limit.unwrap_or(conv.qa.len());
-        for qa in conv.qa.iter().take(qa_take) {
+        for (qa_index, qa) in conv.qa.iter().enumerate().take(qa_take) {
             // Skip category 5 (adversarial) — Letta excludes them from scoring.
             if qa.category == Some(5) || qa.answer.is_none() {
                 continue;
             }
+            // Reset per-QA so the thread-local hit counters don't leak from
+            // the previous QA's retrieval pass.
+            reset_hit_counts();
+
             let started = std::time::Instant::now();
             let session_key = common::SessionKey::from_parts("locomo-real", &conv.sample_id);
+            report.total_input_chars += qa.question.len() as u64;
             let predicted = ctx
                 .chat_complete(qa.question.clone(), session_key.to_string())
                 .await?;
+            report.total_output_chars += predicted.len() as u64;
             let elapsed = started.elapsed().as_millis() as u64;
             latencies.push(elapsed);
 
@@ -290,6 +328,36 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
                 predicted.chars().take(70).collect::<String>(),
                 grade
             );
+
+            // Emit one trace event per graded QA. The phase-specific fields
+            // (entities_extracted, fts_query, top_subjects, etc.) populate
+            // empty for now and fill in as Phase 1+ land. The hit counts
+            // come from the cognitive crate's thread-local shim.
+            let hits = read_hit_counts();
+            let event = QaTraceEvent {
+                run_id: trace.run_id.clone(),
+                conv_id: conv.sample_id.clone(),
+                qa_index: qa_index as u32,
+                category: cat as u8,
+                question: qa.question.clone(),
+                gold: target.clone(),
+                predicted: predicted.clone(),
+                grade,
+                entities_extracted: Vec::new(),
+                subject_was_speaker: false,
+                fts_query: String::new(),
+                vector_hits: hits.vector_hits,
+                fts_hits: hits.fts_hits,
+                episodic_hits: hits.episodic_hits,
+                top_subjects: Vec::new(),
+                top_predicates: Vec::new(),
+                reorganize_fired: false,
+                retry_fired: false,
+                predicted_was_refusal: detect_refusal(&predicted),
+                qa_latency_ms: elapsed,
+                phases_enabled: trace.phases_enabled,
+            };
+            trace.emit(&event);
         }
         report.conversations_replayed += 1;
     }
@@ -300,5 +368,47 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
         let p95_idx = ((latencies.len() as f64) * 0.95) as usize;
         report.p95_query_latency_ms = latencies[p95_idx.min(latencies.len() - 1)];
     }
+    // Phase 1-4 will read phase_flags. For Phase 0 only the bitmask is used
+    // (already stamped on every event via TraceWriter).
+    let _ = phase_flags;
     Ok(report)
 }
+
+/// Detect refusal phrases in the predicted answer.
+///
+/// **FROZEN list — do not modify based on observed failures.** Per the plan's
+/// anti-tuning rule 5: editing this list after seeing C-grade patterns trains
+/// the regex on the eval set. Improve retrieval instead.
+fn detect_refusal(text: &str) -> bool {
+    const PHRASES: &[&str] = &[
+        "i don't have",
+        "i don't recall",
+        "i have no memory",
+        "no information",
+        "cannot find",
+        "not mentioned",
+        "unable to determine",
+        "i don't know",
+    ];
+    let lower = text.to_lowercase();
+    PHRASES.iter().any(|p| lower.contains(p))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn refusal_detected() {
+        assert!(detect_refusal("I don't have any record of Alice"));
+        assert!(detect_refusal("Based on the conversation history, I don't recall."));
+        assert!(detect_refusal("Unable to determine the answer."));
+    }
+
+    #[test]
+    fn normal_response_not_refusal() {
+        assert!(!detect_refusal("Alice owns a Pomeranian named Mochi."));
+        assert!(!detect_refusal("Bob recommended grilled vegetables."));
+    }
+}
+

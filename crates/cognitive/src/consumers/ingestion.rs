@@ -105,7 +105,10 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         let is_proper = subj_clean.len() >= 2
             && subj_clean.chars().next().is_some_and(|c| c.is_uppercase())
             && subj_clean.chars().all(|c| c.is_alphabetic())
-            && !matches!(subj_clean, "I" | "We" | "You" | "He" | "She" | "It" | "They" | "My" | "Hi" | "Hello" | "Hey" | "The" | "A" | "An");
+            && !matches!(subj_clean,
+                "I" | "We" | "You" | "He" | "She" | "It" | "They"
+                | "Her" | "His" | "Their" | "Them" | "Us" | "Our"
+                | "My" | "Hi" | "Hello" | "Hey" | "The" | "A" | "An");
         if !is_proper { continue }
         let Some(verb) = toks.next() else { continue };
         let pred = match verb.to_lowercase().as_str() {

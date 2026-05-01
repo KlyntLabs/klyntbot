@@ -136,9 +136,11 @@ pub async fn retrieve_relevant_facts(
             .await
         {
             Ok(hits) if hits.len() >= MIN_VECTOR_RESULTS => {
+                crate::bench_hooks::record_hits(hits.len() as u32, 0, 0);
                 vector_path(repo, &hits, params.situational_boost, &weights, depth_cache).await?
             }
             Ok(hits) => {
+                crate::bench_hooks::record_hits(hits.len() as u32, 0, 0);
                 // Too few vector results — merge with fallback
                 let mut vector_scored =
                     vector_path(repo, &hits, params.situational_boost, &weights, depth_cache)
@@ -192,6 +194,7 @@ pub async fn retrieve_relevant_facts(
             None
         };
         if let Ok(bm25_hits) = repo.search_fts(query, bm25_domain, params.limit * 2).await {
+            crate::bench_hooks::record_hits(0, bm25_hits.len() as u32, 0);
             let bm25_ids: std::collections::HashMap<String, usize> = bm25_hits
                 .iter()
                 .enumerate()
