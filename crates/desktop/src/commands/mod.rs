@@ -9,6 +9,7 @@ pub mod coding_help;
 pub mod coding_memory;
 pub mod coding_resume;
 pub mod coding_sessions;
+pub mod coding_sessions_v2;
 pub mod coding_skills;
 pub mod coding_status;
 pub mod cognitive;

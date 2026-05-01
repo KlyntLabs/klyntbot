@@ -24,6 +24,7 @@ tokio-util = { workspace = true }
 dashmap = { workspace = true }
 globset = { workspace = true }
 sha2 = "0.10"
+blake3 = "1"
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 dirs = { workspace = true }
@@ -37,6 +38,7 @@ reqwest = { workspace = true, default-features = false, features = ["rustls", "j
 html2text = { workspace = true }
 tools = { workspace = true }
 storage = { workspace = true }
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

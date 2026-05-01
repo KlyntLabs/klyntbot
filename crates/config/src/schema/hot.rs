@@ -18,6 +18,8 @@ pub struct HotConfig {
     pub max_tool_iterations: u32,
     pub safety_timeout_secs: u64,
     pub monthly_budget_usd: Option<f64>,
+    pub per_thread_cost_ceiling_usd: Option<f64>,
+    pub cost_alert_at_percent: u32,
 }
 
 /// Describes which fields changed between two HotConfig snapshots.
@@ -29,6 +31,7 @@ pub struct HotConfigDiff {
     pub max_tool_iterations_changed: bool,
     pub safety_timeout_changed: bool,
     pub budget_changed: bool,
+    pub cost_ceiling_changed: bool,
 }
 
 impl HotConfigDiff {
@@ -51,6 +54,8 @@ impl From<&Config> for HotConfig {
             max_tool_iterations: config.agents.defaults.max_tool_iterations,
             safety_timeout_secs: config.agents.defaults.execution.safety_timeout_secs,
             monthly_budget_usd: config.agents.monthly_budget_usd,
+            per_thread_cost_ceiling_usd: config.coding.cost_ceiling.per_thread_usd,
+            cost_alert_at_percent: config.coding.cost_ceiling.alert_at_percent,
         }
     }
 }
@@ -65,6 +70,8 @@ impl HotConfig {
             max_tool_iterations_changed: self.max_tool_iterations != other.max_tool_iterations,
             safety_timeout_changed: self.safety_timeout_secs != other.safety_timeout_secs,
             budget_changed: self.monthly_budget_usd != other.monthly_budget_usd,
+            cost_ceiling_changed: self.per_thread_cost_ceiling_usd != other.per_thread_cost_ceiling_usd
+                || self.cost_alert_at_percent != other.cost_alert_at_percent,
         }
     }
 }

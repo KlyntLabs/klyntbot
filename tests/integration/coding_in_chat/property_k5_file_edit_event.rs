@@ -47,20 +47,20 @@ proptest! {
                 0 => { let _ = tokio::time::timeout(Duration::from_secs(5),
                         write_run(WriteArgs { path: "f.txt".into(), content: content.clone() },
                             dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string()))
+                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string(), None))
                         .await; }
                 1 => { let _ = tokio::time::timeout(Duration::from_secs(5),
                         edit_run(EditArgs { path: "f.txt".into(),
                                 old_text: "seed".into(), new_text: content.clone() },
                             dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string()))
+                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string(), None))
                         .await; }
                 2 => {
                     let patch = "--- f.txt\n+++ f.txt\n@@ -1 +1 @@\n-seed\n+changed\n".to_string();
                     let _ = tokio::time::timeout(Duration::from_secs(5),
                         patch_run(ApplyPatchArgs { path: "f.txt".into(), patch },
                             dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string()))
+                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string(), None))
                         .await;
                 }
                 _ => unreachable!(),

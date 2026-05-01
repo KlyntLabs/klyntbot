@@ -86,6 +86,12 @@ impl ToolExecute for BashTool {
             cwd: args.cwd.clone(),
             channel: common::tool_channel::Channel::from_name(ctx.channel.as_str()),
             non_ui_policy: self.non_ui_policy,
+            history_repo: None,
+            repo_id: String::new(),
+            mirror_learning_enabled: false,
+            mirror_min_approvals: 5,
+            mirror_cooldown_seconds: 86400,
+            now_unix: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
         };
         let decision = evaluate(guard_ctx, "bash", &args.command).await;
         if !decision.allowed() {

@@ -711,6 +711,38 @@ async codingSessionsUnstar(sessionKey: string) : Promise<Result<null, ApiError>>
     else return { status: "error", error: e  as any };
 }
 },
+async codingPermissionsClearMirror(tool: string, repoId: string | null) : Promise<Result<number, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_permissions_clear_mirror", { tool, repoId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSessionsRewind(sessionKey: string, messageId: string) : Promise<Result<RewindResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_rewind", { sessionKey, messageId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSessionsExport(sessionKey: string, format: ExportFormat) : Promise<Result<SessionExportResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_export", { sessionKey, format }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSessionsFork(sessionKey: string, upToMessage: string | null) : Promise<Result<SessionForkResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_fork", { sessionKey, upToMessage }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async codingResume(prefix: string) : Promise<Result<ResumeResult, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_resume", { prefix }) };
@@ -4416,6 +4448,7 @@ export type EvaluateTranslationParams = { sourceText: string; userTranslation: s
 export type ExecStatus = { kind: "ok" } | { kind: "err"; message: string }
 export type ExecutionStartedPayload = { sessionKey: string; engine: string; maxIterations: number }
 export type ExperimentSummary = { id: string; variant_count: number; messages_scored: number; hypothesis: string; started_at: string }
+export type ExportFormat = "Md" | "Json"
 export type FabricActionParams = { action: string; payload: unknown }
 export type FabricActionResponse = { success: boolean; message: string | null }
 export type FabricCommunity = { id: string; name: string; color: string; stability: number; memberCount: number; memberNoteIds: string[] }
@@ -4898,6 +4931,7 @@ export type ReviewSessionSaveParams = { sessionId: string; cardsReviewed: number
  */
 status: string }
 export type ReviewStatsSummaryResponse = { streak: number; retention: number; weekly: WeeklyStatPoint[] }
+export type RewindResult = { messages_removed: number; files_restored: number; files_deleted: number }
 export type RouterStatusResponse = { hourlyCount: number; hourlyLimit: number; dailyCount: number; dailyLimit: number }
 export type RoutingSnapshot = { id: string; capturedAt: string; windowHours: number; totalMessages: number; distribution: Partial<{ [key in string]: SkillRouteStats }>; fallbackRate: number; avgRoutingConfidence: number; lowConfidenceCount: number; userFeedback: UserFeedback | null }
 export type RuleCreateParams = { domain: string; ruleText: string; confidence: number }
@@ -4946,6 +4980,8 @@ export type SessionDetail = { sessionId: string; providerId: string; scope: Scop
  * `true` when events were truncated due to file-size guardrail.
  */
 truncated: boolean; totalEventCount: number }
+export type SessionExportResult = { path: string; bytes_written: number }
+export type SessionForkResult = { new_session_key: string }
 /**
  * Filters for `coding_memory_session_list`.
  */

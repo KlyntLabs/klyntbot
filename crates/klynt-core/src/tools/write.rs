@@ -49,6 +49,9 @@ pub struct WriteTool {
     pending: Arc<PendingApprovalsMap>,
     bus: Arc<DomainEventBus>,
     non_ui_policy: common::tool_channel::NonUiPolicy,
+    pub snapshot_repo: Option<std::sync::Arc<crate::snapshots::SnapshotRepo>>,
+    pub session_key: String,
+    pub message_id: Option<String>,
 }
 
 impl WriteTool {
@@ -69,6 +72,9 @@ impl WriteTool {
             pending,
             bus,
             non_ui_policy,
+            snapshot_repo: None,
+            session_key: String::new(),
+            message_id: None,
         }
     }
 }
@@ -99,6 +105,7 @@ impl ToolExecute for WriteTool {
             self.non_ui_policy,
             ctx.hook_engine.clone(),
             session_id,
+            self.snapshot_repo.clone(),
         )
         .await
     }
@@ -120,6 +127,7 @@ pub async fn run_for_test(
     non_ui_policy: common::tool_channel::NonUiPolicy,
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     session_id: String,
+    snapshot_repo: Option<std::sync::Arc<crate::snapshots::SnapshotRepo>>,
 ) -> Result<String> {
     let resolved = resolve_under_cwd(&args.path, &cwd, &privacy)
         .map_err(|e| KlyntbotError::Tool(ToolError::PermissionDenied(e.to_string())))?;
@@ -139,12 +147,30 @@ pub async fn run_for_test(
         cwd: Some(cwd.to_string_lossy().into_owned()),
         channel,
         non_ui_policy,
+        history_repo: None,
+        repo_id: String::new(),
+        mirror_learning_enabled: false,
+        mirror_min_approvals: 5,
+        mirror_cooldown_seconds: 86400,
+        now_unix: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
     };
     let decision = evaluate(guard_ctx, "write", &path_str).await;
     if !decision.allowed() {
         return Err(KlyntbotError::Tool(ToolError::PermissionDenied(format!(
             "{decision:?}"
         ))));
+    }
+
+    if let Some(repo) = snapshot_repo.as_ref() {
+        let (content, existed) = match tokio::fs::read(&resolved).await {
+            Ok(bytes) => (bytes, true),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (Vec::new(), false),
+            Err(e) => return Err(e.into()),
+        };
+        let _ = repo.record(
+            &session_id, None::<&str>,
+            &resolved.to_string_lossy(), &content, existed,
+        ).await;
     }
 
     if let Err(reason) = fire_pre_tool_use(

@@ -45,6 +45,8 @@ pub struct ToolKitBuilder {
     pub host_cache: Arc<HostApprovalCache>,
     pub non_ui_policy: common::tool_channel::NonUiPolicy,
     pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    pub snapshot_repo: Option<Arc<crate::snapshots::SnapshotRepo>>,
+    pub session_key: String,
 }
 
 impl ToolKitBuilder {
@@ -82,7 +84,7 @@ impl ToolKitBuilder {
             self.bus.clone(),
             self.non_ui_policy,
         ));
-        reg.register(WriteTool::new(
+        let mut write = WriteTool::new(
             self.cwd.clone(),
             self.layer1.clone(),
             self.policy.clone(),
@@ -90,8 +92,11 @@ impl ToolKitBuilder {
             self.pending.clone(),
             self.bus.clone(),
             self.non_ui_policy,
-        ));
-        reg.register(EditTool::new(
+        );
+        write.snapshot_repo = self.snapshot_repo.clone();
+        write.session_key = self.session_key.clone();
+        reg.register(write);
+        let mut edit = EditTool::new(
             self.cwd.clone(),
             self.layer1.clone(),
             self.policy.clone(),
@@ -99,8 +104,11 @@ impl ToolKitBuilder {
             self.pending.clone(),
             self.bus.clone(),
             self.non_ui_policy,
-        ));
-        reg.register(ApplyPatchTool::new(
+        );
+        edit.snapshot_repo = self.snapshot_repo.clone();
+        edit.session_key = self.session_key.clone();
+        reg.register(edit);
+        let mut patch = ApplyPatchTool::new(
             self.cwd.clone(),
             self.layer1.clone(),
             self.policy.clone(),
@@ -108,7 +116,10 @@ impl ToolKitBuilder {
             self.pending.clone(),
             self.bus.clone(),
             self.non_ui_policy,
-        ));
+        );
+        patch.snapshot_repo = self.snapshot_repo.clone();
+        patch.session_key = self.session_key.clone();
+        reg.register(patch);
         reg.register(NotebookEditTool::new(
             self.cwd.clone(),
             self.layer1.clone(),

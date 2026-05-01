@@ -28,6 +28,12 @@ pub struct GuardCtx<'a> {
     pub cwd: Option<String>,
     pub channel: common::tool_channel::Channel,
     pub non_ui_policy: common::tool_channel::NonUiPolicy,
+    pub history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
+    pub repo_id: String,
+    pub mirror_learning_enabled: bool,
+    pub mirror_min_approvals: u32,
+    pub mirror_cooldown_seconds: i64,
+    pub now_unix: i64,
 }
 
 pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> ApprovalDecision {
@@ -112,7 +118,39 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
         ExecDecision::FallThrough => l1,
     };
 
-    // 3. Layer 3 Mirror-learned — Phase 2; skipped here.
+    // 3. Layer 3 — Mirror-learned (opt-in)
+    if let Some(repo) = ctx.history_repo.as_ref() {
+        let cfg = crate::approval::layer3::Layer3Config {
+            enabled: ctx.mirror_learning_enabled,
+            min_approvals: ctx.mirror_min_approvals,
+            cooldown_seconds: ctx.mirror_cooldown_seconds,
+        };
+        let args_json = ctx.args.as_ref().map(|v| v.to_string()).unwrap_or_default();
+        let hash = crate::approval::layer3::args_hash_for_relevance(tool, &args_json);
+        let summary = repo.summary(tool, &hash, &ctx.repo_id).await
+            .unwrap_or_default();
+        match crate::approval::layer3::evaluate(&cfg, &summary, ctx.now_unix) {
+            crate::approval::layer3::Layer3Outcome::AutoAllow { reason } => {
+                let decision = ApprovalDecision::auto_allow(ApprovalLayer::Layer3Mirror, reason);
+                emit_pair(&ctx, tool, payload, &decision, false).await;
+                return decision;
+            }
+            crate::approval::layer3::Layer3Outcome::Ask { reason } => {
+                let decision = ApprovalDecision::ask(ApprovalLayer::Layer3Mirror, reason);
+                emit_pair(&ctx, tool, payload, &decision, true).await;
+                let user = await_decision(
+                    ctx.pending,
+                    &ctx.request_id,
+                    ctx.cancel.clone(),
+                    APPROVAL_TIMEOUT,
+                )
+                .await;
+                emit_resolved(&ctx, &user).await;
+                return user;
+            }
+            crate::approval::layer3::Layer3Outcome::FallThrough => { /* continue */ }
+        }
+    }
 
     match merged {
         ApprovalDecision::Auto { .. } => {

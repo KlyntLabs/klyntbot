@@ -10,6 +10,7 @@ use coding_memory::mirror::coding_signals::{
     ApprovalHistorySignal, RecallCoverageSignal, SkillEffectivenessSignal,
 };
 use cognitive::mirror::MirrorRepo;
+use cognitive::mirror::sources::approval_history::ApprovalHistorySource;
 use common::Result;
 use std::sync::Arc;
 
@@ -22,6 +23,9 @@ pub async fn init_coding_subscribers(
     let _approval = Arc::new(ApprovalHistorySignal::new(mirror_repo.clone()));
     let skill_eff = Arc::new(SkillEffectivenessSignal::new(mirror_repo.clone()));
     let recall_cov = Arc::new(RecallCoverageSignal::new(mirror_repo));
+
+    let history_repo = storage::repos::CodingApprovalHistoryRepo::new(storage_pool.clone());
+    let approval_source = Arc::new(ApprovalHistorySource::new(history_repo));
 
     let mut rx = bus.subscribe();
     tokio::spawn(async move {
@@ -43,8 +47,32 @@ pub async fn init_coding_subscribers(
                     let coverage = after_score.clamp(0.0, 1.0);
                     let _ = recall_cov.observe_recall_injected(coverage, false).await;
                 }
-                // Approval events are not yet on DomainEventBus; when they are,
-                // add DomainEvent::ApprovalResolved { .. } => approval.observe_approval_decision(...)
+                DomainEvent::ApprovalRequested {
+                    request_id,
+                    tool,
+                    args_hash,
+                    layer,
+                    repo_id,
+                } => {
+                    approval_source.observe_request(
+                        &request_id,
+                        &tool,
+                        &args_hash,
+                        &layer,
+                        repo_id.as_deref().unwrap_or(""),
+                    );
+                }
+                DomainEvent::ApprovalResolved {
+                    request_id,
+                    decision,
+                    decided_by,
+                } => {
+                    let _ = approval_source
+                        .observe_resolution(&request_id, &decision, &decided_by)
+                        .await;
+                    // TODO: wire ApprovalHistorySignal::observe_approval_decision once
+                    // ApprovalResolved carries the tool name (needed for 6+ consecutive-allow detection).
+                }
                 _ => {}
             }
         }

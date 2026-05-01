@@ -41,6 +41,7 @@ async fn edits_unique_match() {
         NonUiPolicy::Allow,
         None,
         "".to_string(),
+        None,
     )
     .await
     .unwrap();
@@ -82,6 +83,7 @@ async fn rejects_multiple_matches() {
         NonUiPolicy::Allow,
         None,
         "".to_string(),
+        None,
     )
     .await;
     assert!(r.is_err());
@@ -123,6 +125,7 @@ async fn rejects_missing_old_text() {
         NonUiPolicy::Allow,
         None,
         "".to_string(),
+        None,
     )
     .await;
     assert!(r.is_err());

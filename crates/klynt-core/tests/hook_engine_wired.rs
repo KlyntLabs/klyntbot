@@ -22,6 +22,8 @@ async fn tool_kit_builder_carries_hook_engine() {
         host_cache: Arc::new(klynt_core::approval::HostApprovalCache::default()),
         non_ui_policy: common::tool_channel::NonUiPolicy::Allow,
         hook_engine: Some(engine.clone()),
+        snapshot_repo: None,
+        session_key: String::new(),
     };
     assert!(builder.hook_engine.is_some());
     assert!(Arc::ptr_eq(&builder.hook_engine.unwrap(), &engine));

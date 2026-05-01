@@ -139,6 +139,12 @@ pub async fn run_for_test(
         cwd: Some(cwd.to_string_lossy().into_owned()),
         channel,
         non_ui_policy,
+        history_repo: None,
+        repo_id: String::new(),
+        mirror_learning_enabled: false,
+        mirror_min_approvals: 5,
+        mirror_cooldown_seconds: 86400,
+        now_unix: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
     };
     let decision = evaluate(guard_ctx, "notebook_edit", &path_str).await;
     if !decision.allowed() {

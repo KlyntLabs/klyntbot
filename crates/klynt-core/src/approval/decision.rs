@@ -37,4 +37,17 @@ impl ApprovalDecision {
     pub fn requires_user_input(&self) -> bool {
         matches!(self, Self::Ask { .. })
     }
+    pub fn auto_allow(layer: ApprovalLayer, reason: String) -> Self {
+        Self::Auto { allowed: true, layer, reason, rule_matched: None }
+    }
+    pub fn ask(layer: ApprovalLayer, reason: String) -> Self {
+        Self::Ask { layer, reason }
+    }
+    pub fn layer(&self) -> ApprovalLayer {
+        match self {
+            Self::Auto { layer, .. } | Self::Ask { layer, .. } => layer.clone(),
+            Self::PrivacyDenied { .. } => ApprovalLayer::Privacy,
+            _ => ApprovalLayer::DefaultMode,
+        }
+    }
 }

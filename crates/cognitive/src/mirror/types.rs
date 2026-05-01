@@ -214,6 +214,12 @@ pub enum MirrorAlert {
         #[specta(type = crate::specta_helpers::JsonValue)]
         payload: serde_json::Value,
     },
+    CostThresholdCrossed {
+        session_key: String,
+        spend_usd: f64,
+        ceiling_usd: f64,
+        percent: f64,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]

@@ -691,6 +691,8 @@ mod tests {
             host_cache,
             non_ui_policy,
             hook_engine: None,
+            snapshot_repo: None,
+            session_key: String::new(),
         })
     }
 

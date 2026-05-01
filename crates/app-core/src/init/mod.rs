@@ -495,6 +495,9 @@ impl AppCore {
         };
 
         // ── Phase 8: Mirror self-reflection layer (before SignalRouter so consumers can be wired in)
+        let coding_approval_history_repo = ::storage::repos::CodingApprovalHistoryRepo::new(
+            storage_pool.clone(),
+        );
         let (mirror_facade, mirror_consumers, mirror_flush_handles, mirror_shutdown) = {
             let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
             let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
@@ -534,6 +537,7 @@ impl AppCore {
                 episodic_repo,
                 rule_repo,
                 trial_evaluator,
+                Some(Arc::new(coding_approval_history_repo.clone())),
             );
 
             // Phase-5 coding mirror sources — pattern effectiveness, stale-memory,
@@ -1205,6 +1209,10 @@ impl AppCore {
             session_start_fired: Arc::new(dashmap::DashMap::new()),
             session_end_fired: Arc::new(dashmap::DashMap::new()),
             coding_skill_activator: Arc::new(tokio::sync::Mutex::new(None)),
+            coding_approval_history_repo: Some(Arc::new(coding_approval_history_repo)),
+            snapshot_repo: Some(Arc::new(klynt_core::snapshots::SnapshotRepo::new(
+                storage_pool.clone(),
+            ))),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────
@@ -1820,6 +1828,8 @@ impl AppCore {
                 host_cache,
                 non_ui_policy,
                 hook_engine: hook_engine.clone(),
+                snapshot_repo: core.snapshot_repo.clone(),
+                session_key: String::new(),
             };
             {
                 let reg = core.agent.tool_registry();
