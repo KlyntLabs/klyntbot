@@ -9,3 +9,19 @@ pub async fn coding_help(command: Option<String>) -> Vec<HelpEntry> {
         .await
         .map_err(|e| ApiError::new("HELP_ERROR", e.to_string()))
 }
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &::app_core::state::AppCore,
+    body: &serde_json::Value,
+) -> Option<desktop_shared::CommandResult<serde_json::Value>> {
+    use super::dev_helpers as dev;
+    Some(match cmd {
+        "coding_help" => {
+            let command = body.get("command").and_then(|v| v.as_str()).map(String::from);
+            dev::val(core.coding_help(command).await.map_err(desktop_shared::errors::ApiError::from))
+        }
+        _ => return None,
+    })
+}

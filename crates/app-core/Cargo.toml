@@ -59,6 +59,7 @@ sqlx = { workspace = true }
 notifications = { workspace = true }
 notify = { workspace = true }
 notify-debouncer-mini = { workspace = true }
+walkdir = { workspace = true }
 platform-macos = { workspace = true }
 voice-engine = { workspace = true }
 

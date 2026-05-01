@@ -1,12 +1,13 @@
-use agent::events::AgentEvent;
 use bus::DomainEventBus;
 use config::schema::CodingPermissions;
+use common::tool_channel::{Channel, NonUiPolicy};
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::{
     edit::{run_for_test as edit_run, EditArgs},
     grep::GrepTool,
 };
+use tools_core::events::ToolEvent;
 use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -53,9 +54,13 @@ async fn grep_then_edit_emits_diff() {
         pol,
         privacy,
         pen,
-        tx.clone(),
+        Some(tx.clone()),
         bus,
         CancellationToken::new(),
+        Channel::Coding,
+        NonUiPolicy::Allow,
+        None,
+        "scenario-test".to_string(),
     )
     .await
     .unwrap();
@@ -64,7 +69,7 @@ async fn grep_then_edit_emits_diff() {
     drop(tx);
     let mut saw = false;
     while let Some(e) = rx.recv().await {
-        if let AgentEvent::FileEditWithSymbols {
+        if let ToolEvent::FileEditWithSymbols {
             op,
             ref path,
             ref diff_full,

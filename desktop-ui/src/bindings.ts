@@ -687,6 +687,14 @@ async codingDoctor() : Promise<Result<DiagnosticChecklist, ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async codingTestSandbox() : Promise<Result<SandboxTestResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_test_sandbox") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async codingSessionsStar(sessionKey: string) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_sessions_star", { sessionKey }) };
@@ -4894,6 +4902,7 @@ export type RouterStatusResponse = { hourlyCount: number; hourlyLimit: number; d
 export type RoutingSnapshot = { id: string; capturedAt: string; windowHours: number; totalMessages: number; distribution: Partial<{ [key in string]: SkillRouteStats }>; fallbackRate: number; avgRoutingConfidence: number; lowConfidenceCount: number; userFeedback: UserFeedback | null }
 export type RuleCreateParams = { domain: string; ruleText: string; confidence: number }
 export type RuleNode = { id: string; ruleText: string; domain: string; signalCount: number; confidence: number }
+export type SandboxTestResult = { ok: boolean; details: string }
 export type ScenarioChallengeResponse = { title: string; situation: string; questions: string[]; modelAnswer: string; sourceNotes: string[]; difficultyScore: number }
 /**
  * Selector for "main agent" vs a specific subagent within a session.

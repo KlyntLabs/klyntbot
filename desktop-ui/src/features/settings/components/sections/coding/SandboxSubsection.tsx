@@ -1,18 +1,28 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@/api/client";
 
+type CodingSection = { sandbox?: { enforce?: boolean } };
+
 export function SandboxSubsection() {
   const [enforce, setEnforce] = useState(true);
   const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const cfg = (await invoke("config_get_coding")) as {
-        sandbox?: { enforce?: boolean };
-      };
-      setEnforce(cfg.sandbox?.enforce ?? true);
+      try {
+        const cfg = (await invoke("config_get_section", { section: "coding" })) as CodingSection;
+        setEnforce(cfg.sandbox?.enforce ?? true);
+      } catch (e) {
+        console.warn("[SandboxSubsection] load failed", e);
+      }
     })();
   }, []);
+
+  const save = () =>
+    invoke("config_update_section", {
+      section: "coding",
+      patch: { sandbox: { enforce } },
+    });
 
   const test = async () => {
     setTestResult("Testing…");
@@ -35,7 +45,7 @@ export function SandboxSubsection() {
           Disabling the sandbox lets bash run unconfined. For pentesting / dev only.
         </p>
       )}
-      <button type="button" onClick={() => invoke("config_set_coding_sandbox", { enforce })}>
+      <button type="button" onClick={save}>
         Save
       </button>
       <button type="button" onClick={test}>

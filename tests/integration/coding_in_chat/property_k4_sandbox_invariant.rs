@@ -1,10 +1,11 @@
 #![cfg(target_os = "macos")]
-use agent::events::AgentEvent;
 use bus::DomainEventBus;
 use config::schema::CodingPermissions;
+use common::tool_channel::NonUiPolicy;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::bash::{BashArgs, BashTool};
+use tools_core::events::ToolEvent;
 use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -30,7 +31,12 @@ async fn k4_sandbox_event_emitted_before_exec() {
         outside.display()
     );
 
-    let tool = BashTool::new(layer1, policy, privacy, pending, Some(tx.clone()), bus);
+    let tool = BashTool::new(layer1, policy, privacy, pending, bus, NonUiPolicy::Allow);
+    let mut routing_ctx = tools_core::RoutingContext::new(
+        ::common::ChannelName::new("coding"),
+        ::common::ChatId::new("test"),
+    );
+    routing_ctx.event_tx = Some(tx.clone());
     let r = ToolExecute::execute(
         &tool,
         BashArgs {
@@ -38,10 +44,7 @@ async fn k4_sandbox_event_emitted_before_exec() {
             cwd: Some(cwd.path().to_string_lossy().into()),
             timeout_ms: Some(5000),
         },
-        &tools_core::RoutingContext::new(
-            ::common::ChannelName::new("coding"),
-            ::common::ChatId::new("test"),
-        ),
+        &routing_ctx,
     )
     .await
     .unwrap();
@@ -49,12 +52,15 @@ async fn k4_sandbox_event_emitted_before_exec() {
     // Forbidden file MUST NOT exist
     assert!(!outside.join("forbidden").exists());
 
-    // SandboxPolicyApplied must precede the actual run output
+    // SandboxPolicyApplied must precede the actual run output.
+    // Drop ALL senders (tx + the cloned tx held by routing_ctx) before draining,
+    // otherwise rx.recv() never returns None.
     let mut saw_sandbox = false;
     drop(tool);
+    drop(routing_ctx);
     drop(tx);
     while let Some(e) = rx.recv().await {
-        if matches!(e, AgentEvent::SandboxPolicyApplied { .. }) {
+        if matches!(e, ToolEvent::SandboxPolicyApplied { .. }) {
             saw_sandbox = true;
         }
     }

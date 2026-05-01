@@ -1,8 +1,14 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct CodingConfig {
+    #[serde(default = "default_mode")]
+    pub default_mode: String,
+    #[serde(default = "default_true")]
+    pub auto_detect_from_workspace: bool,
+    #[serde(default = "default_tool_profile")]
+    pub tool_profile: String,
     #[serde(default)]
     pub permissions: CodingPermissions,
     #[serde(default)]
@@ -11,6 +17,28 @@ pub struct CodingConfig {
     pub skills: super::coding_memory::CodingSkillsConfig,
     #[serde(default)]
     pub sessions: CodingSessionsConfig,
+}
+
+impl Default for CodingConfig {
+    fn default() -> Self {
+        Self {
+            default_mode: default_mode(),
+            auto_detect_from_workspace: true,
+            tool_profile: default_tool_profile(),
+            permissions: Default::default(),
+            sandbox: Default::default(),
+            skills: Default::default(),
+            sessions: Default::default(),
+        }
+    }
+}
+
+fn default_mode() -> String {
+    "general".into()
+}
+
+fn default_tool_profile() -> String {
+    "curated".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,9 +1,10 @@
-use agent::events::AgentEvent;
 use bus::DomainEventBus;
 use config::schema::CodingPermissions;
+use common::tool_channel::{Channel, NonUiPolicy};
 use klynt_core::approval::{guard::evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_execpolicy::Policy;
+use tools_core::events::ToolEvent;
 use proptest::prelude::*;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -37,6 +38,8 @@ proptest! {
                     request_id: format!("r-{i}"),
                     args: None,
                     cwd: None,
+                    channel: Channel::Coding,
+                    non_ui_policy: NonUiPolicy::Allow,
                 };
                 let _ = evaluate(ctx, "bash", "echo k8").await;
             }
@@ -44,8 +47,8 @@ proptest! {
             let mut req = 0; let mut res = 0;
             while let Some(e) = rx.recv().await {
                 match e {
-                    AgentEvent::ApprovalRequested { .. } => req += 1,
-                    AgentEvent::ApprovalResolved { .. }  => res += 1,
+                    ToolEvent::ApprovalRequested { .. } => req += 1,
+                    ToolEvent::ApprovalResolved { .. }  => res += 1,
                     _ => {}
                 }
             }

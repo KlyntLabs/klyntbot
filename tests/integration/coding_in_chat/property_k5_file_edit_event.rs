@@ -1,15 +1,17 @@
-use agent::events::AgentEvent;
 use bus::DomainEventBus;
 use config::schema::CodingPermissions;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
+use common::tool_channel::{Channel, NonUiPolicy};
 use klynt_core::tools::{
     apply_patch::{run_for_test as patch_run, ApplyPatchArgs},
     edit::{run_for_test as edit_run, EditArgs},
     write::{run_for_test as write_run, WriteArgs},
 };
 use klynt_execpolicy::Policy;
+use tools_core::events::ToolEvent;
 use proptest::prelude::*;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -42,25 +44,31 @@ proptest! {
             let (tx, mut rx) = mpsc::channel(64);
 
             match op_idx {
-                0 => { write_run(WriteArgs { path: "f.txt".into(), content: content.clone() },
-                        dir.path().to_path_buf(), l1, pol, pri, pen, tx, bus, CancellationToken::new())
-                        .await.ok(); }
-                1 => { edit_run(EditArgs { path: "f.txt".into(),
-                            old_text: "seed".into(), new_text: content.clone() },
-                        dir.path().to_path_buf(), l1, pol, pri, pen, tx, bus, CancellationToken::new())
-                        .await.ok(); }
+                0 => { let _ = tokio::time::timeout(Duration::from_secs(5),
+                        write_run(WriteArgs { path: "f.txt".into(), content: content.clone() },
+                            dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
+                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string()))
+                        .await; }
+                1 => { let _ = tokio::time::timeout(Duration::from_secs(5),
+                        edit_run(EditArgs { path: "f.txt".into(),
+                                old_text: "seed".into(), new_text: content.clone() },
+                            dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
+                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string()))
+                        .await; }
                 2 => {
                     let patch = "--- f.txt\n+++ f.txt\n@@ -1 +1 @@\n-seed\n+changed\n".to_string();
-                    patch_run(ApplyPatchArgs { path: "f.txt".into(), patch },
-                        dir.path().to_path_buf(), l1, pol, pri, pen, tx, bus, CancellationToken::new())
-                        .await.ok();
+                    let _ = tokio::time::timeout(Duration::from_secs(5),
+                        patch_run(ApplyPatchArgs { path: "f.txt".into(), patch },
+                            dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
+                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string()))
+                        .await;
                 }
                 _ => unreachable!(),
             }
 
             let mut count = 0;
             while let Ok(e) = rx.try_recv() {
-                if matches!(e, AgentEvent::FileEditWithSymbols { .. }) { count += 1; }
+                if matches!(e, ToolEvent::FileEditWithSymbols { .. }) { count += 1; }
             }
             prop_assert!(count == 1 || count == 0,
                 "expected exactly 1 FileEditWithSymbols (or 0 if op failed), got {count}");
