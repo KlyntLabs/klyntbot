@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@/api/client";
 
+type CodingSection = {
+  sessions?: { retentionDays?: number; maxTotalDiskMb?: number; preserveStarred?: boolean };
+};
+
 export function SessionsSubsection() {
   const [retentionDays, setRetentionDays] = useState(90);
   const [maxDiskMb, setMaxDiskMb] = useState(5000);
@@ -8,14 +12,28 @@ export function SessionsSubsection() {
 
   useEffect(() => {
     (async () => {
-      const cfg = (await invoke("config_get_coding")) as {
-        sessions?: { retentionDays?: number; maxTotalDiskMb?: number; preserveStarred?: boolean };
-      };
-      setRetentionDays(cfg.sessions?.retentionDays ?? 90);
-      setMaxDiskMb(cfg.sessions?.maxTotalDiskMb ?? 5000);
-      setPreserveStarred(cfg.sessions?.preserveStarred ?? true);
+      try {
+        const cfg = (await invoke("config_get_section", { section: "coding" })) as CodingSection;
+        setRetentionDays(cfg.sessions?.retentionDays ?? 90);
+        setMaxDiskMb(cfg.sessions?.maxTotalDiskMb ?? 5000);
+        setPreserveStarred(cfg.sessions?.preserveStarred ?? true);
+      } catch (e) {
+        console.warn("[SessionsSubsection] load failed", e);
+      }
     })();
   }, []);
+
+  const save = () =>
+    invoke("config_update_section", {
+      section: "coding",
+      patch: {
+        sessions: {
+          retentionDays,
+          maxTotalDiskMb: maxDiskMb,
+          preserveStarred,
+        },
+      },
+    });
 
   return (
     <section>
@@ -43,12 +61,7 @@ export function SessionsSubsection() {
         />
         Preserve starred threads
       </label>
-      <button
-        type="button"
-        onClick={() =>
-          invoke("config_set_coding_sessions", { retentionDays, maxDiskMb, preserveStarred })
-        }
-      >
+      <button type="button" onClick={save}>
         Save
       </button>
     </section>

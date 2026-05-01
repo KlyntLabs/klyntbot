@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@/api/client";
 
+type CodingSection = {
+  permissions?: { allow?: string[]; deny?: string[]; ask?: string[] };
+};
+
 export function PermissionsSubsection() {
   const [allow, setAllow] = useState("");
   const [deny, setDeny] = useState("");
@@ -8,14 +12,28 @@ export function PermissionsSubsection() {
 
   useEffect(() => {
     (async () => {
-      const cfg = (await invoke("config_get_coding")) as {
-        permissions?: { allow?: string[]; deny?: string[]; ask?: string[] };
-      };
-      setAllow((cfg.permissions?.allow ?? []).join("\n"));
-      setDeny((cfg.permissions?.deny ?? []).join("\n"));
-      setAsk((cfg.permissions?.ask ?? []).join("\n"));
+      try {
+        const cfg = (await invoke("config_get_section", { section: "coding" })) as CodingSection;
+        setAllow((cfg.permissions?.allow ?? []).join("\n"));
+        setDeny((cfg.permissions?.deny ?? []).join("\n"));
+        setAsk((cfg.permissions?.ask ?? []).join("\n"));
+      } catch (e) {
+        console.warn("[PermissionsSubsection] load failed", e);
+      }
     })();
   }, []);
+
+  const save = () =>
+    invoke("config_update_section", {
+      section: "coding",
+      patch: {
+        permissions: {
+          allow: allow.split("\n").filter(Boolean),
+          deny: deny.split("\n").filter(Boolean),
+          ask: ask.split("\n").filter(Boolean),
+        },
+      },
+    });
 
   return (
     <section>
@@ -33,16 +51,7 @@ export function PermissionsSubsection() {
       <label>
         Ask <textarea value={ask} onChange={(e) => setAsk(e.target.value)} rows={4} />
       </label>
-      <button
-        type="button"
-        onClick={() =>
-          invoke("config_set_coding_permissions", {
-            allow: allow.split("\n").filter(Boolean),
-            deny: deny.split("\n").filter(Boolean),
-            ask: ask.split("\n").filter(Boolean),
-          })
-        }
-      >
+      <button type="button" onClick={save}>
         Save
       </button>
     </section>
