@@ -2,6 +2,7 @@ use crate::decision::Decision;
 use crate::error::Error;
 use crate::error::Result;
 use crate::executable_name::executable_path_lookup_key;
+use crate::rule::normalize_network_rule_host;
 use crate::rule::NetworkRule;
 use crate::rule::NetworkRuleProtocol;
 use crate::rule::PatternToken;
@@ -9,13 +10,12 @@ use crate::rule::PrefixPattern;
 use crate::rule::PrefixRule;
 use crate::rule::RuleMatch;
 use crate::rule::RuleRef;
-use crate::rule::normalize_network_rule_host;
-use std::path::PathBuf;
 use multimap::MultiMap;
 use parking_lot::RwLock;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 type HeuristicsFallback<'a> = Option<&'a dyn Fn(&[String]) -> Decision>;
@@ -51,10 +51,6 @@ impl Default for Policy {
         Self::empty()
     }
 }
-
-
-
-
 
 impl Policy {
     pub fn new(rules_by_program: MultiMap<String, RuleRef>) -> Self {
@@ -424,15 +420,27 @@ impl Policy {
         for entry in walkdir::WalkDir::new(path).follow_links(false) {
             let entry = match entry {
                 Ok(e) => e,
-                Err(e) => return Err(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())),
+                Err(e) => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        e.to_string(),
+                    ))
+                }
             };
-            if !entry.file_type().is_file() { continue; }
-            if entry.path().extension().and_then(|e| e.to_str()) != Some("rules") { continue; }
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            if entry.path().extension().and_then(|e| e.to_str()) != Some("rules") {
+                continue;
+            }
             let source = std::fs::read_to_string(entry.path())?;
             let parsed = match crate::parser::parse_to_policy(&source, entry.path()) {
                 Ok(p) => p,
                 Err(e) => {
-                    tracing::warn!("klynt-execpolicy: skipping invalid rule file {:?}: {e}", entry.path());
+                    tracing::warn!(
+                        "klynt-execpolicy: skipping invalid rule file {:?}: {e}",
+                        entry.path()
+                    );
                     continue;
                 }
             };

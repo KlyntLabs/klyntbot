@@ -17,7 +17,7 @@ async fn registers_4_coding_sources_without_error() {
     let registered = register_coding_sources(pool, mirror_repo, shutdown.clone())
         .await
         .unwrap();
-    assert_eq!(registered.consumers.len(), 4);
+    assert_eq!(registered.consumers.len(), 7);
 
     shutdown.cancel();
     for h in registered.flush_handles {

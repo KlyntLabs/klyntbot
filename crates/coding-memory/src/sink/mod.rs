@@ -11,6 +11,14 @@ use common::{KlyntbotError, Result};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+pub mod aggregator;
+pub mod subscriber;
+pub mod translator;
+
+pub use subscriber::MemorySinkSubscriber;
+#[cfg(any(test, feature = "test-helpers"))]
+pub use subscriber::RecordingSink;
+
 /// Abstraction over "accept an `AgentEvent` from a native source".
 #[async_trait]
 pub trait MemorySink: Send + Sync {

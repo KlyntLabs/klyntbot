@@ -1,9 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use app_core::tracing::{
-    providers::kimi::KimiTracingProvider, Scope, TracingProvider,
-};
+use app_core::tracing::{providers::kimi::KimiTracingProvider, Scope, TracingProvider};
 use coding_ingest::adapters::kimi_cli::workdir::WorkdirIndex;
 
 fn fixture_paths() -> (PathBuf, PathBuf, PathBuf) {
@@ -28,10 +26,16 @@ async fn kimi_provider_end_to_end() {
     assert_eq!(s.session_id, "sess-fixture-001");
     assert_eq!(s.turn_count, 1);
 
-    let detail = provider.load_session(&s.session_id, Scope::Main).await.unwrap();
+    let detail = provider
+        .load_session(&s.session_id, Scope::Main)
+        .await
+        .unwrap();
     assert_eq!(detail.events.len(), 9);
 
-    let ctx = provider.load_context(&s.session_id, Scope::Main).await.unwrap();
+    let ctx = provider
+        .load_context(&s.session_id, Scope::Main)
+        .await
+        .unwrap();
     assert_eq!(ctx.len(), 5);
 
     let state = provider.load_state(&s.session_id).await.unwrap();
@@ -41,9 +45,14 @@ async fn kimi_provider_end_to_end() {
     assert_eq!(subs.len(), 1);
     assert_eq!(subs[0].agent_id, "sub-aaa");
 
-    let sub_detail = provider.load_session(
-        &s.session_id,
-        Scope::Subagent { agent_id: "sub-aaa".into() },
-    ).await.unwrap();
+    let sub_detail = provider
+        .load_session(
+            &s.session_id,
+            Scope::Subagent {
+                agent_id: "sub-aaa".into(),
+            },
+        )
+        .await
+        .unwrap();
     assert_eq!(sub_detail.events.len(), 4);
 }

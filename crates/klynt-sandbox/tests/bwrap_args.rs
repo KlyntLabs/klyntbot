@@ -12,7 +12,7 @@ fn cwd_writes_only_with_block_network() {
     // Namespace flags
     assert!(argv.contains(&"--unshare-user"));
     assert!(argv.contains(&"--unshare-pid"));
-    assert!(argv.contains(&"--unshare-net"));   // network blocked
+    assert!(argv.contains(&"--unshare-net")); // network blocked
     assert!(argv.contains(&"--die-with-parent"));
     assert!(argv.contains(&"--new-session"));
 
@@ -24,10 +24,12 @@ fn cwd_writes_only_with_block_network() {
 
     // /proc and /dev
     assert!(argv.windows(2).any(|w| w[0] == "--proc" && w[1] == "/proc"));
-    assert!(argv.windows(2).any(|w| w[0] == "--dev"  && w[1] == "/dev"));
+    assert!(argv.windows(2).any(|w| w[0] == "--dev" && w[1] == "/dev"));
 
     // chdir to cwd
-    assert!(argv.windows(2).any(|w| w[0] == "--chdir" && w[1] == "/tmp/work"));
+    assert!(argv
+        .windows(2)
+        .any(|w| w[0] == "--chdir" && w[1] == "/tmp/work"));
 
     // Delimiter then program/args at end
     let dash = argv.iter().rposition(|s| *s == "--").unwrap();
@@ -80,6 +82,9 @@ fn helper_policy_roundtrip() {
     let encoded = p.to_base64_json().unwrap();
     let parsed = HelperPolicy::from_base64_json(&encoded).unwrap();
     assert_eq!(parsed.mode, HelperMode::WithBwrap);
-    assert!(matches!(parsed.sandbox.fs, FsConstraints::WriteCwdReadAll { .. }));
+    assert!(matches!(
+        parsed.sandbox.fs,
+        FsConstraints::WriteCwdReadAll { .. }
+    ));
     assert!(matches!(parsed.sandbox.network, NetworkConstraints::Block));
 }

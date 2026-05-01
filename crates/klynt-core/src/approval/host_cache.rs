@@ -63,7 +63,9 @@ pub enum HostCheckResult {
     AwaitPending(watch::Receiver<Option<HostDecision>>),
     /// First caller for this host. The caller MUST resolve via `cache.resolve(key, decision)`
     /// after evaluating the approval, and ALSO send via `tx` so existing waiters wake up.
-    NewlyRegistered { tx: watch::Sender<Option<HostDecision>> },
+    NewlyRegistered {
+        tx: watch::Sender<Option<HostDecision>>,
+    },
 }
 
 impl HostApprovalCache {

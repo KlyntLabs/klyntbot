@@ -174,6 +174,7 @@ const JOB_EPISODIC_ROLLUP_HOURLY: &str = "__klyntbot_episodic_rollup_hourly";
 const JOB_EPISODIC_ROLLUP_DAILY: &str = "__klyntbot_episodic_rollup_daily";
 const JOB_EPISODIC_ROLLUP_WEEKLY: &str = "__klyntbot_episodic_rollup_weekly";
 const JOB_FSRS_OPTIMIZE: &str = "__klyntbot_fsrs_optimize_weekly";
+pub(super) const JOB_SESSION_RETENTION: &str = "klynt_session_retention_nightly";
 
 /// Register individual cron handlers.
 #[allow(clippy::too_many_arguments)]
@@ -961,12 +962,12 @@ fn register_cron_callbacks(
                             Ok(notes) => {
                                 let count = notes.len();
                                 for note_id in notes {
-                                    bus.publish(bus::DomainEvent::NoteEditingFinished {
-                                        note_id,
-                                    });
+                                    bus.publish(bus::DomainEvent::NoteEditingFinished { note_id });
                                 }
                                 if count > 0 {
-                                    info!("Atom extraction catchall: queued {count} unextracted notes");
+                                    info!(
+                                        "Atom extraction catchall: queued {count} unextracted notes"
+                                    );
                                 }
                                 Ok(Some(format!("Queued {count} notes for extraction")))
                             }
@@ -1109,7 +1110,7 @@ fn register_cron_callbacks(
                                 Err(e) => {
                                     return Ok(Some(format!(
                                         "Memory maintenance: invalid cutoff: {e}"
-                                    )))
+                                    )));
                                 }
                             };
                         let predicate = format!("created_at < '{cutoff_str}'");
@@ -1531,6 +1532,15 @@ async fn ensure_cron_jobs(
             tz: None
         },
         "Rebuild launcher attention from activity events",
+        "system"
+    );
+    ensure_job!(
+        JOB_SESSION_RETENTION,
+        scheduling::CronSchedule::Cron {
+            expr: "0 30 3 * * *".to_string(),
+            tz: None
+        },
+        "Prune old coding sessions",
         "system"
     );
 

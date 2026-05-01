@@ -9,6 +9,7 @@ desktop-shared = { workspace = true }
 klynt-core = { workspace = true }
 klynt-execpolicy = { workspace = true }
 klynt-hooks = { workspace = true }
+klynt-skill-loader = { path = "../klynt-skill-loader" }
 agent = { workspace = true }
 autotuner = { workspace = true }
 bus = { workspace = true }
@@ -38,6 +39,8 @@ dashmap = { workspace = true }
 dirs = { workspace = true }
 shellexpand = { workspace = true }
 futures-util = { workspace = true }
+globset = "0.4"
+tempfile = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 jiff = { workspace = true }
@@ -62,6 +65,7 @@ voice-engine = { workspace = true }
 [features]
 default = []
 qwen3 = ["voice-engine/qwen3"]
+test-helpers = []
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use klynt_core::registry::builder::ToolKitBuilder;
 use klynt_hooks::HookEngine;
+use std::sync::Arc;
 use storage::{Repos, StoragePool};
 
 #[tokio::test]
@@ -10,7 +10,10 @@ async fn tool_kit_builder_carries_hook_engine() {
     let repos = Repos::from_pool(&pool);
     let builder = ToolKitBuilder {
         cwd: std::env::current_dir().unwrap(),
-        layer1: Arc::new(klynt_core::approval::Layer1::compile(&config::schema::CodingPermissions::default()).unwrap()),
+        layer1: Arc::new(
+            klynt_core::approval::Layer1::compile(&config::schema::CodingPermissions::default())
+                .unwrap(),
+        ),
         policy: Arc::new(klynt_execpolicy::Policy::empty()),
         privacy: Arc::new(klynt_core::privacy::PrivacyGuard::from_globs(&[]).unwrap()),
         pending: Arc::new(klynt_core::approval::PendingApprovalsMap::default()),

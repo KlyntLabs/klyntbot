@@ -15,7 +15,7 @@ use crate::inventory::{ContextInventory, ContextInventoryItem, ContextItemStatus
 use crate::memory_retriever::{MemoryRetriever, MemorySource};
 use crate::source::{ContextSource, SourceContext};
 use crate::summary_provider::SummaryProvider;
-use crate::token_counter::{default_token_counter, TokenCounter};
+use crate::token_counter::{TokenCounter, default_token_counter};
 use common::helpers::tool_def_name;
 
 use crate::memory_scorer::MemoryScorer;
@@ -124,6 +124,16 @@ impl ContextEngine {
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
         self.sources = sources;
         self
+    }
+
+    /// Add a single context source after construction.
+    ///
+    /// Used when a source is built later than the initial `ContextEngine`
+    /// (e.g. `CodingRecallService` which needs the storage pool).
+    pub fn register_source(&mut self, source: Box<dyn ContextSource>) {
+        self.sources.push(source);
+        self.sources
+            .sort_by_key(|s| std::cmp::Reverse(s.priority()));
     }
 
     /// Wire InsightForge for multi-dimensional context retrieval.
@@ -1040,11 +1050,13 @@ mod tests {
         // Clarification mode should NOT include memory
         assert_eq!(result.messages.len(), 1);
         assert_eq!(result.retrieved_memory_count, 0);
-        assert!(result
-            .budget_report
-            .per_priority
-            .iter()
-            .all(|(p, _)| *p != Priority::RetrievedMemory));
+        assert!(
+            result
+                .budget_report
+                .per_priority
+                .iter()
+                .all(|(p, _)| *p != Priority::RetrievedMemory)
+        );
     }
 
     #[test]
@@ -1091,11 +1103,13 @@ mod tests {
         let result = engine.assemble(request).await;
         // No memory entries → only the system prompt
         assert_eq!(result.messages.len(), 1);
-        assert!(result
-            .budget_report
-            .per_priority
-            .iter()
-            .all(|(p, _)| *p != Priority::RetrievedMemory));
+        assert!(
+            result
+                .budget_report
+                .per_priority
+                .iter()
+                .all(|(p, _)| *p != Priority::RetrievedMemory)
+        );
     }
 
     #[tokio::test]

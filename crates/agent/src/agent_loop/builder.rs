@@ -1,7 +1,7 @@
 //! Agent loop construction: tool registration, handler wiring, pipeline assembly.
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
@@ -86,6 +86,7 @@ pub struct AgentLoopBuilder {
     hot_config: Option<Arc<RwLock<config::HotConfig>>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
+    coding_recall_service: Option<Arc<coding_memory::recall::CodingRecallService>>,
 }
 
 impl AgentLoopBuilder {
@@ -109,7 +110,15 @@ impl AgentLoopBuilder {
             hot_config: None,
             context_update_queue: None,
             embedding_engine: None,
+            coding_recall_service: None,
         }
+    }
+    pub fn with_coding_recall_service(
+        mut self,
+        service: Option<Arc<coding_memory::recall::CodingRecallService>>,
+    ) -> Self {
+        self.coding_recall_service = service;
+        self
     }
     pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
         self.embedding_engine = Some(engine);
@@ -584,11 +593,17 @@ impl AgentLoopBuilder {
             summary_model,
         ));
         let token_counter = context_engine::token_counter_for_model(&config.agents.defaults.model);
-        let context_engine =
+        let mut context_engine =
             context_engine::ContextEngine::new(config.cognitive.history_compression.clone())
                 .with_sources(sources)
                 .with_token_counter(Arc::clone(&token_counter))
                 .with_summary_provider(summary_provider);
+
+        if let Some(ref svc) = self.coding_recall_service {
+            context_engine.register_source(Box::new(
+                crate::context_sources::CodingRecallContextSource::new(Arc::clone(svc)),
+            ));
+        }
 
         // ── Session manager (SQL-backed) ──────────────────────────────────
         let session_manager = SessionManager::from_repo(
@@ -1088,7 +1103,9 @@ impl AgentLoopBuilder {
                                 }
                             });
                         } else {
-                            info!("Tree node backfill skipped. Set KLYNTBOT_BACKFILL=1 to re-index all data on startup.");
+                            info!(
+                                "Tree node backfill skipped. Set KLYNTBOT_BACKFILL=1 to re-index all data on startup."
+                            );
                         }
                     }
                 }

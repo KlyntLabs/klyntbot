@@ -57,18 +57,36 @@ mod tests {
     struct Stub;
     #[async_trait]
     impl TracingProvider for Stub {
-        fn id(&self) -> &'static str { "stub" }
-        fn display_name(&self) -> &'static str { "Stub" }
-        async fn list_sessions(&self) -> Result<Vec<SessionSummary>> { Ok(vec![]) }
+        fn id(&self) -> &'static str {
+            "stub"
+        }
+        fn display_name(&self) -> &'static str {
+            "Stub"
+        }
+        async fn list_sessions(&self) -> Result<Vec<SessionSummary>> {
+            Ok(vec![])
+        }
         async fn load_session(&self, _: &str, _: Scope) -> Result<SessionDetail> {
             unimplemented!()
         }
-        async fn load_context(&self, _: &str, _: Scope) -> Result<Vec<ContextMessage>> { Ok(vec![]) }
-        async fn load_state(&self, _: &str) -> Result<SessionState> { Ok(SessionState::default()) }
-        async fn list_subagents(&self, _: &str) -> Result<Vec<SubagentSummary>> { Ok(vec![]) }
-        async fn import_from_file(&self, _: &Path) -> Result<String> { Ok("x".into()) }
-        async fn open_dir(&self, _: &str) -> Result<PathBuf> { Ok(PathBuf::from("/")) }
-        async fn stats(&self) -> Result<StatsBundle> { Ok(StatsBundle::default()) }
+        async fn load_context(&self, _: &str, _: Scope) -> Result<Vec<ContextMessage>> {
+            Ok(vec![])
+        }
+        async fn load_state(&self, _: &str) -> Result<SessionState> {
+            Ok(SessionState::default())
+        }
+        async fn list_subagents(&self, _: &str) -> Result<Vec<SubagentSummary>> {
+            Ok(vec![])
+        }
+        async fn import_from_file(&self, _: &Path) -> Result<String> {
+            Ok("x".into())
+        }
+        async fn open_dir(&self, _: &str) -> Result<PathBuf> {
+            Ok(PathBuf::from("/"))
+        }
+        async fn stats(&self) -> Result<StatsBundle> {
+            Ok(StatsBundle::default())
+        }
     }
 
     #[tokio::test]

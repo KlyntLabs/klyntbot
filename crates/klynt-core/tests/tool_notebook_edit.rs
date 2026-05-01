@@ -1,13 +1,13 @@
 use bus::DomainEventBus;
+use common::tool_channel::{Channel, NonUiPolicy};
+use config::schema::CodingPermissions;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::notebook_edit::{run_for_test as nb_run, NotebookEditArgs};
 use klynt_execpolicy::Policy;
-use config::schema::CodingPermissions;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use common::tool_channel::{Channel, NonUiPolicy};
 
 const NB: &str = r##"{
   "cells": [
@@ -21,7 +21,10 @@ const NB: &str = r##"{
 async fn replaces_cell_source() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("nb.ipynb"), NB).unwrap();
-    let perms = CodingPermissions { allow: vec!["NotebookEdit(./**)".into()], ..Default::default() };
+    let perms = CodingPermissions {
+        allow: vec!["NotebookEdit(./**)".into()],
+        ..Default::default()
+    };
     let l1 = Arc::new(Layer1::compile(&perms).unwrap());
     let pol = Arc::new(Policy::empty());
     let pri = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
@@ -34,9 +37,21 @@ async fn replaces_cell_source() {
             cell_index: 0,
             new_source: "print('updated')\n".into(),
         },
-        dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-        Channel::Coding, NonUiPolicy::Allow, None, "".to_string(),
-    ).await.unwrap();
+        dir.path().to_path_buf(),
+        l1,
+        pol,
+        pri,
+        pen,
+        Some(tx),
+        bus,
+        CancellationToken::new(),
+        Channel::Coding,
+        NonUiPolicy::Allow,
+        None,
+        "".to_string(),
+    )
+    .await
+    .unwrap();
     let saved = std::fs::read_to_string(dir.path().join("nb.ipynb")).unwrap();
     let v: serde_json::Value = serde_json::from_str(&saved).unwrap();
     let cell0_src = &v["cells"][0]["source"];
@@ -47,7 +62,10 @@ async fn replaces_cell_source() {
 async fn rejects_out_of_range_index() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("nb.ipynb"), NB).unwrap();
-    let perms = CodingPermissions { allow: vec!["NotebookEdit(./**)".into()], ..Default::default() };
+    let perms = CodingPermissions {
+        allow: vec!["NotebookEdit(./**)".into()],
+        ..Default::default()
+    };
     let l1 = Arc::new(Layer1::compile(&perms).unwrap());
     let pol = Arc::new(Policy::empty());
     let pri = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
@@ -55,9 +73,24 @@ async fn rejects_out_of_range_index() {
     let bus = Arc::new(DomainEventBus::new(64));
     let (tx, _rx) = mpsc::channel(32);
     let r = nb_run(
-        NotebookEditArgs { path: "nb.ipynb".into(), cell_index: 99, new_source: "x".into() },
-        dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-        Channel::Coding, NonUiPolicy::Allow, None, "".to_string(),
-    ).await;
+        NotebookEditArgs {
+            path: "nb.ipynb".into(),
+            cell_index: 99,
+            new_source: "x".into(),
+        },
+        dir.path().to_path_buf(),
+        l1,
+        pol,
+        pri,
+        pen,
+        Some(tx),
+        bus,
+        CancellationToken::new(),
+        Channel::Coding,
+        NonUiPolicy::Allow,
+        None,
+        "".to_string(),
+    )
+    .await;
     assert!(r.is_err());
 }

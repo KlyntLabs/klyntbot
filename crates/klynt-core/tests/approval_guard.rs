@@ -1,6 +1,5 @@
 use bus::DomainEventBus;
 use common::tool_channel::{Channel, NonUiPolicy};
-use tools_core::events::ToolEvent;
 use config::schema::CodingPermissions;
 use klynt_core::approval::{
     decision::{ApprovalDecision, ApprovalLayer},
@@ -13,6 +12,7 @@ use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use tools_core::events::ToolEvent;
 
 #[tokio::test]
 async fn privacy_blocks_first() {

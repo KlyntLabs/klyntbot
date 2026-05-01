@@ -13,7 +13,9 @@ use tracing::{debug, info, warn};
 use bus::{ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, UpdatePriority};
 use context_engine::book_index::types::SourceType;
 
-use super::tree_builder_base::{compose_embedding_text_with_truncate, run_event_loop, TreeBuilderCore};
+use super::tree_builder_base::{
+    compose_embedding_text_with_truncate, run_event_loop, TreeBuilderCore,
+};
 
 pub struct TaskTreeBuilder {
     core: TreeBuilderCore,

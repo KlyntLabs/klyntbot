@@ -16,7 +16,11 @@ pub fn kimi_kind_to_category(raw_kind: &str, payload: &Value) -> SemanticCategor
         "CompactionBegin" => SemanticCategory::CompactionBegin,
         "CompactionEnd" => SemanticCategory::CompactionEnd,
         "ToolResult" => {
-            if payload.get("is_error").and_then(Value::as_bool).unwrap_or(false) {
+            if payload
+                .get("is_error")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            {
                 SemanticCategory::Error
             } else {
                 SemanticCategory::ToolResult

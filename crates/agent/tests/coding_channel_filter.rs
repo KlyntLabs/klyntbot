@@ -5,9 +5,18 @@ fn coding_tools_visible_on_coding_channel() {
     // Verify that CODING_ONLY mask behaves correctly — this is the mask
     // returned by klynt-core mutating tools via Tool::allowed_channels().
     let mask = ChannelMask::CODING_ONLY;
-    assert!(mask.allows(Channel::Coding), "coding should be visible in coding mode");
-    assert!(!mask.allows(Channel::Desktop), "coding should be hidden on desktop");
-    assert!(!mask.allows(Channel::Other), "coding should be hidden on other channels");
+    assert!(
+        mask.allows(Channel::Coding),
+        "coding should be visible in coding mode"
+    );
+    assert!(
+        !mask.allows(Channel::Desktop),
+        "coding should be hidden on desktop"
+    );
+    assert!(
+        !mask.allows(Channel::Other),
+        "coding should be hidden on other channels"
+    );
 }
 
 #[test]

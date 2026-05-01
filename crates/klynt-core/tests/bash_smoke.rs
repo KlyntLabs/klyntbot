@@ -1,6 +1,7 @@
 #![cfg(target_os = "macos")]
 
 use bus::DomainEventBus;
+use common::tool_channel::NonUiPolicy;
 use common::{ChannelName, ChatId};
 use config::schema::CodingPermissions;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
@@ -10,7 +11,6 @@ use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tools_core::{RoutingContext, ToolExecute};
-use common::tool_channel::NonUiPolicy;
 
 #[tokio::test]
 async fn echo_hi_runs_and_emits_sandbox_event() {
@@ -46,7 +46,10 @@ async fn echo_hi_runs_and_emits_sandbox_event() {
     drop(tx);
     let mut saw_sandbox = false;
     while let Some(e) = rx.recv().await {
-        if matches!(e, tools_core::events::ToolEvent::SandboxPolicyApplied { .. }) {
+        if matches!(
+            e,
+            tools_core::events::ToolEvent::SandboxPolicyApplied { .. }
+        ) {
             saw_sandbox = true;
         }
     }

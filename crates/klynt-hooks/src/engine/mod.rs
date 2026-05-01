@@ -117,8 +117,7 @@ impl HookEngine {
     }
 
     async fn dispatch_stop(&self, input: crate::events::stop::StopInput) -> HookOutcome {
-        dispatcher::dispatch_event(&self.handlers, HookEventName::Stop, &input, false, false)
-            .await
+        dispatcher::dispatch_event(&self.handlers, HookEventName::Stop, &input, false, false).await
     }
 
     async fn dispatch_session_end(
@@ -220,7 +219,6 @@ impl HookEngine {
     }
 
     async fn dispatch_error(&self, input: crate::events::error::ErrorInput) -> HookOutcome {
-        dispatcher::dispatch_event(&self.handlers, HookEventName::Error, &input, false, false)
-            .await
+        dispatcher::dispatch_event(&self.handlers, HookEventName::Error, &input, false, false).await
     }
 }

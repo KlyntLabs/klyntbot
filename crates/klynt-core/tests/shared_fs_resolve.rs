@@ -27,6 +27,11 @@ fn rejects_privacy_excluded_path() {
 fn expands_tilde() {
     // Just verify it doesn't error; actual home expansion depends on $HOME env.
     std::env::set_var("HOME", "/tmp");
-    let r = resolve_under_cwd("~/sub/file.txt", &PathBuf::from("/tmp"), &PrivacyGuard::from_globs(&[]).unwrap()).unwrap();
+    let r = resolve_under_cwd(
+        "~/sub/file.txt",
+        &PathBuf::from("/tmp"),
+        &PrivacyGuard::from_globs(&[]).unwrap(),
+    )
+    .unwrap();
     assert_eq!(r, PathBuf::from("/tmp/sub/file.txt"));
 }

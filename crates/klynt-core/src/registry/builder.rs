@@ -10,11 +10,23 @@ use tools_core::ToolRegistry;
 use crate::approval::{HostApprovalCache, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
 use crate::tools::{
-    apply_patch::ApplyPatchTool, bash::BashTool, edit::EditTool, glob::GlobTool,
-    grep::GrepTool, list_dir::ListDirTool, notebook_edit::NotebookEditTool,
-    plan_mode::{EnterPlanModeTool, ExitPlanModeTool}, read::ReadTool,
-    tool_search::ToolSearchTool, web_fetch::WebFetchTool, write::WriteTool,
+    apply_patch::ApplyPatchTool,
     ask_user::AskUserTool,
+    bash::BashTool,
+    edit::EditTool,
+    glob::GlobTool,
+    grep::GrepTool,
+    list_dir::ListDirTool,
+    notebook_edit::NotebookEditTool,
+    plan_mode::{EnterPlanModeTool, ExitPlanModeTool},
+    read::ReadTool,
+    recall_stubs::{
+        CheckDeadEndsTool, RecallChangeHistoryTool, RecallDecisionPointsTool, RecallFactsAsOfTool,
+        RecallFetchTool, RecallIndexTool, RecallTimelineTool, TraceCausesTool,
+    },
+    tool_search::ToolSearchTool,
+    web_fetch::WebFetchTool,
+    write::WriteTool,
 };
 use bus::DomainEventBus;
 use klynt_execpolicy::Policy;
@@ -114,10 +126,28 @@ impl ToolKitBuilder {
         reg.register(ExitPlanModeTool::new(self.repos.clone(), self.bus.clone()));
     }
 
-    /// All thirteen klynt-core primitive tools.
+    /// Eight recall coding-memory tools (stub when service unavailable).
+    pub fn register_recall(&self, reg: &mut ToolRegistry) {
+        reg.register(RecallIndexTool);
+        reg.register(RecallTimelineTool);
+        reg.register(RecallFetchTool);
+        reg.register(TraceCausesTool);
+        reg.register(CheckDeadEndsTool);
+        reg.register(RecallFactsAsOfTool);
+        reg.register(RecallChangeHistoryTool);
+        reg.register(RecallDecisionPointsTool);
+    }
+
+    /// All thirteen klynt-core primitive tools plus recall stubs.
     pub fn register_all(&self, reg: &mut ToolRegistry) {
         self.register_read_only(reg);
         self.register_mutating(reg);
         self.register_plan_mode(reg);
+        self.register_recall(reg);
+    }
+
+    /// Builder-style no-op for API compatibility.
+    pub fn with_recall_tools(self) -> Self {
+        self
     }
 }

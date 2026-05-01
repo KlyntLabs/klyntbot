@@ -86,7 +86,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
                         } else if nv.path.is_ident("concurrency_safe") {
                             if let syn::Expr::Lit(lit) = &nv.value {
                                 if let Lit::Str(s) = &lit.lit {
-                                    concurrency_safe = Some(matches!(s.value().as_str(), "true" | "1"));
+                                    concurrency_safe =
+                                        Some(matches!(s.value().as_str(), "true" | "1"));
                                 }
                             }
                         } else if nv.path.is_ident("allowed_channels") {

@@ -1,4 +1,4 @@
-use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use};
+use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
 use async_trait::async_trait;
 use common::{KlyntbotError, Result, ToolError};
 use serde::{Deserialize, Serialize};
@@ -24,25 +24,46 @@ pub struct ToolSearchArgs {
     category = "System",
     cost = "Free",
     tags = "tools,coding,stub",
-    concurrency_safe = "true",
+    concurrency_safe = "true"
 )]
 pub struct ToolSearchTool;
 
 impl ToolSearchTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 #[async_trait]
 impl ToolExecute for ToolSearchTool {
     type Params = ToolSearchArgs;
     async fn execute(&self, args: ToolSearchArgs, ctx: &RoutingContext) -> Result<String> {
-        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
-        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "tool_search", &args, None).await {
+        let session_id = ctx
+            .session_key
+            .clone()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        if let Err(reason) = fire_pre_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id.clone(),
+            "tool_search",
+            &args,
+            None,
+        )
+        .await
+        {
             return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
         }
         let start = std::time::Instant::now();
         let result: Result<String> = Ok("[]".into());
-        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "tool_search", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        fire_post_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id,
+            "tool_search",
+            result.is_ok(),
+            start.elapsed().as_millis() as u64,
+        )
+        .await;
         result
     }
 }

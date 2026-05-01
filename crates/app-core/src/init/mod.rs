@@ -2,6 +2,10 @@ mod agent;
 pub mod ai_pipeline;
 mod channels;
 mod coaching;
+mod coding_recall;
+mod coding_retention;
+mod coding_skills;
+mod coding_subscribers;
 mod cognitive;
 mod cron;
 mod dnd;
@@ -12,16 +16,16 @@ mod temporal_scheduler;
 
 use std::sync::Arc;
 
+use ::agent::AgentLoop;
 use ::agent::cognitive_handlers::LlmExtractionHandler;
 use ::agent::cognitive_handlers::{HeuristicCoachingReasonerHandler, LlmCoachingReasonerHandler};
-use ::agent::AgentLoop;
 use ::channels::ChannelManager;
 use ::cognitive::pipeline::{
     AtomCollector, ChatTurnCollector, CoachingCollector, RecallCollector, SessionCollector,
 };
 use bus::MessageBus;
 use feature_productivity::auto_focus::AutoFocusEvent;
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
@@ -201,7 +205,9 @@ impl AppCore {
         let embedding_provider = if config.embedding.provider == "openai" {
             let api_key = config.providers.openai.api_key.expose().to_string();
             if api_key.is_empty() {
-                tracing::warn!("Embedding provider set to 'openai' but no API key configured — falling back to local");
+                tracing::warn!(
+                    "Embedding provider set to 'openai' but no API key configured — falling back to local"
+                );
                 tools::embedding_engine::EmbeddingProvider::Local
             } else {
                 tracing::info!("Using OpenAI text-embedding-3-small for embeddings");
@@ -278,6 +284,11 @@ impl AppCore {
                 vector_store.clone(),
             ));
 
+        // ── Phase 2.5: Coding-memory recall (must be ready before AgentLoop) ─
+        let recall =
+            coding_recall::init_coding_recall(&storage_pool, &domain_event_bus, &causal_edges)
+                .await;
+
         // ── Phase 3: Agent ───────────────────────────────────────────────
         let agent::AgentResult {
             cognitive_provider,
@@ -302,6 +313,7 @@ impl AppCore {
             Arc::clone(&hot_config),
             Some(Arc::clone(&context_update_queue)),
             appcore_embedding_engine.clone(),
+            recall.clone(),
         )
         .await?;
 
@@ -838,13 +850,13 @@ impl AppCore {
         .map_err(|e| format!("notifications migration failed: {e}"))?;
 
         let notification_dispatcher_handle = {
+            use notifications::NotificationDispatcher;
             use notifications::channel::{
-                os_native::OsNativeChannel, tray::TrayChannel, ChannelRegistry,
+                ChannelRegistry, os_native::OsNativeChannel, tray::TrayChannel,
             };
             use notifications::held::HeldReleaseService;
             use notifications::quiet_hours::QuietHoursPolicy;
             use notifications::retry::RetryPolicy;
-            use notifications::NotificationDispatcher;
 
             let notif_cfg = &config.notifications;
             let last_active: std::sync::Arc<
@@ -951,78 +963,15 @@ impl AppCore {
             Arc::new(d)
         };
 
-        let recall = {
-            let fact_repo = Arc::new(::cognitive::SemanticFactRepo::new(
-                storage_pool.inner().clone(),
-            ));
-            let ep_repo = Arc::new(::cognitive::EpisodicMemoryRepo::new(
-                storage_pool.inner().clone(),
-            ));
-            let ums = Arc::new(::cognitive::UnifiedMemoryService::new((*fact_repo).clone()));
-            let telem = coding_memory::RecallInvocationRepo::new(storage_pool.clone());
-            let budgeter = coding_memory::recall::budget::default_budgeter();
-
-            let recall_weights = coding_memory::recall::load_recall_weights(&storage_pool)
-                .await
-                .unwrap_or_else(|e| {
-                    tracing::warn!(error = %e, "load_recall_weights failed, using defaults");
-                    coding_memory::recall::default_weights()
-                });
-
-            let skills: Vec<std::sync::Arc<dyn coding_memory::RetrievalSkill>> = {
-                use coding_memory::retrieval_skills::{QueryDecomposer, QueryRewriter};
-                let ums_for_retrieve = ums.clone();
-                let weights = recall_weights;
-                let retrieve: coding_memory::retrieval_skills::query_rewriter::RetrieveFn =
-                    std::sync::Arc::new(move |q: String| {
-                        let ums = ums_for_retrieve.clone();
-                        let weights = weights;
-                        Box::pin(async move {
-                            let scored = ums.retrieve_with_overrides(&q, 20, 0.0, weights).await?;
-                            let mut sims = Vec::with_capacity(scored.len());
-                            let mut ids = Vec::with_capacity(scored.len());
-                            for s in scored {
-                                sims.push(s.score as f32);
-                                if let Ok(u) = s.fact.id.parse::<uuid::Uuid>() {
-                                    ids.push(u);
-                                }
-                            }
-                            Ok((sims, ids))
-                        })
-                    });
-                vec![
-                    std::sync::Arc::new(QueryRewriter::new(retrieve.clone())),
-                    std::sync::Arc::new(QueryDecomposer::new(retrieve)),
-                ]
-            };
-            let registry = std::sync::Arc::new(coding_memory::RetrievalSkillRegistry::new(
-                skills,
-                domain_event_bus.clone(),
-            ));
-
-            Arc::new(
-                coding_memory::recall::CodingRecallService::new(
-                    coding_memory::recall::CodingRecallServiceConfig {
-                        weights: recall_weights,
-                        ..coding_memory::recall::CodingRecallServiceConfig::default()
-                    },
-                    ums,
-                    fact_repo,
-                    ep_repo,
-                    telem,
-                    budgeter,
-                )
-                .with_skills(registry)
-                .with_causal_repo(causal_edges.clone()),
-            )
-        };
-        let toolset = coding_memory::CodingMemoryToolset::new(recall.clone());
+        let toolset = recall
+            .as_ref()
+            .map(|r| coding_memory::CodingMemoryToolset::new(Arc::clone(r)));
 
         // ── Register coding-memory recall tools in agent's tool registry ──
-        {
+        if let Some(ref ts) = toolset {
             let reg = agent.tool_registry();
             let mut registry = reg.write().await;
-            for tool in toolset.mcp_tools() {
+            for tool in ts.mcp_tools() {
                 registry.register_dyn(tool);
             }
             info!("Coding-memory recall tools registered in MCP registry");
@@ -1084,9 +1033,11 @@ impl AppCore {
                     storage_pool.inner().clone(),
                 )),
                 event_tx: Some(ingest_event_tx),
-                op_handler: Some(std::sync::Arc::new(
-                    crate::coding_memory::recall::RecallOpHandler::new(recall.clone()),
-                )),
+                op_handler: recall.as_ref().map(|r| {
+                    std::sync::Arc::new(crate::coding_memory::recall::RecallOpHandler::new(
+                        Arc::clone(r),
+                    )) as std::sync::Arc<dyn coding_ingest::daemon::OpHandler>
+                }),
                 git_invalidation_handler: Some(git_handler),
                 opencode_db_path,
                 opencode_poll_interval: None,
@@ -1112,9 +1063,9 @@ impl AppCore {
             let widx = Arc::new(coding_ingest::adapters::kimi_cli::workdir::WorkdirIndex::new());
             let _ = widx.refresh(&home.join(".kimi/kimi.json")).await;
             let mut registry = crate::tracing::TracingRegistry::new();
-            registry.register(Arc::new(crate::tracing::providers::kimi::KimiTracingProvider::new(
-                &home, &data_dir, widx,
-            )));
+            registry.register(Arc::new(
+                crate::tracing::providers::kimi::KimiTracingProvider::new(&home, &data_dir, widx),
+            ));
             Arc::new(registry)
         };
 
@@ -1243,8 +1194,8 @@ impl AppCore {
             feature_registry,
             ingest_daemon: std::sync::Mutex::new(ingest_daemon_handle),
             distiller: Some(distiller.clone()),
-            recall: Some(recall.clone()),
-            coding_toolset: Some(toolset),
+            recall: recall.clone(),
+            coding_toolset: toolset,
             session_end_pass: None,
             causal_edge_repo: None,
             symbol_extractor: None,
@@ -1253,6 +1204,7 @@ impl AppCore {
             tracing_registry,
             session_start_fired: Arc::new(dashmap::DashMap::new()),
             session_end_fired: Arc::new(dashmap::DashMap::new()),
+            coding_skill_activator: Arc::new(tokio::sync::Mutex::new(None)),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────
@@ -1332,6 +1284,16 @@ impl AppCore {
                 });
             });
             info!("coding-memory Distiller wired — event receiver + sweepers started");
+
+            // Wire direct DomainEventBus subscribers for coding mirror signals.
+            if let Err(e) = coding_subscribers::init_coding_subscribers(
+                Arc::clone(&domain_event_bus),
+                &storage_pool,
+            )
+            .await
+            {
+                tracing::warn!(error = %e, "init_coding_subscribers failed");
+            }
 
             // Auto-install the Claude Code hook if enabled (default: true).
             // Idempotent — re-running over an existing install just refreshes
@@ -1965,6 +1927,11 @@ impl AppCore {
             dashboard_poll_interval_secs,
             distraction_alert_rx,
         };
+
+        coding_skills::init_coding_skills(&core)
+            .await
+            .map_err(|e| format!("init_coding_skills: {e}"))?;
+        coding_retention::init_coding_retention(&core);
 
         Ok((core, channels))
     }

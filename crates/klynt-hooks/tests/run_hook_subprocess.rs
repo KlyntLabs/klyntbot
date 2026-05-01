@@ -8,7 +8,11 @@ use tempfile::TempDir;
 async fn hook_subprocess_runs_and_returns_stdout() {
     let dir = TempDir::new().unwrap();
     let script = dir.path().join("hello.sh");
-    fs::write(&script, "#!/usr/bin/env bash\nread input\necho \"got=$input\"\n").unwrap();
+    fs::write(
+        &script,
+        "#!/usr/bin/env bash\nread input\necho \"got=$input\"\n",
+    )
+    .unwrap();
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

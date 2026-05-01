@@ -28,7 +28,9 @@ export type MessageSegment =
       result?: string;
       estimatedTokens?: number;
       agent?: string;
-    };
+    }
+  | { type: "system"; kind: string; item: unknown }
+  | { type: "error"; message: string };
 
 // ── Chat Messages ───────────────────────────────────────────
 

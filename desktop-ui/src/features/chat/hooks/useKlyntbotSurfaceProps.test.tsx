@@ -14,6 +14,11 @@ vi.mock("@tauri-apps/api/core", async () => {
   return mockTauriCore();
 });
 
+vi.mock("@tauri-apps/api/event", async () => {
+  const { mockTauriEvent } = await import("@/test/mockTauri");
+  return mockTauriEvent();
+});
+
 import { useChatSession } from "./useChatSession";
 import { invoke } from "@tauri-apps/api/core";
 

@@ -5,7 +5,7 @@
 
 use crate::privacy::PrivacyGuard;
 use crate::tools::shared::fs_resolve::resolve_under_cwd;
-use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use};
+use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
 use async_trait::async_trait;
 use common::{KlyntbotError, Result, ToolError};
 use serde::{Deserialize, Serialize};
@@ -30,7 +30,7 @@ pub struct ListDirArgs {
     category = "FileSystem",
     cost = "Free",
     tags = "fs,list,directory",
-    concurrency_safe = "true",
+    concurrency_safe = "true"
 )]
 pub struct ListDirTool {
     cwd: PathBuf,
@@ -48,54 +48,80 @@ impl ToolExecute for ListDirTool {
     type Params = ListDirArgs;
 
     async fn execute(&self, args: ListDirArgs, ctx: &RoutingContext) -> Result<String> {
-        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
-        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "list_dir", &args, None).await {
+        let session_id = ctx
+            .session_key
+            .clone()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        if let Err(reason) = fire_pre_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id.clone(),
+            "list_dir",
+            &args,
+            None,
+        )
+        .await
+        {
             return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
         }
         let start = std::time::Instant::now();
         let result: Result<String> = (async {
-        let dir_path = resolve_under_cwd(&args.path, &self.cwd, &self.privacy)
-            .map_err(|e| KlyntbotError::Tool(ToolError::PermissionDenied(e.to_string())))?;
+            let dir_path = resolve_under_cwd(&args.path, &self.cwd, &self.privacy)
+                .map_err(|e| KlyntbotError::Tool(ToolError::PermissionDenied(e.to_string())))?;
 
-        let mut entries = match tokio::fs::read_dir(&dir_path).await {
-            Ok(e) => e,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                return Err(KlyntbotError::Tool(ToolError::ExecutionFailed(
-                    format!("Directory not found: {}", args.path)
-                )));
+            let mut entries = match tokio::fs::read_dir(&dir_path).await {
+                Ok(e) => e,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    return Err(KlyntbotError::Tool(ToolError::ExecutionFailed(format!(
+                        "Directory not found: {}",
+                        args.path
+                    ))));
+                }
+                Err(e) if e.raw_os_error() == Some(20 /* ENOTDIR */) => {
+                    return Err(KlyntbotError::Tool(ToolError::ExecutionFailed(format!(
+                        "Not a directory: {}",
+                        args.path
+                    ))));
+                }
+                Err(e) => {
+                    return Err(KlyntbotError::Tool(ToolError::ExecutionFailed(format!(
+                        "Failed to read directory: {e}"
+                    ))));
+                }
+            };
+
+            let mut items = Vec::new();
+            while let Some(entry) = entries.next_entry().await.map_err(|e| {
+                KlyntbotError::Tool(ToolError::ExecutionFailed(format!(
+                    "Failed to read directory entry: {e}"
+                )))
+            })? {
+                let metadata = entry.metadata().await.map_err(|e| {
+                    KlyntbotError::Tool(ToolError::ExecutionFailed(format!(
+                        "Failed to read metadata: {e}"
+                    )))
+                })?;
+                let prefix = if metadata.is_dir() { "📁 " } else { "📄 " };
+                let name = entry.file_name().to_string_lossy().to_string();
+                items.push(format!("{}{}", prefix, name));
             }
-            Err(e) if e.raw_os_error() == Some(20 /* ENOTDIR */) => {
-                return Err(KlyntbotError::Tool(ToolError::ExecutionFailed(
-                    format!("Not a directory: {}", args.path)
-                )));
+
+            if items.is_empty() {
+                return Ok(format!("Directory {} is empty", args.path));
             }
-            Err(e) => {
-                return Err(KlyntbotError::Tool(ToolError::ExecutionFailed(
-                    format!("Failed to read directory: {e}")
-                )));
-            }
-        };
 
-        let mut items = Vec::new();
-        while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            KlyntbotError::Tool(ToolError::ExecutionFailed(format!("Failed to read directory entry: {e}")))
-        })? {
-            let metadata = entry.metadata().await.map_err(|e| {
-                KlyntbotError::Tool(ToolError::ExecutionFailed(format!("Failed to read metadata: {e}")))
-            })?;
-            let prefix = if metadata.is_dir() { "📁 " } else { "📄 " };
-            let name = entry.file_name().to_string_lossy().to_string();
-            items.push(format!("{}{}", prefix, name));
-        }
-
-        if items.is_empty() {
-            return Ok(format!("Directory {} is empty", args.path));
-        }
-
-        items.sort();
-        Ok(items.join("\n"))
-        }).await;
-        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "list_dir", result.is_ok(), start.elapsed().as_millis() as u64).await;
+            items.sort();
+            Ok(items.join("\n"))
+        })
+        .await;
+        fire_post_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id,
+            "list_dir",
+            result.is_ok(),
+            start.elapsed().as_millis() as u64,
+        )
+        .await;
         result
     }
 }

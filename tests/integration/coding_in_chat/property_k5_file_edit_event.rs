@@ -1,5 +1,6 @@
 use agent::events::AgentEvent;
 use bus::DomainEventBus;
+use config::schema::CodingPermissions;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::tools::{
     apply_patch::{run_for_test as patch_run, ApplyPatchArgs},
@@ -7,7 +8,6 @@ use klynt_core::tools::{
     write::{run_for_test as write_run, WriteArgs},
 };
 use klynt_execpolicy::Policy;
-use config::schema::CodingPermissions;
 use proptest::prelude::*;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -15,7 +15,11 @@ use tokio_util::sync::CancellationToken;
 
 fn perms() -> CodingPermissions {
     CodingPermissions {
-        allow: vec!["Write(./**)".into(), "Edit(./**)".into(), "ApplyPatch(./**)".into()],
+        allow: vec![
+            "Write(./**)".into(),
+            "Edit(./**)".into(),
+            "ApplyPatch(./**)".into(),
+        ],
         ..Default::default()
     }
 }

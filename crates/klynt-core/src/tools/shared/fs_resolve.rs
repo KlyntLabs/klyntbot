@@ -28,7 +28,10 @@ pub fn resolve_under_cwd(
     // cwd-restriction
     let cwd_canonical = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
     if !resolved.starts_with(&cwd_canonical) {
-        return Err(FsResolveError::OutsideCwd { path: resolved, cwd: cwd_canonical });
+        return Err(FsResolveError::OutsideCwd {
+            path: resolved,
+            cwd: cwd_canonical,
+        });
     }
     // Privacy
     if privacy.is_excluded(&resolved) {

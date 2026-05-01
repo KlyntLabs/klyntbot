@@ -1,3 +1,4 @@
+use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
 use async_trait::async_trait;
 use bus::DomainEventBus;
 use common::{KlyntbotError, Result, ToolError};
@@ -5,10 +6,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use storage::Repos;
 use tokio::sync::mpsc;
-use tools_core::{RoutingContext, ToolExecute};
 use tools_core::events::ToolEvent;
+use tools_core::{RoutingContext, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
-use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
 pub struct EnterPlanModeArgs {
@@ -70,16 +70,34 @@ impl ExitPlanModeTool {
 impl ToolExecute for EnterPlanModeTool {
     type Params = EnterPlanModeArgs;
     async fn execute(&self, args: EnterPlanModeArgs, ctx: &RoutingContext) -> Result<String> {
-        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
-        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "enter_plan_mode", &args, None).await {
+        let session_id = ctx
+            .session_key
+            .clone()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        if let Err(reason) = fire_pre_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id.clone(),
+            "enter_plan_mode",
+            &args,
+            None,
+        )
+        .await
+        {
             return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
         }
         let start = std::time::Instant::now();
         let key = ctx.chat_id.as_str().to_string();
-        let result = run_enter_for_test(&self.repos, &key,
-            ctx.event_tx.clone(),
-            self.bus.clone()).await;
-        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "enter_plan_mode", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        let result =
+            run_enter_for_test(&self.repos, &key, ctx.event_tx.clone(), self.bus.clone()).await;
+        fire_post_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id,
+            "enter_plan_mode",
+            result.is_ok(),
+            start.elapsed().as_millis() as u64,
+        )
+        .await;
         result
     }
 }
@@ -87,25 +105,48 @@ impl ToolExecute for EnterPlanModeTool {
 impl ToolExecute for ExitPlanModeTool {
     type Params = ExitPlanModeArgs;
     async fn execute(&self, args: ExitPlanModeArgs, ctx: &RoutingContext) -> Result<String> {
-        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
-        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "exit_plan_mode", &args, None).await {
+        let session_id = ctx
+            .session_key
+            .clone()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        if let Err(reason) = fire_pre_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id.clone(),
+            "exit_plan_mode",
+            &args,
+            None,
+        )
+        .await
+        {
             return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
         }
         let start = std::time::Instant::now();
         let key = ctx.chat_id.as_str().to_string();
-        let result = run_exit_for_test(&self.repos, &key,
-            ctx.event_tx.clone(),
-            self.bus.clone()).await;
-        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "exit_plan_mode", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        let result =
+            run_exit_for_test(&self.repos, &key, ctx.event_tx.clone(), self.bus.clone()).await;
+        fire_post_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id,
+            "exit_plan_mode",
+            result.is_ok(),
+            start.elapsed().as_millis() as u64,
+        )
+        .await;
         result
     }
 }
 
 pub async fn run_enter_for_test(
-    repos: &Repos, session_key: &str,
-    event_tx: Option<mpsc::Sender<ToolEvent>>, bus: Arc<DomainEventBus>,
+    repos: &Repos,
+    session_key: &str,
+    event_tx: Option<mpsc::Sender<ToolEvent>>,
+    bus: Arc<DomainEventBus>,
 ) -> Result<String> {
-    repos.sessions.update_approval_mode(session_key, "plan").await
+    repos
+        .sessions
+        .update_approval_mode(session_key, "plan")
+        .await
         .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(e.to_string())))?;
     let evt = ToolEvent::PlanModeChanged {
         in_plan_mode: true,
@@ -116,10 +157,15 @@ pub async fn run_enter_for_test(
 }
 
 pub async fn run_exit_for_test(
-    repos: &Repos, session_key: &str,
-    event_tx: Option<mpsc::Sender<ToolEvent>>, bus: Arc<DomainEventBus>,
+    repos: &Repos,
+    session_key: &str,
+    event_tx: Option<mpsc::Sender<ToolEvent>>,
+    bus: Arc<DomainEventBus>,
 ) -> Result<String> {
-    repos.sessions.update_approval_mode(session_key, "default").await
+    repos
+        .sessions
+        .update_approval_mode(session_key, "default")
+        .await
         .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(e.to_string())))?;
     let evt = ToolEvent::PlanModeChanged {
         in_plan_mode: false,

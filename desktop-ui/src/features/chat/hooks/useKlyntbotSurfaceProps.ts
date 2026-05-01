@@ -86,6 +86,9 @@ function buildItems(
       textBuffer += seg.content;
       return;
     }
+    if (seg.type !== "tool") {
+      return;
+    }
     if (textBuffer.length > 0) {
       items.push({
         id: `stream-assistant-${textBufferIndex}`,

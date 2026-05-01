@@ -188,6 +188,8 @@ pub struct AppCore {
     pub session_start_fired: Arc<dashmap::DashMap<String, ()>>,
     /// Tracks which sessions have already fired the SessionEnd hook (prevents double-fire on cancel).
     pub session_end_fired: Arc<dashmap::DashMap<String, ()>>,
+    /// Skill activator for coding mode — path-conditional + dynamic discovery.
+    pub coding_skill_activator: Arc<tokio::sync::Mutex<Option<klynt_skill_loader::SkillActivator>>>,
 }
 
 impl AppCore {
@@ -514,26 +516,31 @@ impl AppCore {
         rule_source: String,
         suggested_filename: Option<String>,
     ) -> common::Result<String> {
-        let _ = klynt_execpolicy::parse_to_policy(&rule_source, std::path::Path::new("inline.rules"))
-            .map_err(|e| common::KlyntbotError::NotImplemented(format!("invalid Starlark: {e}")))?;
+        let _ = klynt_execpolicy::parse_to_policy(
+            &rule_source,
+            std::path::Path::new("inline.rules"),
+        )
+        .map_err(|e| common::KlyntbotError::NotImplemented(format!("invalid Starlark: {e}")))?;
 
         let rules_dir = dirs::home_dir()
-            .ok_or_else(|| common::KlyntbotError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "no home dir")))?
+            .ok_or_else(|| {
+                common::KlyntbotError::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "no home dir",
+                ))
+            })?
             .join(".klyntbot/rules");
-        std::fs::create_dir_all(&rules_dir)
-            .map_err(common::KlyntbotError::Io)?;
+        std::fs::create_dir_all(&rules_dir).map_err(common::KlyntbotError::Io)?;
 
-        let filename = suggested_filename
-            .unwrap_or_else(|| {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs();
-                format!("rule-{now}.rules")
-            });
+        let filename = suggested_filename.unwrap_or_else(|| {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            format!("rule-{now}.rules")
+        });
         let path = rules_dir.join(filename);
-        std::fs::write(&path, &rule_source)
-            .map_err(common::KlyntbotError::Io)?;
+        std::fs::write(&path, &rule_source).map_err(common::KlyntbotError::Io)?;
 
         Ok(path.to_string_lossy().into_owned())
     }
@@ -554,5 +561,20 @@ impl AppCore {
             exists,
             content,
         })
+    }
+}
+
+impl AppCore {
+    /// Minimal AppCore for unit tests — uses in-memory storage and default config.
+    pub async fn for_test(data_dir: Option<std::path::PathBuf>) -> Result<Self, String> {
+        let mut config = config::Config::default();
+        if let Some(dir) = data_dir {
+            config.data_dir = Some(dir.to_string_lossy().into_owned());
+        } else if let Ok(home) = std::env::var("KLYNTBOT_HOME") {
+            config.data_dir = Some(home);
+        }
+        let (core, _channels) =
+            Self::init_with_sender(common::AppMode::Server, Some(config), None, None).await?;
+        Ok(core)
     }
 }

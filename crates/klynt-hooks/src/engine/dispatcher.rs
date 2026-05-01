@@ -1,8 +1,8 @@
 //! Per-event dispatch logic for the HookEngine.
 
+use crate::engine::command_runner;
 use crate::error::HookResult;
 use crate::schema::Hook;
-use crate::engine::command_runner;
 use klynt_protocol::HookEventName;
 
 /// Unified input enum for `HookEngine::fire`.

@@ -1,5 +1,5 @@
-use crate::engine::HookEngine;
 use crate::engine::discovery::ConfigLayerStack;
+use crate::engine::HookEngine;
 use crate::schema::HookConfig;
 use std::path::PathBuf;
 
@@ -25,7 +25,10 @@ impl HookRegistry {
     }
 
     pub fn with_layers(mut self, user_dir: Option<PathBuf>, project_dir: Option<PathBuf>) -> Self {
-        self.layers = ConfigLayerStack { user_dir, project_dir };
+        self.layers = ConfigLayerStack {
+            user_dir,
+            project_dir,
+        };
         self
     }
 }

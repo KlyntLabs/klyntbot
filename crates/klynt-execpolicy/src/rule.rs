@@ -3,12 +3,12 @@ use crate::error::Error;
 use crate::error::Result;
 use crate::policy::MatchOptions;
 use crate::policy::Policy;
-use std::path::PathBuf;
 use serde::Deserialize;
 use serde::Serialize;
 use shlex::try_join;
 use std::any::Any;
 use std::fmt::Debug;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Matches a single command token, either a fixed string or one of several allowed alternatives.
@@ -184,7 +184,8 @@ pub(crate) fn normalize_network_rule_host(raw: &str) -> Result<String> {
         host = inside;
     } else if host.matches(':').count() == 1 {
         if let Some((candidate, port)) = host.rsplit_once(':') {
-            if !candidate.is_empty() && !port.is_empty() && port.chars().all(|c| c.is_ascii_digit()) {
+            if !candidate.is_empty() && !port.is_empty() && port.chars().all(|c| c.is_ascii_digit())
+            {
                 host = candidate;
             }
         }

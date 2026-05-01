@@ -7,8 +7,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::decision::Decision;
-use crate::rule::NetworkRuleProtocol;
 use crate::rule::normalize_network_rule_host;
+use crate::rule::NetworkRuleProtocol;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

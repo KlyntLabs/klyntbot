@@ -14,10 +14,7 @@ use bus::InboundMessage;
 use providers::{DynProvider, Message};
 use storage::AgentTaskRepo;
 use tools::{
-    agent_task_tool::AgentTaskTool,
-    registry::ToolRegistry,
-    spawn::SpawnHandler,
-    RoutingContext,
+    agent_task_tool::AgentTaskTool, registry::ToolRegistry, spawn::SpawnHandler, RoutingContext,
 };
 
 /// Specialized profiles for sub-agents with different tool sets and behaviors.
@@ -270,7 +267,10 @@ impl SubagentManager {
                 task_summary: label_text.clone(),
                 base: Default::default(),
             };
-            match engine.fire(klynt_hooks::engine::HookFireInput::SubagentSpawn(input)).await {
+            match engine
+                .fire(klynt_hooks::engine::HookFireInput::SubagentSpawn(input))
+                .await
+            {
                 klynt_hooks::HookOutcome::Block { reason } => {
                     return format!(
                         "Subagent spawn blocked by hook: {} (ID: {})",

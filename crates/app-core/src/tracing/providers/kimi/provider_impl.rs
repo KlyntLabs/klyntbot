@@ -6,14 +6,9 @@ use std::sync::Arc;
 
 use crate::tracing::provider::TracingProvider;
 use crate::tracing::providers::kimi::{
-    cache::SessionCache,
-    context_loader::load_context,
-    discovery::discover_sessions,
-    import::import_from_file,
-    loader::load_session_events,
-    stats::aggregate,
-    state_loader::load_state,
-    subagent_loader::list_subagents,
+    cache::SessionCache, context_loader::load_context, discovery::discover_sessions,
+    import::import_from_file, loader::load_session_events, state_loader::load_state,
+    stats::aggregate, subagent_loader::list_subagents,
 };
 use crate::tracing::types::*;
 use jiff::Timestamp;
@@ -27,11 +22,7 @@ pub struct KimiTracingProvider {
 }
 
 impl KimiTracingProvider {
-    pub fn new(
-        home_dir: &Path,
-        klyntbot_data: &Path,
-        workdirs: Arc<WorkdirIndex>,
-    ) -> Self {
+    pub fn new(home_dir: &Path, klyntbot_data: &Path, workdirs: Arc<WorkdirIndex>) -> Self {
         Self {
             kimi_root: home_dir.join(".kimi/sessions"),
             kimi_json: home_dir.join(".kimi/kimi.json"),
@@ -49,7 +40,13 @@ impl KimiTracingProvider {
         imported_root: PathBuf,
         workdirs: Arc<WorkdirIndex>,
     ) -> Self {
-        Self { kimi_root, kimi_json, imported_root, workdirs, cache: SessionCache::new() }
+        Self {
+            kimi_root,
+            kimi_json,
+            imported_root,
+            workdirs,
+            cache: SessionCache::new(),
+        }
     }
 
     async fn refresh_workdirs(&self) {
@@ -62,27 +59,45 @@ impl KimiTracingProvider {
             Ok(d) => d,
             Err(_) => {
                 let imp = self.imported_root.join(session_id);
-                if imp.is_dir() { return Ok(imp); }
-                return Err(common::KlyntbotError::StorageNotFound(format!("session {session_id}")));
+                if imp.is_dir() {
+                    return Ok(imp);
+                }
+                return Err(common::KlyntbotError::StorageNotFound(format!(
+                    "session {session_id}"
+                )));
             }
         };
-        while let Some(h) = entries.next_entry().await
+        while let Some(h) = entries
+            .next_entry()
+            .await
             .map_err(|e| common::KlyntbotError::Storage(format!("dir iter: {e}")))?
         {
-            if !h.file_type().await.map_or(false, |t| t.is_dir()) { continue; }
+            if !h.file_type().await.map_or(false, |t| t.is_dir()) {
+                continue;
+            }
             let candidate = h.path().join(session_id);
-            if candidate.is_dir() { return Ok(candidate); }
+            if candidate.is_dir() {
+                return Ok(candidate);
+            }
         }
         let imp = self.imported_root.join(session_id);
-        if imp.is_dir() { return Ok(imp); }
-        Err(common::KlyntbotError::StorageNotFound(format!("session {session_id}")))
+        if imp.is_dir() {
+            return Ok(imp);
+        }
+        Err(common::KlyntbotError::StorageNotFound(format!(
+            "session {session_id}"
+        )))
     }
 }
 
 #[async_trait]
 impl TracingProvider for KimiTracingProvider {
-    fn id(&self) -> &'static str { "kimi" }
-    fn display_name(&self) -> &'static str { "Kimi" }
+    fn id(&self) -> &'static str {
+        "kimi"
+    }
+    fn display_name(&self) -> &'static str {
+        "Kimi"
+    }
 
     async fn list_sessions(&self) -> Result<Vec<SessionSummary>> {
         self.refresh_workdirs().await;
@@ -108,15 +123,26 @@ impl TracingProvider for KimiTracingProvider {
             let state_path = d.source_dir.join("state.json");
             let state = load_state(&state_path).await.unwrap_or_default();
             let custom_title = state.custom_title.clone().or_else(|| {
-                loaded.events.iter().find(|e| e.category == SemanticCategory::TurnBegin)
+                loaded
+                    .events
+                    .iter()
+                    .find(|e| e.category == SemanticCategory::TurnBegin)
                     .and_then(|e| extract_user_text(&e.payload))
             });
             let cwd = d.hash.as_ref().and_then(|h| hash_to_cwd.get(h).cloned());
-            let project_basename = cwd.as_ref()
+            let project_basename = cwd
+                .as_ref()
                 .and_then(|p| p.file_name())
                 .map(|n| n.to_string_lossy().to_string());
-            let context_size = tokio::fs::metadata(&context_path).await.map(|m| m.len()).unwrap_or(0);
-            let size_bytes = tokio::fs::metadata(&wire).await.map(|m| m.len()).unwrap_or(0) + context_size;
+            let context_size = tokio::fs::metadata(&context_path)
+                .await
+                .map(|m| m.len())
+                .unwrap_or(0);
+            let size_bytes = tokio::fs::metadata(&wire)
+                .await
+                .map(|m| m.len())
+                .unwrap_or(0)
+                + context_size;
 
             let summary = SessionSummary {
                 session_id: d.session_id.clone(),
@@ -125,8 +151,16 @@ impl TracingProvider for KimiTracingProvider {
                 cwd,
                 project_basename,
                 custom_title,
-                started_at: loaded.events.first().map(|e| e.occurred_at).unwrap_or(Timestamp::UNIX_EPOCH),
-                last_event_at: loaded.events.last().map(|e| e.occurred_at).unwrap_or(Timestamp::UNIX_EPOCH),
+                started_at: loaded
+                    .events
+                    .first()
+                    .map(|e| e.occurred_at)
+                    .unwrap_or(Timestamp::UNIX_EPOCH),
+                last_event_at: loaded
+                    .events
+                    .last()
+                    .map(|e| e.occurred_at)
+                    .unwrap_or(Timestamp::UNIX_EPOCH),
                 size_bytes,
                 turn_count: loaded.stats.turn_count,
                 step_count: loaded.stats.step_count,
@@ -170,7 +204,9 @@ impl TracingProvider for KimiTracingProvider {
         let dir = self.resolve_session_dir(session_id).await?;
         let path = match scope {
             Scope::Main => dir.join("context.jsonl"),
-            Scope::Subagent { agent_id } => dir.join("subagents").join(&agent_id).join("context.jsonl"),
+            Scope::Subagent { agent_id } => {
+                dir.join("subagents").join(&agent_id).join("context.jsonl")
+            }
         };
         load_context(&path).await
     }
@@ -203,10 +239,16 @@ fn extract_user_text(payload: &serde_json::Value) -> Option<String> {
     if let Some(s) = payload.get("user_input").and_then(|v| v.as_str()) {
         return Some(s.to_string());
     }
-    payload.get("user_input").and_then(|v| v.as_array())
-        .and_then(|arr| arr.iter().find_map(|p| {
-            if p.get("type")?.as_str()? == "text" {
-                Some(p.get("text")?.as_str()?.to_string())
-            } else { None }
-        }))
+    payload
+        .get("user_input")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| {
+            arr.iter().find_map(|p| {
+                if p.get("type")?.as_str()? == "text" {
+                    Some(p.get("text")?.as_str()?.to_string())
+                } else {
+                    None
+                }
+            })
+        })
 }

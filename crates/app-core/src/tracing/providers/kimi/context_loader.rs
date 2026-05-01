@@ -7,15 +7,24 @@ pub async fn load_context(path: &Path) -> Result<Vec<ContextMessage>> {
     let file = match tokio::fs::File::open(path).await {
         Ok(f) => f,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
-        Err(e) => return Err(common::KlyntbotError::Storage(format!("open {}: {e}", path.display()))),
+        Err(e) => {
+            return Err(common::KlyntbotError::Storage(format!(
+                "open {}: {e}",
+                path.display()
+            )))
+        }
     };
     let mut out = Vec::new();
     let mut reader = BufReader::new(file).lines();
     let mut idx: u32 = 0;
-    while let Some(line) = reader.next_line().await
+    while let Some(line) = reader
+        .next_line()
+        .await
         .map_err(|e| common::KlyntbotError::Storage(format!("read line: {e}")))?
     {
-        if line.trim().is_empty() { continue; }
+        if line.trim().is_empty() {
+            continue;
+        }
         let v: serde_json::Value = match serde_json::from_str(&line) {
             Ok(v) => v,
             Err(e) => {
@@ -23,8 +32,16 @@ pub async fn load_context(path: &Path) -> Result<Vec<ContextMessage>> {
                 continue;
             }
         };
-        let role = v.get("role").and_then(|x| x.as_str()).unwrap_or("").to_string();
-        out.push(ContextMessage { index: idx, role, content: v });
+        let role = v
+            .get("role")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
+        out.push(ContextMessage {
+            index: idx,
+            role,
+            content: v,
+        });
         idx += 1;
     }
     Ok(out)

@@ -10,7 +10,8 @@ fn parse_simple_prefix_rule_allow() {
         r#"
 prefix_rule(["git", "status"], decision="allow")
 "#,
-    ).unwrap();
+    )
+    .unwrap();
 
     let policy = Policy::load_from_dir(dir.path()).expect("load");
     let cmd = vec!["git".to_string(), "status".to_string()];
@@ -26,7 +27,8 @@ fn parse_prefix_rule_ask() {
         r#"
 prefix_rule(["git", "push"], decision="ask")
 "#,
-    ).unwrap();
+    )
+    .unwrap();
 
     let policy = Policy::load_from_dir(dir.path()).expect("load");
     let cmd: Vec<&str> = vec!["git", "push"];
@@ -42,7 +44,8 @@ fn parse_prefix_rule_forbid_via_forbidden_keyword() {
         r#"
 prefix_rule(["rm", "-rf", "/"], decision="forbidden")
 "#,
-    ).unwrap();
+    )
+    .unwrap();
 
     let policy = Policy::load_from_dir(dir.path()).expect("load");
     let dec = policy.eval(&["rm", "-rf", "/"], None);
@@ -55,7 +58,8 @@ fn no_rule_falls_through() {
     fs::write(
         dir.path().join("git.rules"),
         r#"prefix_rule(["git", "status"], decision="allow")"#,
-    ).unwrap();
+    )
+    .unwrap();
 
     let policy = Policy::load_from_dir(dir.path()).expect("load");
     let dec = policy.eval(&["ls", "-la"], None);
@@ -81,8 +85,16 @@ fn nonexistent_dir_returns_empty_policy() {
 #[test]
 fn invalid_rule_file_is_skipped() {
     let dir = TempDir::new().unwrap();
-    fs::write(dir.path().join("good.rules"), r#"prefix_rule(["git", "status"], decision="allow")"#).unwrap();
-    fs::write(dir.path().join("bad.rules"), r#"this is not valid starlark"#).unwrap();
+    fs::write(
+        dir.path().join("good.rules"),
+        r#"prefix_rule(["git", "status"], decision="allow")"#,
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("bad.rules"),
+        r#"this is not valid starlark"#,
+    )
+    .unwrap();
     let policy = Policy::load_from_dir(dir.path()).expect("load");
     let dec = policy.eval(&["git", "status"], None);
     assert_eq!(dec, Decision::Allow);

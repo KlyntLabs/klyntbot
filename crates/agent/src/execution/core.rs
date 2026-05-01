@@ -11,9 +11,9 @@ use tokio::sync::{RwLock, Semaphore};
 
 use common::{helpers::tool_def_name, Result};
 use context_engine::TokenCounter;
+use klynt_core::tools::ask_user::ASK_USER_TOOL_NAME;
 use providers::{tool_calls_to_messages, DynProvider, Message};
 use tools::{registry::ToolRegistry, RoutingContext};
-use klynt_core::tools::ask_user::ASK_USER_TOOL_NAME;
 use tracing::debug;
 
 use providers::Usage;
@@ -814,8 +814,8 @@ impl ExecutionCore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
     use crate::test_utils::MockProvider;
+    use async_trait::async_trait;
     use providers::{LlmResponse, ToolCall, Usage};
     use serde_json::Value;
     use std::time::Duration;
@@ -901,7 +901,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_tool_execution() {
-        let provider = Arc::new(MockProvider::with_tool_call("echo", serde_json::json!({"msg": "test"})));
+        let provider = Arc::new(MockProvider::with_tool_call(
+            "echo",
+            serde_json::json!({"msg": "test"}),
+        ));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -930,7 +933,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_timeout() {
-        let provider = Arc::new(MockProvider::with_tool_call("slow_tool", serde_json::json!({})));
+        let provider = Arc::new(MockProvider::with_tool_call(
+            "slow_tool",
+            serde_json::json!({}),
+        ));
         let registry = make_registry_with(SlowTool);
         let core = ExecutionCore::new(provider, registry);
 
@@ -1101,8 +1107,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_normal_text_not_flagged() {
-        let provider =
-            Arc::new(MockProvider::with_text("Sure, I can help you create a task. What would you like?"));
+        let provider = Arc::new(MockProvider::with_text(
+            "Sure, I can help you create a task. What would you like?",
+        ));
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 

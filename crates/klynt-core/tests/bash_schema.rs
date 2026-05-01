@@ -1,4 +1,5 @@
 use bus::DomainEventBus;
+use common::tool_channel::NonUiPolicy;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::bash::BashTool;
@@ -6,7 +7,6 @@ use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tools_core::Tool;
-use common::tool_channel::NonUiPolicy;
 
 #[test]
 fn bash_tool_metadata() {

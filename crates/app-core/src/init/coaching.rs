@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use cognitive::situation::{compute_situation, SituationInputs, UserSituation};
+use cognitive::situation::{SituationInputs, UserSituation, compute_situation};
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_productivity::repos::ProductivityRepos;
 use storage::Repos;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 

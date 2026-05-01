@@ -220,9 +220,13 @@ pub async fn execute_loop(
                 context_window: params.context_window as u64,
                 base: Default::default(),
             };
-            let _ = engine.fire(klynt_hooks::engine::HookFireInput::PreCompact(pre_input)).await;
+            let _ = engine
+                .fire(klynt_hooks::engine::HookFireInput::PreCompact(pre_input))
+                .await;
         }
-        if let Some((before_tokens, after_tokens, messages_compacted)) = compressor.compress_if_needed(&mut messages) {
+        if let Some((before_tokens, after_tokens, messages_compacted)) =
+            compressor.compress_if_needed(&mut messages)
+        {
             crate::execution::core::fan_out_event(
                 event_tx.as_ref(),
                 core.domain_event_bus.as_ref(),
@@ -242,7 +246,9 @@ pub async fn execute_loop(
                     tokens_after: after_tokens as u64,
                     base: Default::default(),
                 };
-                let _ = engine.fire(klynt_hooks::engine::HookFireInput::PostCompact(post_input)).await;
+                let _ = engine
+                    .fire(klynt_hooks::engine::HookFireInput::PostCompact(post_input))
+                    .await;
             }
         }
 

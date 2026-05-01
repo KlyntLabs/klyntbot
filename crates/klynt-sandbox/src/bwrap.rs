@@ -10,7 +10,11 @@ pub fn build_bwrap_args(policy: &SandboxPolicy, program: &str, args: &[&str]) ->
     let mut a: Vec<String> = Vec::with_capacity(32);
 
     // Namespace isolation
-    a.extend(["--unshare-user", "--unshare-pid"].into_iter().map(String::from));
+    a.extend(
+        ["--unshare-user", "--unshare-pid"]
+            .into_iter()
+            .map(String::from),
+    );
     if matches!(policy.network, NetworkConstraints::Block) {
         a.push("--unshare-net".into());
     }
@@ -19,30 +23,40 @@ pub fn build_bwrap_args(policy: &SandboxPolicy, program: &str, args: &[&str]) ->
 
     // Read-only root mount (essential system dirs)
     for p in ["/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc"] {
-        a.push("--ro-bind".into()); a.push(p.into()); a.push(p.into());
+        a.push("--ro-bind".into());
+        a.push(p.into());
+        a.push(p.into());
     }
 
     // /proc, /dev, /tmp
-    a.push("--proc".into()); a.push("/proc".into());
-    a.push("--dev".into());  a.push("/dev".into());
-    a.push("--tmpfs".into()); a.push("/tmp".into());
+    a.push("--proc".into());
+    a.push("/proc".into());
+    a.push("--dev".into());
+    a.push("/dev".into());
+    a.push("--tmpfs".into());
+    a.push("/tmp".into());
 
     // Filesystem constraints
     match &policy.fs {
         FsConstraints::WriteCwdReadAll { cwd: w } => {
             let wcwd = w.to_string_lossy().into_owned();
-            a.push("--bind".into()); a.push(wcwd.clone()); a.push(wcwd);
+            a.push("--bind".into());
+            a.push(wcwd.clone());
+            a.push(wcwd);
         }
         FsConstraints::ReadCwdOnly { cwd: r } => {
             let rcwd = r.to_string_lossy().into_owned();
-            a.push("--ro-bind".into()); a.push(rcwd.clone()); a.push(rcwd);
+            a.push("--ro-bind".into());
+            a.push(rcwd.clone());
+            a.push(rcwd);
         }
         FsConstraints::None => {
             // No additional bind beyond /tmp tmpfs above.
         }
     }
 
-    a.push("--chdir".into()); a.push(cwd);
+    a.push("--chdir".into());
+    a.push(cwd);
     a.push("--".into());
 
     // Inner command: program + args

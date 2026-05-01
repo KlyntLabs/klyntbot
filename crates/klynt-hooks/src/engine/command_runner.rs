@@ -66,6 +66,6 @@ pub async fn run_command(hook: &Hook, input: &str) -> CommandRunResult {
             stdout: String::new(),
             stderr: String::new(),
             error: Some(format!("timed out after {timeout_ms}ms")),
-        }
+        },
     }
 }

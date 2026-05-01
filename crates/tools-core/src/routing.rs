@@ -10,8 +10,8 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
-use common::{ChannelName, ChatId, FormResponse, InteractionRequest, Result, SessionKey};
 use crate::events::ToolEvent;
+use common::{ChannelName, ChatId, FormResponse, InteractionRequest, Result, SessionKey};
 
 /// Bundle sent from ask_user tool to the CLI.
 /// Each request carries its own response channel.

@@ -1174,8 +1174,7 @@ impl AppCore {
         mode: Option<String>,
     ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
         // Fire SessionStart hook once per session on first coding-mode message.
-        if mode.as_deref() == Some("coding")
-            && !self.session_start_fired.contains_key(&session_key)
+        if mode.as_deref() == Some("coding") && !self.session_start_fired.contains_key(&session_key)
         {
             if let Some(engine) = self.agent.runtime().hook_engine() {
                 let input = SessionStartInput {

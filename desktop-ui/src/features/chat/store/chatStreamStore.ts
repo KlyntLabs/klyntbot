@@ -288,6 +288,28 @@ class ChatStreamStore {
     this.updateState(sessionKey, (s) => ({ ...s, personaMessages: [] }));
   }
 
+  /** Append a synthetic system segment to the stream. */
+  appendSystemItem(sessionKey: string, kind: string, item: unknown): void {
+    this.updateState(sessionKey, (s) => ({
+      ...s,
+      segments: [
+        ...s.segments,
+        { type: "system" as const, kind, item },
+      ],
+    }));
+  }
+
+  /** Append a synthetic error segment to the stream. */
+  appendErrorItem(sessionKey: string, message: string): void {
+    this.updateState(sessionKey, (s) => ({
+      ...s,
+      segments: [
+        ...s.segments,
+        { type: "error" as const, message },
+      ],
+    }));
+  }
+
   // ── Internal helpers ────────────────────────────────────────────────
 
   private notify(): void {

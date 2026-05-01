@@ -1,3 +1,9 @@
 pub mod approval_handler;
-pub mod chat_send_routing; // stub for Task 12
-pub mod mode_handler; // stub for Task 11
+pub mod chat_send_routing;
+pub mod doctor_handler;
+pub mod help_handler;
+pub mod mode_handler;
+pub mod resume_handler;
+pub mod sessions_handler;
+pub mod skills_handler;
+pub mod status_handler;

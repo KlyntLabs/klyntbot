@@ -28,6 +28,7 @@ type UseComposerAutocompleteStateArgs = {
     item: AutocompleteItem,
     context: { triggerChar: string; insertedText: string },
   ) => void;
+  slashEnabled?: boolean;
 };
 
 const MAX_FILE_SUGGESTIONS = 500;
@@ -83,6 +84,7 @@ export function useComposerAutocompleteState({
   setText,
   setSelectionStart,
   onItemApplied,
+  slashEnabled = false,
 }: UseComposerAutocompleteStateArgs) {
   const skillItems = useMemo<AutocompleteItem[]>(
     () => [
@@ -225,11 +227,11 @@ export function useComposerAutocompleteState({
 
   const triggers = useMemo(
     () => [
-      { trigger: "/", items: slashItems },
+      ...(slashEnabled ? [{ trigger: "/", items: slashItems }] : []),
       { trigger: "$", items: skillItems },
       { trigger: "@", items: fileItems },
     ],
-    [fileItems, skillItems, slashItems],
+    [fileItems, skillItems, slashItems, slashEnabled],
   );
 
   const {

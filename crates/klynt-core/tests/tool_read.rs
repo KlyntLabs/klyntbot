@@ -47,5 +47,8 @@ fn is_concurrency_safe() {
     let dir = tempfile::tempdir().unwrap();
     let privacy = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
     let tool = ReadTool::new(dir.path().to_path_buf(), privacy);
-    assert!(<ReadTool as Tool>::is_concurrency_safe(&tool, &serde_json::json!({})));
+    assert!(<ReadTool as Tool>::is_concurrency_safe(
+        &tool,
+        &serde_json::json!({})
+    ));
 }

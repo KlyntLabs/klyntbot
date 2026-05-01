@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use tracing::{warn};
+use tracing::warn;
 use uuid::Uuid;
 
 use bus::{ContextUpdateReason, DomainEvent};
@@ -377,12 +377,7 @@ pub fn build_activity_nodes(
 /// Returns 2 nodes: daily root (level 0, idempotent) and a score leaf
 /// (level 1, idempotent by date). Repeated score events for the same date
 /// are deduplicated by the duplicate-ignore logic in `persist_nodes`.
-pub fn build_score_nodes(
-    date: &str,
-    daily_id: &str,
-    score_id: &str,
-    score: f64,
-) -> Vec<TreeNode> {
+pub fn build_score_nodes(date: &str, daily_id: &str, score_id: &str, score: f64) -> Vec<TreeNode> {
     let score_rounded = score.round() as u64;
     let score_content = format!("Productivity score: {score_rounded}/100");
 
@@ -422,8 +417,8 @@ pub fn build_score_nodes(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::tree_builder_base::compose_embedding_text;
+    use super::*;
 
     // --- compose_embedding_text ---
 

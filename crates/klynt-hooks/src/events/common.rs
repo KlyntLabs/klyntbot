@@ -10,7 +10,10 @@ pub struct BaseEventInput {
     pub cwd: Option<String>,
 }
 
-pub fn matcher_pattern_for_event(event_name: HookEventName, matcher: Option<&str>) -> Option<String> {
+pub fn matcher_pattern_for_event(
+    event_name: HookEventName,
+    matcher: Option<&str>,
+) -> Option<String> {
     match event_name {
         HookEventName::PreToolUse | HookEventName::PostToolUse => {
             matcher.map(|m| format!("tool:{m}"))

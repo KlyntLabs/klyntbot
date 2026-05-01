@@ -9,11 +9,11 @@ use std::sync::Arc;
 #[cfg(not(target_os = "macos"))]
 use async_trait::async_trait;
 use bus::DomainEventBus;
-use feature_focus::alarm_bridge::TemporalAlarmBridge;
-use feature_focus::manager::FocusBridge;
 use feature_focus::DndManager;
 #[cfg(not(target_os = "macos"))]
 use feature_focus::FocusMode;
+use feature_focus::alarm_bridge::TemporalAlarmBridge;
+use feature_focus::manager::FocusBridge;
 use scheduling::temporal::fire_store::FireStore;
 use storage::StoragePool;
 use tokio::task::JoinHandle;

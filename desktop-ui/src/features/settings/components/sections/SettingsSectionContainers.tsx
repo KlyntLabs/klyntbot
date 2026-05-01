@@ -7,6 +7,7 @@ import { SettingsComposerSection } from "./SettingsComposerSection";
 import { SettingsDictationSection } from "./SettingsDictationSection";
 import { SettingsDisplaySection } from "./SettingsDisplaySection";
 import { SettingsEnvironmentsSection } from "./SettingsEnvironmentsSection";
+import { SettingsCodingSection } from "./SettingsCodingSection";
 import { SettingsFeaturesSection } from "./SettingsFeaturesSection";
 import { HooksSection } from "./HooksSection";
 import { SettingsGitSection } from "./SettingsGitSection";
@@ -65,6 +66,9 @@ export function SettingsSectionContainers({
   }
   if (activeSection === "hooks") {
     return <HooksSection />;
+  }
+  if (activeSection === "coding") {
+    return <SettingsCodingSection />;
   }
   return null;
 }

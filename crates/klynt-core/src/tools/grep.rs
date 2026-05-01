@@ -1,5 +1,5 @@
 use crate::privacy::PrivacyGuard;
-use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use};
+use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
 use async_trait::async_trait;
 use common::{KlyntbotError, Result, ToolError};
 use regex::RegexBuilder;
@@ -13,7 +13,8 @@ use walkdir::WalkDir;
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
 pub struct GrepArgs {
     /// Regex pattern (Rust regex syntax).
-    #[param(required)] pub pattern: String,
+    #[param(required)]
+    pub pattern: String,
     /// Optional file glob to restrict the search (default `**/*`).
     pub include: Option<String>,
     /// Case-insensitive match.
@@ -34,7 +35,7 @@ pub struct GrepArgs {
     category = "Search",
     cost = "Free",
     tags = "search,grep,coding",
-    concurrency_safe = "true",
+    concurrency_safe = "true"
 )]
 pub struct GrepTool {
     cwd: PathBuf,
@@ -42,7 +43,9 @@ pub struct GrepTool {
 }
 
 impl GrepTool {
-    pub fn new(cwd: PathBuf, privacy: Arc<PrivacyGuard>) -> Self { Self { cwd, privacy } }
+    pub fn new(cwd: PathBuf, privacy: Arc<PrivacyGuard>) -> Self {
+        Self { cwd, privacy }
+    }
 }
 
 #[async_trait]
@@ -50,8 +53,20 @@ impl ToolExecute for GrepTool {
     type Params = GrepArgs;
 
     async fn execute(&self, args: GrepArgs, ctx: &RoutingContext) -> Result<String> {
-        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
-        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "grep", &args, None).await {
+        let session_id = ctx
+            .session_key
+            .clone()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        if let Err(reason) = fire_pre_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id.clone(),
+            "grep",
+            &args,
+            None,
+        )
+        .await
+        {
             return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
         }
         let start = std::time::Instant::now();
@@ -61,10 +76,14 @@ impl ToolExecute for GrepTool {
             let re = RegexBuilder::new(&args.pattern)
                 .case_insensitive(args.case_insensitive.unwrap_or(false))
                 .build()
-                .map_err(|e| KlyntbotError::Tool(ToolError::InvalidParams(format!("regex: {e}"))))?;
+                .map_err(|e| {
+                    KlyntbotError::Tool(ToolError::InvalidParams(format!("regex: {e}")))
+                })?;
             let include = args.include.unwrap_or_else(|| "**/*".into());
             let glob = globset::Glob::new(&include)
-                .map_err(|e| KlyntbotError::Tool(ToolError::InvalidParams(format!("include: {e}"))))?
+                .map_err(|e| {
+                    KlyntbotError::Tool(ToolError::InvalidParams(format!("include: {e}")))
+                })?
                 .compile_matcher();
 
             let cwd = self.cwd.clone();
@@ -73,10 +92,16 @@ impl ToolExecute for GrepTool {
                 let mut out: Vec<String> = Vec::new();
                 'outer: for entry in WalkDir::new(&cwd).follow_links(false) {
                     let Ok(entry) = entry else { continue };
-                    if !entry.file_type().is_file() { continue }
+                    if !entry.file_type().is_file() {
+                        continue;
+                    }
                     let rel = entry.path().strip_prefix(&cwd).unwrap_or(entry.path());
-                    if !glob.is_match(rel) { continue }
-                    if privacy.is_excluded(entry.path()) { continue }
+                    if !glob.is_match(rel) {
+                        continue;
+                    }
+                    if privacy.is_excluded(entry.path()) {
+                        continue;
+                    }
                     let file = match std::fs::File::open(entry.path()) {
                         Ok(f) => f,
                         Err(_) => continue,
@@ -95,19 +120,36 @@ impl ToolExecute for GrepTool {
                             }
                             for j in lo..hi {
                                 let marker = if j == i { ":" } else { "-" };
-                                out.push(format!("{}:{}{}:{}",
-                                    rel.display(), j + 1, marker, file_lines[j]));
+                                out.push(format!(
+                                    "{}:{}{}:{}",
+                                    rel.display(),
+                                    j + 1,
+                                    marker,
+                                    file_lines[j]
+                                ));
                             }
                             last_hi = hi;
-                            if out.len() >= max { break 'outer; }
+                            if out.len() >= max {
+                                break 'outer;
+                            }
                         }
                     }
                 }
                 out
-            }).await.map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(e.to_string())))?;
+            })
+            .await
+            .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(e.to_string())))?;
             Ok(lines.join("\n"))
-        }).await;
-        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "grep", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        })
+        .await;
+        fire_post_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id,
+            "grep",
+            result.is_ok(),
+            start.elapsed().as_millis() as u64,
+        )
+        .await;
         result
     }
 }

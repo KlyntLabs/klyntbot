@@ -12,7 +12,9 @@ use std::path::PathBuf;
 pub enum Scope {
     Main,
     #[serde(rename_all = "camelCase")]
-    Subagent { agent_id: String },
+    Subagent {
+        agent_id: String,
+    },
 }
 
 impl Scope {
@@ -37,7 +39,10 @@ mod scope_tests {
     }
     #[test]
     fn subagent_serializes_with_camel_case_field() {
-        let s = serde_json::to_string(&Scope::Subagent { agent_id: "a1".into() }).unwrap();
+        let s = serde_json::to_string(&Scope::Subagent {
+            agent_id: "a1".into(),
+        })
+        .unwrap();
         assert_eq!(s, r#"{"kind":"subagent","agentId":"a1"}"#);
     }
 }

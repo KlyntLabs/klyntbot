@@ -355,10 +355,7 @@ mod tests {
             metadata: None,
         };
         // title == content, so just title
-        assert_eq!(
-            compose_embedding_text_with_truncate(&node),
-            "Introduction"
-        );
+        assert_eq!(compose_embedding_text_with_truncate(&node), "Introduction");
     }
 
     #[test]

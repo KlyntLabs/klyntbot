@@ -90,6 +90,7 @@ describe("useComposerAutocompleteState slash commands", () => {
         textareaRef,
         setText: vi.fn(),
         setSelectionStart: vi.fn(),
+        slashEnabled: true,
       }),
     );
 
@@ -142,6 +143,7 @@ describe("useComposerAutocompleteState slash commands", () => {
         textareaRef,
         setText: vi.fn(),
         setSelectionStart: vi.fn(),
+        slashEnabled: true,
       }),
     );
 

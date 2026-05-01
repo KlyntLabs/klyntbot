@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 pub async fn import_from_file(imported_root: &Path, source_wire: &Path) -> Result<String> {
-    if !tokio::fs::try_exists(source_wire).await
-        .map_err(|e| common::KlyntbotError::Storage(format!("stat {}: {e}", source_wire.display())))?
-    {
+    if !tokio::fs::try_exists(source_wire).await.map_err(|e| {
+        common::KlyntbotError::Storage(format!("stat {}: {e}", source_wire.display()))
+    })? {
         return Err(common::KlyntbotError::Storage(format!(
             "source wire missing: {}",
             source_wire.display()
@@ -16,9 +16,11 @@ pub async fn import_from_file(imported_root: &Path, source_wire: &Path) -> Resul
     }
     let new_id = Uuid::new_v4().to_string();
     let target_dir = imported_root.join(&new_id);
-    tokio::fs::create_dir_all(&target_dir).await
-        .map_err(|e| common::KlyntbotError::Storage(format!("mkdir {}: {e}", target_dir.display())))?;
-    tokio::fs::copy(source_wire, target_dir.join("wire.jsonl")).await
+    tokio::fs::create_dir_all(&target_dir).await.map_err(|e| {
+        common::KlyntbotError::Storage(format!("mkdir {}: {e}", target_dir.display()))
+    })?;
+    tokio::fs::copy(source_wire, target_dir.join("wire.jsonl"))
+        .await
         .map_err(|e| common::KlyntbotError::Storage(format!("copy wire: {e}")))?;
 
     let parent = source_wire.parent().unwrap_or(Path::new("."));
@@ -33,9 +35,12 @@ pub async fn import_from_file(imported_root: &Path, source_wire: &Path) -> Resul
         "imported_at": jiff::Timestamp::now().to_string(),
         "original_path": source_wire.display().to_string(),
     });
-    tokio::fs::write(target_dir.join("meta.json"), serde_json::to_vec_pretty(&meta).unwrap())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(format!("write meta: {e}")))?;
+    tokio::fs::write(
+        target_dir.join("meta.json"),
+        serde_json::to_vec_pretty(&meta).unwrap(),
+    )
+    .await
+    .map_err(|e| common::KlyntbotError::Storage(format!("write meta: {e}")))?;
     Ok(new_id)
 }
 
@@ -53,7 +58,9 @@ mod tests {
         fs::write(src.join("context.jsonl"), "{}").await.unwrap();
         fs::write(src.join("state.json"), "{}").await.unwrap();
         let imported = tmp.path().join("imported");
-        let new_id = import_from_file(&imported, &src.join("wire.jsonl")).await.unwrap();
+        let new_id = import_from_file(&imported, &src.join("wire.jsonl"))
+            .await
+            .unwrap();
         let target = imported.join(&new_id);
         assert!(target.join("wire.jsonl").exists());
         assert!(target.join("context.jsonl").exists());

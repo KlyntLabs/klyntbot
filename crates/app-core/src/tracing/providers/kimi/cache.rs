@@ -18,11 +18,15 @@ pub struct SessionCache {
 }
 
 impl SessionCache {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub async fn get(&self, key: &PathBuf, mtime: SystemTime) -> Option<SessionSummary> {
         let g = self.map.read().await;
-        g.get(key).filter(|e| e.mtime == mtime).map(|e| e.summary.clone())
+        g.get(key)
+            .filter(|e| e.mtime == mtime)
+            .map(|e| e.summary.clone())
     }
 
     pub async fn put(&self, key: PathBuf, mtime: SystemTime, summary: SessionSummary) {

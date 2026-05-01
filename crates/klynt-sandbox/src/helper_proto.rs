@@ -27,7 +27,8 @@ impl HelperPolicy {
 
     pub fn from_base64_json(s: &str) -> Result<Self, String> {
         let bytes = base64::engine::general_purpose::STANDARD_NO_PAD
-            .decode(s).map_err(|e| format!("base64: {e}"))?;
+            .decode(s)
+            .map_err(|e| format!("base64: {e}"))?;
         serde_json::from_slice(&bytes).map_err(|e| format!("json: {e}"))
     }
 }

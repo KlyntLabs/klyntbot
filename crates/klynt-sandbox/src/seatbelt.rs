@@ -73,12 +73,16 @@ impl SandboxRunner for MacOsSeatbeltRunner {
 
         let stdout_fut = async move {
             let mut buf = Vec::new();
-            tokio::io::AsyncReadExt::read_to_end(&mut stdout_pipe, &mut buf).await.ok();
+            tokio::io::AsyncReadExt::read_to_end(&mut stdout_pipe, &mut buf)
+                .await
+                .ok();
             buf
         };
         let stderr_fut = async move {
             let mut buf = Vec::new();
-            tokio::io::AsyncReadExt::read_to_end(&mut stderr_pipe, &mut buf).await.ok();
+            tokio::io::AsyncReadExt::read_to_end(&mut stderr_pipe, &mut buf)
+                .await
+                .ok();
             buf
         };
 

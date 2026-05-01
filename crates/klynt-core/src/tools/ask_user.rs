@@ -3,16 +3,16 @@
 //! Moved from `tools::system::ask_user` so the old system module can be deleted
 //! in Task 9. Behaviour is identical; only the crate location changed.
 
-use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use};
+use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
 use async_trait::async_trait;
 use serde_json::Value;
 use tracing::warn;
 
-use tools_core::{InteractionBundle, RoutingContext, Tool};
 use common::{
     Answer, AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question,
     Result, ToolError,
 };
+use tools_core::{InteractionBundle, RoutingContext, Tool};
 
 /// Tool name constant, used by other crates for timeout overrides etc.
 pub const ASK_USER_TOOL_NAME: &str = "ask_user";
@@ -113,8 +113,20 @@ impl Tool for AskUserTool {
     }
 
     async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
-        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
-        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "ask_user", &args, None).await {
+        let session_id = ctx
+            .session_key
+            .clone()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        if let Err(reason) = fire_pre_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id.clone(),
+            "ask_user",
+            &args,
+            None,
+        )
+        .await
+        {
             return Err(ToolError::HookBlocked(reason).into());
         }
         let start = std::time::Instant::now();
@@ -148,8 +160,16 @@ impl Tool for AskUserTool {
 
             // Path 3: Text fallback (non-TTY, no native channel support)
             Ok(format_text_fallback(&request))
-        }).await;
-        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "ask_user", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        })
+        .await;
+        fire_post_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id,
+            "ask_user",
+            result.is_ok(),
+            start.elapsed().as_millis() as u64,
+        )
+        .await;
         result
     }
 }

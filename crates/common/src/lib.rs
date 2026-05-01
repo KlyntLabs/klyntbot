@@ -6,7 +6,6 @@
 // ── Modules ─────────────────────────────────────────────────────────────
 
 pub mod autotuner;
-pub mod tool_channel;
 pub mod date;
 pub mod entity_card;
 pub mod error;
@@ -18,12 +17,12 @@ pub mod ports;
 pub mod pricing;
 pub mod prompts;
 pub mod time;
+pub mod tool_channel;
 pub mod types;
 
 // ── Re-exports: domain types ────────────────────────────────────────────
 
 pub use autotuner::TrialParams;
-pub use tool_channel::{Channel, ChannelMask};
 pub use entity_card::EntityCard;
 pub use error::{
     ChannelError, ConfigError, KlyntbotError, ProviderError, Result, SessionError, ToolError,
@@ -31,6 +30,7 @@ pub use error::{
 pub use prompts::{
     Answer, AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question,
 };
+pub use tool_channel::{Channel, ChannelMask};
 pub use types::{
     AppMode, ChannelName, ChatId, MessageRole, SessionKey, CLI_CHANNEL, CODING_CHANNEL,
     MCP_CHANNEL, SYSTEM_CHANNEL, TELEGRAM_RESET_SENDER,

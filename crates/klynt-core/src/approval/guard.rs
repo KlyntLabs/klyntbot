@@ -4,7 +4,6 @@ use super::{
     round_trip::{await_decision, PendingApprovalsMap},
 };
 use crate::privacy::PrivacyGuard;
-use tools_core::events::ToolEvent;
 use bus::DomainEventBus;
 use klynt_execpolicy::{Decision as ExecDecision, Policy};
 use sha2::{Digest, Sha256};
@@ -12,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use tools_core::events::ToolEvent;
 
 pub const APPROVAL_TIMEOUT: Duration = Duration::from_secs(600);
 
@@ -220,7 +220,8 @@ pub(crate) async fn fan_out_tool_event(
         let _ = tx.send(evt.clone()).await;
     }
     if let Some(bus) = domain_bus {
-        let payload = serde_json::to_value(&evt).unwrap_or_else(|_| serde_json::json!({"type": "unknown"}));
+        let payload =
+            serde_json::to_value(&evt).unwrap_or_else(|_| serde_json::json!({"type": "unknown"}));
         bus.publish(bus::DomainEvent::Generic {
             kind: "agent_event".into(),
             payload,

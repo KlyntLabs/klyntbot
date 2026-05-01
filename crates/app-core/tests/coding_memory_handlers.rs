@@ -112,13 +112,17 @@ async fn cost_breakdown_returns_per_model_rows_with_aggregates() {
     assert_eq!(bd.total_output_tokens, 540_000);
     assert_eq!(bd.total_cached_tokens, 50_000);
 
-    // Sonnet 4.6 long-context (1M > 200K): 1M × $3 × 2 + 500k × $15 × 1.5 = $6 + $11.25 = $17.25
+    // Sonnet 4.6 long-context (1M > 200K):
+    //   input:  1M × $3 × 2 = $6.00
+    //   output: 500k × $15 × 1.5 = $11.25
+    //   cache:  50k × $0.30 = $0.015
+    //   total = $17.265
     let sonnet = bd
         .rows
         .iter()
         .find(|r| r.model == "claude-sonnet-4-6")
         .unwrap();
-    assert!((sonnet.total_cost_usd - 17.25).abs() < 1e-6);
+    assert!((sonnet.total_cost_usd - 17.265).abs() < 1e-6);
     assert!((sonnet.input_cost_usd - 6.0).abs() < 1e-6);
     assert!((sonnet.output_cost_usd - 11.25).abs() < 1e-6);
 
@@ -127,8 +131,8 @@ async fn cost_breakdown_returns_per_model_rows_with_aggregates() {
     assert!((deepseek.total_cost_usd - 0.071).abs() < 1e-6);
     assert_eq!(deepseek.cached_tokens, 0, "no cached field defaults to 0");
 
-    // Sonnet long-context $17.25 + DeepSeek $0.071 = $17.321
-    assert!((bd.total_cost_usd - 17.321).abs() < 1e-6);
+    // Sonnet $17.265 + DeepSeek $0.071 = $17.336
+    assert!((bd.total_cost_usd - 17.336).abs() < 1e-6);
 }
 
 #[tokio::test]

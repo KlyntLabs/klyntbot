@@ -7,22 +7,30 @@ use common::Result;
 use std::collections::HashMap;
 use std::path::Path;
 
-pub async fn aggregate(
-    sessions: &[SessionSummary],
-) -> Result<StatsBundle> {
+pub async fn aggregate(sessions: &[SessionSummary]) -> Result<StatsBundle> {
     let mut per_project: HashMap<String, ProjectTotals> = HashMap::new();
     let mut tool_usage: HashMap<String, ToolUsage> = HashMap::new();
     let mut subagent_types: HashMap<String, u32> = HashMap::new();
     let mut token_series: HashMap<String, TokenSeriesPoint> = HashMap::new();
 
     for s in sessions {
-        let key = s.project_basename.clone().unwrap_or_else(|| "(unknown)".to_string());
-        let entry = per_project.entry(key.clone()).or_insert_with(|| ProjectTotals {
-            project_basename: key,
-            cwd: s.cwd.clone().unwrap_or_default(),
-            session_count: 0, turn_count: 0, tool_call_count: 0, error_count: 0,
-            total_input_tokens: 0, total_output_tokens: 0, cache_read_tokens: 0,
-        });
+        let key = s
+            .project_basename
+            .clone()
+            .unwrap_or_else(|| "(unknown)".to_string());
+        let entry = per_project
+            .entry(key.clone())
+            .or_insert_with(|| ProjectTotals {
+                project_basename: key,
+                cwd: s.cwd.clone().unwrap_or_default(),
+                session_count: 0,
+                turn_count: 0,
+                tool_call_count: 0,
+                error_count: 0,
+                total_input_tokens: 0,
+                total_output_tokens: 0,
+                cache_read_tokens: 0,
+            });
         entry.session_count += 1;
         entry.turn_count += s.turn_count;
         entry.tool_call_count += s.tool_call_count;
@@ -31,7 +39,9 @@ pub async fn aggregate(
         // Per-day token spend keyed by `last_event_at` day.
         let day = s.last_event_at.to_string()[..10].to_string();
         let p = token_series.entry(day.clone()).or_insert(TokenSeriesPoint {
-            day, input_tokens: 0, output_tokens: 0,
+            day,
+            input_tokens: 0,
+            output_tokens: 0,
         });
 
         // Re-load each session's wire to get tool-name + token totals.
@@ -46,12 +56,17 @@ pub async fn aggregate(
 
         for ev in &loaded.events {
             if ev.category == SemanticCategory::ToolCall {
-                let tool = ev.payload.get("function")
+                let tool = ev
+                    .payload
+                    .get("function")
                     .and_then(|f| f.get("name"))
                     .and_then(|v| v.as_str())
-                    .unwrap_or("(unknown)").to_string();
+                    .unwrap_or("(unknown)")
+                    .to_string();
                 let u = tool_usage.entry(tool.clone()).or_insert(ToolUsage {
-                    tool, call_count: 0, error_count: 0,
+                    tool,
+                    call_count: 0,
+                    error_count: 0,
                 });
                 u.call_count += 1;
             }
@@ -71,9 +86,13 @@ pub async fn aggregate(
         }
     }
 
-    let mut errors_by_tool: Vec<ErrorByTool> = tool_usage.values()
+    let mut errors_by_tool: Vec<ErrorByTool> = tool_usage
+        .values()
         .filter(|u| u.error_count > 0)
-        .map(|u| ErrorByTool { tool: u.tool.clone(), error_count: u.error_count })
+        .map(|u| ErrorByTool {
+            tool: u.tool.clone(),
+            error_count: u.error_count,
+        })
         .collect();
     errors_by_tool.sort_by(|a, b| b.error_count.cmp(&a.error_count));
 
@@ -86,8 +105,12 @@ pub async fn aggregate(
     let mut token_series: Vec<TokenSeriesPoint> = token_series.into_values().collect();
     token_series.sort_by(|a, b| a.day.cmp(&b.day));
 
-    let mut subagent_types: Vec<SubagentTypeCount> = subagent_types.into_iter()
-        .map(|(t, c)| SubagentTypeCount { subagent_type: t, count: c })
+    let mut subagent_types: Vec<SubagentTypeCount> = subagent_types
+        .into_iter()
+        .map(|(t, c)| SubagentTypeCount {
+            subagent_type: t,
+            count: c,
+        })
         .collect();
     subagent_types.sort_by(|a, b| b.count.cmp(&a.count));
 
@@ -99,7 +122,14 @@ pub async fn aggregate(
         0.0
     };
 
-    Ok(StatsBundle { per_project, tool_usage, errors_by_tool, token_series, subagent_types, cache_hit_pct })
+    Ok(StatsBundle {
+        per_project,
+        tool_usage,
+        errors_by_tool,
+        token_series,
+        subagent_types,
+        cache_hit_pct,
+    })
 }
 
 fn associated_tool(events: &[TraceEvent], seq: u64) -> Option<String> {
@@ -107,8 +137,12 @@ fn associated_tool(events: &[TraceEvent], seq: u64) -> Option<String> {
     let result = events.iter().find(|e| e.seq == seq)?;
     let id = result.payload.get("id").and_then(|v| v.as_str())?;
     let call = events.iter().rev().find(|e| {
-        e.category == SemanticCategory::ToolCall &&
-        e.payload.get("id").and_then(|v| v.as_str()) == Some(id)
+        e.category == SemanticCategory::ToolCall
+            && e.payload.get("id").and_then(|v| v.as_str()) == Some(id)
     })?;
-    call.payload.get("function")?.get("name")?.as_str().map(|s| s.to_string())
+    call.payload
+        .get("function")?
+        .get("name")?
+        .as_str()
+        .map(|s| s.to_string())
 }

@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use tracing::{warn};
+use tracing::warn;
 use uuid::Uuid;
 
 use bus::{ContextUpdateReason, DomainEvent};
@@ -67,8 +67,9 @@ impl FinanceTreeBuilder {
                         amount,
                         is_over_budget,
                     } => {
-                        if let Err(e) =
-                            this.handle_transaction(&category, amount, is_over_budget).await
+                        if let Err(e) = this
+                            .handle_transaction(&category, amount, is_over_budget)
+                            .await
                         {
                             warn!(
                                 category = %category,
@@ -265,8 +266,7 @@ pub fn build_alert_nodes(
     } else {
         100
     };
-    let alert_content =
-        format!("Budget alert: {category} at {pct}% (${spent:.2} of ${limit:.2})");
+    let alert_content = format!("Budget alert: {category} at {pct}% (${spent:.2} of ${limit:.2})");
 
     vec![
         // Level 0 — daily root
@@ -317,8 +317,8 @@ pub fn build_alert_nodes(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::tree_builder_base::{compose_embedding_text, slugify};
+    use super::*;
 
     // --- slugify ---
 

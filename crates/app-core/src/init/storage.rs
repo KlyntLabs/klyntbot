@@ -207,7 +207,9 @@ pub(super) async fn init_storage(
                 (p, maybe_manager, m)
             }
             Err(e) => {
-                warn!("No LLM provider configured ({e}), using noop — setup wizard will handle configuration");
+                warn!(
+                    "No LLM provider configured ({e}), using noop — setup wizard will handle configuration"
+                );
                 let noop: providers::DynProvider = Arc::new(providers::NoopProvider);
                 (noop, None, config.agents.defaults.model.clone())
             }

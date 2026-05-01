@@ -3,8 +3,8 @@
 use std::fmt::Write;
 
 use async_trait::async_trait;
-use context_engine::source::{ContextSource, SourceContext};
 use context_engine::TtlCache;
+use context_engine::source::{ContextSource, SourceContext};
 use tracing::warn;
 
 /// Default TTL for cached area context (seconds).

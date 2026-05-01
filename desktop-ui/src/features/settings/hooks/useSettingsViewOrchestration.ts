@@ -255,6 +255,7 @@ export function useSettingsViewOrchestration({
     agentsSectionProps,
     codexSectionProps,
     featuresSectionProps,
+    codingSectionProps: {},
   };
 }
 

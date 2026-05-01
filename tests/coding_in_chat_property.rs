@@ -95,7 +95,6 @@ proptest! {
     }
 }
 
-
 proptest! {
     /// K3 — Approval gate composition.
     /// For any (Layer1 decision, Layer2 decision) pair, the merged decision

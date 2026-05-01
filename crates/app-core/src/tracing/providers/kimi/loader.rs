@@ -56,10 +56,14 @@ pub async fn load_session_events(
     let mut last_status_token_usage: Option<Value> = None;
 
     let mut reader = BufReader::new(file).lines();
-    while let Some(line) = reader.next_line().await
+    while let Some(line) = reader
+        .next_line()
+        .await
         .map_err(|e| common::KlyntbotError::Storage(format!("read line: {e}")))?
     {
-        if line.trim().is_empty() { continue; }
+        if line.trim().is_empty() {
+            continue;
+        }
         let parsed = match parse_line(&line) {
             Ok(p) => p,
             Err(e) => {
@@ -95,10 +99,20 @@ pub async fn load_session_events(
                         SemanticCategory::CompactionBegin => stats.compaction_count += 1,
                         SemanticCategory::StatusUpdate => {
                             if let Some(usage) = payload.get("token_usage") {
-                                let other = usage.get("input_other").and_then(Value::as_u64).unwrap_or(0);
-                                let cache_read = usage.get("input_cache_read").and_then(Value::as_u64).unwrap_or(0);
-                                let cache_creation = usage.get("input_cache_creation").and_then(Value::as_u64).unwrap_or(0);
-                                let output = usage.get("output").and_then(Value::as_u64).unwrap_or(0);
+                                let other = usage
+                                    .get("input_other")
+                                    .and_then(Value::as_u64)
+                                    .unwrap_or(0);
+                                let cache_read = usage
+                                    .get("input_cache_read")
+                                    .and_then(Value::as_u64)
+                                    .unwrap_or(0);
+                                let cache_creation = usage
+                                    .get("input_cache_creation")
+                                    .and_then(Value::as_u64)
+                                    .unwrap_or(0);
+                                let output =
+                                    usage.get("output").and_then(Value::as_u64).unwrap_or(0);
                                 stats.total_input_tokens += other + cache_read + cache_creation;
                                 stats.total_output_tokens += output;
                                 stats.cache_read_tokens += cache_read;
@@ -129,13 +143,21 @@ pub async fn load_session_events(
     }
 
     if let (Some(start), Some(end)) = (first_ts, last_ts) {
-        stats.total_duration_ms =
-            (end.as_millisecond() - start.as_millisecond()).max(0) as u64;
+        stats.total_duration_ms = (end.as_millisecond() - start.as_millisecond()).max(0) as u64;
     }
     if let Some(usage) = last_status_token_usage {
-        let other = usage.get("input_other").and_then(Value::as_u64).unwrap_or(0);
-        let cache_read = usage.get("input_cache_read").and_then(Value::as_u64).unwrap_or(0);
-        let cache_creation = usage.get("input_cache_creation").and_then(Value::as_u64).unwrap_or(0);
+        let other = usage
+            .get("input_other")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let cache_read = usage
+            .get("input_cache_read")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let cache_creation = usage
+            .get("input_cache_creation")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
         let denom = (other + cache_read + cache_creation) as f32;
         stats.cache_hit_pct = if denom > 0.0 {
             (cache_read as f32) / denom * 100.0
@@ -144,12 +166,21 @@ pub async fn load_session_events(
         };
     }
 
-    let events: Vec<TraceEvent> = events.into_iter().enumerate().map(|(i, mut e)| {
-        e.seq = i as u64;
-        e
-    }).collect();
+    let events: Vec<TraceEvent> = events
+        .into_iter()
+        .enumerate()
+        .map(|(i, mut e)| {
+            e.seq = i as u64;
+            e
+        })
+        .collect();
 
-    Ok(LoadedSession { events, stats, truncated, total_event_count: total })
+    Ok(LoadedSession {
+        events,
+        stats,
+        truncated,
+        total_event_count: total,
+    })
 }
 
 fn unix_seconds_to_ts(s: f64) -> Timestamp {
@@ -171,7 +202,9 @@ mod tests {
 
     #[tokio::test]
     async fn loads_fixture_session() {
-        let res = load_session_events(&fixture_wire(), "kimi", None, 1).await.unwrap();
+        let res = load_session_events(&fixture_wire(), "kimi", None, 1)
+            .await
+            .unwrap();
         // 1 turn, 2 steps, 1 tool call (paired), 0 errors, 0 compactions, 1 agent (passed in).
         assert_eq!(res.stats.turn_count, 1);
         assert_eq!(res.stats.step_count, 2);

@@ -1482,10 +1482,10 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
+    use crate::test_utils::MockProvider;
     use cognitive::situation::UserSituation;
     use cognitive::types::{SemanticFact, DEFAULT_MEMORY_TYPE};
     use feature_coaching::signal_accumulator::TriggerFired;
-    use crate::test_utils::MockProvider;
     use providers::LlmResponse;
 
     // ── Test helpers ──

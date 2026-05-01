@@ -4,14 +4,14 @@
 //! (Telegram/Discord/Slack/Email), the evaluator falls back to the
 //! configured `non_ui_policy`.
 
+use bus::DomainEventBus;
+use common::tool_channel::{Channel, NonUiPolicy};
+use klynt_core::approval::{evaluate, ApprovalDecision, GuardCtx, Layer1, PendingApprovalsMap};
+use klynt_core::privacy::PrivacyGuard;
+use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use klynt_core::approval::{evaluate, GuardCtx, ApprovalDecision, Layer1, PendingApprovalsMap};
-use klynt_core::privacy::PrivacyGuard;
-use klynt_execpolicy::Policy;
-use bus::DomainEventBus;
-use common::tool_channel::{Channel, NonUiPolicy};
 use tools_core::events::ToolEvent;
 
 fn build_ask_layer1() -> Arc<Layer1> {
@@ -37,7 +37,10 @@ fn build_ctx<'a>(
     non_ui_policy: NonUiPolicy,
 ) -> GuardCtx<'a> {
     GuardCtx {
-        layer1, policy, privacy, pending,
+        layer1,
+        policy,
+        privacy,
+        pending,
         event_tx,
         domain_bus: bus,
         cancel: CancellationToken::new(),
@@ -56,8 +59,16 @@ async fn ask_in_telegram_with_allow_policy_returns_auto_allowed() {
     let privacy = PrivacyGuard::from_globs(&[]).unwrap();
     let pending = Arc::new(PendingApprovalsMap::default());
     let bus = Arc::new(DomainEventBus::new(8));
-    let ctx = build_ctx(&layer1, &policy, &privacy, &pending, None, &bus,
-                        Channel::Other, NonUiPolicy::Allow);
+    let ctx = build_ctx(
+        &layer1,
+        &policy,
+        &privacy,
+        &pending,
+        None,
+        &bus,
+        Channel::Other,
+        NonUiPolicy::Allow,
+    );
     let dec = evaluate(ctx, "web_fetch", "https://example.com").await;
     assert!(matches!(dec, ApprovalDecision::Auto { allowed: true, .. }));
 }
@@ -69,8 +80,16 @@ async fn ask_in_telegram_with_deny_policy_returns_auto_denied() {
     let privacy = PrivacyGuard::from_globs(&[]).unwrap();
     let pending = Arc::new(PendingApprovalsMap::default());
     let bus = Arc::new(DomainEventBus::new(8));
-    let ctx = build_ctx(&layer1, &policy, &privacy, &pending, None, &bus,
-                        Channel::Other, NonUiPolicy::DenyWithError);
+    let ctx = build_ctx(
+        &layer1,
+        &policy,
+        &privacy,
+        &pending,
+        None,
+        &bus,
+        Channel::Other,
+        NonUiPolicy::DenyWithError,
+    );
     let dec = evaluate(ctx, "web_fetch", "https://example.com").await;
     assert!(matches!(dec, ApprovalDecision::Auto { allowed: false, .. }));
 }
@@ -86,8 +105,16 @@ async fn ask_in_coding_chat_does_not_degrade() {
     // so we cancel immediately and assert TimedOut.
     let token = CancellationToken::new();
     token.cancel();
-    let mut ctx = build_ctx(&layer1, &policy, &privacy, &pending, None, &bus,
-                            Channel::Coding, NonUiPolicy::Allow);
+    let mut ctx = build_ctx(
+        &layer1,
+        &policy,
+        &privacy,
+        &pending,
+        None,
+        &bus,
+        Channel::Coding,
+        NonUiPolicy::Allow,
+    );
     ctx.cancel = token;
     let dec = evaluate(ctx, "web_fetch", "https://example.com").await;
     // In coding mode, degradation is bypassed → falls into round-trip → cancelled.

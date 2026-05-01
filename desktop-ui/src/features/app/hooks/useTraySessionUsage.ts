@@ -72,20 +72,29 @@ export function useTraySessionUsage({
 
     let cancelled = false;
     let timeoutId: number | null = null;
+    let retries = 0;
+    const MAX_RETRIES = 3;
 
-    timeoutId = window.setTimeout(() => {
+    const attemptSync = () => {
+      timeoutId = null;
       void setTraySessionUsage(usage)
         .then(() => {
           if (!cancelled) lastSyncedUsageRef.current = serializedUsage;
         })
         .catch((error) => {
           if (cancelled) return;
-          // Mark this payload as "attempted" so we don't loop. A genuine usage
-          // change will re-trigger the effect naturally.
-          lastSyncedUsageRef.current = serializedUsage;
           console.warn("[tray] setTraySessionUsage failed", error);
+          if (retries < MAX_RETRIES) {
+            retries++;
+            timeoutId = window.setTimeout(attemptSync, SYNC_DEBOUNCE_MS);
+          } else {
+            // Exhausted retries — mark as attempted so we don't loop forever.
+            lastSyncedUsageRef.current = serializedUsage;
+          }
         });
-    }, SYNC_DEBOUNCE_MS);
+    };
+
+    timeoutId = window.setTimeout(attemptSync, SYNC_DEBOUNCE_MS);
 
     return () => {
       cancelled = true;

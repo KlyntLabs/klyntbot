@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use tracing::{warn};
+use tracing::warn;
 
 use bus::{ContextUpdateReason, DomainEvent};
 
@@ -333,8 +333,8 @@ pub fn build_milestone_nodes(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::tree_builder_base::{compose_embedding_text, slugify};
+    use super::*;
 
     // --- slugify ---
 

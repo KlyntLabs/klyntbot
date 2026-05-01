@@ -1127,15 +1127,18 @@ impl AgentLoop {
 
         let channel: common::ChannelName = mode
             .as_deref()
-            .map(|m| if m == "coding" { common::CODING_CHANNEL.into() } else { "desktop".into() })
+            .map(|m| {
+                if m == "coding" {
+                    common::CODING_CHANNEL.into()
+                } else {
+                    "desktop".into()
+                }
+            })
             .unwrap_or_else(|| "desktop".into());
 
         // Routing context with interaction channel for ask_user tool
-        let routing_ctx = RoutingContext::with_interaction(
-            channel,
-            session_key.clone().into(),
-            interaction_tx,
-        );
+        let routing_ctx =
+            RoutingContext::with_interaction(channel, session_key.clone().into(), interaction_tx);
 
         let cancel_token = CancellationToken::new();
         let cancel_clone = cancel_token.clone();
@@ -1194,7 +1197,8 @@ impl AgentLoop {
                         .await;
                     if let Some(engine) = agent.runtime.hook_engine() {
                         let message_count = {
-                            if let Ok(session_arc) = agent.session_manager.get_or_create(&sk).await {
+                            if let Ok(session_arc) = agent.session_manager.get_or_create(&sk).await
+                            {
                                 let session = session_arc.lock().await;
                                 session.messages.len() as u64
                             } else {
@@ -1206,7 +1210,9 @@ impl AgentLoop {
                             message_count,
                             base: Default::default(),
                         };
-                        let _ = engine.fire(klynt_hooks::engine::HookFireInput::Stop(stop_input)).await;
+                        let _ = engine
+                            .fire(klynt_hooks::engine::HookFireInput::Stop(stop_input))
+                            .await;
                     }
                     Ok(response)
                 }
@@ -1223,7 +1229,9 @@ impl AgentLoop {
                             recoverable: false,
                             base: Default::default(),
                         };
-                        let _ = engine.fire(klynt_hooks::engine::HookFireInput::Error(error_input)).await;
+                        let _ = engine
+                            .fire(klynt_hooks::engine::HookFireInput::Error(error_input))
+                            .await;
                     }
                     let _ = event_tx
                         .send(AgentEvent::Error {

@@ -3,6 +3,8 @@ import { RequestUserInputMessage } from "@app/components/RequestUserInputMessage
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import { memo, useCallback } from "react";
+import { DeadEndWarning } from "@/features/coding/components/DeadEndWarning";
+import { RecallTrayCard } from "@/features/coding/components/RecallTrayCard";
 import { useApprovalQueue } from "@/features/coding/hooks/useApprovalQueue";
 import { useFileEditEvents } from "@/features/coding/hooks/useFileEditEvents";
 import type {
@@ -233,6 +235,26 @@ export const Messages = memo(function Messages({
     }
     if (item.kind === "approval") {
       return <ApprovalRow key={item.id} item={item} onRespond={handleApprovalRespond} />;
+    }
+    if (item.kind === "recall") {
+      return (
+        <RecallTrayCard
+          key={item.id}
+          memoryIds={item.memory_ids}
+          coverageScore={item.coverage_score}
+          snippets={item.snippets}
+        />
+      );
+    }
+    if (item.kind === "dead_end_warning") {
+      return (
+        <DeadEndWarning
+          key={item.id}
+          approachSummary={item.approach_summary}
+          priorAttemptId={item.prior_attempt_id}
+          confidence={item.confidence}
+        />
+      );
     }
     return null;
   };

@@ -1,13 +1,13 @@
 use bus::DomainEventBus;
+use common::tool_channel::{Channel, NonUiPolicy};
+use config::schema::CodingPermissions;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::web_fetch::{run_for_test as fetch_run, WebFetchArgs};
 use klynt_execpolicy::Policy;
-use config::schema::CodingPermissions;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use common::tool_channel::{Channel, NonUiPolicy};
 
 #[tokio::test]
 async fn fetches_text_from_local_server() {
@@ -17,17 +17,27 @@ async fn fetches_text_from_local_server() {
     drop(listener);
 
     let server = tokio::spawn(async move {
-        let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await.unwrap();
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
+            .await
+            .unwrap();
         let (mut s, _) = listener.accept().await.unwrap();
         let mut buf = [0u8; 1024];
         let _ = tokio::io::AsyncReadExt::read(&mut s, &mut buf).await;
         let body = "<html><body><h1>Title</h1><p>Hello world</p></body></html>";
-        let resp = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/html\r\n\r\n{}",
-            body.len(), body);
-        tokio::io::AsyncWriteExt::write_all(&mut s, resp.as_bytes()).await.unwrap();
+        let resp = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/html\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        tokio::io::AsyncWriteExt::write_all(&mut s, resp.as_bytes())
+            .await
+            .unwrap();
     });
 
-    let perms = CodingPermissions { allow: vec!["WebFetch(*)".into()], ..Default::default() };
+    let perms = CodingPermissions {
+        allow: vec!["WebFetch(*)".into()],
+        ..Default::default()
+    };
     let l1 = Arc::new(Layer1::compile(&perms).unwrap());
     let pol = Arc::new(Policy::empty());
     let pri = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
@@ -40,12 +50,27 @@ async fn fetches_text_from_local_server() {
         .build()
         .unwrap();
     let out = fetch_run(
-        WebFetchArgs { url, format: Some("text".into()), max_bytes: Some(8192) },
-        l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(), client,
-        Channel::Coding, NonUiPolicy::Allow,
+        WebFetchArgs {
+            url,
+            format: Some("text".into()),
+            max_bytes: Some(8192),
+        },
+        l1,
+        pol,
+        pri,
+        pen,
+        Some(tx),
+        bus,
+        CancellationToken::new(),
+        client,
+        Channel::Coding,
+        NonUiPolicy::Allow,
         Arc::new(klynt_core::approval::HostApprovalCache::default()),
-        None, "".to_string(),
-    ).await.unwrap();
+        None,
+        "".to_string(),
+    )
+    .await
+    .unwrap();
     server.await.ok();
     assert!(out.contains("Hello world"));
 }

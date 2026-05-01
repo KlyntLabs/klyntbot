@@ -1,8 +1,10 @@
-use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
+use crate::approval::{GuardCtx, Layer1, PendingApprovalsMap, evaluate};
 use crate::privacy::PrivacyGuard;
+use crate::tools::shared::file_edit_event::{FileEditEvent, emit_file_edit};
 use crate::tools::shared::fs_resolve::resolve_under_cwd;
-use crate::tools::shared::file_edit_event::{emit_file_edit, FileEditEvent};
-use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use, fire_pre_file_edit, fire_post_file_edit};
+use crate::tools::shared::hook_emit::{
+    fire_post_file_edit, fire_post_tool_use, fire_pre_file_edit, fire_pre_tool_use,
+};
 use async_trait::async_trait;
 use bus::DomainEventBus;
 use common::{KlyntbotError, Result, ToolError};
@@ -12,18 +14,20 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use tools_core::{RoutingContext, ToolExecute};
 use tools_core::events::ToolEvent;
+use tools_core::{RoutingContext, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
 pub struct ApplyPatchArgs {
     /// File path inside session cwd.
-    #[param(required)] pub path: String,
+    #[param(required)]
+    pub path: String,
     /// Unified-diff patch text. Headers `---`/`+++` are accepted but the file
     /// is identified by the `path` field, not the diff headers.
-    #[param(required)] pub patch: String,
+    #[param(required)]
+    pub patch: String,
 }
 
 #[derive(ToolDerive)]
@@ -50,12 +54,23 @@ pub struct ApplyPatchTool {
 
 impl ApplyPatchTool {
     pub fn new(
-        cwd: PathBuf, layer1: Arc<Layer1>, policy: Arc<Policy>, privacy: Arc<PrivacyGuard>,
+        cwd: PathBuf,
+        layer1: Arc<Layer1>,
+        policy: Arc<Policy>,
+        privacy: Arc<PrivacyGuard>,
         pending: Arc<PendingApprovalsMap>,
         bus: Arc<DomainEventBus>,
         non_ui_policy: common::tool_channel::NonUiPolicy,
     ) -> Self {
-        Self { cwd, layer1, policy, privacy, pending, bus, non_ui_policy }
+        Self {
+            cwd,
+            layer1,
+            policy,
+            privacy,
+            pending,
+            bus,
+            non_ui_policy,
+        }
     }
 }
 
@@ -63,17 +78,29 @@ impl ApplyPatchTool {
 impl ToolExecute for ApplyPatchTool {
     type Params = ApplyPatchArgs;
     async fn execute(&self, args: ApplyPatchArgs, ctx: &RoutingContext) -> Result<String> {
-        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
-        run_for_test(args, self.cwd.clone(), self.layer1.clone(), self.policy.clone(),
-            self.privacy.clone(), self.pending.clone(),
+        let session_id = ctx
+            .session_key
+            .clone()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        run_for_test(
+            args,
+            self.cwd.clone(),
+            self.layer1.clone(),
+            self.policy.clone(),
+            self.privacy.clone(),
+            self.pending.clone(),
             ctx.event_tx.clone(),
             self.bus.clone(),
-            ctx.cancel_token.clone().unwrap_or_else(CancellationToken::new),
+            ctx.cancel_token
+                .clone()
+                .unwrap_or_else(CancellationToken::new),
             common::tool_channel::Channel::from_name(ctx.channel.as_str()),
             self.non_ui_policy,
             ctx.hook_engine.clone(),
             session_id,
-        ).await
+        )
+        .await
     }
 }
 
@@ -98,9 +125,14 @@ pub async fn run_for_test(
     let path_str = resolved.to_string_lossy().into_owned();
     let request_id = Uuid::new_v4().to_string();
     let guard_ctx = GuardCtx {
-        layer1: &layer1, policy: &policy, privacy: &privacy,
-        pending: &pending, event_tx: event_tx.as_ref(), domain_bus: &bus,
-        cancel, request_id,
+        layer1: &layer1,
+        policy: &policy,
+        privacy: &privacy,
+        pending: &pending,
+        event_tx: event_tx.as_ref(),
+        domain_bus: &bus,
+        cancel,
+        request_id,
         args: Some(serde_json::to_value(&args).unwrap_or_default()),
         cwd: Some(cwd.to_string_lossy().into_owned()),
         channel,
@@ -108,18 +140,30 @@ pub async fn run_for_test(
     };
     let decision = evaluate(guard_ctx, "apply_patch", &path_str).await;
     if !decision.allowed() {
-        return Err(KlyntbotError::Tool(ToolError::PermissionDenied(format!("{decision:?}"))));
+        return Err(KlyntbotError::Tool(ToolError::PermissionDenied(format!(
+            "{decision:?}"
+        ))));
     }
 
-    if let Err(reason) = fire_pre_tool_use(hook_engine.as_ref(), session_id.clone(), "apply_patch", &args, None).await {
+    if let Err(reason) = fire_pre_tool_use(
+        hook_engine.as_ref(),
+        session_id.clone(),
+        "apply_patch",
+        &args,
+        None,
+    )
+    .await
+    {
         return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
     }
     let start = std::time::Instant::now();
     let result: Result<String> = (async {
-        let before = tokio::fs::read_to_string(&resolved).await
+        let before = tokio::fs::read_to_string(&resolved)
+            .await
             .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("read: {e}"))))?;
-        let patch = diffy::Patch::from_str(&args.patch)
-            .map_err(|e| KlyntbotError::Tool(ToolError::InvalidParams(format!("malformed patch: {e}"))))?;
+        let patch = diffy::Patch::from_str(&args.patch).map_err(|e| {
+            KlyntbotError::Tool(ToolError::InvalidParams(format!("malformed patch: {e}")))
+        })?;
         let after = diffy::apply(&before, &patch)
             .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("apply: {e}"))))?;
         let bytes_before = before.len() as u64;
@@ -134,7 +178,8 @@ pub async fn run_for_test(
             diff_preview.clone(),
             bytes_before,
             bytes_after,
-        ).await;
+        )
+        .await;
         let mut final_content = after;
         match pre_file_result {
             Ok(None) => {}
@@ -155,14 +200,36 @@ pub async fn run_for_test(
             "patch",
             (final_content.len() as i64) - (bytes_before as i64),
             write_ok,
-        ).await;
-        write_result.map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("write: {e}"))))?;
+        )
+        .await;
+        write_result
+            .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("write: {e}"))))?;
 
-        emit_file_edit(&event_tx, &bus, FileEditEvent {
-            op: "apply_patch", path: &path_str, bytes: final_content.len() as u64, diff_full: args.patch.clone(),
-        }).await;
-        Ok(format!("applied patch to {} ({} bytes)", path_str, final_content.len()))
-    }).await;
-    fire_post_tool_use(hook_engine.as_ref(), session_id, "apply_patch", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        emit_file_edit(
+            &event_tx,
+            &bus,
+            FileEditEvent {
+                op: "apply_patch",
+                path: &path_str,
+                bytes: final_content.len() as u64,
+                diff_full: args.patch.clone(),
+            },
+        )
+        .await;
+        Ok(format!(
+            "applied patch to {} ({} bytes)",
+            path_str,
+            final_content.len()
+        ))
+    })
+    .await;
+    fire_post_tool_use(
+        hook_engine.as_ref(),
+        session_id,
+        "apply_patch",
+        result.is_ok(),
+        start.elapsed().as_millis() as u64,
+    )
+    .await;
     result
 }

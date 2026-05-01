@@ -279,30 +279,90 @@ impl AgentRuntime {
         // Bridge ToolEvent channel → AgentEvent channel so klynt-core tools
         // can emit events without depending on the agent crate.
         let tool_event_tx = event_tx.as_ref().map(|agent_tx| {
-            let (tool_tx, mut tool_rx) = tokio::sync::mpsc::channel::<tools_core::events::ToolEvent>(64);
+            let (tool_tx, mut tool_rx) =
+                tokio::sync::mpsc::channel::<tools_core::events::ToolEvent>(64);
             let agent_tx = agent_tx.clone();
             tokio::spawn(async move {
                 while let Some(tool_evt) = tool_rx.recv().await {
                     let agent_evt = match tool_evt {
-                        tools_core::events::ToolEvent::FileEditWithSymbols { path, op, bytes, diff_full, anchored_symbols, lsp_diagnostics_delta } => {
-                            AgentEvent::FileEditWithSymbols { path, op, bytes, diff_full, anchored_symbols, lsp_diagnostics_delta }
-                        }
-                        tools_core::events::ToolEvent::SandboxPolicyApplied { tool, policy_summary, policy_hash, fallback_unsandboxed, fs_constraints, network_constraints } => {
-                            AgentEvent::SandboxPolicyApplied { tool, policy_summary, policy_hash, fallback_unsandboxed, fs_constraints, network_constraints }
-                        }
-                        tools_core::events::ToolEvent::PlanModeChanged { in_plan_mode, plan_id } => {
-                            AgentEvent::PlanModeChanged {
-                                session_key: plan_id.unwrap_or_default(),
-                                active: in_plan_mode,
-                                requested_by: "tool".into(),
-                            }
-                        }
-                        tools_core::events::ToolEvent::ApprovalRequested { request_id, tool, args_hash, layer, rule_matched, mirror_history, sandbox_summary, requires_user_input, args, cwd, layer_reason } => {
-                            AgentEvent::ApprovalRequested { request_id, tool, args_hash, layer, rule_matched, mirror_history, sandbox_summary, requires_user_input, args, cwd, layer_reason }
-                        }
-                        tools_core::events::ToolEvent::ApprovalResolved { request_id, decision, decision_reason, latency_ms, persisted_rule, decided_by } => {
-                            AgentEvent::ApprovalResolved { request_id, decision, decision_reason, latency_ms, persisted_rule, decided_by }
-                        }
+                        tools_core::events::ToolEvent::FileEditWithSymbols {
+                            path,
+                            op,
+                            bytes,
+                            diff_full,
+                            anchored_symbols,
+                            lsp_diagnostics_delta,
+                        } => AgentEvent::FileEditWithSymbols {
+                            path,
+                            op,
+                            bytes,
+                            diff_full,
+                            anchored_symbols,
+                            lsp_diagnostics_delta,
+                        },
+                        tools_core::events::ToolEvent::SandboxPolicyApplied {
+                            tool,
+                            policy_summary,
+                            policy_hash,
+                            fallback_unsandboxed,
+                            fs_constraints,
+                            network_constraints,
+                        } => AgentEvent::SandboxPolicyApplied {
+                            tool,
+                            policy_summary,
+                            policy_hash,
+                            fallback_unsandboxed,
+                            fs_constraints,
+                            network_constraints,
+                        },
+                        tools_core::events::ToolEvent::PlanModeChanged {
+                            in_plan_mode,
+                            plan_id,
+                        } => AgentEvent::PlanModeChanged {
+                            session_key: plan_id.unwrap_or_default(),
+                            active: in_plan_mode,
+                            requested_by: "tool".into(),
+                        },
+                        tools_core::events::ToolEvent::ApprovalRequested {
+                            request_id,
+                            tool,
+                            args_hash,
+                            layer,
+                            rule_matched,
+                            mirror_history,
+                            sandbox_summary,
+                            requires_user_input,
+                            args,
+                            cwd,
+                            layer_reason,
+                        } => AgentEvent::ApprovalRequested {
+                            request_id,
+                            tool,
+                            args_hash,
+                            layer,
+                            rule_matched,
+                            mirror_history,
+                            sandbox_summary,
+                            requires_user_input,
+                            args,
+                            cwd,
+                            layer_reason,
+                        },
+                        tools_core::events::ToolEvent::ApprovalResolved {
+                            request_id,
+                            decision,
+                            decision_reason,
+                            latency_ms,
+                            persisted_rule,
+                            decided_by,
+                        } => AgentEvent::ApprovalResolved {
+                            request_id,
+                            decision,
+                            decision_reason,
+                            latency_ms,
+                            persisted_rule,
+                            decided_by,
+                        },
                         _ => continue,
                     };
                     let _ = agent_tx.send(agent_evt).await;
@@ -831,7 +891,8 @@ mod tests {
     use crate::test_utils::MockProvider;
 
     async fn make_runtime(response: &str) -> (AgentRuntime, Arc<RwLock<ToolRegistry>>) {
-        let provider: DynProvider = Arc::new(MockProvider::with_text(response).context_window(128_000));
+        let provider: DynProvider =
+            Arc::new(MockProvider::with_text(response).context_window(128_000));
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
         let core = Arc::new(crate::execution::ExecutionCore::new(
             provider,

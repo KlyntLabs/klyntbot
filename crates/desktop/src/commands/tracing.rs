@@ -8,7 +8,9 @@ pub async fn tracing_list_providers() -> Vec<app_core::tracing::types::ProviderI
 }
 
 #[klynt_command]
-pub async fn tracing_list_sessions(provider_id: String) -> Vec<app_core::tracing::types::SessionSummary> {
+pub async fn tracing_list_sessions(
+    provider_id: String,
+) -> Vec<app_core::tracing::types::SessionSummary> {
     state.tracing_list_sessions(provider_id).await
 }
 
@@ -18,7 +20,9 @@ pub async fn tracing_load_session(
     session_id: String,
     scope: app_core::tracing::types::Scope,
 ) -> app_core::tracing::types::SessionDetail {
-    state.tracing_load_session(provider_id, session_id, scope).await
+    state
+        .tracing_load_session(provider_id, session_id, scope)
+        .await
 }
 
 #[klynt_command]
@@ -27,7 +31,9 @@ pub async fn tracing_load_context(
     session_id: String,
     scope: app_core::tracing::types::Scope,
 ) -> Vec<app_core::tracing::types::ContextMessage> {
-    state.tracing_load_context(provider_id, session_id, scope).await
+    state
+        .tracing_load_context(provider_id, session_id, scope)
+        .await
 }
 
 #[klynt_command]

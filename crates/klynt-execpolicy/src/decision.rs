@@ -20,8 +20,8 @@ impl Decision {
     /// alias accepts both `"ask"` and `"prompt"`.
     pub fn from_starlark_str(s: &str) -> Option<Self> {
         match s {
-            "allow"             => Some(Self::Allow),
-            "ask" | "prompt"    => Some(Self::Ask),
+            "allow" => Some(Self::Allow),
+            "ask" | "prompt" => Some(Self::Ask),
             "forbid" | "forbidden" => Some(Self::Forbid),
             _ => None,
         }

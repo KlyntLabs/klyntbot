@@ -35,26 +35,34 @@ impl LinuxSandboxRunner {
         let bwrap_present = which::which("bwrap").is_ok();
         let landlock_present = is_landlock_available();
         let mode = match (bwrap_present, landlock_present) {
-            (true,  true)  => SandboxMode::WithBwrap,
-            (true,  false) => SandboxMode::WithBwrap,    // bwrap suffices for namespaces
-            (false, true)  => SandboxMode::LandlockOnly,
+            (true, true) => SandboxMode::WithBwrap,
+            (true, false) => SandboxMode::WithBwrap, // bwrap suffices for namespaces
+            (false, true) => SandboxMode::LandlockOnly,
             (false, false) => SandboxMode::Unavailable,
         };
         Ok(Self { helper_path, mode })
     }
 
-    pub fn mode(&self) -> SandboxMode { self.mode }
+    pub fn mode(&self) -> SandboxMode {
+        self.mode
+    }
 }
 
 pub fn locate_helper(parent_exe: Option<&Path>) -> Result<PathBuf, SandboxError> {
     if let Some(exe) = parent_exe {
         if let Some(dir) = exe.parent() {
             let candidate = dir.join("klynt-sandbox-helper");
-            if candidate.exists() { return Ok(candidate); }
+            if candidate.exists() {
+                return Ok(candidate);
+            }
         }
     }
-    if let Ok(p) = which::which("klynt-sandbox-helper") { return Ok(p); }
-    Err(SandboxError::Unavailable("klynt-sandbox-helper not found".into()))
+    if let Ok(p) = which::which("klynt-sandbox-helper") {
+        return Ok(p);
+    }
+    Err(SandboxError::Unavailable(
+        "klynt-sandbox-helper not found".into(),
+    ))
 }
 
 fn is_landlock_available() -> bool {
@@ -77,24 +85,28 @@ impl SandboxRunner for LinuxSandboxRunner {
     ) -> Result<CommandOutput, SandboxError> {
         if matches!(self.mode, SandboxMode::Unavailable) {
             return Err(SandboxError::Unavailable(
-                "neither bwrap nor Landlock available on this host".into()
+                "neither bwrap nor Landlock available on this host".into(),
             ));
         }
 
         let helper_mode = match self.mode {
-            SandboxMode::WithBwrap     => HelperMode::WithBwrap,
-            SandboxMode::LandlockOnly  => HelperMode::LandlockOnly,
-            SandboxMode::Unavailable   => unreachable!(),
+            SandboxMode::WithBwrap => HelperMode::WithBwrap,
+            SandboxMode::LandlockOnly => HelperMode::LandlockOnly,
+            SandboxMode::Unavailable => unreachable!(),
         };
-        let policy_b64 = HelperPolicy { mode: helper_mode, sandbox: policy.clone() }
-            .to_base64_json()
-            .map_err(|e| SandboxError::PolicyGen(e.to_string()))?;
+        let policy_b64 = HelperPolicy {
+            mode: helper_mode,
+            sandbox: policy.clone(),
+        }
+        .to_base64_json()
+        .map_err(|e| SandboxError::PolicyGen(e.to_string()))?;
 
         let mut command = match self.mode {
             SandboxMode::WithBwrap => {
                 // bwrap … -- helper --landlock <b64> -- <program> <args...>
                 let helper_str = self.helper_path.to_string_lossy().into_owned();
-                let mut helper_args: Vec<&str> = vec!["--landlock", policy_b64.as_str(), "--", program];
+                let mut helper_args: Vec<&str> =
+                    vec!["--landlock", policy_b64.as_str(), "--", program];
                 helper_args.extend(args.iter().copied());
                 let bwrap_args = build_bwrap_args(policy, &helper_str, &helper_args);
                 let mut c = Command::new("/usr/bin/bwrap");
@@ -103,16 +115,23 @@ impl SandboxRunner for LinuxSandboxRunner {
             }
             SandboxMode::LandlockOnly => {
                 let mut c = Command::new(&self.helper_path);
-                c.arg("--landlock-only").arg(&policy_b64).arg("--").arg(program).args(args);
+                c.arg("--landlock-only")
+                    .arg(&policy_b64)
+                    .arg("--")
+                    .arg(program)
+                    .args(args);
                 c
             }
             SandboxMode::Unavailable => unreachable!(),
         };
 
-        if let Some(d) = cwd { command.current_dir(d); }
-        command.stdin(std::process::Stdio::null())
-               .stdout(std::process::Stdio::piped())
-               .stderr(std::process::Stdio::piped());
+        if let Some(d) = cwd {
+            command.current_dir(d);
+        }
+        command
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
 
         let child = command.spawn()?;
         let out = match tokio::time::timeout(timeout, child.wait_with_output()).await {
@@ -126,9 +145,11 @@ impl SandboxRunner for LinuxSandboxRunner {
             return Err(SandboxError::Unavailable("landlock not enforced".into()));
         }
         Ok(CommandOutput {
-            stdout: format!("{}{}",
+            stdout: format!(
+                "{}{}",
                 String::from_utf8_lossy(&out.stdout),
-                String::from_utf8_lossy(&out.stderr)),
+                String::from_utf8_lossy(&out.stderr)
+            ),
             exit_code,
         })
     }

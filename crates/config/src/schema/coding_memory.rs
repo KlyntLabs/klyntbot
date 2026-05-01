@@ -187,6 +187,28 @@ impl Default for CodingRuleArtifactsConfig {
 pub struct CodingSkillsConfig {
     pub project_skills: bool,
     pub location: String,
+    #[serde(default = "default_true")]
+    pub enable_conditional_activation: bool,
+    #[serde(default = "default_true")]
+    pub enable_dynamic_discovery: bool,
+    #[serde(default = "default_max_active")]
+    pub max_active_skills: u32,
+    #[serde(default = "default_token_budget")]
+    pub frontmatter_token_budget: u32,
+    #[serde(default)]
+    pub always_activate: Vec<String>,
+    #[serde(default)]
+    pub never_activate: Vec<String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+fn default_max_active() -> u32 {
+    30
+}
+fn default_token_budget() -> u32 {
+    2000
 }
 
 impl Default for CodingSkillsConfig {
@@ -194,6 +216,12 @@ impl Default for CodingSkillsConfig {
         Self {
             project_skills: true,
             location: "private".to_string(),
+            enable_conditional_activation: true,
+            enable_dynamic_discovery: true,
+            max_active_skills: 30,
+            frontmatter_token_budget: 2000,
+            always_activate: vec![],
+            never_activate: vec![],
         }
     }
 }

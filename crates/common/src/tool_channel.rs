@@ -57,9 +57,9 @@ impl ChannelMask {
     #[inline]
     pub fn allows(self, ch: Channel) -> bool {
         let bit = match ch {
-            Channel::Coding  => Self::CODING,
+            Channel::Coding => Self::CODING,
             Channel::Desktop => Self::DESKTOP,
-            Channel::Other   => Self::OTHER,
+            Channel::Other => Self::OTHER,
         };
         self.contains(bit)
     }
@@ -75,4 +75,3 @@ pub enum NonUiPolicy {
     /// Deny with an error explaining the configuration option.
     DenyWithError,
 }
-

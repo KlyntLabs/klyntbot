@@ -155,9 +155,7 @@ pub async fn chat_save_starlark_rule(
 }
 
 #[klynt_command]
-pub async fn coding_hooks_list(
-    app: tauri::AppHandle,
-) -> desktop_shared::HooksTomlSnapshot {
+pub async fn coding_hooks_list(app: tauri::AppHandle) -> desktop_shared::HooksTomlSnapshot {
     let core = app.state::<std::sync::Arc<app_core::AppCore>>();
     core.coding_hooks_list()
         .await
@@ -244,18 +242,15 @@ pub(crate) async fn dispatch_dev(
             let session_key = try_field!(dev::get_str(body, "sessionKey"));
             let mode: app_core::coding::mode_handler::ChatMode =
                 try_field!(dev::require(body, "mode"));
-            let result =
-                app_core::coding::mode_handler::set_mode(&core.repos, &session_key, mode)
-                    .await
-                    .map_err(|e| {
-                        let code = match &e {
-                            app_core::coding::mode_handler::ModeError::NotFound(_) => "NOT_FOUND",
-                            app_core::coding::mode_handler::ModeError::Storage(_) => {
-                                "STORAGE_ERROR"
-                            }
-                        };
-                        desktop_shared::errors::ApiError::new(code, e.to_string())
-                    });
+            let result = app_core::coding::mode_handler::set_mode(&core.repos, &session_key, mode)
+                .await
+                .map_err(|e| {
+                    let code = match &e {
+                        app_core::coding::mode_handler::ModeError::NotFound(_) => "NOT_FOUND",
+                        app_core::coding::mode_handler::ModeError::Storage(_) => "STORAGE_ERROR",
+                    };
+                    desktop_shared::errors::ApiError::new(code, e.to_string())
+                });
             dev::val(result)
         }
         _ => return None,

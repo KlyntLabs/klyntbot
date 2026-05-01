@@ -11,7 +11,9 @@ mod landlock_apply;
 #[cfg(target_os = "linux")]
 fn main() {
     use landlock::RulesetStatus;
-    use landlock_apply::{apply_landlock, apply_no_new_privs, EXIT_SANDBOX_SETUP_FAILED, EXIT_SANDBOX_UNAVAILABLE};
+    use landlock_apply::{
+        apply_landlock, apply_no_new_privs, EXIT_SANDBOX_SETUP_FAILED, EXIT_SANDBOX_UNAVAILABLE,
+    };
     use std::os::unix::process::CommandExt as _;
 
     let argv: Vec<String> = std::env::args().collect();
@@ -34,7 +36,10 @@ fn main() {
                 && parsed.policy.mode == klynt_sandbox::helper_proto::HelperMode::LandlockOnly
             {
                 // Landlock-only mode + not fully enforced = sandbox is missing.
-                eprintln!("klynt-sandbox-helper: landlock not fully enforced ({:?})", status.ruleset);
+                eprintln!(
+                    "klynt-sandbox-helper: landlock not fully enforced ({:?})",
+                    status.ruleset
+                );
                 std::process::exit(EXIT_SANDBOX_UNAVAILABLE);
             }
         }

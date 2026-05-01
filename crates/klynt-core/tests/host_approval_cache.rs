@@ -39,7 +39,9 @@ async fn resolve_propagates_to_pending_waiter() {
     let cache = Arc::new(HostApprovalCache::default());
     let key = HostKey::from_url("https://example.com").unwrap();
     let first = cache.check_or_register(key.clone());
-    let HostCheckResult::NewlyRegistered { tx } = first else { panic!() };
+    let HostCheckResult::NewlyRegistered { tx } = first else {
+        panic!()
+    };
     let mut rx = match cache.check_or_register(key.clone()) {
         HostCheckResult::AwaitPending(rx) => rx,
         other => panic!("expected AwaitPending, got {other:?}"),
@@ -50,7 +52,10 @@ async fn resolve_propagates_to_pending_waiter() {
     assert_eq!(*rx.borrow(), Some(HostDecision::AllowForSession));
     // After resolution, third call returns Cached.
     let third = cache.check_or_register(key);
-    assert!(matches!(third, HostCheckResult::Cached(HostDecision::AllowForSession)));
+    assert!(matches!(
+        third,
+        HostCheckResult::Cached(HostDecision::AllowForSession)
+    ));
 }
 
 #[tokio::test]
@@ -58,7 +63,9 @@ async fn allow_once_evicts_after_resolution() {
     let cache = Arc::new(HostApprovalCache::default());
     let key = HostKey::from_url("https://example.com").unwrap();
     let first = cache.check_or_register(key.clone());
-    let HostCheckResult::NewlyRegistered { tx } = first else { panic!() };
+    let HostCheckResult::NewlyRegistered { tx } = first else {
+        panic!()
+    };
     tx.send(Some(HostDecision::AllowOnce)).unwrap();
     cache.resolve(key.clone(), HostDecision::AllowOnce);
     // After AllowOnce resolution, the key is evicted: next call gets NewlyRegistered.
@@ -97,7 +104,12 @@ async fn parallel_calls_to_same_host_share_one_approval() {
             }
         }));
     }
-    for h in handles { h.await.unwrap(); }
-    assert_eq!(approval_count.load(Ordering::SeqCst), 1,
-               "exactly one approval round-trip should fire for 5 parallel calls");
+    for h in handles {
+        h.await.unwrap();
+    }
+    assert_eq!(
+        approval_count.load(Ordering::SeqCst),
+        1,
+        "exactly one approval round-trip should fire for 5 parallel calls"
+    );
 }

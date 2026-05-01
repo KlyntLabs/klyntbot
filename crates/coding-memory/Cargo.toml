@@ -40,6 +40,9 @@ git2 = { version = "0.19", default-features = false, features = ["vendored-libgi
 lru = "0.12"
 parking_lot = "0.12"
 
+[features]
+test-helpers = []
+
 [dev-dependencies]
 cognitive = { workspace = true }
 proptest = { workspace = true }

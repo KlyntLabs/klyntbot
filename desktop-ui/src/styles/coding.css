@@ -117,3 +117,107 @@
   max-height: 320px;
   overflow: auto;
 }
+
+/* ── CodingModePill ─────────────────────────────────────────────────── */
+.coding-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  background: var(--surface-2);
+  color: var(--text-1);
+  border: 1px solid var(--border-1);
+  cursor: pointer;
+}
+.coding-mode-pill.is-coding {
+  background: var(--accent-1);
+  color: var(--text-inverse);
+}
+.coding-mode-pill[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── SandboxStatusPill ──────────────────────────────────────────────── */
+.sandbox-pill {
+  font-size: var(--fs-xs);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.sandbox-pill--macos,
+.sandbox-pill--linux {
+  color: var(--success-fg);
+}
+.sandbox-pill--unsandboxed {
+  color: var(--warn-fg);
+  background: var(--warn-bg);
+}
+.sandbox-pill--idle {
+  color: var(--text-2);
+}
+
+/* ── CostPill ───────────────────────────────────────────────────────── */
+.cost-pill {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  padding: 2px 8px;
+}
+
+/* ── RecallTrayCard ─────────────────────────────────────────────────── */
+.recall-tray-card {
+  border: 1px solid var(--border-1);
+  border-radius: 4px;
+  margin: 8px 0;
+}
+.recall-tray-card__header {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  width: 100%;
+  background: var(--surface-1);
+  border: 0;
+  cursor: pointer;
+}
+.recall-tray-card__icon {
+  color: var(--accent-1);
+}
+.recall-tray-card__coverage {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.recall-tray-card__list {
+  list-style: none;
+  padding: 0 12px 12px;
+  margin: 0;
+}
+.recall-tray-card__list li {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: var(--fs-xs);
+}
+.recall-tray-card__kind {
+  color: var(--text-2);
+}
+.recall-tray-card__source {
+  color: var(--text-2);
+  font-style: italic;
+}
+
+/* ── DeadEndWarning ─────────────────────────────────────────────────── */
+.dead-end-warning {
+  display: flex;
+  gap: 8px;
+  padding: 6px 12px;
+  margin: 6px 0;
+  background: var(--warn-bg);
+  border-left: 2px solid var(--warn-fg);
+  font-size: var(--fs-xs);
+}
+.dead-end-warning__icon {
+  color: var(--warn-fg);
+}

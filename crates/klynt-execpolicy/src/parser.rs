@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use multimap::MultiMap;
 use starlark::any::ProvidesStaticType;
 use starlark::codemap::FileSpan;
@@ -8,14 +7,15 @@ use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
-use starlark::values::Value;
 use starlark::values::list::ListRef;
 use starlark::values::list::UnpackList;
 use starlark::values::none::NoneType;
+use starlark::values::Value;
 use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::HashMap;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::decision::Decision;
@@ -26,14 +26,14 @@ use crate::error::TextPosition;
 use crate::error::TextRange;
 use crate::executable_name::executable_lookup_key;
 use crate::executable_name::executable_path_lookup_key;
+use crate::rule::validate_match_examples;
+use crate::rule::validate_not_match_examples;
 use crate::rule::NetworkRule;
 use crate::rule::NetworkRuleProtocol;
 use crate::rule::PatternToken;
 use crate::rule::PrefixPattern;
 use crate::rule::PrefixRule;
 use crate::rule::RuleRef;
-use crate::rule::validate_match_examples;
-use crate::rule::validate_not_match_examples;
 
 pub struct PolicyParser {
     builder: RefCell<PolicyBuilder>,
@@ -471,7 +471,6 @@ fn policy_builtins(builder: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 }
-
 
 /// Convenience: parse Starlark source into a fully-built `Policy`.
 pub fn parse_to_policy(source: &str, path: &std::path::Path) -> Result<crate::policy::Policy> {

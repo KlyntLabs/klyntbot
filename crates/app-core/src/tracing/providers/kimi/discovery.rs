@@ -26,24 +26,44 @@ async fn scan_native(root: &Path, out: &mut Vec<DiscoveredSession>) -> Result<()
     let mut hashes = match tokio::fs::read_dir(root).await {
         Ok(d) => d,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(e) => return Err(common::KlyntbotError::Storage(format!("read {}: {e}", root.display()))),
+        Err(e) => {
+            return Err(common::KlyntbotError::Storage(format!(
+                "read {}: {e}",
+                root.display()
+            )))
+        }
     };
-    while let Some(hash_entry) = hashes.next_entry().await
+    while let Some(hash_entry) = hashes
+        .next_entry()
+        .await
         .map_err(|e| common::KlyntbotError::Storage(format!("dir iter: {e}")))?
     {
-        if !hash_entry.file_type().await.map_or(false, |t| t.is_dir()) { continue; }
+        if !hash_entry.file_type().await.map_or(false, |t| t.is_dir()) {
+            continue;
+        }
         let hash = hash_entry.file_name().to_string_lossy().to_string();
-        if hash.starts_with('.') { continue; }
+        if hash.starts_with('.') {
+            continue;
+        }
         let mut sessions = match tokio::fs::read_dir(hash_entry.path()).await {
             Ok(d) => d,
             Err(_) => continue,
         };
-        while let Some(s) = sessions.next_entry().await
+        while let Some(s) = sessions
+            .next_entry()
+            .await
             .map_err(|e| common::KlyntbotError::Storage(format!("dir iter: {e}")))?
         {
-            if !s.file_type().await.map_or(false, |t| t.is_dir()) { continue; }
+            if !s.file_type().await.map_or(false, |t| t.is_dir()) {
+                continue;
+            }
             let session_dir = s.path();
-            if tokio::fs::metadata(session_dir.join("wire.jsonl")).await.is_err() { continue; }
+            if tokio::fs::metadata(session_dir.join("wire.jsonl"))
+                .await
+                .is_err()
+            {
+                continue;
+            }
             out.push(DiscoveredSession {
                 session_id: s.file_name().to_string_lossy().to_string(),
                 source_dir: session_dir,
@@ -59,13 +79,27 @@ async fn scan_imported(root: &Path, out: &mut Vec<DiscoveredSession>) -> Result<
     let mut entries = match tokio::fs::read_dir(root).await {
         Ok(d) => d,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(e) => return Err(common::KlyntbotError::Storage(format!("read {}: {e}", root.display()))),
+        Err(e) => {
+            return Err(common::KlyntbotError::Storage(format!(
+                "read {}: {e}",
+                root.display()
+            )))
+        }
     };
-    while let Some(s) = entries.next_entry().await
+    while let Some(s) = entries
+        .next_entry()
+        .await
         .map_err(|e| common::KlyntbotError::Storage(format!("dir iter: {e}")))?
     {
-        if !s.file_type().await.map_or(false, |t| t.is_dir()) { continue; }
-        if tokio::fs::metadata(s.path().join("wire.jsonl")).await.is_err() { continue; }
+        if !s.file_type().await.map_or(false, |t| t.is_dir()) {
+            continue;
+        }
+        if tokio::fs::metadata(s.path().join("wire.jsonl"))
+            .await
+            .is_err()
+        {
+            continue;
+        }
         out.push(DiscoveredSession {
             session_id: s.file_name().to_string_lossy().to_string(),
             source_dir: s.path(),
@@ -116,7 +150,9 @@ mod tests {
     async fn skips_dirs_without_wire() {
         let tmp = tempfile::tempdir().unwrap();
         let kimi_root = tmp.path().join("kimi/sessions");
-        fs::create_dir_all(kimi_root.join("hash1/sessA")).await.unwrap();
+        fs::create_dir_all(kimi_root.join("hash1/sessA"))
+            .await
+            .unwrap();
         let imported_root = tmp.path().join("imported");
         fs::create_dir_all(&imported_root).await.unwrap();
         let out = discover_sessions(&kimi_root, &imported_root).await.unwrap();

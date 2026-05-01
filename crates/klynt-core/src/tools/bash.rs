@@ -1,6 +1,6 @@
-use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
+use crate::approval::{GuardCtx, Layer1, PendingApprovalsMap, evaluate};
 use crate::privacy::PrivacyGuard;
-use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use};
+use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
 use async_trait::async_trait;
 use bus::DomainEventBus;
 use klynt_execpolicy::Policy;
@@ -9,8 +9,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
-use tools_core::{RoutingContext, ToolExecute, ToolParams};
 use tools_core::events::ToolEvent;
+use tools_core::{RoutingContext, ToolExecute, ToolParams};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, serde::Serialize, ToolParams)]
@@ -77,7 +77,10 @@ impl ToolExecute for BashTool {
             pending: &self.pending,
             event_tx: ctx.event_tx.as_ref(),
             domain_bus: &self.bus,
-            cancel: ctx.cancel_token.clone().unwrap_or_else(CancellationToken::new),
+            cancel: ctx
+                .cancel_token
+                .clone()
+                .unwrap_or_else(CancellationToken::new),
             request_id,
             args: Some(serde_json::to_value(&args).unwrap_or(serde_json::Value::Null)),
             cwd: args.cwd.clone(),
@@ -91,9 +94,23 @@ impl ToolExecute for BashTool {
             ));
         }
 
-        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
-        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "bash", &args, args.cwd.clone()).await {
-            return Err(common::KlyntbotError::Tool(common::ToolError::HookBlocked(reason)));
+        let session_id = ctx
+            .session_key
+            .clone()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        if let Err(reason) = fire_pre_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id.clone(),
+            "bash",
+            &args,
+            args.cwd.clone(),
+        )
+        .await
+        {
+            return Err(common::KlyntbotError::Tool(common::ToolError::HookBlocked(
+                reason,
+            )));
         }
         let start = std::time::Instant::now();
 
@@ -113,14 +130,16 @@ impl ToolExecute for BashTool {
                     .unwrap_or_else(|| std::env::current_dir().unwrap());
                 let sandbox_policy = klynt_sandbox::SandboxPolicy::cwd_writes_only(cwd.clone());
                 if let Some(ref tx) = ctx.event_tx {
-                    let _ = tx.send(ToolEvent::SandboxPolicyApplied {
-                        tool: "bash".into(),
-                        policy_summary: sandbox_policy.summary(),
-                        policy_hash: sandbox_policy.policy_hash(),
-                        fallback_unsandboxed: false,
-                        fs_constraints: vec![format!("{:?}", sandbox_policy.fs)],
-                        network_constraints: vec![format!("{:?}", sandbox_policy.network)],
-                    }).await;
+                    let _ = tx
+                        .send(ToolEvent::SandboxPolicyApplied {
+                            tool: "bash".into(),
+                            policy_summary: sandbox_policy.summary(),
+                            policy_hash: sandbox_policy.policy_hash(),
+                            fallback_unsandboxed: false,
+                            fs_constraints: vec![format!("{:?}", sandbox_policy.fs)],
+                            network_constraints: vec![format!("{:?}", sandbox_policy.network)],
+                        })
+                        .await;
                 }
                 if let Some(ref bus) = Some(&self.bus) {
                     let payload = serde_json::json!({
@@ -149,12 +168,22 @@ impl ToolExecute for BashTool {
                     )
                     .await
                     .map_err(|e| {
-                        common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(e.to_string()))
+                        common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+                            e.to_string(),
+                        ))
                     })?;
                 Ok(out.stdout)
             }
-        }).await;
-        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "bash", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        })
+        .await;
+        fire_post_tool_use(
+            ctx.hook_engine.as_ref(),
+            session_id,
+            "bash",
+            result.is_ok(),
+            start.elapsed().as_millis() as u64,
+        )
+        .await;
         result
     }
 }
