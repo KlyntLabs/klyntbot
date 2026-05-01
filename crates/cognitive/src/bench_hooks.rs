@@ -16,7 +16,7 @@
 //!
 //! See `crates/kca-bench/src/trace.rs` for the consumer side.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct HitCounts {
@@ -31,16 +31,23 @@ thread_local! {
         fts_hits: 0,
         episodic_hits: 0,
     }) };
+    static LAST_ENTITIES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Reset before each QA so stale values don't leak across QAs.
 pub fn reset_hit_counts() {
     LAST_HIT_COUNTS.with(|c| c.set(HitCounts::default()));
+    LAST_ENTITIES.with(|e| e.borrow_mut().clear());
 }
 
 /// Read once per QA after retrieval has run.
 pub fn read_hit_counts() -> HitCounts {
     LAST_HIT_COUNTS.with(|c| c.get())
+}
+
+/// Read the entities the retrieval layer extracted for this QA.
+pub fn read_entities() -> Vec<String> {
+    LAST_ENTITIES.with(|e| e.borrow().clone())
 }
 
 /// Cognitive crate writes here as it observes vector/FTS/episodic hits.
@@ -53,6 +60,20 @@ pub fn record_hits(vector: u32, fts: u32, episodic: u32) {
         h.fts_hits = h.fts_hits.saturating_add(fts);
         h.episodic_hits = h.episodic_hits.saturating_add(episodic);
         c.set(h);
+    });
+}
+
+/// Cognitive crate writes here when entity-aware retrieval (P2) extracts
+/// proper-noun candidates from the query. Empty when P2 is off or the
+/// query is bare lowercase.
+pub fn record_entities(entities: &[String]) {
+    LAST_ENTITIES.with(|e| {
+        let mut v = e.borrow_mut();
+        for ent in entities {
+            if !v.iter().any(|x| x == ent) {
+                v.push(ent.clone());
+            }
+        }
     });
 }
 

@@ -24,7 +24,8 @@
 //! - `KCA_LOCOMO_GRADER_MODEL=gpt-4.1` (default; matches Letta)
 
 use crate::trace::{
-    make_run_id, read_hit_counts, reset_hit_counts, PhaseFlags, QaTraceEvent, TraceWriter,
+    make_run_id, read_entities, read_hit_counts, reset_hit_counts, PhaseFlags, QaTraceEvent,
+    TraceWriter,
 };
 use kca_e2e::replayer::ReplayContext;
 use serde::Deserialize;
@@ -343,7 +344,7 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
                 gold: target.clone(),
                 predicted: predicted.clone(),
                 grade,
-                entities_extracted: Vec::new(),
+                entities_extracted: read_entities(),
                 subject_was_speaker: false,
                 fts_query: String::new(),
                 vector_hits: hits.vector_hits,

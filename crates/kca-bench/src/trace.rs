@@ -15,7 +15,9 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-pub use cognitive::bench_hooks::{read_hit_counts, record_hits, reset_hit_counts, HitCounts};
+pub use cognitive::bench_hooks::{
+    read_entities, read_hit_counts, record_hits, reset_hit_counts, HitCounts,
+};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PhaseFlags {
