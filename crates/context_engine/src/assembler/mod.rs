@@ -15,7 +15,7 @@ use crate::inventory::{ContextInventory, ContextInventoryItem, ContextItemStatus
 use crate::memory_retriever::{MemoryRetriever, MemorySource};
 use crate::source::{ContextSource, SourceContext};
 use crate::summary_provider::SummaryProvider;
-use crate::token_counter::{TokenCounter, default_token_counter};
+use crate::token_counter::{default_token_counter, TokenCounter};
 use common::helpers::tool_def_name;
 
 use crate::memory_scorer::MemoryScorer;
@@ -1050,13 +1050,11 @@ mod tests {
         // Clarification mode should NOT include memory
         assert_eq!(result.messages.len(), 1);
         assert_eq!(result.retrieved_memory_count, 0);
-        assert!(
-            result
-                .budget_report
-                .per_priority
-                .iter()
-                .all(|(p, _)| *p != Priority::RetrievedMemory)
-        );
+        assert!(result
+            .budget_report
+            .per_priority
+            .iter()
+            .all(|(p, _)| *p != Priority::RetrievedMemory));
     }
 
     #[test]
@@ -1103,13 +1101,11 @@ mod tests {
         let result = engine.assemble(request).await;
         // No memory entries → only the system prompt
         assert_eq!(result.messages.len(), 1);
-        assert!(
-            result
-                .budget_report
-                .per_priority
-                .iter()
-                .all(|(p, _)| *p != Priority::RetrievedMemory)
-        );
+        assert!(result
+            .budget_report
+            .per_priority
+            .iter()
+            .all(|(p, _)| *p != Priority::RetrievedMemory));
     }
 
     #[tokio::test]

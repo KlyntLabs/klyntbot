@@ -13,8 +13,7 @@ pub async fn run_session_retention_pass(
     drop(cfg);
 
     let pool = repos.pool();
-    let cutoff_ms =
-        jiff::Timestamp::now().as_millisecond() - retention_days * 86400 * 1000;
+    let cutoff_ms = jiff::Timestamp::now().as_millisecond() - retention_days * 86400 * 1000;
     let result = if preserve_starred {
         sqlx::query("DELETE FROM sessions WHERE created_at < ? AND COALESCE(pinned, 0) = 0")
             .bind(cutoff_ms)

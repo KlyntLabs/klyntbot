@@ -19,20 +19,11 @@ function formatTime(iso: string): string {
 export function Dashboard({ onOpenTask }: DashboardProps) {
   const { data: dashboard } = useDashboardData();
 
-  if (!dashboard) {
-    return <div className="lc-dash-loading">Loading...</div>;
-  }
+  if (!dashboard) return null;
 
   const hasContent = dashboard.calendar.length > 0 || dashboard.tasks.length > 0;
 
-  if (!hasContent) {
-    return (
-      <div className="lc-dash-empty">
-        <p className="lc-muted-sm">No activity yet today</p>
-        <p className="lc-dim-xs">Start a focus session or search for anything</p>
-      </div>
-    );
-  }
+  if (!hasContent) return null;
 
   return (
     <div className="lc-dash">
@@ -101,4 +92,3 @@ function TasksWidget({
     </div>
   );
 }
-

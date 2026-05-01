@@ -210,6 +210,7 @@ impl IntelligenceSessionRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::SessionSource;
     use crate::ProductivityFeature;
 
     async fn setup_pool() -> SqlitePool {

@@ -256,6 +256,58 @@ export interface MemoryPromotedPayload {
   predicate: string;
 }
 
+// ── Approval / Sandbox / Recall Events ──────────────────────
+
+export interface ApprovalRequestedPayload {
+  sessionKey: string;
+  request_id: string;
+  tool: string;
+  args: Record<string, unknown>;
+  cwd: string;
+  sandbox_summary: string;
+  layer: "privacy" | "layer1_declarative" | "layer2_starlark" | "layer3_mirror" | "default_mode";
+  layer_reason: string;
+  mirror_history?: { approval_count: number; denial_count: number };
+  requires_user_input: boolean;
+}
+
+export interface ApprovalResolvedPayload {
+  sessionKey: string;
+  request_id: string;
+  decision: string;
+  decision_reason: string;
+  latency_ms?: number;
+  persisted_rule?: string;
+  decided_by: "user" | "auto_allow" | "auto_deny" | "timeout" | "cancelled";
+}
+
+export interface SandboxPolicyAppliedPayload {
+  sessionKey: string;
+  tool: string;
+  policy_summary: string;
+  policy_hash: string;
+  fallback_unsandboxed: boolean;
+  fs_constraints: string[];
+  network_constraints: string[];
+}
+
+export interface RecallInjectedPayload {
+  sessionKey: string;
+  memory_ids: string[];
+  coverage_score: number;
+  escalation_chain: string[];
+  dead_end_warning: boolean;
+  budget_used_tokens: number;
+  budget_limit_tokens: number;
+}
+
+export interface DeadEndWarningSurfacedPayload {
+  sessionKey: string;
+  approach_summary: string;
+  prior_attempt_id: string;
+  confidence: number;
+}
+
 export interface DebateRound {
   round: number;
   phase: DebatePhase;

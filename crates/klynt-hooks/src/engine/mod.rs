@@ -2,9 +2,8 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
 
-use crate::error::{HookError, HookResult};
+use crate::error::HookResult;
 use crate::schema::{Hook, HookConfig};
 use klynt_protocol::HookEventName;
 

@@ -5,7 +5,7 @@ use bus::{DomainEventBus, MessageBus};
 use cognitive::situation::UserSituation;
 use scheduling::temporal::cron_executor::CronExecutor;
 use storage::{Repos, StoragePool, VectorStore};
-use tokio::sync::{Mutex, RwLock, mpsc};
+use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::info;
 
 /// Results from the agent initialization phase.

@@ -16,16 +16,16 @@ mod temporal_scheduler;
 
 use std::sync::Arc;
 
-use ::agent::AgentLoop;
 use ::agent::cognitive_handlers::LlmExtractionHandler;
 use ::agent::cognitive_handlers::{HeuristicCoachingReasonerHandler, LlmCoachingReasonerHandler};
+use ::agent::AgentLoop;
 use ::channels::ChannelManager;
 use ::cognitive::pipeline::{
     AtomCollector, ChatTurnCollector, CoachingCollector, RecallCollector, SessionCollector,
 };
 use bus::MessageBus;
 use feature_productivity::auto_focus::AutoFocusEvent;
-use tokio::sync::{Mutex, RwLock, mpsc};
+use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
@@ -850,13 +850,13 @@ impl AppCore {
         .map_err(|e| format!("notifications migration failed: {e}"))?;
 
         let notification_dispatcher_handle = {
-            use notifications::NotificationDispatcher;
             use notifications::channel::{
-                ChannelRegistry, os_native::OsNativeChannel, tray::TrayChannel,
+                os_native::OsNativeChannel, tray::TrayChannel, ChannelRegistry,
             };
             use notifications::held::HeldReleaseService;
             use notifications::quiet_hours::QuietHoursPolicy;
             use notifications::retry::RetryPolicy;
+            use notifications::NotificationDispatcher;
 
             let notif_cfg = &config.notifications;
             let last_active: std::sync::Arc<

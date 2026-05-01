@@ -1,8 +1,8 @@
 //! Todo context source — active tasks summary.
 
 use async_trait::async_trait;
-use context_engine::TtlCache;
 use context_engine::source::{ContextSource, SourceContext};
+use context_engine::TtlCache;
 use tracing::warn;
 
 /// Default TTL for cached todo context (seconds).

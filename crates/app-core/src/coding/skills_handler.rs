@@ -65,7 +65,9 @@ impl AppCore {
     {
         let guard = self.coding_skill_activator.lock().await;
         let act = guard.as_ref().ok_or_else(|| {
-            KlyntbotError::Config(ConfigError::Invalid("skill activator not initialized".into()))
+            KlyntbotError::Config(ConfigError::Invalid(
+                "skill activator not initialized".into(),
+            ))
         })?;
         f(act)
     }
@@ -73,13 +75,8 @@ impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub async fn coding_skills_list(&self) -> Result<Vec<SkillListItem>> {
         let cfg = self.config.read().await;
-        let never: std::collections::HashSet<String> = cfg
-            .coding
-            .skills
-            .never_activate
-            .iter()
-            .cloned()
-            .collect();
+        let never: std::collections::HashSet<String> =
+            cfg.coding.skills.never_activate.iter().cloned().collect();
         self.with_activator(|activator| {
             let mut items = Vec::new();
             for (name, skill) in activator.iter_index() {
@@ -94,7 +91,8 @@ impl AppCore {
             }
             items.sort_by(|a, b| a.name.cmp(&b.name));
             Ok(items)
-        }).await
+        })
+        .await
     }
 
     #[tracing::instrument(skip(self), err)]
@@ -123,7 +121,8 @@ impl AppCore {
                     })
                     .collect(),
             })
-        }).await
+        })
+        .await
     }
 
     #[tracing::instrument(skip(self), err)]
@@ -152,19 +151,28 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn coding_skills_uninstall(&self, name: &str) -> Result<()> {
-        let dir = self.with_activator(|activator| {
-            let skill = activator.lookup(name).ok_or_else(|| {
-                KlyntbotError::Config(ConfigError::Invalid(format!("unknown skill: {name}")))
-            })?;
-            if !matches!(skill.source, SkillSource::User) {
-                return Err(KlyntbotError::Config(ConfigError::Invalid(
-                    "can only uninstall User-source skills (project skills live in repo)".into(),
-                )));
-            }
-            skill.source_path.parent().map(|p| p.to_path_buf()).ok_or_else(|| {
-                KlyntbotError::Config(ConfigError::Invalid("skill path has no parent dir".into()))
+        let dir = self
+            .with_activator(|activator| {
+                let skill = activator.lookup(name).ok_or_else(|| {
+                    KlyntbotError::Config(ConfigError::Invalid(format!("unknown skill: {name}")))
+                })?;
+                if !matches!(skill.source, SkillSource::User) {
+                    return Err(KlyntbotError::Config(ConfigError::Invalid(
+                        "can only uninstall User-source skills (project skills live in repo)"
+                            .into(),
+                    )));
+                }
+                skill
+                    .source_path
+                    .parent()
+                    .map(|p| p.to_path_buf())
+                    .ok_or_else(|| {
+                        KlyntbotError::Config(ConfigError::Invalid(
+                            "skill path has no parent dir".into(),
+                        ))
+                    })
             })
-        }).await?;
+            .await?;
         std::fs::remove_dir_all(&dir).map_err(|e| {
             KlyntbotError::Config(ConfigError::Invalid(format!(
                 "remove {}: {e}",
@@ -205,7 +213,9 @@ impl AppCore {
                 None => errors.push(format!("unknown skill: {name}")),
                 Some(skill) => {
                     let raw = std::fs::read_to_string(&skill.source_path).map_err(|e| {
-                        KlyntbotError::Config(ConfigError::Invalid(format!("re-read SKILL.md: {e}")))
+                        KlyntbotError::Config(ConfigError::Invalid(format!(
+                            "re-read SKILL.md: {e}"
+                        )))
                     })?;
                     if let Err(e) = KlyntFrontmatter::parse(&raw) {
                         errors.push(format!("frontmatter invalid: {e}"));
@@ -225,7 +235,8 @@ impl AppCore {
                 errors,
                 warnings,
             })
-        }).await
+        })
+        .await
     }
 
     #[tracing::instrument(skip(self), err)]

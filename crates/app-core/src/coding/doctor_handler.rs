@@ -49,7 +49,11 @@ impl AppCore {
         // starlark rules
         let rules_dir = home.join("rules");
         items.push(match klynt_execpolicy::Policy::load_from_dir(&rules_dir) {
-            Ok(_) => diag("starlark rules", "green", &format!("dir: {}", rules_dir.display())),
+            Ok(_) => diag(
+                "starlark rules",
+                "green",
+                &format!("dir: {}", rules_dir.display()),
+            ),
             Err(e) => diag("starlark rules", "red", &e.to_string()),
         });
 
@@ -62,9 +66,11 @@ impl AppCore {
 
         // skills
         items.push(match self.coding_skills_list().await {
-            Ok(list) if !list.is_empty() => {
-                diag("skill loader", "green", &format!("{} skills indexed", list.len()))
-            }
+            Ok(list) if !list.is_empty() => diag(
+                "skill loader",
+                "green",
+                &format!("{} skills indexed", list.len()),
+            ),
             Ok(_) => diag("skill loader", "yellow", "0 skills indexed"),
             Err(e) => diag("skill loader", "red", &e.to_string()),
         });

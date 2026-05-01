@@ -6,7 +6,7 @@ use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::tracker::categorizer::Categorizer;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
 use storage::StoragePool;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::{mpsc, Mutex};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 

@@ -35,7 +35,8 @@ async fn retention_cron_prunes_old_unpinned_sessions() {
         &core,
         "old",
         false,
-        jiff::Timestamp::from_millisecond(Timestamp::now().as_millisecond() - 100 * 86400 * 1000).unwrap(),
+        jiff::Timestamp::from_millisecond(Timestamp::now().as_millisecond() - 100 * 86400 * 1000)
+            .unwrap(),
     )
     .await;
     // Insert a 100-day-old pinned session
@@ -43,7 +44,8 @@ async fn retention_cron_prunes_old_unpinned_sessions() {
         &core,
         "old-pinned",
         true,
-        jiff::Timestamp::from_millisecond(Timestamp::now().as_millisecond() - 100 * 86400 * 1000).unwrap(),
+        jiff::Timestamp::from_millisecond(Timestamp::now().as_millisecond() - 100 * 86400 * 1000)
+            .unwrap(),
     )
     .await;
     // Insert a recent session
@@ -51,7 +53,8 @@ async fn retention_cron_prunes_old_unpinned_sessions() {
         &core,
         "recent",
         false,
-        jiff::Timestamp::from_millisecond(Timestamp::now().as_millisecond() - 10 * 86400 * 1000).unwrap(),
+        jiff::Timestamp::from_millisecond(Timestamp::now().as_millisecond() - 10 * 86400 * 1000)
+            .unwrap(),
     )
     .await;
 
@@ -61,12 +64,6 @@ async fn retention_cron_prunes_old_unpinned_sessions() {
         !session_exists(&core, "old").await,
         "old session should be pruned"
     );
-    assert!(
-        session_exists(&core, "old-pinned").await,
-        "pinned survives"
-    );
-    assert!(
-        session_exists(&core, "recent").await,
-        "recent survives"
-    );
+    assert!(session_exists(&core, "old-pinned").await, "pinned survives");
+    assert!(session_exists(&core, "recent").await, "recent survives");
 }

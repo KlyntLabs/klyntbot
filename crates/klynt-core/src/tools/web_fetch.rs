@@ -1,5 +1,5 @@
 use crate::approval::host_cache::{HostApprovalCache, HostCheckResult, HostDecision, HostKey};
-use crate::approval::{GuardCtx, Layer1, PendingApprovalsMap, evaluate};
+use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
 use async_trait::async_trait;

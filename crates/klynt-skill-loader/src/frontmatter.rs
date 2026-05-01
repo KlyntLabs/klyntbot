@@ -44,10 +44,11 @@ impl<'de> serde::Deserialize<'de> for ReferenceLoadMode {
 
 impl KlyntFrontmatter {
     pub fn parse(raw: &str) -> Result<(Self, String)> {
-        let (yaml, body) = skill_system::parser::split_frontmatter(raw)
-            .map_err(|e| KlyntbotError::Config(ConfigError::Invalid(format!(
+        let (yaml, body) = skill_system::parser::split_frontmatter(raw).map_err(|e| {
+            KlyntbotError::Config(ConfigError::Invalid(format!(
                 "SKILL.md frontmatter split failed: {e}"
-            ))))?;
+            )))
+        })?;
         if yaml.is_empty() {
             return Err(KlyntbotError::Config(ConfigError::Invalid(
                 "SKILL.md missing frontmatter fence".into(),

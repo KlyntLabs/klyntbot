@@ -1,7 +1,7 @@
 //! Agent loop construction: tool registration, handler wiring, pipeline assembly.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;

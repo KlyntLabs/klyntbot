@@ -41,17 +41,18 @@ describe("slash command e2e", () => {
   test("typing /skills list in coding mode dispatches and renders system row", async () => {
     const { result } = renderHook(() => useSlashCommands());
 
-    let res: { kind: string; itemKind?: string; item?: { result: { name: string }[] } } | undefined;
-    await act(async () => {
-      res = await result.current.dispatch("/skills list", "session-e2e");
+    const res = await act(async () => {
+      return result.current.dispatch("/skills list", "session-e2e");
     });
 
     expect(res?.kind).toBe("render");
-    expect(res?.itemKind).toBe("system");
-    expect(res?.item?.result[0].name).toBe("alpha");
+    if (res?.kind !== "render") return;
+    expect(res.itemKind).toBe("system");
+    const item = res.item as { result: { name: string }[] } | undefined;
+    expect(item?.result[0].name).toBe("alpha");
 
     // Simulate what Composer.tsx does on render result
-    chatStreamStore.appendSystemItem("session-e2e", res.itemKind, res.item);
+    chatStreamStore.appendSystemItem("session-e2e", res.itemKind, item);
 
     const snapshot = chatStreamStore.getSnapshot("session-e2e");
     expect(snapshot.segments.length).toBe(1);
@@ -61,24 +62,24 @@ describe("slash command e2e", () => {
   test("/plan refactor is agent-routed and transforms text", async () => {
     const { result } = renderHook(() => useSlashCommands());
 
-    let res: { kind: string; text?: string } | undefined;
-    await act(async () => {
-      res = await result.current.dispatch("/plan refactor parser", "session-e2e");
+    const res = await act(async () => {
+      return result.current.dispatch("/plan refactor parser", "session-e2e");
     });
 
-    expect(res.kind).toBe("passthrough");
+    expect(res?.kind).toBe("passthrough");
+    if (res?.kind !== "passthrough") return;
     expect(res.text).toContain("[system: enter plan mode]");
   });
 
   test("unknown command falls through as passthrough with original text", async () => {
     const { result } = renderHook(() => useSlashCommands());
 
-    let res: { kind: string; text?: string } | undefined;
-    await act(async () => {
-      res = await result.current.dispatch("/unknown xyz", "session-e2e");
+    const res = await act(async () => {
+      return result.current.dispatch("/unknown xyz", "session-e2e");
     });
 
-    expect(res.kind).toBe("passthrough");
+    expect(res?.kind).toBe("passthrough");
+    if (res?.kind !== "passthrough") return;
     expect(res.text).toBe("/unknown xyz");
   });
 });

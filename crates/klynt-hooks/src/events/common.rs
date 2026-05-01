@@ -1,7 +1,4 @@
-use klynt_protocol::{
-    HookCompletedEvent, HookEventName, HookOutputEntry, HookOutputEntryKind, HookRunStatus,
-    HookRunSummary,
-};
+use klynt_protocol::HookEventName;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, schemars::JsonSchema)]

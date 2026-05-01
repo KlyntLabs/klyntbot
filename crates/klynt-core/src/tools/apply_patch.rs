@@ -1,6 +1,6 @@
-use crate::approval::{GuardCtx, Layer1, PendingApprovalsMap, evaluate};
+use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
-use crate::tools::shared::file_edit_event::{FileEditEvent, emit_file_edit};
+use crate::tools::shared::file_edit_event::{emit_file_edit, FileEditEvent};
 use crate::tools::shared::fs_resolve::resolve_under_cwd;
 use crate::tools::shared::hook_emit::{
     fire_post_file_edit, fire_post_tool_use, fire_pre_file_edit, fire_pre_tool_use,

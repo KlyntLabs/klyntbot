@@ -1139,6 +1139,27 @@ pub async fn relay_chat_stream(
                         });
                         emitter.emit_event("agent:file_edit_with_symbols", payload);
                     }
+                    AgentEvent::RecallInjected { ref memory_ids, coverage_score, ref escalation_chain, dead_end_warning, budget_used_tokens, budget_limit_tokens } => {
+                        let payload = serde_json::json!({
+                            "session_key": sk.clone(),
+                            "memory_ids": memory_ids,
+                            "coverage_score": coverage_score,
+                            "escalation_chain": escalation_chain,
+                            "dead_end_warning": dead_end_warning,
+                            "budget_used_tokens": budget_used_tokens,
+                            "budget_limit_tokens": budget_limit_tokens,
+                        });
+                        emitter.emit_event("agent:recall_injected", payload);
+                    }
+                    AgentEvent::DeadEndWarningSurfaced { ref approach_summary, ref prior_attempt_id, confidence } => {
+                        let payload = serde_json::json!({
+                            "session_key": sk.clone(),
+                            "approach_summary": approach_summary,
+                            "prior_attempt_id": prior_attempt_id,
+                            "confidence": confidence,
+                        });
+                        emitter.emit_event("agent:dead_end_warning_surfaced", payload);
+                    }
                     AgentEvent::PlanModeChanged { ref session_key, active, ref requested_by } => {
                         let payload = serde_json::json!({
                             "session_key": session_key, "active": active, "requested_by": requested_by,

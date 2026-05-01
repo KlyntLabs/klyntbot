@@ -1,6 +1,6 @@
 import { invoke } from "@/api/client";
 import { resolveLeaf } from "./classify";
-import type { DispatchResult, SlashLeaf } from "./types";
+import type { DispatchResult } from "./types";
 
 export async function dispatchDirect(input: string, sessionKey: string): Promise<DispatchResult> {
   const leaf = resolveLeaf(input);

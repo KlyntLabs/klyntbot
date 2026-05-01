@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use feature_launcher::{
-    AppIndex, AttentionSignals, AttentionSource, ClipboardRepo, EntityAttentionRepo,
-    FileSearchSource, FrequencyRepo, FsEventKind, RunningSignals, ScriptRunner, SearchSource,
-    SourceRegistry, new_attention_signals, new_running_signals,
+    new_attention_signals, new_running_signals, AppIndex, AttentionSignals, AttentionSource,
+    ClipboardRepo, EntityAttentionRepo, FileSearchSource, FrequencyRepo, FsEventKind,
+    RunningSignals, ScriptRunner, SearchSource, SourceRegistry,
 };
 use storage::StoragePool;
 use tokio_util::sync::CancellationToken;

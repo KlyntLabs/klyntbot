@@ -1,5 +1,4 @@
 use crate::schema::Hook;
-use crate::types::HookResult;
 use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::timeout;

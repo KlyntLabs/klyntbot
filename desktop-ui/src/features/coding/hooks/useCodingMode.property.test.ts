@@ -30,7 +30,6 @@ describe("K7: mode-toggle event ordering", () => {
 
     const events: string[] = [];
     for (const target of flips) {
-      const _before = result.current.mode;
       await act(async () => {
         await result.current.setMode(target);
       });

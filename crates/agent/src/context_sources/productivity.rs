@@ -5,8 +5,8 @@
 //! Tier 3 (event-driven): latest narrative
 
 use async_trait::async_trait;
-use context_engine::TtlCache;
 use context_engine::source::{ContextSource, SourceContext};
+use context_engine::TtlCache;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, ProductivityPatternAnalyzer, ProductivityPatterns};
 use tokio::sync::Mutex;
