@@ -52,9 +52,12 @@ async fn k4_sandbox_event_emitted_before_exec() {
     // Forbidden file MUST NOT exist
     assert!(!outside.join("forbidden").exists());
 
-    // SandboxPolicyApplied must precede the actual run output
+    // SandboxPolicyApplied must precede the actual run output.
+    // Drop ALL senders (tx + the cloned tx held by routing_ctx) before draining,
+    // otherwise rx.recv() never returns None.
     let mut saw_sandbox = false;
     drop(tool);
+    drop(routing_ctx);
     drop(tx);
     while let Some(e) = rx.recv().await {
         if matches!(e, ToolEvent::SandboxPolicyApplied { .. }) {
