@@ -253,6 +253,24 @@ pub(crate) async fn dispatch_dev(
                 });
             dev::val(result)
         }
+        "chat_save_starlark_rule" => {
+            let request_id = try_field!(dev::get_str(body, "requestId"));
+            let rule_source = try_field!(dev::get_str(body, "ruleSource"));
+            let suggested_filename = body
+                .get("suggestedFilename")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            dev::val(
+                core.chat_save_starlark_rule(request_id, rule_source, suggested_filename)
+                    .await
+                    .map_err(desktop_shared::errors::ApiError::from),
+            )
+        }
+        "coding_hooks_list" => dev::val(
+            core.coding_hooks_list()
+                .await
+                .map_err(desktop_shared::errors::ApiError::from),
+        ),
         _ => return None,
     })
 }

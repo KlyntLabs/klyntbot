@@ -522,14 +522,7 @@ impl AppCore {
         )
         .map_err(|e| common::KlyntbotError::NotImplemented(format!("invalid Starlark: {e}")))?;
 
-        let rules_dir = dirs::home_dir()
-            .ok_or_else(|| {
-                common::KlyntbotError::Io(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "no home dir",
-                ))
-            })?
-            .join(".klyntbot/rules");
+        let rules_dir = self.config.read().await.data_dir_path().join("rules");
         std::fs::create_dir_all(&rules_dir).map_err(common::KlyntbotError::Io)?;
 
         let filename = suggested_filename.unwrap_or_else(|| {
@@ -547,9 +540,7 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn coding_hooks_list(&self) -> common::Result<HooksTomlSnapshot> {
-        let path = dirs::home_dir()
-            .map(|h| h.join(".klyntbot/hooks.toml"))
-            .unwrap_or_else(|| std::path::PathBuf::from("~/.klyntbot/hooks.toml"));
+        let path = self.config.read().await.data_dir_path().join("hooks.toml");
         let exists = path.exists();
         let content = if exists {
             std::fs::read_to_string(&path).unwrap_or_default()

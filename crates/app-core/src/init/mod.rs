@@ -1795,20 +1795,18 @@ impl AppCore {
             let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
 
             let hook_engine: Option<Arc<klynt_hooks::HookEngine>> = {
-                let hooks_path = dirs::home_dir().map(|h| h.join(".klyntbot/hooks.toml"));
-                hooks_path.and_then(|p| {
-                    if p.exists() {
-                        match klynt_hooks::HookEngine::load_from_path(&p) {
-                            Ok(e) => Some(Arc::new(e)),
-                            Err(err) => {
-                                tracing::warn!("klynt-hooks: failed to load {p:?}: {err}");
-                                Some(Arc::new(klynt_hooks::HookEngine::empty()))
-                            }
+                let hooks_path = config_guard.data_dir_path().join("hooks.toml");
+                if hooks_path.exists() {
+                    match klynt_hooks::HookEngine::load_from_path(&hooks_path) {
+                        Ok(e) => Some(Arc::new(e)),
+                        Err(err) => {
+                            tracing::warn!("klynt-hooks: failed to load {hooks_path:?}: {err}");
+                            Some(Arc::new(klynt_hooks::HookEngine::empty()))
                         }
-                    } else {
-                        Some(Arc::new(klynt_hooks::HookEngine::empty()))
                     }
-                })
+                } else {
+                    Some(Arc::new(klynt_hooks::HookEngine::empty()))
+                }
             };
 
             let kit = klynt_core::ToolKitBuilder {

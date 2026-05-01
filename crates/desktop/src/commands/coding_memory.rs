@@ -300,7 +300,7 @@ pub(crate) async fn dispatch_dev(
     core: &Arc<AppCore>,
     body: &serde_json::Value,
 ) -> Option<CommandResult<serde_json::Value>> {
-    use super::dev_helpers as dev;
+    use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "coding_memory_status" => dev::val(core.coding_memory_status().await),
         "coding_memory_cli_health" => dev::val(core.coding_memory_cli_health().await),
@@ -615,6 +615,10 @@ pub(crate) async fn dispatch_dev(
                 .await
                 .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
             )
+        }
+        "coding_memory_install_git_hook" => {
+            let repo_root = try_field!(dev::get_str(body, "repoRoot"));
+            dev::val(core.coding_memory_install_git_hook(repo_root).await.map_err(ApiError::from))
         }
         _ => return None,
     })
