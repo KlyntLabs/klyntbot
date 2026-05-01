@@ -12,6 +12,7 @@ interface Props {
 }
 
 export function DetailHeader(p: Props) {
+  const s = p.stats;
   return (
     <div className="tracing-detail-header">
       <div className="tracing-detail-header__top">
@@ -20,23 +21,23 @@ export function DetailHeader(p: Props) {
       </div>
       <div className="tracing-detail-header__stats">
         <span className="tracing-detail-header__id" title={p.sessionId}>{p.sessionId.slice(0, 16)}…</span>
-        <span className="tracing-stat">{p.stats.turnCount} turns</span>
+        <span className="tracing-stat">{fmtNum(s.turnCount)} turns</span>
         <span className="tracing-stat">·</span>
-        <span className="tracing-stat">{p.stats.stepCount} steps</span>
+        <span className="tracing-stat">{fmtNum(s.stepCount)} steps</span>
         <span className="tracing-stat">·</span>
-        <span className="tracing-stat">{p.stats.toolCallCount} tool calls</span>
+        <span className="tracing-stat">{fmtNum(s.toolCallCount)} tool calls</span>
         <span className="tracing-stat">·</span>
-        <span className="tracing-stat tracing-stat--err">{p.stats.errorCount} errors</span>
+        <span className="tracing-stat tracing-stat--err">{fmtNum(s.errorCount)} errors</span>
         <span className="tracing-stat">·</span>
-        <span className="tracing-stat">{p.stats.compactionCount} compaction</span>
+        <span className="tracing-stat">{fmtNum(s.compactionCount)} compaction</span>
         <span className="tracing-stat">·</span>
-        <span className="tracing-stat">{p.stats.agentCount} agents</span>
+        <span className="tracing-stat">{fmtNum(s.agentCount)} agents</span>
         <span className="tracing-stat">|</span>
-        <span className="tracing-stat">{formatDurationMs(p.stats.totalDurationMs)}</span>
+        <span className="tracing-stat">{formatDurationMs(s.totalDurationMs)}</span>
         <span className="tracing-stat">|</span>
-        <span className="tracing-stat">{(p.stats.totalInputTokens / 1000).toFixed(1)}k in / {(p.stats.totalOutputTokens / 1000).toFixed(1)}k out</span>
+        <span className="tracing-stat">{fmtTokens(s.totalInputTokens)} in / {fmtTokens(s.totalOutputTokens)} out</span>
         <span className="tracing-stat">|</span>
-        <span className="tracing-stat">{p.stats.cacheHitPct.toFixed(0)}% cache</span>
+        <span className="tracing-stat">{fmtPct(s.cacheHitPct)}% cache</span>
         <div className="tracing-detail-header__actions">
           <button type="button" onClick={p.onOpenDir}>Open Dir</button>
           <button type="button" onClick={p.onCopyDir}>Copy DIR</button>
@@ -48,7 +49,22 @@ export function DetailHeader(p: Props) {
   );
 }
 
-function formatDurationMs(ms: number): string {
+function fmtNum(n: number | null | undefined): number | string {
+  return n ?? 0;
+}
+
+function fmtTokens(n: number | null | undefined): string {
+  if (n == null) return "0.0";
+  return (n / 1000).toFixed(1);
+}
+
+function fmtPct(n: number | null | undefined): string {
+  if (n == null) return "0";
+  return n.toFixed(0);
+}
+
+function formatDurationMs(ms: number | null | undefined): string {
+  if (ms == null) return "0s";
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
   return `${(ms / 60_000).toFixed(1)}min`;
 }

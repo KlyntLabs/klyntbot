@@ -94,6 +94,7 @@ export function SessionsListView({ providerId, onOpenSession }: Props) {
               basename={basename}
               cwd={items[0]?.cwd ?? ""}
               count={items.length}
+              layout={layout}
             >
               {items.map((s) => (
                 <SessionCard key={s.sessionId} summary={s} onClick={() => onOpenSession(s.sessionId)} />
@@ -101,7 +102,7 @@ export function SessionsListView({ providerId, onOpenSession }: Props) {
             </ProjectGroup>
           ))
         ) : (
-          <div className="tracing-list__flat">
+          <div className={layout === "list" ? "tracing-list__flat tracing-list__flat--list" : "tracing-list__flat"}>
             {sorted.map((s) => (
               <SessionCard key={s.sessionId} summary={s} onClick={() => onOpenSession(s.sessionId)} />
             ))}

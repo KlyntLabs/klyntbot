@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Virtuoso } from "react-virtuoso";
 import type { TraceEvent, Scope } from "./types";
 import { TurnBeginCard } from "./event-cards/TurnBeginCard";
@@ -52,6 +52,19 @@ export function WireEventsTab(props: Props) {
     return events.find((e) => (e.payload as any)?.id === selectedToolId && e.rawKind === "ToolCall");
   }, [events, selectedToolId]);
 
+  const itemContent = useCallback((index: number, event: TraceEvent) => {
+    const prev = filtered[index - 1];
+    const deltaMs = prev ? new Date(event.occurredAt).getTime() - new Date(prev.occurredAt).getTime() : undefined;
+    return renderCard(event, {
+      expanded: expandedSeq === event.seq,
+      onToggle: () => onToggleEvent(event.seq),
+      deltaMs,
+      onSelectTool: () => onSelectTool((event.payload as any)?.id),
+      selectedTool: selectedToolId === (event.payload as any)?.id,
+      onOpenSubagent,
+    });
+  }, [filtered, expandedSeq, onToggleEvent, selectedToolId, onSelectTool, onOpenSubagent]);
+
   return (
     <div className="tracing-detail-pane">
       <div className="tracing-detail-pane__left">
@@ -59,18 +72,7 @@ export function WireEventsTab(props: Props) {
         <Virtuoso
           className="tracing-detail-pane__scroll"
           data={filtered}
-          itemContent={(index, event) => {
-            const prev = filtered[index - 1];
-            const deltaMs = prev ? new Date(event.occurredAt).getTime() - new Date(prev.occurredAt).getTime() : undefined;
-            return renderCard(event, {
-              expanded: expandedSeq === event.seq,
-              onToggle: () => onToggleEvent(event.seq),
-              deltaMs,
-              onSelectTool: () => onSelectTool((event.payload as any)?.id),
-              selectedTool: selectedToolId === (event.payload as any)?.id,
-              onOpenSubagent,
-            });
-          }}
+          itemContent={itemContent}
         />
       </div>
       <DetailPane selectedToolEvent={selectedToolEvent} />

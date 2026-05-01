@@ -14,7 +14,7 @@ export function SubagentEventCard({ event, onOpenSubagent }: Props) {
         className="tracing-evcard__sub-link"
         onClick={() => agentId && onOpenSubagent?.(agentId)}
       >↳ {description}</button>
-      <pre className="tracing-detail-pane__pre">{JSON.stringify(wrapped, null, 2).slice(0, 240)}</pre>
+      <pre className="tracing-detail-pane__pre">{(JSON.stringify(wrapped, null, 2) ?? "").slice(0, 240)}</pre>
     </div>
   );
 }

@@ -25,11 +25,12 @@ const PALETTE: Record<string, string> = {
 export function EventTypeChip({ rawKind, active, onClick }: Props) {
   const color = PALETTE[rawKind] ?? "var(--text-secondary)";
   return (
-    <button
-      type="button"
+    <span
       className={"tracing-chip" + (active ? " tracing-chip--active" : "")}
       style={{ borderColor: color, color }}
       onClick={onClick}
-    >{rawKind}</button>
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >{rawKind}</span>
   );
 }

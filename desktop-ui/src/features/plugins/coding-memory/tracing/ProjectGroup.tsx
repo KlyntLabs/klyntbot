@@ -7,9 +7,10 @@ interface Props {
   count: number;
   children: ReactNode;
   defaultOpen?: boolean;
+  layout?: "grid" | "list";
 }
 
-export function ProjectGroup({ basename, cwd, count, children, defaultOpen = true }: Props) {
+export function ProjectGroup({ basename, cwd, count, children, defaultOpen = true, layout = "grid" }: Props) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="tracing-group">
@@ -20,7 +21,11 @@ export function ProjectGroup({ basename, cwd, count, children, defaultOpen = tru
         <span className="tracing-group__count">({count})</span>
         <span className="tracing-group__path">{cwd}</span>
       </button>
-      {open && <div className="tracing-group__body">{children}</div>}
+      {open && (
+        <div className={layout === "list" ? "tracing-group__body tracing-group__body--list" : "tracing-group__body"}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

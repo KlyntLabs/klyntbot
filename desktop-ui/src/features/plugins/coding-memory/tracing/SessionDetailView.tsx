@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@/api/client";
 import type { DetailTab, Scope, SubagentSummary } from "./types";
 import { useTracingSession } from "./useTracingSession";
@@ -37,6 +37,23 @@ export function SessionDetailView({ providerId, sessionId, onBack }: Props) {
 
   const chrome = chromeFor(providerId);
 
+  const handleOpenDir = useCallback(() => {
+    invoke("tracing_open_dir", { providerId, sessionId });
+  }, [providerId, sessionId]);
+
+  const handleCopyDir = useCallback(async () => {
+    const path: string = await invoke("tracing_get_dir", { providerId, sessionId });
+    await navigator.clipboard.writeText(path);
+  }, [providerId, sessionId]);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  const handleOpenSubagent = useCallback((agentId: string) => {
+    setScope({ kind: "subagent", agentId });
+  }, []);
+
   if (loading && !detail) return <div className="tracing-state">Loading session…</div>;
   if (error) return <div className="tracing-state tracing-state--error">{error}</div>;
   if (!detail) return null;
@@ -48,13 +65,10 @@ export function SessionDetailView({ providerId, sessionId, onBack }: Props) {
         sessionId={sessionId}
         stats={detail.stats}
         onBack={onBack}
-        onOpenDir={() => invoke("tracing_open_dir", { providerId, sessionId })}
-        onCopyDir={async () => {
-          const path: string = await invoke("tracing_get_dir", { providerId, sessionId });
-          await navigator.clipboard.writeText(path);
-        }}
+        onOpenDir={handleOpenDir}
+        onCopyDir={handleCopyDir}
         onDownload={() => { /* deferred — see "Out of scope for v1" */ }}
-        onRefresh={() => setRefreshKey((k) => k + 1)}
+        onRefresh={handleRefresh}
       />
       <div className="tracing-tabs">
         {(["wireEvents", "contextMessages", "state", "dual", "agents"] as DetailTab[]).map((t) => (
@@ -81,7 +95,7 @@ export function SessionDetailView({ providerId, sessionId, onBack }: Props) {
             onToggleEvent={detailCtl.toggleEvent}
             selectedToolId={detailCtl.selectedToolId}
             onSelectTool={detailCtl.selectToolId}
-            onOpenSubagent={(agentId) => setScope({ kind: "subagent", agentId })}
+            onOpenSubagent={handleOpenSubagent}
           />
         </>
       )}

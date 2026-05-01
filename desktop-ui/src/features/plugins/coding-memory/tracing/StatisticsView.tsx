@@ -40,15 +40,15 @@ export function StatisticsView({ providerId }: Props) {
           <div className="tracing-statistics__label">Turns</div>
         </div>
         <div className="tracing-statistics__card">
-          <div className="tracing-statistics__value">{(totalInputTokens / 1000).toFixed(1)}k</div>
+          <div className="tracing-statistics__value">{((totalInputTokens ?? 0) / 1000).toFixed(1)}k</div>
           <div className="tracing-statistics__label">Input tokens</div>
         </div>
         <div className="tracing-statistics__card">
-          <div className="tracing-statistics__value">{(totalOutputTokens / 1000).toFixed(1)}k</div>
+          <div className="tracing-statistics__value">{((totalOutputTokens ?? 0) / 1000).toFixed(1)}k</div>
           <div className="tracing-statistics__label">Output tokens</div>
         </div>
         <div className="tracing-statistics__card">
-          <div className="tracing-statistics__value">{stats.cacheHitPct.toFixed(0)}%</div>
+          <div className="tracing-statistics__value">{(stats.cacheHitPct ?? 0).toFixed(0)}%</div>
           <div className="tracing-statistics__label">Cache hit</div>
         </div>
       </div>
