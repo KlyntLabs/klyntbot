@@ -1,5 +1,4 @@
 #![cfg(target_os = "macos")]
-use agent::events::AgentEvent;
 use bus::DomainEventBus;
 use config::schema::CodingPermissions;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
@@ -8,7 +7,7 @@ use klynt_core::tools::bash::{BashArgs, BashTool};
 use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tools_core::ToolExecute;
+use tools_core::{events::ToolEvent, ToolExecute};
 
 #[tokio::test]
 async fn bash_happy_path() {
@@ -23,7 +22,12 @@ async fn bash_happy_path() {
     let bus = Arc::new(DomainEventBus::new(256));
     let (tx, mut rx) = mpsc::channel(256);
 
-    let tool = BashTool::new(layer1, policy, privacy, pending, Some(tx), bus);
+    let tool = BashTool::new(layer1, policy, privacy, pending, bus, common::tool_channel::NonUiPolicy::Allow);
+    let mut routing_ctx = tools_core::RoutingContext::new(
+        ::common::ChannelName::new("coding"),
+        ::common::ChatId::new("test"),
+    );
+    routing_ctx.event_tx = Some(tx);
     let result = ToolExecute::execute(
         &tool,
         BashArgs {
@@ -31,10 +35,7 @@ async fn bash_happy_path() {
             cwd: Some("/tmp".into()),
             timeout_ms: Some(5000),
         },
-        &tools_core::RoutingContext::new(
-            ::common::ChannelName::new("coding"),
-            ::common::ChatId::new("test"),
-        ),
+        &routing_ctx,
     )
     .await
     .unwrap();
@@ -48,13 +49,13 @@ async fn bash_happy_path() {
     let mut saw_sandbox = false;
     while let Some(e) = rx.recv().await {
         match e {
-            AgentEvent::ApprovalRequested {
+            ToolEvent::ApprovalRequested {
                 ref tool,
                 requires_user_input,
                 ..
             } if tool == "bash" && !requires_user_input => saw_request = true,
-            AgentEvent::ApprovalResolved { .. } if saw_request => saw_resolved = true,
-            AgentEvent::SandboxPolicyApplied { .. } if saw_resolved => saw_sandbox = true,
+            ToolEvent::ApprovalResolved { .. } if saw_request => saw_resolved = true,
+            ToolEvent::SandboxPolicyApplied { .. } if saw_resolved => saw_sandbox = true,
             _ => {}
         }
     }

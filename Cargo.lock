@@ -434,6 +434,7 @@ dependencies = [
  "tracing",
  "uuid",
  "voice-engine",
+ "walkdir",
 ]
 
 [[package]]

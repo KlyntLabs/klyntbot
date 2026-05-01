@@ -7,9 +7,10 @@
 //! - Cancellation handling
 //! - Non-TTY fallback behavior
 
-use klyntbot::tools::ask_user::AskUserTool;
+use klynt_core::tools::ask_user::AskUserTool;
 use klyntbot::tools::{InteractionBundle, RoutingContext, Tool};
 use klyntbot::{Answer, AnswerValue, FormResponse};
+use common::Result as KResult;
 use serde_json::json;
 use tokio::sync::mpsc;
 
@@ -54,7 +55,7 @@ async fn ask_user_handles_single_select() {
     // Execute ask_user in the background
     let execute_handle = tokio::spawn({
         let ctx = ctx.clone();
-        async move { tool.execute(args, &ctx).await }
+        async move { tool.execute(args, &ctx).await as KResult<String> }
     });
 
     // Receive the interaction request
@@ -125,7 +126,7 @@ async fn ask_user_processes_form_response() {
 
     let execute_handle = tokio::spawn({
         let ctx = ctx.clone();
-        async move { tool.execute(args, &ctx).await }
+        async move { tool.execute(args, &ctx).await as KResult<String> }
     });
 
     let bundle = interaction_rx.recv().await.expect("Should receive bundle");
@@ -183,7 +184,7 @@ async fn ask_user_handles_cancellation() {
 
     let execute_handle = tokio::spawn({
         let ctx = ctx.clone();
-        async move { tool.execute(args, &ctx).await }
+        async move { tool.execute(args, &ctx).await as KResult<String> }
     });
 
     let bundle = interaction_rx.recv().await.unwrap();
@@ -245,7 +246,7 @@ async fn ask_user_handles_free_text() {
 
     let execute_handle = tokio::spawn({
         let ctx = ctx.clone();
-        async move { tool.execute(args, &ctx).await }
+        async move { tool.execute(args, &ctx).await as KResult<String> }
     });
 
     let bundle = interaction_rx.recv().await.unwrap();
@@ -281,7 +282,7 @@ async fn ask_user_handles_skipped_answers() {
 
     let execute_handle = tokio::spawn({
         let ctx = ctx.clone();
-        async move { tool.execute(args, &ctx).await }
+        async move { tool.execute(args, &ctx).await as KResult<String> }
     });
 
     let bundle = interaction_rx.recv().await.unwrap();
@@ -318,7 +319,7 @@ async fn ask_user_handles_empty_multi_select() {
 
     let execute_handle = tokio::spawn({
         let ctx = ctx.clone();
-        async move { tool.execute(args, &ctx).await }
+        async move { tool.execute(args, &ctx).await as KResult<String> }
     });
 
     let bundle = interaction_rx.recv().await.unwrap();
@@ -460,7 +461,7 @@ async fn ask_user_handles_response_channel_closed() {
 
     let execute_handle = tokio::spawn({
         let ctx = ctx.clone();
-        async move { tool.execute(args, &ctx).await }
+        async move { tool.execute(args, &ctx).await as KResult<String> }
     });
 
     let bundle = interaction_rx.recv().await.unwrap();
