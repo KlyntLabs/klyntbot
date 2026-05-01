@@ -1,6 +1,8 @@
 import { Calendar, Clock, FolderPlus, LayoutGrid, Search, Settings, SquarePen } from "lucide-react";
 import { memo } from "react";
 import type { ChatThread } from "@/features/chat/types";
+import { useAppMode } from "../hooks/useAppMode";
+import { AppModeSwitch } from "./AppModeSwitch";
 
 type SidebarChatLayoutProps = {
   onOpenSettings: () => void;
@@ -30,6 +32,7 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   onSelectThread,
   activeNavId,
 }: SidebarChatLayoutProps) {
+  const { mode, setMode } = useAppMode();
   const handleSelectCalendar = onSelectCalendar ?? (() => {});
   const navItems: NavItem[] = [
     { id: "new-chat", label: "New chat", icon: <SquarePen aria-hidden />, onClick: onNewChat },
@@ -48,7 +51,11 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   return (
     <aside className="sidebar-chat">
       <div className="sidebar-chat__drag-strip" />
-      <div className="sidebar-chat__topbar" aria-hidden />
+      <div className="sidebar-chat__topbar">
+        <div className="sidebar-chat__topbar-traffic-reserve" aria-hidden />
+        <div className="sidebar-chat__topbar-spacer" />
+        <AppModeSwitch mode={mode} onChange={setMode} />
+      </div>
 
       <nav className="sidebar-chat__nav" aria-label="Primary">
         {navItems.map((item) => {

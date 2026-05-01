@@ -66,6 +66,7 @@
   --border-accent: rgba(100, 200, 255, 0.6);
   --border-accent-soft: rgba(100, 200, 255, 0.3);
   --text-accent: rgba(164, 195, 255, 0.7);
+  --text-accent-cyan: rgba(120, 200, 255, 0.85);
   --message-link-color: rgba(196, 154, 255, 0.96);
   --shadow-accent: rgba(92, 168, 255, 0.28);
   --titlebar-inset-left: 72px;

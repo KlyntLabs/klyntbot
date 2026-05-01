@@ -213,9 +213,6 @@ export function useKlyntbotSurfaceProps(
   }, [chat.error, dismissedError]);
   const visibleError = dismissedError === chat.error ? null : chat.error;
 
-  // Hooks MUST always run in the same order — never early-return between them.
-  // sessionKey may be null (no thread selected); we still register the
-  // subscription so React's hook count is stable, then bail out below.
   const approvals = useSyncExternalStore(
     chatStreamStore.subscribe,
     useCallback(() => chatStreamStore.getApprovals(sessionKey ?? ""), [sessionKey]),
