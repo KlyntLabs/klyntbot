@@ -213,14 +213,14 @@ export function useKlyntbotSurfaceProps(
   }, [chat.error, dismissedError]);
   const visibleError = dismissedError === chat.error ? null : chat.error;
 
-  if (!sessionKey) {
-    return null;
-  }
-
   const approvals = useSyncExternalStore(
     chatStreamStore.subscribe,
     useCallback(() => chatStreamStore.getApprovals(sessionKey ?? ""), [sessionKey]),
   );
+
+  if (!sessionKey) {
+    return null;
+  }
 
   return {
     messagesProps: {
