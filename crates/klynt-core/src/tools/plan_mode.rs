@@ -71,8 +71,7 @@ impl ToolExecute for EnterPlanModeTool {
     type Params = EnterPlanModeArgs;
     async fn execute(&self, args: EnterPlanModeArgs, ctx: &RoutingContext) -> Result<String> {
         let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
-        let args_json = serde_json::to_value(&args).unwrap_or_default();
-        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "enter_plan_mode", args_json, None).await {
+        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "enter_plan_mode", &args, None).await {
             return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
         }
         let start = std::time::Instant::now();
@@ -89,8 +88,7 @@ impl ToolExecute for ExitPlanModeTool {
     type Params = ExitPlanModeArgs;
     async fn execute(&self, args: ExitPlanModeArgs, ctx: &RoutingContext) -> Result<String> {
         let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
-        let args_json = serde_json::to_value(&args).unwrap_or_default();
-        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "exit_plan_mode", args_json, None).await {
+        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "exit_plan_mode", &args, None).await {
             return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
         }
         let start = std::time::Instant::now();

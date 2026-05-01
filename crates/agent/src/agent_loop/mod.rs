@@ -1186,14 +1186,6 @@ impl AgentLoop {
                     // is available and the DB row exists when the streaming
                     // relay tries to update metadata.
                     let message_id = agent.save_to_session(&sk, &response).await;
-                    let message_count = {
-                        if let Ok(session_arc) = agent.session_manager.get_or_create(&sk).await {
-                            let session = session_arc.lock().await;
-                            session.messages.len() as u64
-                        } else {
-                            0
-                        }
-                    };
                     let _ = event_tx
                         .send(AgentEvent::Done {
                             content: response.clone(),
@@ -1201,6 +1193,14 @@ impl AgentLoop {
                         })
                         .await;
                     if let Some(engine) = agent.runtime.hook_engine() {
+                        let message_count = {
+                            if let Ok(session_arc) = agent.session_manager.get_or_create(&sk).await {
+                                let session = session_arc.lock().await;
+                                session.messages.len() as u64
+                            } else {
+                                0
+                            }
+                        };
                         let stop_input = klynt_hooks::events::stop::StopInput {
                             session_id: sk.clone(),
                             message_count,

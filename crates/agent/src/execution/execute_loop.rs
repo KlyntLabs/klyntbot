@@ -210,9 +210,9 @@ pub async fn execute_loop(
         }
 
         // ── Mid-loop compression ─────────────────────────────
-        let session_key = common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string();
-        let current_tokens = compressor.estimate_tokens(&messages);
         if let Some(ref engine) = params.hook_engine {
+            let session_key = common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string();
+            let current_tokens = compressor.estimate_tokens(&messages);
             let pre_input = klynt_hooks::events::pre_compact::PreCompactInput {
                 session_id: session_key.clone(),
                 message_count: messages.len() as u64,
@@ -234,8 +234,9 @@ pub async fn execute_loop(
             )
             .await;
             if let Some(ref engine) = params.hook_engine {
+                let session_key = common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string();
                 let post_input = klynt_hooks::events::post_compact::PostCompactInput {
-                    session_id: session_key.clone(),
+                    session_id: session_key,
                     messages_compacted: messages_compacted as u64,
                     tokens_before: before_tokens as u64,
                     tokens_after: after_tokens as u64,

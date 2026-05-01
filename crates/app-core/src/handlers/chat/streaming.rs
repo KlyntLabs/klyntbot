@@ -408,6 +408,7 @@ pub async fn relay_chat_stream(
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     user_message: Option<String>,
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    session_start_fired: Arc<dashmap::DashMap<String, ()>>,
     session_end_fired: Arc<dashmap::DashMap<String, ()>>,
 ) {
     // Guard ensures active_streams + pending_interactions cleanup even on panic
@@ -695,6 +696,7 @@ pub async fn relay_chat_stream(
                         if let Some(ref engine) = hook_engine {
                             if !session_end_fired.contains_key(sk.as_str()) {
                                 session_end_fired.insert(sk.clone(), ());
+                                session_start_fired.remove(sk.as_str());
                                 let input = SessionEndInput {
                                     session_id: sk.clone(),
                                     reason: "complete".to_string(),
@@ -1238,6 +1240,7 @@ impl AppCore {
         if let Some(engine) = self.agent.runtime().hook_engine() {
             if !self.session_end_fired.contains_key(&session_key) {
                 self.session_end_fired.insert(session_key.clone(), ());
+                self.session_start_fired.remove(&session_key);
                 let input = SessionEndInput {
                     session_id: session_key.clone(),
                     reason: "user_cancel".to_string(),
@@ -1300,6 +1303,7 @@ impl AppCore {
             domain_event_bus,
             stream_info.user_message,
             hook_engine,
+            Arc::clone(&self.session_start_fired),
             Arc::clone(&self.session_end_fired),
         ));
     }

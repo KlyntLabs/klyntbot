@@ -3,7 +3,6 @@
 
 use klynt_hooks::engine::{HookEngine, HookFireInput, HookOutcome};
 use std::sync::Arc;
-use std::time::Instant;
 
 /// Fire PreToolUse and return:
 /// - `Ok(None)` if no engine, or hooks said allow.
@@ -13,10 +12,11 @@ pub async fn fire_pre_tool_use(
     engine: Option<&Arc<HookEngine>>,
     session_id: String,
     tool: &str,
-    args: serde_json::Value,
-    cwd: Option<String>,
+    args: &impl serde::Serialize,
+    _cwd: Option<String>,
 ) -> Result<Option<serde_json::Value>, String> {
     let Some(e) = engine else { return Ok(None) };
+    let args = serde_json::to_value(args).unwrap_or_default();
     let input = klynt_hooks::events::pre_tool_use::PreToolUseInput {
         session_id,
         tool: tool.to_string(),
@@ -101,32 +101,4 @@ pub async fn fire_post_file_edit(
         base: Default::default(),
     };
     let _ = e.fire(HookFireInput::PostFileEdit(input)).await;
-}
-
-/// Convenience: time a future and fire pre + post around it.
-pub async fn around<F>(
-    engine: Option<&Arc<HookEngine>>,
-    session_id: String,
-    tool: &str,
-    args: serde_json::Value,
-    cwd: Option<String>,
-    fut: F,
-) -> common::Result<String>
-where
-    F: std::future::Future<Output = common::Result<String>>,
-{
-    if let Err(reason) = fire_pre_tool_use(engine, session_id.clone(), tool, args, cwd).await {
-        return Err(common::KlyntbotError::Tool(common::ToolError::HookBlocked(reason)));
-    }
-    let start = Instant::now();
-    let result = fut.await;
-    fire_post_tool_use(
-        engine,
-        session_id,
-        tool,
-        result.is_ok(),
-        start.elapsed().as_millis() as u64,
-    )
-    .await;
-    result
 }

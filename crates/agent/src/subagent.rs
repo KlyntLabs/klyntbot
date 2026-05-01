@@ -251,20 +251,6 @@ impl SubagentManager {
             );
         }
 
-        // Store handle for cancel/status tracking
-        {
-            let mut handles = self.handles.lock().await;
-            handles.insert(
-                short_id.clone(),
-                SubagentHandle {
-                    cancel_token: cancel_token.clone(),
-                    label: label_text.clone(),
-                    profile,
-                    spawned_at: std::time::Instant::now(),
-                },
-            );
-        }
-
         let provider = Arc::clone(&self.provider);
         let workspace = self.workspace.clone();
         let inbound_tx = self.inbound_tx.clone();
@@ -286,11 +272,6 @@ impl SubagentManager {
             };
             match engine.fire(klynt_hooks::engine::HookFireInput::SubagentSpawn(input)).await {
                 klynt_hooks::HookOutcome::Block { reason } => {
-                    // Remove the handle we just inserted since we're aborting.
-                    {
-                        let mut handles = self.handles.lock().await;
-                        handles.remove(&short_id);
-                    }
                     return format!(
                         "Subagent spawn blocked by hook: {} (ID: {})",
                         reason, short_id
@@ -298,6 +279,20 @@ impl SubagentManager {
                 }
                 _ => {}
             }
+        }
+
+        // Store handle for cancel/status tracking (only after hook allows)
+        {
+            let mut handles = self.handles.lock().await;
+            handles.insert(
+                short_id.clone(),
+                SubagentHandle {
+                    cancel_token: cancel_token.clone(),
+                    label: label_text.clone(),
+                    profile,
+                    spawned_at: std::time::Instant::now(),
+                },
+            );
         }
         let subagent_id_clone = subagent_id.clone();
         let label_clone = label_text.clone();
@@ -725,6 +720,8 @@ mod tests {
             config,
             SubagentProfile::ReadWrite,
             Some(kit),
+            None,
+            "test:session".to_string(),
         )
         .await;
         assert!(result.is_ok());

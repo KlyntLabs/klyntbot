@@ -92,8 +92,7 @@ impl ToolExecute for BashTool {
         }
 
         let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
-        let args_json = serde_json::to_value(&args).unwrap_or_default();
-        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "bash", args_json, args.cwd.clone()).await {
+        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "bash", &args, args.cwd.clone()).await {
             return Err(common::KlyntbotError::Tool(common::ToolError::HookBlocked(reason)));
         }
         let start = std::time::Instant::now();

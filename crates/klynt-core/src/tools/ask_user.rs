@@ -114,8 +114,7 @@ impl Tool for AskUserTool {
 
     async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
         let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
-        let args_json = args.clone();
-        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "ask_user", args_json, None).await {
+        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "ask_user", &args, None).await {
             return Err(ToolError::HookBlocked(reason).into());
         }
         let start = std::time::Instant::now();

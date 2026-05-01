@@ -137,8 +137,7 @@ pub async fn run_for_test(
             format!("host {} previously denied", host_key.host))));
     }
 
-    let args_json = serde_json::to_value(&args).unwrap_or_default();
-    if let Err(reason) = fire_pre_tool_use(hook_engine.as_ref(), session_id.clone(), "web_fetch", args_json, None).await {
+    if let Err(reason) = fire_pre_tool_use(hook_engine.as_ref(), session_id.clone(), "web_fetch", &args, None).await {
         return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
     }
     let start = std::time::Instant::now();

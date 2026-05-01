@@ -11,7 +11,7 @@ use klynt_protocol::HookEventName;
 pub mod command_runner;
 pub mod discovery;
 pub mod dispatcher;
-pub mod output_parser;
+
 pub mod schema_loader;
 
 pub use dispatcher::{HookFireInput, HookOutcome};
