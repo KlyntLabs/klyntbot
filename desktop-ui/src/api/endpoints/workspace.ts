@@ -6,9 +6,6 @@ export async function listWorkspaces(): Promise<WorkspaceInfo[]> {
     return await invoke<WorkspaceInfo[]>("list_workspaces");
   } catch (error) {
     if (isMissingTauriInvokeError(error)) {
-      // In non-Tauri environments (e.g., Electron/web previews), the invoke
-      // bridge may be missing. Treat this as "no workspaces" instead of crashing.
-      console.warn("Tauri invoke bridge unavailable; returning empty workspaces list.");
       return [];
     }
     throw error;
