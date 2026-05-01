@@ -134,6 +134,13 @@ impl AgentLoop {
         }
     }
 
+    /// Inject the hook engine into the subagent manager (called by app-core init).
+    pub fn set_subagent_hook_engine(&self, engine: Arc<klynt_hooks::HookEngine>) {
+        if let Some(ref mgr) = self.subagent_manager {
+            mgr.set_hook_engine(engine);
+        }
+    }
+
     /// Reload skill files from disk (hot-reload after UI edits).
     pub async fn reload_agents(&self) -> common::Result<()> {
         let mut store = self.skill_store.write().await;
@@ -1179,12 +1186,28 @@ impl AgentLoop {
                     // is available and the DB row exists when the streaming
                     // relay tries to update metadata.
                     let message_id = agent.save_to_session(&sk, &response).await;
+                    let message_count = {
+                        if let Ok(session_arc) = agent.session_manager.get_or_create(&sk).await {
+                            let session = session_arc.lock().await;
+                            session.messages.len() as u64
+                        } else {
+                            0
+                        }
+                    };
                     let _ = event_tx
                         .send(AgentEvent::Done {
                             content: response.clone(),
                             message_id,
                         })
                         .await;
+                    if let Some(engine) = agent.runtime.hook_engine() {
+                        let stop_input = klynt_hooks::events::stop::StopInput {
+                            session_id: sk.clone(),
+                            message_count,
+                            base: Default::default(),
+                        };
+                        let _ = engine.fire(klynt_hooks::engine::HookFireInput::Stop(stop_input)).await;
+                    }
                     Ok(response)
                 }
                 Err(e) => {
@@ -1192,6 +1215,16 @@ impl AgentLoop {
                     // Without this, the session row exists (created by chat_send)
                     // but has zero messages — a ghost thread in the sidebar.
                     agent.persist_session(&sk).await;
+                    if let Some(engine) = agent.runtime.hook_engine() {
+                        let error_input = klynt_hooks::events::error::ErrorInput {
+                            session_id: sk.clone(),
+                            kind: "agent_loop_error".to_string(),
+                            message: e.to_string(),
+                            recoverable: false,
+                            base: Default::default(),
+                        };
+                        let _ = engine.fire(klynt_hooks::engine::HookFireInput::Error(error_input)).await;
+                    }
                     let _ = event_tx
                         .send(AgentEvent::Error {
                             message: e.to_string(),

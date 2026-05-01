@@ -1,6 +1,7 @@
 use crate::approval::host_cache::{HostApprovalCache, HostCheckResult, HostDecision, HostKey};
 use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
+use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use};
 use async_trait::async_trait;
 use bus::DomainEventBus;
 use common::{KlyntbotError, Result, ToolError};
@@ -67,6 +68,7 @@ impl WebFetchTool {
 impl ToolExecute for WebFetchTool {
     type Params = WebFetchArgs;
     async fn execute(&self, args: WebFetchArgs, ctx: &RoutingContext) -> Result<String> {
+        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
         run_for_test(args, self.layer1.clone(), self.policy.clone(),
             self.privacy.clone(), self.pending.clone(),
             ctx.event_tx.clone(),
@@ -76,6 +78,8 @@ impl ToolExecute for WebFetchTool {
             common::tool_channel::Channel::from_name(ctx.channel.as_str()),
             self.non_ui_policy,
             self.host_cache.clone(),
+            ctx.hook_engine.clone(),
+            session_id,
         ).await
     }
 }
@@ -94,6 +98,8 @@ pub async fn run_for_test(
     channel: common::tool_channel::Channel,
     non_ui_policy: common::tool_channel::NonUiPolicy,
     host_cache: Arc<HostApprovalCache>,
+    hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    session_id: String,
 ) -> Result<String> {
     let host_key = HostKey::from_url(&args.url)?;
     let host_decision = match host_cache.check_or_register(host_key.clone()) {
@@ -131,22 +137,31 @@ pub async fn run_for_test(
             format!("host {} previously denied", host_key.host))));
     }
 
-    let max_bytes = args.max_bytes.unwrap_or(200_000) as usize;
-    let resp = client.get(&args.url).send().await
-        .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("http: {e}"))))?;
-    if !resp.status().is_success() {
-        return Err(KlyntbotError::Tool(ToolError::ExecutionFailed(
-            format!("http {} from {}", resp.status(), args.url))));
+    let args_json = serde_json::to_value(&args).unwrap_or_default();
+    if let Err(reason) = fire_pre_tool_use(hook_engine.as_ref(), session_id.clone(), "web_fetch", args_json, None).await {
+        return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
     }
-    let body = resp.bytes().await
-        .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(e.to_string())))?;
-    let truncated = &body[..body.len().min(max_bytes)];
-    let format = args.format.as_deref().unwrap_or("text");
-    let out = if format == "text" {
-        html2text::from_read(truncated, 80)
-            .unwrap_or_else(|_| String::from_utf8_lossy(truncated).into_owned())
-    } else {
-        String::from_utf8_lossy(truncated).into_owned()
-    };
-    Ok(out)
+    let start = std::time::Instant::now();
+    let result: Result<String> = (async {
+        let max_bytes = args.max_bytes.unwrap_or(200_000) as usize;
+        let resp = client.get(&args.url).send().await
+            .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("http: {e}"))))?;
+        if !resp.status().is_success() {
+            return Err(KlyntbotError::Tool(ToolError::ExecutionFailed(
+                format!("http {} from {}", resp.status(), args.url))));
+        }
+        let body = resp.bytes().await
+            .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(e.to_string())))?;
+        let truncated = &body[..body.len().min(max_bytes)];
+        let format = args.format.as_deref().unwrap_or("text");
+        let out = if format == "text" {
+            html2text::from_read(truncated, 80)
+                .unwrap_or_else(|_| String::from_utf8_lossy(truncated).into_owned())
+        } else {
+            String::from_utf8_lossy(truncated).into_owned()
+        };
+        Ok(out)
+    }).await;
+    fire_post_tool_use(hook_engine.as_ref(), session_id, "web_fetch", result.is_ok(), start.elapsed().as_millis() as u64).await;
+    result
 }

@@ -82,6 +82,7 @@ export const SETTINGS_SECTION_LABELS: Record<CodexSection, string> = {
   git: "Git",
   server: "Server",
   agents: "Agents",
+  hooks: "Hooks & Rules",
   codex: "Codex",
   features: "Features",
 };

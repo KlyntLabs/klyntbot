@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { ApprovalDecision } from "@/features/coding/hooks/useApprovalQueue";
 import type { ConversationItem } from "@/types";
+import { StarlarkRuleEditor } from "./StarlarkRuleEditor";
 
 type ApprovalItem = Extract<ConversationItem, { kind: "approval" }>;
 
@@ -11,16 +12,14 @@ type Props = {
 
 export function ApprovalCard({ item, onRespond }: Props) {
   const pending = item.status === "pending";
+  const [editorOpen, setEditorOpen] = useState(false);
   useEffect(() => {
     if (!pending) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "a") onRespond(item.requestId, { kind: "allow_once" });
       if (e.key === "s") onRespond(item.requestId, { kind: "allow_always" });
       if (e.key === "d") onRespond(item.requestId, { kind: "deny" });
-      if (e.key === "r") {
-        const src = window.prompt("Starlark rule source (Plan 4 will persist):", "");
-        if (src != null) onRespond(item.requestId, { kind: "add_rule", starlark_source: src });
-      }
+      if (e.key === "r") setEditorOpen(true);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -84,16 +83,20 @@ export function ApprovalCard({ item, onRespond }: Props) {
         <button type="button" onClick={() => onRespond(item.requestId, { kind: "deny" })}>
           Deny (d)
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            const src = window.prompt("Starlark rule source (Plan 4):", "");
-            if (src != null) onRespond(item.requestId, { kind: "add_rule", starlark_source: src });
-          }}
-        >
+        <button type="button" onClick={() => setEditorOpen(true)}>
           Add rule… (r)
         </button>
       </div>
+      {editorOpen && (
+        <StarlarkRuleEditor
+          requestId={item.requestId}
+          onCommit={(_path) => {
+            onRespond(item.requestId, { kind: "add_rule", starlark_source: "" });
+            setEditorOpen(false);
+          }}
+          onCancel={() => setEditorOpen(false)}
+        />
+      )}
     </div>
   );
 }

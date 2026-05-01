@@ -12,6 +12,12 @@ use storage::{Repos, SessionContextParams};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
+use klynt_hooks::engine::HookFireInput;
+use klynt_hooks::events::{
+    notification::NotificationInput, session_end::SessionEndInput,
+    session_start::SessionStartInput, user_prompt_submit::UserPromptSubmitInput,
+};
+
 use crate::errors::map_storage_err;
 use crate::state::AppCore;
 
@@ -249,7 +255,17 @@ pub async fn chat_send(
             .map_err(map_storage_err)?;
     }
 
-    // 3. Call agent with streaming (agent loop stores user + assistant messages)
+    // 3. Fire UserPromptSubmit hook before entering the agent loop
+    if let Some(engine) = agent.runtime().hook_engine() {
+        let input = UserPromptSubmitInput {
+            session_id: session_key.clone(),
+            prompt: content.clone(),
+            base: Default::default(),
+        };
+        let _ = engine.fire(HookFireInput::UserPromptSubmit(input)).await;
+    }
+
+    // 4. Call agent with streaming (agent loop stores user + assistant messages)
     let msg_id = uuid::Uuid::new_v4();
     let now = jiff::Timestamp::now();
     let user_message = content.clone();
@@ -258,10 +274,10 @@ pub async fn chat_send(
         .await
         .map_err(ApiError::from)?;
 
-    // 4. Track the cancel token
+    // 5. Track the cancel token
     active_streams.insert(session_key.clone(), streaming_handle.cancel_token);
 
-    // 5. Build the user message response
+    // 6. Build the user message response
     let user_msg = ChatMessageResponse {
         id: msg_id.to_string(),
         role: common::MessageRole::User.to_string(),
@@ -271,7 +287,7 @@ pub async fn chat_send(
         transparency: None,
     };
 
-    // 6. Build stream info for the caller to wire up
+    // 7. Build stream info for the caller to wire up
     let stream_info = ChatStreamInfo {
         session_key,
         event_rx: streaming_handle.event_rx,
@@ -375,7 +391,8 @@ pub async fn chat_respond_interaction(
     emitter,
     journey_tracker,
     domain_event_bus,
-    user_message
+    user_message,
+    hook_engine
 ))]
 #[allow(clippy::too_many_arguments)]
 pub async fn relay_chat_stream(
@@ -390,6 +407,8 @@ pub async fn relay_chat_stream(
     journey_tracker: Option<crate::journey::JourneyTracker>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     user_message: Option<String>,
+    hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    session_end_fired: Arc<dashmap::DashMap<String, ()>>,
 ) {
     // Guard ensures active_streams + pending_interactions cleanup even on panic
     struct StreamGuard {
@@ -673,6 +692,18 @@ pub async fn relay_chat_stream(
                                 source: "chat".to_string(),
                             }
                         );
+                        if let Some(ref engine) = hook_engine {
+                            if !session_end_fired.contains_key(sk.as_str()) {
+                                session_end_fired.insert(sk.clone(), ());
+                                let input = SessionEndInput {
+                                    session_id: sk.clone(),
+                                    reason: "complete".to_string(),
+                                    duration_ms: 0,
+                                    base: Default::default(),
+                                };
+                                let _ = engine.fire(HookFireInput::SessionEnd(input)).await;
+                            }
+                        }
                         break;
                     }
                     AgentEvent::Error { message } => {
@@ -1064,6 +1095,16 @@ pub async fn relay_chat_stream(
                             "layer_reason": layer_reason,
                         });
                         emitter.emit_event("agent:approval_requested", payload);
+                        if let Some(ref engine) = hook_engine {
+                            let input = NotificationInput {
+                                session_id: sk.clone(),
+                                kind: "approval_card_opened".to_string(),
+                                message: format!("Approval requested for {} (layer: {})", tool, layer),
+                                tool: Some(tool.clone()),
+                                base: Default::default(),
+                            };
+                            let _ = engine.fire(HookFireInput::Notification(input)).await;
+                        }
                     }
                     AgentEvent::ApprovalResolved { ref request_id, ref decision, ref decision_reason, ref latency_ms, ref persisted_rule, ref decided_by } => {
                         let payload = serde_json::json!({
@@ -1130,6 +1171,24 @@ impl AppCore {
         context: Option<SessionContextInput>,
         mode: Option<String>,
     ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
+        // Fire SessionStart hook once per session on first coding-mode message.
+        if mode.as_deref() == Some("coding")
+            && !self.session_start_fired.contains_key(&session_key)
+        {
+            if let Some(engine) = self.agent.runtime().hook_engine() {
+                let input = SessionStartInput {
+                    session_id: session_key.clone(),
+                    cwd: std::env::current_dir()
+                        .ok()
+                        .and_then(|p| p.to_str().map(String::from))
+                        .unwrap_or_default(),
+                    base: Default::default(),
+                };
+                let _ = engine.fire(HookFireInput::SessionStart(input)).await;
+            }
+            self.session_start_fired.insert(session_key.clone(), ());
+        }
+
         let result = chat_send(
             &self.repos,
             &self.agent,
@@ -1176,6 +1235,18 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn chat_cancel(&self, session_key: String) -> Result<(), ApiError> {
+        if let Some(engine) = self.agent.runtime().hook_engine() {
+            if !self.session_end_fired.contains_key(&session_key) {
+                self.session_end_fired.insert(session_key.clone(), ());
+                let input = SessionEndInput {
+                    session_id: session_key.clone(),
+                    reason: "user_cancel".to_string(),
+                    duration_ms: 0,
+                    base: Default::default(),
+                };
+                let _ = engine.fire(HookFireInput::SessionEnd(input)).await;
+            }
+        }
         chat_cancel(
             &self.active_streams,
             &self.pending_interactions,
@@ -1214,6 +1285,7 @@ impl AppCore {
         let pending_interactions = Arc::clone(&self.pending_interactions);
         let journey_tracker = self.journey_tracker.clone();
         let domain_event_bus = self.domain_event_bus.clone();
+        let hook_engine = self.agent.runtime().hook_engine();
 
         tokio::spawn(relay_chat_stream(
             repos,
@@ -1227,6 +1299,8 @@ impl AppCore {
             journey_tracker,
             domain_event_bus,
             stream_info.user_message,
+            hook_engine,
+            Arc::clone(&self.session_end_fired),
         ));
     }
 }

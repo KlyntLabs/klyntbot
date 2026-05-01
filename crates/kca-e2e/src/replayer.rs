@@ -126,7 +126,7 @@ impl ReplayContext {
     ) -> common::Result<String> {
         let (_user_msg, mut info) = self
             .app
-            .chat_send(content, session_key, None)
+            .chat_send(content, session_key, None, None)
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("chat_send failed: {e}")))?;
         let mut answer = String::new();

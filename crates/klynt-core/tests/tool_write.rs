@@ -32,7 +32,7 @@ async fn writes_file_and_emits_event() {
         WriteArgs { path: "out.txt".into(), content: "hello write".into() },
         cwd.clone(), layer1, policy, privacy, pending, Some(tx.clone()), bus,
         CancellationToken::new(),
-        Channel::Coding, NonUiPolicy::Allow,
+        Channel::Coding, NonUiPolicy::Allow, None, "".to_string(),
     ).await.unwrap();
 
     assert!(res.contains("wrote"));
@@ -63,7 +63,7 @@ async fn outside_cwd_denied_no_write_no_event() {
         WriteArgs { path: "/etc/passwd".into(), content: "x".into() },
         dir.path().to_path_buf(), layer1, policy, privacy, pending, Some(tx), bus,
         CancellationToken::new(),
-        Channel::Coding, NonUiPolicy::Allow,
+        Channel::Coding, NonUiPolicy::Allow, None, "".to_string(),
     ).await;
     assert!(r.is_err());
 }

@@ -8,6 +8,7 @@ ai-core = { workspace = true }
 desktop-shared = { workspace = true }
 klynt-core = { workspace = true }
 klynt-execpolicy = { workspace = true }
+klynt-hooks = { workspace = true }
 agent = { workspace = true }
 autotuner = { workspace = true }
 bus = { workspace = true }

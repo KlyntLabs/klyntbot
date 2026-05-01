@@ -35,7 +35,7 @@ async fn replaces_cell_source() {
             new_source: "print('updated')\n".into(),
         },
         dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-        Channel::Coding, NonUiPolicy::Allow,
+        Channel::Coding, NonUiPolicy::Allow, None, "".to_string(),
     ).await.unwrap();
     let saved = std::fs::read_to_string(dir.path().join("nb.ipynb")).unwrap();
     let v: serde_json::Value = serde_json::from_str(&saved).unwrap();
@@ -57,7 +57,7 @@ async fn rejects_out_of_range_index() {
     let r = nb_run(
         NotebookEditArgs { path: "nb.ipynb".into(), cell_index: 99, new_source: "x".into() },
         dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-        Channel::Coding, NonUiPolicy::Allow,
+        Channel::Coding, NonUiPolicy::Allow, None, "".to_string(),
     ).await;
     assert!(r.is_err());
 }

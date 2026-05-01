@@ -13,6 +13,7 @@ config = { workspace = true }
 bus = { workspace = true }
 klynt-protocol = { workspace = true }
 klynt-execpolicy = { workspace = true }
+klynt-hooks = { workspace = true }
 klynt-sandbox = { workspace = true }
 async-trait = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

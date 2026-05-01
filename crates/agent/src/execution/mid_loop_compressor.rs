@@ -36,7 +36,7 @@ impl MidLoopCompressor {
         }
     }
 
-    fn estimate_tokens(&self, messages: &[Message]) -> usize {
+    pub fn estimate_tokens(&self, messages: &[Message]) -> usize {
         messages
             .iter()
             .map(|m| context_engine::estimate_message_tokens(&*self.token_counter, m))
@@ -47,8 +47,8 @@ impl MidLoopCompressor {
     ///
     /// Strategy: count tokens, skip if under threshold, then replace older
     /// Tool messages (outside the recent window) with extractive summaries.
-    /// Returns `Some((before_tokens, after_tokens))` if applied, `None` otherwise.
-    pub fn compress_if_needed(&self, messages: &mut [Message]) -> Option<(usize, usize)> {
+    /// Returns `Some((before_tokens, after_tokens, messages_compacted))` if applied, `None` otherwise.
+    pub fn compress_if_needed(&self, messages: &mut [Message]) -> Option<(usize, usize, usize)> {
         // Early exit: not enough messages to have anything outside the recent window
         if messages.len() <= MIN_RECENT_MESSAGES + 1 {
             return None;
@@ -79,6 +79,7 @@ impl MidLoopCompressor {
 
         // Accumulate savings inline to avoid a second full scan
         let mut saved_tokens: usize = 0;
+        let mut messages_compacted: usize = 0;
         for msg in messages[system_count..recent_start].iter_mut() {
             if let Message::Tool { content, name, .. } = msg {
                 let original_text = content.as_text();
@@ -86,6 +87,7 @@ impl MidLoopCompressor {
                 let original_tokens =
                     self.token_counter.estimate_text(&original_text) + image_count * 1024;
                 if original_tokens > MIN_COMPRESSIBLE_TOKENS {
+                    messages_compacted += 1;
                     let summary_text = format!(
                         "{}... [compressed {name} result, originally {} chars + {} image part(s)]",
                         context_engine::first_snippet(&original_text, SUMMARY_SNIPPET_LENGTH),
@@ -109,7 +111,7 @@ impl MidLoopCompressor {
             "mid-loop compression complete"
         );
 
-        Some((total_tokens, new_tokens))
+        Some((total_tokens, new_tokens, messages_compacted))
     }
 }
 
@@ -188,7 +190,7 @@ mod tests {
         ];
         let result = compressor.compress_if_needed(&mut messages);
         assert!(result.is_some(), "should have triggered compression");
-        let (before, after) = result.unwrap();
+        let (before, after, _compacted) = result.unwrap();
         assert!(
             after < before,
             "after ({after}) should be less than before ({before})"

@@ -91,6 +91,8 @@ desktop_macros::klynt_collect_commands![
     crate::commands::chat::chat_respond_interaction,
     crate::commands::chat::chat_respond_approval,
     crate::commands::chat::chat_set_mode,
+    crate::commands::chat::chat_save_starlark_rule,
+    crate::commands::chat::coding_hooks_list,
     crate::commands::coding_memory::coding_memory_status,
     crate::commands::coding_memory::coding_memory_distill_now,
     crate::commands::coding_memory::coding_memory_check_dead_ends,

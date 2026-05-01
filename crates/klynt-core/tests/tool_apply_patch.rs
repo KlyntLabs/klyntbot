@@ -24,7 +24,7 @@ async fn applies_unified_diff() {
     patch_run(
         ApplyPatchArgs { path: "f.txt".into(), patch: patch.into() },
         dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-        Channel::Coding, NonUiPolicy::Allow,
+        Channel::Coding, NonUiPolicy::Allow, None, "".to_string(),
     ).await.unwrap();
     assert_eq!(std::fs::read_to_string(dir.path().join("f.txt")).unwrap(), "line1\nLINE2\nline3\n");
 }
@@ -43,7 +43,7 @@ async fn rejects_malformed_patch() {
     let r = patch_run(
         ApplyPatchArgs { path: "f.txt".into(), patch: "not a patch".into() },
         dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-        Channel::Coding, NonUiPolicy::Allow,
+        Channel::Coding, NonUiPolicy::Allow, None, "".to_string(),
     ).await;
     assert!(r.is_err());
 }

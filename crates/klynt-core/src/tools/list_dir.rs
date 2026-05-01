@@ -5,6 +5,7 @@
 
 use crate::privacy::PrivacyGuard;
 use crate::tools::shared::fs_resolve::resolve_under_cwd;
+use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use};
 use async_trait::async_trait;
 use common::{KlyntbotError, Result, ToolError};
 use serde::{Deserialize, Serialize};
@@ -46,7 +47,14 @@ impl ListDirTool {
 impl ToolExecute for ListDirTool {
     type Params = ListDirArgs;
 
-    async fn execute(&self, args: ListDirArgs, _ctx: &RoutingContext) -> Result<String> {
+    async fn execute(&self, args: ListDirArgs, ctx: &RoutingContext) -> Result<String> {
+        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
+        let args_json = serde_json::to_value(&args).unwrap_or_default();
+        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "list_dir", args_json, None).await {
+            return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
+        }
+        let start = std::time::Instant::now();
+        let result: Result<String> = (async {
         let dir_path = resolve_under_cwd(&args.path, &self.cwd, &self.privacy)
             .map_err(|e| KlyntbotError::Tool(ToolError::PermissionDenied(e.to_string())))?;
 
@@ -87,5 +95,8 @@ impl ToolExecute for ListDirTool {
 
         items.sort();
         Ok(items.join("\n"))
+        }).await;
+        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "list_dir", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        result
     }
 }

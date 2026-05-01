@@ -1,4 +1,5 @@
 use crate::privacy::PrivacyGuard;
+use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use};
 use async_trait::async_trait;
 use common::{KlyntbotError, Result, ToolError};
 use regex::RegexBuilder;
@@ -48,56 +49,66 @@ impl GrepTool {
 impl ToolExecute for GrepTool {
     type Params = GrepArgs;
 
-    async fn execute(&self, args: GrepArgs, _ctx: &RoutingContext) -> Result<String> {
-        let max = args.max_results.unwrap_or(200) as usize;
-        let ctx = args.context_lines.unwrap_or(0).min(5) as usize;
-        let re = RegexBuilder::new(&args.pattern)
-            .case_insensitive(args.case_insensitive.unwrap_or(false))
-            .build()
-            .map_err(|e| KlyntbotError::Tool(ToolError::InvalidParams(format!("regex: {e}"))))?;
-        let include = args.include.unwrap_or_else(|| "**/*".into());
-        let glob = globset::Glob::new(&include)
-            .map_err(|e| KlyntbotError::Tool(ToolError::InvalidParams(format!("include: {e}"))))?
-            .compile_matcher();
+    async fn execute(&self, args: GrepArgs, ctx: &RoutingContext) -> Result<String> {
+        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
+        let args_json = serde_json::to_value(&args).unwrap_or_default();
+        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "grep", args_json, None).await {
+            return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
+        }
+        let start = std::time::Instant::now();
+        let result: Result<String> = (async {
+            let max = args.max_results.unwrap_or(200) as usize;
+            let ctx_lines = args.context_lines.unwrap_or(0).min(5) as usize;
+            let re = RegexBuilder::new(&args.pattern)
+                .case_insensitive(args.case_insensitive.unwrap_or(false))
+                .build()
+                .map_err(|e| KlyntbotError::Tool(ToolError::InvalidParams(format!("regex: {e}"))))?;
+            let include = args.include.unwrap_or_else(|| "**/*".into());
+            let glob = globset::Glob::new(&include)
+                .map_err(|e| KlyntbotError::Tool(ToolError::InvalidParams(format!("include: {e}"))))?
+                .compile_matcher();
 
-        let cwd = self.cwd.clone();
-        let privacy = self.privacy.clone();
-        let lines = tokio::task::spawn_blocking(move || -> Vec<String> {
-            let mut out: Vec<String> = Vec::new();
-            'outer: for entry in WalkDir::new(&cwd).follow_links(false) {
-                let Ok(entry) = entry else { continue };
-                if !entry.file_type().is_file() { continue }
-                let rel = entry.path().strip_prefix(&cwd).unwrap_or(entry.path());
-                if !glob.is_match(rel) { continue }
-                if privacy.is_excluded(entry.path()) { continue }
-                let file = match std::fs::File::open(entry.path()) {
-                    Ok(f) => f,
-                    Err(_) => continue,
-                };
-                let reader = std::io::BufReader::new(file);
-                let file_lines: Vec<String> = std::io::BufRead::lines(reader)
-                    .filter_map(|l| l.ok())
-                    .collect();
-                let mut last_hi = 0usize;
-                for (i, line) in file_lines.iter().enumerate() {
-                    if re.is_match(line) {
-                        let lo = i.saturating_sub(ctx);
-                        let hi = (i + ctx + 1).min(file_lines.len());
-                        if lo > last_hi && !out.is_empty() {
-                            out.push("--".into());
+            let cwd = self.cwd.clone();
+            let privacy = self.privacy.clone();
+            let lines = tokio::task::spawn_blocking(move || -> Vec<String> {
+                let mut out: Vec<String> = Vec::new();
+                'outer: for entry in WalkDir::new(&cwd).follow_links(false) {
+                    let Ok(entry) = entry else { continue };
+                    if !entry.file_type().is_file() { continue }
+                    let rel = entry.path().strip_prefix(&cwd).unwrap_or(entry.path());
+                    if !glob.is_match(rel) { continue }
+                    if privacy.is_excluded(entry.path()) { continue }
+                    let file = match std::fs::File::open(entry.path()) {
+                        Ok(f) => f,
+                        Err(_) => continue,
+                    };
+                    let reader = std::io::BufReader::new(file);
+                    let file_lines: Vec<String> = std::io::BufRead::lines(reader)
+                        .filter_map(|l| l.ok())
+                        .collect();
+                    let mut last_hi = 0usize;
+                    for (i, line) in file_lines.iter().enumerate() {
+                        if re.is_match(line) {
+                            let lo = i.saturating_sub(ctx_lines);
+                            let hi = (i + ctx_lines + 1).min(file_lines.len());
+                            if lo > last_hi && !out.is_empty() {
+                                out.push("--".into());
+                            }
+                            for j in lo..hi {
+                                let marker = if j == i { ":" } else { "-" };
+                                out.push(format!("{}:{}{}:{}",
+                                    rel.display(), j + 1, marker, file_lines[j]));
+                            }
+                            last_hi = hi;
+                            if out.len() >= max { break 'outer; }
                         }
-                        for j in lo..hi {
-                            let marker = if j == i { ":" } else { "-" };
-                            out.push(format!("{}:{}{}:{}",
-                                rel.display(), j + 1, marker, file_lines[j]));
-                        }
-                        last_hi = hi;
-                        if out.len() >= max { break 'outer; }
                     }
                 }
-            }
-            out
-        }).await.map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(e.to_string())))?;
-        Ok(lines.join("\n"))
+                out
+            }).await.map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(e.to_string())))?;
+            Ok(lines.join("\n"))
+        }).await;
+        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "grep", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        result
     }
 }

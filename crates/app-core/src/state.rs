@@ -9,6 +9,7 @@ use cognitive::situation::UserSituation;
 use common::FormResponse;
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
+use desktop_shared::HooksTomlSnapshot;
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_focus::DndManager;
 use feature_notes::repo::{NoteRepo, PracticeSessionRepo};
@@ -183,6 +184,10 @@ pub struct AppCore {
     /// Pending coding approval requests keyed by request_id.
     pub pending_approvals: Arc<klynt_core::approval::PendingApprovalsMap>,
     pub tracing_registry: std::sync::Arc<crate::tracing::TracingRegistry>,
+    /// Tracks which sessions have already fired the SessionStart hook (coding mode).
+    pub session_start_fired: Arc<dashmap::DashMap<String, ()>>,
+    /// Tracks which sessions have already fired the SessionEnd hook (prevents double-fire on cancel).
+    pub session_end_fired: Arc<dashmap::DashMap<String, ()>>,
 }
 
 impl AppCore {
@@ -500,5 +505,54 @@ impl AppCore {
             tracing::warn!("SQLite PRAGMA optimize failed: {e}");
         }
         info!("app core stopped");
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn chat_save_starlark_rule(
+        &self,
+        _request_id: String,
+        rule_source: String,
+        suggested_filename: Option<String>,
+    ) -> common::Result<String> {
+        let _ = klynt_execpolicy::parse_to_policy(&rule_source, std::path::Path::new("inline.rules"))
+            .map_err(|e| common::KlyntbotError::NotImplemented(format!("invalid Starlark: {e}")))?;
+
+        let rules_dir = dirs::home_dir()
+            .ok_or_else(|| common::KlyntbotError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "no home dir")))?
+            .join(".klyntbot/rules");
+        std::fs::create_dir_all(&rules_dir)
+            .map_err(common::KlyntbotError::Io)?;
+
+        let filename = suggested_filename
+            .unwrap_or_else(|| {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                format!("rule-{now}.rules")
+            });
+        let path = rules_dir.join(filename);
+        std::fs::write(&path, &rule_source)
+            .map_err(common::KlyntbotError::Io)?;
+
+        Ok(path.to_string_lossy().into_owned())
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_hooks_list(&self) -> common::Result<HooksTomlSnapshot> {
+        let path = dirs::home_dir()
+            .map(|h| h.join(".klyntbot/hooks.toml"))
+            .unwrap_or_else(|| std::path::PathBuf::from("~/.klyntbot/hooks.toml"));
+        let exists = path.exists();
+        let content = if exists {
+            std::fs::read_to_string(&path).unwrap_or_default()
+        } else {
+            String::new()
+        };
+        Ok(HooksTomlSnapshot {
+            path: path.to_string_lossy().into_owned(),
+            exists,
+            content,
+        })
     }
 }

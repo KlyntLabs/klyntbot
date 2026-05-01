@@ -10,6 +10,13 @@ pub mod types;
 pub use entity_link_types::*;
 pub use errors::{ApiError, CommandResult};
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct HooksTomlSnapshot {
+    pub path: String,
+    pub exists: bool,
+    pub content: String,
+}
+
 #[cfg(test)]
 mod phase5_helper_tests {
     use crate::specta_helpers::{JsonValue, Timestamp};

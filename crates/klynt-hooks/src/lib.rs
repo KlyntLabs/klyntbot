@@ -1,12 +1,15 @@
-//! Klynt hook engine — 13-event Claude-Code-compatible schema.
-//!
-//! Reads `~/.klyntbot/hooks.toml`, dispatches subprocess hooks at the 13
-//! event boundaries listed in spec §7.
-//!
-//! Plan 1: skeleton. Plan 4: vendor + light up.
+//! Klynt hook engine — Claude-Code-compatible schema.
+//! Adapted from codex-rs/hooks/.
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn crate_compiles() {}
-}
+pub mod engine;
+pub mod error;
+pub mod events;
+pub mod registry;
+pub mod schema;
+pub mod types;
+
+pub use engine::{HookEngine, HookFireInput, HookOutcome};
+pub use error::{HookError, HookResult};
+pub use registry::HookRegistry;
+pub use schema::{Hook, HookConfig, HookEvents};
+pub use types::HookPayload;

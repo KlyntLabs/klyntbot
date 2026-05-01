@@ -45,7 +45,7 @@ A single tool registration path: every primitive tool (`read`, `write`, `edit`, 
 | §3 Crate layout | `klynt-core`'s purpose extends from "coding tool kit" to "primitive tool kit for both coding and regular chat". Pool 1 of §6 keeps its name but its visibility is now per-tool, not per-pool. |
 | §6 Tool surface | Static `CODING_ONLY` const replaced by `Tool::allowed_channels()` trait method; per-tool override table added. The 24-tool curated profile remains the coding-mode default; regular chat sees ~21 tools (6 graduating klynt-core + 15 domain). |
 | §7 Approval | Adds *channel-aware degradation* — Layer1 evaluates `ctx.channel.supports_approval_ui()` and short-circuits to the configured `nonUiChannels` policy. Adds `HostApprovalCache` with `(scheme, host, port)` keying and `AllowOnce` / `AllowForSession` decisions. |
-| §10 Event vocabulary | `agent:file_edit_with_symbols` channel becomes live — `event_tx: None` gap closes via `tools_core::RoutingContext.event_tx`, not a runtime accessor. Klynt-core tools read `ctx.event_tx`; agent runtime bridges `ToolEvent → AgentEvent`. |
+| §10 Event vocabulary | `agent:file_edit_with_symbols` channel becomes live — `event_tx` wiring (today `None` at `app-core/src/init/mod.rs:1817`) is fixed via `AgentRuntime::event_sender()` accessor. |
 | §13 Phase 1 | Adds tool-layer consolidation as the final pre-Phase-2 deliverable (the work this spec describes). |
 | Appendix A | Adds 4 new locked decisions (see this spec's Appendix C). |
 | Appendix B | Adds: rename `coding_channel.rs` → `tool_channel.rs`, retire `crates/tools/src/system/`, add `Tool::allowed_channels()`, add `bitflags` workspace dep. |
@@ -152,7 +152,7 @@ let filtered_defs: Vec<_> = registry
 
 ### Per-tool override table
 
-Klynt-core's 14 tools split into two groups by visibility:
+Klynt-core's 13 tools split into two groups by visibility:
 
 | Tool | `allowed_channels()` | Reason |
 |------|---------------------|--------|
@@ -164,7 +164,6 @@ Klynt-core's 14 tools split into two groups by visibility:
 | `EnterPlanModeTool` | `CODING_ONLY` | coding-only concept |
 | `ExitPlanModeTool` | `CODING_ONLY` | coding-only concept |
 | `ReadTool` | (default `ALL`) | read-only, privacy-checked |
-| `ListDirTool` | (default `ALL`) | read-only, privacy-checked |
 | `GlobTool` | (default `ALL`) | read-only, privacy-checked |
 | `GrepTool` | (default `ALL`) | read-only, privacy-checked |
 | `WebFetchTool` | (default `ALL`) | read-only network with channel-aware approval |
@@ -399,7 +398,7 @@ The `kind: "approval"` ConversationItem (per master spec line 1596) gains two bu
 - CREATE `crates/klynt-core/src/approval/host_cache.rs` (~150 lines).
 - MODIFY `crates/klynt-core/src/approval/mod.rs` — re-export.
 - MODIFY `crates/klynt-core/src/tools/web_fetch.rs` — replace single `evaluate()` with cache-aware flow.
-- MODIFY `crates/klynt-core/src/registry/builder.rs` — add `host_cache` field; pass to `WebFetchTool::new`.
+- MODIFY `crates/klynt-core/src/registry/builder.rs` — add `host_approvals` field; pass to `WebFetchTool::new`.
 - EXTEND `klynt_execpolicy::ApprovalDecision` — add `AllowOnce` variant if absent.
 - MODIFY `desktop-ui/src/features/coding/components/ApprovalCard.tsx` — Allow-for-session button.
 
@@ -446,7 +445,7 @@ pub struct ToolKitBuilder {
     pub event_tx: Option<mpsc::Sender<AgentEvent>>,
     pub bus: Arc<DomainEventBus>,
     pub repos: Repos,
-    pub host_cache: Arc<HostApprovalCache>,
+    pub host_approvals: Arc<HostApprovalCache>,
 }
 
 impl ToolKitBuilder {
@@ -482,9 +481,10 @@ let kit = klynt_core::ToolKitBuilder {
     policy: policy.clone(),
     privacy: privacy.clone(),
     pending: pending_approvals.clone(),
+    event_tx: Some(core.agent.event_sender()),    // §8 fix
     bus: bus.clone(),
     repos: repos.clone(),
-    host_cache: host_cache.clone(),               // §5 fix
+    host_approvals: host_approvals.clone(),       // §5 fix
 };
 {
     let mut reg = core.agent.tool_registry().write();
@@ -534,8 +534,6 @@ pub fn tool_kit(&self) -> Option<Arc<klynt_core::ToolKitBuilder>> { self.tool_ki
 pub fn set_tool_kit(&mut self, kit: Arc<klynt_core::ToolKitBuilder>) { self.tool_kit = Some(kit); }
 ```
 
-**Note on event wiring (§8):** The spec originally proposed an `AgentRuntime::event_sender()` accessor. The implementation adopted the *minimum-diff alternative*: `tools_core::RoutingContext` gained an `event_tx: Option<mpsc::Sender<ToolEvent>>` field. Klynt-core tools read `ctx.event_tx` instead of storing their own sender. The agent runtime bridges `ToolEvent → AgentEvent` at the execute-loop level.
-
 ### Touch points
 
 - CREATE `crates/klynt-core/src/registry/builder.rs` (~120 lines).
@@ -547,9 +545,9 @@ pub fn set_tool_kit(&mut self, kit: Arc<klynt_core::ToolKitBuilder>) { self.tool
 
 ### Test coverage
 
-- Unit: `ToolKitBuilder::register_read_only` registers exactly 7 names; `register_mutating` exactly 5; `register_plan_mode` exactly 2; `register_all` exactly 14.
+- Unit: `ToolKitBuilder::register_read_only` registers exactly 6 names; `register_mutating` exactly 5; `register_plan_mode` exactly 2; `register_all` exactly 13.
 - Property: `parent.tool_kit().is_some()` ⇒ every sub-agent profile builds without panicking.
-- Integration: spawn a `ReadOnly` sub-agent in coding mode → only the 7 read-only tools advertised. Spawn `Full` → 14 + domain.
+- Integration: spawn a `ReadOnly` sub-agent in coding mode → only the 6 read-only tools advertised. Spawn `Full` → 13 + domain.
 
 ---
 
@@ -647,36 +645,21 @@ let root = match args.path.as_deref() {
 
 ### Fix
 
-`tools_core::RoutingContext` gains an `event_tx` field:
-
 ```rust
-// crates/tools-core/src/routing.rs
+// crates/agent/src/agent_runtime/runtime.rs (additive accessor)
 
-pub struct RoutingContext {
-    // ... existing fields ...
-    pub event_tx: Option<mpsc::Sender<ToolEvent>>,
-}
-```
-
-Klynt-core tools emit via `ctx.event_tx`:
-
-```rust
-// Example: crates/klynt-core/src/tools/edit.rs
-if let Some(ref tx) = ctx.event_tx {
-    let _ = tx.send(ToolEvent::FileEditWithSymbols { ... }).await;
-}
-```
-
-The agent runtime bridges `ToolEvent → AgentEvent`:
-
-```rust
-// crates/agent/src/execution/core.rs (bridging inside execute_loop)
-match tool_event {
-    ToolEvent::FileEditWithSymbols { .. } => {
-        agent_event_tx.send(AgentEvent::FileEditWithSymbols { ... }).await.ok();
+impl AgentRuntime {
+    pub fn event_sender(&self) -> mpsc::Sender<AgentEvent> {
+        self.event_tx.clone()
     }
-    // ... other 4 variants
 }
+```
+
+```rust
+// crates/app-core/src/init/mod.rs:1817 — replace None
+let agent_event_tx = core.agent.event_sender();
+// ... in ToolKitBuilder construction (per §6):
+event_tx: Some(agent_event_tx),
 ```
 
 ### Streaming relay
@@ -719,7 +702,7 @@ export function useFileEditEvents(sessionId: string) {
 
 ### Touch points
 
-- MODIFY `crates/agent/src/agent_runtime/runtime.rs` — `tool_kit` field + accessors (note: `event_sender()` accessor was replaced by `RoutingContext.event_tx` per minimum-diff decision).
+- MODIFY `crates/agent/src/agent_runtime/runtime.rs` — `event_sender()` accessor.
 - MODIFY `crates/app-core/src/init/mod.rs:1817` — `Some(...)` instead of `None`.
 - VERIFY-OR-ADD `crates/app-core/src/streaming/relay.rs` — `FileEditWithSymbols` + `PlanModeChanged` arms.
 - VERIFY-OR-ADD `desktop-ui/src/features/coding/hooks/useFileEditEvents.ts`.
@@ -728,7 +711,7 @@ export function useFileEditEvents(sessionId: string) {
 
 ### Test coverage
 
-- Unit: `RoutingContext::new()` sets `event_tx: None`; `with_interaction()` also `None`. Tools check `ctx.event_tx` before sending.
+- Unit: `AgentRuntime::event_sender()` returns a usable sender; receiver gets the event.
 - Integration: `EditTool::execute(args)` emits exactly one `FileEditWithSymbols` for a real edit; zero for a no-op edit.
 - Vitest: hook upserts to store on mock event; `DiffRow` renders.
 - E2E manual: in coding mode, ask agent to "rewrite README.md to mention Tauri 2"; verify diff card appears.
@@ -906,7 +889,7 @@ Per CLAUDE.md, before merging the deletion PR:
 - **K12 — ChannelMask filter idempotence**: For any (registry, channel), `filter(filter(R, c)) == filter(R, c)`. Property test in `tests/coding_in_chat_property.rs`.
 - **K13 — Host approval dedup correctness**: For N concurrent `web_fetch` calls hitting M unique `(scheme, host, port)` tuples, exactly M `ApprovalRequested` events are emitted. Property test in `tests/coding_in_chat_property.rs`.
 - **K14 — Channel-aware approval safety**: For every (tool with `ChannelMask` allowing non-coding channels) × (channel where `!supports_approval_ui`) × (`NonUiPolicy::Allow`), the tool is read-only or read-network — never mutating. Property test enumerating klynt-core tool inventory.
-- **K15 — Retirement compile-gate**: After Commit 9, no reference to `crates::tools::system` or any of the OLD types {`ReadFileTool`, `WriteFileTool`, `EditFileTool`, `BrowserTool`, `MessageTool`, `WebSearchTool`} exists in compiled code under `crates/`. The new klynt-core `ListDirTool` and `AskUserTool` are native implementations, not references to the old system module. Enforced by `rg` check in CI.
+- **K15 — Retirement compile-gate**: After Commit 9, no reference to `crates::tools::system` or any of {`ReadFileTool`, `WriteFileTool`, `EditFileTool`, `ListDirTool`, `BrowserTool`, `MessageTool`, `WebSearchTool`} exists in the workspace. Enforced by `rg` check in CI.
 
 ### Quality gates (every commit)
 
@@ -995,7 +978,7 @@ EDIT   crates/config/src/lib.rs                      (Config struct gains tools.
 ### `crates/agent/`
 
 ```
-EDIT   crates/agent/src/agent_runtime/runtime.rs     (+ tool_kit field, tool_kit accessor)
+EDIT   crates/agent/src/agent_runtime/runtime.rs     (+ tool_kit field, event_sender, tool_kit accessor)
 EDIT   crates/agent/src/agent_loop/mod.rs:889-950    (filter rewrite using Tool::allowed_channels)
 EDIT   crates/agent/src/agent_loop/builder.rs:629-658 (DELETE OLD-tool registrations)
 REWRITE crates/agent/src/subagent.rs:430-470         (ToolKitBuilder usage + SubAgentProfile)
@@ -1004,7 +987,7 @@ REWRITE crates/agent/src/subagent.rs:430-470         (ToolKitBuilder usage + Sub
 ### `crates/app-core/`
 
 ```
-REWRITE crates/app-core/src/init/mod.rs:1784-1851   (ToolKitBuilder; host_cache)
+REWRITE crates/app-core/src/init/mod.rs:1784-1851   (ToolKitBuilder; event_tx Some; host_approvals)
 VERIFY crates/app-core/src/streaming/relay.rs       (FileEditWithSymbols + PlanModeChanged arms)
 ```
 

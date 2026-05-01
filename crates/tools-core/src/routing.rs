@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
-use common::{ChannelName, ChatId, FormResponse, InteractionRequest, Result};
+use common::{ChannelName, ChatId, FormResponse, InteractionRequest, Result, SessionKey};
 use crate::events::ToolEvent;
 
 /// Bundle sent from ask_user tool to the CLI.
@@ -85,6 +85,11 @@ pub struct RoutingContext {
     /// (e.g., FileEditWithSymbols, SandboxPolicyApplied) for the relay to
     /// translate into Tauri events. May be None for non-streaming contexts.
     pub event_tx: Option<mpsc::Sender<ToolEvent>>,
+    /// Hook engine for firing PreToolUse / PostToolUse / etc. at tool-execute
+    /// boundaries. None = hooks disabled (e.g., in unit tests).
+    pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    /// Session key for conversation continuity. Used by hook firing.
+    pub session_key: Option<SessionKey>,
 }
 
 impl RoutingContext {
@@ -101,6 +106,8 @@ impl RoutingContext {
             champion_params: None,
             cancel_token: None,
             event_tx: None,
+            hook_engine: None,
+            session_key: None,
         }
     }
 
@@ -121,6 +128,8 @@ impl RoutingContext {
             champion_params: None,
             cancel_token: None,
             event_tx: None,
+            hook_engine: None,
+            session_key: None,
         }
     }
 }

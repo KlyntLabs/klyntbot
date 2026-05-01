@@ -66,6 +66,14 @@ rust-version = "1.93"
 license = "MIT"
 
 [workspace.dependencies]
+multimap = "0.10"
+shlex = "1.3"
+starlark = "0.13.0"
+walkdir = "2"
+schemars = "0.8.22"
+chrono = "0.4"
+futures = "0.3"
+
 # Internal workspace crates
 common = { path = "crates/common" }
 config = { path = "crates/config" }
@@ -253,7 +261,6 @@ feature-coaching.workspace = true
 plugin-runtime.workspace = true
 tools-core.workspace = true
 extism.workspace = true
-walkdir = "2"
 dashmap.workspace = true
 assert_cmd = "2"
 coding-ingest = { path = "crates/coding-ingest" }

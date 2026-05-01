@@ -141,6 +141,29 @@ pub async fn chat_set_mode(
     Ok(row)
 }
 
+#[klynt_command]
+pub async fn chat_save_starlark_rule(
+    app: tauri::AppHandle,
+    request_id: String,
+    rule_source: String,
+    suggested_filename: Option<String>,
+) -> String {
+    let core = app.state::<std::sync::Arc<app_core::AppCore>>();
+    core.chat_save_starlark_rule(request_id, rule_source, suggested_filename)
+        .await
+        .map_err(|e| desktop_shared::errors::ApiError::new("CONFIG_ERROR", e.to_string()))
+}
+
+#[klynt_command]
+pub async fn coding_hooks_list(
+    app: tauri::AppHandle,
+) -> desktop_shared::HooksTomlSnapshot {
+    let core = app.state::<std::sync::Arc<app_core::AppCore>>();
+    core.coding_hooks_list()
+        .await
+        .map_err(|e| desktop_shared::errors::ApiError::new("IO_ERROR", e.to_string()))
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 // Note: `chat_send` is dispatched directly in `dev_server.rs` because it needs
 // SSE channel state. All other chat commands are handled here.

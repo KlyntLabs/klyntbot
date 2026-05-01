@@ -371,20 +371,20 @@ Existing call sites in `core.rs` and `execute_loop.rs` switch from `event_tx.sen
 
 Coding tools are registered eagerly into the `ToolRegistry` at app start, but only **selected** when `channel == "coding"`. Two implementation options:
 
-- **Option A (selected):** A single `ToolRegistry` containing every tool; `AgentRuntime` filters by channel at tool-list construction time using `tool.allowed_channels().allows(channel)` where `allowed_channels()` returns a `ChannelMask` (default `ALL`; mutating tools override to `CODING_ONLY`).
+- **Option A (selected):** A single `ToolRegistry` containing every tool; `AgentRuntime` filters by channel at tool-list construction time using a per-tool `available_for_channel(channel: &str) -> bool` predicate.
 - Option B: Two registries (chat / coding), wired by channel. Rejected because it duplicates infra.
 
 Tools registered for the coding channel:
 
-| Tool | Crate | Sandbox-aware | Approval-aware | Channel visibility |
+| Tool | Crate | Sandbox-aware | Approval-aware | Available in non-coding channels? |
 |---|---|---|---|---|
-| `bash` | `klynt-core::tools::bash` | yes | yes | `CODING_ONLY` |
-| `read` / `glob` / `grep` / `list_dir` | `klynt-core::tools::fs` | yes (read-only) | rule-checked | `ALL` |
-| `edit` / `write` / `apply_patch` | `klynt-core::tools::edit` | yes | yes | `CODING_ONLY` |
-| `web_fetch` / `ask_user` / `tool_search` | `klynt-core::tools::web` / `ask_user` | n/a | yes | `ALL` |
-| `notebook_edit` | `klynt-core::tools::notebook` | yes | yes | `CODING_ONLY` |
-| `enter_plan_mode` / `exit_plan_mode` | `klynt-core::tools::mode` | n/a | n/a | `CODING_ONLY` |
-| `recall_*` (8 tools) | `coding-memory` | n/a | n/a | configurable per channel |
+| `bash` | `klynt-core::tools::bash` | yes | yes | no |
+| `read` / `glob` / `grep` | `klynt-core::tools::fs` | yes (read-only) | rule-checked | no |
+| `edit` / `write` / `apply_patch` | `klynt-core::tools::edit` | yes | yes | no |
+| `web_fetch` | `klynt-core::tools::web` | n/a (network) | yes | no |
+| `notebook_edit` | `klynt-core::tools::notebook` | yes | yes | no |
+| `enter_plan_mode` / `exit_plan_mode` | `klynt-core::tools::mode` | n/a | n/a | no |
+| `recall_*` (8 tools) | `coding-memory` | n/a | n/a | yes (configurable per channel; coding channel exposes them by default) |
 
 Universal tools (also exposed in coding channel): `task` (subagent), curated klyntbot domain tools, MCP gateway.
 
@@ -701,7 +701,7 @@ PRIVACY GUARD ─────── always first; non-bypassable; spec excludePa
 LAYER 1 — DECLARATIVE  (config.json allow/deny/ask globs)
        │
        ▼
-LAYER 2 — STARLARK     (~/.klyntbot/rules/*.rules; prefix_rule, custom_rule)
+LAYER 2 — STARLARK     (~/.klyntbot/rules/*.rules; prefix_rule)
        │
        ▼
 LAYER 3 — MIRROR       (Phase 2; opt-in; auto-approve learned patterns)
@@ -767,12 +767,7 @@ Loads `~/.klyntbot/rules/*.rules`:
 prefix_rule(["git", "status"], decision="allow")
 prefix_rule(["git", "push"], decision="ask")
 
-def check_git_push(args):
-    if "main" in args or "master" in args:
-        return forbid("never auto-push to main/master")
-    return ask()
-
-custom_rule(["git", "push"], handler=check_git_push)
+prefix_rule(["git", "push"], decision="ask")
 
 prefix_rule(["cargo", "nextest"], decision="allow")
 prefix_rule(["cargo", "fmt"], decision="allow")
@@ -1088,7 +1083,7 @@ export function useSlashCommands() {
 
 ## 10. Event vocabulary: AgentEvent extensions
 
-> **Amendment 2026-04-30:** `agent:file_edit_with_symbols` and `agent:plan_mode_changed` go live by closing the `event_tx: None` gap. `tools_core::RoutingContext` gains an `event_tx: Option<mpsc::Sender<ToolEvent>>` field; klynt-core tools read `ctx.event_tx` instead of storing their own sender. The agent runtime bridges `ToolEvent → AgentEvent` and app-core's chat relay forwards all 5 variants to the UI. Wiring detail in [`2026-04-30-tool-layer-consolidation-design.md`](./2026-04-30-tool-layer-consolidation-design.md) §8.
+> **Amendment 2026-04-30:** `agent:file_edit_with_symbols` and `agent:plan_mode_changed` go live by closing the `event_tx: None` gap at `app-core/src/init/mod.rs:1817` via a new `AgentRuntime::event_sender()` accessor passed through `klynt_core::ToolKitBuilder`. Wiring detail in [`2026-04-30-tool-layer-consolidation-design.md`](./2026-04-30-tool-layer-consolidation-design.md) §8.
 
 ### Two enums, one event story
 
@@ -1789,7 +1784,7 @@ Cross-reference summary for the consolidation specified in [`docs/superpowers/sp
 |---|---|
 | §3 Crate layout | `klynt-core`'s purpose extended from "Coding tool registry" to "Primitive tool registry for both coding and regular chat". |
 | §3 Surgical changes | Adds: rename `coding_channel.rs` → `tool_channel.rs`; `Tool::allowed_channels()` trait method; `bitflags = "2"` workspace dep; retire `crates/tools/src/system/`. |
-| §6 Tool surface | Static `CODING_ONLY` const replaced by per-tool `Tool::allowed_channels()`. Pool 1 tools split: 7 graduate to `ChannelMask::ALL` (`read`, `glob`, `grep`, `list_dir`, `web_fetch`, `ask_user`, `tool_search`), 7 stay `CODING_ONLY` (`bash`, `edit`, `write`, `apply_patch`, `notebook_edit`, `enter_plan_mode`, `exit_plan_mode`). |
+| §6 Tool surface | Static `CODING_ONLY` const replaced by per-tool `Tool::allowed_channels()`. Pool 1 tools split: 6 graduate to `ChannelMask::ALL`, 7 stay `CODING_ONLY`. |
 | §7 Approval | Adds channel-aware degradation in `Layer1::evaluate` and `HostApprovalCache` for per-host dedup. |
 | §10 Event vocabulary | `agent:file_edit_with_symbols` and `agent:plan_mode_changed` go live; `event_tx: None` gap closes. |
 | §13 Phase 1 | Adds tool-layer consolidation deliverable — the final pre-Phase-2 work. |
@@ -1801,13 +1796,13 @@ Cross-reference summary for the consolidation specified in [`docs/superpowers/sp
 
 - `crates/tools/src/system/ask_user.rs` (922 lines) — moved to `crates/klynt-core/src/tools/ask_user.rs`.
 - `crates/tools/src/system/browser.rs` (740) — DELETE; future MCP browser tools as replacement.
-- `crates/tools/src/system/filesystem.rs` (640) — DELETE; klynt-core's `read`/`write`/`edit`/`list_dir` cover the surface. `list_dir` added to klynt-core as a native read-only tool.
+- `crates/tools/src/system/filesystem.rs` (640) — DELETE; klynt-core's `read`/`write`/`edit` cover the surface.
 - `crates/tools/src/system/glob_tool.rs` (189) — DELETE; klynt-core's `glob` (with the new `path` param port) replaces.
 - `crates/tools/src/system/grep.rs` (316) — DELETE; klynt-core's `grep` (with the new `context_lines` param port) replaces.
 - `crates/tools/src/system/message.rs` (79) — DELETE; outbound dispatch is the chat surface itself.
 - `crates/tools/src/system/web.rs` (272) — DELETE; klynt-core's `web_fetch` covers the surface; `WebSearchTool` retires (LLM uses `web_fetch` plus reasoning).
 
-Net diff: ~−3500 LOC retired, ~+1900 LOC added (ToolKitBuilder, HostApprovalCache, ChannelMask, `list_dir`, `ask_user` native impl, sweep), net **~−1600 LOC**.
+Net diff: ~−3500 LOC retired, ~+1700 LOC added (ToolKitBuilder, HostApprovalCache, ChannelMask, sweep), net **~−1800 LOC**.
 
 ### What's reused
 

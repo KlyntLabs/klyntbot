@@ -1,5 +1,6 @@
 //! Types for the execution engine.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use providers::{ChatParams, Usage};
@@ -29,6 +30,8 @@ pub struct ExecutionParams {
     pub context_update_queue: Option<std::sync::Arc<bus::ContextUpdateQueue>>,
     /// When true, the LiveContextRefresher skips injection (frozen-context mode).
     pub pause_context_updates: bool,
+    /// Hook engine for firing PreCompact / PostCompact lifecycle hooks.
+    pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
 }
 
 impl ExecutionParams {
@@ -45,6 +48,7 @@ impl ExecutionParams {
             context_window: 128_000,
             context_update_queue: None,
             pause_context_updates: false,
+            hook_engine: None,
         }
     }
 
@@ -98,6 +102,11 @@ impl ExecutionParams {
 
     pub fn with_pause_context_updates(mut self, pause: bool) -> Self {
         self.pause_context_updates = pause;
+        self
+    }
+
+    pub fn with_hook_engine(mut self, engine: Arc<klynt_hooks::HookEngine>) -> Self {
+        self.hook_engine = Some(engine);
         self
     }
 }

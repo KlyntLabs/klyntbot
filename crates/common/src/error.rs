@@ -73,6 +73,11 @@ pub enum ToolError {
 
     #[error("Permission denied: {0}")]
     PermissionDenied(String),
+
+    /// A hook returned `block: true` (Pre*Tool/Pre*FileEdit/SubagentSpawn).
+    /// The agent loop surfaces the reason to the LLM so it can react.
+    #[error("hook blocked: {0}")]
+    HookBlocked(String),
 }
 
 /// Provider-specific errors

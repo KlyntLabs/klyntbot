@@ -7,4 +7,15 @@ description = "Klynt execution policy — Starlark prefix-rule approval engine. 
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
+anyhow = { workspace = true }
+multimap = { workspace = true }
+shlex = { workspace = true }
+starlark = { workspace = true }
+walkdir = { workspace = true }
+tracing = { workspace = true }
+parking_lot = "0.12"
+
+[dev-dependencies]
+tempfile = { workspace = true }

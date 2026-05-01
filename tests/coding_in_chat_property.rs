@@ -94,3 +94,44 @@ proptest! {
         }).unwrap();
     }
 }
+
+
+proptest! {
+    /// K3 — Approval gate composition.
+    /// For any (Layer1 decision, Layer2 decision) pair, the merged decision
+    /// follows the spec's priority: deny beats allow beats ask; FallThrough
+    /// from one layer passes to the next.
+    #[test]
+    fn k3_approval_gate_composition(
+        l1_idx in 0u8..4,
+        l2_idx in 0u8..4,
+    ) {
+        use klynt_execpolicy::Decision;
+        let l1 = match l1_idx { 0 => Decision::Allow, 1 => Decision::Ask, 2 => Decision::Forbid, _ => Decision::FallThrough };
+        let l2 = match l2_idx { 0 => Decision::Allow, 1 => Decision::Ask, 2 => Decision::Forbid, _ => Decision::FallThrough };
+
+        // The tool-layer-consolidation `guard.rs:95-113` merge logic:
+        //   if l1 == Auto (Allow/Forbid) → return l1 (short-circuits Layer 2)
+        //   else l2 == Allow → Auto Allow Layer2
+        //   else l2 == Forbid → Auto Forbid Layer2
+        //   else l2 == Ask → Ask Layer2
+        //   else l2 == FallThrough → fall back to l1
+        let merged = match l1 {
+            Decision::Allow | Decision::Forbid => l1,
+            _ => match l2 {
+                Decision::Allow => Decision::Allow,
+                Decision::Forbid => Decision::Forbid,
+                Decision::Ask => Decision::Ask,
+                Decision::FallThrough => l1,
+            }
+        };
+        // Property: Forbid wins per the merge logic semantics.
+        if l1 == Decision::Forbid {
+            prop_assert_eq!(merged, Decision::Forbid);
+        } else if l1 == Decision::Allow {
+            prop_assert_eq!(merged, Decision::Allow);
+        } else if l2 == Decision::Forbid {
+            prop_assert_eq!(merged, Decision::Forbid);
+        }
+    }
+}

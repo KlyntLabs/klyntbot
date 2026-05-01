@@ -8,6 +8,7 @@ use tokio::sync::mpsc;
 use tools_core::{RoutingContext, ToolExecute};
 use tools_core::events::ToolEvent;
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
+use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
 pub struct EnterPlanModeArgs {
@@ -68,21 +69,37 @@ impl ExitPlanModeTool {
 #[async_trait]
 impl ToolExecute for EnterPlanModeTool {
     type Params = EnterPlanModeArgs;
-    async fn execute(&self, _args: EnterPlanModeArgs, ctx: &RoutingContext) -> Result<String> {
+    async fn execute(&self, args: EnterPlanModeArgs, ctx: &RoutingContext) -> Result<String> {
+        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
+        let args_json = serde_json::to_value(&args).unwrap_or_default();
+        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "enter_plan_mode", args_json, None).await {
+            return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
+        }
+        let start = std::time::Instant::now();
         let key = ctx.chat_id.as_str().to_string();
-        run_enter_for_test(&self.repos, &key,
+        let result = run_enter_for_test(&self.repos, &key,
             ctx.event_tx.clone(),
-            self.bus.clone()).await
+            self.bus.clone()).await;
+        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "enter_plan_mode", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        result
     }
 }
 #[async_trait]
 impl ToolExecute for ExitPlanModeTool {
     type Params = ExitPlanModeArgs;
-    async fn execute(&self, _args: ExitPlanModeArgs, ctx: &RoutingContext) -> Result<String> {
+    async fn execute(&self, args: ExitPlanModeArgs, ctx: &RoutingContext) -> Result<String> {
+        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
+        let args_json = serde_json::to_value(&args).unwrap_or_default();
+        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "exit_plan_mode", args_json, None).await {
+            return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
+        }
+        let start = std::time::Instant::now();
         let key = ctx.chat_id.as_str().to_string();
-        run_exit_for_test(&self.repos, &key,
+        let result = run_exit_for_test(&self.repos, &key,
             ctx.event_tx.clone(),
-            self.bus.clone()).await
+            self.bus.clone()).await;
+        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "exit_plan_mode", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        result
     }
 }
 

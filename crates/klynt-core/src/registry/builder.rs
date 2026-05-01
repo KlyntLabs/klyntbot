@@ -32,6 +32,7 @@ pub struct ToolKitBuilder {
     pub repos: Repos,
     pub host_cache: Arc<HostApprovalCache>,
     pub non_ui_policy: common::tool_channel::NonUiPolicy,
+    pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
 }
 
 impl ToolKitBuilder {

@@ -115,6 +115,7 @@ pub struct SubagentManager {
     handles: Arc<Mutex<HashMap<String, SubagentHandle>>>,
     agent_task_repo: AgentTaskRepo,
     tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
+    hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
 }
 
 /// Builder for SubagentManager
@@ -127,6 +128,7 @@ pub struct SubagentManagerBuilder {
     max_concurrent_subagents: usize,
     agent_task_repo: Option<AgentTaskRepo>,
     tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
+    hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
 }
 
 impl SubagentManagerBuilder {
@@ -141,11 +143,17 @@ impl SubagentManagerBuilder {
             max_concurrent_subagents: 3,
             agent_task_repo: None,
             tool_kit: None,
+            hook_engine: None,
         }
     }
 
     pub fn tool_kit(mut self, kit: Arc<klynt_core::ToolKitBuilder>) -> Self {
         self.tool_kit = Some(kit);
+        self
+    }
+
+    pub fn hook_engine(mut self, engine: Arc<klynt_hooks::HookEngine>) -> Self {
+        self.hook_engine = Some(engine);
         self
     }
 
@@ -185,6 +193,7 @@ impl SubagentManagerBuilder {
             handles: Arc::new(Mutex::new(HashMap::new())),
             agent_task_repo: self.agent_task_repo.expect("agent_task_repo is required"),
             tool_kit: std::sync::Mutex::new(self.tool_kit),
+            hook_engine: std::sync::Mutex::new(self.hook_engine),
         }
     }
 }
@@ -199,6 +208,11 @@ impl SubagentManager {
     pub fn set_tool_kit(&self, kit: Arc<klynt_core::ToolKitBuilder>) {
         let mut lock = self.tool_kit.lock().unwrap();
         *lock = Some(kit);
+    }
+
+    pub fn set_hook_engine(&self, engine: Arc<klynt_hooks::HookEngine>) {
+        let mut lock = self.hook_engine.lock().unwrap();
+        *lock = Some(engine);
     }
 
     /// Returns the total semaphore permit count (max concurrent subagents).
@@ -256,6 +270,35 @@ impl SubagentManager {
         let inbound_tx = self.inbound_tx.clone();
         let model = self.model.clone();
         let origin_key = format!("{}:{}", origin_channel, origin_chat_id);
+
+        // Fire SubagentSpawn hook; abort if blocked.
+        let hook_engine = {
+            let lock = self.hook_engine.lock().unwrap();
+            lock.clone()
+        };
+        if let Some(ref engine) = hook_engine {
+            let input = klynt_hooks::events::subagent_spawn::SubagentSpawnInput {
+                session_id: origin_key.clone(),
+                parent_session_id: None,
+                profile: profile.to_string(),
+                task_summary: label_text.clone(),
+                base: Default::default(),
+            };
+            match engine.fire(klynt_hooks::engine::HookFireInput::SubagentSpawn(input)).await {
+                klynt_hooks::HookOutcome::Block { reason } => {
+                    // Remove the handle we just inserted since we're aborting.
+                    {
+                        let mut handles = self.handles.lock().await;
+                        handles.remove(&short_id);
+                    }
+                    return format!(
+                        "Subagent spawn blocked by hook: {} (ID: {})",
+                        reason, short_id
+                    );
+                }
+                _ => {}
+            }
+        }
         let subagent_id_clone = subagent_id.clone();
         let label_clone = label_text.clone();
         let config = SubagentConfig {
@@ -283,7 +326,7 @@ impl SubagentManager {
                 _ = cancel_token.cancelled() => {
                     Err("Cancelled by user".into())
                 }
-                r = run_subagent_task(&provider, &workspace, &model, &task, config, profile, tool_kit) => {
+                r = run_subagent_task(&provider, &workspace, &model, &task, config, profile, tool_kit, hook_engine.clone(), origin_key.clone()) => {
                     r
                 }
             };
@@ -410,6 +453,8 @@ async fn run_subagent_task(
     config: SubagentConfig,
     profile: SubagentProfile,
     tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
+    hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    session_key: String,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
     use crate::execution::budget::{DepthMode, ExecutionBudget};
     use crate::execution::core::ExecutionCore;
@@ -467,7 +512,9 @@ async fn run_subagent_task(
 
     let params = ExecutionParams::new(model)
         .with_timeout(std::time::Duration::from_secs(config.task_timeout));
-    let routing_ctx = RoutingContext::new("subagent".into(), "background".into());
+    let mut routing_ctx = RoutingContext::new("subagent".into(), "background".into());
+    routing_ctx.hook_engine = hook_engine;
+    routing_ctx.session_key = Some(session_key.into());
 
     // Execute via unified execute loop with a fixed budget
     let mut budget = ExecutionBudget::with_limits(
@@ -648,6 +695,7 @@ mod tests {
             repos,
             host_cache,
             non_ui_policy,
+            hook_engine: None,
         })
     }
 

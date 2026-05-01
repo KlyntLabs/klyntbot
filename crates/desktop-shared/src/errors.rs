@@ -51,6 +51,9 @@ impl From<KlyntbotError> for ApiError {
             KlyntbotError::Tool(ToolError::PermissionDenied(msg)) => {
                 ApiError::new("PERMISSION_DENIED", msg)
             }
+            KlyntbotError::Tool(ToolError::HookBlocked(msg)) => {
+                ApiError::new("HOOK_BLOCKED", msg)
+            }
 
             // Provider errors
             KlyntbotError::Provider(ProviderError::Http(msg)) => ApiError::new("HTTP_ERROR", msg),

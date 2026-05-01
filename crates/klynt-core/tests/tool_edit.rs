@@ -25,7 +25,7 @@ async fn edits_unique_match() {
     edit_run(
         EditArgs { path: "f.txt".into(), old_text: "beta".into(), new_text: "BETA".into() },
         dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-        Channel::Coding, NonUiPolicy::Allow,
+        Channel::Coding, NonUiPolicy::Allow, None, "".to_string(),
     ).await.unwrap();
     assert_eq!(std::fs::read_to_string(dir.path().join("f.txt")).unwrap(), "alpha\nBETA\ngamma\n");
 }
@@ -44,7 +44,7 @@ async fn rejects_multiple_matches() {
     let r = edit_run(
         EditArgs { path: "f.txt".into(), old_text: "x".into(), new_text: "Y".into() },
         dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-        Channel::Coding, NonUiPolicy::Allow,
+        Channel::Coding, NonUiPolicy::Allow, None, "".to_string(),
     ).await;
     assert!(r.is_err());
     assert_eq!(std::fs::read_to_string(dir.path().join("f.txt")).unwrap(), "x\nx\n");
@@ -64,7 +64,7 @@ async fn rejects_missing_old_text() {
     let r = edit_run(
         EditArgs { path: "f.txt".into(), old_text: "missing".into(), new_text: "x".into() },
         dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-        Channel::Coding, NonUiPolicy::Allow,
+        Channel::Coding, NonUiPolicy::Allow, None, "".to_string(),
     ).await;
     assert!(r.is_err());
 }

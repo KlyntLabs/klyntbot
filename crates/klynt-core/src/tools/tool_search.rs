@@ -1,5 +1,6 @@
+use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use};
 use async_trait::async_trait;
-use common::Result;
+use common::{KlyntbotError, Result, ToolError};
 use serde::{Deserialize, Serialize};
 use tools_core::{RoutingContext, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
@@ -34,7 +35,15 @@ impl ToolSearchTool {
 #[async_trait]
 impl ToolExecute for ToolSearchTool {
     type Params = ToolSearchArgs;
-    async fn execute(&self, _args: ToolSearchArgs, _ctx: &RoutingContext) -> Result<String> {
-        Ok("[]".into())
+    async fn execute(&self, args: ToolSearchArgs, ctx: &RoutingContext) -> Result<String> {
+        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
+        let args_json = serde_json::to_value(&args).unwrap_or_default();
+        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "tool_search", args_json, None).await {
+            return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason)));
+        }
+        let start = std::time::Instant::now();
+        let result: Result<String> = Ok("[]".into());
+        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "tool_search", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        result
     }
 }

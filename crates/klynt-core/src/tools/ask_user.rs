@@ -3,6 +3,7 @@
 //! Moved from `tools::system::ask_user` so the old system module can be deleted
 //! in Task 9. Behaviour is identical; only the crate location changed.
 
+use crate::tools::shared::hook_emit::{fire_pre_tool_use, fire_post_tool_use};
 use async_trait::async_trait;
 use serde_json::Value;
 use tracing::warn;
@@ -112,35 +113,45 @@ impl Tool for AskUserTool {
     }
 
     async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
-        // 1. Parse JSON args into InteractionRequest (lenient parsing)
-        let request = match parse_interaction_request(&args) {
-            Ok(r) => r,
-            Err(e) => {
-                // Log the error visibly so it can be diagnosed
-                warn!("ask_user parse error: {} | args: {}", e, args);
-                eprintln!("[ask_user] parse error: {}", e);
-                return Err(e);
-            }
-        };
-
-        // Path 1: CLI/dashboard interactive mode (oneshot channel)
-        if let Some(interaction_tx) = &ctx.interaction_tx {
-            return self.execute_via_cli(interaction_tx, request).await;
+        let session_id = ctx.session_key.clone().map(|s| s.to_string()).unwrap_or_default();
+        let args_json = args.clone();
+        if let Err(reason) = fire_pre_tool_use(ctx.hook_engine.as_ref(), session_id.clone(), "ask_user", args_json, None).await {
+            return Err(ToolError::HookBlocked(reason).into());
         }
+        let start = std::time::Instant::now();
+        let result: Result<String> = (async {
+            // 1. Parse JSON args into InteractionRequest (lenient parsing)
+            let request = match parse_interaction_request(&args) {
+                Ok(r) => r,
+                Err(e) => {
+                    // Log the error visibly so it can be diagnosed
+                    warn!("ask_user parse error: {} | args: {}", e, args);
+                    eprintln!("[ask_user] parse error: {}", e);
+                    return Err(e);
+                }
+            };
 
-        // Path 2: Platform-native channel interaction (Telegram buttons, Discord selects, etc.)
-        if let Some(channel) = &ctx.interaction_channel {
-            if channel.supports_interaction() {
-                let request_for_response = request.clone();
-                let response = channel
-                    .send_interaction(ctx.chat_id.as_str(), &request)
-                    .await?;
-                return Ok(format_semantic_response(&response, &request_for_response));
+            // Path 1: CLI/dashboard interactive mode (oneshot channel)
+            if let Some(interaction_tx) = &ctx.interaction_tx {
+                return self.execute_via_cli(interaction_tx, request).await;
             }
-        }
 
-        // Path 3: Text fallback (non-TTY, no native channel support)
-        Ok(format_text_fallback(&request))
+            // Path 2: Platform-native channel interaction (Telegram buttons, Discord selects, etc.)
+            if let Some(channel) = &ctx.interaction_channel {
+                if channel.supports_interaction() {
+                    let request_for_response = request.clone();
+                    let response = channel
+                        .send_interaction(ctx.chat_id.as_str(), &request)
+                        .await?;
+                    return Ok(format_semantic_response(&response, &request_for_response));
+                }
+            }
+
+            // Path 3: Text fallback (non-TTY, no native channel support)
+            Ok(format_text_fallback(&request))
+        }).await;
+        fire_post_tool_use(ctx.hook_engine.as_ref(), session_id, "ask_user", result.is_ok(), start.elapsed().as_millis() as u64).await;
+        result
     }
 }
 

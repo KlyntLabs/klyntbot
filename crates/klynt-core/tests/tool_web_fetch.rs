@@ -44,6 +44,7 @@ async fn fetches_text_from_local_server() {
         l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(), client,
         Channel::Coding, NonUiPolicy::Allow,
         Arc::new(klynt_core::approval::HostApprovalCache::default()),
+        None, "".to_string(),
     ).await.unwrap();
     server.await.ok();
     assert!(out.contains("Hello world"));

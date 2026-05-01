@@ -77,6 +77,8 @@ pub struct AgentRuntime {
     predictions_per_turn: u32,
     /// Tool-kit builder for constructing tool registries (main agent + sub-agents).
     tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
+    /// Hook engine for firing lifecycle and tool-use hooks.
+    hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
 }
 
 impl AgentRuntime {
@@ -115,6 +117,7 @@ impl AgentRuntime {
             query_predictor: None,
             predictions_per_turn: 3,
             tool_kit: std::sync::Mutex::new(None),
+            hook_engine: std::sync::Mutex::new(None),
         }
     }
 
@@ -124,6 +127,14 @@ impl AgentRuntime {
 
     pub fn set_tool_kit(&self, kit: Arc<klynt_core::ToolKitBuilder>) {
         *self.tool_kit.lock().unwrap() = Some(kit);
+    }
+
+    pub fn hook_engine(&self) -> Option<Arc<klynt_hooks::HookEngine>> {
+        self.hook_engine.lock().unwrap().clone()
+    }
+
+    pub fn set_hook_engine(&self, engine: Arc<klynt_hooks::HookEngine>) {
+        *self.hook_engine.lock().unwrap() = Some(engine);
     }
 
     // ── Builder methods ─────────────────────────────────────────
@@ -303,6 +314,7 @@ impl AgentRuntime {
         if let Some(t) = &cancel_token {
             ctx.cancel_token = Some(t.clone());
         }
+        ctx.hook_engine = self.hook_engine();
         let ctx = &ctx;
         let pipeline_start = Instant::now();
         let hot = self.hot_config.read().await;
@@ -410,6 +422,9 @@ impl AgentRuntime {
         }
         if let Some(ref queue) = self.context_update_queue {
             params = params.with_context_update_queue(Arc::clone(queue));
+        }
+        if let Some(ref engine) = self.hook_engine() {
+            params = params.with_hook_engine(Arc::clone(engine));
         }
 
         // ── Phase 2: Execute ─────────────────────────────────────
