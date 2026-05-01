@@ -607,6 +607,118 @@ async codingMemorySessionReplayRecallOverlay(args: SessionRecallOverlayArgs) : P
     else return { status: "error", error: e  as any };
 }
 },
+async codingSkillsList() : Promise<Result<SkillListItem[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsInfo(name: string) : Promise<Result<SkillInfo, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_info", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsInstall(source: string) : Promise<Result<SkillListItem, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_install", { source }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsUpdate(name: string) : Promise<Result<SkillListItem, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_update", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsUninstall(name: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_uninstall", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsToggle(name: string, enabled: boolean) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_toggle", { name, enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsValidate(name: string) : Promise<Result<SkillValidationResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_validate", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsReload() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_reload") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingStatus(sessionKey: string) : Promise<Result<CodingStatus, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_status", { sessionKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingDoctor() : Promise<Result<DiagnosticChecklist, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_doctor") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSessionsStar(sessionKey: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_star", { sessionKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSessionsUnstar(sessionKey: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_unstar", { sessionKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingResume(prefix: string) : Promise<Result<ResumeResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_resume", { prefix }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingHelp(command: string | null) : Promise<Result<HelpEntry[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_help", { command }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async cognitiveUserModel() : Promise<Result<UserModelSummaryResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("cognitive_user_model") };
@@ -4135,6 +4247,7 @@ export type CliHealthRow = { cli: string; enabled: boolean; lastEventAt: string 
 export type ClipboardContentType = "text" | "image" | "file"
 export type ClipboardEntry = { id: number; content: string; content_type: string; source_app: string | null; preview: string | null; file_path: string | null; pinned: boolean; created_at: string }
 export type CodingMemoryStatusResponse = { daemonAlive: boolean; bufferedEventCount: number; unprocessedEventCount: number; socketPath: string }
+export type CodingStatus = { mode: string; profile: string; sandbox: string; total_cost_usd: number; total_tokens: number; active_skills: string[] }
 export type CognitiveCommunity = { id: string; name: string; color: string; memberTopicIds: string[] }
 export type CognitiveGraphData = { topics: TopicNode[]; edges: TopicEdge[]; communities: CognitiveCommunity[]; rules: RuleNode[]; stats: GraphStats }
 export type ColumnCreateParams = { projectId: string; name: string; columnType: string; options: string[] | null; width: number | null }
@@ -4230,6 +4343,8 @@ export type DeliveredInterventionResponse = { id: string; interventionType: stri
 export type DetectConfusablesParams = { word: string; sourceLang: string }
 export type DetectedPatternResponse = { name: string; confidence: number; signalCount: number; description: string; domain: string }
 export type DiagnoseResult = { ok: boolean; message: string }
+export type DiagnosticChecklist = { items: DiagnosticItem[] }
+export type DiagnosticItem = { name: string; status: string; detail: string }
 export type DiffSegmentResponse = { text: string; status: string }
 export type DistractionDetectedPayload = { appName: string; sessionId: string; previousApp: string; previousContext: string; reason: string }
 export type DistractionPayload = { appName: string; sessionId: string }
@@ -4413,6 +4528,7 @@ export type GradeResultResponse = { score: number | null; suggestedRating: strin
 export type GrammarPattern = { pattern: string; explanation: string; patternType: string | null }
 export type GraphStats = { totalFacts: number; totalTopics: number; totalEdges: number; totalCommunities: number; avgConvergence: number }
 export type HeaderStats = { turnCount: number; stepCount: number; toolCallCount: number; errorCount: number; compactionCount: number; agentCount: number; totalDurationMs: number; totalInputTokens: number; totalOutputTokens: number; cacheReadTokens: number; cacheHitPct: number; model: string | null }
+export type HelpEntry = { command: string; description: string; category: string; arg_hint: string | null }
 export type HooksTomlSnapshot = { path: string; exists: boolean; content: string }
 export type HourlyBreakdownResponse = { hour: number; productiveSecs: number; neutralSecs: number; distractingSecs: number; idleSecs: number; totalSecs: number; productiveRatio: number }
 export type HybridSearchResponse = { exact: NoteResponse[]; related: NoteResponse[] }
@@ -4764,6 +4880,7 @@ repos: string[];
 artifactsWritten: number }
 export type ReforgeStateResponse = { lastRunAt: string | null; lastRunStats: unknown | null; runCount: number }
 export type ResourceCluster = { resources: string[]; accessCount: number }
+export type ResumeResult = { session_key: string; title: string }
 export type RetentionHistoryResponse = { overall: RetentionPoint[]; domains: DomainHistory[] }
 export type RetentionPoint = { date: string; avgRetention: number; reviewCount: number }
 export type RetrievalEnhancedPayload = { sessionKey: string; stages: EnhancementStagePayload[]; totalLatencyMs: number; totalLlmCalls: number }
@@ -4877,9 +4994,13 @@ export type ShellHookStatusResponse = { installed: boolean; shell: string; rcFil
 export type ShortcutsConfig = { launcher: string; tray: string }
 export type SignalResponse = { eventType: string; timestamp: string; metadata: string }
 export type SignalWindowResponse = { windowSize: number; signals: SignalResponse[]; triggers: TriggerConditionResponse[] }
+export type SkillInfo = { name: string; description: string; allowed_tools: string[]; paths: string[]; tags: string[]; sensitivity: string | null; source: string; source_path: string; references: SkillReferenceInfo[] }
+export type SkillListItem = { name: string; description: string; source: string; source_path: string; tags: string[]; enabled: boolean }
 export type SkillListResponse = { skillNames: string[] }
 export type SkillLoadedPayload = { sessionKey: string; name: string; trigger: string; agent?: string | null }
+export type SkillReferenceInfo = { name: string; file: string; load: string }
 export type SkillRouteStats = { count: number; percentage: number; avgConfidence: number; topTriggers: string[] }
+export type SkillValidationResult = { ok: boolean; errors: string[]; warnings: string[] }
 export type SkillVersionDetailResponse = { id: string; skillName: string; version: number; filePath: string; content: string; diff: string | null; source: string; reason: string | null; createdAt: string }
 export type SkillVersionResponse = { id: string; skillName: string; version: number; filePath: string; diff: string | null; source: string; reason: string | null; createdAt: string }
 export type SkippedFile = { path: string; reason: string }

@@ -78,6 +78,9 @@ fn scan_root(dir: PathBuf, source: SkillSource) -> Result<SkillIndex> {
             )))
         })?;
         let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
         let skill_md = path.join("SKILL.md");
         match parse_skill(&skill_md, source) {
             Ok(skill) => idx.insert(skill.frontmatter.name.clone(), skill),

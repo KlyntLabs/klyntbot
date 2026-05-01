@@ -13,23 +13,30 @@ export function useLauncherSearch() {
   // queryKey change cancels the in-flight TQ fetch automatically.
   const debounced = useDebounced(query, DEBOUNCE_MS);
 
+  const isEmpty = debounced.trim().length === 0;
+
   const search = useTauriQuery<LauncherItem[]>({
     queryKey: qk.launcher.search(debounced),
     command: "launcher_search",
     args: { query: debounced },
     fallback: [],
+    enabled: !isEmpty,
     // Search results are inherently stale-fast; tighter than the global
     // 30s default so an exact-string repeat within ~5s reuses the cache.
     staleTime: 5_000,
   });
 
   useEffect(() => {
-    setIsSearching(search.isFetching);
-  }, [search.isFetching, setIsSearching]);
+    setIsSearching(!isEmpty && search.isFetching);
+  }, [isEmpty, search.isFetching, setIsSearching]);
 
   useEffect(() => {
+    if (isEmpty) {
+      setResults([]);
+      return;
+    }
     if (search.data) setResults(search.data);
-  }, [search.data, setResults]);
+  }, [isEmpty, search.data, setResults]);
 }
 
 function useDebounced<T>(value: T, ms: number): T {
