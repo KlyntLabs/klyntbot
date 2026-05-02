@@ -163,6 +163,7 @@ pub struct IngestionConsumer {
     episodic_repo: EpisodicMemoryRepo,
     extraction_handler: Option<Arc<dyn ExtractionHandler>>,
     fact_repo: Option<SemanticFactRepo>,
+    conflict_resolver: Option<Arc<dyn crate::services::extraction::ConflictResolver>>,
     episodic_importance_threshold: f64,
 }
 
@@ -179,8 +180,21 @@ impl IngestionConsumer {
             episodic_repo,
             extraction_handler,
             fact_repo: None,
+            conflict_resolver: None,
             episodic_importance_threshold: 0.7,
         }
+    }
+
+    /// Wire an LLM-backed AUDD conflict resolver (Mem0 pattern). When
+    /// absent, ingestion uses the default Add-only behavior. Gated by
+    /// `KCA_AUDD=1` at the call site so production stays safe by
+    /// default.
+    pub fn with_conflict_resolver(
+        mut self,
+        resolver: Arc<dyn crate::services::extraction::ConflictResolver>,
+    ) -> Self {
+        self.conflict_resolver = Some(resolver);
+        self
     }
 
     /// Wire the semantic fact repo so extracted facts are persisted (not
@@ -246,6 +260,7 @@ impl SignalConsumer for IngestionConsumer {
                 let obs = observation.clone();
                 let fact_repo = self.fact_repo.clone();
                 let entity_repo = self.entity_repo.clone();
+                let conflict_resolver = self.conflict_resolver.clone();
                 tokio::spawn(async move {
                     // Look up persisted user-name BEFORE extraction so we can
                     // both (a) prepend identity context to the prompt and
@@ -406,13 +421,87 @@ impl SignalConsumer for IngestionConsumer {
                                             .map(|f| f.object)
                                     })
                                     .or(user_name);
+                                let audd_on = matches!(
+                                    std::env::var("KCA_AUDD").ok().as_deref(),
+                                    Some("1") | Some("true") | Some("yes")
+                                );
                                 let mut written = 0usize;
                                 for ext in &result.extractions {
                                     for f in &ext.facts {
-                                        let fact = to_semantic_fact(f, &obs);
-                                        match repo.upsert(&fact).await {
-                                            Ok(()) => written += 1,
-                                            Err(e) => tracing::warn!(error = %e, "fact upsert failed"),
+                                        let mut fact = to_semantic_fact(f, &obs);
+
+                                        // AUDD (Mem0 pattern): when a
+                                        // resolver is wired AND KCA_AUDD=1,
+                                        // ask it whether to ADD/UPDATE/DELETE/
+                                        // NOOP this candidate vs existing
+                                        // facts on the same (subject,
+                                        // predicate). Default behavior (no
+                                        // resolver / flag off) is the
+                                        // pre-AUDD Add-only path.
+                                        let mut decision =
+                                            crate::services::extraction::ConflictDecision::Add;
+                                        if audd_on {
+                                            if let Some(resolver) = &conflict_resolver {
+                                                let existing = repo
+                                                    .find_by_subject_predicate(
+                                                        &fact.subject,
+                                                        &fact.predicate,
+                                                    )
+                                                    .await
+                                                    .ok()
+                                                    .map(|rows| {
+                                                        rows.into_iter()
+                                                            .filter(|r| r.superseded_at.is_none())
+                                                            .collect::<Vec<_>>()
+                                                    })
+                                                    .unwrap_or_default();
+                                                if !existing.is_empty() {
+                                                    decision = resolver
+                                                        .classify(f, &existing)
+                                                        .await;
+                                                }
+                                            }
+                                        }
+                                        match decision {
+                                            crate::services::extraction::ConflictDecision::Noop => {
+                                                tracing::debug!(
+                                                    subject = %fact.subject,
+                                                    predicate = %fact.predicate,
+                                                    "AUDD: NOOP (equivalent fact exists)"
+                                                );
+                                            }
+                                            crate::services::extraction::ConflictDecision::Update {
+                                                existing_id,
+                                            } => {
+                                                fact.id = existing_id;
+                                                if let Err(e) = repo.upsert(&fact).await {
+                                                    tracing::warn!(error = %e, "AUDD UPDATE failed");
+                                                } else {
+                                                    written += 1;
+                                                }
+                                            }
+                                            crate::services::extraction::ConflictDecision::Delete {
+                                                existing_id,
+                                            } => {
+                                                if let Err(e) = repo
+                                                    .supersede_fact(&existing_id, &fact.id)
+                                                    .await
+                                                {
+                                                    tracing::warn!(error = %e, "AUDD DELETE supersede failed");
+                                                }
+                                                if let Err(e) = repo.upsert(&fact).await {
+                                                    tracing::warn!(error = %e, "AUDD DELETE+ADD failed");
+                                                } else {
+                                                    written += 1;
+                                                }
+                                            }
+                                            crate::services::extraction::ConflictDecision::Add => {
+                                                if let Err(e) = repo.upsert(&fact).await {
+                                                    tracing::warn!(error = %e, "fact upsert failed");
+                                                } else {
+                                                    written += 1;
+                                                }
+                                            }
                                         }
                                         // Mirror to proper-noun subject when
                                         // the original is a first-person fact

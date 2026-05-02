@@ -551,6 +551,31 @@ impl SemanticFactRepo {
         .await
     }
 
+    /// Mark `existing_id` as superseded by `new_id`. Used by AUDD's
+    /// DELETE path: the candidate fact contradicts the existing one,
+    /// so we tomb the old row (it stays queryable as historical fact)
+    /// and the caller separately upserts the new one.
+    pub async fn supersede_fact(
+        &self,
+        existing_id: &str,
+        new_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        let now = jiff::Timestamp::now().to_string();
+        sqlx::query(
+            r#"
+            UPDATE semantic_facts
+            SET superseded_at = ?1, superseded_by = ?2
+            WHERE id = ?3 AND superseded_at IS NULL
+            "#,
+        )
+        .bind(&now)
+        .bind(new_id)
+        .bind(existing_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     /// Returns up to `limit` facts where the given entity_id is referenced as either the subject
     /// or object entity. Used by Track 1 (KCA Phase A) to enrich consolidation candidates with
     /// cross-entity context.

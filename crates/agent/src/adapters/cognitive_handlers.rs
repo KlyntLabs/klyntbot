@@ -189,6 +189,117 @@ impl CoachingReasonerHandler for HeuristicCoachingReasonerHandler {
 
 // ── LLM-backed handlers ────────────────────────────────────────────────────
 
+// ── AUDD conflict resolver (Mem0 pattern) ──
+
+const AUDD_SYSTEM_PROMPT: &str = "\
+You are a memory-conflict resolver. Given a CANDIDATE fact (newly extracted) \
+and a list of EXISTING facts on the same (subject, predicate), decide ONE \
+of:\n\
+- ADD : the candidate is new information not already represented.\n\
+- UPDATE id=<existing_id>: the candidate refines / completes one specific \
+existing fact (same meaning, more accurate).\n\
+- DELETE id=<existing_id>: the candidate contradicts one specific existing \
+fact (the new one is right, mark the old superseded).\n\
+- NOOP : the candidate is semantically equivalent to an existing fact \
+already stored.\n\n\
+Return EXACTLY ONE line: `ADD`, `UPDATE id=<existing_id>`, `DELETE \
+id=<existing_id>`, or `NOOP`.";
+
+pub struct LlmConflictResolver {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmConflictResolver {
+    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
+        Self { provider, params }
+    }
+}
+
+#[async_trait]
+impl cognitive::services::extraction::ConflictResolver for LlmConflictResolver {
+    async fn classify(
+        &self,
+        candidate: &ExtractedFact,
+        nearest: &[cognitive::types::SemanticFact],
+    ) -> cognitive::services::extraction::ConflictDecision {
+        if nearest.is_empty() {
+            return cognitive::services::extraction::ConflictDecision::Add;
+        }
+        let mut user_msg = String::new();
+        user_msg.push_str("CANDIDATE:\n");
+        user_msg.push_str(&format!(
+            "  {} | {} | {} (confidence={})\n",
+            candidate.subject, candidate.predicate, candidate.object, candidate.confidence
+        ));
+        user_msg.push_str("\nEXISTING:\n");
+        for f in nearest {
+            user_msg.push_str(&format!(
+                "  id={}: {} | {} | {}\n",
+                f.id, f.subject, f.predicate, f.object
+            ));
+        }
+        user_msg.push_str("\nDecision:");
+
+        let messages = vec![
+            Message::system(AUDD_SYSTEM_PROMPT.to_string()),
+            Message::user(user_msg),
+        ];
+        let response = match self.provider.chat(&messages, None, &self.params).await {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!(error = %e, "AUDD classify failed, defaulting to ADD");
+                return cognitive::services::extraction::ConflictDecision::Add;
+            }
+        };
+        let line = response
+            .content
+            .unwrap_or_default()
+            .lines()
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        let upper = line.to_uppercase();
+        if upper == "NOOP" {
+            cognitive::services::extraction::ConflictDecision::Noop
+        } else if upper == "ADD" {
+            cognitive::services::extraction::ConflictDecision::Add
+        } else if let Some(rest) = upper.strip_prefix("UPDATE ID=") {
+            let id = rest.split_whitespace().next().unwrap_or("").trim();
+            // Find the matching existing fact (case-sensitive id), fall back to ADD
+            // if the LLM hallucinated.
+            if nearest.iter().any(|f| f.id.eq_ignore_ascii_case(id)) {
+                cognitive::services::extraction::ConflictDecision::Update {
+                    existing_id: nearest
+                        .iter()
+                        .find(|f| f.id.eq_ignore_ascii_case(id))
+                        .map(|f| f.id.clone())
+                        .unwrap_or_default(),
+                }
+            } else {
+                cognitive::services::extraction::ConflictDecision::Add
+            }
+        } else if let Some(rest) = upper.strip_prefix("DELETE ID=") {
+            let id = rest.split_whitespace().next().unwrap_or("").trim();
+            if nearest.iter().any(|f| f.id.eq_ignore_ascii_case(id)) {
+                cognitive::services::extraction::ConflictDecision::Delete {
+                    existing_id: nearest
+                        .iter()
+                        .find(|f| f.id.eq_ignore_ascii_case(id))
+                        .map(|f| f.id.clone())
+                        .unwrap_or_default(),
+                }
+            } else {
+                cognitive::services::extraction::ConflictDecision::Add
+            }
+        } else {
+            tracing::warn!(line = %line, "AUDD: unparseable response, defaulting to ADD");
+            cognitive::services::extraction::ConflictDecision::Add
+        }
+    }
+}
+
 // ── Extraction ──
 
 const EXTRACTION_SYSTEM_PROMPT: &str = "\
