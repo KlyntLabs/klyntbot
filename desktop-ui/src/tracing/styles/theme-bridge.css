@@ -1,0 +1,27 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md. */
+
+.tracing-root {
+  --color-background: var(--ds-bg);
+  --color-foreground: var(--ds-fg);
+  --color-card: var(--ds-surface);
+  --color-card-foreground: var(--ds-fg);
+  --color-popover: var(--ds-surface, var(--ds-surface));
+  --color-popover-foreground: var(--ds-fg);
+  --color-primary: var(--ds-accent);
+  --color-primary-foreground: var(--ds-bg);
+  --color-secondary: var(--ds-bg-elevated, var(--ds-surface));
+  --color-secondary-foreground: var(--ds-fg);
+  --color-muted: var(--ds-bg-muted, var(--ds-surface));
+  --color-muted-foreground: var(--ds-fg-muted, var(--ds-fg));
+  --color-accent: var(--ds-accent);
+  --color-accent-foreground: var(--ds-bg);
+  --color-destructive: var(--ds-error, #ef4444);
+  --color-destructive-foreground: #fff;
+  --color-border: var(--ds-border);
+  --color-input: var(--ds-border);
+  --color-ring: var(--ds-accent);
+
+  --radius: 6px;
+  font-family: "Inter Variable", system-ui, sans-serif;
+}
