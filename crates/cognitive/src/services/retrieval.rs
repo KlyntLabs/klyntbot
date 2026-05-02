@@ -218,31 +218,83 @@ pub async fn retrieve_relevant_facts(
             vec![query.to_string()]
         };
 
-        let mut merged_ranks: std::collections::HashMap<String, usize> =
+        // Collect rank + full fact row for every FTS hit across all terms.
+        // Keeping the SemanticFact (not just the id) lets us PROMOTE hits
+        // that the vector/fallback path missed into the scored pool — a
+        // pure rank-only merge previously dropped them, which produced
+        // 100% zero-retrieval refusals on questions containing proper
+        // nouns the embedder under-weighted.
+        let mut merged: std::collections::HashMap<String, (usize, SemanticFact)> =
             std::collections::HashMap::new();
         let mut total_hits = 0usize;
         for term in &fts_terms {
             if let Ok(bm25_hits) = repo.search_fts(term, bm25_domain, params.limit * 2).await {
                 total_hits += bm25_hits.len();
-                for (rank, f) in bm25_hits.iter().enumerate() {
-                    merged_ranks
+                for (rank, f) in bm25_hits.into_iter().enumerate() {
+                    merged
                         .entry(f.id.clone())
-                        .and_modify(|r| {
+                        .and_modify(|(r, _)| {
                             if rank < *r {
                                 *r = rank;
                             }
                         })
-                        .or_insert(rank);
+                        .or_insert_with(|| (rank, f));
                 }
             }
         }
         crate::bench_hooks::record_hits(0, total_hits as u32, 0);
 
+        let scored_ids: std::collections::HashSet<String> =
+            scored.iter().map(|s| s.fact.id.clone()).collect();
+        let now = Timestamp::now();
+
         for result in &mut scored {
-            if let Some(&rank) = merged_ranks.get(&result.fact.id) {
+            if let Some(&(rank, _)) = merged.get(&result.fact.id) {
                 let bm25_boost = 1.0 / (DEFAULT_RRF_K + rank as f64 + 1.0);
                 result.score += bm25_boost;
             }
+        }
+
+        // Promote FTS-only hits into the scored pool. Score them with the
+        // same relevance formula fallback_path uses (neutral similarity)
+        // plus the RRF rank bonus, so they land on the same scale as
+        // fallback candidates and pass the downstream MIN_FACT_SCORE
+        // floor. Without this, a fact correctly stored under
+        // `subject="Alice"` but missed by the vector path is invisible —
+        // which is the root cause of the 100%-zero-retrieval pattern
+        // observed in p1-confirm-001.
+        for (id, (rank, fact)) in merged {
+            if scored_ids.contains(&id) {
+                continue;
+            }
+            let (r, freq) = compute_decay_and_freq(&fact, &now);
+            let temporal = temporal_recency_score(&fact.valid_from);
+            let hierarchy = match depth_cache {
+                Some(cache) => cache.get_or_compute(&fact, repo).await,
+                None => 0.0,
+            };
+            let cross_note = scoring::convergence_score(&fact);
+            let base = relevance_score(
+                0.5,
+                r,
+                fact.confidence,
+                freq,
+                params.situational_boost,
+                temporal,
+                hierarchy,
+                0.5,
+                0.0,
+                cross_note,
+                0.0,
+                0.0,
+                &weights,
+            );
+            let bm25_boost = 1.0 / (DEFAULT_RRF_K + rank as f64 + 1.0);
+            scored.push(ScoredFact {
+                fact,
+                score: base + bm25_boost,
+                similarity: None,
+            });
         }
     }
 
