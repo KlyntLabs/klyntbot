@@ -532,8 +532,8 @@ export function getSessionDownloadUrl(_sessionId: string): string {
   return "";
 }
 
-export async function openInPath(_app: "finder", path: string): Promise<void> {
-  await invoke("tracing_open_dir", { path });
+export async function openInPath(_app: "finder", sessionId: string): Promise<void> {
+  await invoke("tracing_open_dir", { providerId: PROVIDER_ID, sessionId });
 }
 
 export async function importSession(

@@ -136,7 +136,7 @@ function SessionDirectoryActions({
 
   const handleOpenSessionDir = useCallback(async () => {
     try {
-      await openInPath("finder", session.session_dir);
+      await openInPath("finder", session.session_id);
     } catch (error) {
       console.error("Failed to open session directory:", error);
       window.alert(
