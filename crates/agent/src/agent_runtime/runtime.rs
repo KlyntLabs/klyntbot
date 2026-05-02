@@ -498,7 +498,21 @@ impl AgentRuntime {
         // ── Phase 2: Execute ─────────────────────────────────────
         let safety_timeout = Duration::from_secs(safety_timeout_secs.max(1));
 
-        let loop_result = tokio::time::timeout(
+        // Phase 4 (KCA_PHASE_4=1): clone messages before move so we can
+        // retry once if the response looks like a memory refusal. The
+        // clone is cheap relative to the LLM call and only matters when
+        // the retry actually fires.
+        let phase_4_on = matches!(
+            std::env::var("KCA_PHASE_4").ok().as_deref(),
+            Some("1") | Some("true") | Some("yes")
+        );
+        let messages_for_retry: Option<Vec<providers::types::Message>> = if phase_4_on {
+            Some(assembled.messages.clone())
+        } else {
+            None
+        };
+
+        let mut loop_result = tokio::time::timeout(
             safety_timeout,
             execute_loop(
                 &self.core,
@@ -516,6 +530,54 @@ impl AgentRuntime {
                 "Safety timeout ({safety_timeout_secs}s) — this is a bug, please report it"
             ))
         })??;
+
+        // Phase 4 retry: if the answer matched a memory-refusal phrase,
+        // re-run execute_loop ONCE with an appended user nudge. The
+        // mechanism — let the agent grep the conversation history again
+        // with broader effort — mirrors Letta's filesystem-tool agentic
+        // retrieval pattern. Single retry per QA, capped to bound cost.
+        if let Some(retry_messages_base) = messages_for_retry {
+            if crate::output::validator::detect_memory_refusal(&loop_result.content)
+                .is_some()
+            {
+                let mut retry_messages = retry_messages_base;
+                retry_messages.push(providers::types::Message::assistant(
+                    loop_result.content.clone(),
+                ));
+                retry_messages.push(providers::types::Message::user(
+                    "Re-search the conversation history with broader effort. \
+                     Focus on specific named entities, dates, places, and concrete \
+                     details that appear in the question. Even if your initial \
+                     recall returned nothing, attempt a best-effort answer based on \
+                     what is most likely true given the conversation. Provide a \
+                     concrete answer with specific names and details where possible.",
+                ));
+                let mut retry_budget = ExecutionBudget::new(depth);
+                let retry_result = tokio::time::timeout(
+                    safety_timeout,
+                    execute_loop(
+                        &self.core,
+                        retry_messages,
+                        tool_definitions,
+                        &params,
+                        &mut retry_budget,
+                        ctx,
+                        event_tx.clone(),
+                    ),
+                )
+                .await;
+                if let Ok(Ok(retried)) = retry_result {
+                    // Take retry only if it produced a non-refusal answer.
+                    // A retry that ALSO refuses just doubles latency without
+                    // signal; keep the original in that case.
+                    if crate::output::validator::detect_memory_refusal(&retried.content)
+                        .is_none()
+                    {
+                        loop_result = retried;
+                    }
+                }
+            }
+        }
 
         // ── Phase 3: Record ──────────────────────────────────────
         let mode_name = depth.to_string();
@@ -631,6 +693,9 @@ impl AgentRuntime {
                             crate::output::validator::ValidationWarning::LowQuality { reason } => {
                                 ("low_quality", Some(reason.clone()))
                             }
+                            crate::output::validator::ValidationWarning::MemoryRefusal {
+                                pattern,
+                            } => ("memory_refusal", Some(pattern.clone())),
                         };
                         let _ = warning_repo
                             .insert(&request_id, wtype, detail.as_deref(), Some(&chat_id))

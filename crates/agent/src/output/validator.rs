@@ -35,6 +35,40 @@ pub enum ValidationWarning {
     PotentialSystemLeak { pattern: String },
     /// Response quality is suspiciously low.
     LowQuality { reason: String },
+    /// Response contains a memory-refusal hedge phrase ("I don't have…",
+    /// "no information…"). Signals that retrieval came back empty or
+    /// the LLM didn't find what the question asked for. Caller may use
+    /// this as a hint to retry with widened retrieval scope (Phase 4).
+    /// `is_valid` stays true — the response is still shown to the user;
+    /// this is purely a signal for upstream retry logic.
+    MemoryRefusal { pattern: String },
+}
+
+/// Frozen phrase list (anti-tuning rule 5 — Phase 4). Detects
+/// hedging answers that suggest a retrieval failure rather than a
+/// model-quality failure. Modifying these phrases mid-run trains the
+/// detector on observed C-grade patterns; do not change them based on
+/// trace data alone — improve retrieval instead.
+const MEMORY_REFUSAL_PATTERNS: &[&str] = &[
+    "i don't have",
+    "i don't recall",
+    "i have no memory",
+    "no information",
+    "cannot find",
+    "not mentioned",
+    "unable to determine",
+    "i don't know",
+];
+
+/// Returns the first matched refusal phrase (lowercased), if any.
+/// Public so the agent runtime can check whether a retry is warranted
+/// without re-running the full `validate()` pipeline.
+pub fn detect_memory_refusal(content: &str) -> Option<&'static str> {
+    let lower = content.to_lowercase();
+    MEMORY_REFUSAL_PATTERNS
+        .iter()
+        .find(|p| lower.contains(*p))
+        .copied()
 }
 
 /// Patterns that suggest system prompt leakage.
@@ -171,6 +205,14 @@ impl ResponseValidator {
             // Very short responses might indicate a problem (but not always)
             warnings.push(ValidationWarning::LowQuality {
                 reason: "extremely short response".to_string(),
+            });
+        }
+
+        // 4. Memory-refusal detection (Phase 4 signal — does NOT
+        //    affect is_valid; it's a hint for retry logic upstream).
+        if let Some(pattern) = detect_memory_refusal(&filtered) {
+            warnings.push(ValidationWarning::MemoryRefusal {
+                pattern: pattern.to_string(),
             });
         }
 
