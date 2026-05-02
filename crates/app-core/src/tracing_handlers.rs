@@ -132,4 +132,48 @@ impl AppCore {
             .await
             .map_err(ApiError::from)
     }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn tracing_session_summary(
+        &self,
+        provider_id: String,
+        session_id: String,
+    ) -> Result<SessionSummary, ApiError> {
+        self.tracing_registry
+            .get(&provider_id)
+            .map_err(ApiError::from)?
+            .session_summary(&session_id)
+            .await
+            .map_err(ApiError::from)
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn tracing_load_subagent_session(
+        &self,
+        provider_id: String,
+        session_id: String,
+        agent_id: String,
+    ) -> Result<SessionDetail, ApiError> {
+        self.tracing_registry
+            .get(&provider_id)
+            .map_err(ApiError::from)?
+            .load_subagent_session(&session_id, &agent_id)
+            .await
+            .map_err(ApiError::from)
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn tracing_load_subagent_context(
+        &self,
+        provider_id: String,
+        session_id: String,
+        agent_id: String,
+    ) -> Result<Vec<ContextMessage>, ApiError> {
+        self.tracing_registry
+            .get(&provider_id)
+            .map_err(ApiError::from)?
+            .load_subagent_context(&session_id, &agent_id)
+            .await
+            .map_err(ApiError::from)
+    }
 }
