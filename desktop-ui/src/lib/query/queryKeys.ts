@@ -114,6 +114,20 @@ export const qk = {
   productivity: {
     all: () => ["productivity"] as const,
     calendarEvents: (date: string) => ["productivity", "calendarEvents", date] as const,
+
+    summaryRange: (startDate: string, endDate: string) =>
+      ["productivity", "summaryRange", startDate, endDate] as const,
+    weekly: () => ["productivity", "weekly"] as const,
+    patterns: (days: number | null) =>
+      ["productivity", "patterns", days ?? "default"] as const,
+    hourlyBreakdown: (startDate: string, endDate: string) =>
+      ["productivity", "hourlyBreakdown", startDate, endDate] as const,
+    timeline: (date: string) => ["productivity", "timeline", date] as const,
+    categories: () => ["productivity", "categories"] as const,
+    intelligenceSessions: (date: string) =>
+      ["productivity", "intelligenceSessions", date] as const,
+    activityFeed: (limit: number) => ["productivity", "activityFeed", limit] as const,
+    goals: () => ["productivity", "goals"] as const,
   },
 } as const;
 
