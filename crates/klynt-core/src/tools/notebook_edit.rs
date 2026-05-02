@@ -197,7 +197,7 @@ pub async fn run_for_test(
             .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("read: {e}"))))?;
         if let Some(repo) = snapshot_repo.as_ref() {
             let _ = repo
-                .record(
+                .try_record_with_ghost(
                     &session_id,
                     message_id.as_deref(),
                     &resolved.to_string_lossy(),

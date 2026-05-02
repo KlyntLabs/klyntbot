@@ -868,14 +868,20 @@ CREATE TABLE IF NOT EXISTS coding_snapshots (
     session_key     TEXT NOT NULL,
     message_id      TEXT,                    -- which assistant turn produced the edit (nullable)
     file_path       TEXT NOT NULL,
-    content_before  BLOB NOT NULL,           -- raw bytes pre-edit; '' if file did not exist
+    content_before  BLOB NOT NULL,           -- raw bytes pre-edit; '' if file did not exist OR ghost-mode
     file_existed    INTEGER NOT NULL DEFAULT 1,  -- 0 means restoring should delete the file
-    content_hash    TEXT NOT NULL,           -- blake3 of content_before
+    content_hash    TEXT NOT NULL,           -- blake3 of content_before; sha "ghost" when ghost_commit_sha is set
+    ghost_commit_sha TEXT NULL,              -- when set, restore via klynt_git_utils::restore_ghost_commit instead of BLOB
+    ghost_repo_root  TEXT NULL,              -- absolute path of the git repo at snapshot time
+    ghost_preexisting_untracked_json TEXT NULL,  -- JSON array of preexisting untracked file paths at snapshot time
     created_at      INTEGER NOT NULL DEFAULT (cast(strftime('%s','now') as integer))
 );
 
 CREATE INDEX IF NOT EXISTS idx_coding_snapshots_session
   ON coding_snapshots(session_key, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_coding_snapshots_ghost
+  ON coding_snapshots(session_key, ghost_commit_sha) WHERE ghost_commit_sha IS NOT NULL;
 
 -- ============================================================
 -- Workspaces (code editor workspace lifecycle, Cursor/Codex-style)

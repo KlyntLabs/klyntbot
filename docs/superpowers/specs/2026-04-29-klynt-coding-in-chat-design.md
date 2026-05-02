@@ -679,6 +679,8 @@ Same as superseded spec: `Tool::is_concurrency_safe(args) -> bool` (default fals
 
 Existing 50KB cap at `crates/agent/src/execution/core.rs:31` inherited unchanged. Phase 3+ adds Claude Code's content-replacement pattern for oversized results we want to preserve in full.
 
+**Phase 3 status (2026-05-02):** Adopted codex's `TruncationPolicy` (Bytes/Tokens) with structured middle-chop and a "Total output lines: N" prefix instead of Claude Code's content-replacement pattern. Trade-off: model loses access to the full content, but gains an explicit line-count signal. See plan `2026-05-02-klynt-coding-in-chat-phase3-codex-polish.md` for rationale.
+
 ### Conflict detection
 
 Naming hygiene unchanged: short verbs for the coding kit; `recall_` / `trace_` / `check_` prefixes for recall; `mcp_<server>_<tool>` for MCP. Conflict detection runs at registry build time; duplicates abort boot.
@@ -1406,6 +1408,8 @@ Coding-memory spec's 9 invariants + this spec's 11 (next section) = **20 invaria
 - Multi-window per-repo coding (Phase 3+ via `lazy_window.rs`).
 - Voice-driven coding via the existing `useDictationController.ts` (already works in composer; verify in coding mode).
 - Snapshots: content-addressed dedup.
+
+**Phase 3 status (2026-05-02):** Implemented via codex-style "ghost commits" (`klynt-git-utils` crate) rather than blob-content addressing. Git's object store provides natural content-addressing with zero-copy for unchanged files. BLOB fallback retained for non-git directories. See plan `2026-05-02-klynt-coding-in-chat-phase3-codex-polish.md`.
 - Windows sandbox.
 
 ### Coordination with coding-memory

@@ -184,7 +184,7 @@ pub async fn run_for_test(
             Err(e) => return Err(e.into()),
         };
         let _ = repo
-            .record(
+            .try_record_with_ghost(
                 &session_id,
                 message_id.as_deref(),
                 &resolved.to_string_lossy(),

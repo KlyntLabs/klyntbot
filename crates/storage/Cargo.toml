@@ -8,6 +8,7 @@ ai-core.workspace = true
 bus = { path = "../bus" }
 common.workspace = true
 tools-core.workspace = true
+klynt-git-utils = { path = "../klynt-git-utils" }
 sqlx.workspace = true
 lance.workspace = true
 lance-io.workspace = true

@@ -89,6 +89,7 @@ dependencies = [
  "klynt-core",
  "klynt-execpolicy",
  "klynt-hooks",
+ "klynt-truncation",
  "mcp",
  "plugin-runtime",
  "providers",
@@ -4461,6 +4462,7 @@ dependencies = [
  "feature-productivity",
  "futures-util",
  "jiff",
+ "klynt-process-hardening",
  "klyntbot-server",
  "linkme",
  "mcp-bridge",
@@ -7967,6 +7969,7 @@ dependencies = [
  "html2text",
  "jiff",
  "klynt-execpolicy",
+ "klynt-git-utils",
  "klynt-hooks",
  "klynt-protocol",
  "klynt-sandbox",
@@ -8010,6 +8013,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "klynt-git-utils"
+version = "0.1.1"
+dependencies = [
+ "common",
+ "once_cell",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "walkdir",
+]
+
+[[package]]
 name = "klynt-hooks"
 version = "0.0.1"
 dependencies = [
@@ -8029,6 +8047,14 @@ dependencies = [
  "toml 0.8.2",
  "tracing",
  "walkdir",
+]
+
+[[package]]
+name = "klynt-process-hardening"
+version = "0.1.1"
+dependencies = [
+ "libc",
+ "pretty_assertions",
 ]
 
 [[package]]
@@ -8088,6 +8114,15 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "walkdir",
+]
+
+[[package]]
+name = "klynt-truncation"
+version = "0.1.1"
+dependencies = [
+ "pretty_assertions",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -11457,6 +11492,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pretty_assertions"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae130e2f271fbc2ac3a40fb1d07180839cdbbe443c7a27e1e3c13c5cac0116d"
+dependencies = [
+ "diff",
+ "yansi",
+]
+
+[[package]]
 name = "prettyplease"
 version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14319,6 +14364,7 @@ dependencies = [
  "dashmap",
  "futures-util",
  "jiff",
+ "klynt-git-utils",
  "lance",
  "lance-io",
  "lancedb",
@@ -18233,6 +18279,12 @@ name = "y4m"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a5a4b21e1a62b67a2970e6831bc091d7b87e119e7f9791aef9702e3bef04448"
+
+[[package]]
+name = "yansi"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
 
 [[package]]
 name = "yoke"

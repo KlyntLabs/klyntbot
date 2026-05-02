@@ -15,6 +15,24 @@ pub trait SnapshotService: Send + Sync {
         existed: bool,
     ) -> Result<i64>;
 
+    async fn record_ghost(
+        &self,
+        session_key: &str,
+        message_id: Option<&str>,
+        ghost_commit_sha: &str,
+        ghost_repo_root: &str,
+        ghost_preexisting_untracked_json: Option<&str>,
+    ) -> Result<i64>;
+
+    async fn try_record_with_ghost(
+        &self,
+        session_key: &str,
+        message_id: Option<&str>,
+        file_path: &str,
+        content: &[u8],
+        existed: bool,
+    ) -> Result<i64>;
+
     async fn get(&self, id: i64) -> Result<Option<Snapshot>>;
 
     async fn list_for_session(&self, session_key: &str) -> Result<Vec<Snapshot>>;
@@ -37,6 +55,36 @@ impl SnapshotService for SnapshotRepo {
         existed: bool,
     ) -> Result<i64> {
         self.record(session_key, message_id, file_path, content, existed)
+            .await
+    }
+
+    async fn record_ghost(
+        &self,
+        session_key: &str,
+        message_id: Option<&str>,
+        ghost_commit_sha: &str,
+        ghost_repo_root: &str,
+        ghost_preexisting_untracked_json: Option<&str>,
+    ) -> Result<i64> {
+        self.record_ghost(
+            session_key,
+            message_id,
+            ghost_commit_sha,
+            ghost_repo_root,
+            ghost_preexisting_untracked_json,
+        )
+        .await
+    }
+
+    async fn try_record_with_ghost(
+        &self,
+        session_key: &str,
+        message_id: Option<&str>,
+        file_path: &str,
+        content: &[u8],
+        existed: bool,
+    ) -> Result<i64> {
+        self.try_record_with_ghost(session_key, message_id, file_path, content, existed)
             .await
     }
 
