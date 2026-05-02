@@ -2,6 +2,7 @@
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { TooltipProvider } from "@/tracing/components/ui/tooltip";
 import { SessionsExplorer } from "@/tracing/features/sessions-explorer/sessions-explorer";
 import { StatisticsView } from "@/tracing/features/statistics/statistics-view";
 import { WireViewer } from "@/tracing/features/wire-viewer/wire-viewer";
@@ -390,7 +391,8 @@ export function TracingApp() {
   }, [showShortcutHelp]);
 
   return (
-    <div className="tracing-root flex h-full flex-col">
+    <TooltipProvider>
+    <div className="tracing-root flex h-full min-h-0 flex-1 flex-col">
       {/* Header */}
       <header className="flex items-center justify-between border-b px-4 py-3">
         <h1
@@ -489,7 +491,7 @@ export function TracingApp() {
           )}
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden">
             {activeTab === "wire" && (
               <WireViewer
                 sessionId={sessionId}
@@ -622,5 +624,6 @@ export function TracingApp() {
         </div>
       )}
     </div>
+    </TooltipProvider>
   );
 }

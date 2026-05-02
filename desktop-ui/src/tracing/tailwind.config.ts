@@ -3,9 +3,10 @@
 
 import type { Config } from "tailwindcss";
 
+// Note: in Tailwind v4 the `darkMode` config field is ignored; the dark
+// variant is declared via `@custom-variant dark (...)` in tracing.css.
 const config: Config = {
   content: ["./src/tracing/**/*.{ts,tsx,css}"],
-  darkMode: "class",
   theme: { extend: {} },
 };
 

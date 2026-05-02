@@ -452,7 +452,7 @@ export function WireViewer({ sessionId, refreshKey = 0, onNavigateToContext, scr
           setTimeout(() => scrollToEventIndex(idx), 100);
         }} />
       ) : (
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Turn/Step navigation sidebar */}
           <TurnTree
             events={events}
@@ -463,8 +463,8 @@ export function WireViewer({ sessionId, refreshKey = 0, onNavigateToContext, scr
           />
 
           {/* Main content area */}
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex-1 overflow-hidden">
+          <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
               <Virtuoso
                 ref={virtuosoRef}
                 data={filtered}

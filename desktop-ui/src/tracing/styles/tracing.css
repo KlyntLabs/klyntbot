@@ -5,6 +5,11 @@
 @import "@fontsource-variable/inter";
 @import "./theme-bridge.css";
 
+/* Bridge Tailwind's `dark:` variant to klyntbot's data-theme attribute.
+ * Klyntbot writes data-theme="dark" / "dim" / "light" on <html>; the `dark`
+ * class is never set. Treat both "dark" and "dim" as dark variants. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="dim"], [data-theme="dim"] *));
+
 @theme inline {
   --color-background: var(--color-background);
   --color-foreground: var(--color-foreground);
@@ -31,5 +36,8 @@
 .tracing-root {
   background: var(--color-background);
   color: var(--color-foreground);
-  min-height: 100%;
+  /* Height is controlled by Tailwind utilities (h-full / flex-1 / min-h-0)
+   * applied in TSX. Setting min-height: 100% here overrides min-h-0 and
+   * breaks the flex-shrink chain for scrolling children. */
+  min-height: 0;
 }
