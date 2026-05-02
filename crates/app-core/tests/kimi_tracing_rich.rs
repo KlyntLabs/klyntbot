@@ -26,7 +26,10 @@ async fn rich_fixture_loads_and_aggregates() {
     assert!(summary.error_count >= 1);
     assert_eq!(summary.subagent_count, 2);
 
-    let detail = provider.load_session("sess-fixture-rich", app_core::tracing::Scope::Main).await.unwrap();
+    let detail = provider
+        .load_session("sess-fixture-rich", app_core::tracing::Scope::Main)
+        .await
+        .unwrap();
     assert!(detail.events.len() >= 100);
 
     let subs = provider.list_subagents("sess-fixture-rich").await.unwrap();

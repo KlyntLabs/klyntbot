@@ -7,10 +7,10 @@
 //! - Cancellation handling
 //! - Non-TTY fallback behavior
 
+use common::Result as KResult;
 use klynt_core::tools::ask_user::AskUserTool;
 use klyntbot::tools::{InteractionBundle, RoutingContext, Tool};
 use klyntbot::{Answer, AnswerValue, FormResponse};
-use common::Result as KResult;
 use serde_json::json;
 use tokio::sync::mpsc;
 

@@ -22,7 +22,14 @@ async fn bash_happy_path() {
     let bus = Arc::new(DomainEventBus::new(256));
     let (tx, mut rx) = mpsc::channel(256);
 
-    let tool = BashTool::new(layer1, policy, privacy, pending, bus, common::tool_channel::NonUiPolicy::Allow);
+    let tool = BashTool::new(
+        layer1,
+        policy,
+        privacy,
+        pending,
+        bus,
+        common::tool_channel::NonUiPolicy::Allow,
+    );
     let mut routing_ctx = tools_core::RoutingContext::new(
         ::common::ChannelName::new("coding"),
         ::common::ChatId::new("test"),

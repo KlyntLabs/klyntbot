@@ -1,17 +1,17 @@
 use bus::DomainEventBus;
-use config::schema::CodingPermissions;
 use common::tool_channel::{Channel, NonUiPolicy};
+use config::schema::CodingPermissions;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::{
     edit::{run_for_test as edit_run, EditArgs},
     grep::GrepTool,
 };
-use tools_core::events::ToolEvent;
 use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use tools_core::events::ToolEvent;
 use tools_core::{RoutingContext, Tool};
 
 #[tokio::test]

@@ -1,14 +1,14 @@
 #![cfg(target_os = "macos")]
 use bus::DomainEventBus;
-use config::schema::CodingPermissions;
 use common::tool_channel::NonUiPolicy;
+use config::schema::CodingPermissions;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::bash::{BashArgs, BashTool};
-use tools_core::events::ToolEvent;
 use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use tools_core::events::ToolEvent;
 use tools_core::ToolExecute;
 
 #[tokio::test]

@@ -86,7 +86,9 @@ pub async fn tracing_load_subagent_session(
     session_id: String,
     agent_id: String,
 ) -> app_core::tracing::types::SessionDetail {
-    state.tracing_load_subagent_session(provider_id, session_id, agent_id).await
+    state
+        .tracing_load_subagent_session(provider_id, session_id, agent_id)
+        .await
 }
 
 #[klynt_command]
@@ -95,5 +97,7 @@ pub async fn tracing_load_subagent_context(
     session_id: String,
     agent_id: String,
 ) -> Vec<app_core::tracing::types::ContextMessage> {
-    state.tracing_load_subagent_context(provider_id, session_id, agent_id).await
+    state
+        .tracing_load_subagent_context(provider_id, session_id, agent_id)
+        .await
 }

@@ -173,9 +173,15 @@ impl TracingProvider for KimiTracingProvider {
 
                 work_dir_hash: d.hash.clone().unwrap_or_default(),
                 has_state: tokio::fs::try_exists(&state_path).await.unwrap_or(false),
-                wire_size: tokio::fs::metadata(&wire).await.map(|m| m.len()).unwrap_or(0),
+                wire_size: tokio::fs::metadata(&wire)
+                    .await
+                    .map(|m| m.len())
+                    .unwrap_or(0),
                 context_size,
-                state_size: tokio::fs::metadata(&state_path).await.map(|m| m.len()).unwrap_or(0),
+                state_size: tokio::fs::metadata(&state_path)
+                    .await
+                    .map(|m| m.len())
+                    .unwrap_or(0),
                 total_size: size_bytes,
                 metadata: None,
             };
@@ -252,8 +258,13 @@ impl TracingProvider for KimiTracingProvider {
         session_id: &str,
         agent_id: &str,
     ) -> Result<SessionDetail> {
-        self.load_session(session_id, Scope::Subagent { agent_id: agent_id.to_string() })
-            .await
+        self.load_session(
+            session_id,
+            Scope::Subagent {
+                agent_id: agent_id.to_string(),
+            },
+        )
+        .await
     }
 
     async fn load_subagent_context(
@@ -261,8 +272,13 @@ impl TracingProvider for KimiTracingProvider {
         session_id: &str,
         agent_id: &str,
     ) -> Result<Vec<ContextMessage>> {
-        self.load_context(session_id, Scope::Subagent { agent_id: agent_id.to_string() })
-            .await
+        self.load_context(
+            session_id,
+            Scope::Subagent {
+                agent_id: agent_id.to_string(),
+            },
+        )
+        .await
     }
 }
 

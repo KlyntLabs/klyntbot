@@ -27,11 +27,19 @@ pub(crate) async fn dispatch_dev(
     Some(match cmd {
         "coding_sessions_star" => {
             let session_key = try_field!(dev::get_str(body, "sessionKey"));
-            dev::val(core.coding_sessions_star(&session_key).await.map_err(desktop_shared::errors::ApiError::from))
+            dev::val(
+                core.coding_sessions_star(&session_key)
+                    .await
+                    .map_err(desktop_shared::errors::ApiError::from),
+            )
         }
         "coding_sessions_unstar" => {
             let session_key = try_field!(dev::get_str(body, "sessionKey"));
-            dev::val(core.coding_sessions_unstar(&session_key).await.map_err(desktop_shared::errors::ApiError::from))
+            dev::val(
+                core.coding_sessions_unstar(&session_key)
+                    .await
+                    .map_err(desktop_shared::errors::ApiError::from),
+            )
         }
         _ => return None,
     })

@@ -42,8 +42,14 @@ pub async fn compute(session_dir: &Path) -> Result<SessionSummary> {
     };
 
     let metadata = SessionMetadataInfo {
-        session_id: session_dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
-        title: session_dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
+        session_id: session_dir
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default(),
+        title: session_dir
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default(),
         title_generated: false,
         archived: false,
         archived_at: None,
@@ -57,7 +63,10 @@ pub async fn compute(session_dir: &Path) -> Result<SessionSummary> {
     };
 
     Ok(SessionSummary {
-        session_id: session_dir.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
+        session_id: session_dir
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default(),
         provider_id: "kimi".into(),
         source_dir: session_dir.to_path_buf(),
         cwd: None,
