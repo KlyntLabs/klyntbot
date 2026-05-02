@@ -7964,6 +7964,7 @@ dependencies = [
  "dirs",
  "globset",
  "html2text",
+ "jiff",
  "klynt-execpolicy",
  "klynt-hooks",
  "klynt-protocol",

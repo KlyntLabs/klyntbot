@@ -14,7 +14,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::mirror::{
     sources::{
-        ApprovalHistorySource, ConfigArchiverSource, FinanceSpendingDriftSource,
+        ApprovalHistorySource, ConfigArchiverSource, CostCeilingSource, FinanceSpendingDriftSource,
         MetaRuleSignalSource, RoutingSignalSource, TaskFocusPatternSource, TrialPreviewSource,
     },
     AutotunerBridge, MirrorFacade, MirrorRepo, NarrativeHandler,
@@ -82,6 +82,9 @@ impl MirrorEngine {
             let approval_history = Arc::new(ApprovalHistorySource::new(Arc::try_unwrap(ah_repo).unwrap_or_else(|arc| (*arc).clone())));
             register!(approval_history);
         }
+
+        let cost_ceiling = Arc::new(CostCeilingSource::new(Arc::new(repo.clone())));
+        register!(cost_ceiling);
 
         // Build the facade (unchanged API; drop the now-unused domain_event_bus).
         let mut facade = MirrorFacade::new(repo);

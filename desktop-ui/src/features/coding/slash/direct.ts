@@ -33,6 +33,14 @@ function buildParams(cmd: string, args: string[], sessionKey: string): Record<st
     case "sessions star":
     case "sessions unstar":
       return { sessionKey };
+    case "sessions rewind":
+      return { sessionKey, messageId: args[0] ?? "" };
+    case "sessions export":
+      return { sessionKey, format: args[0] ?? "md" };
+    case "sessions fork":
+      return { sessionKey, upToMessage: args[0] ?? null };
+    case "permissions clear-mirror":
+      return { tool: args[0] ?? "", repoId: null };
     default:
       return {};
   }

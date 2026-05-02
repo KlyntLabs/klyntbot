@@ -1839,6 +1839,11 @@ impl AppCore {
                 hook_engine: hook_engine.clone(),
                 snapshot_repo: core.snapshot_repo.clone(),
                 session_key: String::new(),
+                history_repo: core.coding_approval_history_repo.clone(),
+                mirror_learning_enabled: config_guard.coding.permissions.mirror_learning,
+                mirror_min_approvals: config_guard.coding.permissions.mirror_min_approvals,
+                mirror_cooldown_seconds: (config_guard.coding.permissions.mirror_cooldown_hours as i64) * 3600,
+                repo_id: String::new(),
             };
             {
                 let reg = core.agent.tool_registry();

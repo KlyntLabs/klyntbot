@@ -24,11 +24,17 @@ pub struct ToolSearchArgs {
     tags = "tools,coding",
     concurrency_safe = "true"
 )]
-pub struct ToolSearchTool;
+pub struct ToolSearchTool {
+    pub effectiveness_scores: Option<std::collections::HashMap<String, f32>>,
+}
 
 impl ToolSearchTool {
     pub fn new() -> Self {
-        Self
+        Self { effectiveness_scores: None }
+    }
+
+    pub fn with_effectiveness(scores: std::collections::HashMap<String, f32>) -> Self {
+        Self { effectiveness_scores: Some(scores) }
     }
 
     fn curated_meta() -> Vec<super::ToolMeta> {
@@ -75,7 +81,11 @@ impl ToolExecute for ToolSearchTool {
             let query = args.query.as_deref().unwrap_or("");
             let top_n = args.max_results.unwrap_or(10) as usize;
             let meta = Self::curated_meta();
-            let hits = super::ToolIndex::build(&meta).search(query, top_n);
+            let index = super::ToolIndex::build(&meta);
+            let hits = match &self.effectiveness_scores {
+                Some(scores) => index.search_with_effectiveness(query, top_n, scores),
+                None => index.search(query, top_n),
+            };
             Ok(serde_json::to_string(&hits).map_err(|e| ToolError::ExecutionFailed(e.to_string()))?)
         }).await;
         fire_post_tool_use(

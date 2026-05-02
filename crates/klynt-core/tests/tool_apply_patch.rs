@@ -42,6 +42,12 @@ async fn applies_unified_diff() {
         None,
         "".to_string(),
         None,
+        None,
+        false,
+        5,
+        86400,
+        "".to_string(),
+        None,
     )
     .await
     .unwrap();
@@ -81,6 +87,12 @@ async fn rejects_malformed_patch() {
         Channel::Coding,
         NonUiPolicy::Allow,
         None,
+        "".to_string(),
+        None,
+        None,
+        false,
+        5,
+        86400,
         "".to_string(),
         None,
     )

@@ -3,6 +3,7 @@
 pub mod activator;
 pub mod frontmatter;
 pub mod replay;
+pub mod url;
 
 mod discovery;
 mod dynamic;
@@ -12,3 +13,4 @@ pub use activator::{ActivationConfig, SkillActivator};
 pub use discovery::sanitize_repo_id;
 pub use frontmatter::{KlyntFrontmatter, Reference, ReferenceLoadMode};
 pub use index::{DiscoveryRoots, IndexedSkill, SkillIndex, SkillSource};
+pub use url::load_from_url;

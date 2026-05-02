@@ -132,7 +132,7 @@ impl AppCore {
             KlyntbotError::Config(ConfigError::Invalid(format!("create skills dir: {e}")))
         })?;
         let installed_name = if source.starts_with("http://") || source.starts_with("https://") {
-            install_from_url(&source, &target_dir).await?
+            klynt_skill_loader::load_from_url(&source, &target_dir).await?
         } else {
             install_from_local_path(&PathBuf::from(&source), &target_dir)?
         };
@@ -309,17 +309,3 @@ fn fs_copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-async fn install_from_url(url: &str, target_dir: &std::path::Path) -> Result<String> {
-    let temp = tempfile::tempdir()
-        .map_err(|e| KlyntbotError::Config(ConfigError::Invalid(format!("tempdir: {e}"))))?;
-    let status = std::process::Command::new("git")
-        .args(["clone", "--depth", "1", url, temp.path().to_str().unwrap()])
-        .status()
-        .map_err(|e| KlyntbotError::Config(ConfigError::Invalid(format!("git clone: {e}"))))?;
-    if !status.success() {
-        return Err(KlyntbotError::Config(ConfigError::Invalid(format!(
-            "git clone failed: {url}"
-        ))));
-    }
-    install_from_local_path(temp.path(), target_dir)
-}

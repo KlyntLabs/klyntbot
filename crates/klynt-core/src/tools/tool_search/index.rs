@@ -18,6 +18,15 @@ impl ToolIndex {
     pub fn build(meta: &[ToolMeta]) -> Self { Self { meta: meta.to_vec() } }
 
     pub fn search(&self, query: &str, top_n: usize) -> Vec<SearchHit> {
+        self.search_with_effectiveness(query, top_n, &std::collections::HashMap::new())
+    }
+
+    pub fn search_with_effectiveness(
+        &self,
+        query: &str,
+        top_n: usize,
+        effectiveness: &std::collections::HashMap<String, f32>,
+    ) -> Vec<SearchHit> {
         let q = query.trim().to_lowercase();
         let mut hits: Vec<SearchHit> = self.meta.iter().map(|m| {
             let mut score = 0.0_f32;
@@ -27,6 +36,10 @@ impl ToolIndex {
                 if m.aliases.iter().any(|a| a.to_lowercase().contains(&q)) { score += 1.5; }
             } else {
                 score = 1.0;
+            }
+            // Mirror effectiveness reranker: boost by per-skill effectiveness score
+            if let Some(eff) = effectiveness.get(&m.name) {
+                score *= 1.0 + eff.min(1.0);
             }
             SearchHit { name: m.name.clone(), score, description: m.description.clone() }
         }).filter(|h| h.score > 0.0).collect();

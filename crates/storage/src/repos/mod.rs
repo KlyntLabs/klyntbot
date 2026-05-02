@@ -164,6 +164,7 @@ pub struct Repos {
     pub skill_version: SkillVersionRepo,
     pub notification_log: NotificationLogRepo,
     pub held_notifications: HeldNotificationsRepo,
+    pub coding_approval_history: CodingApprovalHistoryRepo,
 }
 
 impl Repos {
@@ -202,6 +203,7 @@ impl Repos {
             skill_version: SkillVersionRepo::new(db.clone()),
             notification_log: NotificationLogRepo::new(db.clone()),
             held_notifications: HeldNotificationsRepo::new(db.clone()),
+            coding_approval_history: CodingApprovalHistoryRepo::new(pool.clone()),
             pool: db,
         }
     }

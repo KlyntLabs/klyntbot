@@ -23,7 +23,7 @@ impl ApprovalHistorySummary {
     pub fn poisoned(&self) -> bool { self.denial_count > 0 }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CodingApprovalHistoryRepo { pool: StoragePool }
 
 impl CodingApprovalHistoryRepo {

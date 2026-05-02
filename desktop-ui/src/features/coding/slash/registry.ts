@@ -201,7 +201,7 @@ export const REGISTRY: Record<string, SlashNode> = {
         kind: "leaf",
         path: "direct",
         tauriCommand: "coding_permissions_clear_mirror",
-        command: "/permissions clear-mirror",
+        command: "permissions clear-mirror",
         description: "Reset Mirror-learned approval cache for a tool",
         argHint: "<tool>",
         category: "permissions",

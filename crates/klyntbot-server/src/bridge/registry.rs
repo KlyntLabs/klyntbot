@@ -114,6 +114,8 @@ impl ToolRegistryBridge {
             event_tx: None,
             hook_engine: None,
             session_key: None,
+            message_id: None,
+            repo_id: String::new(),
         };
 
         // Acquire read lock, prepare (validate + clone Arc<dyn Tool>), then drop lock

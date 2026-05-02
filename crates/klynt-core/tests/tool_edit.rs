@@ -42,6 +42,12 @@ async fn edits_unique_match() {
         None,
         "".to_string(),
         None,
+        None,
+        false,
+        5,
+        86400,
+        "".to_string(),
+        None,
     )
     .await
     .unwrap();
@@ -84,6 +90,12 @@ async fn rejects_multiple_matches() {
         None,
         "".to_string(),
         None,
+        None,
+        false,
+        5,
+        86400,
+        "".to_string(),
+        None,
     )
     .await;
     assert!(r.is_err());
@@ -124,6 +136,12 @@ async fn rejects_missing_old_text() {
         Channel::Coding,
         NonUiPolicy::Allow,
         None,
+        "".to_string(),
+        None,
+        None,
+        false,
+        5,
+        86400,
         "".to_string(),
         None,
     )
