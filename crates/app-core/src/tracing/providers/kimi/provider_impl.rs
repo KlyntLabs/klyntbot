@@ -8,7 +8,7 @@ use crate::tracing::provider::TracingProvider;
 use crate::tracing::providers::kimi::{
     cache::SessionCache, context_loader::load_context, discovery::discover_sessions,
     import::import_from_file, loader::load_session_events, state_loader::load_state,
-    stats::aggregate, subagent_loader::list_subagents,
+    stats::aggregate, subagent_loader::list_subagents, summary,
 };
 use crate::tracing::types::*;
 use jiff::Timestamp;
@@ -240,6 +240,29 @@ impl TracingProvider for KimiTracingProvider {
     async fn stats(&self) -> Result<StatsBundle> {
         let sessions = self.list_sessions().await?;
         aggregate(&sessions).await
+    }
+
+    async fn session_summary(&self, session_id: &str) -> Result<SessionSummary> {
+        let dir = self.resolve_session_dir(session_id).await?;
+        summary::compute(&dir).await
+    }
+
+    async fn load_subagent_session(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+    ) -> Result<SessionDetail> {
+        self.load_session(session_id, Scope::Subagent { agent_id: agent_id.to_string() })
+            .await
+    }
+
+    async fn load_subagent_context(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+    ) -> Result<Vec<ContextMessage>> {
+        self.load_context(session_id, Scope::Subagent { agent_id: agent_id.to_string() })
+            .await
     }
 }
 
