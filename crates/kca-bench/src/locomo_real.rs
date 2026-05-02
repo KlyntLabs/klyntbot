@@ -288,6 +288,29 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
             ctx.await_cognitive_idle().await;
         }
 
+        // Phase 3 (KCA_PHASE_3=1): fire graph consolidation between
+        // batch ingest and QA so entity edges, supersedes, and merges
+        // are in place before retrieval runs. Mirrors what nightly
+        // Reforge does in production but on demand here so bench
+        // measures the same memory state a real user would see after
+        // a few days.
+        let phase_3_on = matches!(
+            std::env::var("KCA_PHASE_3").ok().as_deref(),
+            Some("1") | Some("true") | Some("yes")
+        );
+        let mut reorganize_fired = false;
+        if phase_3_on {
+            match ctx.consolidate_graph().await {
+                Ok(n) => {
+                    tracing::info!(facts_processed = n, "phase-3 consolidation done");
+                    reorganize_fired = true;
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "phase-3 consolidation failed");
+                }
+            }
+        }
+
         let qa_take = qa_limit.unwrap_or(conv.qa.len());
         for (qa_index, qa) in conv.qa.iter().enumerate().take(qa_take) {
             // Skip category 5 (adversarial) — Letta excludes them from scoring.
@@ -352,7 +375,7 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
                 episodic_hits: hits.episodic_hits,
                 top_subjects: Vec::new(),
                 top_predicates: Vec::new(),
-                reorganize_fired: false,
+                reorganize_fired,
                 retry_fired: false,
                 predicted_was_refusal: detect_refusal(&predicted),
                 qa_latency_ms: elapsed,

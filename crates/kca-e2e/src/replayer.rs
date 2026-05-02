@@ -200,6 +200,13 @@ impl ReplayContext {
         }
         Ok(answer)
     }
+
+    /// Phase 3 hook: trigger graph consolidation between ingest and QA.
+    /// Bench callers fire this after `await_cognitive_idle()` and
+    /// before the QA loop begins, gated on `KCA_PHASE_3=1`.
+    pub async fn consolidate_graph(&self) -> common::Result<u32> {
+        self.app.trigger_graph_consolidation().await
+    }
 }
 
 #[derive(Debug, Default, Clone)]
