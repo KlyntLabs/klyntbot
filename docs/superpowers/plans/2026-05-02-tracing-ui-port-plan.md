@@ -2329,27 +2329,13 @@ git add -A desktop-ui/src/features/plugins/coding-memory/tracing/
 git commit -m "chore(tracing): remove legacy tracing folder"
 ```
 
-### Task 15.2: Delete legacy `WireViewer.tsx` + `TurnTree.tsx`
+### Task 15.2: Delete legacy `WireViewer.tsx` + `TurnTree.tsx` (AMENDED)
 
-- [ ] **Step 1: Verify no consumers**
-
-Run: `grep -r "coding-memory/WireViewer\|coding-memory/TurnTree" desktop-ui/src/`
-Expected: 0 matches.
-
-- [ ] **Step 2: Delete**
-
-```bash
-rm desktop-ui/src/features/plugins/coding-memory/WireViewer.tsx
-rm desktop-ui/src/features/plugins/coding-memory/TurnTree.tsx
-```
-
-- [ ] **Step 3: Typecheck + commit**
-
-```bash
-cd desktop-ui && bun run typecheck
-git add -A desktop-ui/src/features/plugins/coding-memory/
-git commit -m "chore(tracing): remove legacy WireViewer and TurnTree"
-```
+> **Amendment:** The root-level `WireViewer.tsx` and `TurnTree.tsx` in `coding-memory/` are **not** legacy tracing files — they belong to the Coding Memory plugin's "Sessions" tab (a separate feature consuming `listCodingSessions`). The legacy tracing UI lived entirely inside `coding-memory/tracing/` (deleted in Task 15.1). Deleting the root-level files would break the Coding Memory Sessions tab.
+>
+> Therefore, **Task 15.2 is skipped**. The Coding Memory plugin keeps its Sessions and Reforge tabs during cutover; only the Tracing tab is replaced by `<TracingApp />`.
+>
+> If a future refactor merges the Coding Memory Sessions view into TracingApp, that work belongs to a separate feature spec.
 
 ### Task 15.3: Drop `tracing.css` from the global stylesheet
 
