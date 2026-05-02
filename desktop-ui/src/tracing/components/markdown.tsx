@@ -146,7 +146,7 @@ const markdownComponents: StreamdownProps["components"] = {
   pre: MarkdownPre,
 };
 
-/** Markdown renderer using streamdown, matching the web's approach */
+/** Markdown renderer using streamdown, matching the web approach */
 export const Markdown = memo(
   ({ className, children, ...props }: Omit<StreamdownProps, "components" | "rehypePlugins">) => (
     <Streamdown
