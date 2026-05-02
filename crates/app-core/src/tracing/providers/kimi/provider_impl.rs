@@ -170,6 +170,14 @@ impl TracingProvider for KimiTracingProvider {
                 has_wire: true,
                 has_context,
                 imported: d.imported,
+
+                work_dir_hash: d.hash.clone().unwrap_or_default(),
+                has_state: tokio::fs::try_exists(&state_path).await.unwrap_or(false),
+                wire_size: tokio::fs::metadata(&wire).await.map(|m| m.len()).unwrap_or(0),
+                context_size,
+                state_size: tokio::fs::metadata(&state_path).await.map(|m| m.len()).unwrap_or(0),
+                total_size: size_bytes,
+                metadata: None,
             };
             self.cache.put(wire, mtime, summary.clone()).await;
             out.push(summary);

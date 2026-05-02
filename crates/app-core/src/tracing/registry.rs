@@ -87,6 +87,15 @@ mod tests {
         async fn stats(&self) -> Result<StatsBundle> {
             Ok(StatsBundle::default())
         }
+        async fn session_summary(&self, _: &str) -> Result<SessionSummary> {
+            unimplemented!()
+        }
+        async fn load_subagent_session(&self, _: &str, _: &str) -> Result<SessionDetail> {
+            unimplemented!()
+        }
+        async fn load_subagent_context(&self, _: &str, _: &str) -> Result<Vec<ContextMessage>> {
+            Ok(vec![])
+        }
     }
 
     #[tokio::test]

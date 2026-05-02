@@ -23,4 +23,21 @@ pub trait TracingProvider: Send + Sync {
     async fn import_from_file(&self, path: &Path) -> Result<String>;
     async fn open_dir(&self, session_id: &str) -> Result<PathBuf>;
     async fn stats(&self) -> Result<StatsBundle>;
+
+    /// Per-session aggregate summary (deeper than `list_sessions` row).
+    async fn session_summary(&self, session_id: &str) -> Result<SessionSummary>;
+
+    /// Wire events for a single subagent within a session.
+    async fn load_subagent_session(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+    ) -> Result<SessionDetail>;
+
+    /// Context messages for a single subagent within a session.
+    async fn load_subagent_context(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+    ) -> Result<Vec<ContextMessage>>;
 }
