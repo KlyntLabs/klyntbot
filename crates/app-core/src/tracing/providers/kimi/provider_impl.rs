@@ -54,6 +54,23 @@ impl KimiTracingProvider {
     }
 
     async fn resolve_session_dir(&self, session_id: &str) -> Result<PathBuf> {
+        // Accept either bare UUID or "<hash>/<uuid>" composite form.
+        // The UI composes the latter from list_sessions output; legacy
+        // callers may pass the bare UUID. Both must resolve.
+        if let Some((hash, uuid)) = session_id.split_once('/') {
+            let direct = self.kimi_root.join(hash).join(uuid);
+            if direct.is_dir() {
+                return Ok(direct);
+            }
+            let imp = self.imported_root.join(uuid);
+            if imp.is_dir() {
+                return Ok(imp);
+            }
+            return Err(common::KlyntbotError::StorageNotFound(format!(
+                "session {session_id}"
+            )));
+        }
+
         // Native session: <kimi_root>/<hash>/<session_id>/
         let mut entries = match tokio::fs::read_dir(&self.kimi_root).await {
             Ok(d) => d,
