@@ -245,6 +245,7 @@ impl SignalConsumer for IngestionConsumer {
                 let handler = handler.clone();
                 let obs = observation.clone();
                 let fact_repo = self.fact_repo.clone();
+                let entity_repo = self.entity_repo.clone();
                 tokio::spawn(async move {
                     // Look up persisted user-name BEFORE extraction so we can
                     // both (a) prepend identity context to the prompt and
@@ -302,8 +303,65 @@ impl SignalConsumer for IngestionConsumer {
                             tracing::info!(
                                 n_extractions = result.extractions.len(),
                                 n_facts,
+                                n_entities = result.entities.len(),
+                                n_relationships = result.relationships.len(),
                                 "ingestion: LLM extraction completed"
                             );
+
+                            // Persist entities + relationships discovered by
+                            // the LLM. Without this loop, `BatchExtractionResult.entities`
+                            // is computed and dropped — the entities table
+                            // only ever sees the single `signal.entity` set
+                            // upstream, which means graph_path_boost,
+                            // entity-aware FTS expansion, and PPR
+                            // retrieval all see a near-empty graph
+                            // regardless of what the extractor found.
+                            for ent in &result.entities {
+                                if let Err(e) = entity_repo
+                                    .upsert_entity(&crate::repos::NewEntity {
+                                        name: ent.name.clone(),
+                                        entity_type: ent.entity_type.clone(),
+                                        description: ent.description.clone(),
+                                        source: "extraction".to_string(),
+                                        source_id: None,
+                                        metadata: None,
+                                    })
+                                    .await
+                                {
+                                    tracing::warn!(error = %e, name = %ent.name, "entity upsert failed");
+                                }
+                            }
+                            for rel in &result.relationships {
+                                let src = entity_repo
+                                    .find_by_name(&rel.source_name)
+                                    .await
+                                    .ok()
+                                    .and_then(|rows| rows.into_iter().next());
+                                let tgt = entity_repo
+                                    .find_by_name(&rel.target_name)
+                                    .await
+                                    .ok()
+                                    .and_then(|rows| rows.into_iter().next());
+                                if let (Some(s), Some(t)) = (src, tgt) {
+                                    if let Err(e) = entity_repo
+                                        .upsert_relationship(&crate::repos::NewRelationship {
+                                            source_entity_id: s.id.clone(),
+                                            target_entity_id: t.id.clone(),
+                                            relationship_type: rel.relationship_type.clone(),
+                                            evidence: None,
+                                            source: "extraction".to_string(),
+                                        })
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            error = %e,
+                                            source = %rel.source_name,
+                                            target = %rel.target_name,
+                                            "relationship upsert failed"
+                                        );
+                                    }
+                                }
+                            }
                             // Persist extracted facts. Without this, the
                             // extraction work is wasted — facts only
                             // exist in memory and never reach the FTS5
@@ -353,6 +411,29 @@ impl SignalConsumer for IngestionConsumer {
                                                         "mirrored fact upsert failed"
                                                     ),
                                                 }
+                                            }
+                                        } else if fact.predicate != "name"
+                                            && user_name
+                                                .as_ref()
+                                                .is_some_and(|n| n == &fact.subject)
+                                        {
+                                            // Reverse mirror: when the LLM
+                                            // emits a third-person fact about
+                                            // the named user (e.g. user said
+                                            // "I'm Alice" once, then later
+                                            // "Alice loves hiking"), also
+                                            // write the `subject="user"`
+                                            // copy so first-person queries
+                                            // ("what do I love") still hit.
+                                            let mut mirrored = fact.clone();
+                                            mirrored.subject = "user".to_string();
+                                            mirrored.id = uuid::Uuid::new_v4().to_string();
+                                            match repo.upsert(&mirrored).await {
+                                                Ok(()) => written += 1,
+                                                Err(e) => tracing::warn!(
+                                                    error = %e,
+                                                    "reverse-mirrored fact upsert failed"
+                                                ),
                                             }
                                         }
                                     }
