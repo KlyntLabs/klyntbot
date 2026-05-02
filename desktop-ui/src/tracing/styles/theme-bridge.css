@@ -1,26 +1,39 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md. */
 
+/* Bridge shadcn/Tailwind --color-* tokens to klyntbot's real DS tokens
+ * (defined in styles/themes.{dark,dim,light}.css and styles/ds-tokens.css).
+ *
+ * Background stays transparent so the tracing pane inherits whatever surface
+ * the host page paints (--surface-messages inside .main, etc.). */
 .tracing-root {
-  --color-background: var(--ds-bg);
-  --color-foreground: var(--ds-fg);
-  --color-card: var(--ds-surface);
-  --color-card-foreground: var(--ds-fg);
-  --color-popover: var(--ds-surface, var(--ds-surface));
-  --color-popover-foreground: var(--ds-fg);
-  --color-primary: var(--ds-accent);
-  --color-primary-foreground: var(--ds-bg);
-  --color-secondary: var(--ds-bg-elevated, var(--ds-surface));
-  --color-secondary-foreground: var(--ds-fg);
-  --color-muted: var(--ds-bg-muted, var(--ds-surface));
-  --color-muted-foreground: var(--ds-fg-muted, var(--ds-fg));
-  --color-accent: var(--ds-accent);
-  --color-accent-foreground: var(--ds-bg);
-  --color-destructive: var(--ds-error, #ef4444);
-  --color-destructive-foreground: #fff;
-  --color-border: var(--ds-border);
-  --color-input: var(--ds-border);
-  --color-ring: var(--ds-accent);
+  --color-background: transparent;
+  --color-foreground: var(--text-primary);
+
+  --color-card: var(--surface-card);
+  --color-card-foreground: var(--text-primary);
+
+  --color-popover: var(--surface-popover);
+  --color-popover-foreground: var(--text-primary);
+
+  --color-primary: var(--text-accent-cyan);
+  --color-primary-foreground: var(--surface-messages);
+
+  --color-secondary: var(--surface-card-muted);
+  --color-secondary-foreground: var(--text-primary);
+
+  --color-muted: var(--surface-card-muted);
+  --color-muted-foreground: var(--text-muted);
+
+  --color-accent: var(--surface-control-hover);
+  --color-accent-foreground: var(--text-primary);
+
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
+  --color-border: var(--border-subtle);
+  --color-input: var(--border-subtle);
+  --color-ring: var(--border-accent);
 
   --radius: 6px;
   font-family: "Inter Variable", system-ui, sans-serif;

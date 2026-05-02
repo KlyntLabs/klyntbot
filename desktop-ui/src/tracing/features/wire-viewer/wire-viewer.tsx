@@ -468,6 +468,7 @@ export function WireViewer({ sessionId, refreshKey = 0, onNavigateToContext, scr
               <Virtuoso
                 ref={virtuosoRef}
                 data={filtered}
+                computeItemKey={(_, event) => event.index}
                 rangeChanged={(range) => {
                   if (filtered.length > 0) {
                     const startIdx = filtered[range.startIndex]?.index ?? 0;
