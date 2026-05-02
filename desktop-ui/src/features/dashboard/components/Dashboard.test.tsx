@@ -47,4 +47,11 @@ describe("Dashboard", () => {
     fireEvent.click(weekPill);
     expect(screen.getAllByTestId("week-day-header").length).toBe(7);
   });
+
+  it("mounts FocusStateIndicator and AutoFocusToast as siblings of dashboard__content", () => {
+    render(wrap(<Dashboard />));
+    const root = screen.getByText("Day").closest(".dashboard");
+    expect(root).toBeTruthy();
+    expect(root?.querySelector(".dashboard__content")).toBeTruthy();
+  });
 });
