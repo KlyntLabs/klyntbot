@@ -49,6 +49,13 @@ async fn writes_file_and_emits_event() {
         NonUiPolicy::Allow,
         None,
         "".to_string(),
+        None,
+        None,
+        false,
+        5,
+        86400,
+        "".to_string(),
+        None,
     )
     .await
     .unwrap();
@@ -97,6 +104,13 @@ async fn outside_cwd_denied_no_write_no_event() {
         NonUiPolicy::Allow,
         None,
         "".to_string(),
+        None,
+        None,
+        false,
+        5,
+        86400,
+        "".to_string(),
+        None,
     )
     .await;
     assert!(r.is_err());

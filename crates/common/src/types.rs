@@ -15,6 +15,9 @@ pub const MCP_CHANNEL: &str = "mcp";
 pub const CODING_CHANNEL: &str = "coding";
 pub const TELEGRAM_RESET_SENDER: &str = "telegram_reset";
 
+/// Mirror alert kind emitted when a coding session's per-thread cost ceiling is crossed.
+pub const MIRROR_ALERT_COST_THRESHOLD_CROSSED: &str = "costThresholdCrossed";
+
 /// Channel name (e.g., "telegram", "discord")
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ChannelName(String);

@@ -79,6 +79,8 @@ pub struct AgentRuntime {
     tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
     /// Hook engine for firing lifecycle and tool-use hooks.
     hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
+    /// Domain event bus for emitting cross-cutting events (e.g. Mirror alerts).
+    domain_event_bus: Option<Arc<bus::DomainEventBus>>,
 }
 
 impl AgentRuntime {
@@ -118,6 +120,7 @@ impl AgentRuntime {
             predictions_per_turn: 3,
             tool_kit: std::sync::Mutex::new(None),
             hook_engine: std::sync::Mutex::new(None),
+            domain_event_bus: None,
         }
     }
 
@@ -188,6 +191,11 @@ impl AgentRuntime {
 
     pub fn with_context_update_queue(mut self, queue: Arc<bus::ContextUpdateQueue>) -> Self {
         self.context_update_queue = Some(queue);
+        self
+    }
+
+    pub fn with_domain_event_bus(mut self, bus: Arc<bus::DomainEventBus>) -> Self {
+        self.domain_event_bus = Some(bus);
         self
     }
 
@@ -830,6 +838,42 @@ impl AgentRuntime {
             .await
         {
             warn!("AgentRuntime: failed to record usage: {}", e);
+        }
+
+        if let Some(ref session_key) = ctx.session_key {
+            self.cost_tracker.record_for_session(
+                session_key.as_str(),
+                usage,
+                &self.execution_model,
+            );
+
+            // Per-session cost ceiling check → Mirror alert
+            let hot = self.hot_config.read().await;
+            let ceiling_usd = hot.per_thread_cost_ceiling_usd.unwrap_or(0.0);
+            let alert_at = hot.cost_alert_at_percent;
+            drop(hot);
+
+            if ceiling_usd > 0.0 {
+                if let Some(alert) = self.cost_tracker.check_session_ceiling(
+                    session_key.as_str(),
+                    ceiling_usd,
+                    alert_at,
+                ) {
+                    if let Some(ref bus) = self.domain_event_bus {
+                        let payload = serde_json::json!({
+                            "session_key": &alert.session_key,
+                            "spend_usd": alert.spend_usd,
+                            "ceiling_usd": alert.ceiling_usd,
+                            "percent": alert.percent,
+                        });
+                        bus.publish(bus::DomainEvent::CodingMirrorAlert {
+                            kind: common::MIRROR_ALERT_COST_THRESHOLD_CROSSED.to_string(),
+                            severity: "medium".to_string(),
+                            payload: payload.to_string(),
+                        });
+                    }
+                }
+            }
         }
 
         if let Some(ref tx) = event_tx {

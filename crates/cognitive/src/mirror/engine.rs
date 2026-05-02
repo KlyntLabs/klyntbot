@@ -14,8 +14,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::mirror::{
     sources::{
-        ConfigArchiverSource, FinanceSpendingDriftSource, MetaRuleSignalSource,
-        RoutingSignalSource, TaskFocusPatternSource, TrialPreviewSource,
+        ApprovalHistorySource, ConfigArchiverSource, CostCeilingSource, FinanceSpendingDriftSource,
+        MetaRuleSignalSource, RoutingSignalSource, TaskFocusPatternSource, TrialPreviewSource,
     },
     AutotunerBridge, MirrorFacade, MirrorRepo, NarrativeHandler,
 };
@@ -38,6 +38,7 @@ impl MirrorEngine {
         episodic_repo: Option<EpisodicMemoryRepo>,
         rule_repo: Option<ProceduralRuleRepo>,
         trial_evaluator: Option<Arc<dyn crate::mirror::types::EarlyTrialEvaluator>>,
+        approval_history_repo: Option<Arc<storage::repos::CodingApprovalHistoryRepo>>,
     ) -> StartedMirror {
         let shutdown = CancellationToken::new();
         let active_timers: Arc<DashMap<String, JoinHandle<()>>> = Arc::new(DashMap::new());
@@ -77,6 +78,16 @@ impl MirrorEngine {
         register!(task_focus);
         register!(finance_drift);
 
+        if let Some(ah_repo) = approval_history_repo {
+            let approval_history = Arc::new(ApprovalHistorySource::new(
+                Arc::try_unwrap(ah_repo).unwrap_or_else(|arc| (*arc).clone()),
+            ));
+            register!(approval_history);
+        }
+
+        let cost_ceiling = Arc::new(CostCeilingSource::new(Arc::new(repo.clone())));
+        register!(cost_ceiling);
+
         // Build the facade (unchanged API; drop the now-unused domain_event_bus).
         let mut facade = MirrorFacade::new(repo);
         facade = facade.with_active_timers(active_timers);
@@ -107,13 +118,13 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn start_produces_six_consumers() {
+    async fn start_produces_seven_consumers() {
         let repo = crate::mirror::test_mirror_repo().await;
-        let built = MirrorEngine::start(repo, None, None, None, None, None);
+        let built = MirrorEngine::start(repo, None, None, None, None, None, None);
         assert_eq!(
             built.consumers.len(),
-            6,
-            "routing + meta_rule + config_archiver + trial + task_focus + finance_drift"
+            7,
+            "routing + meta_rule + config_archiver + trial + task_focus + finance_drift + cost_ceiling"
         );
         for h in built.flush_handles.iter() {
             assert!(!h.is_finished());

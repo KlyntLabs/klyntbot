@@ -1803,6 +1803,10 @@ impl AgentLoopBuilder {
             config.cognitive.query_enhancement.budget_overrides.clone(),
         );
 
+        if let Some(ref bus) = self.domain_event_bus {
+            runtime = runtime.with_domain_event_bus(Arc::clone(bus));
+        }
+
         if let Some(ref orchestrator) = self.autotuner {
             if let Some(sink) = orchestrator.memory_param_sink() {
                 runtime = runtime.with_enhancement_param_sink(sink);

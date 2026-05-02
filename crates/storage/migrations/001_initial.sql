@@ -842,3 +842,37 @@ CREATE TABLE IF NOT EXISTS response_warnings (
 
 CREATE INDEX IF NOT EXISTS idx_response_warnings_created
     ON response_warnings(created_at);
+
+-- Phase 2: Mirror-learned approval cache (Layer 3)
+-- Append-only log of every ApprovalResolved event keyed by (tool, args_hash, repo_id).
+CREATE TABLE IF NOT EXISTS coding_approval_history (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    tool            TEXT NOT NULL,
+    args_hash       TEXT NOT NULL,
+    repo_id         TEXT NOT NULL DEFAULT '',
+    decision        TEXT NOT NULL,           -- 'allow' | 'deny'
+    decided_by      TEXT NOT NULL,           -- 'user' | 'auto_allow' | 'auto_deny' | 'timeout' | 'cancelled'
+    layer           TEXT NOT NULL,           -- which layer fired
+    created_at      INTEGER NOT NULL DEFAULT (cast(strftime('%s','now') as integer))
+);
+
+CREATE INDEX IF NOT EXISTS idx_coding_approval_history_key
+  ON coding_approval_history(tool, args_hash, repo_id);
+
+CREATE INDEX IF NOT EXISTS idx_coding_approval_history_clear
+  ON coding_approval_history(tool, repo_id);
+
+-- Phase 2: file snapshots for /sessions rewind
+CREATE TABLE IF NOT EXISTS coding_snapshots (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_key     TEXT NOT NULL,
+    message_id      TEXT,                    -- which assistant turn produced the edit (nullable)
+    file_path       TEXT NOT NULL,
+    content_before  BLOB NOT NULL,           -- raw bytes pre-edit; '' if file did not exist
+    file_existed    INTEGER NOT NULL DEFAULT 1,  -- 0 means restoring should delete the file
+    content_hash    TEXT NOT NULL,           -- blake3 of content_before
+    created_at      INTEGER NOT NULL DEFAULT (cast(strftime('%s','now') as integer))
+);
+
+CREATE INDEX IF NOT EXISTS idx_coding_snapshots_session
+  ON coding_snapshots(session_key, created_at);

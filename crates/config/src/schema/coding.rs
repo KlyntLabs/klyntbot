@@ -17,6 +17,8 @@ pub struct CodingConfig {
     pub skills: super::coding_memory::CodingSkillsConfig,
     #[serde(default)]
     pub sessions: CodingSessionsConfig,
+    #[serde(default)]
+    pub cost_ceiling: CostCeilingConfig,
 }
 
 impl Default for CodingConfig {
@@ -29,6 +31,7 @@ impl Default for CodingConfig {
             sandbox: Default::default(),
             skills: Default::default(),
             sessions: Default::default(),
+            cost_ceiling: Default::default(),
         }
     }
 }
@@ -54,9 +57,19 @@ pub struct CodingPermissions {
     pub default_if_no_match: String,
     #[serde(default)]
     pub mirror_learning: bool,
+    #[serde(default = "default_mirror_min_approvals")]
+    pub mirror_min_approvals: u32,
+    #[serde(default = "default_mirror_cooldown_hours")]
+    pub mirror_cooldown_hours: u32,
 }
 fn default_match() -> String {
     "ask".into()
+}
+fn default_mirror_min_approvals() -> u32 {
+    5
+}
+fn default_mirror_cooldown_hours() -> u32 {
+    24
 }
 impl Default for CodingPermissions {
     fn default() -> Self {
@@ -66,6 +79,8 @@ impl Default for CodingPermissions {
             ask: vec![],
             default_if_no_match: "ask".into(),
             mirror_learning: false,
+            mirror_min_approvals: default_mirror_min_approvals(),
+            mirror_cooldown_hours: default_mirror_cooldown_hours(),
         }
     }
 }
@@ -109,6 +124,28 @@ impl Default for CodingSessionsConfig {
             retention_days: default_retention_days(),
             max_total_disk_mb: default_max_total_disk_mb(),
             preserve_starred: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CostCeilingConfig {
+    #[serde(default)]
+    pub per_thread_usd: Option<f64>,
+    #[serde(default = "default_cost_alert_pct")]
+    pub alert_at_percent: u32,
+}
+
+fn default_cost_alert_pct() -> u32 {
+    80
+}
+
+impl Default for CostCeilingConfig {
+    fn default() -> Self {
+        Self {
+            per_thread_usd: None,
+            alert_at_percent: default_cost_alert_pct(),
         }
     }
 }

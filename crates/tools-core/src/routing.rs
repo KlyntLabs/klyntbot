@@ -90,6 +90,10 @@ pub struct RoutingContext {
     pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     /// Session key for conversation continuity. Used by hook firing.
     pub session_key: Option<SessionKey>,
+    /// Message ID of the turn that triggered tool execution (used for rewind anchors).
+    pub message_id: Option<String>,
+    /// Repo identifier for repo-scoped operations (e.g. Mirror Layer 3 caching).
+    pub repo_id: String,
 }
 
 impl RoutingContext {
@@ -108,6 +112,8 @@ impl RoutingContext {
             event_tx: None,
             hook_engine: None,
             session_key: None,
+            message_id: None,
+            repo_id: String::new(),
         }
     }
 
@@ -130,6 +136,8 @@ impl RoutingContext {
             event_tx: None,
             hook_engine: None,
             session_key: None,
+            message_id: None,
+            repo_id: String::new(),
         }
     }
 }

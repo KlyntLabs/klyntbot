@@ -35,6 +35,18 @@ pub struct ToolRegistry {
     permissions: Option<ToolPermissions>,
 }
 
+impl Clone for ToolRegistry {
+    fn clone(&self) -> Self {
+        Self {
+            tools: self.tools.clone(),
+            metadata: self.metadata.clone(),
+            usage_counts: Mutex::new(self.usage_counts.lock().unwrap().clone()),
+            cached_definitions: Mutex::new(self.cached_definitions.lock().unwrap().clone()),
+            permissions: self.permissions.clone(),
+        }
+    }
+}
+
 impl ToolRegistry {
     /// Create a new tool registry
     pub fn new() -> Self {
@@ -181,6 +193,14 @@ impl ToolRegistry {
     /// Get metadata for a tool by name.
     pub fn get_metadata(&self, name: &str) -> Option<&ToolMetadata> {
         self.metadata.get(name)
+    }
+
+    /// List all registered tools as (name, description, aliases) tuples.
+    pub fn list_meta(&self) -> Vec<(String, String, Vec<String>)> {
+        self.tools
+            .iter()
+            .map(|(name, tool)| (name.clone(), tool.description().to_string(), vec![]))
+            .collect()
     }
 
     /// Get tool names that belong to a given category.

@@ -28,6 +28,12 @@ pub struct GuardCtx<'a> {
     pub cwd: Option<String>,
     pub channel: common::tool_channel::Channel,
     pub non_ui_policy: common::tool_channel::NonUiPolicy,
+    pub history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
+    pub repo_id: String,
+    pub mirror_learning_enabled: bool,
+    pub mirror_min_approvals: u32,
+    pub mirror_cooldown_seconds: i64,
+    pub now_unix: i64,
 }
 
 pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> ApprovalDecision {
@@ -47,7 +53,7 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
             reason: "privacy guard: excludePaths match".into(),
             pattern: pat,
         };
-        emit_pair(&ctx, tool, payload, &d, false).await;
+        emit_pair(&ctx, tool, payload, &d, false, None).await;
         return d;
     }
 
@@ -85,7 +91,7 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
     };
 
     if matches!(l1, ApprovalDecision::Auto { .. }) {
-        emit_pair(&ctx, tool, payload, &l1, false).await;
+        emit_pair(&ctx, tool, payload, &l1, false, None).await;
         return l1;
     }
 
@@ -112,15 +118,49 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
         ExecDecision::FallThrough => l1,
     };
 
-    // 3. Layer 3 Mirror-learned — Phase 2; skipped here.
+    // 3. Layer 3 — Mirror-learned (opt-in)
+    if let Some(repo) = ctx.history_repo.as_ref() {
+        let cfg = crate::approval::layer3::Layer3Config {
+            enabled: ctx.mirror_learning_enabled,
+            min_approvals: ctx.mirror_min_approvals,
+            cooldown_seconds: ctx.mirror_cooldown_seconds,
+        };
+        let args_json = ctx.args.as_ref().map(|v| v.to_string()).unwrap_or_default();
+        let hash = crate::approval::layer3::args_hash_for_relevance(tool, &args_json);
+        let summary = repo
+            .summary(tool, &hash, &ctx.repo_id)
+            .await
+            .unwrap_or_default();
+        match crate::approval::layer3::evaluate(&cfg, &summary, ctx.now_unix) {
+            crate::approval::layer3::Layer3Outcome::AutoAllow { reason } => {
+                let decision = ApprovalDecision::auto_allow(ApprovalLayer::Layer3Mirror, reason);
+                emit_pair(&ctx, tool, payload, &decision, false, Some(&summary)).await;
+                return decision;
+            }
+            crate::approval::layer3::Layer3Outcome::Ask { reason } => {
+                let decision = ApprovalDecision::ask(ApprovalLayer::Layer3Mirror, reason);
+                emit_pair(&ctx, tool, payload, &decision, true, Some(&summary)).await;
+                let user = await_decision(
+                    ctx.pending,
+                    &ctx.request_id,
+                    ctx.cancel.clone(),
+                    APPROVAL_TIMEOUT,
+                )
+                .await;
+                emit_resolved(&ctx, &user).await;
+                return user;
+            }
+            crate::approval::layer3::Layer3Outcome::FallThrough => { /* continue */ }
+        }
+    }
 
     match merged {
         ApprovalDecision::Auto { .. } => {
-            emit_pair(&ctx, tool, payload, &merged, false).await;
+            emit_pair(&ctx, tool, payload, &merged, false, None).await;
             merged
         }
         ApprovalDecision::Ask { .. } => {
-            emit_pair(&ctx, tool, payload, &merged, true).await;
+            emit_pair(&ctx, tool, payload, &merged, true, None).await;
             let user = await_decision(
                 ctx.pending,
                 &ctx.request_id,
@@ -141,17 +181,24 @@ async fn emit_pair<'a>(
     payload: &str,
     decision: &ApprovalDecision,
     requires_user_input: bool,
+    mirror_history: Option<&storage::repos::ApprovalHistorySummary>,
 ) {
     let mut h = Sha256::new();
     h.update(payload.as_bytes());
     let args_hash = format!("{:x}", h.finalize());
+    let mirror_history_json = mirror_history.map(|s| {
+        serde_json::json!({
+            "approval_count": s.approval_count,
+            "denial_count": s.denial_count,
+        })
+    });
     let req = ToolEvent::ApprovalRequested {
         request_id: ctx.request_id.clone(),
         tool: tool.into(),
         args_hash,
         layer: format!("{:?}", layer_of(decision)),
         rule_matched: rule_of(decision),
-        mirror_history: None,
+        mirror_history: mirror_history_json,
         sandbox_summary: String::new(),
         requires_user_input,
         args: ctx.args.clone(),

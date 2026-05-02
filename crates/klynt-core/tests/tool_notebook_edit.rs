@@ -49,6 +49,13 @@ async fn replaces_cell_source() {
         NonUiPolicy::Allow,
         None,
         "".to_string(),
+        None,
+        None,
+        false,
+        5,
+        86400,
+        "".to_string(),
+        None,
     )
     .await
     .unwrap();
@@ -90,6 +97,13 @@ async fn rejects_out_of_range_index() {
         NonUiPolicy::Allow,
         None,
         "".to_string(),
+        None,
+        None,
+        false,
+        5,
+        86400,
+        "".to_string(),
+        None,
     )
     .await;
     assert!(r.is_err());

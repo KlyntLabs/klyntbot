@@ -1,3 +1,5 @@
+mod property_k10_mirror_cache_poisoning;
+mod property_k11_starred_retention;
 mod property_k3_layer1_routing;
 mod property_k4_sandbox_invariant;
 mod property_k5_file_edit_event;
@@ -7,3 +9,5 @@ mod scenario_bash_happy_path;
 mod scenario_grep_then_edit;
 #[cfg(target_os = "linux")]
 mod scenario_linux_bash;
+mod scenario_mirror_auto_approve;
+mod scenario_rewind;

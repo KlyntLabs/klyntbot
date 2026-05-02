@@ -40,6 +40,12 @@ proptest! {
                     cwd: None,
                     channel: Channel::Coding,
                     non_ui_policy: NonUiPolicy::Allow,
+                    history_repo: None,
+                    repo_id: String::new(),
+                    mirror_learning_enabled: false,
+                    mirror_min_approvals: 5,
+                    mirror_cooldown_seconds: 86400,
+                    now_unix: jiff::Timestamp::now().as_second(),
                 };
                 let _ = evaluate(ctx, "bash", "echo k8").await;
             }

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex, Semaphore};
+use tokio::sync::{mpsc, Mutex, RwLock, Semaphore};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
@@ -21,7 +21,7 @@ use tools::{
 ///
 /// klyntbot is a personal AI agent — no code execution tools are provided.
 /// Profiles control access to filesystem (read/write), web, and browser tools.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub enum SubagentProfile {
     /// Read-only access: search, read files, web fetch, ask user (default)
     #[default]
@@ -113,6 +113,10 @@ pub struct SubagentManager {
     agent_task_repo: AgentTaskRepo,
     tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
     hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
+    /// Cache of base ToolRegistry builds keyed by (profile, cwd).
+    /// The cache stores the registry *before* AgentTaskTool is added,
+    /// so each invocation can clone the base and append its task tool.
+    registry_cache: std::sync::Mutex<HashMap<(SubagentProfile, PathBuf), Arc<RwLock<ToolRegistry>>>>,
 }
 
 /// Builder for SubagentManager
@@ -191,6 +195,7 @@ impl SubagentManagerBuilder {
             agent_task_repo: self.agent_task_repo.expect("agent_task_repo is required"),
             tool_kit: std::sync::Mutex::new(self.tool_kit),
             hook_engine: std::sync::Mutex::new(self.hook_engine),
+            registry_cache: std::sync::Mutex::new(HashMap::new()),
         }
     }
 }
@@ -205,6 +210,9 @@ impl SubagentManager {
     pub fn set_tool_kit(&self, kit: Arc<klynt_core::ToolKitBuilder>) {
         let mut lock = self.tool_kit.lock().unwrap();
         *lock = Some(kit);
+        // ToolKitBuilder deps changed → cached registries are stale.
+        let mut cache = self.registry_cache.lock().unwrap();
+        cache.clear();
     }
 
     pub fn set_hook_engine(&self, engine: Arc<klynt_hooks::HookEngine>) {
@@ -303,6 +311,35 @@ impl SubagentManager {
             agent_id: short_id.clone(),
         };
 
+        // Build or retrieve cached base registry (without AgentTaskTool).
+        let base_registry = if let Some(ref kit) = tool_kit {
+            let kit = (**kit).clone().with_cwd(workspace.clone());
+            let cache_key = (profile, workspace.clone());
+            let mut cache = self.registry_cache.lock().unwrap();
+            if let Some(cached) = cache.get(&cache_key) {
+                Some(cached.clone())
+            } else {
+                let mut tools = ToolRegistry::new();
+                match profile {
+                    SubagentProfile::ReadOnly => {
+                        kit.register_read_only(&mut tools);
+                    }
+                    SubagentProfile::ReadWrite => {
+                        kit.register_read_only(&mut tools);
+                        kit.register_mutating(&mut tools);
+                    }
+                    SubagentProfile::Full => {
+                        kit.register_all(&mut tools);
+                    }
+                }
+                let arc = Arc::new(RwLock::new(tools));
+                cache.insert(cache_key, arc.clone());
+                Some(arc)
+            }
+        } else {
+            None
+        };
+
         let semaphore = Arc::clone(&self.semaphore);
         let handles_ref = Arc::clone(&self.handles);
         let short_id_clone = short_id.clone();
@@ -321,7 +358,7 @@ impl SubagentManager {
                 _ = cancel_token.cancelled() => {
                     Err("Cancelled by user".into())
                 }
-                r = run_subagent_task(&provider, &workspace, &model, &task, config, profile, tool_kit, hook_engine.clone(), origin_key.clone()) => {
+                r = run_subagent_task(&provider, &workspace, &model, &task, config, profile, tool_kit, hook_engine.clone(), origin_key.clone(), base_registry) => {
                     r
                 }
             };
@@ -450,6 +487,7 @@ async fn run_subagent_task(
     tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     session_key: String,
+    base_registry: Option<Arc<RwLock<ToolRegistry>>>,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
     use crate::execution::budget::{DepthMode, ExecutionBudget};
     use crate::execution::core::ExecutionCore;
@@ -457,39 +495,51 @@ async fn run_subagent_task(
     use crate::execution::types::ExecutionParams;
     use tokio::sync::RwLock;
 
-    let kit = tool_kit.ok_or_else(|| {
-        Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "subagent tool kit not initialized",
-        )) as Box<dyn std::error::Error + Send + Sync>
-    })?;
-    let kit = (*kit).clone().with_cwd(workspace.to_path_buf());
+    let mut tools = if let Some(cached) = base_registry {
+        // Clone the cached base registry and append the per-invocation AgentTaskTool.
+        let mut t = (*cached.read().await).clone();
+        let task_handler = Arc::new(crate::adapters::agent_task::AgentTaskHandlerImpl::new(
+            config.agent_task_repo,
+        ));
+        t.register(AgentTaskTool::new(
+            task_handler,
+            config.session_key,
+            config.agent_id,
+        ));
+        t
+    } else {
+        let kit = tool_kit.ok_or_else(|| {
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "subagent tool kit not initialized",
+            )) as Box<dyn std::error::Error + Send + Sync>
+        })?;
+        let kit = (*kit).clone().with_cwd(workspace.to_path_buf());
 
-    // Build subagent tool registry based on profile
-    let mut tools = ToolRegistry::new();
+        let mut tools = ToolRegistry::new();
+        match profile {
+            SubagentProfile::ReadOnly => {
+                kit.register_read_only(&mut tools);
+            }
+            SubagentProfile::ReadWrite => {
+                kit.register_read_only(&mut tools);
+                kit.register_mutating(&mut tools);
+            }
+            SubagentProfile::Full => {
+                kit.register_all(&mut tools);
+            }
+        }
 
-    match profile {
-        SubagentProfile::ReadOnly => {
-            kit.register_read_only(&mut tools);
-        }
-        SubagentProfile::ReadWrite => {
-            kit.register_read_only(&mut tools);
-            kit.register_mutating(&mut tools);
-        }
-        SubagentProfile::Full => {
-            kit.register_all(&mut tools);
-        }
-    }
-
-    // All profiles get the agent task tool for task board coordination
-    let task_handler = Arc::new(crate::adapters::agent_task::AgentTaskHandlerImpl::new(
-        config.agent_task_repo,
-    ));
-    tools.register(AgentTaskTool::new(
-        task_handler,
-        config.session_key,
-        config.agent_id,
-    ));
+        let task_handler = Arc::new(crate::adapters::agent_task::AgentTaskHandlerImpl::new(
+            config.agent_task_repo,
+        ));
+        tools.register(AgentTaskTool::new(
+            task_handler,
+            config.session_key,
+            config.agent_id,
+        ));
+        tools
+    };
 
     let tool_defs = tools.get_definitions();
 
@@ -691,6 +741,13 @@ mod tests {
             host_cache,
             non_ui_policy,
             hook_engine: None,
+            snapshot_repo: None,
+            session_key: String::new(),
+            history_repo: None,
+            mirror_learning_enabled: false,
+            mirror_min_approvals: 0,
+            mirror_cooldown_seconds: 0,
+            repo_id: String::new(),
         })
     }
 
@@ -722,6 +779,7 @@ mod tests {
             Some(kit),
             None,
             "test:session".to_string(),
+            None,
         )
         .await;
         assert!(result.is_ok());
@@ -750,9 +808,9 @@ mod tests {
     }
 
     #[test]
-    fn test_subagent_profile_default_is_read_write() {
+    fn test_subagent_profile_default_is_read_only() {
         let profile = SubagentProfile::default();
-        assert!(matches!(profile, SubagentProfile::ReadWrite));
+        assert!(matches!(profile, SubagentProfile::ReadOnly));
     }
 
     #[test]

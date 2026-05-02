@@ -88,3 +88,21 @@ fn max_active_skills_cap_enforced() {
     act.touch_path(std::path::Path::new("a.rs")).unwrap();
     assert_eq!(act.active_set().len(), 3);
 }
+
+#[test]
+fn lru_cache_returns_same_result_on_second_touch() {
+    let idx = make_index_with_paths("rust-helper", &["**/*.rs"]);
+    let mut act = SkillActivator::new(idx, ActivationConfig::default()).unwrap();
+
+    // First touch activates.
+    let first = act.touch_path(std::path::Path::new("src/lib.rs")).unwrap();
+    assert_eq!(first, vec!["rust-helper".to_string()]);
+
+    // Second touch of the same path hits the cache and sees the skill is already active.
+    let second = act.touch_path(std::path::Path::new("src/lib.rs")).unwrap();
+    assert!(second.is_empty());
+
+    // A different matching path still works (cache miss, new entry).
+    let third = act.touch_path(std::path::Path::new("src/main.rs")).unwrap();
+    assert!(third.is_empty()); // already active from first touch
+}

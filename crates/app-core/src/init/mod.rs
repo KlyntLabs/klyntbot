@@ -495,6 +495,8 @@ impl AppCore {
         };
 
         // ── Phase 8: Mirror self-reflection layer (before SignalRouter so consumers can be wired in)
+        let coding_approval_history_repo =
+            ::storage::repos::CodingApprovalHistoryRepo::new(storage_pool.clone());
         let (mirror_facade, mirror_consumers, mirror_flush_handles, mirror_shutdown) = {
             let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
             let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
@@ -534,6 +536,7 @@ impl AppCore {
                 episodic_repo,
                 rule_repo,
                 trial_evaluator,
+                Some(Arc::new(coding_approval_history_repo.clone())),
             );
 
             // Phase-5 coding mirror sources — pattern effectiveness, stale-memory,
@@ -624,17 +627,26 @@ impl AppCore {
             let episodic_repo = ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
             let extraction_handler: Option<Arc<dyn ::cognitive::ExtractionHandler>> =
                 cognitive_provider.as_ref().map(|cp| {
-                    let params = providers::cognitive_chat_params(&config, 1024);
+                    // 4096 not 1024: LoCoMo-style 18-turn sessions
+                    // produce extraction JSON ~3000-3500 chars; 1024
+                    // tokens truncates mid-string and silently falls
+                    // back to regex. Symptom: "JSON parse failed: EOF
+                    // while parsing a string at line 1 column ~3400".
+                    let params = providers::cognitive_chat_params(&config, 4096);
                     Arc::new(LlmExtractionHandler::new(cp.clone(), params))
                         as Arc<dyn ::cognitive::ExtractionHandler>
                 });
-            let ingestion: Arc<dyn ai_core::SignalConsumer> =
-                Arc::new(::cognitive::consumers::IngestionConsumer::new(
+            let ingestion: Arc<dyn ai_core::SignalConsumer> = Arc::new(
+                ::cognitive::consumers::IngestionConsumer::new(
                     observation_repo,
                     entity_repo,
                     episodic_repo,
                     extraction_handler,
-                ));
+                )
+                .with_fact_repo(::cognitive::SemanticFactRepo::new(
+                    storage_pool.inner().clone(),
+                )),
+            );
 
             // 5 cognitive collectors — each SignalConsumer pushes CognitiveSignals
             // to the existing consolidator tx (signal_queue).
@@ -1205,6 +1217,10 @@ impl AppCore {
             session_start_fired: Arc::new(dashmap::DashMap::new()),
             session_end_fired: Arc::new(dashmap::DashMap::new()),
             coding_skill_activator: Arc::new(tokio::sync::Mutex::new(None)),
+            coding_approval_history_repo: Some(Arc::new(coding_approval_history_repo)),
+            snapshot_repo: Some(Arc::new(klynt_core::snapshots::SnapshotRepo::new(
+                storage_pool.clone(),
+            ))),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────
@@ -1820,6 +1836,15 @@ impl AppCore {
                 host_cache,
                 non_ui_policy,
                 hook_engine: hook_engine.clone(),
+                snapshot_repo: core.snapshot_repo.clone(),
+                session_key: String::new(),
+                history_repo: core.coding_approval_history_repo.clone(),
+                mirror_learning_enabled: config_guard.coding.permissions.mirror_learning,
+                mirror_min_approvals: config_guard.coding.permissions.mirror_min_approvals,
+                mirror_cooldown_seconds: (config_guard.coding.permissions.mirror_cooldown_hours
+                    as i64)
+                    * 3600,
+                repo_id: String::new(),
             };
             {
                 let reg = core.agent.tool_registry();

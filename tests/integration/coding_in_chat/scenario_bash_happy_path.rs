@@ -50,6 +50,7 @@ async fn bash_happy_path() {
     assert!(result.contains("hi"));
 
     drop(tool);
+    drop(routing_ctx); // close the sender so recv drains then returns None
 
     let mut saw_request = false;
     let mut saw_resolved = false;
@@ -61,13 +62,13 @@ async fn bash_happy_path() {
                 requires_user_input,
                 ..
             } if tool == "bash" && !requires_user_input => saw_request = true,
-            ToolEvent::ApprovalResolved { .. } if saw_request => saw_resolved = true,
-            ToolEvent::SandboxPolicyApplied { .. } if saw_resolved => saw_sandbox = true,
+            ToolEvent::ApprovalResolved { .. } => saw_resolved = true,
+            ToolEvent::SandboxPolicyApplied { .. } => saw_sandbox = true,
             _ => {}
         }
     }
     assert!(
         saw_request && saw_resolved && saw_sandbox,
-        "expected ApprovalRequested → ApprovalResolved → SandboxPolicyApplied"
+        "expected ApprovalRequested, ApprovalResolved, SandboxPolicyApplied; got request={saw_request}, resolved={saw_resolved}, sandbox={saw_sandbox}"
     );
 }

@@ -13,7 +13,15 @@ pub fn first_snippet(text: &str, max_chars: usize) -> String {
         return trimmed.to_string();
     }
 
-    let window = &trimmed[..max_chars];
+    // Find a UTF-8 char boundary at-or-below max_chars. Slicing `&trimmed[..max_chars]`
+    // panics if max_chars lands inside a multi-byte char (e.g. an em-dash `—` is 3
+    // bytes — LoCoMo's punctuation hits this constantly). Walk back to the previous
+    // char boundary and slice there.
+    let mut cut = max_chars.min(trimmed.len());
+    while cut > 0 && !trimmed.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    let window = &trimmed[..cut];
 
     // Look for sentence-ending punctuation followed by a space or end-of-window,
     // to avoid cutting mid-abbreviation (e.g., "Dr.Smith").

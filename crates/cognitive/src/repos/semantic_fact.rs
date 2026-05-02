@@ -59,6 +59,41 @@ impl SemanticFactRepo {
 
     /// Insert or replace a semantic fact.
     pub async fn upsert(&self, fact: &SemanticFact) -> Result<(), sqlx::Error> {
+        // Triple-level dedup: if an active row for the same
+        // (subject, predicate, object) already exists, refresh its
+        // access metadata + bump confidence/convergence and return.
+        // Without this every extraction pass inserts a new uuid, so
+        // identical triples accumulate as separate rows and crowd out
+        // diverse facts in retrieval top-K (observed: lmb_000 ballooning
+        // from 16 → 26 facts, with `lives_in` getting bumped out of the
+        // context budget by 4 redundant `works_at` rows).
+        if let Some(existing_id) = sqlx::query_scalar::<_, String>(
+            "SELECT id FROM semantic_facts \
+             WHERE subject = ?1 AND predicate = ?2 AND object = ?3 \
+               AND superseded_at IS NULL \
+             LIMIT 1",
+        )
+        .bind(&fact.subject)
+        .bind(&fact.predicate)
+        .bind(&fact.object)
+        .fetch_optional(&self.pool)
+        .await?
+        {
+            sqlx::query(
+                "UPDATE semantic_facts SET \
+                   last_accessed = ?2, \
+                   access_count = access_count + 1, \
+                   confidence = MAX(confidence, ?3), \
+                   convergence_score = convergence_score + 0.1 \
+                 WHERE id = ?1",
+            )
+            .bind(&existing_id)
+            .bind(&fact.last_accessed)
+            .bind(fact.confidence)
+            .execute(&self.pool)
+            .await?;
+            return Ok(());
+        }
         sqlx::query(
             r#"
             INSERT INTO semantic_facts (id, domain, subject, predicate, object, confidence, source,

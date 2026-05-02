@@ -192,26 +192,50 @@ impl CoachingReasonerHandler for HeuristicCoachingReasonerHandler {
 // ── Extraction ──
 
 const EXTRACTION_SYSTEM_PROMPT: &str = "\
-You are a semantic memory extraction agent. Given an observation about a user, \
-extract structured facts as subject-predicate-object triples.\n\n\
+You are a semantic memory extraction agent. Given one or more observations \
+about a user, extract structured facts as subject-predicate-object triples.\n\n\
 Domains: identity, energy, work, finance, learning, preferences, general\n\
-Subjects: usually \"user\", or \"project:<name>\", \"task:<id>\"\n\
-Predicates: descriptive relationship (e.g., \"name\", \"favorite_language\", \"peak_hours\", \"occupation\")\n\
-Object: the value (e.g., \"Jayden\", \"Rust\", \"10am-12pm\", \"software developer\")\n\n\
+Subjects: usually \"user\", or \"project:<name>\", \"task:<id>\". When the user \
+has introduced themselves by name (e.g., \"Hi, I'm Alice\"), ALSO emit \
+parallel facts using their proper name as subject. This is critical so that \
+queries like \"Where does Alice work?\" can find facts about Alice.\n\
+Predicates: descriptive relationship (e.g., \"name\", \"works_at\", \"lives_in\", \"team\", \"favorite_language\")\n\
+Object: the value (e.g., \"Alice\", \"Anthropic\", \"SF\", \"Claude team\")\n\n\
 Rules:\n\
-- Extract EVERY distinct fact from the observation as a separate triple\n\
+- Extract EVERY distinct fact from the observation as a separate triple — \
+short observations like \"Hi, I'm Alice and I work at Anthropic\" still contain \
+multiple facts (name=Alice, works_at=Anthropic).\n\
 - Set confidence based on certainty (user-stated = 1.0, inferred = 0.5-0.8)\n\
-- Use source \"user_stated\" for explicit statements, \"observed\" for behavioral data, \"inferred\" for patterns\n\
-- Return empty facts array if nothing meaningful can be extracted\n\
-- Questions (e.g., 'What is my name?') are NOT facts — return empty array for questions\n\
-- Be specific in predicates — use snake_case names like \"name\", \"occupation\", \"favorite_language\"\n\
-- Be concise in objects — just the value, not the full sentence\n\n\
-Additionally, extract named entities (people, organizations, projects, technologies, places) \
-and relationships between them. Only extract entities that are explicitly mentioned — do not infer.\n\n\
-Respond with JSON in this exact format:\n\
-{\"facts\": [{\"domain\": \"identity\", \"subject\": \"user\", \"predicate\": \"name\", \"object\": \"Jayden\", \"confidence\": 1.0, \"source\": \"user_stated\"}], \
-\"entities\": [{\"name\": \"Klynt\", \"type\": \"project\", \"description\": \"AI assistant project\"}], \
-\"relationships\": [{\"source\": \"Jayden\", \"target\": \"Klynt\", \"type\": \"works_on\"}]}";
+- Use source \"user_stated\" for explicit statements, \"observed\" for behavioral data\n\
+- Return empty facts array ONLY if the observation is a question or a pure greeting\n\
+- Questions (e.g., 'What is my name?') are NOT facts — return empty for questions\n\
+- Be specific in predicates — use snake_case (\"name\", \"works_at\", \"lives_in\")\n\
+- Be concise in objects — just the value, not the full sentence\n\
+- IDENTITY BINDING: when an observation contains \"I'm X\", \"I am X\", or \"My name is X\", \
+emit BOTH a {subject:\"user\", predicate:\"name\", object:\"X\"} fact AND apply X as a \
+parallel subject for every first-person fact in the SAME observation.\n\
+- For non-self proper nouns (e.g., \"Max loves pizza\"), emit subject=\"Max\" directly.\n\n\
+Additionally, extract named entities (people, orgs, projects, technologies, places) \
+and relationships. Only extract entities explicitly mentioned — do not infer.\n\n\
+RESPONSE FORMAT — return one object per observation, indexed from 1:\n\
+{\"results\": [\n\
+  {\"observation_index\": 1, \"facts\": [\n\
+    {\"domain\": \"identity\", \"subject\": \"user\", \"predicate\": \"name\", \"object\": \"Alice\", \"confidence\": 1.0, \"source\": \"user_stated\"},\n\
+    {\"domain\": \"work\", \"subject\": \"user\", \"predicate\": \"works_at\", \"object\": \"Anthropic\", \"confidence\": 1.0, \"source\": \"user_stated\"},\n\
+    {\"domain\": \"work\", \"subject\": \"Alice\", \"predicate\": \"works_at\", \"object\": \"Anthropic\", \"confidence\": 1.0, \"source\": \"user_stated\"},\n\
+    {\"domain\": \"work\", \"subject\": \"user\", \"predicate\": \"team\", \"object\": \"Claude\", \"confidence\": 1.0, \"source\": \"user_stated\"}\n\
+  ], \"entities\": [{\"name\": \"Anthropic\", \"type\": \"organization\", \"description\": null}], \
+\"relationships\": [{\"source\": \"Alice\", \"target\": \"Anthropic\", \"type\": \"works_at\"}]}\n\
+]}\n\n\
+The example above shows extraction from \"Hi, I'm Alice and I work at Anthropic on the Claude team.\" \
+Notice how a single short sentence yields 4 facts (with identity binding) plus an entity and relationship.\n\n\
+THIRD-PERSON FACTS ARE EQUALLY IMPORTANT. When the user mentions another entity \
+(person, pet, project, place), extract its facts directly under that entity as subject. \
+Example — observation: \"Max loves pizza.\" → \
+{\"results\":[{\"observation_index\":1,\"facts\":[{\"domain\":\"preferences\",\"subject\":\"Max\",\"predicate\":\"loves\",\"object\":\"pizza\",\"confidence\":1.0,\"source\":\"user_stated\"}]}]}\n\
+Example — observation: \"Bella loves sushi.\" → subject=\"Bella\", predicate=\"loves\", object=\"sushi\".\n\
+Do NOT skip third-person sentences. Do NOT rewrite them as user-facts. \
+The bench fails when third-person SPO triples are dropped.";
 
 /// LLM-backed fact extraction with heuristic fallback.
 pub struct LlmExtractionHandler {
@@ -272,6 +296,49 @@ struct ExtractedRelationshipJson {
     relationship_type: String,
 }
 
+/// Post-process extracted facts so first-person statements are also indexed
+/// under the user's proper name.
+///
+/// When the LLM has produced a `{user, name, X}` fact, every other fact in
+/// the same batch with `subject = "user"` is duplicated with `subject = X`.
+/// Without this, "Where does Alice work?" can't surface the underlying
+/// `{user, employer, Anthropic}` fact because Alice never appears as a fact
+/// subject — only as the object of the `name` triple. This is the dominant
+/// cause of low long-mem recall on synthetic benchmarks.
+fn bind_user_identity(extractions: &mut Vec<cognitive::BatchExtraction>) {
+    let mut name: Option<String> = None;
+    for ext in extractions.iter() {
+        for fact in &ext.facts {
+            if fact.subject == "user" && fact.predicate == "name" && !fact.object.is_empty() {
+                name = Some(fact.object.clone());
+                break;
+            }
+        }
+        if name.is_some() {
+            break;
+        }
+    }
+    let Some(proper) = name else {
+        return;
+    };
+    for ext in extractions.iter_mut() {
+        let mut additions = Vec::new();
+        for fact in &ext.facts {
+            if fact.subject == "user" && fact.predicate != "name" {
+                additions.push(ExtractedFact {
+                    domain: fact.domain.clone(),
+                    subject: proper.clone(),
+                    predicate: fact.predicate.clone(),
+                    object: fact.object.clone(),
+                    confidence: fact.confidence,
+                    source: fact.source.clone(),
+                });
+            }
+        }
+        ext.facts.extend(additions);
+    }
+}
+
 impl LlmExtractionHandler {
     fn fallback_all(&self, observations: &[Observation]) -> cognitive::BatchExtractionResult {
         // Delegate to the heuristic handler (same logic), then mark all as fallback
@@ -317,7 +384,7 @@ impl ExtractionHandler for LlmExtractionHandler {
         );
 
         let messages = vec![
-            Message::system(EXTRACTION_SYSTEM_PROMPT),
+            Message::system(EXTRACTION_SYSTEM_PROMPT.to_string()),
             Message::user(user_msg),
         ];
 
@@ -328,7 +395,7 @@ impl ExtractionHandler for LlmExtractionHandler {
                     Ok(result) => {
                         let mut entities = Vec::new();
                         let mut relationships = Vec::new();
-                        let extractions = result
+                        let mut extractions: Vec<cognitive::BatchExtraction> = result
                             .results
                             .into_iter()
                             .filter(|r| r.observation_index > 0) // skip invalid 0 indices (prompt is 1-based)
@@ -365,6 +432,7 @@ impl ExtractionHandler for LlmExtractionHandler {
                                 }
                             })
                             .collect();
+                        bind_user_identity(&mut extractions);
                         Ok(cognitive::BatchExtractionResult {
                             extractions,
                             fallback_indices: Vec::new(),
@@ -1483,10 +1551,12 @@ mod tests {
     use std::sync::Arc;
 
     use crate::test_utils::MockProvider;
+    use common::{KlyntbotError, ProviderError};
     use cognitive::situation::UserSituation;
     use cognitive::types::{SemanticFact, DEFAULT_MEMORY_TYPE};
     use feature_coaching::signal_accumulator::TriggerFired;
-    use providers::LlmResponse;
+    use providers::{LlmProvider, LlmResponse, Usage, ProviderCapabilities, ProviderHealth};
+    use serde_json::Value;
 
     // ── Test helpers ──
 
@@ -1704,9 +1774,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_consolidation_parses_update() {
-        let mock = Arc::new(MockProvider::new(mock_response(
+        let mock = Arc::new(MockProvider::with_text(
             r#"{"decisions":[{"index":1,"action":"update","target_id":"old-1"}]}"#,
-        )));
+        ));
         let params = ChatParams::new("test-model");
         let handler = LlmConsolidationHandler::new(mock, params);
 
@@ -1730,9 +1800,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_consolidation_parses_noop() {
-        let mock = Arc::new(MockProvider::new(mock_response(
+        let mock = Arc::new(MockProvider::with_text(
             r#"{"decisions":[{"index":1,"action":"noop","target_id":null}]}"#,
-        )));
+        ));
         let params = ChatParams::new("test-model");
         let handler = LlmConsolidationHandler::new(mock, params);
 
@@ -1769,7 +1839,7 @@ mod tests {
             "superseded": []
         }"#;
 
-        let mock = Arc::new(MockProvider::new(mock_response(json_response)));
+        let mock = Arc::new(MockProvider::with_text(json_response));
         let params = ChatParams::new("test-model");
         let handler = LlmGraphLinkHandler::new(mock, params);
 
@@ -1841,9 +1911,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_coaching_reasoner_parses_intervention() {
-        let mock = Arc::new(MockProvider::new(mock_response(
+        let mock = Arc::new(MockProvider::with_text(
             r#"{"should_intervene":true,"confidence":0.75,"message":"You've been distracted 3 times. A short walk might help.","intervention_type":"chat_message","reasoning":"Distraction pattern detected","observations":["Afternoon focus decline"]}"#,
-        )));
+        ));
         let params = ChatParams::new("test-model");
         let handler = LlmCoachingReasonerHandler::new(mock, params);
 
@@ -2011,7 +2081,7 @@ mod tests {
     #[tokio::test]
     async fn llm_community_membership_confirms_match() {
         let json = r#"{"confirm": true, "reason": "C aligns with alpha by topic"}"#;
-        let provider = MockProvider::new(LlmResponse {
+        let provider = MockProvider::with_response(LlmResponse {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
@@ -2048,7 +2118,7 @@ mod tests {
             ],
             "missed_facts": []
         }"#;
-        let provider = MockProvider::new(LlmResponse {
+        let provider = MockProvider::with_response(LlmResponse {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
@@ -2092,7 +2162,7 @@ mod tests {
     #[tokio::test]
     async fn llm_query_predictor_returns_n_predictions() {
         let json = r#"{"predictions": ["how do I install rust?", "what about cargo?", "memory safety details?"]}"#;
-        let provider = MockProvider::new(LlmResponse {
+        let provider = MockProvider::with_response(LlmResponse {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
@@ -2119,7 +2189,7 @@ mod tests {
 
         let json =
             r#"{"keep": ["f2"], "drop": [{"fact_id": "f1", "reason": "f2 supersedes by date"}]}"#;
-        let provider = MockProvider::new(LlmResponse {
+        let provider = MockProvider::with_response(LlmResponse {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),

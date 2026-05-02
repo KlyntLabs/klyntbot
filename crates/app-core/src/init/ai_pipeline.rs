@@ -74,6 +74,13 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
         DomainEvent::ChatTurnCompleted { user_message, .. } => Some(AiSignal {
             event_kind: "ChatTurnCompleted",
             content: user_message.clone().unwrap_or_default(),
+            // Route chat turns through the LLM-based extraction pipeline
+            // rather than the keyword-heuristic accumulator. The LLM
+            // extractor produces structured S-P-O facts (with identity
+            // binding) — the heuristic path can only catch overt
+            // "I work at X" patterns and stores everything as subject=user.
+            salience: SalienceVerdict::Extract,
+            importance: 0.6,
             ..base
         }),
         DomainEvent::SessionEnded {
@@ -127,6 +134,12 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
                 category: Some(verdict.clone()),
                 ..AiMetrics::default()
             },
+            ..base
+        }),
+        DomainEvent::CodingMirrorAlert { kind, payload, .. } => Some(AiSignal {
+            event_kind: "CodingMirrorAlert",
+            importance: 0.5,
+            content: format!("{kind}: {payload}"),
             ..base
         }),
         _ => None,
