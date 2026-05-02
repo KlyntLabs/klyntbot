@@ -47,7 +47,7 @@ export function useAppShellOrchestration({
     shouldReduceTransparency ? " reduced-transparency" : ""
   }${sidebarCollapsed ? " sidebar-collapsed" : ""}${
     rightPanelCollapsed ? " right-panel-collapsed" : ""
-  }${appView === "plugins" ? " is-plugins" : ""}${isWindows ? " is-windows" : ""}`;
+  }${appView === "plugins" ? " is-plugins" : ""}${appView === "calendar" ? " is-calendar" : ""}${isWindows ? " is-windows" : ""}`;
 
   const appStyle = useMemo<CSSProperties>(
     () =>

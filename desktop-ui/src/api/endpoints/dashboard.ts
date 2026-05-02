@@ -1,5 +1,7 @@
 import type {
   CalendarEventInput,
+  DashboardIntelligenceResponse,
+  ProductivitySummaryResponse,
   TaskResponse,
   TaskUpdateParams,
   TimelineResponse,
@@ -55,4 +57,19 @@ export async function calendarSyncEvents(): Promise<void> {
   const r = await commands.calendarSyncEvents([] as CalendarEventInput[]);
   if (r.status !== "ok") throw new Error(r.error.message ?? "calendar sync failed");
   return;
+}
+
+export async function productivityTodayQuery(): Promise<ProductivitySummaryResponse | null> {
+  const r = await commands.productivityToday();
+  if (r.status !== "ok") throw new Error(r.error.message ?? "productivity today failed");
+  return r.data;
+}
+
+export async function dashboardIntelligenceQuery(
+  date: string,
+  tzOffsetMins: number | null,
+): Promise<DashboardIntelligenceResponse> {
+  const r = await commands.getDashboardIntelligence(date, tzOffsetMins);
+  if (r.status !== "ok") throw new Error(r.error.message ?? "dashboard intelligence failed");
+  return r.data;
 }

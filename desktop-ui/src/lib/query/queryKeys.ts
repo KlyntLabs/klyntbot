@@ -104,6 +104,8 @@ export const qk = {
     all: () => ["dashboard"] as const,
     timeline: (startDate: string, endDate: string, sources: readonly string[]) =>
       ["dashboard", "timeline", startDate, endDate, [...sources].sort().join(",")] as const,
+    productivityToday: (date: string) => ["dashboard", "productivityToday", date] as const,
+    intelligence: (date: string) => ["dashboard", "intelligence", date] as const,
   },
   calendarSync: {
     all: () => ["calendarSync"] as const,

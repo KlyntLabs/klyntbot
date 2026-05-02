@@ -7,8 +7,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ProductivitySummaryResponse, TimelineEntry, TimelineSummary } from "@/bindings";
 import { formatHumanDuration, minutesSinceMidnight } from "@/utils/dashboardDates";
 import { useTimelineDrag } from "../../hooks/useTimelineDrag";
-import { type LayerKey, useEnabledLayers } from "../../lib/layers";
+import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../../lib/layers";
 import { computeOverlapLayout } from "../../lib/timeline-utils";
+import { SummaryPanel } from "../SummaryPanel";
 import { ActivityTrack } from "./ActivityTrack";
 import { CalendarTrack } from "./CalendarTrack";
 import { ContextRibbon } from "./ContextRibbon";
@@ -100,13 +101,14 @@ export interface DayColumnsProps {
 export function DayColumns({
   date,
   entries,
-  summary: _summary,
+  summary,
   isToday,
   loading,
   productivitySummary: _productivitySummary,
   queryKey,
 }: DayColumnsProps) {
   const { enabled } = useEnabledLayers();
+  const { sidebarOpen } = useSidebarOpen();
   const [selectedEntry, setSelectedEntry] = useState<TimelineEntry | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -474,6 +476,14 @@ export function DayColumns({
           </div>
         </div>
       </div>
+      {sidebarOpen && (
+        <SummaryPanel
+          summary={summary}
+          selectedEntry={selectedEntry}
+          onClose={() => setSelectedEntry(null)}
+          date={date}
+        />
+      )}
     </div>
   );
 }
