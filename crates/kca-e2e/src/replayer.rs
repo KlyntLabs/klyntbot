@@ -178,11 +178,25 @@ impl ReplayContext {
         // stays empty even though the agent itself answered correctly
         // from session history. Publish it manually here to wire the
         // memory pipeline back up for benchmarks.
+        //
+        // Defensive: if the bus has been dropped or has no live
+        // consumers, the publish becomes a no-op rather than a hard
+        // error. Observed during n=500 LoCoMo runs where late
+        // cognitive tasks could outlive the consumer in some teardown
+        // races. Losing one ChatTurnCompleted event for a single QA
+        // is not worth aborting the bench over.
         if let Ok(bus) = self.app.domain_event_bus() {
-            bus.publish(bus::DomainEvent::ChatTurnCompleted {
-                session_key,
-                user_message: Some(user_message),
-            });
+            if let Err(e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                bus.publish(bus::DomainEvent::ChatTurnCompleted {
+                    session_key,
+                    user_message: Some(user_message),
+                });
+            })) {
+                tracing::warn!(
+                    ?e,
+                    "ChatTurnCompleted publish failed (bus likely shutting down)"
+                );
+            }
         }
         Ok(answer)
     }
