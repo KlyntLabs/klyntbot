@@ -10,7 +10,8 @@ import {
   toLocalISO,
 } from "@/utils/dashboardDates";
 import { useDashboardState } from "../../hooks/useDashboardState";
-import { useEnabledLayers } from "../../lib/layers";
+import { useEnabledLayers, useSidebarOpen } from "../../lib/layers";
+import { SummaryPanel } from "../SummaryPanel";
 
 const DAY_LABELS = ["M", "", "W", "", "F", "", ""];
 
@@ -60,6 +61,7 @@ export function YearView() {
   const year = parseInt(date.slice(0, 4), 10) || new Date().getFullYear();
 
   const { enabledSources } = useEnabledLayers();
+  const { sidebarOpen } = useSidebarOpen();
   const sourcesKey = useMemo(() => enabledSources.map((s) => String(s)), [enabledSources]);
 
   const startDate = `${year}-01-01`;
@@ -73,9 +75,10 @@ export function YearView() {
 
   // Aggregate focus seconds per day
   const { dayMap, maxSecs } = useMemo(() => {
+    const enabledSet = new Set<string>(enabledSources.map((s) => String(s)));
     const map = new Map<string, number>();
     for (const entry of data.entries) {
-      if (entry.source !== "focus") continue;
+      if (!enabledSet.has(String(entry.source))) continue;
       const day = toLocalISO(new Date(entry.startedAt));
       map.set(day, (map.get(day) || 0) + (entry.durationSecs ?? 0));
     }
@@ -84,18 +87,15 @@ export function YearView() {
       if (v > max) max = v;
     }
     return { dayMap: map, maxSecs: max };
-  }, [data.entries]);
+  }, [data.entries, enabledSources]);
 
   const today = todayISO();
 
   return (
-    <div className="dashboard__year-grid">
-      <div className="dashboard__year-grid-inner">
-        {isLoading && (
-          <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", marginBottom: 8 }}>
-            Loading...
-          </div>
-        )}
+    <div style={{ display: "flex", gap: 8, height: "100%", width: "100%" }}>
+      <div className="dashboard__year-grid" style={{ flex: 1 }}>
+        <div className="dashboard__year-grid-inner">
+          {isLoading && <div className="dashboard__year-loading">Loading...</div>}
 
         <div className="dashboard__year-months">
           {Array.from({ length: 12 }, (_, monthIdx) => {
@@ -187,6 +187,10 @@ export function YearView() {
           <span className="dashboard__year-legend-label">More focus</span>
         </div>
       </div>
+    </div>
+    {sidebarOpen && (
+        <SummaryPanel summary={null} selectedEntry={null} onClose={() => {}} />
+      )}
     </div>
   );
 }
