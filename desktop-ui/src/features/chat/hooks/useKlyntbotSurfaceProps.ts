@@ -38,9 +38,6 @@ type ComposerOverride = Pick<
   | "onStop"
   | "canStop"
   | "isProcessing"
-  | "models"
-  | "selectedModelId"
-  | "onSelectModel"
   | "collaborationModes"
   | "selectedCollaborationModeId"
   | "onSelectCollaborationMode"
@@ -245,9 +242,6 @@ export function useKlyntbotSurfaceProps(
       onStop: () => {},
       canStop: false,
       isProcessing: chat.isStreaming,
-      models: [{ id: "klyntbot", displayName: "klyntbot", model: "klyntbot" }],
-      selectedModelId: "klyntbot",
-      onSelectModel: () => {},
       collaborationModes: [{ id: "default", label: "klyntbot" }],
       selectedCollaborationModeId: "default",
       onSelectCollaborationMode: () => {},

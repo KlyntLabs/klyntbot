@@ -95,6 +95,7 @@ describe("useComposerAutocompleteState slash commands", () => {
     );
 
     const labels = result.current.autocompleteMatches.map((item) => item.label);
+    // Generic Codex-style slashes
     expect(labels).toEqual(
       expect.arrayContaining([
         "apps",
@@ -108,17 +109,20 @@ describe("useComposerAutocompleteState slash commands", () => {
         "status",
       ]),
     );
-    expect(labels.slice(0, 9)).toEqual([
-      "apps",
-      "compact",
-      "fast",
-      "fork",
-      "mcp",
-      "new",
-      "resume",
-      "review",
-      "status",
-    ]);
+    // Phase 2 + coding-mode slashes derived from registry FLAT_CATALOG
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        "sessions rewind",
+        "sessions export",
+        "sessions fork",
+        "permissions clear-mirror",
+        "dead-ends",
+        "mirror",
+      ]),
+    );
+    // Sorted alphabetically
+    const sorted = [...labels].sort((a, b) => a.localeCompare(b));
+    expect(labels).toEqual(sorted);
   });
 
   it("hides /apps when apps are disabled", () => {
@@ -149,7 +153,21 @@ describe("useComposerAutocompleteState slash commands", () => {
 
     const labels = result.current.autocompleteMatches.map((item) => item.label);
     expect(labels).not.toContain("apps");
-    expect(labels).toEqual(["compact", "fast", "fork", "mcp", "new", "resume", "review", "status"]);
+    // Generic slashes still present
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        "compact",
+        "fast",
+        "fork",
+        "mcp",
+        "new",
+        "resume",
+        "review",
+        "status",
+      ]),
+    );
+    // Phase 2 entries still present (independent of appsEnabled)
+    expect(labels).toEqual(expect.arrayContaining(["sessions rewind", "dead-ends", "mirror"]));
   });
 });
 

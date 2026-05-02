@@ -7,6 +7,7 @@ import {
 import { isComposingEvent } from "@utils/keys";
 import { useCallback, useMemo } from "react";
 import { connectorMentionSlug } from "@/features/apps/utils/appMentions";
+import { FLAT_CATALOG } from "@/features/coding/slash/registry";
 import type { AppOption, CustomPromptOption } from "@/types";
 import type { AutocompleteItem } from "./useComposerAutocomplete";
 import { useComposerAutocomplete } from "./useComposerAutocomplete";
@@ -150,74 +151,41 @@ export function useComposerAutocompleteState({
   );
 
   const slashCommandItems = useMemo<AutocompleteItem[]>(() => {
-    const commands: AutocompleteItem[] = [
-      {
-        id: "compact",
-        label: "compact",
-        description: "compact the active thread context",
-        insertText: "compact",
-        group: "Slash",
-      },
-      {
-        id: "fast",
-        label: "fast",
-        description: "toggle Fast mode for upcoming turns",
-        insertText: "fast",
-        group: "Slash",
-      },
-      {
-        id: "fork",
-        label: "fork",
-        description: "branch into a new thread",
-        insertText: "fork",
-        group: "Slash",
-      },
-      {
-        id: "mcp",
-        label: "mcp",
-        description: "list configured MCP tools",
-        insertText: "mcp",
-        group: "Slash",
-      },
-      {
-        id: "new",
-        label: "new",
-        description: "start a new chat",
-        insertText: "new",
-        group: "Slash",
-      },
-      {
-        id: "review",
-        label: "review",
-        description: "start a code review",
-        insertText: "review",
-        group: "Slash",
-      },
-      {
-        id: "resume",
-        label: "resume",
-        description: "refresh the active thread",
-        insertText: "resume",
-        group: "Slash",
-      },
-      {
-        id: "status",
-        label: "status",
-        description: "show session status",
-        insertText: "status",
-        group: "Slash",
-      },
+    // Generic Codex-style slashes (no Tauri dispatch — handled by upstream chat layer).
+    const generic: AutocompleteItem[] = [
+      { id: "compact", label: "compact", description: "compact the active thread context", insertText: "compact", group: "Slash" },
+      { id: "fast", label: "fast", description: "toggle Fast mode for upcoming turns", insertText: "fast", group: "Slash" },
+      { id: "fork", label: "fork", description: "branch into a new thread", insertText: "fork", group: "Slash" },
+      { id: "mcp", label: "mcp", description: "list configured MCP tools", insertText: "mcp", group: "Slash" },
+      { id: "new", label: "new", description: "start a new chat", insertText: "new", group: "Slash" },
+      { id: "review", label: "review", description: "start a code review", insertText: "review", group: "Slash" },
+      { id: "resume", label: "resume", description: "refresh the active thread", insertText: "resume", group: "Slash" },
+      { id: "status", label: "status", description: "show session status", insertText: "status", group: "Slash" },
     ];
     if (appsEnabled) {
-      commands.push({
-        id: "apps",
-        label: "apps",
-        description: "list available apps",
-        insertText: "apps",
-        group: "Slash",
-      });
+      generic.push({ id: "apps", label: "apps", description: "list available apps", insertText: "apps", group: "Slash" });
     }
-    return commands.sort((a, b) => a.label.localeCompare(b.label));
+    // Derived from FLAT_CATALOG so new registry entries surface automatically.
+    const coding: AutocompleteItem[] = FLAT_CATALOG.map((entry) => {
+      const stripped = entry.command.replace(/^\//, "");
+      const insert = entry.argHint ? `${stripped} ${entry.argHint}` : stripped;
+      return {
+        id: stripped,
+        label: stripped,
+        description: entry.description,
+        insertText: insert,
+        cursorOffset: entry.argHint ? stripped.length + 1 : undefined,
+        group: "Slash" as const,
+      };
+    });
+    const seen = new Set<string>();
+    const merged: AutocompleteItem[] = [];
+    for (const item of [...generic, ...coding]) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      merged.push(item);
+    }
+    return merged.sort((a, b) => a.label.localeCompare(b.label));
   }, [appsEnabled]);
 
   const slashItems = useMemo<AutocompleteItem[]>(

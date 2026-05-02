@@ -1,8 +1,10 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use sqlx::SqlitePool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use storage::StorageError;
 
 const DECAY_HALF_LIFE_DAYS: f64 = 14.0;
+static LEGACY_SITE_PURGE_DONE: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug, Clone)]
 pub struct AttentionAggregator {
@@ -31,7 +33,11 @@ impl AttentionAggregator {
         // We only need the fields required for grouping + scoring.
         let rows: Vec<ActivityEventLite> = sqlx::query_as(
             "SELECT
-                COALESCE(NULLIF(bundle_id, ''), lower(NULLIF(site_name, '')), lower(app_name)) AS canonical_id,
+                CASE
+                    WHEN site_name IS NOT NULL AND site_name != ''
+                        THEN lower(site_name)
+                    ELSE COALESCE(NULLIF(bundle_id, ''), lower(app_name))
+                END AS canonical_id,
                 CASE WHEN site_name IS NOT NULL AND site_name != '' THEN 'site' ELSE 'app' END AS kind,
                 COALESCE(site_name, app_name) AS display_name,
                 started_at,
@@ -111,6 +117,21 @@ impl AttentionAggregator {
 
         // Single transaction so 1000 entities = 1 fsync, not 1000.
         let mut tx = self.pool.begin().await?;
+
+        // One-shot per-process: purge legacy poisoned site rows whose canonical_id
+        // is actually a browser bundle id (pre-fix COALESCE ordering bug).
+        if !LEGACY_SITE_PURGE_DONE.swap(true, Ordering::Relaxed) {
+            sqlx::query(
+                "DELETE FROM entity_attention
+                 WHERE kind = 'site'
+                   AND canonical_id IN (
+                       SELECT canonical_id FROM entity_attention WHERE kind = 'app'
+                   )",
+            )
+            .execute(&mut *tx)
+            .await?;
+        }
+
         let mut affected: u64 = 0;
         for ((canonical_id, kind), acc) in groups {
             sqlx::query(
@@ -253,13 +274,17 @@ mod tests {
         }
 
         let affected = agg.rebuild_from_activity(30).await.unwrap();
-        assert_eq!(affected, 2); // com.apple.safari (app) + com.google.chrome (site)
+        assert_eq!(affected, 2); // com.apple.Safari (app) + github.com (site)
 
         let repo = EntityAttentionRepo::new(pool);
         let top = repo.top_by_attention(None, 10).await.unwrap();
         assert_eq!(top.len(), 2);
-        assert!(top.iter().any(|r| r.canonical_id == "com.apple.Safari"));
-        assert!(top.iter().any(|r| r.canonical_id == "com.google.Chrome"));
+        assert!(top
+            .iter()
+            .any(|r| r.canonical_id == "com.apple.Safari" && r.kind == "app"));
+        assert!(top
+            .iter()
+            .any(|r| r.canonical_id == "github.com" && r.kind == "site"));
     }
 
     #[tokio::test]

@@ -653,6 +653,95 @@ impl AppCore {
             new_session_key: new_key,
         })
     }
+
+    // ── Workspace lifecycle (Cursor/Codex-style "open folder") ────────────
+    //
+    // Workspaces are registered folders on disk. The `id` UUID flows into
+    // `sessions.repo_id`, `coding_approval_history.repo_id`, and `GuardCtx.repo_id`
+    // (Phase 2). `project_id` (optional) links to a Klyntbot organizational
+    // project; null for one-off folders.
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn list_workspaces(&self) -> common::Result<serde_json::Value> {
+        let rows = self.repos.workspaces.list_all().await?;
+        let dtos: Vec<_> = rows.into_iter().map(workspace_row_to_dto).collect();
+        Ok(serde_json::Value::Array(dtos))
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn add_workspace(&self, path: String) -> common::Result<serde_json::Value> {
+        let abs = std::path::PathBuf::from(&path);
+        let canonical = tokio::fs::canonicalize(&abs).await.map_err(|e| {
+            common::KlyntbotError::Storage(format!("invalid workspace path '{path}': {e}"))
+        })?;
+        let meta = tokio::fs::metadata(&canonical).await.map_err(|e| {
+            common::KlyntbotError::Storage(format!("workspace path stat failed: {e}"))
+        })?;
+        if !meta.is_dir() {
+            return Err(common::KlyntbotError::Storage(format!(
+                "workspace path is not a directory: {path}"
+            )));
+        }
+        let path_str = canonical.to_string_lossy().into_owned();
+        if let Some(existing) = self.repos.workspaces.get_by_path(&path_str).await? {
+            return Ok(workspace_row_to_dto(existing));
+        }
+        let name = canonical
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("workspace")
+            .to_string();
+        let id = format!("ws-{}", uuid::Uuid::new_v4());
+        let row = self
+            .repos
+            .workspaces
+            .insert(storage::repos::NewWorkspace {
+                id: &id,
+                name: &name,
+                path: &path_str,
+                kind: "main",
+                parent_id: None,
+                project_id: None,
+                settings_json: "{}",
+            })
+            .await?;
+        Ok(workspace_row_to_dto(row))
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn is_workspace_path_dir(&self, path: String) -> common::Result<bool> {
+        match tokio::fs::metadata(&path).await {
+            Ok(m) => Ok(m.is_dir()),
+            Err(_) => Ok(false),
+        }
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn remove_workspace(&self, id: String) -> common::Result<()> {
+        self.repos.workspaces.remove(&id).await?;
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn connect_workspace(&self, id: String) -> common::Result<()> {
+        self.repos.workspaces.set_connected(&id, true).await?;
+        Ok(())
+    }
+}
+
+fn workspace_row_to_dto(row: storage::repos::WorkspaceRow) -> serde_json::Value {
+    let settings: serde_json::Value =
+        serde_json::from_str(&row.settings).unwrap_or_else(|_| serde_json::json!({}));
+    serde_json::json!({
+        "id": row.id,
+        "name": row.name,
+        "path": row.path,
+        "connected": row.connected != 0,
+        "kind": row.kind,
+        "parentId": row.parent_id,
+        "projectId": row.project_id,
+        "settings": settings,
+    })
 }
 
 impl AppCore {

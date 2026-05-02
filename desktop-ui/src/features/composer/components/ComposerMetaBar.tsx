@@ -1,14 +1,18 @@
 import type { CodexArgsOption } from "@threads/utils/codexArgsProfiles";
-import { BrainCog, SlidersHorizontal, Zap } from "lucide-react";
+import { BrainCog, Server, SlidersHorizontal, Zap } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
-import type { AccessMode, ServiceTier, ThreadTokenUsage } from "@/types";
+import type { AccessMode, ServiceTier } from "@/types";
+import type { ProviderInfo } from "@/features/models/hooks/useProviders";
 
 type ComposerMetaBarProps = {
   disabled: boolean;
   collaborationModes: { id: string; label: string }[];
   selectedCollaborationModeId: string | null;
   onSelectCollaborationMode: (id: string | null) => void;
-  models: { id: string; displayName: string; model: string }[];
+  providers: ProviderInfo[];
+  selectedProviderId: string | null;
+  onSelectProvider: (id: string | null) => void;
+  models: { id: string; displayName: string; model: string; provider: string | null }[];
   selectedModelId: string | null;
   onSelectModel: (id: string) => void;
   reasoningOptions: string[];
@@ -21,7 +25,6 @@ type ComposerMetaBarProps = {
   codexArgsOptions?: CodexArgsOption[];
   selectedCodexArgsOverride?: string | null;
   onSelectCodexArgsOverride?: (value: string | null) => void;
-  contextUsage?: ThreadTokenUsage | null;
   children?: ReactNode;
 };
 
@@ -30,6 +33,9 @@ export function ComposerMetaBar({
   collaborationModes,
   selectedCollaborationModeId,
   onSelectCollaborationMode,
+  providers,
+  selectedProviderId,
+  onSelectProvider,
   models,
   selectedModelId,
   onSelectModel,
@@ -43,7 +49,6 @@ export function ComposerMetaBar({
   codexArgsOptions = [],
   selectedCodexArgsOverride = null,
   onSelectCodexArgsOverride,
-  contextUsage = null,
   children,
 }: ComposerMetaBarProps) {
   const selectedModel = models.find((model) => model.id === selectedModelId) ?? null;
@@ -51,14 +56,6 @@ export function ComposerMetaBar({
   const modelSelectStyle = {
     "--composer-model-select-width": `${Math.max(selectedModelLabel.length + 2, 8)}ch`,
   } as CSSProperties;
-  const contextWindow = contextUsage?.modelContextWindow ?? null;
-  const lastTokens = contextUsage?.last.totalTokens ?? 0;
-  const totalTokens = contextUsage?.total.totalTokens ?? 0;
-  const usedTokens = lastTokens > 0 ? lastTokens : totalTokens;
-  const contextFreePercent =
-    contextWindow && contextWindow > 0 && usedTokens > 0
-      ? Math.max(0, 100 - Math.min(Math.max((usedTokens / contextWindow) * 100, 0), 100))
-      : null;
   const planMode = collaborationModes.find((mode) => mode.id === "plan") ?? null;
   const defaultMode = collaborationModes.find((mode) => mode.id === "default") ?? null;
   const canUsePlanToggle =
@@ -127,6 +124,27 @@ export function ComposerMetaBar({
               </select>
             </div>
           ))}
+        {providers.length > 0 && (
+          <div className="composer-select-wrap composer-select-wrap--provider">
+            <span className="composer-icon composer-icon--provider" aria-hidden>
+              <Server size={14} strokeWidth={1.8} />
+            </span>
+            <select
+              className="composer-select composer-select--provider"
+              aria-label="Provider"
+              value={selectedProviderId ?? ""}
+              onChange={(event) => onSelectProvider(event.target.value || null)}
+              disabled={disabled}
+            >
+              <option value="">Select provider...</option>
+              {providers.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.displayName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="composer-select-wrap composer-select-wrap--model">
           <span className="composer-icon composer-icon--model" aria-hidden>
             <svg viewBox="0 0 24 24" fill="none">
@@ -153,15 +171,23 @@ export function ComposerMetaBar({
             aria-label="Model"
             value={selectedModelId ?? ""}
             onChange={(event) => onSelectModel(event.target.value)}
-            disabled={disabled}
+            disabled={disabled || models.length === 0}
             style={modelSelectStyle}
           >
-            {models.length === 0 && <option value="">No models</option>}
-            {models.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.displayName || model.model}
-              </option>
-            ))}
+            {providers.length > 0 && !selectedProviderId ? (
+              <option value="">Select provider first</option>
+            ) : models.length === 0 ? (
+              <option value="">No models available</option>
+            ) : (
+              <>
+                <option value="">Select model...</option>
+                {models.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.displayName || model.model}
+                  </option>
+                ))}
+              </>
+            )}
           </select>
           {selectedServiceTier === "fast" && (
             <span
@@ -242,28 +268,6 @@ export function ComposerMetaBar({
             <option value="current">On-Request</option>
             <option value="full-access">Full access</option>
           </select>
-        </div>
-      </div>
-      <div className="composer-context">
-        <div
-          className="composer-context-ring"
-          data-tooltip={
-            contextFreePercent === null
-              ? "Context free --"
-              : `Context free ${Math.round(contextFreePercent)}%`
-          }
-          aria-label={
-            contextFreePercent === null
-              ? "Context free --"
-              : `Context free ${Math.round(contextFreePercent)}%`
-          }
-          style={
-            {
-              "--context-free": contextFreePercent ?? 0,
-            } as CSSProperties
-          }
-        >
-          <span className="composer-context-value">●</span>
         </div>
       </div>
     </div>

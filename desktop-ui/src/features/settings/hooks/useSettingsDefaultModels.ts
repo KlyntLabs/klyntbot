@@ -94,6 +94,7 @@ export function useSettingsDefaultModels(projects: WorkspaceInfo[]) {
               model: configModel,
               displayName: configModel,
               description: CONFIG_MODEL_DESCRIPTION,
+              provider: null,
               supportedReasoningEfforts: [],
               defaultReasoningEffort: null,
               isDefault: true,

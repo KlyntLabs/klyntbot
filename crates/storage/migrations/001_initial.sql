@@ -876,3 +876,27 @@ CREATE TABLE IF NOT EXISTS coding_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_coding_snapshots_session
   ON coding_snapshots(session_key, created_at);
+
+-- ============================================================
+-- Workspaces (code editor workspace lifecycle, Cursor/Codex-style)
+-- ============================================================
+-- A registered folder on disk. Phase 2 surfaces (sessions.repo_id,
+-- coding_approval_history.repo_id, GuardCtx.repo_id) carry this id as
+-- a freeform string. project_id is an optional link to a Klyntbot
+-- organizational project; null for one-off folders.
+CREATE TABLE IF NOT EXISTS workspaces (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    path        TEXT NOT NULL UNIQUE,
+    connected   INTEGER NOT NULL DEFAULT 1,
+    kind        TEXT NOT NULL DEFAULT 'main',
+    parent_id   TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
+    project_id  TEXT REFERENCES projects(id) ON DELETE SET NULL,
+    settings    TEXT NOT NULL DEFAULT '{}',
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_workspaces_path ON workspaces(path);
+CREATE INDEX IF NOT EXISTS idx_workspaces_project_id ON workspaces(project_id);
+CREATE INDEX IF NOT EXISTS idx_workspaces_parent_id ON workspaces(parent_id);

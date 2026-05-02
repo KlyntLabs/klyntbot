@@ -57,6 +57,7 @@ pub mod window;
 pub mod work_context;
 pub mod workflows;
 pub mod workspace;
+pub mod workspace_lifecycle;
 
 #[cfg(debug_assertions)]
 pub(crate) mod dev_helpers;

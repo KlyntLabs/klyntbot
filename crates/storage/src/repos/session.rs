@@ -610,10 +610,7 @@ impl SessionRepo {
         up_to_message: Option<&str>,
     ) -> Result<String, StorageError> {
         let new_key = format!("fork-{}", uuid::Uuid::new_v4());
-        let metadata = match self.get_session(source_key).await {
-            Ok(s) => s.metadata,
-            Err(_) => "{}".into(),
-        };
+        let metadata = self.get_session(source_key).await?.metadata;
         sqlx::query(
             "INSERT INTO sessions (key, metadata, parent_session_id, conversation_type, approval_mode) \
              SELECT ?, ?, key, conversation_type, approval_mode FROM sessions WHERE key = ?"

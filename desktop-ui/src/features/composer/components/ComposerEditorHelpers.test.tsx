@@ -33,6 +33,9 @@ function ComposerHarness({ initialText = "", editorSettings }: HarnessProps) {
       collaborationModes={[]}
       selectedCollaborationModeId={null}
       onSelectCollaborationMode={() => {}}
+      providers={[]}
+      selectedProviderId={null}
+      onSelectProvider={() => {}}
       models={[]}
       selectedModelId={null}
       onSelectModel={() => {}}
