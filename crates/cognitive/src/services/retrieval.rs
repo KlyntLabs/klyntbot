@@ -104,6 +104,7 @@ pub async fn retrieve_relevant_facts(
     co_activation_repo: Option<&CoActivationRepo>,
     depth_cache: Option<&KnowledgeDepthCache>,
     community_cache: Option<&CommunityCache>,
+    entity_repo: Option<&crate::repos::EntityRepo>,
 ) -> Result<Vec<ScoredFact>, sqlx::Error> {
     let use_vector = !query.is_empty() && embedder.map(|e| e.is_available()).unwrap_or(false);
 
@@ -194,28 +195,40 @@ pub async fn retrieve_relevant_facts(
             None
         };
 
-        // Phase 2 (KCA_PHASE_2=1): build a per-entity FTS term list so proper
-        // nouns aren't drowned out by question filler words under BM25.
-        // Falls back to the raw query when no entities are detected.
-        let phase_2_on = matches!(
-            std::env::var("KCA_PHASE_2").ok().as_deref(),
-            Some("1") | Some("true") | Some("yes")
-        );
-        let fts_terms: Vec<String> = if phase_2_on {
-            let entities = crate::services::graph_retrieval::extract_query_entities(query);
-            crate::bench_hooks::record_entities(&entities);
-            if entities.is_empty() {
-                vec![query.to_string()]
-            } else {
-                let mut terms: Vec<String> = entities
-                    .iter()
-                    .map(|e| format!("\"{}\"", e.replace('"', "")))
-                    .collect();
-                terms.push(query.to_string());
-                terms
-            }
-        } else {
+        // Build a per-entity FTS term list so proper nouns aren't
+        // drowned out by question filler words under BM25. When an
+        // EntityRepo is wired, expand each detected entity through its
+        // alias table (possessive / short-form / nickname forms) so
+        // questions phrased as "Caroline's necklace" or "Mel's husband"
+        // resolve to the canonical entity. Always-on now that Tier 1's
+        // FTS-as-candidate fix is in place; production paths see
+        // identical behavior to pre-Tier 1 when no entity is in the
+        // query.
+        let entities = crate::services::graph_retrieval::extract_query_entities(query);
+        crate::bench_hooks::record_entities(&entities);
+        let fts_terms: Vec<String> = if entities.is_empty() {
             vec![query.to_string()]
+        } else {
+            let mut terms_set: std::collections::BTreeSet<String> =
+                std::collections::BTreeSet::new();
+            for e in &entities {
+                terms_set.insert(format!("\"{}\"", e.replace('"', "")));
+                if let Some(er) = entity_repo {
+                    if let Ok(rows) = er.find_by_name(e).await {
+                        for row in rows {
+                            if let Ok(aliases) = er.list_aliases(&row.id).await {
+                                for alias in aliases {
+                                    terms_set
+                                        .insert(format!("\"{}\"", alias.replace('"', "")));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            let mut terms: Vec<String> = terms_set.into_iter().collect();
+            terms.push(query.to_string());
+            terms
         };
 
         // Collect rank + full fact row for every FTS hit across all terms.
@@ -519,7 +532,10 @@ pub async fn retrieve_all_domains(
         ..RetrievalParams::new(0)
     };
     // retrieve_relevant_facts already returns results sorted by score.
-    retrieve_relevant_facts(repo, embedder, query, domains, &params, None, None, None).await
+    retrieve_relevant_facts(
+        repo, embedder, query, domains, &params, None, None, None, None,
+    )
+    .await
 }
 
 #[cfg(test)]

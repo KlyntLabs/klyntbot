@@ -359,6 +359,25 @@ CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
     tokenize='porter unicode61'
 );
 
+-- Aliases for an entity. Closes the gap where the question references
+-- an entity by a non-canonical form ("Mel" for "Melissa", "Caroline's"
+-- for "Caroline"). Populated at extraction time; expanded at query
+-- time inside `extract_query_entities`. alias_type is purely advisory
+-- — retrieval treats all aliases as equivalent matches.
+CREATE TABLE IF NOT EXISTS entity_aliases (
+    id TEXT PRIMARY KEY,
+    entity_id TEXT NOT NULL,
+    alias TEXT NOT NULL,
+    alias_type TEXT NOT NULL,        -- 'short_form' | 'possessive' | 'nickname' | 'full_form' | 'spelling'
+    source TEXT NOT NULL,            -- 'derived' | 'extraction' | 'manual'
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE,
+    UNIQUE(entity_id, alias)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_aliases_alias ON entity_aliases(alias);
+CREATE INDEX IF NOT EXISTS idx_entity_aliases_entity ON entity_aliases(entity_id);
+
 CREATE TRIGGER IF NOT EXISTS entities_ai AFTER INSERT ON entities BEGIN
     INSERT INTO entities_fts(rowid, name, description)
     VALUES (new.rowid, new.name, COALESCE(new.description, ''));

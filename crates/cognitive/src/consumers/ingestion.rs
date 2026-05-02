@@ -317,7 +317,7 @@ impl SignalConsumer for IngestionConsumer {
                             // retrieval all see a near-empty graph
                             // regardless of what the extractor found.
                             for ent in &result.entities {
-                                if let Err(e) = entity_repo
+                                match entity_repo
                                     .upsert_entity(&crate::repos::NewEntity {
                                         name: ent.name.clone(),
                                         entity_type: ent.entity_type.clone(),
@@ -328,7 +328,29 @@ impl SignalConsumer for IngestionConsumer {
                                     })
                                     .await
                                 {
-                                    tracing::warn!(error = %e, name = %ent.name, "entity upsert failed");
+                                    Ok(row) => {
+                                        // Auto-derive possessive + short-form
+                                        // aliases so retrieval finds the entity
+                                        // when the question phrases it as
+                                        // "Caroline's" or "Mel".
+                                        for (alias, alias_type) in
+                                            crate::repos::entity::derive_name_aliases(&ent.name)
+                                        {
+                                            let _ = entity_repo
+                                                .upsert_alias(
+                                                    &row.id,
+                                                    &alias,
+                                                    alias_type,
+                                                    "derived",
+                                                )
+                                                .await;
+                                        }
+                                    }
+                                    Err(e) => tracing::warn!(
+                                        error = %e,
+                                        name = %ent.name,
+                                        "entity upsert failed"
+                                    ),
                                 }
                             }
                             for rel in &result.relationships {

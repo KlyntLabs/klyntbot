@@ -5,6 +5,68 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
+/// Conservative aliases derivable purely from a canonical name string —
+/// no LLM calls, no language models. Safe to call at extraction time
+/// for every entity. Returns `(alias, alias_type)` pairs.
+///
+/// Cases handled:
+/// - Possessive form: `Caroline` → `Caroline's`
+/// - Short form for ≥6-char single-token names: `Melissa` → `Mel`
+///
+/// Multi-word names (`Matt Patterson`) are intentionally skipped here;
+/// nickname mining for those needs LLM context.
+pub fn derive_name_aliases(name: &str) -> Vec<(String, &'static str)> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    let mut out: Vec<(String, &'static str)> = Vec::new();
+    out.push((format!("{trimmed}'s"), "possessive"));
+    if !trimmed.contains(char::is_whitespace)
+        && trimmed.chars().count() >= 6
+        && trimmed.chars().all(|c| c.is_alphabetic())
+    {
+        let short: String = trimmed.chars().take(3).collect();
+        if short.len() >= 3 && short.to_lowercase() != trimmed.to_lowercase() {
+            out.push((short, "short_form"));
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod alias_derivation_tests {
+    use super::derive_name_aliases;
+
+    #[test]
+    fn possessive_always_emitted() {
+        let aliases = derive_name_aliases("Caroline");
+        assert!(aliases
+            .iter()
+            .any(|(a, t)| a == "Caroline's" && *t == "possessive"));
+    }
+
+    #[test]
+    fn short_form_for_long_name() {
+        let aliases = derive_name_aliases("Melissa");
+        assert!(aliases
+            .iter()
+            .any(|(a, t)| a == "Mel" && *t == "short_form"));
+    }
+
+    #[test]
+    fn no_short_form_for_short_name() {
+        let aliases = derive_name_aliases("Bob");
+        assert!(aliases.iter().all(|(_, t)| *t != "short_form"));
+    }
+
+    #[test]
+    fn no_short_form_for_multiword() {
+        let aliases = derive_name_aliases("Matt Patterson");
+        assert!(aliases.iter().all(|(_, t)| *t != "short_form"));
+    }
+}
+
 // ── Row types ───────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -186,21 +248,30 @@ impl EntityRepo {
         }
     }
 
-    /// Find entities by name: exact match first, then FTS5 fallback.
+    /// Find entities by name: exact match → alias lookup → FTS5 fallback.
+    /// The alias hop catches cases like "Mel" resolving to "Melissa" or
+    /// "Caroline's" resolving to "Caroline" — needed for proper-noun
+    /// retrieval when the question phrases an entity in a non-canonical
+    /// form.
     pub async fn find_by_name(&self, query: &str) -> Result<Vec<EntityRow>, sqlx::Error> {
-        // Try exact match first
+        // 1. Exact match on canonical name.
         let exact = sqlx::query_as::<_, EntityRow>(
             "SELECT * FROM entities WHERE LOWER(TRIM(name)) = LOWER(TRIM(?1))",
         )
         .bind(query)
         .fetch_all(&self.pool)
         .await?;
-
         if !exact.is_empty() {
             return Ok(exact);
         }
 
-        // FTS5 fallback via subquery (quote the query to handle special chars)
+        // 2. Alias lookup (possessives, short forms, nicknames).
+        let aliased = self.find_by_alias(query).await?;
+        if !aliased.is_empty() {
+            return Ok(aliased);
+        }
+
+        // 3. FTS5 fallback (handles partial / fuzzy matches).
         let fts_query = format!("\"{}\"", query.replace('"', "\"\""));
         sqlx::query_as::<_, EntityRow>(
             "SELECT * FROM entities WHERE rowid IN (SELECT rowid FROM entities_fts WHERE entities_fts MATCH ?1 LIMIT 10)",
@@ -216,6 +287,60 @@ impl EntityRepo {
             .bind(id)
             .fetch_optional(&self.pool)
             .await
+    }
+
+    /// Insert an alias mapping. Idempotent on (entity_id, alias).
+    pub async fn upsert_alias(
+        &self,
+        entity_id: &str,
+        alias: &str,
+        alias_type: &str,
+        source: &str,
+    ) -> Result<(), sqlx::Error> {
+        let alias_norm = alias.trim();
+        if alias_norm.is_empty() {
+            return Ok(());
+        }
+        let now = Timestamp::now().to_string();
+        sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO entity_aliases (id, entity_id, alias, alias_type, source, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            "#,
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(entity_id)
+        .bind(alias_norm)
+        .bind(alias_type)
+        .bind(source)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Resolve an alias to its canonical entity row (case-insensitive).
+    pub async fn find_by_alias(&self, alias: &str) -> Result<Vec<EntityRow>, sqlx::Error> {
+        sqlx::query_as::<_, EntityRow>(
+            r#"
+            SELECT e.* FROM entities e
+            INNER JOIN entity_aliases a ON a.entity_id = e.id
+            WHERE LOWER(TRIM(a.alias)) = LOWER(TRIM(?1))
+            "#,
+        )
+        .bind(alias)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Return every alias string registered for an entity.
+    pub async fn list_aliases(&self, entity_id: &str) -> Result<Vec<String>, sqlx::Error> {
+        let rows: Vec<(String,)> =
+            sqlx::query_as("SELECT alias FROM entity_aliases WHERE entity_id = ?1")
+                .bind(entity_id)
+                .fetch_all(&self.pool)
+                .await?;
+        Ok(rows.into_iter().map(|(a,)| a).collect())
     }
 
     /// Get all relationships for a given entity (both directions).

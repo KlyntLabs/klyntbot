@@ -295,6 +295,7 @@ impl UnifiedMemoryService {
             self.co_activation_repo.as_ref(),
             Some(&self.depth_cache),
             Some(&self.community_cache),
+            self.entity_repo.as_ref(),
         )
         .await
         {
@@ -379,6 +380,7 @@ impl UnifiedMemoryService {
             None,
             None,
             None,
+            self.entity_repo.as_ref(),
         )
         .await
         {
@@ -461,6 +463,7 @@ impl UnifiedMemoryService {
             None,
             None,
             None,
+            self.entity_repo.as_ref(),
         )
         .await
         {
