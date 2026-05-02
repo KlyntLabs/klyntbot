@@ -211,6 +211,7 @@ multiple facts (name=Alice, works_at=Anthropic).\n\
 - Questions (e.g., 'What is my name?') are NOT facts — return empty for questions\n\
 - Be specific in predicates — use snake_case (\"name\", \"works_at\", \"lives_in\")\n\
 - Be concise in objects — just the value, not the full sentence\n\
+- PRESERVE SPECIFIC NOUNS EXACTLY. Names, places, items, dates, numbers, brands, colors, kinship terms (grandma, husband, sister) must appear in the object verbatim — never paraphrase \"a gold necklace from grandma\" as \"jewelry\" or \"Mel's husband\" as \"family member\". Incidental detail recall depends on this.\n\
 - IDENTITY BINDING: when an observation contains \"I'm X\", \"I am X\", or \"My name is X\", \
 emit BOTH a {subject:\"user\", predicate:\"name\", object:\"X\"} fact AND apply X as a \
 parallel subject for every first-person fact in the SAME observation.\n\
