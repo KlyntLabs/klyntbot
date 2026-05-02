@@ -3,7 +3,14 @@ use crate::inventory::ContextInventory;
 use providers::Message;
 
 /// Default number of memory entries to retrieve.
-pub(crate) const DEFAULT_MEMORY_RETRIEVAL_LIMIT: usize = 5;
+///
+/// Wave 1: raised from 5 → 12. The original value was calibrated for short
+/// chat sessions; long-history corpora (LoCoMo, multi-month threads)
+/// frequently need 3+ chained facts to answer a multi-hop question, and a
+/// 5-cut buries the chain. 12 is a compromise: enough head-room for multi-
+/// hop while keeping the system-prompt token budget under ~2K
+/// (12 × ~150 chars per fact).
+pub(crate) const DEFAULT_MEMORY_RETRIEVAL_LIMIT: usize = 12;
 
 /// Determines how the agent should process a request.
 #[derive(Debug, Clone)]
