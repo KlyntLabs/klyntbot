@@ -16,7 +16,7 @@ mod temporal_scheduler;
 
 use std::sync::Arc;
 
-use ::agent::cognitive_handlers::LlmExtractionHandler;
+use ::agent::cognitive_handlers::{LlmConflictResolver, LlmExtractionHandler};
 use ::agent::cognitive_handlers::{HeuristicCoachingReasonerHandler, LlmCoachingReasonerHandler};
 use ::agent::AgentLoop;
 use ::channels::ChannelManager;
@@ -637,17 +637,37 @@ impl AppCore {
                     Arc::new(LlmExtractionHandler::new(cp.clone(), params))
                         as Arc<dyn ::cognitive::ExtractionHandler>
                 });
-            let ingestion: Arc<dyn ai_core::SignalConsumer> = Arc::new(
-                ::cognitive::consumers::IngestionConsumer::new(
-                    observation_repo,
-                    entity_repo,
-                    episodic_repo,
-                    extraction_handler,
-                )
-                .with_fact_repo(::cognitive::SemanticFactRepo::new(
-                    storage_pool.inner().clone(),
-                )),
-            );
+            // Wire AUDD conflict resolver when KCA_AUDD=1. Resolver is
+            // optional; when absent the consumer's default Add-only path
+            // runs (pre-AUDD behavior). Production callers stay safe by
+            // default.
+            let audd_resolver: Option<
+                Arc<dyn ::cognitive::services::extraction::ConflictResolver>,
+            > = if matches!(
+                std::env::var("KCA_AUDD").ok().as_deref(),
+                Some("1") | Some("true") | Some("yes")
+            ) {
+                cognitive_provider.clone().map(|cp| {
+                    let params = providers::cognitive_chat_params(&config, 1024);
+                    Arc::new(LlmConflictResolver::new(cp, params))
+                        as Arc<dyn ::cognitive::services::extraction::ConflictResolver>
+                })
+            } else {
+                None
+            };
+            let mut ingestion_inner = ::cognitive::consumers::IngestionConsumer::new(
+                observation_repo,
+                entity_repo,
+                episodic_repo,
+                extraction_handler,
+            )
+            .with_fact_repo(::cognitive::SemanticFactRepo::new(
+                storage_pool.inner().clone(),
+            ));
+            if let Some(resolver) = audd_resolver {
+                ingestion_inner = ingestion_inner.with_conflict_resolver(resolver);
+            }
+            let ingestion: Arc<dyn ai_core::SignalConsumer> = Arc::new(ingestion_inner);
 
             // 5 cognitive collectors — each SignalConsumer pushes CognitiveSignals
             // to the existing consolidator tx (signal_queue).
