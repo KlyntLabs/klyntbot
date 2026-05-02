@@ -52,8 +52,10 @@ vi.mock("@/api/endpoints/dashboard", async () => {
   const actual = await vi.importActual<typeof import("@/api/endpoints/dashboard")>(
     "@/api/endpoints/dashboard",
   );
+  const { defaultDashboardMocks } = await import("../../__tests__/dashboardCommandMocks");
   return {
     ...actual,
+    ...defaultDashboardMocks(),
     timelineQuery: vi.fn(),
     taskUpdate: vi.fn(),
   };
@@ -189,5 +191,43 @@ describe("MonthView", () => {
       expect(focused).toBeTruthy();
       expect(focused?.textContent).toContain("16");
     });
+  });
+
+  it("renders SummaryPanel when sidebar is open", async () => {
+    mockedTimelineQuery.mockResolvedValue(mockTimeline);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(
+      <QueryClientProvider client={client}>
+        <DashboardStateContext.Provider
+          value={{
+            mode: "month",
+            date: "2026-04-01",
+            setDate: vi.fn(),
+            setMode: vi.fn(),
+            navigatePrev: vi.fn(),
+            navigateNext: vi.fn(),
+            navigateToday: vi.fn(),
+          }}
+        >
+          <LayerContext.Provider
+            value={{
+              enabled: new Set(["activity"]),
+              enabledSources: ["productivity", "focus"],
+              toggle: () => {},
+              reset: () => {},
+            }}
+          >
+            <SidebarContext.Provider value={{ sidebarOpen: true, toggleSidebar: () => {} }}>
+              <MonthView />
+            </SidebarContext.Provider>
+          </LayerContext.Provider>
+        </DashboardStateContext.Provider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
+    });
+    // SummaryPanel renders DaySummary which shows tracked time
+    expect(screen.getByText("tracked")).toBeTruthy();
   });
 });

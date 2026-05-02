@@ -5,7 +5,8 @@ import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import { formatHumanDuration, TZ_OFFSET_MINS, todayISO, toLocalISO } from "@/utils/dashboardDates";
 import { useDashboardState } from "../../hooks/useDashboardState";
-import { useEnabledLayers } from "../../lib/layers";
+import { useEnabledLayers, useSidebarOpen } from "../../lib/layers";
+import { SummaryPanel } from "../SummaryPanel";
 import { computeDayStats, DAY_LABELS } from "../../lib/timeline-utils";
 
 function getMonthRange(dateStr: string): {
@@ -93,6 +94,7 @@ function focusIntensityBg(secs: number, maxSecs: number): string {
 
 export function MonthView() {
   const { date, setDate, setMode } = useDashboardState();
+  const { sidebarOpen } = useSidebarOpen();
   const dateStr = date || todayISO();
   const today = todayISO();
 
@@ -153,13 +155,10 @@ export function MonthView() {
   }, [weeks]);
 
   return (
-    <div className="dashboard__month-grid">
-      <div className="dashboard__month-grid-inner">
-        {isLoading && (
-          <div style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)", marginBottom: 4 }}>
-            Loading...
-          </div>
-        )}
+    <div style={{ display: "flex", gap: 8, height: "100%", width: "100%" }}>
+      <div className="dashboard__month-grid" style={{ flex: 1 }}>
+        <div className="dashboard__month-grid-inner">
+          {isLoading && <div className="dashboard__month-loading">Loading...</div>}
 
         {/* Day-of-week header */}
         <div className="dashboard__month-dow-header">
@@ -267,6 +266,10 @@ export function MonthView() {
           ))}
         </div>
       </div>
+    </div>
+    {sidebarOpen && (
+        <SummaryPanel summary={data.summary} selectedEntry={null} onClose={() => {}} />
+      )}
     </div>
   );
 }
