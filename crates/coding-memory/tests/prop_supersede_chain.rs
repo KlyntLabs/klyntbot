@@ -50,7 +50,8 @@ proptest! {
                     scope_id: None,
                     scope_repo_id: None,
                     metadata: None,
-                };
+                
+                    speaker: None,};
                 writer.facts().upsert(&fact).await.unwrap();
 
                 if let Some(prev) = prev_id {

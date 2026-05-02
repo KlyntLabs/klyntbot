@@ -34,7 +34,8 @@ impl HeuristicExtractionHandler {
             object: observation.content.clone(),
             confidence,
             source: source.into(),
-        };
+        
+            speaker: None,};
         let od = observation.domain.as_str();
 
         match observation.source_event.as_str() {
@@ -67,7 +68,8 @@ impl HeuristicExtractionHandler {
                         object,
                         confidence: 0.8,
                         source: "user_stated".into(),
-                    }]
+                    
+                        speaker: None,}]
                 }
             }
             bus::DomainEvent::KIND_BUDGET_ALERT => {
@@ -326,7 +328,13 @@ multiple facts (name=Alice, works_at=Anthropic).\n\
 - IDENTITY BINDING: when an observation contains \"I'm X\", \"I am X\", or \"My name is X\", \
 emit BOTH a {subject:\"user\", predicate:\"name\", object:\"X\"} fact AND apply X as a \
 parallel subject for every first-person fact in the SAME observation.\n\
-- For non-self proper nouns (e.g., \"Max loves pizza\"), emit subject=\"Max\" directly.\n\n\
+- For non-self proper nouns (e.g., \"Max loves pizza\"), emit subject=\"Max\" directly.\n\
+- SPEAKER ATTRIBUTION (Wave 2): when the source observation includes a speaker label \
+(lines like \"Alice: I went hiking today\"), set the optional \"speaker\" field on each fact \
+to the label string (e.g., \"speaker\": \"Alice\"). For first-person facts derived from Alice's \
+text, the SUBJECT is \"Alice\" AND the speaker is \"Alice\". For third-person facts within \
+Alice's text (\"Bob mentioned he likes pizza\"), the subject is \"Bob\" but the speaker stays \
+\"Alice\". Omit the speaker field when no label is present. NEVER invent a speaker.\n\n\
 Additionally, extract named entities (people, orgs, projects, technologies, places) \
 and relationships. Only extract entities explicitly mentioned — do not infer.\n\n\
 RESPONSE FORMAT — return one object per observation, indexed from 1:\n\
@@ -389,6 +397,10 @@ struct ExtractedFactJson {
     object: String,
     confidence: f64,
     source: String,
+    /// Wave 2: speaker label parsed from the source observation. None when
+    /// the speaker IS the subject or the LLM omitted it.
+    #[serde(default)]
+    speaker: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -444,7 +456,8 @@ fn bind_user_identity(extractions: &mut Vec<cognitive::BatchExtraction>) {
                     object: fact.object.clone(),
                     confidence: fact.confidence,
                     source: fact.source.clone(),
-                });
+                
+                    speaker: None,});
             }
         }
         ext.facts.extend(additions);
@@ -539,6 +552,7 @@ impl ExtractionHandler for LlmExtractionHandler {
                                             object: f.object,
                                             confidence: f.confidence,
                                             source: f.source,
+                                            speaker: f.speaker,
                                         })
                                         .collect(),
                                 }

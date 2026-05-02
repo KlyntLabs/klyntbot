@@ -15,6 +15,9 @@ pub struct ExtractedFact {
     pub object: String,
     pub confidence: f64,
     pub source: String,
+    /// Wave 2: who said this. NULL when the speaker IS the subject (i.e.
+    /// first-person fact) or unknown.
+    pub speaker: Option<String>,
 }
 
 /// Maps extracted facts back to their source observation in a batch.
@@ -193,7 +196,7 @@ pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) ->
         scope_id: None,
         scope_repo_id: None,
         metadata: None,
-                speaker: None,
+        speaker: candidate.speaker.clone(),
     }
 }
 
@@ -225,7 +228,8 @@ mod tests {
                         object: "10am-12pm".into(),
                         confidence: 0.8,
                         source: "observed".into(),
-                    }],
+                    
+                        speaker: None,}],
                 },
                 BatchExtraction {
                     observation_index: 1,
@@ -296,7 +300,8 @@ mod tests {
             object: "10am-12pm".into(),
             confidence: 0.8,
             source: "observed".into(),
-        };
+        
+            speaker: None,};
         let obs = test_observation();
         let fact = to_semantic_fact(&candidate, &obs);
 

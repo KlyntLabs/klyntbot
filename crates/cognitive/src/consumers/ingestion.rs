@@ -22,7 +22,8 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         object: obj.trim().trim_end_matches('.').to_string(),
         confidence: 0.9,
         source: "regex_backstop".into(),
-    };
+    
+        speaker: None,};
 
     // "I moved to {city} ..." / "I'm now in {city}" → lives_in
     for prefix in [
@@ -138,7 +139,8 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
             object: obj.to_string(),
             confidence: 0.85,
             source: "regex_backstop_3p".into(),
-        });
+        
+            speaker: None,});
     }
 
     out

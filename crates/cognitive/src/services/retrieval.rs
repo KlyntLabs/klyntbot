@@ -106,6 +106,10 @@ pub async fn retrieve_relevant_facts(
     community_cache: Option<&CommunityCache>,
     entity_repo: Option<&crate::repos::EntityRepo>,
 ) -> Result<Vec<ScoredFact>, sqlx::Error> {
+    // Wave 1: extract once at function-top so Wave 2 (speaker boost) and
+    // the BM25 alias-expansion block can share the same entity set.
+    let query_entities = crate::services::graph_retrieval::extract_query_entities(query);
+
     let use_vector = !query.is_empty() && embedder.map(|e| e.is_available()).unwrap_or(false);
 
     let weights = RelevanceWeights {
@@ -204,14 +208,14 @@ pub async fn retrieve_relevant_facts(
         // FTS-as-candidate fix is in place; production paths see
         // identical behavior to pre-Tier 1 when no entity is in the
         // query.
-        let entities = crate::services::graph_retrieval::extract_query_entities(query);
-        crate::bench_hooks::record_entities(&entities);
+        let entities = &query_entities;
+        crate::bench_hooks::record_entities(entities);
         let fts_terms: Vec<String> = if entities.is_empty() {
             vec![query.to_string()]
         } else {
             let mut terms_set: std::collections::BTreeSet<String> =
                 std::collections::BTreeSet::new();
-            for e in &entities {
+            for e in entities {
                 terms_set.insert(format!("\"{}\"", e.replace('"', "")));
                 if let Some(er) = entity_repo {
                     if let Ok(rows) = er.find_by_name(e).await {
@@ -308,6 +312,24 @@ pub async fn retrieve_relevant_facts(
                 score: base + bm25_boost,
                 similarity: None,
             });
+        }
+    }
+
+    // Wave 2: speaker-match boost. When the query mentions a person whose
+    // name appears as a fact `speaker`, bump those facts. This is the
+    // single-pool minimum-viable form of ENGRAM's R̃(q,A)/R̃(q,B) speaker
+    // split — full pool partitioning is a future wave. Boost is small
+    // (additive 0.10) so a wrong speaker match doesn't displace a strong
+    // semantic match.
+    if !query_entities.is_empty() {
+        let entity_set: std::collections::HashSet<String> =
+            query_entities.iter().map(|e| e.to_lowercase()).collect();
+        for result in &mut scored {
+            if let Some(spk) = &result.fact.speaker {
+                if entity_set.contains(&spk.to_lowercase()) {
+                    result.score += 0.10;
+                }
+            }
         }
     }
 
