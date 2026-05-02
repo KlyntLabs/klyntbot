@@ -559,17 +559,29 @@ impl AppCore {
     }
 
     #[tracing::instrument(skip(self), err)]
-    pub async fn coding_permissions_clear_mirror(&self, tool: String, repo_id: Option<String>) -> common::Result<u64> {
-        let repo = self.coding_approval_history_repo.clone()
-            .ok_or_else(|| common::KlyntbotError::Storage("approval history repo not initialized".into()))?;
+    pub async fn coding_permissions_clear_mirror(
+        &self,
+        tool: String,
+        repo_id: Option<String>,
+    ) -> common::Result<u64> {
+        let repo = self.coding_approval_history_repo.clone().ok_or_else(|| {
+            common::KlyntbotError::Storage("approval history repo not initialized".into())
+        })?;
         repo.clear_for_tool(&tool, repo_id.as_deref()).await
     }
 
     #[tracing::instrument(skip(self), err)]
-    pub async fn coding_sessions_rewind(&self, session_key: String, message_id: String) -> common::Result<desktop_shared::RewindResult> {
-        let snap_repo = self.snapshot_repo.clone()
-            .ok_or_else(|| common::KlyntbotError::Storage("snapshot repo not initialized".into()))?;
-        let snaps: Vec<klynt_core::snapshots::Snapshot> = snap_repo.list_after_message(&session_key, &message_id).await?;
+    pub async fn coding_sessions_rewind(
+        &self,
+        session_key: String,
+        message_id: String,
+    ) -> common::Result<desktop_shared::RewindResult> {
+        let snap_repo = self.snapshot_repo.clone().ok_or_else(|| {
+            common::KlyntbotError::Storage("snapshot repo not initialized".into())
+        })?;
+        let snaps: Vec<klynt_core::snapshots::Snapshot> = snap_repo
+            .list_after_message(&session_key, &message_id)
+            .await?;
         let mut restored: usize = 0;
         let mut deleted: usize = 0;
         // Apply newest-first to undo in reverse order
@@ -583,30 +595,63 @@ impl AppCore {
                 deleted += 1;
             }
         }
-        let removed = self.repos.sessions.rewind_to_message(&session_key, &message_id).await?;
-        Ok(desktop_shared::RewindResult { messages_removed: removed, files_restored: restored, files_deleted: deleted })
+        let removed = self
+            .repos
+            .sessions
+            .rewind_to_message(&session_key, &message_id)
+            .await?;
+        Ok(desktop_shared::RewindResult {
+            messages_removed: removed,
+            files_restored: restored,
+            files_deleted: deleted,
+        })
     }
 
     #[tracing::instrument(skip(self), err)]
-    pub async fn coding_sessions_export(&self, session_key: String, format: desktop_shared::ExportFormat)
-        -> common::Result<desktop_shared::SessionExportResult>
-    {
+    pub async fn coding_sessions_export(
+        &self,
+        session_key: String,
+        format: desktop_shared::ExportFormat,
+    ) -> common::Result<desktop_shared::SessionExportResult> {
         let bytes = match format {
-            desktop_shared::ExportFormat::Md   => self.repos.sessions.export_session_md(&session_key).await?,
-            desktop_shared::ExportFormat::Json => self.repos.sessions.export_session_json(&session_key).await?,
+            desktop_shared::ExportFormat::Md => {
+                self.repos.sessions.export_session_md(&session_key).await?
+            }
+            desktop_shared::ExportFormat::Json => {
+                self.repos
+                    .sessions
+                    .export_session_json(&session_key)
+                    .await?
+            }
         };
         let dir = self.config.read().await.data_dir_path().join("exports");
         tokio::fs::create_dir_all(&dir).await?;
-        let ext = match format { desktop_shared::ExportFormat::Md => "md", desktop_shared::ExportFormat::Json => "json" };
+        let ext = match format {
+            desktop_shared::ExportFormat::Md => "md",
+            desktop_shared::ExportFormat::Json => "json",
+        };
         let path = dir.join(format!("{session_key}.{ext}"));
         tokio::fs::write(&path, &bytes).await?;
-        Ok(desktop_shared::SessionExportResult { path: path.to_string_lossy().into_owned(), bytes_written: bytes.len() })
+        Ok(desktop_shared::SessionExportResult {
+            path: path.to_string_lossy().into_owned(),
+            bytes_written: bytes.len(),
+        })
     }
 
     #[tracing::instrument(skip(self), err)]
-    pub async fn coding_sessions_fork(&self, session_key: String, up_to_message: Option<String>) -> common::Result<desktop_shared::SessionForkResult> {
-        let new_key = self.repos.sessions.fork_session(&session_key, up_to_message.as_deref()).await?;
-        Ok(desktop_shared::SessionForkResult { new_session_key: new_key })
+    pub async fn coding_sessions_fork(
+        &self,
+        session_key: String,
+        up_to_message: Option<String>,
+    ) -> common::Result<desktop_shared::SessionForkResult> {
+        let new_key = self
+            .repos
+            .sessions
+            .fork_session(&session_key, up_to_message.as_deref())
+            .await?;
+        Ok(desktop_shared::SessionForkResult {
+            new_session_key: new_key,
+        })
     }
 }
 

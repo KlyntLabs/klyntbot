@@ -185,10 +185,15 @@ pub async fn run_for_test(
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => (Vec::new(), false),
             Err(e) => return Err(e.into()),
         };
-        let _ = repo.record(
-            &session_id, message_id.as_deref(),
-            &resolved.to_string_lossy(), &content, existed,
-        ).await;
+        let _ = repo
+            .record(
+                &session_id,
+                message_id.as_deref(),
+                &resolved.to_string_lossy(),
+                &content,
+                existed,
+            )
+            .await;
     }
 
     if let Err(reason) = fire_pre_tool_use(

@@ -19,7 +19,11 @@ pub trait SnapshotService: Send + Sync {
 
     async fn list_for_session(&self, session_key: &str) -> Result<Vec<Snapshot>>;
 
-    async fn list_after_message(&self, session_key: &str, message_id: &str) -> Result<Vec<Snapshot>>;
+    async fn list_after_message(
+        &self,
+        session_key: &str,
+        message_id: &str,
+    ) -> Result<Vec<Snapshot>>;
 }
 
 #[async_trait::async_trait]
@@ -32,7 +36,8 @@ impl SnapshotService for SnapshotRepo {
         content: &[u8],
         existed: bool,
     ) -> Result<i64> {
-        self.record(session_key, message_id, file_path, content, existed).await
+        self.record(session_key, message_id, file_path, content, existed)
+            .await
     }
 
     async fn get(&self, id: i64) -> Result<Option<Snapshot>> {
@@ -43,7 +48,11 @@ impl SnapshotService for SnapshotRepo {
         self.list_for_session(session_key).await
     }
 
-    async fn list_after_message(&self, session_key: &str, message_id: &str) -> Result<Vec<Snapshot>> {
+    async fn list_after_message(
+        &self,
+        session_key: &str,
+        message_id: &str,
+    ) -> Result<Vec<Snapshot>> {
         self.list_after_message(session_key, message_id).await
     }
 }

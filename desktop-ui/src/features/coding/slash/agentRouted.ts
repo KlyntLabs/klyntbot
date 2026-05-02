@@ -1,4 +1,3 @@
-import { REGISTRY } from "./registry";
 import { resolveLeaf } from "./classify";
 import type { DispatchResult } from "./types";
 

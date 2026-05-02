@@ -30,7 +30,7 @@ use crate::tools::{
 };
 use bus::DomainEventBus;
 use klynt_execpolicy::Policy;
-use storage::{Repos, repos::CodingApprovalHistoryRepo};
+use storage::{repos::CodingApprovalHistoryRepo, Repos};
 
 /// Shared dependencies for constructing the 13 klynt-core primitive tools.
 #[derive(Clone)]

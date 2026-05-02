@@ -79,7 +79,9 @@ impl MirrorEngine {
         register!(finance_drift);
 
         if let Some(ah_repo) = approval_history_repo {
-            let approval_history = Arc::new(ApprovalHistorySource::new(Arc::try_unwrap(ah_repo).unwrap_or_else(|arc| (*arc).clone())));
+            let approval_history = Arc::new(ApprovalHistorySource::new(
+                Arc::try_unwrap(ah_repo).unwrap_or_else(|arc| (*arc).clone()),
+            ));
             register!(approval_history);
         }
 
@@ -116,13 +118,13 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn start_produces_six_consumers() {
+    async fn start_produces_seven_consumers() {
         let repo = crate::mirror::test_mirror_repo().await;
         let built = MirrorEngine::start(repo, None, None, None, None, None, None);
         assert_eq!(
             built.consumers.len(),
-            6,
-            "routing + meta_rule + config_archiver + trial + task_focus + finance_drift"
+            7,
+            "routing + meta_rule + config_archiver + trial + task_focus + finance_drift + cost_ceiling"
         );
         for h in built.flush_handles.iter() {
             assert!(!h.is_finished());

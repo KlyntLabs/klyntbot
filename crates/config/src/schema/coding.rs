@@ -65,8 +65,12 @@ pub struct CodingPermissions {
 fn default_match() -> String {
     "ask".into()
 }
-fn default_mirror_min_approvals() -> u32 { 5 }
-fn default_mirror_cooldown_hours() -> u32 { 24 }
+fn default_mirror_min_approvals() -> u32 {
+    5
+}
+fn default_mirror_cooldown_hours() -> u32 {
+    24
+}
 impl Default for CodingPermissions {
     fn default() -> Self {
         Self {
@@ -133,7 +137,9 @@ pub struct CostCeilingConfig {
     pub alert_at_percent: u32,
 }
 
-fn default_cost_alert_pct() -> u32 { 80 }
+fn default_cost_alert_pct() -> u32 {
+    80
+}
 
 impl Default for CostCeilingConfig {
     fn default() -> Self {

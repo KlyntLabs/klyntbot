@@ -18,8 +18,15 @@ async fn skill_routed_event_persists_routing_snapshot_via_ai_pipeline() {
     let bus = Arc::new(bus::DomainEventBus::new(64));
     let mirror_repo = cognitive::mirror::MirrorRepo::new(pool);
 
-    let started =
-        cognitive::mirror::MirrorEngine::start(mirror_repo.clone(), None, None, None, None, None, None);
+    let started = cognitive::mirror::MirrorEngine::start(
+        mirror_repo.clone(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    );
 
     let _router = ai_core::SignalRouter::start(
         Arc::clone(&bus),

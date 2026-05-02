@@ -495,9 +495,8 @@ impl AppCore {
         };
 
         // ── Phase 8: Mirror self-reflection layer (before SignalRouter so consumers can be wired in)
-        let coding_approval_history_repo = ::storage::repos::CodingApprovalHistoryRepo::new(
-            storage_pool.clone(),
-        );
+        let coding_approval_history_repo =
+            ::storage::repos::CodingApprovalHistoryRepo::new(storage_pool.clone());
         let (mirror_facade, mirror_consumers, mirror_flush_handles, mirror_shutdown) = {
             let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
             let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
@@ -1842,7 +1841,9 @@ impl AppCore {
                 history_repo: core.coding_approval_history_repo.clone(),
                 mirror_learning_enabled: config_guard.coding.permissions.mirror_learning,
                 mirror_min_approvals: config_guard.coding.permissions.mirror_min_approvals,
-                mirror_cooldown_seconds: (config_guard.coding.permissions.mirror_cooldown_hours as i64) * 3600,
+                mirror_cooldown_seconds: (config_guard.coding.permissions.mirror_cooldown_hours
+                    as i64)
+                    * 3600,
                 repo_id: String::new(),
             };
             {

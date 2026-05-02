@@ -7,6 +7,12 @@ use storage::repos::ApprovalHistorySummary;
 /// scripted echo provider + in-memory storage + pre-built tool registry.
 /// That harness is deferred until the agent test-helper crate stabilises.
 /// These micro-benches cover the new Phase-2 surfaces that sit on the hot path.
+///
+/// Phase-2 perf pass applied (2026-05-02):
+///   • SoulContextSource now uses mtime memoization to avoid redundant disk reads
+///     when KLYNTBOT.md has not changed between turns.
+///   • Tool-registry per-thread cache and SkillActivator LRU remain as future
+///     optimisations if profiling shows they are needed.
 
 fn bench_layer3_approval_eval(c: &mut Criterion) {
     let cfg = klynt_core::approval::layer3::Layer3Config {
@@ -86,5 +92,10 @@ fn bench_args_hash(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_layer3_approval_eval, bench_tool_search, bench_args_hash);
+criterion_group!(
+    benches,
+    bench_layer3_approval_eval,
+    bench_tool_search,
+    bench_args_hash
+);
 criterion_main!(benches);

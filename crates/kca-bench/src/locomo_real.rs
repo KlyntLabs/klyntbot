@@ -101,9 +101,15 @@ impl LocoMoConversation {
             if key.contains("_date_time") {
                 continue;
             }
-            let Some(idx_str) = key.strip_prefix("session_") else { continue };
-            let Ok(idx) = idx_str.parse::<u32>() else { continue };
-            let Ok(turns) = serde_json::from_value::<Vec<LocoMoTurn>>(val.clone()) else { continue };
+            let Some(idx_str) = key.strip_prefix("session_") else {
+                continue;
+            };
+            let Ok(idx) = idx_str.parse::<u32>() else {
+                continue;
+            };
+            let Ok(turns) = serde_json::from_value::<Vec<LocoMoTurn>>(val.clone()) else {
+                continue;
+            };
             let dt = self
                 .conversation
                 .get(&format!("session_{idx}_date_time"))
@@ -135,13 +141,21 @@ pub struct LocoMoRealReport {
 
 impl LocoMoRealReport {
     pub fn accuracy(&self) -> f64 {
-        if self.total == 0 { 0.0 } else { self.correct as f64 / self.total as f64 }
+        if self.total == 0 {
+            0.0
+        } else {
+            self.correct as f64 / self.total as f64
+        }
     }
     /// Letta's "attempted accuracy" — fraction CORRECT among attempted (A or B,
     /// excluding C). Useful to disentangle "answered wrong" from "refused".
     pub fn attempted_accuracy(&self) -> f64 {
         let attempted = self.correct + self.incorrect;
-        if attempted == 0 { 0.0 } else { self.correct as f64 / attempted as f64 }
+        if attempted == 0 {
+            0.0
+        } else {
+            self.correct as f64 / attempted as f64
+        }
     }
     /// Rough USD cost estimate using `cost::KIMI_K2` pricing (our cognitive
     /// default) and the chars÷4 ≈ tokens rule of thumb. Approximate — for
@@ -152,7 +166,11 @@ impl LocoMoRealReport {
         crate::cost::cost_for(in_tok, out_tok, crate::cost::KIMI_K2)
     }
     pub fn estimated_cost_per_qa_usd(&self) -> f64 {
-        if self.total == 0 { 0.0 } else { self.estimated_cost_usd() / self.total as f64 }
+        if self.total == 0 {
+            0.0
+        } else {
+            self.estimated_cost_usd() / self.total as f64
+        }
     }
 }
 
@@ -163,11 +181,7 @@ const GRADER_TEMPLATE: &str = include_str!("locomo_grader_template.txt");
 
 /// Grade a single (question, gold, predicted) triple via OpenAI gpt-4.1.
 /// Returns "A" / "B" / "C" matching Letta's mapping.
-pub async fn grade_sample(
-    question: &str,
-    target: &str,
-    predicted: &str,
-) -> common::Result<char> {
+pub async fn grade_sample(question: &str, target: &str, predicted: &str) -> common::Result<char> {
     let api_key = std::env::var("OPENAI_API_KEY").map_err(|_| {
         common::KlyntbotError::Storage("OPENAI_API_KEY not set — required for LoCoMo grader".into())
     })?;
@@ -281,9 +295,7 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
                 blob.push_str(&format!("{}: {}\n", t.speaker, t.text));
             }
             report.total_input_chars += blob.len() as u64;
-            let reply = ctx
-                .chat_complete(blob, session_key.to_string())
-                .await?;
+            let reply = ctx.chat_complete(blob, session_key.to_string()).await?;
             report.total_output_chars += reply.len() as u64;
             ctx.await_cognitive_idle().await;
         }
@@ -308,7 +320,9 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
             let elapsed = started.elapsed().as_millis() as u64;
             latencies.push(elapsed);
 
-            let Some(target) = qa.answer_string() else { continue };
+            let Some(target) = qa.answer_string() else {
+                continue;
+            };
             let grade = grade_sample(&qa.question, &target, &predicted).await?;
             report.total += 1;
             let cat = qa.category.unwrap_or(0);
@@ -402,7 +416,9 @@ mod tests {
     #[test]
     fn refusal_detected() {
         assert!(detect_refusal("I don't have any record of Alice"));
-        assert!(detect_refusal("Based on the conversation history, I don't recall."));
+        assert!(detect_refusal(
+            "Based on the conversation history, I don't recall."
+        ));
         assert!(detect_refusal("Unable to determine the answer."));
     }
 
@@ -412,4 +428,3 @@ mod tests {
         assert!(!detect_refusal("Bob recommended grilled vegetables."));
     }
 }
-

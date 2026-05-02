@@ -19,7 +19,10 @@ pub async fn coding_sessions_rewind(session_key: String, message_id: String) -> 
 }
 
 #[klynt_command]
-pub async fn coding_sessions_export(session_key: String, format: ExportFormat) -> SessionExportResult {
+pub async fn coding_sessions_export(
+    session_key: String,
+    format: ExportFormat,
+) -> SessionExportResult {
     state
         .coding_sessions_export(session_key, format)
         .await
@@ -27,7 +30,10 @@ pub async fn coding_sessions_export(session_key: String, format: ExportFormat) -
 }
 
 #[klynt_command]
-pub async fn coding_sessions_fork(session_key: String, up_to_message: Option<String>) -> SessionForkResult {
+pub async fn coding_sessions_fork(
+    session_key: String,
+    up_to_message: Option<String>,
+) -> SessionForkResult {
     state
         .coding_sessions_fork(session_key, up_to_message)
         .await

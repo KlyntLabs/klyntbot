@@ -4,10 +4,11 @@ use async_trait::async_trait;
 use jiff::Timestamp;
 use uuid::Uuid;
 
-use common::Result;
+use common::{Result, MIRROR_ALERT_COST_THRESHOLD_CROSSED};
 
 use crate::mirror::{
-    MetaRule, MirrorAlert, MirrorAlertSeverity, MirrorAlertType, NarrativeContext, NarrativeSnippet, SuggestedAction,
+    MetaRule, MirrorAlert, MirrorAlertSeverity, MirrorAlertType, NarrativeContext,
+    NarrativeSnippet, SuggestedAction,
 };
 
 /// Generated components of a narrative output from an LLM call.
@@ -153,7 +154,7 @@ pub fn snippet_from_alert(alert: &MirrorAlert) -> NarrativeSnippet {
             suggested_action: Some(SuggestedAction::ViewDetails),
             user_feedback: None,
             dismissed_at: None,
-            coding_alert_kind: Some("costThresholdCrossed".into()),
+            coding_alert_kind: Some(MIRROR_ALERT_COST_THRESHOLD_CROSSED.into()),
             coding_alert_severity: Some(MirrorAlertSeverity::Medium),
         },
     }

@@ -16,7 +16,7 @@ export function CostCeilingBanner({ sessionKey }: { sessionKey: string }) {
       })
       .then((res) => {
         if (!mounted || res.status !== "ok") return;
-        const hit = res.data[0];
+        const hit = res.data?.[0];
         if (hit) setAlert(hit);
       });
     return () => {

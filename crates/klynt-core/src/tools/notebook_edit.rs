@@ -196,10 +196,15 @@ pub async fn run_for_test(
             .await
             .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("read: {e}"))))?;
         if let Some(repo) = snapshot_repo.as_ref() {
-            let _ = repo.record(
-                &session_id, message_id.as_deref(),
-                &resolved.to_string_lossy(), before.as_bytes(), true,
-            ).await;
+            let _ = repo
+                .record(
+                    &session_id,
+                    message_id.as_deref(),
+                    &resolved.to_string_lossy(),
+                    before.as_bytes(),
+                    true,
+                )
+                .await;
         }
         let mut nb: serde_json::Value = serde_json::from_str(&before).map_err(|e| {
             KlyntbotError::Tool(ToolError::ExecutionFailed(format!("parse ipynb: {e}")))

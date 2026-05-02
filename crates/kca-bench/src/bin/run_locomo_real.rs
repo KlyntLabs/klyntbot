@@ -65,7 +65,11 @@ async fn main() -> common::Result<()> {
     let mut cats: Vec<_> = report.by_category.iter().collect();
     cats.sort_by_key(|(k, _)| **k);
     for (cat, (correct, total)) in cats {
-        let acc = if *total > 0 { *correct as f64 / *total as f64 * 100.0 } else { 0.0 };
+        let acc = if *total > 0 {
+            *correct as f64 / *total as f64 * 100.0
+        } else {
+            0.0
+        };
         println!("  cat {cat}: {correct}/{total} = {acc:.1}%");
     }
 

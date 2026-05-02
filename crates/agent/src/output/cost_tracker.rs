@@ -145,17 +145,28 @@ impl CostTracker {
     /// Record usage for a specific session.
     pub fn record_for_session(&self, session_key: &str, usage: &Usage, model: &str) {
         let cost = estimate_cost(usage, model);
-        *self.session_ledger.entry(session_key.to_string()).or_insert(0.0) += cost;
+        *self
+            .session_ledger
+            .entry(session_key.to_string())
+            .or_insert(0.0) += cost;
     }
 
     /// Total spend for a session.
     pub fn total_for_session(&self, session_key: &str) -> f64 {
-        self.session_ledger.get(session_key).map(|v| *v).unwrap_or(0.0)
+        self.session_ledger
+            .get(session_key)
+            .map(|v| *v)
+            .unwrap_or(0.0)
     }
 
     /// Check if a session has crossed its cost ceiling alert threshold.
     /// Returns `Some(CostAlert)` once per crossing.
-    pub fn check_session_ceiling(&self, session_key: &str, ceiling_usd: f64, alert_at_percent: u32) -> Option<CostAlert> {
+    pub fn check_session_ceiling(
+        &self,
+        session_key: &str,
+        ceiling_usd: f64,
+        alert_at_percent: u32,
+    ) -> Option<CostAlert> {
         if ceiling_usd <= 0.0 {
             return None;
         }
@@ -163,11 +174,16 @@ impl CostTracker {
         let percent = (spend / ceiling_usd) * 100.0;
         let threshold = alert_at_percent as f64;
         if percent >= threshold {
-            let last = self.last_reported_percent.get(session_key).map(|v| *v).unwrap_or(0);
+            let last = self
+                .last_reported_percent
+                .get(session_key)
+                .map(|v| *v)
+                .unwrap_or(0);
             // 10-percent bands to avoid spam (80, 90, 100, …)
             let current_band = (percent as u32 / 10) * 10;
             if current_band > last {
-                self.last_reported_percent.insert(session_key.to_string(), current_band);
+                self.last_reported_percent
+                    .insert(session_key.to_string(), current_band);
                 Some(CostAlert {
                     session_key: session_key.to_string(),
                     spend_usd: spend,
@@ -289,20 +305,28 @@ mod tests {
 
         // Spend $4.9 → 49% — below threshold
         tracker.session_ledger.insert(sk.to_string(), 4.9);
-        assert!(tracker.check_session_ceiling(sk, ceiling, alert_at).is_none());
+        assert!(tracker
+            .check_session_ceiling(sk, ceiling, alert_at)
+            .is_none());
 
         // Spend $5.1 → 51% — first alert at band 50
         tracker.session_ledger.insert(sk.to_string(), 5.1);
-        let a1 = tracker.check_session_ceiling(sk, ceiling, alert_at).unwrap();
+        let a1 = tracker
+            .check_session_ceiling(sk, ceiling, alert_at)
+            .unwrap();
         assert_eq!(a1.percent, 51.0);
 
         // Spend $5.9 → 59% — still in band 50, no duplicate alert
         tracker.session_ledger.insert(sk.to_string(), 5.9);
-        assert!(tracker.check_session_ceiling(sk, ceiling, alert_at).is_none());
+        assert!(tracker
+            .check_session_ceiling(sk, ceiling, alert_at)
+            .is_none());
 
         // Spend $6.1 → 61% — crosses into band 60
         tracker.session_ledger.insert(sk.to_string(), 6.1);
-        let a2 = tracker.check_session_ceiling(sk, ceiling, alert_at).unwrap();
+        let a2 = tracker
+            .check_session_ceiling(sk, ceiling, alert_at)
+            .unwrap();
         assert_eq!(a2.percent, 61.0);
     }
 
