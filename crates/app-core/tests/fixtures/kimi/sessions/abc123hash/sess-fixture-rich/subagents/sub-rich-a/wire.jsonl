@@ -1,0 +1,8 @@
+{"type":"metadata","protocol_version":"1.9"}
+{"timestamp":1777000101.0,"message":{"type":"TurnBegin","payload":{"user_input":"Find all references to X"}}}
+{"timestamp":1777000102.0,"message":{"type":"StepBegin","payload":{"n":1}}}
+{"timestamp":1777000103.0,"message":{"type":"ContentPart","payload":{"type":"think","think":"Searching codebase...","encrypted":null}}}
+{"timestamp":1777000104.0,"message":{"type":"ToolCall","payload":{"type":"function","id":"tool_suba1","function":{"name":"GrepSearch","arguments":"{\"pattern\":\"X\"}"},"extras":null}}}
+{"timestamp":1777000105.0,"message":{"type":"ToolResult","payload":{"id":"tool_suba1","content":"5 matches found","is_error":false}}}
+{"timestamp":1777000106.0,"message":{"type":"ContentPart","payload":{"type":"text","text":"Found 5 matches."}}}
+{"timestamp":1777000107.0,"message":{"type":"TurnEnd","payload":{}}}

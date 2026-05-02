@@ -1,0 +1,10 @@
+{
+  "agent_id": "sub-rich-a",
+  "subagent_type": "researcher",
+  "status": "completed",
+  "description": "Looked up X",
+  "created_at": 1777000100.0,
+  "updated_at": 1777000200.0,
+  "last_task_id": null,
+  "launch_spec": {"agent_id":"sub-rich-a","subagent_type":"researcher","model_override":null,"effective_model":null,"created_at":1777000100.0}
+}

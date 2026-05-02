@@ -1,0 +1,8 @@
+{"type":"metadata","protocol_version":"1.9"}
+{"timestamp":1777100101.0,"message":{"type":"TurnBegin","payload":{"user_input":"Implement the Y feature"}}}
+{"timestamp":1777100102.0,"message":{"type":"StepBegin","payload":{"n":1}}}
+{"timestamp":1777100103.0,"message":{"type":"ContentPart","payload":{"type":"think","think":"Planning implementation...","encrypted":null}}}
+{"timestamp":1777100104.0,"message":{"type":"ToolCall","payload":{"type":"function","id":"tool_subb1","function":{"name":"WriteFile","arguments":"{\"path\":\"/src/y.rs\"}"},"extras":null}}}
+{"timestamp":1777100105.0,"message":{"type":"ToolResult","payload":{"id":"tool_subb1","content":"file written","is_error":false}}}
+{"timestamp":1777100106.0,"message":{"type":"ContentPart","payload":{"type":"text","text":"Implemented Y feature."}}}
+{"timestamp":1777100107.0,"message":{"type":"TurnEnd","payload":{}}}
