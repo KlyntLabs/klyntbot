@@ -136,6 +136,7 @@ pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) ->
         scope_id: None,
         scope_repo_id: None,
         metadata: None,
+                speaker: None,
     }
 }
 

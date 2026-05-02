@@ -22,11 +22,17 @@ CREATE TABLE IF NOT EXISTS semantic_facts (
     scope_type      TEXT NOT NULL DEFAULT 'system',
     scope_id        TEXT,
     scope_repo_id   TEXT,
-    metadata        TEXT
+    metadata        TEXT,
+    -- Speaker attribution: who *uttered* the fact (often the user, but in
+    -- multi-party transcripts e.g. 'Alice told me Bob is sick' →
+    -- speaker=Alice, subject=Bob). NULL means the speaker is the subject
+    -- (the common single-user case). Indexed for query-side filtering.
+    speaker         TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_domain ON semantic_facts(domain);
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_subject ON semantic_facts(subject, predicate);
+CREATE INDEX IF NOT EXISTS idx_semantic_facts_speaker ON semantic_facts(speaker) WHERE speaker IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_active ON semantic_facts(valid_until) WHERE valid_until IS NULL;
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_scope ON semantic_facts(scope_type, scope_id);
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_recorded_at ON semantic_facts(recorded_at);

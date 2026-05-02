@@ -99,8 +99,8 @@ impl SemanticFactRepo {
             INSERT INTO semantic_facts (id, domain, subject, predicate, object, confidence, source,
                 valid_from, valid_until, recorded_at, superseded_at, superseded_by,
                 stability, last_accessed, access_count, convergence_score, project_id, memory_type,
-                scope_type, scope_id)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+                scope_type, scope_id, speaker)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
             ON CONFLICT (id) DO UPDATE SET
                 domain = excluded.domain,
                 subject = excluded.subject,
@@ -119,7 +119,8 @@ impl SemanticFactRepo {
                 project_id = excluded.project_id,
                 memory_type = excluded.memory_type,
                 scope_type = excluded.scope_type,
-                scope_id = excluded.scope_id
+                scope_id = excluded.scope_id,
+                speaker = excluded.speaker
             "#,
         )
         .bind(&fact.id)
@@ -142,6 +143,7 @@ impl SemanticFactRepo {
         .bind(&fact.memory_type)
         .bind(&fact.scope_type)
         .bind(&fact.scope_id)
+        .bind(&fact.speaker)
         .execute(&self.pool)
         .await?;
         if let Some(ref cl) = self.changelog {
@@ -958,6 +960,7 @@ impl SemanticFactRepo {
             scope_id: None,
             scope_repo_id: scope_repo_id.map(str::to_string),
             metadata: None,
+            speaker: None,
         };
         self.upsert(&fact)
             .await
