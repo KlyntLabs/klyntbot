@@ -1,0 +1,10 @@
+{
+  "agent_id": "sub-rich-b",
+  "subagent_type": "coder",
+  "status": "completed",
+  "description": "Implemented Y feature",
+  "created_at": 1777100100.0,
+  "updated_at": 1777100200.0,
+  "last_task_id": null,
+  "launch_spec": {"agent_id":"sub-rich-b","subagent_type":"coder","model_override":null,"effective_model":null,"created_at":1777100100.0}
+}

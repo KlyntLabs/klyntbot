@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
@@ -65,7 +66,7 @@ const appGitBranch = resolveGitBranch();
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: [
       // Path aliases (more specific prefixes first).
@@ -230,7 +231,7 @@ export default defineConfig({
   },
 
   server: {
-    port: 1420,
+    port: Number(process.env.VITE_DEV_PORT ?? 1420),
     strictPort: true,
   },
 });

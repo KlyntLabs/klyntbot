@@ -1,0 +1,3 @@
+Research task:
+Find all references to X in the codebase.
+Summarize findings in 3 bullet points.

@@ -11,6 +11,13 @@
   --fs-display-md: 36px; /* voice orb, hero icons */
   --fs-base: var(--fs-sm);
 
+  /* Spacing scale — used by tracing and other newer modules */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+
   --ds-surface-overlay: var(--surface-context-core);
   --ds-surface-card: var(--surface-card-strong);
   --ds-surface-muted: var(--surface-card-muted);

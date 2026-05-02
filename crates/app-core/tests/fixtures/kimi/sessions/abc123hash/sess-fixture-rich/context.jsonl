@@ -1,0 +1,13 @@
+{"role":"_system_prompt","content":"You are a helpful assistant."}
+{"role":"user","content":"Turn 1 user request"}
+{"role":"assistant","content":"Text output turn 1 step 6"}
+{"role":"user","content":"Turn 2 user request"}
+{"role":"assistant","tool_calls":[{"id":"tool_t2s1","type":"function","function":{"name":"ReadFile","arguments":"{\"path\":\"/tmp/t2s1\"}"}}]}
+{"role":"tool","tool_call_id":"tool_t2s1","content":"ok"}
+{"role":"assistant","content":"Text output turn 2 step 6"}
+{"role":"user","content":"Turn 3 user request"}
+{"role":"assistant","content":"Text output turn 3 step 6"}
+{"role":"user","content":"Turn 4 user request"}
+{"role":"assistant","content":"Text output turn 4 step 6"}
+{"role":"user","content":"Turn 5 user request"}
+{"role":"assistant","content":"Text output turn 5 step 6"}

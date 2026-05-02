@@ -3,7 +3,7 @@ import { ProviderChips } from "./ProviderChips";
 import { SessionList } from "./SessionList";
 import { WireViewer } from "./WireViewer";
 import { ReforgeCycleDiff } from "./ReforgeCycleDiff";
-import { TracingTab } from "./tracing/TracingTab";
+import { TracingApp } from "@/tracing";
 import { listCodingSessions } from "@/api/endpoints/codingMemory";
 import type { ProviderId, SessionSummaryDto } from "./types";
 
@@ -138,7 +138,7 @@ export function CodingMemoryPlugin() {
           </main>
         ) : (
           <main className="cm-plugin__main">
-            <TracingTab />
+            <TracingApp />
           </main>
         )}
       </div>

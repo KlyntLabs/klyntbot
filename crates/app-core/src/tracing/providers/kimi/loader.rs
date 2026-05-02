@@ -44,8 +44,10 @@ pub async fn load_session_events(
     };
 
     let mut events: VecDeque<TraceEvent> = VecDeque::with_capacity(MAX_EVENTS_DEFAULT);
-    let mut stats = HeaderStats::default();
-    stats.agent_count = agent_count_for_main;
+    let mut stats = HeaderStats {
+        agent_count: agent_count_for_main,
+        ..Default::default()
+    };
     let mut total: u64 = 0;
     let mut truncated = false;
 
@@ -212,7 +214,7 @@ mod tests {
         assert_eq!(res.stats.error_count, 0);
         assert_eq!(res.stats.compaction_count, 0);
         assert_eq!(res.stats.agent_count, 1);
-        assert_eq!(res.stats.total_input_tokens, 2490 + 9216 + 0);
+        assert_eq!(res.stats.total_input_tokens, 2490 + 9216);
         assert_eq!(res.stats.total_output_tokens, 106);
         // cache_hit_pct = 9216 / (9216 + 2490 + 0) * 100 = 78.72…
         assert!((res.stats.cache_hit_pct - 78.7).abs() < 0.5);

@@ -9,7 +9,7 @@ fn fixture_paths() -> (PathBuf, PathBuf, PathBuf) {
     p.push("tests/fixtures/kimi");
     let kimi_root = p.join("sessions");
     let kimi_json = p.join("kimi.json");
-    let imported = tempfile::tempdir().unwrap().into_path();
+    let imported = tempfile::tempdir().unwrap().keep();
     (kimi_root, kimi_json, imported)
 }
 
@@ -21,9 +21,11 @@ async fn kimi_provider_end_to_end() {
     let provider = KimiTracingProvider::new_for_test(kimi_root, kimi_json, imported, widx);
 
     let sessions = provider.list_sessions().await.unwrap();
-    assert_eq!(sessions.len(), 1);
-    let s = &sessions[0];
-    assert_eq!(s.session_id, "sess-fixture-001");
+    assert_eq!(sessions.len(), 2);
+    let s = sessions
+        .iter()
+        .find(|s| s.session_id == "sess-fixture-001")
+        .expect("sess-fixture-001 not found");
     assert_eq!(s.turn_count, 1);
 
     let detail = provider
