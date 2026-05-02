@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { EMPTY_TIMELINE_RESPONSE, timelineQuery } from "@/api/endpoints/dashboard";
 import type { TimelineEntry } from "@/bindings";
+import { useSidebarOpen } from "../../lib/layers";
+import { SummaryPanel } from "../SummaryPanel";
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import {
@@ -90,7 +92,6 @@ function buildWeekSessions(entries: TimelineEntry[]): WeekSession[] {
 
   // Annotate activity sessions with hasFocus when overlapped by a focus session
   for (const a of filtered) {
-    if (a.type !== "activity") continue;
     a.hasFocus = focusEntries.some((f) => {
       const fStart = minutesSinceMidnight(f.startedAt);
       const fEnd = fStart + (f.durationSecs ?? 0) / 60;
@@ -143,6 +144,8 @@ function sessionOpacity(totalSecs: number): number {
 
 export function WeekView() {
   const { date, setDate, setMode } = useDashboardState();
+  const { sidebarOpen } = useSidebarOpen();
+  const [selectedEntry, setSelectedEntry] = useState<TimelineEntry | null>(null);
   const dateStr = date || todayISO();
   const monday = weekStartISO(dateStr);
   const today = todayISO();
@@ -188,20 +191,10 @@ export function WeekView() {
   }, [data.entries, days]);
 
   return (
-    <div className="dashboard__week-grid">
-      <div className="dashboard__week-grid-inner">
-        {isLoading && (
-          <div
-            style={{
-              fontSize: "var(--fs-2xs)",
-              color: "var(--text-muted)",
-              marginBottom: 4,
-              padding: "4px 8px",
-            }}
-          >
-            Loading...
-          </div>
-        )}
+    <div style={{ display: "flex", gap: 8, height: "100%", width: "100%" }}>
+      <div className="dashboard__week-grid" style={{ flex: 1 }}>
+        <div className="dashboard__week-grid-inner">
+        {isLoading && <div className="dashboard__week-loading">Loading...</div>}
 
         {/* Header row */}
         <div className="dashboard__week-header">
@@ -226,11 +219,7 @@ export function WeekView() {
                 </div>
                 <div>{d.getDate()}</div>
                 {activeSecs > 0 && (
-                  <div
-                    style={{ fontSize: "var(--fs-3xs)", color: "var(--text-muted)", marginTop: 2 }}
-                  >
-                    {formatHumanDuration(activeSecs)}
-                  </div>
+                  <div className="dashboard__week-day-active">{formatHumanDuration(activeSecs)}</div>
                 )}
               </button>
             );
@@ -299,6 +288,22 @@ export function WeekView() {
                           right: 2,
                           opacity: sessionOpacity(s.totalSecs),
                         }}
+                        onClick={() => {
+                          setSelectedEntry({
+                            id: `week-${day}-${s.startMin}`,
+                            title: s.label,
+                            description: null,
+                            startedAt: new Date(`${day}T00:00:00`).toISOString(),
+                            endedAt: null,
+                            durationSecs: s.totalSecs,
+                            source: "productivity",
+                            entryType: "appUsage",
+                            color: "var(--timeline-app-productive)",
+                            metadata: null,
+                            entityId: null,
+                            entityRoute: null,
+                          });
+                        }}
                       >
                         <span className="dashboard__week-session-label">{s.label}</span>
                         {s.appCount > 1 && (
@@ -317,7 +322,15 @@ export function WeekView() {
             })}
           </div>
         </div>
+        </div>
       </div>
+      {sidebarOpen && (
+        <SummaryPanel
+          summary={data.summary}
+          selectedEntry={selectedEntry}
+          onClose={() => setSelectedEntry(null)}
+        />
+      )}
     </div>
   );
 }

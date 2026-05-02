@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -75,6 +75,46 @@ describe("WeekView", () => {
       const hours = screen.getAllByTestId("hour-label");
       expect(hours.length).toBe(24);
     });
+  });
+
+  it("selecting a session block opens EntryDetail in SummaryPanel", async () => {
+    mockedTimelineQuery.mockResolvedValue({
+      entries: [
+        {
+          id: "a1",
+          title: "VSCode",
+          description: null,
+          startedAt: "2026-04-29T10:00:00",
+          endedAt: "2026-04-29T11:00:00",
+          durationSecs: 3600,
+          source: "productivity",
+          entryType: "appUsage",
+          color: "var(--timeline-app-productive)",
+          metadata: null,
+          entityId: null,
+          entityRoute: null,
+        },
+      ],
+      summary: {
+        totalTrackedSecs: 3600,
+        focusSecs: 0,
+        tasksCompleted: 0,
+        tasksCreated: 0,
+        notesTouched: 0,
+        transactionsCount: 0,
+        topApps: [{ appName: "VSCode", durationSecs: 3600, percentage: 100 }],
+        sourceBreakdown: [],
+      },
+    });
+    render(wrap(<WeekView />));
+    await waitFor(() => expect(screen.getAllByText("VSCode").length).toBeGreaterThan(0));
+    const sessionBtn = screen
+      .getAllByText("VSCode")
+      .find((el) => el.closest("button")?.classList.contains("dashboard__week-session"))
+      ?.closest("button");
+    if (!sessionBtn) throw new Error("session button not found");
+    fireEvent.click(sessionBtn);
+    await waitFor(() => expect(screen.getByText("Details")).toBeTruthy());
   });
 
   it("clicking a day header switches to day mode", async () => {
