@@ -417,7 +417,7 @@ pub fn build_score_nodes(date: &str, daily_id: &str, score_id: &str, score: f64)
 
 #[cfg(test)]
 mod tests {
-    use super::tree_builder_base::compose_embedding_text;
+    use crate::adapters::tree_builder_base::compose_embedding_text;
     use super::*;
 
     // --- compose_embedding_text ---

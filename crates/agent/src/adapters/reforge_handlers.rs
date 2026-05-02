@@ -772,9 +772,7 @@ mod tests {
         use coding_memory::reforge::cross_cli_synthesis::TransferableCandidate;
 
         let json = r#"{"approved_rule_ids": ["r_cc"], "rejected": [], "notes": "all approved"}"#;
-        let provider = std::sync::Arc::new(MockProvider {
-            response: json.to_string(),
-        });
+        let provider = std::sync::Arc::new(MockProvider::with_text(json));
         let handler = LlmCrossCliSynthesisHandler::new(provider, "m", 1024);
 
         let candidates = vec![TransferableCandidate {
@@ -802,9 +800,7 @@ mod tests {
           }],
           "notes": null
         }"##;
-        let provider = std::sync::Arc::new(MockProvider {
-            response: json.to_string(),
-        });
+        let provider = std::sync::Arc::new(MockProvider::with_text(json));
         let handler = LlmSkillDiscoveryHandler::new(provider, "m", 4096);
 
         let cluster = RuleCluster {

@@ -35,6 +35,18 @@ pub struct ToolRegistry {
     permissions: Option<ToolPermissions>,
 }
 
+impl Clone for ToolRegistry {
+    fn clone(&self) -> Self {
+        Self {
+            tools: self.tools.clone(),
+            metadata: self.metadata.clone(),
+            usage_counts: Mutex::new(self.usage_counts.lock().unwrap().clone()),
+            cached_definitions: Mutex::new(self.cached_definitions.lock().unwrap().clone()),
+            permissions: self.permissions.clone(),
+        }
+    }
+}
+
 impl ToolRegistry {
     /// Create a new tool registry
     pub fn new() -> Self {

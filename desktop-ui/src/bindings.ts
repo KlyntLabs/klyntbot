@@ -711,33 +711,33 @@ async codingSessionsUnstar(sessionKey: string) : Promise<Result<null, ApiError>>
     else return { status: "error", error: e  as any };
 }
 },
-async codingPermissionsClearMirror(tool: string, repoId: string | null) : Promise<Result<number, ApiError>> {
+async codingPermissionsClearMirror(args: { tool: string; repoId: string | null }) : Promise<Result<number, ApiError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("coding_permissions_clear_mirror", { tool, repoId }) };
+    return { status: "ok", data: await TAURI_INVOKE("coding_permissions_clear_mirror", { args }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async codingSessionsRewind(sessionKey: string, messageId: string) : Promise<Result<RewindResult, ApiError>> {
+async codingSessionsRewind(args: { sessionKey: string; messageId: string }) : Promise<Result<RewindResult, ApiError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_rewind", { sessionKey, messageId }) };
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_rewind", { args }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async codingSessionsExport(sessionKey: string, format: ExportFormat) : Promise<Result<SessionExportResult, ApiError>> {
+async codingSessionsExport(args: { sessionKey: string; format: ExportFormat }) : Promise<Result<SessionExportResult, ApiError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_export", { sessionKey, format }) };
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_export", { args }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async codingSessionsFork(sessionKey: string, upToMessage: string | null) : Promise<Result<SessionForkResult, ApiError>> {
+async codingSessionsFork(args: { sessionKey: string; upToMessage: string | null }) : Promise<Result<SessionForkResult, ApiError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_fork", { sessionKey, upToMessage }) };
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_fork", { args }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

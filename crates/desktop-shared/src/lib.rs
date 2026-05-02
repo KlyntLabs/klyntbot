@@ -41,6 +41,38 @@ pub struct SessionForkResult {
     pub new_session_key: String,
 }
 
+/// Args for `coding_sessions_export`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionExportArgs {
+    pub session_key: String,
+    pub format: ExportFormat,
+}
+
+/// Args for `coding_sessions_fork`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionForkArgs {
+    pub session_key: String,
+    pub up_to_message: Option<String>,
+}
+
+/// Args for `coding_sessions_rewind`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRewindArgs {
+    pub session_key: String,
+    pub message_id: String,
+}
+
+/// Args for `coding_permissions_clear_mirror`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ClearMirrorCacheArgs {
+    pub tool: String,
+    pub repo_id: Option<String>,
+}
+
 #[cfg(test)]
 mod phase5_helper_tests {
     use crate::specta_helpers::{JsonValue, Timestamp};

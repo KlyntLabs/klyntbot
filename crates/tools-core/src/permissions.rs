@@ -30,6 +30,7 @@ impl std::fmt::Display for PermissionLevel {
 }
 
 /// Per-channel permission configuration for tool access control.
+#[derive(Debug, Clone)]
 pub struct ToolPermissions {
     /// Permission level per channel name.
     channel_levels: HashMap<String, PermissionLevel>,
