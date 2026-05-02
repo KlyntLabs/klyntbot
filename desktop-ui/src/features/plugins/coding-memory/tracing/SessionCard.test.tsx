@@ -5,7 +5,7 @@ import type { SessionSummary } from "./types";
 
 const sample: SessionSummary = {
   sessionId: "sess-fixture-001",
-  providerId: "kimi",
+  providerId: "default",
   sourceDir: "/x",
   cwd: "/Users/me/proj",
   projectBasename: "proj",
@@ -21,6 +21,13 @@ const sample: SessionSummary = {
   hasWire: true,
   hasContext: true,
   imported: false,
+  workDirHash: "",
+  hasState: false,
+  wireSize: 0,
+  contextSize: 0,
+  stateSize: 0,
+  totalSize: 15360,
+  metadata: null,
 };
 
 describe("SessionCard", () => {
