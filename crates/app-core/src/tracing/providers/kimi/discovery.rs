@@ -38,7 +38,7 @@ async fn scan_native(root: &Path, out: &mut Vec<DiscoveredSession>) -> Result<()
         .await
         .map_err(|e| common::KlyntbotError::Storage(format!("dir iter: {e}")))?
     {
-        if !hash_entry.file_type().await.map_or(false, |t| t.is_dir()) {
+        if !hash_entry.file_type().await.is_ok_and(|t| t.is_dir()) {
             continue;
         }
         let hash = hash_entry.file_name().to_string_lossy().to_string();
@@ -54,7 +54,7 @@ async fn scan_native(root: &Path, out: &mut Vec<DiscoveredSession>) -> Result<()
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("dir iter: {e}")))?
         {
-            if !s.file_type().await.map_or(false, |t| t.is_dir()) {
+            if !s.file_type().await.is_ok_and(|t| t.is_dir()) {
                 continue;
             }
             let session_dir = s.path();
@@ -91,7 +91,7 @@ async fn scan_imported(root: &Path, out: &mut Vec<DiscoveredSession>) -> Result<
         .await
         .map_err(|e| common::KlyntbotError::Storage(format!("dir iter: {e}")))?
     {
-        if !s.file_type().await.map_or(false, |t| t.is_dir()) {
+        if !s.file_type().await.is_ok_and(|t| t.is_dir()) {
             continue;
         }
         if tokio::fs::metadata(s.path().join("wire.jsonl"))

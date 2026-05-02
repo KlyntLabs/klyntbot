@@ -9,7 +9,7 @@ fn fixture_paths() -> (PathBuf, PathBuf, PathBuf) {
     p.push("tests/fixtures/kimi");
     let kimi_root = p.join("sessions");
     let kimi_json = p.join("kimi.json");
-    let imported = tempfile::tempdir().unwrap().into_path();
+    let imported = tempfile::tempdir().unwrap().keep();
     (kimi_root, kimi_json, imported)
 }
 

@@ -5,7 +5,6 @@ use crate::tracing::providers::kimi::subagent_loader::list_subagents;
 use crate::tracing::types::*;
 use common::Result;
 use std::collections::HashMap;
-use std::path::Path;
 
 pub async fn aggregate(sessions: &[SessionSummary]) -> Result<StatsBundle> {
     let mut per_project: HashMap<String, ProjectTotals> = HashMap::new();
@@ -94,13 +93,13 @@ pub async fn aggregate(sessions: &[SessionSummary]) -> Result<StatsBundle> {
             error_count: u.error_count,
         })
         .collect();
-    errors_by_tool.sort_by(|a, b| b.error_count.cmp(&a.error_count));
+    errors_by_tool.sort_by_key(|b| std::cmp::Reverse(b.error_count));
 
     let mut tool_usage: Vec<ToolUsage> = tool_usage.into_values().collect();
-    tool_usage.sort_by(|a, b| b.call_count.cmp(&a.call_count));
+    tool_usage.sort_by_key(|b| std::cmp::Reverse(b.call_count));
 
     let mut per_project: Vec<ProjectTotals> = per_project.into_values().collect();
-    per_project.sort_by(|a, b| b.session_count.cmp(&a.session_count));
+    per_project.sort_by_key(|b| std::cmp::Reverse(b.session_count));
 
     let mut token_series: Vec<TokenSeriesPoint> = token_series.into_values().collect();
     token_series.sort_by(|a, b| a.day.cmp(&b.day));
@@ -112,7 +111,7 @@ pub async fn aggregate(sessions: &[SessionSummary]) -> Result<StatsBundle> {
             count: c,
         })
         .collect();
-    subagent_types.sort_by(|a, b| b.count.cmp(&a.count));
+    subagent_types.sort_by_key(|b| std::cmp::Reverse(b.count));
 
     let total_input: u64 = per_project.iter().map(|p| p.total_input_tokens).sum();
     let total_cache_read: u64 = per_project.iter().map(|p| p.cache_read_tokens).sum();

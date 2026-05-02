@@ -72,7 +72,7 @@ impl KimiTracingProvider {
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("dir iter: {e}")))?
         {
-            if !h.file_type().await.map_or(false, |t| t.is_dir()) {
+            if !h.file_type().await.is_ok_and(|t| t.is_dir()) {
                 continue;
             }
             let candidate = h.path().join(session_id);
@@ -182,7 +182,7 @@ impl TracingProvider for KimiTracingProvider {
             self.cache.put(wire, mtime, summary.clone()).await;
             out.push(summary);
         }
-        out.sort_by(|a, b| b.last_event_at.cmp(&a.last_event_at));
+        out.sort_by_key(|b| std::cmp::Reverse(b.last_event_at));
         Ok(out)
     }
 
