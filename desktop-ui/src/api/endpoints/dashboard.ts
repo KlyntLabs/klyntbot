@@ -1,4 +1,5 @@
 import type {
+  CalendarEvent,
   CalendarEventInput,
   DashboardIntelligenceResponse,
   ProductivitySummaryResponse,
@@ -71,5 +72,11 @@ export async function dashboardIntelligenceQuery(
 ): Promise<DashboardIntelligenceResponse> {
   const r = await commands.getDashboardIntelligence(date, tzOffsetMins);
   if (r.status !== "ok") throw new Error(r.error.message ?? "dashboard intelligence failed");
+  return r.data;
+}
+
+export async function productivityCalendarEvents(date: string): Promise<CalendarEvent[]> {
+  const r = await commands.productivityCalendarEvents(date);
+  if (r.status !== "ok") throw new Error(r.error.message ?? "productivity calendar events failed");
   return r.data;
 }

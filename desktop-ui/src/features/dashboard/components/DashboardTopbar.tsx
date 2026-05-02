@@ -15,7 +15,11 @@ const VIEWS: { key: DashboardViewMode; label: string }[] = [
 ];
 
 function formatDateDisplay(mode: DashboardViewMode, date: string): string {
-  if (mode === "year") return date;
+  if (mode === "year") {
+    return /^\d{4}$/.test(date) ? date : String(new Date().getFullYear());
+  }
+  // Day/Week/Month all expect YYYY-MM-DD.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return "—";
   if (mode === "day") return formatFullDate(date);
   if (mode === "month") return formatMonthLabel(date.slice(0, 7));
   // Week mode: "Apr 27 – May 3, 2026"

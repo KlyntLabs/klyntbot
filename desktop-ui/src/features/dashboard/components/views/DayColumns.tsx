@@ -4,7 +4,12 @@
 
 import type { QueryKey } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ProductivitySummaryResponse, TimelineEntry, TimelineSummary } from "@/bindings";
+import type {
+  CalendarEvent,
+  ProductivitySummaryResponse,
+  TimelineEntry,
+  TimelineSummary,
+} from "@/bindings";
 import { formatHumanDuration, minutesSinceMidnight } from "@/utils/dashboardDates";
 import { useTimelineDrag } from "../../hooks/useTimelineDrag";
 import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../../lib/layers";
@@ -110,6 +115,7 @@ export function DayColumns({
   const { enabled } = useEnabledLayers();
   const { sidebarOpen } = useSidebarOpen();
   const [selectedEntry, setSelectedEntry] = useState<TimelineEntry | null>(null);
+  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Dynamic zoom state
@@ -403,8 +409,17 @@ export function DayColumns({
                 // Calendar column: fetches its own data
                 if (col.key === "calendar") {
                   return (
-                    <div key={col.key} className="dashboard__day-column">
-                      <CalendarTrack />
+                    <div
+                      key={col.key}
+                      className="dashboard__day-column"
+                      style={{ position: "relative" }}
+                    >
+                      <CalendarTrack
+                        date={date}
+                        hourHeight={hourHeight}
+                        selectedEventId={selectedCalendarEvent?.id ?? null}
+                        onSelectEvent={setSelectedCalendarEvent}
+                      />
                     </div>
                   );
                 }

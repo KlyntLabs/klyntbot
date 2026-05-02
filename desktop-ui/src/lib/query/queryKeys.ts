@@ -111,6 +111,10 @@ export const qk = {
     all: () => ["calendarSync"] as const,
     status: () => ["calendarSync", "status"] as const,
   },
+  productivity: {
+    all: () => ["productivity"] as const,
+    calendarEvents: (date: string) => ["productivity", "calendarEvents", date] as const,
+  },
 } as const;
 
 type QkType = typeof qk;

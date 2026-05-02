@@ -9,6 +9,9 @@ import {
 } from "../lib/layers";
 import { DashboardTopbar } from "./DashboardTopbar";
 import { DayView } from "./views/DayView";
+import { MonthView } from "./views/MonthView";
+import { WeekView } from "./views/WeekView";
+import { YearView } from "./views/YearView";
 
 export function Dashboard() {
   const state = useDashboardStateImpl();
@@ -22,13 +25,13 @@ export function Dashboard() {
       view = <DayView />;
       break;
     case "week":
+      view = <WeekView />;
+      break;
     case "month":
+      view = <MonthView />;
+      break;
     case "year":
-      view = (
-        <div className="dashboard__placeholder">
-          {state.mode.charAt(0).toUpperCase() + state.mode.slice(1)} view — coming in next phase
-        </div>
-      );
+      view = <YearView />;
       break;
   }
 
