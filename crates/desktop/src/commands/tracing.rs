@@ -71,3 +71,29 @@ pub async fn tracing_open_dir(provider_id: String, session_id: String) -> std::p
 pub async fn tracing_stats(provider_id: String) -> app_core::tracing::types::StatsBundle {
     state.tracing_stats(provider_id).await
 }
+
+#[klynt_command]
+pub async fn tracing_session_summary(
+    provider_id: String,
+    session_id: String,
+) -> app_core::tracing::types::SessionSummary {
+    state.tracing_session_summary(provider_id, session_id).await
+}
+
+#[klynt_command]
+pub async fn tracing_load_subagent_session(
+    provider_id: String,
+    session_id: String,
+    agent_id: String,
+) -> app_core::tracing::types::SessionDetail {
+    state.tracing_load_subagent_session(provider_id, session_id, agent_id).await
+}
+
+#[klynt_command]
+pub async fn tracing_load_subagent_context(
+    provider_id: String,
+    session_id: String,
+    agent_id: String,
+) -> Vec<app_core::tracing::types::ContextMessage> {
+    state.tracing_load_subagent_context(provider_id, session_id, agent_id).await
+}

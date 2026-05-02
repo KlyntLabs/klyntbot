@@ -3400,6 +3400,22 @@ async tracingLoadState(providerId: string, sessionId: string) : Promise<Result<S
     else return { status: "error", error: e  as any };
 }
 },
+async tracingLoadSubagentContext(providerId: string, sessionId: string, agentId: string) : Promise<Result<ContextMessage[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_load_subagent_context", { providerId, sessionId, agentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingLoadSubagentSession(providerId: string, sessionId: string, agentId: string) : Promise<Result<SessionDetail, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_load_subagent_session", { providerId, sessionId, agentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async tracingListSubagents(providerId: string, sessionId: string) : Promise<Result<SubagentSummary[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("tracing_list_subagents", { providerId, sessionId }) };
@@ -3427,6 +3443,14 @@ async tracingGetDir(providerId: string, sessionId: string) : Promise<Result<stri
 async tracingOpenDir(providerId: string, sessionId: string) : Promise<Result<string, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("tracing_open_dir", { providerId, sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingSessionSummary(providerId: string, sessionId: string) : Promise<Result<SessionSummary, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_session_summary", { providerId, sessionId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -4962,6 +4986,7 @@ repoId: string | null;
  * Look back N days. Defaults to 14.
  */
 sinceDays?: number; limit?: number; offset?: number }
+export type SessionMetadataInfo = { sessionId: string; title: string; titleGenerated: boolean; archived: boolean; archivedAt: number | null; autoArchiveExempt: boolean; wireMtime: number | null }
 /**
  * Args for `coding_memory_session_replay_recall_overlay`.
  */
@@ -4976,7 +5001,7 @@ export type SessionState = { customTitle: string | null; planMode: boolean; arch
  * Verbatim parsed state.json for the State tab's "raw" view.
  */
 raw: unknown }
-export type SessionSummary = { sessionId: string; providerId: string; sourceDir: string; cwd: string | null; projectBasename: string | null; customTitle: string | null; startedAt: string; lastEventAt: string; sizeBytes: number; turnCount: number; stepCount: number; toolCallCount: number; errorCount: number; subagentCount: number; hasWire: boolean; hasContext: boolean; imported: boolean }
+export type SessionSummary = { sessionId: string; providerId: string; sourceDir: string; cwd: string | null; projectBasename: string | null; customTitle: string | null; startedAt: string; lastEventAt: string; sizeBytes: number; turnCount: number; stepCount: number; toolCallCount: number; errorCount: number; subagentCount: number; hasWire: boolean; hasContext: boolean; imported: boolean; workDirHash: string; hasState: boolean; wireSize: number; contextSize: number; stateSize: number; totalSize: number; metadata: SessionMetadataInfo | null }
 /**
  * One row in the Plugins → Coding Memory session list.
  */
