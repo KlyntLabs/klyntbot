@@ -1,7 +1,7 @@
-use proptest::prelude::*;
-use storage::StoragePool;
-use storage::repos::{CodingApprovalHistoryRepo, HistoryEntry};
 use klynt_core::approval::layer3::{evaluate, Layer3Config, Layer3Outcome};
+use proptest::prelude::*;
+use storage::repos::{CodingApprovalHistoryRepo, HistoryEntry};
+use storage::StoragePool;
 
 proptest! {
     #![proptest_config(ProptestConfig { cases: 256, .. ProptestConfig::default() })]

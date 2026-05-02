@@ -152,7 +152,9 @@ fn diff_files(baseline: &str, candidate: &str) -> std::io::Result<()> {
 
     for c_ev in &cand {
         let key = (c_ev.conv_id.clone(), c_ev.qa_index);
-        let Some(&b_ev) = base_map.get(&key) else { continue };
+        let Some(&b_ev) = base_map.get(&key) else {
+            continue;
+        };
         if b_ev.grade != c_ev.grade {
             transitions.push((b_ev.grade, c_ev.grade, b_ev, c_ev));
             match (b_ev.grade, c_ev.grade) {
@@ -167,9 +169,7 @@ fn diff_files(baseline: &str, candidate: &str) -> std::io::Result<()> {
 
     println!("=== diff: {baseline} → {candidate} ===");
     println!("matched QA pairs: {}", cand.len().min(base.len()));
-    println!(
-        "C→A (gained): {c_to_a}  A→C (lost): {a_to_c}  B→A: {b_to_a}  A→B: {a_to_b}"
-    );
+    println!("C→A (gained): {c_to_a}  A→C (lost): {a_to_c}  B→A: {b_to_a}  A→B: {a_to_b}");
 
     // Sample 5 wins and 5 losses
     println!("\nSample C→A transitions (mechanism that changed):");

@@ -68,6 +68,11 @@ async fn fetches_text_from_local_server() {
         Arc::new(klynt_core::approval::HostApprovalCache::default()),
         None,
         "".to_string(),
+        None,
+        false,
+        5,
+        86400,
+        "".to_string(),
     )
     .await
     .unwrap();

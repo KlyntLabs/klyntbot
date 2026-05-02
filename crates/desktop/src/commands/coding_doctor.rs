@@ -26,8 +26,16 @@ pub(crate) async fn dispatch_dev(
 ) -> Option<desktop_shared::CommandResult<serde_json::Value>> {
     use super::dev_helpers as dev;
     Some(match cmd {
-        "coding_doctor" => dev::val(core.coding_doctor().await.map_err(desktop_shared::errors::ApiError::from)),
-        "coding_test_sandbox" => dev::val(core.coding_test_sandbox().await.map_err(desktop_shared::errors::ApiError::from)),
+        "coding_doctor" => dev::val(
+            core.coding_doctor()
+                .await
+                .map_err(desktop_shared::errors::ApiError::from),
+        ),
+        "coding_test_sandbox" => dev::val(
+            core.coding_test_sandbox()
+                .await
+                .map_err(desktop_shared::errors::ApiError::from),
+        ),
         _ => return None,
     })
 }

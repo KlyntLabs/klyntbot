@@ -43,7 +43,11 @@ fn guard_ctx_with_history<'a>(
         mirror_learning_enabled: mirror_learning,
         mirror_min_approvals: 5,
         mirror_cooldown_seconds: 86400,
-        now_unix: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64 + now_offset_h * 3600,
+        now_unix: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64
+            + now_offset_h * 3600,
     }
 }
 
@@ -78,7 +82,10 @@ async fn privacy_blocks_first() {
         mirror_learning_enabled: false,
         mirror_min_approvals: 5,
         mirror_cooldown_seconds: 86400,
-        now_unix: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+        now_unix: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
     };
     let d = evaluate(ctx, "bash", "cat .env").await;
     assert!(matches!(d, ApprovalDecision::PrivacyDenied { .. }));
@@ -121,7 +128,10 @@ async fn auto_allow_emits_pair_no_user_input() {
         mirror_learning_enabled: false,
         mirror_min_approvals: 5,
         mirror_cooldown_seconds: 86400,
-        now_unix: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+        now_unix: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
     };
     let d = evaluate(ctx, "bash", "echo hi").await;
     assert!(d.allowed());
@@ -187,7 +197,10 @@ async fn ask_path_awaits_user_decision() {
         mirror_learning_enabled: false,
         mirror_min_approvals: 5,
         mirror_cooldown_seconds: 86400,
-        now_unix: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+        now_unix: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
     };
     let d = evaluate(ctx, "bash", "rm something").await;
     assert!(d.allowed());
@@ -199,14 +212,20 @@ async fn layer3_auto_allows_after_5_prior_approvals_when_enabled() {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
     let history = CodingApprovalHistoryRepo::new(pool.clone());
     for _ in 0..5 {
-        history.record(HistoryEntry {
-            tool: "bash".into(),
-            args_hash: klynt_core::approval::layer3::args_hash_for_relevance("bash", r#"{"command":"echo hi"}"#),
-            repo_id: "test-repo".into(),
-            decision: "allow".into(),
-            decided_by: "user".into(),
-            layer: "ask".into(),
-        }).await.unwrap();
+        history
+            .record(HistoryEntry {
+                tool: "bash".into(),
+                args_hash: klynt_core::approval::layer3::args_hash_for_relevance(
+                    "bash",
+                    r#"{"command":"echo hi"}"#,
+                ),
+                repo_id: "test-repo".into(),
+                decision: "allow".into(),
+                decided_by: "user".into(),
+                layer: "ask".into(),
+            })
+            .await
+            .unwrap();
     }
     let perms = CodingPermissions {
         allow: vec![],
@@ -222,9 +241,15 @@ async fn layer3_auto_allows_after_5_prior_approvals_when_enabled() {
     let pending = Arc::new(PendingApprovalsMap::new());
 
     let ctx = guard_ctx_with_history(
-        &l1, &policy, &privacy, &pending, None, &bus,
+        &l1,
+        &policy,
+        &privacy,
+        &pending,
+        None,
+        &bus,
         Some(Arc::new(history.clone())),
-        true, 25,
+        true,
+        25,
     );
     let decision = evaluate(ctx, "bash", r#"{"command":"echo hi"}"#).await;
     assert!(matches!(decision.layer(), ApprovalLayer::Layer3Mirror));

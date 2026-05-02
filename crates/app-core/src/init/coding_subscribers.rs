@@ -9,8 +9,8 @@ use bus::{DomainEvent, DomainEventBus};
 use coding_memory::mirror::coding_signals::{
     ApprovalHistorySignal, RecallCoverageSignal, SkillEffectivenessSignal,
 };
-use cognitive::mirror::MirrorRepo;
 use cognitive::mirror::sources::approval_history::ApprovalHistorySource;
+use cognitive::mirror::MirrorRepo;
 use common::Result;
 use std::sync::Arc;
 

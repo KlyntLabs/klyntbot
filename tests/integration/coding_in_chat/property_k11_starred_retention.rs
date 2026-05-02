@@ -1,6 +1,6 @@
 use proptest::prelude::*;
-use storage::StoragePool;
 use storage::repos::SessionRepo;
+use storage::StoragePool;
 
 proptest! {
     #![proptest_config(ProptestConfig { cases: 128, .. ProptestConfig::default() })]

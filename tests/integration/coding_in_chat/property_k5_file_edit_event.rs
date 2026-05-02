@@ -1,19 +1,19 @@
 use bus::DomainEventBus;
+use common::tool_channel::{Channel, NonUiPolicy};
 use config::schema::CodingPermissions;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
-use common::tool_channel::{Channel, NonUiPolicy};
 use klynt_core::tools::{
     apply_patch::{run_for_test as patch_run, ApplyPatchArgs},
     edit::{run_for_test as edit_run, EditArgs},
     write::{run_for_test as write_run, WriteArgs},
 };
 use klynt_execpolicy::Policy;
-use tools_core::events::ToolEvent;
 use proptest::prelude::*;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use tools_core::events::ToolEvent;
 
 fn perms() -> CodingPermissions {
     CodingPermissions {

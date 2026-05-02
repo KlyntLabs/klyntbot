@@ -24,28 +24,90 @@ pub struct ToolSearchArgs {
     tags = "tools,coding",
     concurrency_safe = "true"
 )]
-pub struct ToolSearchTool;
+pub struct ToolSearchTool {
+    pub effectiveness_scores: Option<std::collections::HashMap<String, f32>>,
+}
 
 impl ToolSearchTool {
     pub fn new() -> Self {
-        Self
+        Self {
+            effectiveness_scores: None,
+        }
+    }
+
+    pub fn with_effectiveness(scores: std::collections::HashMap<String, f32>) -> Self {
+        Self {
+            effectiveness_scores: Some(scores),
+        }
     }
 
     fn curated_meta() -> Vec<super::ToolMeta> {
         vec![
-            super::ToolMeta { name: "bash".into(), aliases: vec![], description: "Run a shell command".into() },
-            super::ToolMeta { name: "read".into(), aliases: vec![], description: "Read a file".into() },
-            super::ToolMeta { name: "edit".into(), aliases: vec![], description: "Edit a file in place".into() },
-            super::ToolMeta { name: "write".into(), aliases: vec![], description: "Write a file".into() },
-            super::ToolMeta { name: "apply_patch".into(), aliases: vec![], description: "Apply a unified-diff patch".into() },
-            super::ToolMeta { name: "glob".into(), aliases: vec![], description: "List files matching a glob pattern".into() },
-            super::ToolMeta { name: "grep".into(), aliases: vec![], description: "Search file contents with regex".into() },
-            super::ToolMeta { name: "list_dir".into(), aliases: vec![], description: "List directory contents".into() },
-            super::ToolMeta { name: "ask_user".into(), aliases: vec![], description: "Ask the user a question".into() },
-            super::ToolMeta { name: "web_fetch".into(), aliases: vec![], description: "Fetch a URL".into() },
-            super::ToolMeta { name: "tool_search".into(), aliases: vec![], description: "Search available tools".into() },
-            super::ToolMeta { name: "enter_plan_mode".into(), aliases: vec![], description: "Enter plan mode".into() },
-            super::ToolMeta { name: "exit_plan_mode".into(), aliases: vec![], description: "Exit plan mode".into() },
+            super::ToolMeta {
+                name: "bash".into(),
+                aliases: vec![],
+                description: "Run a shell command".into(),
+            },
+            super::ToolMeta {
+                name: "read".into(),
+                aliases: vec![],
+                description: "Read a file".into(),
+            },
+            super::ToolMeta {
+                name: "edit".into(),
+                aliases: vec![],
+                description: "Edit a file in place".into(),
+            },
+            super::ToolMeta {
+                name: "write".into(),
+                aliases: vec![],
+                description: "Write a file".into(),
+            },
+            super::ToolMeta {
+                name: "apply_patch".into(),
+                aliases: vec![],
+                description: "Apply a unified-diff patch".into(),
+            },
+            super::ToolMeta {
+                name: "glob".into(),
+                aliases: vec![],
+                description: "List files matching a glob pattern".into(),
+            },
+            super::ToolMeta {
+                name: "grep".into(),
+                aliases: vec![],
+                description: "Search file contents with regex".into(),
+            },
+            super::ToolMeta {
+                name: "list_dir".into(),
+                aliases: vec![],
+                description: "List directory contents".into(),
+            },
+            super::ToolMeta {
+                name: "ask_user".into(),
+                aliases: vec![],
+                description: "Ask the user a question".into(),
+            },
+            super::ToolMeta {
+                name: "web_fetch".into(),
+                aliases: vec![],
+                description: "Fetch a URL".into(),
+            },
+            super::ToolMeta {
+                name: "tool_search".into(),
+                aliases: vec![],
+                description: "Search available tools".into(),
+            },
+            super::ToolMeta {
+                name: "enter_plan_mode".into(),
+                aliases: vec![],
+                description: "Enter plan mode".into(),
+            },
+            super::ToolMeta {
+                name: "exit_plan_mode".into(),
+                aliases: vec![],
+                description: "Exit plan mode".into(),
+            },
         ]
     }
 }
@@ -75,9 +137,15 @@ impl ToolExecute for ToolSearchTool {
             let query = args.query.as_deref().unwrap_or("");
             let top_n = args.max_results.unwrap_or(10) as usize;
             let meta = Self::curated_meta();
-            let hits = super::ToolIndex::build(&meta).search(query, top_n);
-            Ok(serde_json::to_string(&hits).map_err(|e| ToolError::ExecutionFailed(e.to_string()))?)
-        }).await;
+            let index = super::ToolIndex::build(&meta);
+            let hits = match &self.effectiveness_scores {
+                Some(scores) => index.search_with_effectiveness(query, top_n, scores),
+                None => index.search(query, top_n),
+            };
+            Ok(serde_json::to_string(&hits)
+                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?)
+        })
+        .await;
         fire_post_tool_use(
             ctx.hook_engine.as_ref(),
             session_id,

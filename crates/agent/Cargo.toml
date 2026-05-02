@@ -19,6 +19,7 @@ session.workspace = true
 tools.workspace = true
 tools-core.workspace = true
 klynt-core.workspace = true
+klynt-execpolicy.workspace = true
 klynt-hooks.workspace = true
 feature-alarms.workspace = true
 feature-tasks.workspace = true

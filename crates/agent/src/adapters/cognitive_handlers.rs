@@ -1663,10 +1663,12 @@ mod tests {
     use std::sync::Arc;
 
     use crate::test_utils::MockProvider;
+    use common::{KlyntbotError, ProviderError};
     use cognitive::situation::UserSituation;
     use cognitive::types::{SemanticFact, DEFAULT_MEMORY_TYPE};
     use feature_coaching::signal_accumulator::TriggerFired;
-    use providers::LlmResponse;
+    use providers::{LlmProvider, LlmResponse, Usage, ProviderCapabilities, ProviderHealth};
+    use serde_json::Value;
 
     // ── Test helpers ──
 
@@ -1884,9 +1886,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_consolidation_parses_update() {
-        let mock = Arc::new(MockProvider::new(mock_response(
+        let mock = Arc::new(MockProvider::with_text(
             r#"{"decisions":[{"index":1,"action":"update","target_id":"old-1"}]}"#,
-        )));
+        ));
         let params = ChatParams::new("test-model");
         let handler = LlmConsolidationHandler::new(mock, params);
 
@@ -1910,9 +1912,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_consolidation_parses_noop() {
-        let mock = Arc::new(MockProvider::new(mock_response(
+        let mock = Arc::new(MockProvider::with_text(
             r#"{"decisions":[{"index":1,"action":"noop","target_id":null}]}"#,
-        )));
+        ));
         let params = ChatParams::new("test-model");
         let handler = LlmConsolidationHandler::new(mock, params);
 
@@ -1949,7 +1951,7 @@ mod tests {
             "superseded": []
         }"#;
 
-        let mock = Arc::new(MockProvider::new(mock_response(json_response)));
+        let mock = Arc::new(MockProvider::with_text(json_response));
         let params = ChatParams::new("test-model");
         let handler = LlmGraphLinkHandler::new(mock, params);
 
@@ -2021,9 +2023,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_coaching_reasoner_parses_intervention() {
-        let mock = Arc::new(MockProvider::new(mock_response(
+        let mock = Arc::new(MockProvider::with_text(
             r#"{"should_intervene":true,"confidence":0.75,"message":"You've been distracted 3 times. A short walk might help.","intervention_type":"chat_message","reasoning":"Distraction pattern detected","observations":["Afternoon focus decline"]}"#,
-        )));
+        ));
         let params = ChatParams::new("test-model");
         let handler = LlmCoachingReasonerHandler::new(mock, params);
 
@@ -2191,7 +2193,7 @@ mod tests {
     #[tokio::test]
     async fn llm_community_membership_confirms_match() {
         let json = r#"{"confirm": true, "reason": "C aligns with alpha by topic"}"#;
-        let provider = MockProvider::new(LlmResponse {
+        let provider = MockProvider::with_response(LlmResponse {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
@@ -2228,7 +2230,7 @@ mod tests {
             ],
             "missed_facts": []
         }"#;
-        let provider = MockProvider::new(LlmResponse {
+        let provider = MockProvider::with_response(LlmResponse {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
@@ -2272,7 +2274,7 @@ mod tests {
     #[tokio::test]
     async fn llm_query_predictor_returns_n_predictions() {
         let json = r#"{"predictions": ["how do I install rust?", "what about cargo?", "memory safety details?"]}"#;
-        let provider = MockProvider::new(LlmResponse {
+        let provider = MockProvider::with_response(LlmResponse {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
@@ -2299,7 +2301,7 @@ mod tests {
 
         let json =
             r#"{"keep": ["f2"], "drop": [{"fact_id": "f1", "reason": "f2 supersedes by date"}]}"#;
-        let provider = MockProvider::new(LlmResponse {
+        let provider = MockProvider::with_response(LlmResponse {
             content: Some(json.to_string()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),

@@ -70,7 +70,8 @@ impl HotConfig {
             max_tool_iterations_changed: self.max_tool_iterations != other.max_tool_iterations,
             safety_timeout_changed: self.safety_timeout_secs != other.safety_timeout_secs,
             budget_changed: self.monthly_budget_usd != other.monthly_budget_usd,
-            cost_ceiling_changed: self.per_thread_cost_ceiling_usd != other.per_thread_cost_ceiling_usd
+            cost_ceiling_changed: self.per_thread_cost_ceiling_usd
+                != other.per_thread_cost_ceiling_usd
                 || self.cost_alert_at_percent != other.cost_alert_at_percent,
         }
     }

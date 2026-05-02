@@ -20,7 +20,11 @@ pub(crate) async fn dispatch_dev(
     Some(match cmd {
         "coding_resume" => {
             let prefix = try_field!(dev::get_str(body, "prefix"));
-            dev::val(core.coding_resume(&prefix).await.map_err(desktop_shared::errors::ApiError::from))
+            dev::val(
+                core.coding_resume(&prefix)
+                    .await
+                    .map_err(desktop_shared::errors::ApiError::from),
+            )
         }
         _ => return None,
     })

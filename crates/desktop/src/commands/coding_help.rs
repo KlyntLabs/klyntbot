@@ -19,8 +19,15 @@ pub(crate) async fn dispatch_dev(
     use super::dev_helpers as dev;
     Some(match cmd {
         "coding_help" => {
-            let command = body.get("command").and_then(|v| v.as_str()).map(String::from);
-            dev::val(core.coding_help(command).await.map_err(desktop_shared::errors::ApiError::from))
+            let command = body
+                .get("command")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            dev::val(
+                core.coding_help(command)
+                    .await
+                    .map_err(desktop_shared::errors::ApiError::from),
+            )
         }
         _ => return None,
     })

@@ -136,6 +136,12 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
             },
             ..base
         }),
+        DomainEvent::CodingMirrorAlert { kind, payload, .. } => Some(AiSignal {
+            event_kind: "CodingMirrorAlert",
+            importance: 0.5,
+            content: format!("{kind}: {payload}"),
+            ..base
+        }),
         _ => None,
     }
 }

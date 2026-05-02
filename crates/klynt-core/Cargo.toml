@@ -39,6 +39,7 @@ html2text = { workspace = true }
 tools = { workspace = true }
 storage = { workspace = true }
 sqlx = { workspace = true, features = ["runtime-tokio", "sqlite"] }
+jiff = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }

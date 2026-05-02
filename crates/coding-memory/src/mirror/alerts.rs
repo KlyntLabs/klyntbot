@@ -28,6 +28,8 @@ pub enum CodingMirrorAlertKind {
     DistillerQueueBacklog,
     /// Retrieval skill effectiveness dropped below threshold.
     RetrievalSkillIneffective,
+    /// Per-thread cost ceiling crossed the configured threshold.
+    CostThresholdCrossed,
 }
 
 impl CodingMirrorAlertKind {
@@ -47,6 +49,7 @@ impl CodingMirrorAlertKind {
             Self::ProvenanceMissing => "provenance_missing",
             Self::DistillerQueueBacklog => "distiller_queue_backlog",
             Self::RetrievalSkillIneffective => "retrieval_skill_ineffective",
+            Self::CostThresholdCrossed => "cost_threshold_crossed",
         }
     }
 }

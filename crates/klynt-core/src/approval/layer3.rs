@@ -13,10 +13,18 @@ pub enum Layer3Outcome {
     FallThrough,
 }
 
-pub fn evaluate(cfg: &Layer3Config, summary: &ApprovalHistorySummary, now_unix: i64) -> Layer3Outcome {
-    if !cfg.enabled { return Layer3Outcome::FallThrough; }
+pub fn evaluate(
+    cfg: &Layer3Config,
+    summary: &ApprovalHistorySummary,
+    now_unix: i64,
+) -> Layer3Outcome {
+    if !cfg.enabled {
+        return Layer3Outcome::FallThrough;
+    }
     if summary.denial_count >= 1 {
-        return Layer3Outcome::Ask { reason: "mirror: prior denial — always confirm".into() };
+        return Layer3Outcome::Ask {
+            reason: "mirror: prior denial — always confirm".into(),
+        };
     }
     if summary.approval_count < cfg.min_approvals {
         return Layer3Outcome::FallThrough;
@@ -26,7 +34,10 @@ pub fn evaluate(cfg: &Layer3Config, summary: &ApprovalHistorySummary, now_unix: 
         return Layer3Outcome::FallThrough;
     }
     Layer3Outcome::AutoAllow {
-        reason: format!("mirror: {}+ prior approvals, no denials", summary.approval_count),
+        reason: format!(
+            "mirror: {}+ prior approvals, no denials",
+            summary.approval_count
+        ),
     }
 }
 
@@ -52,41 +63,68 @@ fn normalize_bash(args_json: &str) -> String {
 
 fn normalize_path(args_json: &str) -> String {
     let v: serde_json::Value = serde_json::from_str(args_json).unwrap_or(serde_json::Value::Null);
-    v.get("path").and_then(|p| p.as_str()).unwrap_or("").to_string()
+    v.get("path")
+        .and_then(|p| p.as_str())
+        .unwrap_or("")
+        .to_string()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     fn cfg(enabled: bool) -> Layer3Config {
-        Layer3Config { enabled, min_approvals: 5, cooldown_seconds: 86400 }
-    }
-    fn s(ok: u32, deny: u32, last: Option<i64>) -> ApprovalHistorySummary {
-        ApprovalHistorySummary { approval_count: ok, denial_count: deny, last_decided_at: last }
-    }
-
-    #[test] fn disabled_falls_through() {
-        assert_eq!(evaluate(&cfg(false), &s(100, 0, Some(0)), 999_999), Layer3Outcome::FallThrough);
-    }
-    #[test] fn single_denial_locks_to_ask() {
-        match evaluate(&cfg(true), &s(100, 1, Some(0)), 999_999) {
-            Layer3Outcome::Ask { .. } => {}, other => panic!("got {other:?}"),
+        Layer3Config {
+            enabled,
+            min_approvals: 5,
+            cooldown_seconds: 86400,
         }
     }
-    #[test] fn under_threshold_falls_through() {
-        assert_eq!(evaluate(&cfg(true), &s(4, 0, Some(0)), 999_999), Layer3Outcome::FallThrough);
+    fn s(ok: u32, deny: u32, last: Option<i64>) -> ApprovalHistorySummary {
+        ApprovalHistorySummary {
+            approval_count: ok,
+            denial_count: deny,
+            last_decided_at: last,
+        }
     }
-    #[test] fn cooldown_falls_through() {
-        // 5 approvals but last decided 1 hour ago → still in cooldown
-        assert_eq!(evaluate(&cfg(true), &s(5, 0, Some(999_000)), 999_999 + 3600), Layer3Outcome::FallThrough);
+
+    #[test]
+    fn disabled_falls_through() {
+        assert_eq!(
+            evaluate(&cfg(false), &s(100, 0, Some(0)), 999_999),
+            Layer3Outcome::FallThrough
+        );
     }
-    #[test] fn five_approvals_post_cooldown_auto_allow() {
-        match evaluate(&cfg(true), &s(5, 0, Some(0)), 90_000 + 999_999) {
-            Layer3Outcome::AutoAllow { .. } => {},
+    #[test]
+    fn single_denial_locks_to_ask() {
+        match evaluate(&cfg(true), &s(100, 1, Some(0)), 999_999) {
+            Layer3Outcome::Ask { .. } => {}
             other => panic!("got {other:?}"),
         }
     }
-    #[test] fn args_hash_strips_command_args() {
+    #[test]
+    fn under_threshold_falls_through() {
+        assert_eq!(
+            evaluate(&cfg(true), &s(4, 0, Some(0)), 999_999),
+            Layer3Outcome::FallThrough
+        );
+    }
+    #[test]
+    fn cooldown_falls_through() {
+        // 5 approvals but last decided 1 hour ago → still in cooldown
+        assert_eq!(
+            evaluate(&cfg(true), &s(5, 0, Some(999_000)), 999_999 + 3600),
+            Layer3Outcome::FallThrough
+        );
+    }
+    #[test]
+    fn five_approvals_post_cooldown_auto_allow() {
+        match evaluate(&cfg(true), &s(5, 0, Some(0)), 90_000 + 999_999) {
+            Layer3Outcome::AutoAllow { .. } => {}
+            other => panic!("got {other:?}"),
+        }
+    }
+    #[test]
+    fn args_hash_strips_command_args() {
         let a = args_hash_for_relevance("bash", r#"{"command":"git status"}"#);
         let b = args_hash_for_relevance("bash", r#"{"command":"git status --short"}"#);
         assert_eq!(a, b, "trailing flags should not change the relevance hash");

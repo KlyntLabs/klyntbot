@@ -38,7 +38,12 @@ impl ApprovalDecision {
         matches!(self, Self::Ask { .. })
     }
     pub fn auto_allow(layer: ApprovalLayer, reason: String) -> Self {
-        Self::Auto { allowed: true, layer, reason, rule_matched: None }
+        Self::Auto {
+            allowed: true,
+            layer,
+            reason,
+            rule_matched: None,
+        }
     }
     pub fn ask(layer: ApprovalLayer, reason: String) -> Self {
         Self::Ask { layer, reason }

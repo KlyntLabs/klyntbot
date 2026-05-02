@@ -99,6 +99,9 @@ mod tests {
     use async_trait::async_trait;
 
     use crate::test_utils::MockProvider;
+    use common::{KlyntbotError, ProviderError};
+    use providers::{LlmProvider, LlmResponse, ProviderCapabilities, ProviderHealth};
+    use serde_json::Value;
     use std::sync::Arc;
 
     fn mock_provider_returning(response: &str) -> DynProvider {

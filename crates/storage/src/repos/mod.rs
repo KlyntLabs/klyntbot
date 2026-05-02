@@ -3,9 +3,9 @@
 pub mod agent_task;
 pub mod area;
 pub mod brain_signal;
-pub mod coding_approval_history;
 pub mod coaching_intervention_log;
 pub mod coaching_strategy;
+pub mod coding_approval_history;
 pub mod cron;
 pub mod custom_column;
 pub mod decision_log;
@@ -54,9 +54,11 @@ pub mod usage;
 pub use agent_task::AgentTaskRepo;
 pub use area::AreaRepo;
 pub use brain_signal::{BrainSignalFeedbackRepo, BrainSignalFeedbackRow};
-pub use coding_approval_history::{CodingApprovalHistoryRepo, HistoryEntry, ApprovalHistorySummary};
 pub use coaching_intervention_log::{CoachingInterventionLogRepo, InterventionLogRow};
 pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
+pub use coding_approval_history::{
+    ApprovalHistorySummary, CodingApprovalHistoryRepo, HistoryEntry,
+};
 pub use cron::CronRepo;
 pub use custom_column::CustomColumnRepo;
 pub use decision_log::DecisionLogRepo;
@@ -164,6 +166,7 @@ pub struct Repos {
     pub skill_version: SkillVersionRepo,
     pub notification_log: NotificationLogRepo,
     pub held_notifications: HeldNotificationsRepo,
+    pub coding_approval_history: CodingApprovalHistoryRepo,
 }
 
 impl Repos {
@@ -202,6 +205,7 @@ impl Repos {
             skill_version: SkillVersionRepo::new(db.clone()),
             notification_log: NotificationLogRepo::new(db.clone()),
             held_notifications: HeldNotificationsRepo::new(db.clone()),
+            coding_approval_history: CodingApprovalHistoryRepo::new(pool.clone()),
             pool: db,
         }
     }

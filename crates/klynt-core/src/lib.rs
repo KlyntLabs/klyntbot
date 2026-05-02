@@ -5,3 +5,4 @@ pub mod snapshots;
 pub mod tools;
 
 pub use registry::builder::ToolKitBuilder;
+pub use snapshots::{Snapshot, SnapshotRepo};

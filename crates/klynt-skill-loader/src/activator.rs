@@ -2,7 +2,9 @@ use crate::frontmatter::KlyntFrontmatter;
 use crate::index::{IndexedSkill, SkillIndex};
 use common::{ConfigError, KlyntbotError, Result};
 use globset::{Glob, GlobSet, GlobSetBuilder};
+use lru::LruCache;
 use std::collections::HashSet;
+use std::num::NonZeroUsize;
 use std::path::Path;
 
 #[derive(Debug, Clone, Default)]
@@ -35,6 +37,10 @@ pub struct SkillActivator {
     conditionals: Vec<ConditionalSkill>,
     active: HashSet<String>,
     walker: crate::dynamic::DynamicWalker,
+    /// Cache path -> matching skill names (independent of active set).
+    /// Eliminates redundant glob matching when the same paths are touched
+    /// repeatedly within a session.
+    path_match_cache: LruCache<std::path::PathBuf, Vec<String>>,
 }
 
 impl SkillActivator {
@@ -62,14 +68,29 @@ impl SkillActivator {
             conditionals,
             active,
             walker: crate::dynamic::DynamicWalker::new(),
+            path_match_cache: LruCache::new(NonZeroUsize::new(256).unwrap()),
         })
     }
 
     /// Returns names of skills newly-activated by this touch (empty if none).
     pub fn touch_path(&mut self, path: &Path) -> Result<Vec<String>> {
+        // Check LRU cache for path -> matching skill names.
+        let matches = if let Some(cached) = self.path_match_cache.get(path) {
+            cached.clone()
+        } else {
+            let mut m = Vec::new();
+            for c in &self.conditionals {
+                if c.glob_set.is_match(path) {
+                    m.push(c.name.clone());
+                }
+            }
+            self.path_match_cache.put(path.to_path_buf(), m.clone());
+            m
+        };
+
         let mut newly = Vec::new();
-        for c in &self.conditionals {
-            if self.active.contains(&c.name) {
+        for name in matches {
+            if self.active.contains(&name) {
                 continue;
             }
             if self.config.max_active_skills > 0
@@ -77,10 +98,8 @@ impl SkillActivator {
             {
                 break;
             }
-            if c.glob_set.is_match(path) {
-                self.active.insert(c.name.clone());
-                newly.push(c.name.clone());
-            }
+            self.active.insert(name.clone());
+            newly.push(name);
         }
         Ok(newly)
     }
@@ -104,6 +123,10 @@ impl SkillActivator {
                     self.conditionals.push(cs);
                 }
             }
+        }
+        // New conditionals added → prior path→match cache is stale.
+        if !newly_indexed.is_empty() {
+            self.path_match_cache.clear();
         }
         self.touch_path(path)
     }

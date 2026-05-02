@@ -56,7 +56,10 @@ fn build_ctx<'a>(
         mirror_learning_enabled: false,
         mirror_min_approvals: 5,
         mirror_cooldown_seconds: 86400,
-        now_unix: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+        now_unix: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
     }
 }
 

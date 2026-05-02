@@ -532,7 +532,11 @@ impl SessionRepo {
     }
 
     #[tracing::instrument(skip(self), err)]
-    pub async fn rewind_to_message(&self, session_key: &str, anchor_id: &str) -> Result<u64, StorageError> {
+    pub async fn rewind_to_message(
+        &self,
+        session_key: &str,
+        anchor_id: &str,
+    ) -> Result<u64, StorageError> {
         let anchor_uuid = uuid::Uuid::parse_str(anchor_id)
             .map_err(|e| StorageError::NotFound(format!("invalid anchor uuid: {e}")))?;
         let res = sqlx::query(
@@ -581,8 +585,30 @@ impl SessionRepo {
         Ok(json.to_string())
     }
 
+    /// Decrement the `starred` counter and return sessions that should be pruned.
     #[tracing::instrument(skip(self), err)]
-    pub async fn fork_session(&self, source_key: &str, up_to_message: Option<&str>) -> Result<String, StorageError> {
+    pub async fn decrement_starred_prune(
+        &self,
+        ttl_days: i64,
+    ) -> Result<Vec<String>, StorageError> {
+        let cutoff = jiff::Timestamp::now().as_second() - (ttl_days * 86400);
+        let rows = sqlx::query_scalar::<_, String>(
+            "SELECT key FROM sessions \
+             WHERE pinned = 0 AND updated_at < ?1 \
+             AND key NOT IN (SELECT session_key FROM session_messages WHERE role = 'user' AND timestamp > ?1) \
+             ORDER BY updated_at ASC LIMIT 100"
+        )
+        .bind(cutoff)
+        .fetch_all(&self.pool).await?;
+        Ok(rows)
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn fork_session(
+        &self,
+        source_key: &str,
+        up_to_message: Option<&str>,
+    ) -> Result<String, StorageError> {
         let new_key = format!("fork-{}", uuid::Uuid::new_v4());
         let metadata = match self.get_session(source_key).await {
             Ok(s) => s.metadata,

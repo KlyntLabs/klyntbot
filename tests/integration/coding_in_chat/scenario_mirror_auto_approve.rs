@@ -13,16 +13,22 @@ use tokio_util::sync::CancellationToken;
 async fn scenario_mirror_layer3_auto_approves_after_5_prior_allows() {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
     let history = CodingApprovalHistoryRepo::new(pool.clone());
-    let hash = klynt_core::approval::layer3::args_hash_for_relevance("bash", r#"{"command":"git status"}"#);
+    let hash = klynt_core::approval::layer3::args_hash_for_relevance(
+        "bash",
+        r#"{"command":"git status"}"#,
+    );
     for _ in 0..5 {
-        history.record(HistoryEntry {
-            tool: "bash".into(),
-            args_hash: hash.clone(),
-            repo_id: "test-repo".into(),
-            decision: "allow".into(),
-            decided_by: "user".into(),
-            layer: "ask".into(),
-        }).await.unwrap();
+        history
+            .record(HistoryEntry {
+                tool: "bash".into(),
+                args_hash: hash.clone(),
+                repo_id: "test-repo".into(),
+                decision: "allow".into(),
+                decided_by: "user".into(),
+                layer: "ask".into(),
+            })
+            .await
+            .unwrap();
     }
 
     let perms = CodingPermissions {
@@ -65,8 +71,14 @@ async fn scenario_mirror_layer3_auto_approves_after_5_prior_allows() {
     // Should emit ApprovalRequested + ApprovalResolved with no user input required
     let req = rx.recv().await.unwrap();
     match req {
-        tools_core::events::ToolEvent::ApprovalRequested { requires_user_input, .. } => {
-            assert!(!requires_user_input, "Layer 3 should not require user input");
+        tools_core::events::ToolEvent::ApprovalRequested {
+            requires_user_input,
+            ..
+        } => {
+            assert!(
+                !requires_user_input,
+                "Layer 3 should not require user input"
+            );
         }
         other => panic!("expected ApprovalRequested, got {other:?}"),
     }

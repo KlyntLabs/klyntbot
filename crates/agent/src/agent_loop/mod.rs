@@ -616,8 +616,8 @@ impl AgentLoop {
         };
 
         // Async conversation embedding hook for user message
-        if let Some(msg_id) = embed_msg_id {
-            self.spawn_embed_message(session_key.as_str(), "user", &msg.content, &msg_id);
+        if let Some(ref msg_id) = embed_msg_id {
+            self.spawn_embed_message(session_key.as_str(), "user", &msg.content, msg_id);
         }
 
         // Ingest user message into activity log (fire-and-forget)
@@ -693,7 +693,9 @@ impl AgentLoop {
         };
 
         // Run through pipeline
-        let routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
+        let mut routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
+        routing_ctx.session_key = Some(session_key.clone().into());
+        routing_ctx.message_id = embed_msg_id.map(|id| id.to_string());
         let response_content = self
             .run_pipeline(&msg.content, history, &routing_ctx, None, None, correction)
             .await?;
@@ -983,7 +985,7 @@ impl AgentLoop {
         content: &str,
         session_key: &str,
         label: &str,
-    ) -> Result<Vec<session::SessionMessage>> {
+    ) -> Result<(Vec<session::SessionMessage>, Option<String>)> {
         let preview = preview_text(content, 80);
         debug!("Processing {} message: {}", label, preview);
 
@@ -991,23 +993,25 @@ impl AgentLoop {
         let (history, embed_msg_id) = {
             let mut session = session_arc.lock().await;
             session.add_message("user", content);
-            let msg_id = session.messages.last().map(|m| m.id.clone());
+            let msg_id = session.messages.last().map(|m| m.id.to_string());
             let history = session.get_history(self.history_limit).to_vec();
             (history, msg_id)
         };
 
-        if let Some(msg_id) = embed_msg_id {
-            self.spawn_embed_message(session_key, "user", content, &msg_id);
+        if let Some(ref msg_id) = embed_msg_id {
+            self.spawn_embed_message(session_key, "user", content, msg_id);
         }
 
-        Ok(history)
+        Ok((history, embed_msg_id))
     }
 
     pub async fn process_direct(&self, content: String, session_key: String) -> Result<String> {
-        let history = self.setup_session(&content, &session_key, "direct").await?;
+        let (history, user_msg_id) = self.setup_session(&content, &session_key, "direct").await?;
 
         // Run through pipeline
-        let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
+        let mut routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
+        routing_ctx.session_key = Some(session_key.clone().into());
+        routing_ctx.message_id = user_msg_id;
         let response_content = self
             .run_pipeline(&content, history, &routing_ctx, None, None, None)
             .await?;
@@ -1117,7 +1121,7 @@ impl AgentLoop {
             false
         };
 
-        let history = self
+        let (history, user_msg_id) = self
             .setup_session(&content, &session_key, "streaming direct")
             .await?;
 
@@ -1137,8 +1141,10 @@ impl AgentLoop {
             .unwrap_or_else(|| "desktop".into());
 
         // Routing context with interaction channel for ask_user tool
-        let routing_ctx =
+        let mut routing_ctx =
             RoutingContext::with_interaction(channel, session_key.clone().into(), interaction_tx);
+        routing_ctx.session_key = Some(session_key.clone().into());
+        routing_ctx.message_id = user_msg_id;
 
         let cancel_token = CancellationToken::new();
         let cancel_clone = cancel_token.clone();

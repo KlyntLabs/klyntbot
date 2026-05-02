@@ -110,7 +110,11 @@ pub struct TraceWriter {
 impl TraceWriter {
     pub fn open_if_enabled(run_id: String, phases_enabled: u8) -> std::io::Result<Self> {
         if !env_truthy("KCA_TRACE") {
-            return Ok(Self { file: None, run_id, phases_enabled });
+            return Ok(Self {
+                file: None,
+                run_id,
+                phases_enabled,
+            });
         }
         let dir = PathBuf::from("benchmark-out");
         create_dir_all(&dir)?;
@@ -126,7 +130,9 @@ impl TraceWriter {
 
     /// Append one event. Failures log to stderr but never abort the run.
     pub fn emit(&mut self, event: &QaTraceEvent) {
-        let Some(file) = self.file.as_mut() else { return };
+        let Some(file) = self.file.as_mut() else {
+            return;
+        };
         match serde_json::to_string(event) {
             Ok(line) => {
                 if let Err(e) = writeln!(file, "{line}") {
@@ -167,7 +173,11 @@ mod tests {
 
     #[test]
     fn phase_flags_bitmask() {
-        let f = PhaseFlags { p1: true, p3: true, ..Default::default() };
+        let f = PhaseFlags {
+            p1: true,
+            p3: true,
+            ..Default::default()
+        };
         assert_eq!(f.bitmask(), 0b0101);
     }
 }

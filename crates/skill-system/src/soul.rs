@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use async_trait::async_trait;
 use tokio::sync::RwLock;
@@ -35,6 +36,7 @@ You are Klyntbot, a personal AI assistant.
 pub struct SoulContextSource {
     content: Arc<RwLock<String>>,
     path: PathBuf,
+    last_mtime: Arc<RwLock<Option<SystemTime>>>,
 }
 
 impl SoulContextSource {
@@ -48,10 +50,12 @@ impl SoulContextSource {
         }
 
         let content = std::fs::read_to_string(&path)?;
+        let mtime = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
 
         Ok(Self {
             content: Arc::new(RwLock::new(content)),
             path,
+            last_mtime: Arc::new(RwLock::new(mtime)),
         })
     }
 
@@ -59,6 +63,11 @@ impl SoulContextSource {
     pub async fn reload(&self) -> common::Result<()> {
         let content = std::fs::read_to_string(&self.path)?;
         *self.content.write().await = content;
+        if let Ok(meta) = std::fs::metadata(&self.path) {
+            if let Ok(mtime) = meta.modified() {
+                *self.last_mtime.write().await = Some(mtime);
+            }
+        }
         debug!("KLYNTBOT.md reloaded");
         Ok(())
     }
@@ -82,12 +91,40 @@ impl ContextSource for SoulContextSource {
         // Live-read so edits to KLYNTBOT.md take effect on the next turn
         // without restarting the agent. The cached copy is the fallback
         // for transient read failures (e.g. atomic mid-write swap).
+        //
+        // Phase-2 perf optimisation: skip the disk read when mtime hasn't
+        // changed since the last successful load.
+        let needs_reload = match tokio::fs::metadata(&self.path).await {
+            Ok(meta) => match meta.modified() {
+                Ok(mtime) => {
+                    let last = *self.last_mtime.read().await;
+                    last != Some(mtime)
+                }
+                Err(_) => true,
+            },
+            Err(_) => true,
+        };
+
+        if !needs_reload {
+            let cached = self.content.read().await;
+            return if cached.is_empty() {
+                None
+            } else {
+                Some(cached.clone())
+            };
+        }
+
         match tokio::fs::read_to_string(&self.path).await {
             Ok(fresh) => {
                 {
                     let mut cached = self.content.write().await;
                     if *cached != fresh {
                         *cached = fresh.clone();
+                    }
+                }
+                if let Ok(meta) = tokio::fs::metadata(&self.path).await {
+                    if let Ok(mtime) = meta.modified() {
+                        *self.last_mtime.write().await = Some(mtime);
                     }
                 }
                 if fresh.is_empty() {
@@ -136,5 +173,37 @@ mod tests {
         let content = source.provide(&ctx).await;
         assert!(content.is_some());
         assert!(content.unwrap().contains("Klyntbot"));
+    }
+
+    #[tokio::test]
+    async fn soul_uses_mtime_cache_to_avoid_redundant_reads() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = SoulContextSource::load(dir.path()).unwrap();
+        let ctx = SourceContext {
+            channel: String::new(),
+            chat_id: String::new(),
+            message: None,
+            intent_summary: None,
+            project_id: None,
+        };
+
+        // First call populates the cache.
+        let first = source.provide(&ctx).await;
+        assert!(first.is_some());
+
+        // Second call with unchanged mtime should hit the cache and
+        // still return the same content.
+        let second = source.provide(&ctx).await;
+        assert_eq!(first, second);
+
+        // Mutate the file on disk.
+        tokio::fs::write(&source.path, "# Mutated soul\n")
+            .await
+            .unwrap();
+
+        // Third call should detect the mtime change and reload.
+        let third = source.provide(&ctx).await;
+        assert!(third.is_some());
+        assert!(third.unwrap().contains("Mutated soul"));
     }
 }
