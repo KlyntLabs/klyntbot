@@ -4,13 +4,22 @@
 
 import type { QueryKey } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type {
   CalendarEvent,
   ProductivitySummaryResponse,
   TimelineEntry,
   TimelineSummary,
 } from "@/bindings";
+import {
+  productivitySummaryRangeQuery,
+  productivityTodayQuery,
+} from "@/api/endpoints/dashboard";
+import { useTauriQuery } from "@/lib/query";
+import { qk } from "@/lib/query/queryKeys";
 import { formatHumanDuration, minutesSinceMidnight } from "@/utils/dashboardDates";
+import { ActivityFeed } from "../productivity/ActivityFeed";
+import type { SessionBlock } from "./ActivityTrack";
 import { useTimelineDrag } from "../../hooks/useTimelineDrag";
 import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../../lib/layers";
 import { computeOverlapLayout } from "../../lib/timeline-utils";
@@ -116,7 +125,21 @@ export function DayColumns({
   const { sidebarOpen } = useSidebarOpen();
   const [selectedEntry, setSelectedEntry] = useState<TimelineEntry | null>(null);
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
+  const [selectedSession, setSelectedSession] = useState<SessionBlock | null>(null);
+  const [feedExpanded, setFeedExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const { data: productivitySummary } = useTauriQuery<ProductivitySummaryResponse | null>({
+    queryKey: isToday
+      ? qk.dashboard.productivityToday(date)
+      : qk.productivity.summaryRange(date, date),
+    queryFn: async () => {
+      if (isToday) return productivityTodayQuery();
+      const arr = await productivitySummaryRangeQuery(date, date);
+      return arr[0] ?? null;
+    },
+    fallback: null,
+  });
 
   // Dynamic zoom state
   const [hourHeight, setHourHeight] = useState(DEFAULT_HOUR_HEIGHT);
@@ -405,10 +428,10 @@ export function DayColumns({
                         date={date}
                         hourHeight={hourHeight}
                         isToday={isToday}
-                        onSelectSession={() => {}}
-                        onSelectEntry={() => {}}
-                        selectedSession={null}
-                        selectedEntryId={null}
+                        onSelectSession={(s) => setSelectedSession(s)}
+                        onSelectEntry={(entry) => setSelectedEntry(entry)}
+                        selectedSession={selectedSession}
+                        selectedEntryId={selectedEntry?.id ?? null}
                       />
                     </div>
                   );
@@ -426,7 +449,31 @@ export function DayColumns({
                         date={date}
                         hourHeight={hourHeight}
                         selectedEventId={selectedCalendarEvent?.id ?? null}
-                        onSelectEvent={setSelectedCalendarEvent}
+                        onSelectEvent={(event) => {
+                          setSelectedCalendarEvent(event);
+                          if (!event) return;
+                          // Convert calendar event to TimelineEntry-shape so SummaryPanel's EntryDetail can render it
+                          const startedAt = event.startedAt;
+                          const endedAt = event.endedAt;
+                          const durationSecs =
+                            startedAt && endedAt
+                              ? Math.max(0, Math.floor((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000))
+                              : null;
+                          setSelectedEntry({
+                            id: event.id,
+                            title: event.title,
+                            description: event.description ?? null,
+                            startedAt,
+                            endedAt,
+                            durationSecs,
+                            source: "calendar",
+                            entryType: "calendarEvent",
+                            color: event.color ?? "var(--timeline-focus)",
+                            metadata: null,
+                            entityId: event.id,
+                            entityRoute: null,
+                          });
+                        }}
                       />
                     </div>
                   );
@@ -498,12 +545,41 @@ export function DayColumns({
             </div>
           </div>
         </div>
+
+        <div
+          style={{
+            borderTop: "1px solid var(--ds-border-subtle)",
+            transition: "max-height 0.3s ease-in-out",
+            maxHeight: feedExpanded ? 260 : 36,
+            overflow: "hidden",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setFeedExpanded(!feedExpanded)}
+            className="dashboard__activity-feed-toggle"
+          >
+            {feedExpanded ? <ChevronDown aria-hidden /> : <ChevronUp aria-hidden />}
+            Live Activity Feed
+          </button>
+          {feedExpanded && (
+            <div style={{ overflowY: "auto", maxHeight: 224 }}>
+              <ActivityFeed />
+            </div>
+          )}
+        </div>
       </div>
       {sidebarOpen && (
         <SummaryPanel
           summary={summary}
           selectedEntry={selectedEntry}
-          onClose={() => setSelectedEntry(null)}
+          selectedSession={selectedSession}
+          onClose={() => {
+            setSelectedEntry(null);
+            setSelectedSession(null);
+            setSelectedCalendarEvent(null);
+          }}
+          productivitySummary={productivitySummary}
           date={date}
         />
       )}
