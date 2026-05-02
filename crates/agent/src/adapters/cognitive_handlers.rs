@@ -1706,6 +1706,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         }
     }
 
@@ -2099,6 +2100,7 @@ mod tests {
                 scope_id: None,
                 scope_repo_id: None,
                 metadata: None,
+                speaker: None,
             },
             existing: vec![],
             subject_neighborhood: vec![("Bob".into(), "knows".into())],
@@ -2126,6 +2128,7 @@ mod tests {
                 scope_id: None,
                 scope_repo_id: None,
                 metadata: None,
+                speaker: None,
             }],
         };
 

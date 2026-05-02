@@ -57,6 +57,7 @@ pub fn prepared_fact_with_prov(
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         },
         metadata_json: None,
         scope_repo_id: None,

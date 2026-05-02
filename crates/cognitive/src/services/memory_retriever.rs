@@ -946,6 +946,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         fact_repo.upsert(&fact).await.unwrap();
 

@@ -167,6 +167,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         }
     }
 
@@ -344,6 +345,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         let existing = vec![SemanticFact {
             id: "e1".into(),
@@ -368,6 +370,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         }];
         let neighborhood = vec![("Bob".to_string(), "manages".to_string())];
         let cross_entity_facts = vec![SemanticFact {
@@ -393,6 +396,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         }];
 
         let cand = ConsolidationCandidate {

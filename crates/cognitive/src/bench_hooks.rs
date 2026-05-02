@@ -1,22 +1,22 @@
-//! Thread-local hit counters for benchmark instrumentation.
+//! Cross-thread hit counters for benchmark instrumentation.
 //!
 //! The KCA bench harness needs per-QA retrieval-mechanism telemetry
 //! (vector hits, FTS hits, episodic hits) to attribute lift across
-//! the four-phase improvement ladder. Plumbing this through every
-//! retrieval function's return type would thrash the API; instead we
-//! write to a thread-local cell from inside the cognitive crate and
-//! the bench reads it once per QA.
+//! the wave ladder. Wave 0 (Truth in Telemetry) replaces the prior
+//! `thread_local!` storage which silently dropped writes from tokio
+//! worker threads — `record_hits` ran inside async retrieval (worker
+//! thread); `read_hit_counts` ran on the bench main thread; TLS is
+//! per-thread, so the bench always read zeros.
 //!
-//! Bench loop is sequential per-conversation, so `thread_local!` is
-//! correct — no contention, no Arc<Mutex>.
+//! Now backed by `OnceLock<Mutex<Inner>>`: a single shared cell visible
+//! from any thread. No-op overhead is one mutex acquire/release per
+//! call (negligible vs. the surrounding LLM call). Production paths
+//! never read the cell so writes have no observable effect.
 //!
-//! Production paths call `record_hits` unconditionally; the writes are
-//! cheap (a `Cell::get`/`set` pair) and ignored unless a bench reader
-//! is paired.
-//!
-//! See `crates/kca-bench/src/trace.rs` for the consumer side.
+//! See `crates/kca-bench/src/trace.rs` for the consumer side and
+//! `docs/superpowers/plans/2026-05-02-kca-memory-game-changer.md` Wave 0.
 
-use std::cell::{Cell, RefCell};
+use std::sync::{Mutex, OnceLock};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct HitCounts {
@@ -25,56 +25,61 @@ pub struct HitCounts {
     pub episodic_hits: u32,
 }
 
-thread_local! {
-    static LAST_HIT_COUNTS: Cell<HitCounts> = const { Cell::new(HitCounts {
-        vector_hits: 0,
-        fts_hits: 0,
-        episodic_hits: 0,
-    }) };
-    static LAST_ENTITIES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+#[derive(Debug, Default)]
+struct Inner {
+    hits: HitCounts,
+    entities: Vec<String>,
+}
+
+static GLOBAL: OnceLock<Mutex<Inner>> = OnceLock::new();
+
+fn slot() -> &'static Mutex<Inner> {
+    GLOBAL.get_or_init(|| Mutex::new(Inner::default()))
+}
+
+/// Install the bench hook (idempotent). Optional: `slot()` lazily
+/// creates the cell on first access either way.
+pub fn install_for_bench() {
+    let _ = slot();
 }
 
 /// Reset before each QA so stale values don't leak across QAs.
 pub fn reset_hit_counts() {
-    LAST_HIT_COUNTS.with(|c| c.set(HitCounts::default()));
-    LAST_ENTITIES.with(|e| e.borrow_mut().clear());
+    let mut g = slot().lock().unwrap();
+    g.hits = HitCounts::default();
+    g.entities.clear();
 }
 
 /// Read once per QA after retrieval has run.
 pub fn read_hit_counts() -> HitCounts {
-    LAST_HIT_COUNTS.with(|c| c.get())
+    slot().lock().unwrap().hits
 }
 
 /// Read the entities the retrieval layer extracted for this QA.
 pub fn read_entities() -> Vec<String> {
-    LAST_ENTITIES.with(|e| e.borrow().clone())
+    slot().lock().unwrap().entities.clone()
 }
 
 /// Cognitive crate writes here as it observes vector/FTS/episodic hits.
 /// Saturating add so a Phase 4 retry that fires retrieval twice still
 /// shows total hits seen.
 pub fn record_hits(vector: u32, fts: u32, episodic: u32) {
-    LAST_HIT_COUNTS.with(|c| {
-        let mut h = c.get();
-        h.vector_hits = h.vector_hits.saturating_add(vector);
-        h.fts_hits = h.fts_hits.saturating_add(fts);
-        h.episodic_hits = h.episodic_hits.saturating_add(episodic);
-        c.set(h);
-    });
+    let mut g = slot().lock().unwrap();
+    g.hits.vector_hits = g.hits.vector_hits.saturating_add(vector);
+    g.hits.fts_hits = g.hits.fts_hits.saturating_add(fts);
+    g.hits.episodic_hits = g.hits.episodic_hits.saturating_add(episodic);
 }
 
 /// Cognitive crate writes here when entity-aware retrieval (P2) extracts
 /// proper-noun candidates from the query. Empty when P2 is off or the
 /// query is bare lowercase.
 pub fn record_entities(entities: &[String]) {
-    LAST_ENTITIES.with(|e| {
-        let mut v = e.borrow_mut();
-        for ent in entities {
-            if !v.iter().any(|x| x == ent) {
-                v.push(ent.clone());
-            }
+    let mut g = slot().lock().unwrap();
+    for ent in entities {
+        if !g.entities.iter().any(|x| x == ent) {
+            g.entities.push(ent.clone());
         }
-    });
+    }
 }
 
 #[cfg(test)]
@@ -92,5 +97,27 @@ mod tests {
         assert_eq!(h.episodic_hits, 1);
         reset_hit_counts();
         assert_eq!(read_hit_counts().vector_hits, 0);
+    }
+
+    /// Wave 0: writes from a tokio worker thread MUST be visible from the
+    /// main thread. Previously broken because `thread_local!` storage is
+    /// per-thread; the bench always read zero.
+    #[test]
+    fn cross_thread_writes_visible() {
+        reset_hit_counts();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            tokio::spawn(async {
+                record_hits(7, 3, 2);
+                record_entities(&["Alice".to_string(), "Bob".to_string()]);
+            })
+            .await
+            .unwrap();
+        });
+        let h = read_hit_counts();
+        assert_eq!(h.vector_hits, 7, "worker-thread write must be visible to main");
+        assert_eq!(h.fts_hits, 3);
+        assert_eq!(h.episodic_hits, 2);
+        assert_eq!(read_entities(), vec!["Alice".to_string(), "Bob".to_string()]);
     }
 }

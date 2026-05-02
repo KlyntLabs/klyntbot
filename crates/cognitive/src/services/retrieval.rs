@@ -581,6 +581,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         }
     }
 
@@ -655,6 +656,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -683,6 +685,7 @@ mod tests {
             "anything",
             &["productivity"],
             &default_params(10),
+            None,
             None,
             None,
             None,
@@ -715,6 +718,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -740,6 +744,7 @@ mod tests {
             "query",
             &["productivity"],
             &default_params(10),
+            None,
             None,
             None,
             None,
@@ -775,6 +780,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -798,6 +804,7 @@ mod tests {
             "",
             &["productivity"],
             &default_params(10),
+            None,
             None,
             None,
             None,
@@ -830,6 +837,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -847,6 +855,7 @@ mod tests {
             "",
             &["nonexistent"],
             &default_params(10),
+            None,
             None,
             None,
             None,
@@ -876,6 +885,7 @@ mod tests {
             "morning routine",
             &["productivity"],
             &default_params(10),
+            None,
             None,
             None,
             None,

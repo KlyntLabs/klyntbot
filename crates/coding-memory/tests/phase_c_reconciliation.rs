@@ -26,6 +26,7 @@ fn seed(id: &str, subj: &str, pred: &str, obj: &str) -> SemanticFact {
         scope_id: None,
         scope_repo_id: None,
         metadata: None,
+        speaker: None,
     }
 }
 

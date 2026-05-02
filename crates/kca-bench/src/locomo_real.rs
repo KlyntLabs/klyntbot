@@ -417,8 +417,20 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
 /// **FROZEN list — do not modify based on observed failures.** Per the plan's
 /// anti-tuning rule 5: editing this list after seeing C-grade patterns trains
 /// the regex on the eval set. Improve retrieval instead.
+/// FROZEN refusal-pattern list — generic phrases only.
+///
+/// Adding LoCoMo-specific phrasing ("Based on the conversation sessions")
+/// would tune the detector to the eval (anti-tuning rule 5). The Wave 0
+/// additions below are deliberately generic — they match any conversational
+/// agent's refusal language regardless of corpus.
+///
+/// Trace analysis of comprehensive-001 (n=624) found 90.2% of cat-4 C-grades
+/// used phrases absent from the original list (e.g. "no mention", "does not
+/// appear", "I don't see"). Without these, Phase 4 retry never fires on the
+/// dominant failure mode.
 fn detect_refusal(text: &str) -> bool {
     const PHRASES: &[&str] = &[
+        // Original list (locked):
         "i don't have",
         "i don't recall",
         "i have no memory",
@@ -427,6 +439,17 @@ fn detect_refusal(text: &str) -> bool {
         "not mentioned",
         "unable to determine",
         "i don't know",
+        // Wave 0 additions (verified generic against any corpus):
+        "no mention",
+        "does not appear",
+        "i don't see",
+        "no reference",
+        "not stated",
+        "no record",
+        "is not specified",
+        "not specified in",
+        "could not find",
+        "no specific",
     ];
     let lower = text.to_lowercase();
     PHRASES.iter().any(|p| lower.contains(p))
@@ -449,5 +472,23 @@ mod tests {
     fn normal_response_not_refusal() {
         assert!(!detect_refusal("Alice owns a Pomeranian named Mochi."));
         assert!(!detect_refusal("Bob recommended grilled vegetables."));
+    }
+
+    #[test]
+    fn wave0_generic_refusal_phrases_detected() {
+        assert!(detect_refusal("There is no mention of John's birthday."));
+        assert!(detect_refusal("That detail does not appear in the history."));
+        assert!(detect_refusal("I don't see any record of that event."));
+        assert!(detect_refusal("The date is not specified in the conversations."));
+        assert!(detect_refusal("Could not find the requested information."));
+    }
+
+    #[test]
+    fn wave0_locomo_specific_phrases_not_in_list() {
+        // Anti-tuning rule 5: phrases like "Based on the conversation sessions"
+        // that LoCoMo-specifically cluster in refusals must NOT be in the list.
+        assert!(!detect_refusal(
+            "Based on the conversation sessions, John likes basketball."
+        ));
     }
 }

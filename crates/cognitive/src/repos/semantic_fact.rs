@@ -1042,6 +1042,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         }
     }
 
@@ -1398,6 +1399,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         repo.upsert(&fact).await.unwrap();
 
@@ -1436,6 +1438,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         repo.upsert(&f1).await.unwrap();
 
@@ -1464,6 +1467,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         repo.upsert(&f2).await.unwrap();
 
@@ -1506,6 +1510,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         repo.upsert(&f1).await.unwrap();
 
@@ -1550,6 +1555,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         repo.upsert(&f1).await.unwrap();
 
@@ -1577,6 +1583,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         repo.upsert(&f2).await.unwrap();
 
@@ -1658,6 +1665,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         let fact_obj = SemanticFact {
             id: "f2".into(),
@@ -1682,6 +1690,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         let fact_unrelated = SemanticFact {
             id: "f3".into(),
@@ -1706,6 +1715,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
 
         repo.upsert(&fact_subj).await.unwrap();

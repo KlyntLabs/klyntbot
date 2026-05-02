@@ -1413,6 +1413,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         let fact2 = crate::types::SemanticFact {
             id: "f2".into(),
@@ -1437,6 +1438,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         fact_repo.upsert(&fact1).await.unwrap();
         fact_repo.upsert(&fact2).await.unwrap();
@@ -1465,6 +1467,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
 
         let candidates = prefetch_existing(&fact_repo, &entity_repo, vec![new_fact.clone()]).await;
@@ -1576,6 +1579,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         fact_repo.upsert(&new_fact).await.unwrap();
 
@@ -1633,6 +1637,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         fact_repo.upsert(&new_fact).await.unwrap();
 
