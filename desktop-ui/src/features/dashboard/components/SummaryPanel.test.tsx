@@ -16,7 +16,7 @@ vi.mock("@/api/endpoints/dashboard", async () => {
 });
 
 import type { TimelineEntry, TimelineSummary } from "@/bindings";
-import type { SessionBlock } from "../views/ActivityTrack";
+import type { SessionBlock } from "./views/ActivityTrack";
 import { SummaryPanel } from "./SummaryPanel";
 
 afterEach(() => cleanup());
@@ -33,7 +33,7 @@ const SUMMARY: TimelineSummary = {
   tasksCreated: 0,
   notesTouched: 0,
   transactionsCount: 0,
-  topApps: [{ appName: "VSCode", durationSecs: 1800 }],
+  topApps: [{ appName: "VSCode", durationSecs: 1800, percentage: 50 }],
   sourceBreakdown: [],
 };
 

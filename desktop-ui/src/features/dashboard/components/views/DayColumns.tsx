@@ -401,7 +401,15 @@ export function DayColumns({
                 if (col.key === "activity") {
                   return (
                     <div key={col.key} className="dashboard__day-column">
-                      <ActivityTrack />
+                      <ActivityTrack
+                        date={date}
+                        hourHeight={hourHeight}
+                        isToday={isToday}
+                        onSelectSession={() => {}}
+                        onSelectEntry={() => {}}
+                        selectedSession={null}
+                        selectedEntryId={null}
+                      />
                     </div>
                   );
                 }

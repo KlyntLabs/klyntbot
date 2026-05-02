@@ -19,7 +19,7 @@ import {
   TZ_OFFSET_MINS,
 } from "@/utils/dashboardDates";
 import { resolveActivityColor, resolveCategoryLabel } from "../lib/productivity";
-import type { SessionBlock } from "../views/ActivityTrack";
+import type { SessionBlock } from "./views/ActivityTrack";
 import { GoalsProgress } from "./productivity/GoalsProgress";
 import { HourlyHeatmap } from "./productivity/HourlyHeatmap";
 import { PatternsCard } from "./productivity/PatternsCard";
