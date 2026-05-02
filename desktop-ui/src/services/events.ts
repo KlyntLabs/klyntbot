@@ -5,6 +5,7 @@ import type {
   DictationModelStatus,
   TrayOpenThreadPayload,
 } from "../types";
+import type { AutoFocusPayload, FocusStatePayload } from "@/bindings";
 
 export type Unsubscribe = () => void;
 
@@ -112,6 +113,8 @@ const menuComposerCycleModelHub = createEventHub<void>("menu-composer-cycle-mode
 const menuComposerCycleAccessHub = createEventHub<void>("menu-composer-cycle-access");
 const menuComposerCycleReasoningHub = createEventHub<void>("menu-composer-cycle-reasoning");
 const menuComposerCycleCollaborationHub = createEventHub<void>("menu-composer-cycle-collaboration");
+const focusStateChangedHub = createEventHub<FocusStatePayload>("focus:state_changed");
+const focusAutoDetectedHub = createEventHub<AutoFocusPayload>("focus:auto_detected");
 
 export function subscribeAppServerEvents(
   onEvent: (event: AppServerEvent) => void,
@@ -362,4 +365,18 @@ export function subscribeMenuComposerCycleCollaboration(
   return menuComposerCycleCollaborationHub.subscribe(() => {
     onEvent();
   }, options);
+}
+
+export function subscribeFocusStateChanged(
+  onEvent: (payload: FocusStatePayload) => void,
+  options?: SubscriptionOptions,
+): Unsubscribe {
+  return focusStateChangedHub.subscribe(onEvent, options);
+}
+
+export function subscribeFocusAutoDetected(
+  onEvent: (payload: AutoFocusPayload) => void,
+  options?: SubscriptionOptions,
+): Unsubscribe {
+  return focusAutoDetectedHub.subscribe(onEvent, options);
 }
