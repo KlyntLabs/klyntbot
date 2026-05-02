@@ -1,0 +1,147 @@
+{"type": "metadata", "protocol_version": "1.9"}
+{"timestamp": 1777000000.5, "message": {"type": "TurnBegin", "payload": {"user_input": "Turn 1 user request"}}}
+{"timestamp": 1777000001.0, "message": {"type": "StepBegin", "payload": {"n": 1}}}
+{"timestamp": 1777000001.5, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 1 step 1", "encrypted": null}}}
+{"timestamp": 1777000002.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t1s1", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t1s1\"}"}, "extras": null}}}
+{"timestamp": 1777000002.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t1s1", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000003.0, "message": {"type": "StepBegin", "payload": {"n": 2}}}
+{"timestamp": 1777000003.5, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 1 step 2"}}}
+{"timestamp": 1777000004.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t1s2", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t1s2\"}"}, "extras": null}}}
+{"timestamp": 1777000004.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t1s2", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000005.0, "message": {"type": "StepBegin", "payload": {"n": 3}}}
+{"timestamp": 1777000005.5, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 1 step 3", "encrypted": null}}}
+{"timestamp": 1777000006.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t1s3", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t1s3\"}"}, "extras": null}}}
+{"timestamp": 1777000006.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t1s3", "content": "error occurred", "is_error": true}}}
+{"timestamp": 1777000007.0, "message": {"type": "StepBegin", "payload": {"n": 4}}}
+{"timestamp": 1777000007.5, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 1 step 4"}}}
+{"timestamp": 1777000008.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t1s4", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t1s4\"}"}, "extras": null}}}
+{"timestamp": 1777000008.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t1s4", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000009.0, "message": {"type": "StepBegin", "payload": {"n": 5}}}
+{"timestamp": 1777000009.5, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 1 step 5", "encrypted": null}}}
+{"timestamp": 1777000010.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t1s5", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t1s5\"}"}, "extras": null}}}
+{"timestamp": 1777000010.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t1s5", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000011.0, "message": {"type": "StepBegin", "payload": {"n": 6}}}
+{"timestamp": 1777000011.5, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 1 step 6"}}}
+{"timestamp": 1777000012.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t1s6", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t1s6\"}"}, "extras": null}}}
+{"timestamp": 1777000012.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t1s6", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000013.0, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Step summary for turn 1"}}}
+{"timestamp": 1777000013.5, "message": {"type": "StatusUpdate", "payload": {"context_usage": 0.05, "context_tokens": 10000, "max_context_tokens": 262144, "token_usage": {"input_other": 2000, "output": 100, "input_cache_read": 8000, "input_cache_creation": 0}, "message_id": "chatcmpl-turn1", "plan_mode": false, "mcp_status": null}}}
+{"timestamp": 1777000014.0, "message": {"type": "TurnEnd", "payload": {}}}
+{"timestamp": 1777000014.5, "message": {"type": "TurnBegin", "payload": {"user_input": "Turn 2 user request"}}}
+{"timestamp": 1777000015.0, "message": {"type": "StepBegin", "payload": {"n": 1}}}
+{"timestamp": 1777000015.5, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 2 step 1", "encrypted": null}}}
+{"timestamp": 1777000016.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t2s1", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t2s1\"}"}, "extras": null}}}
+{"timestamp": 1777000016.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t2s1", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000017.0, "message": {"type": "StepBegin", "payload": {"n": 2}}}
+{"timestamp": 1777000017.5, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 2 step 2"}}}
+{"timestamp": 1777000018.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t2s2", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t2s2\"}"}, "extras": null}}}
+{"timestamp": 1777000018.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t2s2", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000019.0, "message": {"type": "StepBegin", "payload": {"n": 3}}}
+{"timestamp": 1777000019.5, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 2 step 3", "encrypted": null}}}
+{"timestamp": 1777000020.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t2s3", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t2s3\"}"}, "extras": null}}}
+{"timestamp": 1777000020.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t2s3", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000021.0, "message": {"type": "StepBegin", "payload": {"n": 4}}}
+{"timestamp": 1777000021.5, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 2 step 4"}}}
+{"timestamp": 1777000022.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t2s4", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t2s4\"}"}, "extras": null}}}
+{"timestamp": 1777000022.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t2s4", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000023.0, "message": {"type": "StepBegin", "payload": {"n": 5}}}
+{"timestamp": 1777000023.5, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 2 step 5", "encrypted": null}}}
+{"timestamp": 1777000024.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t2s5", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t2s5\"}"}, "extras": null}}}
+{"timestamp": 1777000024.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t2s5", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000025.0, "message": {"type": "StepBegin", "payload": {"n": 6}}}
+{"timestamp": 1777000025.5, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 2 step 6"}}}
+{"timestamp": 1777000026.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t2s6", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t2s6\"}"}, "extras": null}}}
+{"timestamp": 1777000026.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t2s6", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000027.0, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Step summary for turn 2"}}}
+{"timestamp": 1777000027.5, "message": {"type": "StatusUpdate", "payload": {"context_usage": 0.060000000000000005, "context_tokens": 10500, "max_context_tokens": 262144, "token_usage": {"input_other": 2100, "output": 120, "input_cache_read": 8200, "input_cache_creation": 0}, "message_id": "chatcmpl-turn2", "plan_mode": false, "mcp_status": null}}}
+{"timestamp": 1777000028.0, "message": {"type": "SubagentEvent", "payload": {"event": {"type": "ContentPart", "payload": {"type": "text", "text": "Launching subagent sub-rich-a"}}, "agent_id": "sub-rich-a", "subagent_type": "researcher", "status": "running"}}}
+{"timestamp": 1777000028.5, "message": {"type": "TurnEnd", "payload": {}}}
+{"timestamp": 1777000029.0, "message": {"type": "TurnBegin", "payload": {"user_input": "Turn 3 user request"}}}
+{"timestamp": 1777000029.5, "message": {"type": "StepBegin", "payload": {"n": 1}}}
+{"timestamp": 1777000030.0, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 3 step 1", "encrypted": null}}}
+{"timestamp": 1777000030.5, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t3s1", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t3s1\"}"}, "extras": null}}}
+{"timestamp": 1777000031.0, "message": {"type": "ToolResult", "payload": {"id": "tool_t3s1", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000031.5, "message": {"type": "StepBegin", "payload": {"n": 2}}}
+{"timestamp": 1777000032.0, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 3 step 2"}}}
+{"timestamp": 1777000032.5, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t3s2", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t3s2\"}"}, "extras": null}}}
+{"timestamp": 1777000033.0, "message": {"type": "ToolResult", "payload": {"id": "tool_t3s2", "content": "error occurred", "is_error": true}}}
+{"timestamp": 1777000033.5, "message": {"type": "StepBegin", "payload": {"n": 3}}}
+{"timestamp": 1777000034.0, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 3 step 3", "encrypted": null}}}
+{"timestamp": 1777000034.5, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t3s3", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t3s3\"}"}, "extras": null}}}
+{"timestamp": 1777000035.0, "message": {"type": "ToolResult", "payload": {"id": "tool_t3s3", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000035.5, "message": {"type": "StepBegin", "payload": {"n": 4}}}
+{"timestamp": 1777000036.0, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 3 step 4"}}}
+{"timestamp": 1777000036.5, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t3s4", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t3s4\"}"}, "extras": null}}}
+{"timestamp": 1777000037.0, "message": {"type": "ToolResult", "payload": {"id": "tool_t3s4", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000037.5, "message": {"type": "StepBegin", "payload": {"n": 5}}}
+{"timestamp": 1777000038.0, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 3 step 5", "encrypted": null}}}
+{"timestamp": 1777000038.5, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t3s5", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t3s5\"}"}, "extras": null}}}
+{"timestamp": 1777000039.0, "message": {"type": "ToolResult", "payload": {"id": "tool_t3s5", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000039.5, "message": {"type": "StepBegin", "payload": {"n": 6}}}
+{"timestamp": 1777000040.0, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 3 step 6"}}}
+{"timestamp": 1777000040.5, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t3s6", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t3s6\"}"}, "extras": null}}}
+{"timestamp": 1777000041.0, "message": {"type": "ToolResult", "payload": {"id": "tool_t3s6", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000041.5, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Step summary for turn 3"}}}
+{"timestamp": 1777000042.0, "message": {"type": "StatusUpdate", "payload": {"context_usage": 0.07, "context_tokens": 11000, "max_context_tokens": 262144, "token_usage": {"input_other": 2200, "output": 140, "input_cache_read": 8400, "input_cache_creation": 0}, "message_id": "chatcmpl-turn3", "plan_mode": false, "mcp_status": null}}}
+{"timestamp": 1777000042.5, "message": {"type": "SubagentEvent", "payload": {"event": {"type": "ContentPart", "payload": {"type": "text", "text": "Launching subagent sub-rich-b"}}, "agent_id": "sub-rich-b", "subagent_type": "coder", "status": "running"}}}
+{"timestamp": 1777000043.0, "message": {"type": "TurnEnd", "payload": {}}}
+{"timestamp": 1777000043.5, "message": {"type": "TurnBegin", "payload": {"user_input": "Turn 4 user request"}}}
+{"timestamp": 1777000044.0, "message": {"type": "StepBegin", "payload": {"n": 1}}}
+{"timestamp": 1777000044.5, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 4 step 1", "encrypted": null}}}
+{"timestamp": 1777000045.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t4s1", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t4s1\"}"}, "extras": null}}}
+{"timestamp": 1777000045.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t4s1", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000046.0, "message": {"type": "StepBegin", "payload": {"n": 2}}}
+{"timestamp": 1777000046.5, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 4 step 2"}}}
+{"timestamp": 1777000047.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t4s2", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t4s2\"}"}, "extras": null}}}
+{"timestamp": 1777000047.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t4s2", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000048.0, "message": {"type": "StepBegin", "payload": {"n": 3}}}
+{"timestamp": 1777000048.5, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 4 step 3", "encrypted": null}}}
+{"timestamp": 1777000049.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t4s3", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t4s3\"}"}, "extras": null}}}
+{"timestamp": 1777000049.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t4s3", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000050.0, "message": {"type": "StepBegin", "payload": {"n": 4}}}
+{"timestamp": 1777000050.5, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 4 step 4"}}}
+{"timestamp": 1777000051.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t4s4", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t4s4\"}"}, "extras": null}}}
+{"timestamp": 1777000051.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t4s4", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000052.0, "message": {"type": "StepBegin", "payload": {"n": 5}}}
+{"timestamp": 1777000052.5, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 4 step 5", "encrypted": null}}}
+{"timestamp": 1777000053.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t4s5", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t4s5\"}"}, "extras": null}}}
+{"timestamp": 1777000053.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t4s5", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000054.0, "message": {"type": "StepBegin", "payload": {"n": 6}}}
+{"timestamp": 1777000054.5, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 4 step 6"}}}
+{"timestamp": 1777000055.0, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t4s6", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t4s6\"}"}, "extras": null}}}
+{"timestamp": 1777000055.5, "message": {"type": "ToolResult", "payload": {"id": "tool_t4s6", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000056.0, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Step summary for turn 4"}}}
+{"timestamp": 1777000056.5, "message": {"type": "StatusUpdate", "payload": {"context_usage": 0.08, "context_tokens": 11500, "max_context_tokens": 262144, "token_usage": {"input_other": 2300, "output": 160, "input_cache_read": 8600, "input_cache_creation": 0}, "message_id": "chatcmpl-turn4", "plan_mode": false, "mcp_status": null}}}
+{"timestamp": 1777000057.0, "message": {"type": "SubagentEvent", "payload": {"event": {"type": "ContentPart", "payload": {"type": "text", "text": "Launching subagent sub-rich-a"}}, "agent_id": "sub-rich-a", "subagent_type": "researcher", "status": "running"}}}
+{"timestamp": 1777000057.5, "message": {"type": "CompactionBegin", "payload": {"reason": "context_limit", "messages_removed": 10}}}
+{"timestamp": 1777000058.0, "message": {"type": "CompactionEnd", "payload": {"messages_remaining": 20}}}
+{"timestamp": 1777000058.5, "message": {"type": "TurnEnd", "payload": {}}}
+{"timestamp": 1777000059.0, "message": {"type": "TurnBegin", "payload": {"user_input": "Turn 5 user request"}}}
+{"timestamp": 1777000059.5, "message": {"type": "StepBegin", "payload": {"n": 1}}}
+{"timestamp": 1777000060.0, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 5 step 1", "encrypted": null}}}
+{"timestamp": 1777000060.5, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t5s1", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t5s1\"}"}, "extras": null}}}
+{"timestamp": 1777000061.0, "message": {"type": "ToolResult", "payload": {"id": "tool_t5s1", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000061.5, "message": {"type": "StepBegin", "payload": {"n": 2}}}
+{"timestamp": 1777000062.0, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 5 step 2"}}}
+{"timestamp": 1777000062.5, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t5s2", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t5s2\"}"}, "extras": null}}}
+{"timestamp": 1777000063.0, "message": {"type": "ToolResult", "payload": {"id": "tool_t5s2", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000063.5, "message": {"type": "StepBegin", "payload": {"n": 3}}}
+{"timestamp": 1777000064.0, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 5 step 3", "encrypted": null}}}
+{"timestamp": 1777000064.5, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t5s3", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t5s3\"}"}, "extras": null}}}
+{"timestamp": 1777000065.0, "message": {"type": "ToolResult", "payload": {"id": "tool_t5s3", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000065.5, "message": {"type": "StepBegin", "payload": {"n": 4}}}
+{"timestamp": 1777000066.0, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 5 step 4"}}}
+{"timestamp": 1777000066.5, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t5s4", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t5s4\"}"}, "extras": null}}}
+{"timestamp": 1777000067.0, "message": {"type": "ToolResult", "payload": {"id": "tool_t5s4", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000067.5, "message": {"type": "StepBegin", "payload": {"n": 5}}}
+{"timestamp": 1777000068.0, "message": {"type": "ContentPart", "payload": {"type": "think", "think": "Thinking for turn 5 step 5", "encrypted": null}}}
+{"timestamp": 1777000068.5, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t5s5", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t5s5\"}"}, "extras": null}}}
+{"timestamp": 1777000069.0, "message": {"type": "ToolResult", "payload": {"id": "tool_t5s5", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000069.5, "message": {"type": "StepBegin", "payload": {"n": 6}}}
+{"timestamp": 1777000070.0, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Text output turn 5 step 6"}}}
+{"timestamp": 1777000070.5, "message": {"type": "ToolCall", "payload": {"type": "function", "id": "tool_t5s6", "function": {"name": "ReadFile", "arguments": "{\"path\": \"/tmp/t5s6\"}"}, "extras": null}}}
+{"timestamp": 1777000071.0, "message": {"type": "ToolResult", "payload": {"id": "tool_t5s6", "content": "ok", "is_error": false}}}
+{"timestamp": 1777000071.5, "message": {"type": "ContentPart", "payload": {"type": "text", "text": "Step summary for turn 5"}}}
+{"timestamp": 1777000072.0, "message": {"type": "StatusUpdate", "payload": {"context_usage": 0.09, "context_tokens": 12000, "max_context_tokens": 262144, "token_usage": {"input_other": 2400, "output": 180, "input_cache_read": 8800, "input_cache_creation": 0}, "message_id": "chatcmpl-turn5", "plan_mode": false, "mcp_status": null}}}
+{"timestamp": 1777000072.5, "message": {"type": "SubagentEvent", "payload": {"event": {"type": "ContentPart", "payload": {"type": "text", "text": "Launching subagent sub-rich-b"}}, "agent_id": "sub-rich-b", "subagent_type": "coder", "status": "running"}}}
+{"timestamp": 1777000073.0, "message": {"type": "TurnEnd", "payload": {}}}

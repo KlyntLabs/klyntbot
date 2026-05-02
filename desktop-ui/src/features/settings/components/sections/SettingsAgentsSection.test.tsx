@@ -50,6 +50,7 @@ const baseProps = (): SettingsAgentsSectionProps => ({
       model: "gpt-5-codex",
       displayName: "gpt-5-codex",
       description: "",
+      provider: "openai",
       supportedReasoningEfforts: [],
       defaultReasoningEffort: null,
       isDefault: true,

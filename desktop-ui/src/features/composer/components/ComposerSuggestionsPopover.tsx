@@ -198,7 +198,10 @@ export function ComposerSuggestionsPopover({
       ) : (
         suggestions.map((item, index) => {
           const prevGroup = suggestions[index - 1]?.group;
-          const showGroup = Boolean(item.group && item.group !== prevGroup);
+          // Only show on transition between named groups; first item has prevGroup === undefined.
+          const showGroup = Boolean(
+            item.group && item.group !== prevGroup && prevGroup !== undefined,
+          );
           const Icon = suggestionIcon(item);
           const fileSuggestion = isFileSuggestion(item);
           const skillSuggestion = item.id.startsWith("skill:");
@@ -235,7 +238,7 @@ export function ComposerSuggestionsPopover({
                       <Icon size={14} />
                     )}
                   </span>
-                  <span className="composer-suggestion-content">
+                  <span className="composer-suggestion-content composer-suggestion-content--inline">
                     <span className="composer-suggestion-title">{title}</span>
                     {description && (
                       <span

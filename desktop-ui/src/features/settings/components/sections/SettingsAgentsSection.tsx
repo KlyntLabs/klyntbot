@@ -20,6 +20,7 @@ const FALLBACK_AGENT_MODELS: ModelOption[] = [
     model: "gpt-5-codex",
     displayName: "gpt-5-codex",
     description: "Fallback model while workspace model list is unavailable.",
+    provider: "openai",
     supportedReasoningEfforts: [
       { reasoningEffort: "low", description: "" },
       { reasoningEffort: "medium", description: "" },

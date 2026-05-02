@@ -22,7 +22,7 @@ pub async fn list_subagents(session_dir: &Path) -> Result<Vec<SubagentSummary>> 
         .await
         .map_err(|e| common::KlyntbotError::Storage(format!("dir iter: {e}")))?
     {
-        if !s.file_type().await.map_or(false, |t| t.is_dir()) {
+        if !s.file_type().await.is_ok_and(|t| t.is_dir()) {
             continue;
         }
         let agent_dir = s.path();
@@ -67,7 +67,7 @@ pub async fn list_subagents(session_dir: &Path) -> Result<Vec<SubagentSummary>> 
             event_count,
         });
     }
-    out.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+    out.sort_by_key(|a| a.created_at);
     Ok(out)
 }
 

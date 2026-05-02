@@ -73,6 +73,8 @@ type ComposerInputProps = {
   onReviewPromptConfirmCommit?: () => Promise<void>;
   onReviewPromptUpdateCustomInstructions?: (value: string) => void;
   onReviewPromptConfirmCustom?: () => Promise<void>;
+  contextFreePercent?: number | null;
+  contextFreeLabel?: string;
 };
 
 export function ComposerInput({
@@ -129,6 +131,8 @@ export function ComposerInput({
   onReviewPromptConfirmCommit,
   onReviewPromptUpdateCustomInstructions,
   onReviewPromptConfirmCustom,
+  contextFreePercent = null,
+  contextFreeLabel,
 }: ComposerInputProps) {
   const suggestionListRef = useRef<HTMLDivElement | null>(null);
   const suggestionRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -317,6 +321,11 @@ export function ComposerInput({
                 <Mic aria-hidden />
               )}
             </button>
+            <span
+              className="composer-send-ring"
+              data-tooltip={contextFreeLabel ?? "Context free --"}
+              style={{ ["--context-free" as string]: contextFreePercent ?? 0 }}
+            >
             <button
               className={`composer-action${canStop ? " is-stop" : " is-send"}${
                 canStop && isProcessing ? " is-loading" : ""
@@ -343,6 +352,7 @@ export function ComposerInput({
                 </svg>
               )}
             </button>
+            </span>
           </div>
         </div>
         {isDictationBusy && (

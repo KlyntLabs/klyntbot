@@ -65,6 +65,20 @@ if (typeof window !== "undefined" && !window.__TAURI_INTERNALS__) {
       if (event) window.dispatchEvent(new CustomEvent(event, { detail: payload }));
       return undefined;
     }
+    // Browser-mode fallback for the native folder picker. Real Tauri uses
+    // `plugin:dialog|open`; in Chrome we surface a `prompt()` so the
+    // workspace lifecycle is still exercisable end-to-end.
+    if (cmd === "plugin:dialog|open") {
+      const opts = (args?.options ?? args ?? {}) as Record<string, unknown>;
+      const directory = Boolean(opts.directory);
+      const multiple = Boolean(opts.multiple);
+      const title = typeof opts.title === "string" ? opts.title : "Select";
+      const placeholder = directory ? "/path/to/folder" : "/path/to/file";
+      const v = window.prompt(`${title} (${placeholder})`, "");
+      if (v == null || v.trim() === "") return null;
+      const value = v.trim();
+      return multiple ? [value] : value;
+    }
     // Window/menu/etc. plugins — silently no-op so the UI doesn't crash.
     return undefined;
   };

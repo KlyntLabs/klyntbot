@@ -70,6 +70,7 @@ import { effectiveCommitMessageModelId } from "@/features/git/utils/commitMessag
 import { isMissingRepo } from "@/features/git/utils/repoErrors";
 import { useMobileServerSetup } from "@/features/mobile/hooks/useMobileServerSetup";
 import { useModels } from "@/features/models/hooks/useModels";
+import { useProviders } from "@/features/models/hooks/useProviders";
 import { useErrorToasts } from "@/features/notifications/hooks/useErrorToasts";
 import { PluginsView } from "@/features/plugins/components/PluginsView";
 import { useCustomPrompts } from "@/features/prompts/hooks/useCustomPrompts";
@@ -301,6 +302,24 @@ export default function MainApp() {
     selectionKey: threadCodexSelectionKey,
   });
 
+  const { providers } = useProviders();
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+
+  const filteredModels = useMemo(() => {
+    if (providers.length > 0 && !selectedProviderId) return [];
+    if (selectedProviderId) return models.filter((model) => model.provider === selectedProviderId);
+    return models;
+  }, [models, providers, selectedProviderId]);
+
+  const handleSelectProvider = useCallback(
+    (providerId: string | null) => {
+      setSelectedProviderId(providerId);
+      // Clear model selection when provider changes
+      setSelectedModelId(null);
+    },
+    [setSelectedModelId],
+  );
+
   const {
     collaborationModes,
     selectedCollaborationMode,
@@ -368,8 +387,8 @@ export default function MainApp() {
     persistThreadCodexParams,
   });
   const commitMessageModelId = useMemo(
-    () => effectiveCommitMessageModelId(models, appSettings.commitMessageModelId),
-    [models, appSettings.commitMessageModelId],
+    () => effectiveCommitMessageModelId(filteredModels, appSettings.commitMessageModelId),
+    [filteredModels, appSettings.commitMessageModelId],
   );
 
   const composerShortcuts = {
@@ -379,7 +398,7 @@ export default function MainApp() {
     collaborationShortcut: appSettings.collaborationModesEnabled
       ? appSettings.composerCollaborationShortcut
       : null,
-    models,
+    models: filteredModels,
     collaborationModes,
     selectedModelId,
     onSelectModel: handleSelectModel,
@@ -405,7 +424,7 @@ export default function MainApp() {
   });
 
   useComposerMenuActions({
-    models,
+    models: filteredModels,
     selectedModelId,
     onSelectModel: handleSelectModel,
     collaborationModes,
@@ -1107,7 +1126,7 @@ export default function MainApp() {
       pauseQueuedMessagesWhenResponseRequired: appSettings.pauseQueuedMessagesWhenResponseRequired,
     },
     models: {
-      models,
+      models: filteredModels,
       selectedModelId,
       resolvedEffort,
       selectedServiceTier,
@@ -1478,7 +1497,7 @@ export default function MainApp() {
           onStartRun: startWorkspaceRun,
           runMode: workspaceRunMode,
           onRunModeChange: setWorkspaceRunMode,
-          models,
+          models: filteredModels,
           selectedModelId,
           onSelectModel: setSelectedModelId,
           modelSelections: workspaceModelSelections,
@@ -1655,9 +1674,12 @@ export default function MainApp() {
     handleToggleTerminalWithFocus,
     launchScriptState,
     launchScriptsState,
-    models,
+    models: filteredModels,
     selectedModelId,
     onSelectModel: handleSelectModel,
+    providers,
+    selectedProviderId,
+    onSelectProvider: handleSelectProvider,
     collaborationModes,
     selectedCollaborationModeId,
     onSelectCollaborationMode: handleSelectCollaborationMode,
