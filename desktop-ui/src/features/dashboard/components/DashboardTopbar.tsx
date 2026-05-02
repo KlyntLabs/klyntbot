@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { formatFullDate, formatMonthLabel } from "@/utils/dashboardDates";
 import { type DashboardViewMode, useDashboardState } from "../hooks/useDashboardState";
 import { LAYERS, useEnabledLayers, useSidebarOpen } from "../lib/layers";
+import { FocusTrayIndicator } from "./productivity/FocusTrayIndicator";
 import { CalendarSync } from "./CalendarSync";
 import { MiniCalendar } from "./MiniCalendar";
 
@@ -106,6 +107,7 @@ export function DashboardTopbar() {
   return (
     <div className="dashboard__topbar">
       <span className="dashboard__topbar-date">{formatDateDisplay(mode, date)}</span>
+      <FocusTrayIndicator />
 
       {/* View-pill switcher */}
       <div className="dashboard__view-switcher">
