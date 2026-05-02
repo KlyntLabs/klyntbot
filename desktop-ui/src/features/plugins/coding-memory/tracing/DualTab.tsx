@@ -1,5 +1,5 @@
-import type { Scope } from "./types";
 import { ContextMessagesTab } from "./ContextMessagesTab";
+import type { Scope } from "./types";
 
 interface Props {
   events?: import("./types").TraceEvent[];
@@ -9,7 +9,13 @@ interface Props {
   sessionId?: string;
 }
 
-export function DualTab({ events, providerName: _providerName, scope, providerId, sessionId }: Props) {
+export function DualTab({
+  events,
+  providerName: _providerName,
+  scope,
+  providerId,
+  sessionId,
+}: Props) {
   return (
     <div className="tracing-dual">
       <div className="tracing-dual__col">

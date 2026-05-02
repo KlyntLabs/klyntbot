@@ -3,27 +3,24 @@
 // - productivity_calendar_events    → CalendarTrack
 
 import type { QueryKey } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { productivitySummaryRangeQuery, productivityTodayQuery } from "@/api/endpoints/dashboard";
 import type {
   CalendarEvent,
   ProductivitySummaryResponse,
   TimelineEntry,
   TimelineSummary,
 } from "@/bindings";
-import {
-  productivitySummaryRangeQuery,
-  productivityTodayQuery,
-} from "@/api/endpoints/dashboard";
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import { formatHumanDuration, minutesSinceMidnight } from "@/utils/dashboardDates";
-import { ActivityFeed } from "../productivity/ActivityFeed";
-import type { SessionBlock } from "./ActivityTrack";
 import { useTimelineDrag } from "../../hooks/useTimelineDrag";
 import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../../lib/layers";
 import { computeOverlapLayout } from "../../lib/timeline-utils";
+import { ActivityFeed } from "../productivity/ActivityFeed";
 import { SummaryPanel } from "../SummaryPanel";
+import type { SessionBlock } from "./ActivityTrack";
 import { ActivityTrack } from "./ActivityTrack";
 import { CalendarTrack } from "./CalendarTrack";
 import { ContextRibbon } from "./ContextRibbon";
@@ -108,7 +105,6 @@ export interface DayColumnsProps {
   summary: TimelineSummary | null;
   isToday: boolean;
   loading: boolean;
-  productivitySummary?: ProductivitySummaryResponse | null;
   queryKey: QueryKey;
 }
 
@@ -118,7 +114,6 @@ export function DayColumns({
   summary,
   isToday,
   loading,
-  productivitySummary: _productivitySummary,
   queryKey,
 }: DayColumnsProps) {
   const { enabled } = useEnabledLayers();
@@ -457,7 +452,13 @@ export function DayColumns({
                           const endedAt = event.endedAt;
                           const durationSecs =
                             startedAt && endedAt
-                              ? Math.max(0, Math.floor((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000))
+                              ? Math.max(
+                                  0,
+                                  Math.floor(
+                                    (new Date(endedAt).getTime() - new Date(startedAt).getTime()) /
+                                      1000,
+                                  ),
+                                )
                               : null;
                           setSelectedEntry({
                             id: event.id,

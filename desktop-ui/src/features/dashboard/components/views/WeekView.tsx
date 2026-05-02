@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { EMPTY_TIMELINE_RESPONSE, timelineQuery } from "@/api/endpoints/dashboard";
 import type { TimelineEntry } from "@/bindings";
-import { useSidebarOpen } from "../../lib/layers";
-import { SummaryPanel } from "../SummaryPanel";
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import {
@@ -15,8 +13,9 @@ import {
   weekStartISO,
 } from "@/utils/dashboardDates";
 import { useDashboardState } from "../../hooks/useDashboardState";
-import { useEnabledLayers } from "../../lib/layers";
+import { useEnabledLayers, useSidebarOpen } from "../../lib/layers";
 import { computeDayStats, IDLE_APPS } from "../../lib/timeline-utils";
+import { SummaryPanel } from "../SummaryPanel";
 
 const HOUR_HEIGHT = 60;
 const PX_PER_MIN = HOUR_HEIGHT / 60;
@@ -194,134 +193,136 @@ export function WeekView() {
     <div style={{ display: "flex", gap: 8, height: "100%", width: "100%" }}>
       <div className="dashboard__week-grid" style={{ flex: 1 }}>
         <div className="dashboard__week-grid-inner">
-        {isLoading && <div className="dashboard__week-loading">Loading...</div>}
+          {isLoading && <div className="dashboard__week-loading">Loading...</div>}
 
-        {/* Header row */}
-        <div className="dashboard__week-header">
-          <div /> {/* gutter */}
-          {days.map((day) => {
-            const isToday = day === today;
-            const d = new Date(`${day}T00:00:00`);
-            const activeSecs = activeByDay.get(day) || 0;
-            return (
-              <button
-                key={day}
-                data-testid="week-day-header"
-                type="button"
-                className={`dashboard__week-header-cell${isToday ? " dashboard__week-header-cell--today" : ""}`}
-                onClick={() => {
-                  setDate(day);
-                  setMode("day");
-                }}
-              >
-                <div className="dashboard__week-header-day">
-                  {d.toLocaleDateString("en-US", { weekday: "short" })}
-                </div>
-                <div>{d.getDate()}</div>
-                {activeSecs > 0 && (
-                  <div className="dashboard__week-day-active">{formatHumanDuration(activeSecs)}</div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Scrollable grid */}
-        <div className="dashboard__week-scroll">
-          <div className="dashboard__week-columns">
-            {/* Hour gutter */}
-            <div className="dashboard__day-gutter">
-              {HOURS.map((h) => (
-                <div
-                  key={h}
-                  data-testid="hour-label"
-                  className="dashboard__day-hour-label"
-                  style={{ height: HOUR_HEIGHT }}
-                >
-                  {h === 0 ? "" : `${h}:00`}
-                </div>
-              ))}
-            </div>
-
-            {/* Day columns */}
+          {/* Header row */}
+          <div className="dashboard__week-header">
+            <div /> {/* gutter */}
             {days.map((day) => {
-              const dayEntries = entriesByDay.get(day) || [];
-              const sessions = buildWeekSessions(dayEntries);
-
+              const isToday = day === today;
+              const d = new Date(`${day}T00:00:00`);
+              const activeSecs = activeByDay.get(day) || 0;
               return (
-                <div key={day} className="dashboard__day-column">
-                  {/* Hour lines */}
-                  {HOURS.map((h) => (
-                    <div
-                      key={h}
-                      className="dashboard__hour-row"
-                      style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
-                    >
-                      <div className="dashboard__hour-line" />
+                <button
+                  key={day}
+                  data-testid="week-day-header"
+                  type="button"
+                  className={`dashboard__week-header-cell${isToday ? " dashboard__week-header-cell--today" : ""}`}
+                  onClick={() => {
+                    setDate(day);
+                    setMode("day");
+                  }}
+                >
+                  <div className="dashboard__week-header-day">
+                    {d.toLocaleDateString("en-US", { weekday: "short" })}
+                  </div>
+                  <div>{d.getDate()}</div>
+                  {activeSecs > 0 && (
+                    <div className="dashboard__week-day-active">
+                      {formatHumanDuration(activeSecs)}
                     </div>
-                  ))}
-
-                  {/* Sessions */}
-                  {sessions.map((s) => {
-                    const top = s.startMin * PX_PER_MIN;
-                    const height = Math.max((s.endMin - s.startMin) * PX_PER_MIN, 4);
-
-                    if (s.type === "focus") {
-                      return (
-                        <div
-                          key={`focus-${s.startMin}`}
-                          className="dashboard__week-focus-bar"
-                          style={{ top, height }}
-                        />
-                      );
-                    }
-
-                    return (
-                      <button
-                        key={`activity-${s.startMin}`}
-                        type="button"
-                        className="dashboard__week-session"
-                        style={{
-                          top,
-                          height,
-                          left: s.hasFocus ? 5 : 2,
-                          right: 2,
-                          opacity: sessionOpacity(s.totalSecs),
-                        }}
-                        onClick={() => {
-                          setSelectedEntry({
-                            id: `week-${day}-${s.startMin}`,
-                            title: s.label,
-                            description: null,
-                            startedAt: new Date(`${day}T00:00:00`).toISOString(),
-                            endedAt: null,
-                            durationSecs: s.totalSecs,
-                            source: "productivity",
-                            entryType: "appUsage",
-                            color: "var(--timeline-app-productive)",
-                            metadata: null,
-                            entityId: null,
-                            entityRoute: null,
-                          });
-                        }}
-                      >
-                        <span className="dashboard__week-session-label">{s.label}</span>
-                        {s.appCount > 1 && (
-                          <span className="dashboard__week-session-meta">
-                            {s.appCount} apps · {Math.round(s.totalSecs / 60)}m
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-
-                  {/* Now line for today */}
-                  {day === today && <WeekNowLine />}
-                </div>
+                  )}
+                </button>
               );
             })}
           </div>
-        </div>
+
+          {/* Scrollable grid */}
+          <div className="dashboard__week-scroll">
+            <div className="dashboard__week-columns">
+              {/* Hour gutter */}
+              <div className="dashboard__day-gutter">
+                {HOURS.map((h) => (
+                  <div
+                    key={h}
+                    data-testid="hour-label"
+                    className="dashboard__day-hour-label"
+                    style={{ height: HOUR_HEIGHT }}
+                  >
+                    {h === 0 ? "" : `${h}:00`}
+                  </div>
+                ))}
+              </div>
+
+              {/* Day columns */}
+              {days.map((day) => {
+                const dayEntries = entriesByDay.get(day) || [];
+                const sessions = buildWeekSessions(dayEntries);
+
+                return (
+                  <div key={day} className="dashboard__day-column">
+                    {/* Hour lines */}
+                    {HOURS.map((h) => (
+                      <div
+                        key={h}
+                        className="dashboard__hour-row"
+                        style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
+                      >
+                        <div className="dashboard__hour-line" />
+                      </div>
+                    ))}
+
+                    {/* Sessions */}
+                    {sessions.map((s) => {
+                      const top = s.startMin * PX_PER_MIN;
+                      const height = Math.max((s.endMin - s.startMin) * PX_PER_MIN, 4);
+
+                      if (s.type === "focus") {
+                        return (
+                          <div
+                            key={`focus-${s.startMin}`}
+                            className="dashboard__week-focus-bar"
+                            style={{ top, height }}
+                          />
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={`activity-${s.startMin}`}
+                          type="button"
+                          className="dashboard__week-session"
+                          style={{
+                            top,
+                            height,
+                            left: s.hasFocus ? 5 : 2,
+                            right: 2,
+                            opacity: sessionOpacity(s.totalSecs),
+                          }}
+                          onClick={() => {
+                            setSelectedEntry({
+                              id: `week-${day}-${s.startMin}`,
+                              title: s.label,
+                              description: null,
+                              startedAt: new Date(`${day}T00:00:00`).toISOString(),
+                              endedAt: null,
+                              durationSecs: s.totalSecs,
+                              source: "productivity",
+                              entryType: "appUsage",
+                              color: "var(--timeline-app-productive)",
+                              metadata: null,
+                              entityId: null,
+                              entityRoute: null,
+                            });
+                          }}
+                        >
+                          <span className="dashboard__week-session-label">{s.label}</span>
+                          {s.appCount > 1 && (
+                            <span className="dashboard__week-session-meta">
+                              {s.appCount} apps · {Math.round(s.totalSecs / 60)}m
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+
+                    {/* Now line for today */}
+                    {day === today && <WeekNowLine />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
       {sidebarOpen && (

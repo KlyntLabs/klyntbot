@@ -37,11 +37,7 @@ function scoreLabel(score: number): string {
   return "—";
 }
 
-export function ProductivityScoreRing({
-  score,
-  size = 110,
-  summary,
-}: ProductivityScoreRingProps) {
+export function ProductivityScoreRing({ score, size = 110, summary }: ProductivityScoreRingProps) {
   const [hovered, setHovered] = useState(false);
   const strokeWidth = 7;
   const radius = (size - strokeWidth) / 2;
@@ -67,8 +63,13 @@ export function ProductivityScoreRing({
       <div
         className="dashboard__score-ring-track"
         style={{ width: size, height: size }}
+        tabIndex={0}
+        role="img"
+        aria-label={`Productivity score ${Math.round(score)} out of 100`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        onFocus={() => setHovered(true)}
+        onBlur={() => setHovered(false)}
       >
         <div
           className="dashboard__score-ring-glow"

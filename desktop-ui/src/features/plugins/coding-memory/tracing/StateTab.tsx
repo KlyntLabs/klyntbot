@@ -12,14 +12,23 @@ export function StateTab({ providerId, sessionId }: Props) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!providerId || !sessionId) { setState(null); return; }
+    if (!providerId || !sessionId) {
+      setState(null);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     invoke<SessionState>("tracing_load_state", { providerId, sessionId })
-      .then((s) => { if (!cancelled) setState(s); })
+      .then((s) => {
+        if (!cancelled) setState(s);
+      })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [providerId, sessionId]);
 
   if (loading) return <div className="tracing-state">Loading state…</div>;
@@ -45,7 +54,13 @@ export function StateTab({ providerId, sessionId }: Props) {
         <ul className="tracing-state-tab__todos">
           {state.todos?.map((t, i) => (
             <li key={i} className="tracing-state-tab__todo">
-              <span className={"tracing-state-tab__pill tracing-state-tab__pill--" + t.status.replace(" ", "_")}>{t.status}</span>
+              <span
+                className={
+                  "tracing-state-tab__pill tracing-state-tab__pill--" + t.status.replace(" ", "_")
+                }
+              >
+                {t.status}
+              </span>
               <span className="tracing-state-tab__title">{t.title}</span>
             </li>
           ))}

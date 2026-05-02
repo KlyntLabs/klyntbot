@@ -1,8 +1,10 @@
 import { useState } from "react";
-import type { TraceEvent } from "../types";
 import { EventTypeChip } from "../EventTypeChip";
+import type { TraceEvent } from "../types";
 
-interface Props { event: TraceEvent; }
+interface Props {
+  event: TraceEvent;
+}
 
 export function ThinkingCard({ event }: Props) {
   const [open, setOpen] = useState(false);
@@ -15,7 +17,11 @@ export function ThinkingCard({ event }: Props) {
           {open ? "▾" : "▸"} thinking…
         </button>
       </div>
-      {open && <pre className="tracing-detail-pane__pre" style={{ fontStyle: "italic" }}>{text}</pre>}
+      {open && (
+        <pre className="tracing-detail-pane__pre" style={{ fontStyle: "italic" }}>
+          {text}
+        </pre>
+      )}
     </div>
   );
 }

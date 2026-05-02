@@ -131,7 +131,11 @@ function ResultRow({
       <ItemIcon kind={item.kind.type} icon={item.icon} />
       <div className="lc-row-text">
         <div className="lc-row-title">
-          {item.pinned && <span className="lc-pin-glyph" aria-label="Pinned">📌</span>}
+          {item.pinned && (
+            <span className="lc-pin-glyph" aria-label="Pinned">
+              📌
+            </span>
+          )}
           {displayTitle}
         </div>
         {item.subtitle && <div className="lc-row-subtitle">{item.subtitle}</div>}

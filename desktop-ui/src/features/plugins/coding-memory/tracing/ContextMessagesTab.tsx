@@ -13,14 +13,23 @@ export function ContextMessagesTab({ providerId, sessionId, scope }: Props) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!providerId || !sessionId) { setMessages([]); return; }
+    if (!providerId || !sessionId) {
+      setMessages([]);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     invoke<ContextMessage[]>("tracing_load_context", { providerId, sessionId, scope })
-      .then((rows) => { if (!cancelled) setMessages(rows); })
+      .then((rows) => {
+        if (!cancelled) setMessages(rows);
+      })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [providerId, sessionId, JSON.stringify(scope)]);
 
   if (loading) return <div className="tracing-state">Loading context…</div>;

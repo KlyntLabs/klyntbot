@@ -1,5 +1,5 @@
-import type { TraceEvent } from "./types";
 import { ToolCallDetail } from "./ToolCallDetail";
+import type { TraceEvent } from "./types";
 
 interface Props {
   selectedToolEvent?: TraceEvent;

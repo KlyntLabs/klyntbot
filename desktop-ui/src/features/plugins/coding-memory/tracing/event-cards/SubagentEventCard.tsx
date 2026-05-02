@@ -1,6 +1,9 @@
 import type { TraceEvent } from "../types";
 
-interface Props { event: TraceEvent; onOpenSubagent?: (agentId: string) => void; }
+interface Props {
+  event: TraceEvent;
+  onOpenSubagent?: (agentId: string) => void;
+}
 
 export function SubagentEventCard({ event, onOpenSubagent }: Props) {
   const p = event.payload as any;
@@ -13,8 +16,12 @@ export function SubagentEventCard({ event, onOpenSubagent }: Props) {
         type="button"
         className="tracing-evcard__sub-link"
         onClick={() => agentId && onOpenSubagent?.(agentId)}
-      >↳ {description}</button>
-      <pre className="tracing-detail-pane__pre">{JSON.stringify(wrapped, null, 2).slice(0, 240)}</pre>
+      >
+        ↳ {description}
+      </button>
+      <pre className="tracing-detail-pane__pre">
+        {JSON.stringify(wrapped, null, 2).slice(0, 240)}
+      </pre>
     </div>
   );
 }

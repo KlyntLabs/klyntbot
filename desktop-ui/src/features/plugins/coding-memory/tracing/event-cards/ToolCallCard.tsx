@@ -1,7 +1,11 @@
-import type { TraceEvent } from "../types";
 import { EventTypeChip } from "../EventTypeChip";
+import type { TraceEvent } from "../types";
 
-interface Props { event: TraceEvent; onSelect: () => void; selected: boolean; }
+interface Props {
+  event: TraceEvent;
+  onSelect: () => void;
+  selected: boolean;
+}
 
 export function ToolCallCard({ event, onSelect, selected }: Props) {
   const fn = (event.payload as any)?.function;
@@ -10,7 +14,9 @@ export function ToolCallCard({ event, onSelect, selected }: Props) {
   return (
     <button
       type="button"
-      className={"tracing-evcard tracing-evcard--tool" + (selected ? " tracing-evcard--selected" : "")}
+      className={
+        "tracing-evcard tracing-evcard--tool" + (selected ? " tracing-evcard--selected" : "")
+      }
       onClick={onSelect}
     >
       <span className="tracing-evcard__tool-id">{(event.payload as any)?.id?.slice?.(0, 16)}</span>

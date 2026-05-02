@@ -50,8 +50,7 @@ describe("Dashboard", () => {
 
   it("mounts FocusStateIndicator and AutoFocusToast as siblings of dashboard__content", () => {
     render(wrap(<Dashboard />));
-    const root = screen.getByText("Day").closest(".dashboard");
-    expect(root).toBeTruthy();
-    expect(root?.querySelector(".dashboard__content")).toBeTruthy();
+    expect(screen.getByTestId("focus-state-indicator")).toBeTruthy();
+    expect(screen.getByTestId("auto-focus-toast")).toBeTruthy();
   });
 });

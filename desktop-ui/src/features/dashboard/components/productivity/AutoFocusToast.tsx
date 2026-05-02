@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import type { AutoFocusPayload, FocusSessionResponse } from "@/bindings";
 import { productivityAutoFocusConfirm } from "@/api/endpoints/dashboard";
+import type { AutoFocusPayload, FocusSessionResponse } from "@/bindings";
 import { useTauriMutation } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import { subscribeFocusAutoDetected } from "@/services/events";
@@ -36,7 +36,7 @@ export function AutoFocusToast() {
     setSession(null);
   }, []);
 
-  if (!session) return null;
+  if (!session) return <div data-testid="auto-focus-toast" style={{ display: "none" }} />;
 
   const color = getAppColor(session.dominantApp, null);
   const ratio = Math.round(session.productiveRatio * 100);

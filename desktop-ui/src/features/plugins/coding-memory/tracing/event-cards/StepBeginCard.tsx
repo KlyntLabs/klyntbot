@@ -1,13 +1,18 @@
 import type { TraceEvent } from "../types";
 
-interface Props { event: TraceEvent; deltaMs?: number; }
+interface Props {
+  event: TraceEvent;
+  deltaMs?: number;
+}
 
 export function StepBeginCard({ event, deltaMs }: Props) {
   const n = (event.payload as any)?.n ?? "?";
   return (
     <div className="tracing-evcard tracing-evcard--step">
       <span className="tracing-evcard__step-label">Step {n}</span>
-      {deltaMs !== undefined && <span className="tracing-evcard__delta">+{formatDelta(deltaMs)}</span>}
+      {deltaMs !== undefined && (
+        <span className="tracing-evcard__delta">+{formatDelta(deltaMs)}</span>
+      )}
     </div>
   );
 }

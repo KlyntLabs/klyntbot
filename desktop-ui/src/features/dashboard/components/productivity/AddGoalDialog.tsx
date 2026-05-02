@@ -104,7 +104,9 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
         </div>
 
         <div className="dashboard__goal-dialog-footer">
-          <button type="button" onClick={onClose}>Cancel</button>
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
           <button type="button" onClick={handleSubmit} disabled={!canSubmit}>
             Add goal
           </button>

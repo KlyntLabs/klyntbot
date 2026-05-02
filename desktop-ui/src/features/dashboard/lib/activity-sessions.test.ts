@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeActivitySessions, type MergeableEvent } from "./activity-sessions";
+import { type MergeableEvent, mergeActivitySessions } from "./activity-sessions";
 
 function ev(partial: Partial<MergeableEvent>): MergeableEvent {
   return {

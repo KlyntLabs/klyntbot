@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import type { ActivityTimelineResponse } from "@/bindings";
 import { productivityActivityFeedQuery } from "@/api/endpoints/dashboard";
+import type { ActivityTimelineResponse } from "@/bindings";
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import { formatTime } from "@/utils/dashboardDates";

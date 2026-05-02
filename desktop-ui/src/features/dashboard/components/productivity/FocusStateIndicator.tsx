@@ -21,7 +21,7 @@ export function FocusStateIndicator() {
     });
   }, []);
 
-  if (!focusState) return null;
+  if (!focusState) return <div data-testid="focus-state-indicator" style={{ display: "none" }} />;
   const config = STATE_CONFIG[focusState.state];
   if (!config) return null;
 

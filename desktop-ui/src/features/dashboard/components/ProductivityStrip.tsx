@@ -83,7 +83,11 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
 
   return (
     <div className="dashboard__strip">
-      <button type="button" onClick={() => setExpanded(!expanded)} className="dashboard__strip-toggle">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="dashboard__strip-toggle"
+      >
         <MiniScore score={summary.productivityScore} />
         <div>
           <CategoryBar summary={summary} />

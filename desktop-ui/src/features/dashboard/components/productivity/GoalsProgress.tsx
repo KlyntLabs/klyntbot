@@ -1,12 +1,12 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import type { GoalProgressResponse } from "@/bindings";
 import {
   type GoalCreateParams,
   productivityGoalCreate,
   productivityGoalDelete,
   productivityGoalsQuery,
 } from "@/api/endpoints/dashboard";
+import type { GoalProgressResponse } from "@/bindings";
 import { useTauriMutation, useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import { AddGoalDialog } from "./AddGoalDialog";
@@ -94,10 +94,13 @@ export function GoalsProgress() {
                     <span>
                       {formatValue(g.metric, g.targetValue)} {metricLabel(g.metric)}
                     </span>
-                    {g.projectId && <span className="dashboard__goal-project-tag">{g.projectId}</span>}
+                    {g.projectId && (
+                      <span className="dashboard__goal-project-tag">{g.projectId}</span>
+                    )}
                     <span>({g.goalType})</span>
                     <span>
-                      {formatValue(g.metric, g.currentValue)} / {formatValue(g.metric, g.targetValue)}
+                      {formatValue(g.metric, g.currentValue)} /{" "}
+                      {formatValue(g.metric, g.targetValue)}
                     </span>
                     <button
                       type="button"

@@ -97,100 +97,98 @@ export function YearView() {
         <div className="dashboard__year-grid-inner">
           {isLoading && <div className="dashboard__year-loading">Loading...</div>}
 
-        <div className="dashboard__year-months">
-          {Array.from({ length: 12 }, (_, monthIdx) => {
-            const weeks = buildMonthGrid(year, monthIdx);
-            const monthName = SHORT_MONTHS[monthIdx];
-            return (
-              <div key={monthName}>
-                <div className="dashboard__year-month-name">{monthName}</div>
+          <div className="dashboard__year-months">
+            {Array.from({ length: 12 }, (_, monthIdx) => {
+              const weeks = buildMonthGrid(year, monthIdx);
+              const monthName = SHORT_MONTHS[monthIdx];
+              return (
+                <div key={monthName}>
+                  <div className="dashboard__year-month-name">{monthName}</div>
 
-                {/* Day-of-week labels */}
-                <div className="dashboard__year-week" style={{ marginBottom: 2 }}>
-                  {DAY_LABELS.map((label, i) => (
+                  {/* Day-of-week labels */}
+                  <div className="dashboard__year-week" style={{ marginBottom: 2 }}>
+                    {DAY_LABELS.map((label, i) => (
+                      <div
+                        // biome-ignore lint/suspicious/noArrayIndexKey: static 7 day-of-week labels with duplicates
+                        key={`${monthName}-label-${i}`}
+                        className="dashboard__year-dow-label"
+                      >
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Weeks */}
+                  {weeks.map((week, wi) => (
                     <div
-                      // biome-ignore lint/suspicious/noArrayIndexKey: static 7 day-of-week labels with duplicates
-                      key={`${monthName}-label-${i}`}
-                      className="dashboard__year-dow-label"
+                      // biome-ignore lint/suspicious/noArrayIndexKey: week rows within month have no unique ID
+                      key={`${monthName}-w${wi}`}
+                      className="dashboard__year-week"
                     >
-                      {label}
+                      {week.map((day, di) =>
+                        day ? (
+                          <button
+                            type="button"
+                            key={day}
+                            onClick={() => {
+                              setDate(day);
+                              setMode("day");
+                            }}
+                            className={
+                              day === today
+                                ? "dashboard__year-day dashboard__year-day--today"
+                                : "dashboard__year-day"
+                            }
+                            style={intensityStyle(dayMap.get(day) || 0, maxSecs)}
+                            title={`${day}: ${formatHumanDuration(dayMap.get(day) || 0)}`}
+                          >
+                            <span className="dashboard__year-day-num">
+                              {parseInt(day.slice(8, 10), 10)}
+                            </span>
+                          </button>
+                        ) : (
+                          <div
+                            // biome-ignore lint/suspicious/noArrayIndexKey: empty calendar padding cells
+                            key={`empty-${monthName}-${wi}-${di}`}
+                            className="dashboard__year-day-pad"
+                          />
+                        ),
+                      )}
                     </div>
                   ))}
                 </div>
+              );
+            })}
+          </div>
 
-                {/* Weeks */}
-                {weeks.map((week, wi) => (
-                  <div
-                    // biome-ignore lint/suspicious/noArrayIndexKey: week rows within month have no unique ID
-                    key={`${monthName}-w${wi}`}
-                    className="dashboard__year-week"
-                  >
-                    {week.map((day, di) =>
-                      day ? (
-                        <button
-                          type="button"
-                          key={day}
-                          onClick={() => {
-                            setDate(day);
-                            setMode("day");
-                          }}
-                          className={
-                            day === today
-                              ? "dashboard__year-day dashboard__year-day--today"
-                              : "dashboard__year-day"
-                          }
-                          style={intensityStyle(dayMap.get(day) || 0, maxSecs)}
-                          title={`${day}: ${formatHumanDuration(dayMap.get(day) || 0)}`}
-                        >
-                          <span className="dashboard__year-day-num">
-                            {parseInt(day.slice(8, 10), 10)}
-                          </span>
-                        </button>
-                      ) : (
-                        <div
-                          // biome-ignore lint/suspicious/noArrayIndexKey: empty calendar padding cells
-                          key={`empty-${monthName}-${wi}-${di}`}
-                          className="dashboard__year-day-pad"
-                        />
-                      ),
-                    )}
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Legend */}
-        <div className="dashboard__year-legend">
-          <span className="dashboard__year-legend-label">Less focus</span>
-          <div
-            className="dashboard__year-legend-swatch"
-            style={{ background: "color-mix(in oklch, var(--text-muted) 10%, transparent)" }}
-          />
-          <div
-            className="dashboard__year-legend-swatch"
-            style={{ background: "color-mix(in oklch, var(--timeline-focus) 10%, transparent)" }}
-          />
-          <div
-            className="dashboard__year-legend-swatch"
-            style={{ background: "color-mix(in oklch, var(--timeline-focus) 25%, transparent)" }}
-          />
-          <div
-            className="dashboard__year-legend-swatch"
-            style={{ background: "color-mix(in oklch, var(--timeline-focus) 40%, transparent)" }}
-          />
-          <div
-            className="dashboard__year-legend-swatch"
-            style={{ background: "color-mix(in oklch, var(--timeline-focus) 60%, transparent)" }}
-          />
-          <span className="dashboard__year-legend-label">More focus</span>
+          {/* Legend */}
+          <div className="dashboard__year-legend">
+            <span className="dashboard__year-legend-label">Less focus</span>
+            <div
+              className="dashboard__year-legend-swatch"
+              style={{ background: "color-mix(in oklch, var(--text-muted) 10%, transparent)" }}
+            />
+            <div
+              className="dashboard__year-legend-swatch"
+              style={{ background: "color-mix(in oklch, var(--timeline-focus) 10%, transparent)" }}
+            />
+            <div
+              className="dashboard__year-legend-swatch"
+              style={{ background: "color-mix(in oklch, var(--timeline-focus) 25%, transparent)" }}
+            />
+            <div
+              className="dashboard__year-legend-swatch"
+              style={{ background: "color-mix(in oklch, var(--timeline-focus) 40%, transparent)" }}
+            />
+            <div
+              className="dashboard__year-legend-swatch"
+              style={{ background: "color-mix(in oklch, var(--timeline-focus) 60%, transparent)" }}
+            />
+            <span className="dashboard__year-legend-label">More focus</span>
+          </div>
         </div>
       </div>
-    </div>
-    {sidebarOpen && (
-        <SummaryPanel summary={null} selectedEntry={null} onClose={() => {}} />
-      )}
+      {sidebarOpen && <SummaryPanel summary={null} selectedEntry={null} onClose={() => {}} />}
     </div>
   );
 }

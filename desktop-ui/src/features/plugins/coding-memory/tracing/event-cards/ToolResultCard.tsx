@@ -1,7 +1,9 @@
-import type { TraceEvent } from "../types";
 import { EventTypeChip } from "../EventTypeChip";
+import type { TraceEvent } from "../types";
 
-interface Props { event: TraceEvent; }
+interface Props {
+  event: TraceEvent;
+}
 
 export function ToolResultCard({ event }: Props) {
   const id = (event.payload as any)?.id;

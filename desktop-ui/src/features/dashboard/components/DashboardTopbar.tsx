@@ -4,9 +4,9 @@ import { createPortal } from "react-dom";
 import { formatFullDate, formatMonthLabel } from "@/utils/dashboardDates";
 import { type DashboardViewMode, useDashboardState } from "../hooks/useDashboardState";
 import { LAYERS, useEnabledLayers, useSidebarOpen } from "../lib/layers";
-import { FocusTrayIndicator } from "./productivity/FocusTrayIndicator";
 import { CalendarSync } from "./CalendarSync";
 import { MiniCalendar } from "./MiniCalendar";
+import { FocusTrayIndicator } from "./productivity/FocusTrayIndicator";
 
 const VIEWS: { key: DashboardViewMode; label: string }[] = [
   { key: "day", label: "Day" },

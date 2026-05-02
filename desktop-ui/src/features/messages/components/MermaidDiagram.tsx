@@ -17,7 +17,10 @@ function resolveTheme() {
   if (explicit === "dim" || explicit === "dark") {
     return "dark" as const;
   }
-  if (typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: light)").matches) {
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-color-scheme: light)").matches
+  ) {
     return "default" as const;
   }
   return "dark" as const;
@@ -86,11 +89,7 @@ export function MermaidDiagram({ source }: { source: string }) {
 
   if (state.status === "loading") {
     return (
-      <div
-        className="markdown-mermaid markdown-mermaid-loading"
-        role="status"
-        aria-live="polite"
-      >
+      <div className="markdown-mermaid markdown-mermaid-loading" role="status" aria-live="polite">
         Rendering diagram…
       </div>
     );
@@ -99,9 +98,7 @@ export function MermaidDiagram({ source }: { source: string }) {
   if (state.status === "error") {
     return (
       <div className="markdown-mermaid markdown-mermaid-error" role="alert">
-        <div className="markdown-mermaid-error-label">
-          Mermaid render error: {state.message}
-        </div>
+        <div className="markdown-mermaid-error-label">Mermaid render error: {state.message}</div>
         <pre tabIndex={0}>
           <code>{source}</code>
         </pre>

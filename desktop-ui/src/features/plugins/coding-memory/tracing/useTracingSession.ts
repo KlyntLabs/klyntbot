@@ -34,7 +34,9 @@ export function useTracingSession(
         if (cancelled) return;
         setState({ detail: null, loading: false, error: String(err?.message ?? err) });
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [providerId, sessionId, scopeKey, refreshKey]);
 
   return state;

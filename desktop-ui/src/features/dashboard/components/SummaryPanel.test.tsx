@@ -16,8 +16,8 @@ vi.mock("@/api/endpoints/dashboard", async () => {
 });
 
 import type { TimelineEntry, TimelineSummary } from "@/bindings";
-import type { SessionBlock } from "./views/ActivityTrack";
 import { SummaryPanel } from "./SummaryPanel";
+import type { SessionBlock } from "./views/ActivityTrack";
 
 afterEach(() => cleanup());
 

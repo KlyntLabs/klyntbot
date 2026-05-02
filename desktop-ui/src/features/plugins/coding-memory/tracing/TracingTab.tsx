@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@/api/client";
-import type { ProviderInfo } from "./types";
-import { SessionsListView } from "./SessionsListView";
 import { SessionDetailView } from "./SessionDetailView";
+import { SessionsListView } from "./SessionsListView";
 import { StatisticsView } from "./StatisticsView";
+import type { ProviderInfo } from "./types";
 
- type RootTab = "sessions" | "statistics";
+type RootTab = "sessions" | "statistics";
 
 interface ViewState {
   view: "list" | "detail";
@@ -19,7 +19,9 @@ export function TracingTab() {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
 
   useEffect(() => {
-    invoke<ProviderInfo[]>("tracing_list_providers").then(setProviders).catch(() => {});
+    invoke<ProviderInfo[]>("tracing_list_providers")
+      .then(setProviders)
+      .catch(() => {});
   }, []);
 
   return (
@@ -29,9 +31,13 @@ export function TracingTab() {
           <button
             key={p.id}
             type="button"
-            className={"tracing-provider" + (providerId === p.id ? " tracing-provider--active" : "")}
+            className={
+              "tracing-provider" + (providerId === p.id ? " tracing-provider--active" : "")
+            }
             onClick={() => setProviderId(p.id)}
-          >{p.displayName} ({p.sessionCount})</button>
+          >
+            {p.displayName} ({p.sessionCount})
+          </button>
         ))}
       </div>
       <div className="tracing-tabs">

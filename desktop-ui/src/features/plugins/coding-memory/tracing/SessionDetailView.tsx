@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@/api/client";
-import type { DetailTab, Scope, SubagentSummary } from "./types";
-import { useTracingSession } from "./useTracingSession";
-import { useDetail } from "./useDetail";
-import { chromeFor } from "./providers";
-import { DetailHeader } from "./DetailHeader";
-import { ScopeSelector } from "./ScopeSelector";
-import { WireEventsTab } from "./WireEventsTab";
-import { ContextMessagesTab } from "./ContextMessagesTab";
-import { StateTab } from "./StateTab";
-import { DualTab } from "./DualTab";
 import { AgentsTab } from "./AgentsTab";
+import { ContextMessagesTab } from "./ContextMessagesTab";
+import { DetailHeader } from "./DetailHeader";
+import { DualTab } from "./DualTab";
+import { chromeFor } from "./providers";
+import { ScopeSelector } from "./ScopeSelector";
+import { StateTab } from "./StateTab";
+import type { DetailTab, Scope, SubagentSummary } from "./types";
+import { useDetail } from "./useDetail";
+import { useTracingSession } from "./useTracingSession";
+import { WireEventsTab } from "./WireEventsTab";
 
 interface Props {
   providerId: string;
@@ -30,9 +30,13 @@ export function SessionDetailView({ providerId, sessionId, onBack }: Props) {
   useEffect(() => {
     let cancelled = false;
     invoke<SubagentSummary[]>("tracing_list_subagents", { providerId, sessionId })
-      .then((s) => { if (!cancelled) setSubagents(s); })
+      .then((s) => {
+        if (!cancelled) setSubagents(s);
+      })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [providerId, sessionId, refreshKey]);
 
   const chrome = chromeFor(providerId);
@@ -53,7 +57,9 @@ export function SessionDetailView({ providerId, sessionId, onBack }: Props) {
           const path: string = await invoke("tracing_get_dir", { providerId, sessionId });
           await navigator.clipboard.writeText(path);
         }}
-        onDownload={() => { /* deferred — see "Out of scope for v1" */ }}
+        onDownload={() => {
+          /* deferred — see "Out of scope for v1" */
+        }}
         onRefresh={() => setRefreshKey((k) => k + 1)}
       />
       <div className="tracing-tabs">
@@ -63,7 +69,9 @@ export function SessionDetailView({ providerId, sessionId, onBack }: Props) {
             type="button"
             className={"tracing-tab" + (tab === t ? " tracing-tab--active" : "")}
             onClick={() => setTab(t)}
-          >{labelFor(t)}</button>
+          >
+            {labelFor(t)}
+          </button>
         ))}
       </div>
       {tab === "wireEvents" && (
@@ -85,20 +93,34 @@ export function SessionDetailView({ providerId, sessionId, onBack }: Props) {
           />
         </>
       )}
-      {tab === "contextMessages" && <ContextMessagesTab providerId={providerId} sessionId={sessionId} scope={scope} />}
+      {tab === "contextMessages" && (
+        <ContextMessagesTab providerId={providerId} sessionId={sessionId} scope={scope} />
+      )}
       {tab === "state" && <StateTab providerId={providerId} sessionId={sessionId} />}
       {tab === "dual" && <DualTab providerId={providerId} sessionId={sessionId} scope={scope} />}
-      {tab === "agents" && <AgentsTab providerName={chrome.displayName} scope={scope} providerId={providerId} sessionId={sessionId} />}
+      {tab === "agents" && (
+        <AgentsTab
+          providerName={chrome.displayName}
+          scope={scope}
+          providerId={providerId}
+          sessionId={sessionId}
+        />
+      )}
     </div>
   );
 }
 
 function labelFor(t: DetailTab): string {
   switch (t) {
-    case "wireEvents": return "Wire Events";
-    case "contextMessages": return "Context Messages";
-    case "state": return "State";
-    case "dual": return "Dual";
-    case "agents": return "Agents";
+    case "wireEvents":
+      return "Wire Events";
+    case "contextMessages":
+      return "Context Messages";
+    case "state":
+      return "State";
+    case "dual":
+      return "Dual";
+    case "agents":
+      return "Agents";
   }
 }

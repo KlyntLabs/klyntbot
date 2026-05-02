@@ -26,9 +26,9 @@ vi.mock("@/api/endpoints/dashboard", async () => {
         isIdle: false,
       },
     ]),
-    productivityCategoriesQuery: vi.fn().mockResolvedValue([
-      { id: "coding", categoryType: "productive", name: "Coding" },
-    ]),
+    productivityCategoriesQuery: vi
+      .fn()
+      .mockResolvedValue([{ id: "coding", categoryType: "productive", name: "Coding" }]),
     productivityIntelligenceSessionsQuery: vi.fn().mockResolvedValue([]),
   };
 });

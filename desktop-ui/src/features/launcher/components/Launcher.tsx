@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTransparentBackground } from "@/hooks/window/useTransparentBackground";
 import { useWindowAutoResize } from "@/hooks/window/useWindowAutoResize";
 import { emit, getCurrentWindow, ipc, isTauri, listen } from "@/utils/tauri-bridge";
-import { showError } from "../lib/showError";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { useDndActive } from "../hooks/useDndActive";
 import { executeItem } from "../hooks/useExecuteItem";
 import { useKeyboardNavigation } from "../hooks/useKeyboardNavigation";
 import { useLauncherSearch } from "../hooks/useLauncherSearch";
+import { showError } from "../lib/showError";
 import { LauncherStoreProvider, useLauncherApi, useLauncherState } from "../store";
 import { ActionMenu } from "./ActionMenu";
 import { ArgChipBar } from "./ArgChipBar";
@@ -202,11 +202,14 @@ function LauncherShell() {
                 {mode === "dashboard" && (
                   <>
                     <ShortcutHints />
-                    <Dashboard onOpenTask={(taskId: string) => {
-                      ipc("launcher_open_app", { path: `klyntbot://task/${taskId}` })
-                        .catch((err) => showError("Couldn't open task:", err));
-                      getCurrentWindow().hide();
-                    }} />
+                    <Dashboard
+                      onOpenTask={(taskId: string) => {
+                        ipc("launcher_open_app", { path: `klyntbot://task/${taskId}` }).catch(
+                          (err) => showError("Couldn't open task:", err),
+                        );
+                        getCurrentWindow().hide();
+                      }}
+                    />
                     <ResultsList onExecute={handleExecute} />
                   </>
                 )}

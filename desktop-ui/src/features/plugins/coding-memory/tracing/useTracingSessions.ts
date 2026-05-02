@@ -23,7 +23,9 @@ export function useTracingSessions(providerId: string, refreshKey: number = 0): 
         if (cancelled) return;
         setState({ sessions: [], loading: false, error: String(err?.message ?? err) });
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [providerId, refreshKey]);
 
   return state;

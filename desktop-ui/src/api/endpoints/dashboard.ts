@@ -144,7 +144,8 @@ export async function productivityIntelligenceSessionsQuery(
   tzOffsetMins: number | null,
 ): Promise<IntelligenceSessionResponse[]> {
   const r = await commands.productivityIntelligenceSessions(date, tzOffsetMins);
-  if (r.status !== "ok") throw new Error(r.error.message ?? "productivity intelligence sessions failed");
+  if (r.status !== "ok")
+    throw new Error(r.error.message ?? "productivity intelligence sessions failed");
   return r.data;
 }
 
@@ -171,7 +172,11 @@ export interface GoalCreateParams {
 export async function productivityGoalCreate(
   params: GoalCreateParams,
 ): Promise<GoalProgressResponse> {
-  const r = await commands.productivityGoalCreate(params.goalType, params.metric, params.targetValue);
+  const r = await commands.productivityGoalCreate(
+    params.goalType,
+    params.metric,
+    params.targetValue,
+  );
   if (r.status !== "ok") throw new Error(r.error.message ?? "productivity goal create failed");
   return r.data;
 }
@@ -186,6 +191,7 @@ export async function productivityAutoFocusConfirm(
   payload: AutoFocusPayload,
 ): Promise<FocusSessionResponse> {
   const r = await commands.productivityAutoFocusConfirm(payload);
-  if (r.status !== "ok") throw new Error(r.error.message ?? "productivity auto-focus confirm failed");
+  if (r.status !== "ok")
+    throw new Error(r.error.message ?? "productivity auto-focus confirm failed");
   return r.data;
 }

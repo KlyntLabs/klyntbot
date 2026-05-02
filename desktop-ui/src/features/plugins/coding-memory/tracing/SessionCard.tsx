@@ -21,10 +21,14 @@ export function SessionCard({ summary, onClick, selected }: Props) {
         <span className="tracing-card__id">{summary.sessionId.slice(0, 8)}</span>
         <span className="tracing-card__time">{relativeTime(summary.lastEventAt)}</span>
       </div>
-      <div className="tracing-card__title" title={title}>{title}</div>
+      <div className="tracing-card__title" title={title}>
+        {title}
+      </div>
       <div className="tracing-card__row">
         {summary.hasWire && <span className="tracing-badge tracing-badge--wire">wire</span>}
-        {summary.hasContext && <span className="tracing-badge tracing-badge--context">context</span>}
+        {summary.hasContext && (
+          <span className="tracing-badge tracing-badge--context">context</span>
+        )}
         <span className="tracing-card__size">{sizeKB} KB</span>
       </div>
       <div className="tracing-card__counts">

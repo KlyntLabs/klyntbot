@@ -1,11 +1,11 @@
 import { listen } from "@tauri-apps/api/event";
+import type { AutoFocusPayload, FocusStatePayload } from "@/bindings";
 import type {
   AppServerEvent,
   DictationEvent,
   DictationModelStatus,
   TrayOpenThreadPayload,
 } from "../types";
-import type { AutoFocusPayload, FocusStatePayload } from "@/bindings";
 
 export type Unsubscribe = () => void;
 

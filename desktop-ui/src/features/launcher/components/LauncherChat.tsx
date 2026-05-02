@@ -9,13 +9,7 @@ interface Props {
 }
 
 export function LauncherChat({ initialQuery, sessionKey, onBack, onExpandToMain }: Props) {
-  const {
-    messages,
-    isStreaming,
-    input,
-    setInput,
-    send,
-  } = useChatSession(sessionKey);
+  const { messages, isStreaming, input, setInput, send } = useChatSession(sessionKey);
   const sentInitialRef = useRef(false);
 
   useEffect(() => {
@@ -40,9 +34,17 @@ export function LauncherChat({ initialQuery, sessionKey, onBack, onExpandToMain 
   return (
     <div className="lc-chat">
       <header className="lc-chat-header">
-        <button className="lc-icon-btn" onClick={onBack} aria-label="Back">←</button>
+        <button className="lc-icon-btn" onClick={onBack} aria-label="Back">
+          ←
+        </button>
         <span className="lc-chat-title">Ask</span>
-        <button className="lc-icon-btn" onClick={() => onExpandToMain(sessionKey)} aria-label="Expand">↗</button>
+        <button
+          className="lc-icon-btn"
+          onClick={() => onExpandToMain(sessionKey)}
+          aria-label="Expand"
+        >
+          ↗
+        </button>
       </header>
       <div className="lc-chat-thread" role="log" aria-live="polite">
         {messages.map((m) => (
@@ -52,10 +54,15 @@ export function LauncherChat({ initialQuery, sessionKey, onBack, onExpandToMain 
         ))}
         {isStreaming && <div className="lc-chat-streaming">…</div>}
       </div>
-      <form className="lc-chat-composer" onSubmit={(e) => {
-        e.preventDefault();
-        if (input.trim()) { void send(); }
-      }}>
+      <form
+        className="lc-chat-composer"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (input.trim()) {
+            void send();
+          }
+        }}
+      >
         <input
           className="lc-chat-input"
           value={input}

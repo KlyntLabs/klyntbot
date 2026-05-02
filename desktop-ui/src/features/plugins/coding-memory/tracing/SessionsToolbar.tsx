@@ -40,19 +40,27 @@ export function SessionsToolbar(p: Props) {
         type="button"
         className={"tracing-toolbar__btn" + (p.importedOnly ? " tracing-toolbar__btn--on" : "")}
         onClick={p.onImportedToggle}
-      >Imported</button>
+      >
+        Imported
+      </button>
       <button
         type="button"
         className={"tracing-toolbar__btn" + (p.group ? " tracing-toolbar__btn--on" : "")}
         onClick={p.onGroupToggle}
-      >Group</button>
+      >
+        Group
+      </button>
       <button
         type="button"
         className="tracing-toolbar__btn"
         onClick={p.onLayoutToggle}
         title={p.layout === "grid" ? "Switch to list" : "Switch to grid"}
-      >{p.layout === "grid" ? "List" : "Grid"}</button>
-      <button type="button" className="tracing-toolbar__btn" onClick={p.onImport}>Import</button>
+      >
+        {p.layout === "grid" ? "List" : "Grid"}
+      </button>
+      <button type="button" className="tracing-toolbar__btn" onClick={p.onImport}>
+        Import
+      </button>
       <span className="tracing-toolbar__count">{p.sessionCount} sessions</span>
     </div>
   );

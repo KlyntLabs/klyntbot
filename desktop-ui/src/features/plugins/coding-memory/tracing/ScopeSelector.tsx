@@ -15,7 +15,9 @@ export function ScopeSelector({ scope, onScopeChange, subagents }: Props) {
         type="button"
         className={"tracing-scope__chip" + (isMain ? " tracing-scope__chip--active" : "")}
         onClick={() => onScopeChange({ kind: "main" })}
-      >Main Agent</button>
+      >
+        Main Agent
+      </button>
       {subagents.map((s) => {
         const active = scope.kind === "subagent" && scope.agentId === s.agentId;
         const color = stableColor(s.agentId);
@@ -27,7 +29,9 @@ export function ScopeSelector({ scope, onScopeChange, subagents }: Props) {
             style={{ borderLeft: `3px solid ${color}` }}
             onClick={() => onScopeChange({ kind: "subagent", agentId: s.agentId })}
             title={s.description ?? s.agentId}
-          >{s.description ?? s.agentId}</button>
+          >
+            {s.description ?? s.agentId}
+          </button>
         );
       })}
     </div>

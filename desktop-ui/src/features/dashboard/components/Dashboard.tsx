@@ -7,9 +7,9 @@ import {
   useLayerToggle,
   useSidebarToggle,
 } from "../lib/layers";
+import { DashboardTopbar } from "./DashboardTopbar";
 import { AutoFocusToast } from "./productivity/AutoFocusToast";
 import { FocusStateIndicator } from "./productivity/FocusStateIndicator";
-import { DashboardTopbar } from "./DashboardTopbar";
 import { DayView } from "./views/DayView";
 import { MonthView } from "./views/MonthView";
 import { WeekView } from "./views/WeekView";

@@ -69,10 +69,7 @@ if (typeof window !== "undefined" && !window.__TAURI_INTERNALS__) {
     return undefined;
   };
 
-  const browserInvoke = async <T>(
-    cmd: string,
-    args?: Record<string, unknown>,
-  ): Promise<T> => {
+  const browserInvoke = async <T>(cmd: string, args?: Record<string, unknown>): Promise<T> => {
     if (cmd.startsWith("plugin:")) {
       return handlePluginCommand(cmd, args) as T;
     }
@@ -136,7 +133,9 @@ if (typeof window !== "undefined" && !window.__TAURI_INTERNALS__) {
   type EventPluginInternals = {
     unregisterListener: (event: string, eventId: number) => void;
   };
-  (window as unknown as { __TAURI_EVENT_PLUGIN_INTERNALS__?: EventPluginInternals }).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+  (
+    window as unknown as { __TAURI_EVENT_PLUGIN_INTERNALS__?: EventPluginInternals }
+  ).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
     unregisterListener: (_event, eventId) => {
       const entry = eventListeners.get(eventId);
       if (entry) {

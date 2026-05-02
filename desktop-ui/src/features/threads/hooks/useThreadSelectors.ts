@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
-import type { ConversationItem } from "@/types";
 import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
+import type { ConversationItem } from "@/types";
 import { getActiveItemsForThread, getActiveThreadIdForWorkspace } from "./threadSelectorsHelpers";
 import type { ThreadState } from "./useThreadsReducer";
 

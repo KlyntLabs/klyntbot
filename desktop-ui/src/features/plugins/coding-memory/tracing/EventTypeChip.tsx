@@ -30,6 +30,8 @@ export function EventTypeChip({ rawKind, active, onClick }: Props) {
       className={"tracing-chip" + (active ? " tracing-chip--active" : "")}
       style={{ borderColor: color, color }}
       onClick={onClick}
-    >{rawKind}</button>
+    >
+      {rawKind}
+    </button>
   );
 }

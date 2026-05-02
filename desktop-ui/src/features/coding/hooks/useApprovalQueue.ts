@@ -83,7 +83,7 @@ export function useApprovalQueue(sessionKey: string) {
         } else {
           unlistens.push(un);
         }
-      } catch { }
+      } catch {}
 
       try {
         const un = await listen<ResolvedPayload>("agent:approval_resolved", (e) => {
@@ -99,7 +99,7 @@ export function useApprovalQueue(sessionKey: string) {
         } else {
           unlistens.push(un);
         }
-      } catch { }
+      } catch {}
     })();
 
     return () => {

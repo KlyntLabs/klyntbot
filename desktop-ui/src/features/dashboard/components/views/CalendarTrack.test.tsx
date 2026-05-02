@@ -105,7 +105,9 @@ describe("CalendarTrack", () => {
     await waitFor(() => {
       expect(screen.getByText("Standup")).toBeTruthy();
     });
-    fireEvent.click(screen.getByText("Standup").closest("button")!);
+    const standupButton = screen.getByText("Standup").closest("button");
+    if (!standupButton) throw new Error("Standup button not found");
+    fireEvent.click(standupButton);
     expect(onSelectEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "evt-1" }));
   });
 
@@ -126,7 +128,9 @@ describe("CalendarTrack", () => {
     await waitFor(() => {
       expect(screen.getByText("Standup")).toBeTruthy();
     });
-    fireEvent.click(screen.getByText("Standup").closest("button")!);
+    const standupButton2 = screen.getByText("Standup").closest("button");
+    if (!standupButton2) throw new Error("Standup button not found");
+    fireEvent.click(standupButton2);
     expect(onSelectEvent).toHaveBeenCalledWith(null);
   });
 

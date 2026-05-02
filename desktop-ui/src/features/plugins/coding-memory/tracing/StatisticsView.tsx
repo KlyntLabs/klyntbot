@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@/api/client";
-import type { StatsBundle, ProjectTotals, ToolUsage, ErrorByTool } from "./types";
+import type { ErrorByTool, ProjectTotals, StatsBundle, ToolUsage } from "./types";
 
 interface Props {
   providerId: string;
@@ -14,10 +14,16 @@ export function StatisticsView({ providerId }: Props) {
     let cancelled = false;
     setLoading(true);
     invoke<StatsBundle>("tracing_stats", { providerId })
-      .then((s) => { if (!cancelled) setStats(s); })
+      .then((s) => {
+        if (!cancelled) setStats(s);
+      })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [providerId]);
 
   if (loading) return <div className="tracing-state">Loading statistics…</div>;

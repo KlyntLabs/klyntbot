@@ -11,5 +11,11 @@ const REGISTRY: Record<string, ProviderChrome> = {
 };
 
 export function chromeFor(providerId: string): ProviderChrome {
-  return REGISTRY[providerId] ?? { id: providerId, displayName: providerId, accent: "var(--accent-blue)" };
+  return (
+    REGISTRY[providerId] ?? {
+      id: providerId,
+      displayName: providerId,
+      accent: "var(--accent-blue)",
+    }
+  );
 }

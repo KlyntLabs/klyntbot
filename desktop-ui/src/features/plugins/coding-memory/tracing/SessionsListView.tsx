@@ -1,11 +1,11 @@
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useMemo, useState } from "react";
 import { invoke } from "@/api/client";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { ProjectGroup } from "./ProjectGroup";
+import { SessionCard } from "./SessionCard";
+import { SessionsToolbar, type SortKey } from "./SessionsToolbar";
 import type { SessionSummary } from "./types";
 import { useTracingSessions } from "./useTracingSessions";
-import { SessionsToolbar, type SortKey } from "./SessionsToolbar";
-import { SessionCard } from "./SessionCard";
-import { ProjectGroup } from "./ProjectGroup";
 
 interface Props {
   providerId: string;
@@ -38,10 +38,14 @@ export function SessionsListView({ providerId, onOpenSession }: Props) {
     const a = [...filtered];
     a.sort((x, y) => {
       switch (sort) {
-        case "recent": return y.lastEventAt.localeCompare(x.lastEventAt);
-        case "created": return y.startedAt.localeCompare(x.startedAt);
-        case "size": return y.sizeBytes - x.sizeBytes;
-        case "errors": return y.errorCount - x.errorCount;
+        case "recent":
+          return y.lastEventAt.localeCompare(x.lastEventAt);
+        case "created":
+          return y.startedAt.localeCompare(x.startedAt);
+        case "size":
+          return y.sizeBytes - x.sizeBytes;
+        case "errors":
+          return y.errorCount - x.errorCount;
       }
     });
     return a;
@@ -79,11 +83,16 @@ export function SessionsListView({ providerId, onOpenSession }: Props) {
     <div className="tracing-list">
       <SessionsToolbar
         sessionCount={sorted.length}
-        search={search} onSearchChange={setSearch}
-        sort={sort} onSortChange={setSort}
-        importedOnly={importedOnly} onImportedToggle={() => setImportedOnly((v) => !v)}
-        group={group} onGroupToggle={() => setGroup((v) => !v)}
-        layout={layout} onLayoutToggle={() => setLayout((l) => (l === "grid" ? "list" : "grid"))}
+        search={search}
+        onSearchChange={setSearch}
+        sort={sort}
+        onSortChange={setSort}
+        importedOnly={importedOnly}
+        onImportedToggle={() => setImportedOnly((v) => !v)}
+        group={group}
+        onGroupToggle={() => setGroup((v) => !v)}
+        layout={layout}
+        onLayoutToggle={() => setLayout((l) => (l === "grid" ? "list" : "grid"))}
         onImport={handleImport}
       />
       <div className="tracing-list__body">
@@ -96,20 +105,29 @@ export function SessionsListView({ providerId, onOpenSession }: Props) {
               count={items.length}
             >
               {items.map((s) => (
-                <SessionCard key={s.sessionId} summary={s} onClick={() => onOpenSession(s.sessionId)} />
+                <SessionCard
+                  key={s.sessionId}
+                  summary={s}
+                  onClick={() => onOpenSession(s.sessionId)}
+                />
               ))}
             </ProjectGroup>
           ))
         ) : (
           <div className="tracing-list__flat">
             {sorted.map((s) => (
-              <SessionCard key={s.sessionId} summary={s} onClick={() => onOpenSession(s.sessionId)} />
+              <SessionCard
+                key={s.sessionId}
+                summary={s}
+                onClick={() => onOpenSession(s.sessionId)}
+              />
             ))}
           </div>
         )}
       </div>
       <div className="tracing-list__footer">
-        {sorted.length} sessions · {projectCount} projects · {(totalSize / (1024 * 1024)).toFixed(1)} MB total
+        {sorted.length} sessions · {projectCount} projects ·{" "}
+        {(totalSize / (1024 * 1024)).toFixed(1)} MB total
       </div>
     </div>
   );

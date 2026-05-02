@@ -1,6 +1,8 @@
 import type { TraceEvent } from "../types";
 
-interface Props { event: TraceEvent; }
+interface Props {
+  event: TraceEvent;
+}
 
 export function StatusUpdateCard({ event }: Props) {
   const p = event.payload as any;
@@ -13,7 +15,8 @@ export function StatusUpdateCard({ event }: Props) {
   const cachePct = inTok > 0 ? ((cacheRead / inTok) * 100).toFixed(0) : "0";
   return (
     <div className="tracing-evcard tracing-evcard--status">
-      ctx: {ctxPct}% · {(ctxTok / 1000).toFixed(1)}k / {(maxCtx / 1000).toFixed(0)}k tokens · in: {(inTok / 1000).toFixed(1)}k ({cachePct}% cache) · out: {(u.output ?? 0) / 1000}k
+      ctx: {ctxPct}% · {(ctxTok / 1000).toFixed(1)}k / {(maxCtx / 1000).toFixed(0)}k tokens · in:{" "}
+      {(inTok / 1000).toFixed(1)}k ({cachePct}% cache) · out: {(u.output ?? 0) / 1000}k
     </div>
   );
 }

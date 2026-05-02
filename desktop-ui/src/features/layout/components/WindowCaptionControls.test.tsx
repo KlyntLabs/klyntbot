@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
+
+import { isTauri } from "@tauri-apps/api/core";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { isTauri } from "@tauri-apps/api/core";
 
 const isTauriMock = vi.mocked(isTauri);
 const getCurrentWindowMock = vi.hoisted(() => vi.fn());

@@ -1,27 +1,20 @@
 import { useMemo, useState } from "react";
+import {
+  productivityCategoriesQuery,
+  productivityIntelligenceSessionsQuery,
+  productivityTimelineQuery,
+} from "@/api/endpoints/dashboard";
 import type {
   ActivityCategoryResponse,
   ActivityTimelineResponse,
   IntelligenceSessionResponse,
   TimelineEntry,
 } from "@/bindings";
-import {
-  productivityCategoriesQuery,
-  productivityIntelligenceSessionsQuery,
-  productivityTimelineQuery,
-} from "@/api/endpoints/dashboard";
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import { formatHumanDuration, minutesSinceMidnight, TZ_OFFSET_MINS } from "@/utils/dashboardDates";
-import {
-  type MergeableEvent,
-  mergeActivitySessions,
-} from "../../lib/activity-sessions";
-import {
-  purityToOpacity,
-  qualityToColor,
-  resolveActivityColor,
-} from "../../lib/productivity";
+import { type MergeableEvent, mergeActivitySessions } from "../../lib/activity-sessions";
+import { purityToOpacity, qualityToColor, resolveActivityColor } from "../../lib/productivity";
 
 export interface SessionBlock {
   startMin: number;

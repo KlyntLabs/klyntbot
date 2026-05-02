@@ -13,17 +13,13 @@ import type {
 } from "@/bindings";
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
-import {
-  formatHumanDuration,
-  todayISO,
-  TZ_OFFSET_MINS,
-} from "@/utils/dashboardDates";
+import { formatHumanDuration, TZ_OFFSET_MINS, todayISO } from "@/utils/dashboardDates";
 import { resolveActivityColor, resolveCategoryLabel } from "../lib/productivity";
-import type { SessionBlock } from "./views/ActivityTrack";
 import { GoalsProgress } from "./productivity/GoalsProgress";
 import { HourlyHeatmap } from "./productivity/HourlyHeatmap";
 import { PatternsCard } from "./productivity/PatternsCard";
 import { ProductivityScoreRing, ScoreBar } from "./productivity/ProductivityScoreRing";
+import type { SessionBlock } from "./views/ActivityTrack";
 
 interface SummaryPanelProps {
   summary: TimelineSummary | null;
@@ -497,4 +493,4 @@ function TrendArrow({ value, label }: { value?: number | null; label?: string })
 
 // Re-export for use by views that fetch productivity-summary data and pass it down.
 export type { SessionBlock };
-export { productivityTodayQuery, productivitySummaryRangeQuery };
+export { productivitySummaryRangeQuery, productivityTodayQuery };

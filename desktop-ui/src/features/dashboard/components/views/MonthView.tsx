@@ -6,8 +6,8 @@ import { qk } from "@/lib/query/queryKeys";
 import { formatHumanDuration, TZ_OFFSET_MINS, todayISO, toLocalISO } from "@/utils/dashboardDates";
 import { useDashboardState } from "../../hooks/useDashboardState";
 import { useEnabledLayers, useSidebarOpen } from "../../lib/layers";
-import { SummaryPanel } from "../SummaryPanel";
 import { computeDayStats, DAY_LABELS } from "../../lib/timeline-utils";
+import { SummaryPanel } from "../SummaryPanel";
 
 function getMonthRange(dateStr: string): {
   start: string;
@@ -160,114 +160,114 @@ export function MonthView() {
         <div className="dashboard__month-grid-inner">
           {isLoading && <div className="dashboard__month-loading">Loading...</div>}
 
-        {/* Day-of-week header */}
-        <div className="dashboard__month-dow-header">
-          {DAY_LABELS.map((label) => (
-            <div key={label} className="dashboard__month-dow-label">
-              {label}
-            </div>
-          ))}
-        </div>
+          {/* Day-of-week header */}
+          <div className="dashboard__month-dow-header">
+            {DAY_LABELS.map((label) => (
+              <div key={label} className="dashboard__month-dow-label">
+                {label}
+              </div>
+            ))}
+          </div>
 
-        {/* Calendar grid */}
-        {/* biome-ignore lint/a11y/useSemanticElements: CSS grid layout requires div, not table */}
-        <div
-          style={{
-            flex: 1,
-            display: "grid",
-            gridTemplateRows: "repeat(6, 1fr)",
-            gap: 1,
-            outline: "none",
-          }}
-          role="grid"
-          aria-label="Month calendar"
-          tabIndex={0}
-          onKeyDown={handleGridKeyDown}
-        >
-          {weeks.map((week) => (
-            <div key={week[0].date} className="dashboard__month-week">
-              {week.map((cell) => {
-                const stats = dayStats.get(cell.date) || { activeSecs: 0, focusSecs: 0 };
-                const aRatio = activeRatio(stats.activeSecs, maxActiveSecs);
+          {/* Calendar grid */}
+          {/* biome-ignore lint/a11y/useSemanticElements: CSS grid layout requires div, not table */}
+          <div
+            style={{
+              flex: 1,
+              display: "grid",
+              gridTemplateRows: "repeat(6, 1fr)",
+              gap: 1,
+              outline: "none",
+            }}
+            role="grid"
+            aria-label="Month calendar"
+            tabIndex={0}
+            onKeyDown={handleGridKeyDown}
+          >
+            {weeks.map((week) => (
+              <div key={week[0].date} className="dashboard__month-week">
+                {week.map((cell) => {
+                  const stats = dayStats.get(cell.date) || { activeSecs: 0, focusSecs: 0 };
+                  const aRatio = activeRatio(stats.activeSecs, maxActiveSecs);
 
-                const isToday = cell.date === today;
-                const isFocused = cell.date === focusedDate && cell.date !== today;
+                  const isToday = cell.date === today;
+                  const isFocused = cell.date === focusedDate && cell.date !== today;
 
-                const dayClasses = [
-                  "dashboard__month-day",
-                  isToday && "dashboard__month-day--today",
-                  isFocused && "dashboard__month-day--focused",
-                  !cell.isCurrentMonth && "dashboard__month-day--other",
-                ]
-                  .filter(Boolean)
-                  .join(" ");
+                  const dayClasses = [
+                    "dashboard__month-day",
+                    isToday && "dashboard__month-day--today",
+                    isFocused && "dashboard__month-day--focused",
+                    !cell.isCurrentMonth && "dashboard__month-day--other",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
 
-                return (
-                  <button
-                    type="button"
-                    key={cell.date}
-                    className={dayClasses}
-                    onClick={() => {
-                      setDate(cell.date);
-                      setMode("day");
-                    }}
-                    style={{
-                      backgroundColor: focusIntensityBg(stats.focusSecs, maxFocusSecs),
-                    }}
-                  >
-                    {/* Date + focus time */}
-                    <div className="dashboard__month-day-header">
-                      <span
-                        className={[
-                          "dashboard__month-day-number",
-                          isToday && "dashboard__month-day-number--today",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                      >
-                        {cell.day}
-                      </span>
-                      {stats.focusSecs > 0 && (
-                        <span className="dashboard__month-day-focus">
-                          {formatHumanDuration(stats.focusSecs)}
+                  return (
+                    <button
+                      type="button"
+                      key={cell.date}
+                      className={dayClasses}
+                      onClick={() => {
+                        setDate(cell.date);
+                        setMode("day");
+                      }}
+                      style={{
+                        backgroundColor: focusIntensityBg(stats.focusSecs, maxFocusSecs),
+                      }}
+                    >
+                      {/* Date + focus time */}
+                      <div className="dashboard__month-day-header">
+                        <span
+                          className={[
+                            "dashboard__month-day-number",
+                            isToday && "dashboard__month-day-number--today",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {cell.day}
                         </span>
-                      )}
-                    </div>
-
-                    {/* Activity bar — proportional to active time */}
-                    {stats.activeSecs > 0 && (
-                      <div
-                        style={{
-                          width: "100%",
-                          marginTop: "auto",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 2,
-                        }}
-                      >
-                        <div className="dashboard__month-activity-track">
-                          <div
-                            className="dashboard__month-activity-fill"
-                            style={{
-                              width: `${Math.max(aRatio * 100, 8)}%`,
-                              opacity: 0.7 + aRatio * 0.3,
-                            }}
-                          />
-                        </div>
-                        <span className="dashboard__month-activity-label">
-                          {formatHumanDuration(stats.activeSecs)}
-                        </span>
+                        {stats.focusSecs > 0 && (
+                          <span className="dashboard__month-day-focus">
+                            {formatHumanDuration(stats.focusSecs)}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+
+                      {/* Activity bar — proportional to active time */}
+                      {stats.activeSecs > 0 && (
+                        <div
+                          style={{
+                            width: "100%",
+                            marginTop: "auto",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
+                          }}
+                        >
+                          <div className="dashboard__month-activity-track">
+                            <div
+                              className="dashboard__month-activity-fill"
+                              style={{
+                                width: `${Math.max(aRatio * 100, 8)}%`,
+                                opacity: 0.7 + aRatio * 0.3,
+                              }}
+                            />
+                          </div>
+                          <span className="dashboard__month-activity-label">
+                            {formatHumanDuration(stats.activeSecs)}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
-    {sidebarOpen && (
+      {sidebarOpen && (
         <SummaryPanel summary={data.summary} selectedEntry={null} onClose={() => {}} />
       )}
     </div>

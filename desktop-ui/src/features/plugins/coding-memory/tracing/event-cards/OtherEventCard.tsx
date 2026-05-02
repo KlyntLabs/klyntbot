@@ -1,8 +1,10 @@
 import { useState } from "react";
-import type { TraceEvent } from "../types";
 import { EventTypeChip } from "../EventTypeChip";
+import type { TraceEvent } from "../types";
 
-interface Props { event: TraceEvent; }
+interface Props {
+  event: TraceEvent;
+}
 
 export function OtherEventCard({ event }: Props) {
   const [open, setOpen] = useState(false);
@@ -14,7 +16,9 @@ export function OtherEventCard({ event }: Props) {
           {open ? "▾" : "▸"} {event.rawKind}
         </button>
       </div>
-      {open && <pre className="tracing-detail-pane__pre">{JSON.stringify(event.payload, null, 2)}</pre>}
+      {open && (
+        <pre className="tracing-detail-pane__pre">{JSON.stringify(event.payload, null, 2)}</pre>
+      )}
     </div>
   );
 }

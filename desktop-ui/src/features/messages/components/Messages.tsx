@@ -52,7 +52,10 @@ type MessagesProps = {
   onPlanSubmitChanges?: (changes: string) => void;
   onOpenThreadLink?: (threadId: string, workspaceId?: string | null) => void;
   onQuoteMessage?: (text: string) => void;
-  onApprovalRespond?: (requestId: string, decision: import("@/features/coding/hooks/useApprovalQueue").ApprovalDecision) => void;
+  onApprovalRespond?: (
+    requestId: string,
+    decision: import("@/features/coding/hooks/useApprovalQueue").ApprovalDecision,
+  ) => void;
 };
 
 export const Messages = memo(function Messages({
