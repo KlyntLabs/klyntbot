@@ -72,7 +72,7 @@ fn weight_for_edge_type(t: &EdgeType) -> f64 {
 
 /// Extract potential entity names from a query string.
 /// Capitalized words that aren't sentence starters.
-fn extract_query_entities(query: &str) -> Vec<String> {
+pub(crate) fn extract_query_entities(query: &str) -> Vec<String> {
     let words: Vec<&str> = query.split_whitespace().collect();
     let mut entities = Vec::new();
 

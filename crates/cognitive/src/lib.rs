@@ -1,6 +1,7 @@
 //! Cognitive memory system — unified memory with FSRS decay, bi-temporal facts,
 //! and Mem0-style consolidation.
 
+pub mod bench_hooks;
 pub mod consumers;
 pub mod embedder;
 pub mod mirror;

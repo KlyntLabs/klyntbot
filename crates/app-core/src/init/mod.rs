@@ -628,17 +628,26 @@ impl AppCore {
             let episodic_repo = ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
             let extraction_handler: Option<Arc<dyn ::cognitive::ExtractionHandler>> =
                 cognitive_provider.as_ref().map(|cp| {
-                    let params = providers::cognitive_chat_params(&config, 1024);
+                    // 4096 not 1024: LoCoMo-style 18-turn sessions
+                    // produce extraction JSON ~3000-3500 chars; 1024
+                    // tokens truncates mid-string and silently falls
+                    // back to regex. Symptom: "JSON parse failed: EOF
+                    // while parsing a string at line 1 column ~3400".
+                    let params = providers::cognitive_chat_params(&config, 4096);
                     Arc::new(LlmExtractionHandler::new(cp.clone(), params))
                         as Arc<dyn ::cognitive::ExtractionHandler>
                 });
-            let ingestion: Arc<dyn ai_core::SignalConsumer> =
-                Arc::new(::cognitive::consumers::IngestionConsumer::new(
+            let ingestion: Arc<dyn ai_core::SignalConsumer> = Arc::new(
+                ::cognitive::consumers::IngestionConsumer::new(
                     observation_repo,
                     entity_repo,
                     episodic_repo,
                     extraction_handler,
-                ));
+                )
+                .with_fact_repo(::cognitive::SemanticFactRepo::new(
+                    storage_pool.inner().clone(),
+                )),
+            );
 
             // 5 cognitive collectors — each SignalConsumer pushes CognitiveSignals
             // to the existing consolidator tx (signal_queue).

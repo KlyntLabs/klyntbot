@@ -20,18 +20,31 @@ const CACHE_TTL_SECS: u64 = 60;
 /// Returns a freshness label for a semantic fact based on convergence score,
 /// confidence, and recency of last access.
 fn freshness_label(fact: &crate::types::SemanticFact) -> &'static str {
-    let days_old = fact
+    // A just-recorded fact has `last_accessed = None` because nothing has
+    // queried it yet. Treat that as fresh by falling back to `recorded_at`
+    // — otherwise every newly extracted fact would be labeled `"weak"` and
+    // the LLM would refuse to use it. (Use `recorded_at` rather than
+    // `last_accessed.unwrap_or(recorded_at)` so we cover both the new-fact
+    // case and the never-accessed-but-old case symmetrically.)
+    let reference_ts = fact
         .last_accessed
-        .as_ref()
+        .as_deref()
+        .or(Some(fact.recorded_at.as_str()));
+    let days_old = reference_ts
         .and_then(|ts| ts.parse::<jiff::Timestamp>().ok())
         .map(|ts| (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()) / 86_400_000)
         .unwrap_or(90);
     if fact.convergence_score >= 0.4 || (fact.confidence >= 0.8 && days_old <= 7) {
-        "strong"
+        "trusted"
     } else if fact.confidence >= 0.5 && days_old <= 30 {
-        "moderate"
+        "noted"
     } else {
-        "weak -- verify"
+        // Was "weak -- verify" — but the LLM, seeing "verify" in the
+        // label, would reflexively hedge ("you may want to verify this")
+        // even when the fact was right in front of it. Use a neutral
+        // descriptor; the LLM can still reason about confidence from
+        // explicit numeric scores when needed.
+        "low-confidence"
     }
 }
 
@@ -250,7 +263,21 @@ impl ContextSource for CognitiveContextSource {
             sections.push(format!(
                 "## Confidence Calibration\n\
                  Current confidence threshold: {threshold:.2}. \
-                 When uncertain about user intent, ask for clarification rather than guessing."
+                 When uncertain about user intent, ask for clarification rather than guessing.\n\n\
+                 **Answer style for memory-grounded facts:** State retrieved facts \
+                 directly. Do NOT prefix answers with disclaimers like \"weak confidence\", \
+                 \"verify\", \"weakly-confirmed\", \"you may want to confirm\", or \
+                 \"this is marked as low-confidence\" — fact metadata is for your own \
+                 reasoning, not user-facing prose. If a fact's `[trusted]` tag is \
+                 present, treat it as authoritative; if it's `[low-confidence]`, \
+                 you may add a brief \"recently mentioned\" qualifier but never tell \
+                 the user to verify.\n\n\
+                 **CRITICAL — never claim ignorance about facts shown above.** \
+                 If a fact like `Alice lives_in SF` appears under \"User Understanding\", \
+                 you MUST use it to answer questions about Alice. Saying \"I don't have \
+                 information about where Alice lives\" while that fact is in your context \
+                 is a serious hallucination. Trust the User Understanding section as \
+                 ground truth — it is your memory."
             ));
         }
 

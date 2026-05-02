@@ -136,9 +136,11 @@ pub async fn retrieve_relevant_facts(
             .await
         {
             Ok(hits) if hits.len() >= MIN_VECTOR_RESULTS => {
+                crate::bench_hooks::record_hits(hits.len() as u32, 0, 0);
                 vector_path(repo, &hits, params.situational_boost, &weights, depth_cache).await?
             }
             Ok(hits) => {
+                crate::bench_hooks::record_hits(hits.len() as u32, 0, 0);
                 // Too few vector results — merge with fallback
                 let mut vector_scored =
                     vector_path(repo, &hits, params.situational_boost, &weights, depth_cache)
@@ -191,19 +193,55 @@ pub async fn retrieve_relevant_facts(
         } else {
             None
         };
-        if let Ok(bm25_hits) = repo.search_fts(query, bm25_domain, params.limit * 2).await {
-            let bm25_ids: std::collections::HashMap<String, usize> = bm25_hits
-                .iter()
-                .enumerate()
-                .map(|(rank, f)| (f.id.clone(), rank))
-                .collect();
 
-            for result in &mut scored {
-                if let Some(&rank) = bm25_ids.get(&result.fact.id) {
-                    // BM25 boost: add RRF-style score contribution
-                    let bm25_boost = 1.0 / (DEFAULT_RRF_K + rank as f64 + 1.0);
-                    result.score += bm25_boost;
+        // Phase 2 (KCA_PHASE_2=1): build a per-entity FTS term list so proper
+        // nouns aren't drowned out by question filler words under BM25.
+        // Falls back to the raw query when no entities are detected.
+        let phase_2_on = matches!(
+            std::env::var("KCA_PHASE_2").ok().as_deref(),
+            Some("1") | Some("true") | Some("yes")
+        );
+        let fts_terms: Vec<String> = if phase_2_on {
+            let entities = crate::services::graph_retrieval::extract_query_entities(query);
+            crate::bench_hooks::record_entities(&entities);
+            if entities.is_empty() {
+                vec![query.to_string()]
+            } else {
+                let mut terms: Vec<String> = entities
+                    .iter()
+                    .map(|e| format!("\"{}\"", e.replace('"', "")))
+                    .collect();
+                terms.push(query.to_string());
+                terms
+            }
+        } else {
+            vec![query.to_string()]
+        };
+
+        let mut merged_ranks: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        let mut total_hits = 0usize;
+        for term in &fts_terms {
+            if let Ok(bm25_hits) = repo.search_fts(term, bm25_domain, params.limit * 2).await {
+                total_hits += bm25_hits.len();
+                for (rank, f) in bm25_hits.iter().enumerate() {
+                    merged_ranks
+                        .entry(f.id.clone())
+                        .and_modify(|r| {
+                            if rank < *r {
+                                *r = rank;
+                            }
+                        })
+                        .or_insert(rank);
                 }
+            }
+        }
+        crate::bench_hooks::record_hits(0, total_hits as u32, 0);
+
+        for result in &mut scored {
+            if let Some(&rank) = merged_ranks.get(&result.fact.id) {
+                let bm25_boost = 1.0 / (DEFAULT_RRF_K + rank as f64 + 1.0);
+                result.score += bm25_boost;
             }
         }
     }
