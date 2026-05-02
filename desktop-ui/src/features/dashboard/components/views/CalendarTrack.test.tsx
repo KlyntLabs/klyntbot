@@ -148,4 +148,56 @@ describe("CalendarTrack", () => {
       expect(btn?.className).toContain("dashboard__calendar-event--selected");
     });
   });
+
+  it("renders two overlapping events side-by-side via computeOverlapLayout", async () => {
+    mockedCalendarEvents.mockResolvedValue([
+      makeEvent({
+        id: "e1",
+        title: "Meeting A",
+        startedAt: "2026-05-02T10:00:00",
+        endedAt: "2026-05-02T11:00:00",
+        color: "#4285F4",
+      }),
+      makeEvent({
+        id: "e2",
+        title: "Meeting B",
+        startedAt: "2026-05-02T10:30:00",
+        endedAt: "2026-05-02T11:30:00",
+        color: "#FF0000",
+      }),
+    ]);
+    render(
+      wrap(
+        <CalendarTrack
+          date="2026-05-02"
+          hourHeight={60}
+          selectedEventId={null}
+          onSelectEvent={() => {}}
+        />,
+      ),
+    );
+    await waitFor(() => expect(screen.getByText("Meeting A")).toBeTruthy());
+    expect(screen.getByText("Meeting B")).toBeTruthy();
+    // Both blocks present — overlap layout should give them differing left/width inline styles
+    const blocks = screen.getAllByRole("button");
+    const styleA = blocks[0].getAttribute("style") ?? "";
+    const styleB = blocks[1].getAttribute("style") ?? "";
+    // Distinct left percentages indicate overlap layout was applied
+    expect(styleA).not.toEqual(styleB);
+  });
+
+  it("returns null with no children when productivityCalendarEvents returns empty", async () => {
+    mockedCalendarEvents.mockResolvedValue([]);
+    const { container } = render(
+      wrap(
+        <CalendarTrack
+          date="2026-05-02"
+          hourHeight={60}
+          selectedEventId={null}
+          onSelectEvent={() => {}}
+        />,
+      ),
+    );
+    await waitFor(() => expect(container.firstChild).toBeNull());
+  });
 });
