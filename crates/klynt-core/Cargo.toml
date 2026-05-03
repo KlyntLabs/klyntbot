@@ -11,6 +11,7 @@ tools-core = { workspace = true }
 tools-core-macros = { workspace = true }
 config = { workspace = true }
 bus = { workspace = true }
+desktop-shared = { workspace = true }
 klynt-protocol = { workspace = true }
 klynt-execpolicy = { workspace = true }
 klynt-hooks = { workspace = true }

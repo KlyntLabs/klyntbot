@@ -102,6 +102,8 @@ impl ToolExecute for BashTool {
             mirror_min_approvals: self.mirror_min_approvals,
             mirror_cooldown_seconds: self.mirror_cooldown_seconds,
             now_unix: jiff::Timestamp::now().as_second(),
+            thread_id: None,
+            turn_id: None,
         };
         let decision = evaluate(guard_ctx, "bash", &args.command).await;
         if !decision.allowed() {

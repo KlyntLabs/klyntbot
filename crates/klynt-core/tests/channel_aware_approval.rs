@@ -60,6 +60,8 @@ fn build_ctx<'a>(
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as i64,
+        thread_id: None,
+        turn_id: None,
     }
 }
 

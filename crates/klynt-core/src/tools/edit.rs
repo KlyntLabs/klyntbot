@@ -171,6 +171,8 @@ pub async fn run_for_test(
         mirror_min_approvals,
         mirror_cooldown_seconds,
         now_unix: jiff::Timestamp::now().as_second(),
+        thread_id: None,
+        turn_id: None,
     };
     let decision = evaluate(guard_ctx, "edit", &path_str).await;
     if !decision.allowed() {
