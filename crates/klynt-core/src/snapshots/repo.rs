@@ -102,9 +102,10 @@ impl SnapshotRepo {
         let maybe_ghost = async {
             let root = klynt_git_utils::get_git_repo_root(parent).await.ok()?;
             let cfg = klynt_git_utils::GhostSnapshotConfig::default();
-            let ghost = klynt_git_utils::create_ghost_commit(&root, &cfg).await.ok()?;
-            let preexisting_json =
-                serde_json::to_string(ghost.preexisting_untracked_files()).ok();
+            let ghost = klynt_git_utils::create_ghost_commit(&root, &cfg)
+                .await
+                .ok()?;
+            let preexisting_json = serde_json::to_string(ghost.preexisting_untracked_files()).ok();
             Some((
                 ghost.id().to_string(),
                 root.to_string_lossy().into_owned(),

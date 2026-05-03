@@ -131,6 +131,7 @@ desktop_macros::klynt_collect_commands![
     crate::commands::coding_skills::coding_skills_validate,
     crate::commands::coding_skills::coding_skills_reload,
     crate::commands::coding_status::coding_status,
+    crate::commands::coding_window::coding_open_repo_window,
     crate::commands::coding_doctor::coding_doctor,
     crate::commands::coding_doctor::coding_test_sandbox,
     crate::commands::coding_sessions::coding_sessions_star,

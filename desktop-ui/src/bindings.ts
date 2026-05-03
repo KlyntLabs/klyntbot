@@ -679,6 +679,21 @@ async codingStatus(sessionKey: string) : Promise<Result<CodingStatus, ApiError>>
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Open a coding window for a specific repo.
+ * 
+ * Creates a `coding:{repo_id}` window if it doesn't exist, or focuses
+ * the existing one. The `repo_id` must be ASCII alphanumeric with
+ * dashes/underscores, 1–64 characters.
+ */
+async codingOpenRepoWindow(repoId: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_open_repo_window", { repoId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async codingDoctor() : Promise<Result<DiagnosticChecklist, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_doctor") };

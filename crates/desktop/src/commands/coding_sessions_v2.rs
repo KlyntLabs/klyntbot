@@ -1,8 +1,8 @@
 use desktop_macros::klynt_command;
 use desktop_shared::errors::ApiError;
 use desktop_shared::{
-    ClearMirrorCacheArgs, RewindResult, SessionExportArgs, SessionExportResult,
-    SessionForkArgs, SessionForkResult, SessionRewindArgs,
+    ClearMirrorCacheArgs, RewindResult, SessionExportArgs, SessionExportResult, SessionForkArgs,
+    SessionForkResult, SessionRewindArgs,
 };
 
 #[klynt_command]
@@ -45,9 +45,7 @@ pub(crate) async fn dispatch_dev(
 ) -> Option<desktop_shared::CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
     // klynt_command sends `{ args: {...} }`; fall back to `body` for direct callers.
-    fn parse_args<T: serde::de::DeserializeOwned>(
-        body: &serde_json::Value,
-    ) -> Result<T, ApiError> {
+    fn parse_args<T: serde::de::DeserializeOwned>(body: &serde_json::Value) -> Result<T, ApiError> {
         let raw = body.get("args").cloned().unwrap_or_else(|| body.clone());
         serde_json::from_value(raw).map_err(|e| ApiError::new("VALIDATION", e.to_string()))
     }

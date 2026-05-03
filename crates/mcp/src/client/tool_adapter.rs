@@ -14,6 +14,7 @@ use common::{KlyntbotError, Result};
 use tools_core::{PermissionLevel, RoutingContext, Tool};
 
 use super::sanitize;
+use crate::allowlist::{AllowDecision, McpChannelAllowlist};
 use crate::client::circuit_breaker::McpCircuitBreaker;
 
 /// Classify whether an MCP error is transient (worth retrying) or permanent.
@@ -49,6 +50,8 @@ pub struct McpTool {
     tool_timeout: Duration,
     /// Circuit breaker shared across all tools on the same server
     circuit_breaker: Arc<McpCircuitBreaker>,
+    /// Per-channel allowlist — gates which servers are available per channel.
+    channel_allowlist: Arc<McpChannelAllowlist>,
 }
 
 impl McpTool {
@@ -58,6 +61,7 @@ impl McpTool {
         peer: Arc<rmcp::service::Peer<rmcp::service::RoleClient>>,
         tool_timeout: Duration,
         circuit_breaker: Arc<McpCircuitBreaker>,
+        channel_allowlist: Arc<McpChannelAllowlist>,
     ) -> Self {
         let original_name = tool_def.name.to_string();
         let namespaced_name = sanitize::build_tool_name(server_name, &original_name);
@@ -78,6 +82,7 @@ impl McpTool {
             peer,
             tool_timeout,
             circuit_breaker,
+            channel_allowlist,
         }
     }
 
@@ -188,7 +193,22 @@ impl Tool for McpTool {
         Some(self.tool_timeout)
     }
 
-    async fn execute(&self, arguments: Value, _ctx: &RoutingContext) -> Result<String> {
+    async fn execute(&self, arguments: Value, ctx: &RoutingContext) -> Result<String> {
+        // Per-channel allowlist check
+        let channel_str = ctx.channel.to_string();
+        if self
+            .channel_allowlist
+            .decide(&channel_str, &self.server_name)
+            == AllowDecision::Denied
+        {
+            return Err(KlyntbotError::Tool(common::ToolError::PermissionDenied(
+                format!(
+                    "MCP server '{}' is not allowed in channel '{}'",
+                    self.server_name, channel_str
+                ),
+            )));
+        }
+
         if self.circuit_breaker.is_open(&self.server_name) {
             return Err(KlyntbotError::Tool(common::ToolError::ExecutionFailed(
                 format!(

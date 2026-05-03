@@ -60,6 +60,7 @@ members = [
     "crates/klynt-process-hardening",
     "crates/klynt-truncation",
     "crates/klynt-git-utils",
+    "crates/lsp-client",
 ]
 
 [workspace.package]

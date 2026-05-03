@@ -562,21 +562,15 @@ impl SessionRepo {
         for row in ghost_rows {
             let sha: String = row.try_get("ghost_commit_sha")?;
             let root: String = row.try_get("ghost_repo_root")?;
-            let preexisting_json: Option<String> = row.try_get("ghost_preexisting_untracked_json")?;
+            let preexisting_json: Option<String> =
+                row.try_get("ghost_preexisting_untracked_json")?;
             let preexisting: Vec<std::path::PathBuf> = preexisting_json
                 .and_then(|j| serde_json::from_str(&j).ok())
                 .unwrap_or_default();
-            let ghost = klynt_git_utils::GhostCommit::new(
-                sha.clone(),
-                None,
-                preexisting,
-                Vec::new(),
-            );
-            if let Err(e) = klynt_git_utils::restore_ghost_commit(
-                std::path::Path::new(&root),
-                &ghost,
-            )
-            .await
+            let ghost =
+                klynt_git_utils::GhostCommit::new(sha.clone(), None, preexisting, Vec::new());
+            if let Err(e) =
+                klynt_git_utils::restore_ghost_commit(std::path::Path::new(&root), &ghost).await
             {
                 tracing::error!(?e, ghost_sha = %sha, "ghost restore failed");
             }

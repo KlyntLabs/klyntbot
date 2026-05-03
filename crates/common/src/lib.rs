@@ -6,6 +6,7 @@
 // ── Modules ─────────────────────────────────────────────────────────────
 
 pub mod autotuner;
+pub mod coverage;
 pub mod date;
 pub mod entity_card;
 pub mod error;

@@ -162,7 +162,9 @@ async fn git_rev_parse_head(root: &Path) -> Result<Option<String>, GitToolingErr
     if !out.status.success() {
         return Ok(None); // No HEAD yet (empty repo).
     }
-    Ok(Some(String::from_utf8_lossy(&out.stdout).trim().to_string()))
+    Ok(Some(
+        String::from_utf8_lossy(&out.stdout).trim().to_string(),
+    ))
 }
 
 async fn list_untracked_files(root: &Path) -> Result<Vec<PathBuf>, GitToolingError> {
@@ -197,7 +199,8 @@ async fn collect_files_to_snapshot(
         .collect();
 
     let mut out = Vec::new();
-    let mut dir_counts: std::collections::HashMap<PathBuf, usize> = std::collections::HashMap::new();
+    let mut dir_counts: std::collections::HashMap<PathBuf, usize> =
+        std::collections::HashMap::new();
     for entry in walkdir::WalkDir::new(root)
         .follow_links(false)
         .into_iter()
@@ -213,9 +216,9 @@ async fn collect_files_to_snapshot(
             continue;
         }
         let parent = entry.path().parent().unwrap_or(root);
-        let count = *dir_counts.entry(parent.to_path_buf()).or_insert_with(|| {
-            std::fs::read_dir(parent).map(|rd| rd.count()).unwrap_or(0)
-        });
+        let count = *dir_counts
+            .entry(parent.to_path_buf())
+            .or_insert_with(|| std::fs::read_dir(parent).map(|rd| rd.count()).unwrap_or(0));
         if count > config.max_dir_entries {
             continue;
         }
@@ -279,9 +282,7 @@ mod tests {
     async fn commit_file(dir: &Path, name: &str, body: &str) -> String {
         std::fs::write(dir.join(name), body).unwrap();
         run_git(dir, &["add", name], None).await.unwrap();
-        run_git(dir, &["commit", "-m", "msg"], None)
-            .await
-            .unwrap();
+        run_git(dir, &["commit", "-m", "msg"], None).await.unwrap();
         String::from_utf8(run_git(dir, &["rev-parse", "HEAD"], None).await.unwrap())
             .unwrap()
             .trim()
@@ -317,7 +318,11 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         init_repo(tmp.path()).await;
         std::fs::create_dir(tmp.path().join("node_modules")).unwrap();
-        std::fs::write(tmp.path().join("node_modules/big.js"), "x".repeat(1_000_000)).unwrap();
+        std::fs::write(
+            tmp.path().join("node_modules/big.js"),
+            "x".repeat(1_000_000),
+        )
+        .unwrap();
         std::fs::write(tmp.path().join("a.txt"), "small").unwrap();
         create_ghost_commit(tmp.path(), &GhostSnapshotConfig::default())
             .await

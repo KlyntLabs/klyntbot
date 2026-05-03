@@ -223,7 +223,10 @@ mod formatted_tests {
     fn prefixes_with_total_lines_when_truncated() {
         let big = "line\n".repeat(2000); // ~10000 bytes
         let out = formatted_truncate_text(&big, TruncationPolicy::Bytes(200));
-        assert!(out.starts_with("Total output lines: 2000\n\n"), "got: {out}");
+        assert!(
+            out.starts_with("Total output lines: 2000\n\n"),
+            "got: {out}"
+        );
     }
 
     #[test]

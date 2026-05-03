@@ -25,7 +25,10 @@ fn images_are_preserved_text_is_truncated() {
             _ => None,
         })
         .sum();
-    assert!(total_text_bytes <= 700, "text truncated: {total_text_bytes}");
+    assert!(
+        total_text_bytes <= 700,
+        "text truncated: {total_text_bytes}"
+    );
 }
 
 #[test]
