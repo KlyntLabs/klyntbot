@@ -66,22 +66,22 @@ export function useDashboardStateImpl(init?: InitArgs): DashboardState {
 }
 
 /**
- * Convert a date string to the canonical form for `next` mode. Idempotent —
- * safe to call repeatedly with the same arguments without corrupting the value.
+ * Convert a date string to the canonical form for `next` mode.
+ *
+ * We keep the date as a full YYYY-MM-DD even in year mode (`YearView` reads
+ * the year via `date.slice(0, 4)`) so that round-tripping Day → Year → Day
+ * preserves the original day. The earlier strip-to-YYYY shape was lossy
+ * and made Year → Day land on Jan 1 of the year — appearing as "blank"
+ * data even though the user had only switched views.
  */
 function convertDateForMode(
   date: string,
-  prev: DashboardViewMode,
-  next: DashboardViewMode,
+  _prev: DashboardViewMode,
+  _next: DashboardViewMode,
 ): string {
-  if (next === "year" && prev !== "year") {
-    // Day/Week/Month → Year: strip to YYYY (only if not already 4-char).
-    return /^\d{4}$/.test(date) ? date : date.slice(0, 4);
-  }
-  if (next !== "year" && prev === "year") {
-    // Year → Day/Week/Month: expand YYYY to YYYY-01-01 (only if currently bare year).
-    return /^\d{4}$/.test(date) ? `${date}-01-01` : date;
-  }
+  // If the date is currently a bare YYYY (e.g. from an older persisted
+  // session), expand it to Jan 1 so day/week/month parsing works.
+  if (/^\d{4}$/.test(date)) return `${date}-01-01`;
   return date;
 }
 
@@ -98,8 +98,11 @@ function stepDate(mode: DashboardViewMode, date: string, dir: 1 | -1): string {
     }
     case "year": {
       const y = Number(date.slice(0, 4));
-      if (Number.isNaN(y)) return String(new Date().getFullYear() + dir);
-      return String(y + dir);
+      if (Number.isNaN(y)) return `${new Date().getFullYear() + dir}-01-01`;
+      // Preserve month/day suffix so a later switch back to Day/Week/Month
+      // keeps the user on the same calendar position.
+      const suffix = date.length > 4 ? date.slice(4) : "-01-01";
+      return `${y + dir}${suffix}`;
     }
   }
 }

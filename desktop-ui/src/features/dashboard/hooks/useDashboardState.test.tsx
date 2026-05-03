@@ -32,17 +32,28 @@ describe("useDashboardStateImpl", () => {
     expect(result.current.date.slice(0, 7)).toBe("2026-03");
   });
 
-  it("setMode('year') keeps the year portion of the date", () => {
+  it("setMode('year') preserves the full date so Year → Day round-trip restores the original day", () => {
     const { result } = renderHook(() => useDashboardStateImpl({ mode: "day", date: "2026-04-30" }));
     act(() => result.current.setMode("year"));
     expect(result.current.mode).toBe("year");
-    expect(result.current.date).toBe("2026");
+    expect(result.current.date).toBe("2026-04-30");
+    act(() => result.current.setMode("day"));
+    expect(result.current.mode).toBe("day");
+    expect(result.current.date).toBe("2026-04-30");
   });
 
-  it("navigateNext in year mode moves forward one year", () => {
+  it("setMode expands a bare YYYY date to YYYY-01-01 for non-year modes", () => {
     const { result } = renderHook(() => useDashboardStateImpl({ mode: "year", date: "2026" }));
+    act(() => result.current.setMode("day"));
+    expect(result.current.date).toBe("2026-01-01");
+  });
+
+  it("navigateNext in year mode moves forward one year and preserves the suffix", () => {
+    const { result } = renderHook(() =>
+      useDashboardStateImpl({ mode: "year", date: "2026-04-30" }),
+    );
     act(() => result.current.navigateNext());
-    expect(result.current.date).toBe("2027");
+    expect(result.current.date).toBe("2027-04-30");
   });
 
   it("navigateToday returns to today's date and day mode", () => {
