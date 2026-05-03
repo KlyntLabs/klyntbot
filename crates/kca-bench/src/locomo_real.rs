@@ -316,25 +316,47 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
         );
         let ctx = ReplayContext::new().await?;
 
-        // Replay every session as conversation history.
+        // T1.1 — per-turn ingest. When KCA_PER_TURN_INGEST=1, send each
+        // turn as its own chat_complete call so the extraction handler
+        // sees small dialog units instead of a 2-4KB session blob.
+        // Mirrors how Letta-style agents see incoming messages and gives
+        // the LLM extractor better signal-to-noise on long-history data.
+        // Cost: ~15× LLM extraction calls per conversation.
+        let per_turn = matches!(
+            std::env::var("KCA_PER_TURN_INGEST").ok().as_deref(),
+            Some("1") | Some("true") | Some("yes")
+        );
+
         for (idx, dt, turns) in conv.ordered_sessions() {
             let session_key = common::SessionKey::from_parts("locomo-real", &conv.sample_id);
-            // One bulk message per session: prefix with date_time + speaker
-            // labels so the agent can attribute facts. Replaying every turn
-            // individually would multiply LLM cost ~30× for marginal gain.
-            let mut blob = String::new();
-            if let Some(dt) = &dt {
-                blob.push_str(&format!("[Session {idx} — {dt}]\n"));
+            if per_turn {
+                let header = match &dt {
+                    Some(dt) => format!("[Session {idx} — {dt}]"),
+                    None => format!("[Session {idx}]"),
+                };
+                for t in &turns {
+                    let payload = format!("{header}\n{}: {}", t.speaker, t.text);
+                    report.total_input_chars += payload.len() as u64;
+                    let reply = ctx.chat_complete(payload, session_key.to_string()).await?;
+                    report.total_output_chars += reply.len() as u64;
+                    ctx.await_cognitive_idle().await;
+                }
             } else {
-                blob.push_str(&format!("[Session {idx}]\n"));
+                // Default: one bulk message per session
+                let mut blob = String::new();
+                if let Some(dt) = &dt {
+                    blob.push_str(&format!("[Session {idx} — {dt}]\n"));
+                } else {
+                    blob.push_str(&format!("[Session {idx}]\n"));
+                }
+                for t in &turns {
+                    blob.push_str(&format!("{}: {}\n", t.speaker, t.text));
+                }
+                report.total_input_chars += blob.len() as u64;
+                let reply = ctx.chat_complete(blob, session_key.to_string()).await?;
+                report.total_output_chars += reply.len() as u64;
+                ctx.await_cognitive_idle().await;
             }
-            for t in &turns {
-                blob.push_str(&format!("{}: {}\n", t.speaker, t.text));
-            }
-            report.total_input_chars += blob.len() as u64;
-            let reply = ctx.chat_complete(blob, session_key.to_string()).await?;
-            report.total_output_chars += reply.len() as u64;
-            ctx.await_cognitive_idle().await;
         }
 
         // Phase 3 (KCA_PHASE_3=1): fire graph consolidation between
