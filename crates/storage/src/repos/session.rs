@@ -4,6 +4,7 @@ use sqlx::Row;
 use sqlx::SqlitePool;
 
 use crate::error::{OptionExt, StorageError};
+use crate::messages::parts::{FinishReason, MessagePart};
 use crate::rows::session::{SessionListRow, SessionMessageRow, SessionRow};
 
 /// Repository for session and message persistence.
@@ -669,4 +670,155 @@ impl SessionRepo {
         query.execute(&self.pool).await?;
         Ok(new_key)
     }
+
+    // ── Phase 4: Parts-aware methods ────────────────────────────────────
+
+    /// Insert a message with typed `Vec<MessagePart>` content.
+    ///
+    /// The `content` column is set to empty string; the real content lives in `parts`.
+    /// For legacy compatibility, callers that still use `content: String` should use
+    /// `add_message` instead.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn add_message_with_parts(
+        &self,
+        session_key: &str,
+        message_id: uuid::Uuid,
+        role: &str,
+        parts: &[MessagePart],
+        turn_id: Option<&str>,
+        finish_reason: Option<&FinishReason>,
+    ) -> Result<(), StorageError> {
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
+        let parts_json = serde_json::to_string(parts).map_err(StorageError::serialization)?;
+        let finish_json = finish_reason
+            .map(|f| serde_json::to_string(f))
+            .transpose()
+            .map_err(StorageError::serialization)?;
+
+        // Touch session updated_at
+        sqlx::query("UPDATE sessions SET updated_at = ?1 WHERE key = ?2")
+            .bind(now)
+            .bind(session_key)
+            .execute(&self.pool)
+            .await?;
+
+        sqlx::query(
+            "INSERT INTO session_messages \
+             (id, session_key, role, content, parts, turn_id, finish_reason, timestamp) \
+             VALUES (?1, ?2, ?3, '', ?4, ?5, ?6, ?7)",
+        )
+        .bind(message_id)
+        .bind(session_key)
+        .bind(role)
+        .bind(&parts_json)
+        .bind(turn_id)
+        .bind(finish_json)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Get messages for a session with Parts deserialized.
+    ///
+    /// Falls back to wrapping legacy `content` in a `Text` part when `parts` is NULL.
+    pub async fn get_messages_parts(
+        &self,
+        session_key: &str,
+        limit: i64,
+    ) -> Result<Vec<SessionMessageWithParts>, StorageError> {
+        let rows: Vec<SessionMessageRow> = sqlx::query_as(
+            "SELECT * FROM session_messages \
+             WHERE session_key = ?1 ORDER BY timestamp ASC LIMIT ?2",
+        )
+        .bind(session_key)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter()
+            .map(|r| {
+                let parts: Vec<MessagePart> = match r.parts.as_deref() {
+                    Some(s) if !s.is_empty() => {
+                        serde_json::from_str(s).map_err(StorageError::serialization)?
+                    }
+                    _ => vec![MessagePart::Text {
+                        text: r.content.clone(),
+                    }],
+                };
+                let finish_reason: Option<FinishReason> = match r.finish_reason.as_deref() {
+                    Some(s) if !s.is_empty() => {
+                        Some(serde_json::from_str(s).map_err(StorageError::serialization)?)
+                    }
+                    _ => None,
+                };
+                Ok(SessionMessageWithParts {
+                    id: r.id.to_string(),
+                    session_key: r.session_key,
+                    role: r.role,
+                    parts,
+                    turn_id: r.turn_id,
+                    finish_reason,
+                    timestamp: r.timestamp.into(),
+                    metadata: r.metadata,
+                })
+            })
+            .collect()
+    }
+
+    /// Set the workspace_id on a session.
+    pub async fn set_workspace_id(
+        &self,
+        session_key: &str,
+        workspace_id: &str,
+    ) -> Result<(), StorageError> {
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
+        sqlx::query(
+            "UPDATE sessions SET workspace_id = ?1, updated_at = ?2 WHERE key = ?3",
+        )
+        .bind(workspace_id)
+        .bind(now)
+        .bind(session_key)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Set the ephemeral flag on a session.
+    pub async fn set_ephemeral(
+        &self,
+        session_key: &str,
+        ephemeral: bool,
+    ) -> Result<(), StorageError> {
+        sqlx::query("UPDATE sessions SET ephemeral = ?1 WHERE key = ?2")
+            .bind(if ephemeral { 1i64 } else { 0i64 })
+            .bind(session_key)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Set the archived_at timestamp on a session.
+    pub async fn archive(&self, session_key: &str) -> Result<(), StorageError> {
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
+        sqlx::query("UPDATE sessions SET archived_at = ?1, updated_at = ?1 WHERE key = ?2")
+            .bind(now)
+            .bind(session_key)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+}
+
+/// A message with deserialized Parts — returned by `get_messages_parts`.
+#[derive(Debug, Clone)]
+pub struct SessionMessageWithParts {
+    pub id: String,
+    pub session_key: String,
+    pub role: String,
+    pub parts: Vec<MessagePart>,
+    pub turn_id: Option<String>,
+    pub finish_reason: Option<FinishReason>,
+    pub timestamp: jiff::Timestamp,
+    pub metadata: Option<serde_json::Value>,
 }
