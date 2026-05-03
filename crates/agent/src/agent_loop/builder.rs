@@ -705,7 +705,7 @@ impl AgentLoopBuilder {
         let context_engine = if let Some(fact_repo) = cognitive_fact_repo {
             let mut retriever = cognitive::UnifiedMemoryService::new(fact_repo)
                 .with_recall_opt(recall_service.clone())
-                .with_embedder_opt(cognitive_embedder);
+                .with_embedder_opt(cognitive_embedder.clone());
             if let Some(ref pool) = self.pool {
                 retriever =
                     retriever.with_episodic_repo(cognitive::EpisodicMemoryRepo::new(pool.clone()));
@@ -1434,6 +1434,22 @@ impl AgentLoopBuilder {
 
                 memory_tool =
                     memory_tool.with_enhancement_trace_store(Arc::clone(&latest_enhancement_trace));
+
+                // T2.2 — wire semantic-fact search so memory.search_all
+                // queries the same fact pool as pre-injection retrieval.
+                if let Some(pool) = &self.pool {
+                    let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
+                    let entity_repo =
+                        Some(cognitive::repos::EntityRepo::new(pool.clone()));
+                    let fact_search_handler = Arc::new(
+                        crate::adapters::semantic_fact_search::SemanticFactSearchHandlerImpl::new(
+                            fact_repo,
+                            cognitive_embedder.clone(),
+                            entity_repo,
+                        ),
+                    ) as Arc<dyn tools::semantic_fact_search::SemanticFactSearchHandler>;
+                    memory_tool = memory_tool.with_fact_search_handler(fact_search_handler);
+                }
 
                 tool_registry.register(memory_tool);
             }

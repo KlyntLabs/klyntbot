@@ -14,6 +14,7 @@ pub mod community_search;
 pub mod conversation_recall;
 pub mod correction_tracker;
 pub mod cron;
+pub mod semantic_fact_search;
 pub mod entity_embedder;
 pub mod entity_tree_linker;
 pub mod finance;
