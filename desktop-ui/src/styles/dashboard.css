@@ -7,6 +7,13 @@
   flex: 1;
   height: 100%;
   overflow: hidden;
+  /* Match the .content gradient used by the chat pane so the calendar
+     reads as the same surface as the New Chat view. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-messages) 94%, transparent) 0%,
+    color-mix(in srgb, var(--surface-messages) 100%, transparent) 100%
+  );
 }
 
 .dashboard__content {
@@ -21,9 +28,11 @@
   align-items: center;
   gap: 16px;
   padding: 8px 16px;
-  background: var(--color-surface-raised, var(--surface-hover));
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  /* Flush against the dashboard surface — no card border — so it reads
+     as part of the same chrome as the chat topbar. */
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 .dashboard__topbar-date {
@@ -159,9 +168,11 @@
 .dashboard__day-grid {
   display: flex;
   height: 100%;
-  background: var(--color-surface-raised, var(--surface-hover));
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  /* Sit flush on the dashboard canvas — no card chrome — so the grid
+     reads as one surface with the rest of the calendar. */
+  background: transparent;
+  border: none;
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -459,8 +470,12 @@
   top: 0;
   z-index: 20;
   display: grid;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--ds-popover-bg);
+  /* Same surface as the dashboard canvas behind it, so the header reads
+     as part of that canvas. Opaque (not transparent) because the header
+     is sticky — scrolled content must not bleed through. */
+  background: var(--surface-messages);
+  border-radius: 0;
+  border-bottom: none;
 }
 
 .dashboard__column-header-cell {
@@ -590,9 +605,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--color-surface-raised, var(--surface-hover));
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 .dashboard__week-header {
@@ -700,9 +715,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--color-surface-raised, var(--surface-hover));
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   padding: 12px;
 }
 
@@ -805,9 +820,9 @@
 
 .dashboard__year-grid-inner {
   flex: 1;
-  background: var(--surface-hover);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   padding: 16px;
   overflow-y: auto;
 }
@@ -917,8 +932,10 @@
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
-  background: var(--surface-card-strong);
-  border-left: 1px solid var(--ds-border-subtle);
+  /* Same surface as the main calendar grid so the panel reads as one
+     continuous canvas with the day view. */
+  background: var(--surface-messages);
+  border-left: 1px solid var(--border-subtle);
   font-size: var(--fs-base);
 }
 .dashboard__summary-section {
@@ -1750,27 +1767,6 @@
   color: var(--ds-text-subtle);
   margin: 0;
 }
-.dashboard__activity-feed-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  font-size: var(--fs-2xs);
-  color: var(--ds-text-subtle);
-  background: none;
-  border: none;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-}
-.dashboard__activity-feed-toggle:hover {
-  color: var(--ds-text-strong);
-}
-.dashboard__activity-feed-toggle svg {
-  width: 14px;
-  height: 14px;
-}
-
 /* ── AppIcon ──────────────────────────────────────────────────────── */
 .dashboard__app-icon {
   width: 14px;
