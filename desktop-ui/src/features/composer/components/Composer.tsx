@@ -17,7 +17,6 @@ import {
 import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
 import { CodingModePill } from "@/features/coding/components/CodingModePill";
 import { CostPill } from "@/features/coding/components/CostPill";
-import { SandboxStatusPill } from "@/features/coding/components/SandboxStatusPill";
 import { useCodingMode } from "@/features/coding/hooks/useCodingMode";
 import { useSlashCommands } from "@/features/coding/hooks/useSlashCommands";
 import type {
@@ -37,8 +36,6 @@ import { useComposerDraftEffects } from "../hooks/useComposerDraftEffects";
 import { useComposerKeyDown } from "../hooks/useComposerKeyDown";
 import { useComposerSuggestionStyle } from "../hooks/useComposerSuggestionStyle";
 import { usePromptHistory } from "../hooks/usePromptHistory";
-import { CodingModePill } from "@/features/coding/components/CodingModePill";
-import { CostPill } from "@/features/coding/components/CostPill";
 import { ComposerInput } from "./ComposerInput";
 import { ComposerMetaBar } from "./ComposerMetaBar";
 import { ComposerQueue } from "./ComposerQueue";
