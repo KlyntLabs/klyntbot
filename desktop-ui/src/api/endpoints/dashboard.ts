@@ -149,13 +149,6 @@ export async function productivityIntelligenceSessionsQuery(
   return r.data;
 }
 
-export async function productivityActivityFeedQuery(
-  limit: number | null,
-): Promise<ActivityTimelineResponse[]> {
-  const r = await commands.productivityActivityFeed(limit);
-  if (r.status !== "ok") throw new Error(r.error.message ?? "productivity activity feed failed");
-  return r.data;
-}
 
 export async function productivityGoalsQuery(): Promise<GoalProgressResponse[]> {
   const r = await commands.productivityGoals();

@@ -3,7 +3,6 @@
 // - productivity_calendar_events    → CalendarTrack
 
 import type { QueryKey } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { productivitySummaryRangeQuery, productivityTodayQuery } from "@/api/endpoints/dashboard";
 import type {
@@ -18,7 +17,6 @@ import { formatHumanDuration, minutesSinceMidnight } from "@/utils/dashboardDate
 import { useTimelineDrag } from "../../hooks/useTimelineDrag";
 import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../../lib/layers";
 import { computeOverlapLayout } from "../../lib/timeline-utils";
-import { ActivityFeed } from "../productivity/ActivityFeed";
 import { SummaryPanel } from "../SummaryPanel";
 import type { SessionBlock } from "./ActivityTrack";
 import { ActivityTrack } from "./ActivityTrack";
@@ -121,7 +119,6 @@ export function DayColumns({
   const [selectedEntry, setSelectedEntry] = useState<TimelineEntry | null>(null);
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [selectedSession, setSelectedSession] = useState<SessionBlock | null>(null);
-  const [feedExpanded, setFeedExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: productivitySummary } = useTauriQuery<ProductivitySummaryResponse | null>({
@@ -547,28 +544,6 @@ export function DayColumns({
           </div>
         </div>
 
-        <div
-          style={{
-            borderTop: "1px solid var(--ds-border-subtle)",
-            transition: "max-height 0.3s ease-in-out",
-            maxHeight: feedExpanded ? 260 : 36,
-            overflow: "hidden",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setFeedExpanded(!feedExpanded)}
-            className="dashboard__activity-feed-toggle"
-          >
-            {feedExpanded ? <ChevronDown aria-hidden /> : <ChevronUp aria-hidden />}
-            Live Activity Feed
-          </button>
-          {feedExpanded && (
-            <div style={{ overflowY: "auto", maxHeight: 224 }}>
-              <ActivityFeed />
-            </div>
-          )}
-        </div>
       </div>
       {sidebarOpen && (
         <SummaryPanel

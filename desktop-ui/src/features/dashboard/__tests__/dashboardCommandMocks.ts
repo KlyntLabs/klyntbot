@@ -51,7 +51,6 @@ export function defaultDashboardMocks() {
     productivityTimelineQuery: vi.fn().mockResolvedValue([]),
     productivityCategoriesQuery: vi.fn().mockResolvedValue([]),
     productivityIntelligenceSessionsQuery: vi.fn().mockResolvedValue([]),
-    productivityActivityFeedQuery: vi.fn().mockResolvedValue([]),
     productivityGoalsQuery: vi.fn().mockResolvedValue([]),
     productivityGoalCreate: vi.fn(),
     productivityGoalDelete: vi.fn(),
