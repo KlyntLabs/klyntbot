@@ -1,5 +1,5 @@
 use super::{
-    decision::{ApprovalDecision, ApprovalLayer},
+    decision::{ApprovalDecision, ApprovalLayer, LayerOutcomeAudit},
     layer1::Layer1,
     round_trip::{await_decision, PendingApprovalsMap},
 };
@@ -37,12 +37,20 @@ pub struct GuardCtx<'a> {
 }
 
 pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> ApprovalDecision {
+    let mut audit = LayerOutcomeAudit {
+        privacy_passed: true,
+        layer1: "skipped".into(),
+        layer2: "skipped".into(),
+        layer3: "skipped".into(),
+    };
+
     // 0. Privacy guard (non-bypassable)
     let privacy_hit = match tool {
         "bash" => ctx.privacy.bash_command_touches_excluded(payload),
         _ => ctx.privacy.is_excluded(std::path::Path::new(payload)),
     };
     if privacy_hit {
+        audit.privacy_passed = false;
         let pat = ctx
             .privacy
             .raw_patterns()
@@ -59,6 +67,7 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
 
     // 1. Layer 1 declarative
     let l1 = ctx.layer1.evaluate(tool, payload);
+    audit.layer1 = format_layer_outcome(&l1);
 
     // Channel-aware degradation: if Layer1 says "ask" but the channel can't
     // surface an approval card (Telegram/Discord/Slack/Email), fall back to
@@ -98,6 +107,7 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
     // 2. Layer 2 Starlark — Plan 2 stub returns FallThrough.
     let argv: Vec<&str> = payload.split_whitespace().collect();
     let l2 = ctx.policy.eval(&argv, None);
+    audit.layer2 = format_layer2_outcome(&l2);
     let merged: ApprovalDecision = match l2 {
         ExecDecision::Allow => ApprovalDecision::Auto {
             allowed: true,
@@ -130,12 +140,15 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
             .unwrap_or_default();
         match crate::approval::layer3::evaluate(&cfg, &summary, ctx.now_unix) {
             crate::approval::layer3::Layer3Outcome::AutoAllow { reason } => {
+                audit.layer3 = format!("auto-allow: {reason}");
                 let decision = ApprovalDecision::auto_allow(ApprovalLayer::Layer3Mirror, reason);
                 emit_pair(&ctx, tool, payload, &decision, false, Some(&summary)).await;
                 return decision;
             }
             crate::approval::layer3::Layer3Outcome::Ask { reason } => {
-                let decision = ApprovalDecision::ask(ApprovalLayer::Layer3Mirror, reason);
+                audit.layer3 = format!("ask: {reason}");
+                let decision =
+                    ApprovalDecision::ask_with_audit(ApprovalLayer::Layer3Mirror, reason, audit);
                 emit_pair(&ctx, tool, payload, &decision, true, Some(&summary)).await;
                 let user = await_decision(
                     ctx.pending,
@@ -147,8 +160,12 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
                 emit_resolved(&ctx, &user).await;
                 return user;
             }
-            crate::approval::layer3::Layer3Outcome::FallThrough => { /* continue */ }
+            crate::approval::layer3::Layer3Outcome::FallThrough => {
+                audit.layer3 = "deferred: not enough history".into();
+            }
         }
+    } else {
+        audit.layer3 = "skipped: no history repo".into();
     }
 
     match merged {
@@ -157,7 +174,13 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
             merged
         }
         ApprovalDecision::Ask { .. } => {
-            emit_pair(&ctx, tool, payload, &merged, true, None).await;
+            let decision_with_audit = match merged {
+                ApprovalDecision::Ask { layer, reason, .. } => {
+                    ApprovalDecision::ask_with_audit(layer, reason, audit)
+                }
+                other => other,
+            };
+            emit_pair(&ctx, tool, payload, &decision_with_audit, true, None).await;
             let user = await_decision(
                 ctx.pending,
                 &ctx.request_id,
@@ -252,6 +275,38 @@ fn decided_by(d: &ApprovalDecision) -> &'static str {
         ApprovalDecision::PrivacyDenied { .. } => "auto_deny",
         ApprovalDecision::Cancelled => "cancelled",
         ApprovalDecision::TimedOut => "timeout",
+    }
+}
+
+fn format_layer_outcome(d: &ApprovalDecision) -> String {
+    match d {
+        ApprovalDecision::Auto {
+            allowed: true,
+            rule_matched,
+            ..
+        } => format!(
+            "allowed: {}",
+            rule_matched.as_deref().unwrap_or("?")
+        ),
+        ApprovalDecision::Auto {
+            allowed: false,
+            rule_matched,
+            ..
+        } => format!(
+            "denied: {}",
+            rule_matched.as_deref().unwrap_or("?")
+        ),
+        ApprovalDecision::Ask { reason, .. } => format!("ask: {reason}"),
+        _ => "?".into(),
+    }
+}
+
+fn format_layer2_outcome(d: &ExecDecision) -> String {
+    match d {
+        ExecDecision::Allow => "allowed".into(),
+        ExecDecision::Forbid => "denied".into(),
+        ExecDecision::Ask => "ask".into(),
+        ExecDecision::FallThrough => "deferred: no rule".into(),
     }
 }
 
