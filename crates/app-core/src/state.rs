@@ -194,6 +194,18 @@ pub struct AppCore {
     pub coding_approval_history_repo: Option<Arc<storage::repos::CodingApprovalHistoryRepo>>,
     /// File snapshot repo for /sessions rewind (Phase 2).
     pub snapshot_repo: Option<Arc<klynt_core::snapshots::SnapshotRepo>>,
+    // ── Phase 4: Coding thread events ─────────────────────────────────
+    /// Typed broker for ThreadEvent — publish from agent loop, subscribe from Tauri adapter.
+    pub thread_events: bus::TypedBroker<desktop_shared::coding::ThreadEvent>,
+    /// Active thread subscriptions keyed by subscription_id.
+    pub thread_subscriptions: Arc<dashmap::DashMap<String, ThreadSubscription>>,
+}
+
+/// State for an active thread subscription.
+#[derive(Debug, Clone)]
+pub struct ThreadSubscription {
+    pub thread_id: String,
+    pub created_at: i64,
 }
 
 impl AppCore {

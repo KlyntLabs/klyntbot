@@ -149,6 +149,8 @@ desktop_macros::klynt_collect_commands![
     crate::commands::coding_thread::coding_thread_compact,
     crate::commands::coding_thread::coding_thread_archive,
     crate::commands::coding_thread::coding_thread_set_name,
+    crate::commands::coding_thread::coding_thread_subscribe,
+    crate::commands::coding_thread::coding_thread_unsubscribe,
     crate::commands::workspace_lifecycle::list_workspaces,
     crate::commands::workspace_lifecycle::add_workspace,
     crate::commands::workspace_lifecycle::is_workspace_path_dir,

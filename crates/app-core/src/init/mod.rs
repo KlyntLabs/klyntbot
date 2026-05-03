@@ -1241,6 +1241,8 @@ impl AppCore {
             snapshot_repo: Some(Arc::new(klynt_core::snapshots::SnapshotRepo::new(
                 storage_pool.clone(),
             ))),
+            thread_events: bus::TypedBroker::new(1024),
+            thread_subscriptions: Arc::new(dashmap::DashMap::new()),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────

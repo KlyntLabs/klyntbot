@@ -93,6 +93,23 @@ pub async fn coding_thread_set_name(thread_id: String, name: String) -> () {
         .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))
 }
 
+#[klynt_command]
+pub async fn coding_thread_subscribe(thread_id: String) -> serde_json::Value {
+    let sub_id = state
+        .coding_thread_subscribe(&thread_id)
+        .await
+        .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))?;
+    Ok(serde_json::json!({ "subscriptionId": sub_id }))
+}
+
+#[klynt_command]
+pub async fn coding_thread_unsubscribe(subscription_id: String) -> () {
+    state
+        .coding_thread_unsubscribe(&subscription_id)
+        .await
+        .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))
+}
+
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
@@ -180,6 +197,21 @@ pub(crate) async fn dispatch_dev(
             let name = try_field!(dev::get_str(body, "name"));
             dev::val(
                 core.coding_thread_set_name(&thread_id, &name)
+                    .await
+                    .map_err(ApiError::from),
+            )
+        }
+        "coding_thread_subscribe" => {
+            let thread_id = try_field!(dev::get_str(body, "threadId"));
+            match core.coding_thread_subscribe(&thread_id).await {
+                Ok(sub_id) => Ok(serde_json::json!({ "subscriptionId": sub_id })),
+                Err(e) => Err(ApiError::new("THREAD_ERROR", e.to_string())),
+            }
+        }
+        "coding_thread_unsubscribe" => {
+            let subscription_id = try_field!(dev::get_str(body, "subscriptionId"));
+            dev::val(
+                core.coding_thread_unsubscribe(&subscription_id)
                     .await
                     .map_err(ApiError::from),
             )
