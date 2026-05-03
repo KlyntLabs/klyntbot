@@ -111,10 +111,7 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
             reason: "layer-2 forbid".into(),
             rule_matched: None,
         },
-        ExecDecision::Ask => ApprovalDecision::Ask {
-            layer: ApprovalLayer::Layer2Starlark,
-            reason: "layer-2 ask".into(),
-        },
+        ExecDecision::Ask => ApprovalDecision::ask(ApprovalLayer::Layer2Starlark, "layer-2 ask"),
         ExecDecision::FallThrough => l1,
     };
 
