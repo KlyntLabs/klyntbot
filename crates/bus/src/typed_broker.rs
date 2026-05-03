@@ -46,4 +46,40 @@ mod tests {
         b.publish(7);
         assert_eq!(b.receiver_count(), 0);
     }
+
+    /// K12: TypedBroker delivers events to subscribers in publish order.
+    #[tokio::test]
+    async fn k12_broker_delivers_in_publish_order() {
+        let b: TypedBroker<u64> = TypedBroker::new(256);
+        let mut rx = b.subscribe();
+
+        let count = 100u64;
+        for i in 0..count {
+            b.publish(i);
+        }
+
+        for expected in 0..count {
+            let got = rx.recv().await.unwrap();
+            assert_eq!(got, expected, "event {expected} out of order");
+        }
+    }
+
+    /// K12: Multiple subscribers see the same sequence.
+    #[tokio::test]
+    async fn k12_multiple_subscribers_see_same_order() {
+        let b: TypedBroker<u64> = TypedBroker::new(256);
+        let mut rx1 = b.subscribe();
+        let mut rx2 = b.subscribe();
+
+        for i in 0..50 {
+            b.publish(i);
+        }
+
+        for expected in 0..50 {
+            let a = rx1.recv().await.unwrap();
+            let b = rx2.recv().await.unwrap();
+            assert_eq!(a, expected);
+            assert_eq!(b, expected);
+        }
+    }
 }
