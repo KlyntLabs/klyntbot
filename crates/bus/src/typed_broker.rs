@@ -14,7 +14,9 @@ impl<E: Clone + Send + 'static> TypedBroker<E> {
     }
 
     pub fn publish(&self, event: E) {
-        let _ = self.sender.send(event);
+        if let Err(e) = self.sender.send(event) {
+            tracing::warn!("TypedBroker: no subscribers, event dropped: {e}");
+        }
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<E> {

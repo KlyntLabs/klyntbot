@@ -2,15 +2,22 @@ use super::parts::MessagePart;
 
 /// Joins all `Text` parts in a message into a single string.
 /// Used by cognitive subsystems that operate on prose.
-pub fn extract_text(parts: &[MessagePart]) -> String {
-    parts
+pub fn extract_text_from_parts(parts: &[MessagePart]) -> String {
+    let mut out = String::new();
+    for (i, text) in parts
         .iter()
         .filter_map(|p| match p {
             MessagePart::Text { text } => Some(text.as_str()),
             _ => None,
         })
-        .collect::<Vec<_>>()
-        .join("\n")
+        .enumerate()
+    {
+        if i > 0 {
+            out.push('\n');
+        }
+        out.push_str(text);
+    }
+    out
 }
 
 /// Returns `(call_id, output_text, is_error)` for every `ToolResult` part.
@@ -47,7 +54,7 @@ mod tests {
                 text: "there".into(),
             },
         ];
-        assert_eq!(extract_text(&parts), "hi\nthere");
+        assert_eq!(extract_text_from_parts(&parts), "hi\nthere");
     }
 
     #[test]

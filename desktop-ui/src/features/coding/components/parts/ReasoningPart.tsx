@@ -4,7 +4,7 @@ import { useState } from "react";
 export function ReasoningPart({ text, redacted }: { text: string; redacted: boolean }) {
   const [expanded, setExpanded] = useState(false);
 
-  if (!text.trim()) return null;
+  if (!text) return null;
 
   return (
     <div className="part-reasoning">

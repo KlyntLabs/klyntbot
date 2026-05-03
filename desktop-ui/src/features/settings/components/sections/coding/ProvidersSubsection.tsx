@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { providersList, providerStatus } from "@/api/endpoints/providers";
 import type { ProviderListItem, ProviderStatusResult } from "@/api/endpoints/providers";
 
 export function ProvidersSubsection() {
@@ -12,7 +13,6 @@ export function ProvidersSubsection() {
     let mounted = true;
     (async () => {
       try {
-        const { providersList } = await import("@/api/endpoints/providers");
         const result = await providersList();
         if (mounted) {
           setProviders(result.providers);
@@ -21,8 +21,9 @@ export function ProvidersSubsection() {
       } catch (e) {
         if (mounted) {
           setError(e instanceof Error ? e.message : "Failed to load providers");
-          setLoading(false);
         }
+      } finally {
+        if (mounted) setLoading(false);
       }
     })();
     return () => {
@@ -33,7 +34,6 @@ export function ProvidersSubsection() {
   const handleTest = async (providerId: string) => {
     setTestingId(providerId);
     try {
-      const { providerStatus } = await import("@/api/endpoints/providers");
       const result = await providerStatus(providerId);
       setTestResult((prev) => ({ ...prev, [providerId]: result }));
     } catch (e) {
@@ -81,13 +81,17 @@ export function ProvidersSubsection() {
                 >
                   {testingId === p.id ? "Testing…" : "Test"}
                 </button>
-                {testResult[p.id] && (
-                  <span
-                    className={`providers-subsection__test-result ${testResult[p.id].available ? "success" : "error"}`}
-                  >
-                    {testResult[p.id].available ? "OK" : testResult[p.id].error}
-                  </span>
-                )}
+                {(() => {
+                  const r = testResult[p.id];
+                  if (!r) return null;
+                  return (
+                    <span
+                      className={`providers-subsection__test-result ${r.available ? "success" : "error"}`}
+                    >
+                      {r.available ? "OK" : r.error}
+                    </span>
+                  );
+                })()}
               </div>
             </li>
           ))}

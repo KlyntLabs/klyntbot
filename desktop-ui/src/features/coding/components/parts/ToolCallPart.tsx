@@ -1,9 +1,12 @@
 import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 export function ToolCallPart({ callId, name, args }: { callId: string; name: string; args: unknown }) {
   const [expanded, setExpanded] = useState(false);
-  const argsStr = typeof args === "string" ? args : JSON.stringify(args, null, 2);
+  const argsStr = useMemo(
+    () => (typeof args === "string" ? args : JSON.stringify(args, null, 2)),
+    [args]
+  );
 
   return (
     <div className="part-tool-call">

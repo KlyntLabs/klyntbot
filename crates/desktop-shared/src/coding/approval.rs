@@ -70,7 +70,7 @@ pub struct LayerDecisions {
     pub layer3: LayerOutcome,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, PartialEq)]
 #[serde(tag = "outcome", rename_all = "snake_case")]
 pub enum LayerOutcome {
     Allowed {

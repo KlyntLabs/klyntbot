@@ -870,6 +870,46 @@ async codingTurnSteer(threadId: string, turnId: string, text: string) : Promise<
     else return { status: "error", error: e  as any };
 }
 },
+async codingReviewStart(threadId: string, target: string | null, delivery: string | null) : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_review_start", { threadId, target, delivery }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMcpStatus(workspaceId: string | null) : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_mcp_status", { workspaceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingThreadMetadataGenerate(workspaceId: string, prompt: string) : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_thread_metadata_generate", { workspaceId, prompt }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async providersList() : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("providers_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async providerStatus(providerId: string) : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("provider_status", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async listWorkspaces() : Promise<Result<unknown, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_workspaces") };

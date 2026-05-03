@@ -42,7 +42,7 @@ impl AppCore {
                 None,
             )
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
 
         // 2. Resolve model
         let config = self.config.read().await;
@@ -82,9 +82,10 @@ impl AppCore {
 
             match result {
                 Ok(handle) => {
-                    // Store cancel token
+                    // Store cancel token keyed by turn_id so concurrent turns on the
+                    // same thread don't overwrite each other.
                     let cancel = handle.cancel_token.clone();
-                    active_streams.insert(thread_id_owned.clone(), cancel);
+                    active_streams.insert(turn_id_clone.clone(), cancel);
 
                     // Bridge AgentEvent → ThreadEvent
                     let mut event_rx = handle.event_rx;
@@ -249,9 +250,8 @@ impl AppCore {
                         }
                     });
 
-                    // Wait for pipeline to finish, then emit TurnCompleted
-                    let join_result = handle.handle.await;
-                    let _ = bridge_handle.await;
+                    // Wait for pipeline and bridge to finish concurrently
+                    let (join_result, _) = tokio::join!(handle.handle, bridge_handle);
 
                     let completed_at = jiff::Timestamp::now().as_millisecond();
                     let duration_ms = (completed_at - started_at) as u64;
@@ -272,7 +272,7 @@ impl AppCore {
                     });
 
                     // Clean up active stream
-                    active_streams.remove(&thread_id_owned);
+                    active_streams.remove(&turn_id_clone);
                 }
                 Err(e) => {
                     tracing::error!("coding turn failed to start: {e}");
@@ -302,15 +302,15 @@ impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub async fn coding_turn_interrupt(
         &self,
-        thread_id: &str,
-        _turn_id: &str,
+        _thread_id: &str,
+        turn_id: &str,
     ) -> Result<()> {
-        if let Some((_, token)) = self.active_streams.remove(thread_id) {
+        if let Some((_, token)) = self.active_streams.remove(turn_id) {
             token.cancel();
             Ok(())
         } else {
             Err(common::KlyntbotError::StorageNotFound(format!(
-                "active_turn {thread_id}"
+                "active_turn {turn_id}"
             )))
         }
     }

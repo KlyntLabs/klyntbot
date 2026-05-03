@@ -42,9 +42,15 @@ pub struct GuardCtx<'a> {
 pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> ApprovalDecision {
     let mut audit = LayerOutcomeAudit {
         privacy_passed: true,
-        layer1: "skipped".into(),
-        layer2: "skipped".into(),
-        layer3: "skipped".into(),
+        layer1: desktop_shared::coding::LayerOutcome::Skipped {
+            reason: "skipped".into(),
+        },
+        layer2: desktop_shared::coding::LayerOutcome::Skipped {
+            reason: "skipped".into(),
+        },
+        layer3: desktop_shared::coding::LayerOutcome::Skipped {
+            reason: "skipped".into(),
+        },
     };
 
     // 0. Privacy guard (non-bypassable)
@@ -70,7 +76,7 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
 
     // 1. Layer 1 declarative
     let l1 = ctx.layer1.evaluate(tool, payload);
-    audit.layer1 = format_layer_outcome(&l1);
+    audit.layer1 = layer_outcome_from_decision(&l1);
 
     // Channel-aware degradation: if Layer1 says "ask" but the channel can't
     // surface an approval card (Telegram/Discord/Slack/Email), fall back to
@@ -110,7 +116,7 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
     // 2. Layer 2 Starlark — Plan 2 stub returns FallThrough.
     let argv: Vec<&str> = payload.split_whitespace().collect();
     let l2 = ctx.policy.eval(&argv, None);
-    audit.layer2 = format_layer2_outcome(&l2);
+    audit.layer2 = layer_outcome_from_exec_decision(&l2);
     let merged: ApprovalDecision = match l2 {
         ExecDecision::Allow => ApprovalDecision::Auto {
             allowed: true,
@@ -143,16 +149,21 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
             .unwrap_or_default();
         match crate::approval::layer3::evaluate(&cfg, &summary, ctx.now_unix) {
             crate::approval::layer3::Layer3Outcome::AutoAllow { reason } => {
-                audit.layer3 = format!("auto-allow: {reason}");
+                audit.layer3 = desktop_shared::coding::LayerOutcome::Allowed {
+                    reason: format!("auto-allow: {reason}"),
+                    rule_matched: None,
+                };
                 let decision = ApprovalDecision::auto_allow(ApprovalLayer::Layer3Mirror, reason);
                 emit_pair(&ctx, tool, payload, &decision, false, Some(&summary)).await;
                 return decision;
             }
             crate::approval::layer3::Layer3Outcome::Ask { reason } => {
-                audit.layer3 = format!("ask: {reason}");
+                audit.layer3 = desktop_shared::coding::LayerOutcome::Deferred {
+                    reason: format!("ask: {reason}"),
+                };
+                emit_approval_request(&ctx, tool, &audit).await;
                 let decision =
                     ApprovalDecision::ask_with_audit(ApprovalLayer::Layer3Mirror, reason, audit);
-                emit_approval_request(&ctx, tool, &decision_audit(&decision)).await;
                 emit_pair(&ctx, tool, payload, &decision, true, Some(&summary)).await;
                 let user = await_decision(
                     ctx.pending,
@@ -165,11 +176,15 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
                 return user;
             }
             crate::approval::layer3::Layer3Outcome::FallThrough => {
-                audit.layer3 = "deferred: not enough history".into();
+                audit.layer3 = desktop_shared::coding::LayerOutcome::Skipped {
+                    reason: "deferred: not enough history".into(),
+                };
             }
         }
     } else {
-        audit.layer3 = "skipped: no history repo".into();
+        audit.layer3 = desktop_shared::coding::LayerOutcome::Skipped {
+            reason: "skipped: no history repo".into(),
+        };
     }
 
     match merged {
@@ -178,13 +193,13 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
             merged
         }
         ApprovalDecision::Ask { .. } => {
+            emit_approval_request(&ctx, tool, &audit).await;
             let decision_with_audit = match merged {
                 ApprovalDecision::Ask { layer, reason, .. } => {
                     ApprovalDecision::ask_with_audit(layer, reason, audit)
                 }
                 other => other,
             };
-            emit_approval_request(&ctx, tool, &decision_audit(&decision_with_audit)).await;
             emit_pair(&ctx, tool, payload, &decision_with_audit, true, None).await;
             let user = await_decision(
                 ctx.pending,
@@ -283,42 +298,77 @@ fn decided_by(d: &ApprovalDecision) -> &'static str {
     }
 }
 
-fn format_layer_outcome(d: &ApprovalDecision) -> String {
+/// Map an `ApprovalDecision` into the frontend `LayerOutcome` type.
+fn layer_outcome_from_decision(d: &ApprovalDecision) -> desktop_shared::coding::LayerOutcome {
     match d {
         ApprovalDecision::Auto {
             allowed: true,
+            reason: _,
             rule_matched,
             ..
-        } => format!(
-            "allowed: {}",
-            rule_matched.as_deref().unwrap_or("?")
-        ),
+        } => desktop_shared::coding::LayerOutcome::Allowed {
+            reason: format!(
+                "allowed: {}",
+                rule_matched.as_deref().unwrap_or("?")
+            ),
+            rule_matched: rule_matched.clone(),
+        },
         ApprovalDecision::Auto {
             allowed: false,
+            reason: _,
             rule_matched,
             ..
-        } => format!(
-            "denied: {}",
-            rule_matched.as_deref().unwrap_or("?")
-        ),
-        ApprovalDecision::Ask { reason, .. } => format!("ask: {reason}"),
-        _ => "?".into(),
+        } => desktop_shared::coding::LayerOutcome::Denied {
+            reason: format!(
+                "denied: {}",
+                rule_matched.as_deref().unwrap_or("?")
+            ),
+            rule_matched: rule_matched.clone(),
+        },
+        ApprovalDecision::Ask { reason, .. } => {
+            desktop_shared::coding::LayerOutcome::Deferred {
+                reason: format!("ask: {reason}"),
+            }
+        }
+        _ => desktop_shared::coding::LayerOutcome::Skipped {
+            reason: "skipped".into(),
+        },
     }
 }
 
-fn format_layer2_outcome(d: &ExecDecision) -> String {
+/// Map an `ExecDecision` into the frontend `LayerOutcome` type.
+fn layer_outcome_from_exec_decision(
+    d: &ExecDecision,
+) -> desktop_shared::coding::LayerOutcome {
     match d {
-        ExecDecision::Allow => "allowed".into(),
-        ExecDecision::Forbid => "denied".into(),
-        ExecDecision::Ask => "ask".into(),
-        ExecDecision::FallThrough => "deferred: no rule".into(),
+        ExecDecision::Allow => desktop_shared::coding::LayerOutcome::Allowed {
+            reason: "layer-2 allow".into(),
+            rule_matched: None,
+        },
+        ExecDecision::Forbid => desktop_shared::coding::LayerOutcome::Denied {
+            reason: "layer-2 forbid".into(),
+            rule_matched: None,
+        },
+        ExecDecision::Ask => desktop_shared::coding::LayerOutcome::Deferred {
+            reason: "layer-2 ask".into(),
+        },
+        ExecDecision::FallThrough => desktop_shared::coding::LayerOutcome::Skipped {
+            reason: "layer-2 fall-through".into(),
+        },
     }
+}
+
+/// Extract a string argument from the optional JSON args payload.
+fn get_arg_str(args: &Option<serde_json::Value>, key: &str) -> Option<String> {
+    args.as_ref()
+        .and_then(|v| v.get(key))
+        .and_then(|v| v.as_str())
+        .map(String::from)
 }
 
 /// Emit a typed `ApprovalRequest` event for the coding surface.
 ///
-/// Converts the internal `LayerOutcomeAudit` into the `desktop_shared::coding::LayerDecisions`
-/// DTO and wraps it in a `ToolEvent::ApprovalRequest`. No-op if `event_tx` is None.
+/// No-op if `event_tx` is None.
 pub async fn emit_approval_request(
     ctx: &GuardCtx<'_>,
     tool: &str,
@@ -343,9 +393,9 @@ pub async fn emit_approval_request(
                 rule_matched: None,
             }
         },
-        layer1: parse_audit_str_to_outcome(&audit.layer1),
-        layer2: parse_audit_str_to_outcome(&audit.layer2),
-        layer3: parse_audit_str_to_outcome(&audit.layer3),
+        layer1: audit.layer1.clone(),
+        layer2: audit.layer2.clone(),
+        layer3: audit.layer3.clone(),
     };
 
     let request = match tool {
@@ -353,11 +403,7 @@ pub async fn emit_approval_request(
             approval_id,
             thread_id,
             turn_id,
-            command: ctx
-                .args
-                .as_ref()
-                .and_then(|v| v.get("command"))
-                .and_then(|v| v.as_str())
+            command: get_arg_str(&ctx.args, "command")
                 .map(|s| s.split_whitespace().map(String::from).collect())
                 .unwrap_or_default(),
             cwd: ctx.cwd.clone().unwrap_or_default(),
@@ -369,20 +415,8 @@ pub async fn emit_approval_request(
             approval_id,
             thread_id,
             turn_id,
-            path: ctx
-                .args
-                .as_ref()
-                .and_then(|v| v.get("path"))
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .into(),
-            diff_unified: ctx
-                .args
-                .as_ref()
-                .and_then(|v| v.get("diff_unified"))
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .into(),
+            path: get_arg_str(&ctx.args, "path").unwrap_or_default(),
+            diff_unified: get_arg_str(&ctx.args, "diff_unified").unwrap_or_default(),
             write_kind: desktop_shared::coding::WriteKind::Modify,
             layer_decisions,
         },
@@ -394,43 +428,6 @@ pub async fn emit_approval_request(
         payload,
     };
     fan_out_tool_event(ctx.event_tx, None, evt).await;
-}
-
-fn parse_audit_str_to_outcome(s: &str) -> desktop_shared::coding::LayerOutcome {
-    if s.starts_with("allowed") {
-        desktop_shared::coding::LayerOutcome::Allowed {
-            reason: s.into(),
-            rule_matched: None,
-        }
-    } else if s.starts_with("denied") {
-        desktop_shared::coding::LayerOutcome::Denied {
-            reason: s.into(),
-            rule_matched: None,
-        }
-    } else if s.starts_with("auto-allow") {
-        desktop_shared::coding::LayerOutcome::Allowed {
-            reason: s.into(),
-            rule_matched: None,
-        }
-    } else if s.starts_with("skipped") {
-        desktop_shared::coding::LayerOutcome::Skipped { reason: s.into() }
-    } else {
-        desktop_shared::coding::LayerOutcome::Deferred { reason: s.into() }
-    }
-}
-
-fn decision_audit(d: &ApprovalDecision) -> LayerOutcomeAudit {
-    match d {
-        ApprovalDecision::Ask {
-            layer_audit: Some(a), ..
-        } => a.clone(),
-        _ => LayerOutcomeAudit {
-            privacy_passed: true,
-            layer1: "skipped".into(),
-            layer2: "skipped".into(),
-            layer3: "skipped".into(),
-        },
-    }
 }
 
 pub(crate) async fn fan_out_tool_event(

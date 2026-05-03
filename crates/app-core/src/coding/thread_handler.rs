@@ -21,7 +21,7 @@ impl AppCore {
             .workspaces
             .get(workspace_id)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
 
         // 2. Privacy: refuse risky workspace paths
         validate_workspace_path(&ws.path)?;
@@ -63,17 +63,17 @@ impl AppCore {
             .sessions
             .upsert_session(&session_key, &metadata)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
         self.repos
             .sessions
             .set_workspace_id(&session_key, &ws.id)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
         self.repos
             .sessions
             .set_ephemeral(&session_key, ephemeral)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
 
         // 7. Inject AGENTS.md bundle as synthetic user message
         if !agents_sources.is_empty() {
@@ -91,7 +91,7 @@ impl AppCore {
                     None,
                 )
                 .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                ?;
         }
 
         let now = jiff::Timestamp::now().as_millisecond();
@@ -131,7 +131,7 @@ impl AppCore {
             .sessions
             .get_session(thread_id)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
 
         let ws_id = session
             .workspace_id
@@ -143,14 +143,14 @@ impl AppCore {
             .workspaces
             .get(ws_id)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
 
         let items = if include_items {
             self.repos
                 .sessions
                 .get_messages_parts(thread_id, 1000)
                 .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?
+                ?
                 .into_iter()
                 .map(message_with_parts_to_dto)
                 .collect()
@@ -233,7 +233,7 @@ impl AppCore {
             .sessions
             .list_sessions()
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
 
         let summaries: Vec<ThreadSummary> = sessions
             .into_iter()
@@ -278,7 +278,7 @@ impl AppCore {
             .sessions
             .fork_session(thread_id, from_message_id.as_deref())
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
 
         // Set forked_from_id
         let pool = self.repos.pool();
@@ -287,7 +287,7 @@ impl AppCore {
             .bind(&new_key)
             .execute(pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
 
         self.coding_thread_resume(&new_key, true).await
     }
@@ -307,7 +307,7 @@ impl AppCore {
             text: "[Thread compacted — summary not yet implemented]".into(),
         }];
         let parts_json = serde_json::to_string(&parts)
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
         sqlx::query(
             "INSERT INTO session_messages (id, session_key, role, content, parts, timestamp) \
              VALUES (?1, ?2, 'system', '', ?3, unixepoch('now') * 1000)",
@@ -317,7 +317,7 @@ impl AppCore {
         .bind(&parts_json)
         .execute(pool)
         .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        ?;
 
         // Set summary_message_id
         sqlx::query("UPDATE sessions SET summary_message_id = ?1 WHERE key = ?2")
@@ -325,7 +325,7 @@ impl AppCore {
             .bind(thread_id)
             .execute(pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
 
         Ok(serde_json::json!({ "summaryMessageId": summary_id }))
     }
@@ -336,8 +336,8 @@ impl AppCore {
         self.repos
             .sessions
             .archive(thread_id)
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
+            .await?;
+        Ok(())
     }
 
     /// Set the name/title of a coding thread.
@@ -351,7 +351,7 @@ impl AppCore {
             .sessions
             .rename_session(thread_id, name)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            ?;
         Ok(())
     }
 }

@@ -43,16 +43,11 @@ pub(crate) async fn dispatch_dev(
     core: &::app_core::state::AppCore,
     body: &serde_json::Value,
 ) -> Option<desktop_shared::CommandResult<serde_json::Value>> {
+    use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "approval_respond" => {
-            let approval_id = dev::get_str(body, "approvalId").unwrap_or_default();
-            let decision: ApprovalDecisionDto =
-                match serde_json::from_value(body.get("decision").cloned().unwrap_or_default()) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        return Some(Err(ApiError::new("INVALID_PARAMS", e.to_string())))
-                    }
-                };
+            let approval_id = try_field!(dev::get_str(body, "approvalId"));
+            let decision: ApprovalDecisionDto = try_field!(dev::require(body, "decision"));
             let internal = map_decision(decision);
             match app_core::coding::approval_handler::respond_approval(
                 &core.pending_approvals,

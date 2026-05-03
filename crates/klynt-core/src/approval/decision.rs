@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use desktop_shared::coding::LayerOutcome;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ApprovalLayer {
@@ -15,9 +17,9 @@ pub enum ApprovalLayer {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LayerOutcomeAudit {
     pub privacy_passed: bool,
-    pub layer1: String,
-    pub layer2: String,
-    pub layer3: String,
+    pub layer1: LayerOutcome,
+    pub layer2: LayerOutcome,
+    pub layer3: LayerOutcome,
 }
 
 #[derive(Debug, Clone)]

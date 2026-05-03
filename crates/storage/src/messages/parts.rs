@@ -26,20 +26,8 @@ pub enum MessagePart {
         text: String,
         redacted: bool,
     },
-    FileChange {
-        path: PathBuf,
-        before: Option<String>,
-        after: String,
-        diff_unified: String,
-        applied: bool,
-    },
-    CommandExecution {
-        command: Vec<String>,
-        cwd: PathBuf,
-        exit_code: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
+    FileChange(Box<FileChangeData>),
+    CommandExecution(Box<CommandExecutionData>),
     Finish {
         reason: FinishReason,
     },
@@ -51,6 +39,26 @@ pub struct ToolOutput {
     pub text: String,
     pub mime: Option<String>,
     pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub struct FileChangeData {
+    pub path: PathBuf,
+    pub before: Option<String>,
+    pub after: String,
+    pub diff_unified: String,
+    pub applied: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub struct CommandExecutionData {
+    pub command: Vec<String>,
+    pub cwd: PathBuf,
+    pub exit_code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

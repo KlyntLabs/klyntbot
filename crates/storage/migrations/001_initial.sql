@@ -143,7 +143,7 @@ CREATE TABLE sessions (
     total_cost_usd         REAL NOT NULL DEFAULT 0,
     total_tokens           INTEGER NOT NULL DEFAULT 0,
     parent_session_id      TEXT,
-    -- Phase 4 columns (added 2026-05-03 per spec 2026-05-03-klynt-coding-in-chat-phase4-design.md)
+    -- Phase 4 columns
     workspace_id           TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
     forked_from_id         TEXT REFERENCES sessions(key) ON DELETE SET NULL,
     summary_message_id     TEXT,

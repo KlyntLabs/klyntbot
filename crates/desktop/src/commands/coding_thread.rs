@@ -19,7 +19,7 @@ pub async fn coding_thread_start(
             ephemeral.unwrap_or(false),
         )
         .await
-        .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))
+        .map_err(ApiError::from)
 }
 
 #[klynt_command]
@@ -30,7 +30,7 @@ pub async fn coding_thread_resume(
     state
         .coding_thread_resume(&thread_id, include_items.unwrap_or(true))
         .await
-        .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))
+        .map_err(ApiError::from)
 }
 
 #[klynt_command]
@@ -42,7 +42,7 @@ pub async fn coding_thread_read(
     state
         .coding_thread_read(&thread_id, cursor, limit)
         .await
-        .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))
+        .map_err(ApiError::from)
 }
 
 #[klynt_command]
@@ -55,7 +55,7 @@ pub async fn coding_thread_list(
     state
         .coding_thread_list(&workspace_id, cursor, limit, sort_key)
         .await
-        .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))
+        .map_err(ApiError::from)
 }
 
 #[klynt_command]
@@ -66,7 +66,7 @@ pub async fn coding_thread_fork(
     state
         .coding_thread_fork(&thread_id, from_message_id)
         .await
-        .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))
+        .map_err(ApiError::from)
 }
 
 #[klynt_command]
@@ -74,7 +74,7 @@ pub async fn coding_thread_compact(thread_id: String) -> serde_json::Value {
     state
         .coding_thread_compact(&thread_id)
         .await
-        .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))
+        .map_err(ApiError::from)
 }
 
 #[klynt_command]
@@ -82,7 +82,7 @@ pub async fn coding_thread_archive(thread_id: String) -> () {
     state
         .coding_thread_archive(&thread_id)
         .await
-        .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))
+        .map_err(ApiError::from)
 }
 
 #[klynt_command]
@@ -90,7 +90,7 @@ pub async fn coding_thread_set_name(thread_id: String, name: String) -> () {
     state
         .coding_thread_set_name(&thread_id, &name)
         .await
-        .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))
+        .map_err(ApiError::from)
 }
 
 #[klynt_command]
@@ -98,7 +98,7 @@ pub async fn coding_thread_subscribe(thread_id: String) -> serde_json::Value {
     let sub_id = state
         .coding_thread_subscribe(&thread_id)
         .await
-        .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))?;
+        ?;
     Ok(serde_json::json!({ "subscriptionId": sub_id }))
 }
 
@@ -107,7 +107,7 @@ pub async fn coding_thread_unsubscribe(subscription_id: String) -> () {
     state
         .coding_thread_unsubscribe(&subscription_id)
         .await
-        .map_err(|e| ApiError::new("THREAD_ERROR", e.to_string()))
+        .map_err(ApiError::from)
 }
 
 #[cfg(debug_assertions)]

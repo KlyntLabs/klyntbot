@@ -29,13 +29,7 @@ export function ApprovalCard({ item, onRespond }: Props) {
     return (
       <div className="approval-card approval-card--decided">
         <span>
-          {item.status === "approved-once" || item.status === "approved-always"
-            ? "approved"
-            : item.status === "denied"
-              ? "denied"
-              : item.status === "timed-out"
-                ? "timed out"
-                : "cancelled"}
+          {statusLabel(item.status)}
           {" — "}
           {item.tool}: {summarizeArgs(item.args)}
         </span>
@@ -114,6 +108,20 @@ export function ApprovalCard({ item, onRespond }: Props) {
       )}
     </div>
   );
+}
+
+function statusLabel(status: ApprovalItem["status"]): string {
+  switch (status) {
+    case "approved-once":
+    case "approved-always":
+      return "approved";
+    case "denied":
+      return "denied";
+    case "timed-out":
+      return "timed out";
+    default:
+      return "cancelled";
+  }
 }
 
 function summarizeArgs(a: Record<string, unknown>): string {

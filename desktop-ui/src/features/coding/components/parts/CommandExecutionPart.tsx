@@ -1,3 +1,9 @@
+function statusClass(exitCode: number | null): "success" | "error" | "running" {
+  if (exitCode === 0) return "success";
+  if (exitCode !== null) return "error";
+  return "running";
+}
+
 export function CommandExecutionPart({
   command,
   exitCode,
@@ -10,11 +16,11 @@ export function CommandExecutionPart({
   stderr: string;
 }) {
   return (
-    <div className={`part-command-execution ${exitCode === 0 ? "success" : exitCode !== null ? "error" : "running"}`}>
+    <div className={`part-command-execution ${statusClass(exitCode)}`}>
       <div className="part-command-execution__header">
         <code className="part-command-execution__cmd">{command.join(" ")}</code>
         {exitCode !== null && (
-          <span className={`part-command-execution__exit ${exitCode === 0 ? "success" : "error"}`}>
+          <span className={`part-command-execution__exit ${statusClass(exitCode)}`}>
             exit {exitCode}
           </span>
         )}

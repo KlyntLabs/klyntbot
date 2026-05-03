@@ -7,6 +7,16 @@ use crate::error::{OptionExt, StorageError};
 use crate::messages::parts::{FinishReason, MessagePart};
 use crate::rows::session::{SessionListRow, SessionMessageRow, SessionRow};
 
+/// Deserialize an optional JSON column, treating NULL or empty string as `None`.
+fn parse_json_column<T: serde::de::DeserializeOwned>(
+    col: &Option<String>,
+) -> Result<Option<T>, StorageError> {
+    match col.as_deref() {
+        Some(s) if !s.is_empty() => serde_json::from_str(s).map_err(StorageError::serialization).map(Some),
+        _ => Ok(None),
+    }
+}
+
 /// Repository for session and message persistence.
 #[derive(Debug, Clone)]
 pub struct SessionRepo {
@@ -688,6 +698,7 @@ impl SessionRepo {
         turn_id: Option<&str>,
         finish_reason: Option<&FinishReason>,
     ) -> Result<(), StorageError> {
+        let mut tx = self.pool.begin().await?;
         let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         let parts_json = serde_json::to_string(parts).map_err(StorageError::serialization)?;
         let finish_json = finish_reason
@@ -699,7 +710,7 @@ impl SessionRepo {
         sqlx::query("UPDATE sessions SET updated_at = ?1 WHERE key = ?2")
             .bind(now)
             .bind(session_key)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
 
         sqlx::query(
@@ -714,8 +725,10 @@ impl SessionRepo {
         .bind(turn_id)
         .bind(finish_json)
         .bind(now)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+
+        tx.commit().await?;
         Ok(())
     }
 
@@ -738,20 +751,12 @@ impl SessionRepo {
 
         rows.into_iter()
             .map(|r| {
-                let parts: Vec<MessagePart> = match r.parts.as_deref() {
-                    Some(s) if !s.is_empty() => {
-                        serde_json::from_str(s).map_err(StorageError::serialization)?
-                    }
-                    _ => vec![MessagePart::Text {
+                let parts: Vec<MessagePart> = parse_json_column(&r.parts)?.unwrap_or_else(|| {
+                    vec![MessagePart::Text {
                         text: r.content.clone(),
-                    }],
-                };
-                let finish_reason: Option<FinishReason> = match r.finish_reason.as_deref() {
-                    Some(s) if !s.is_empty() => {
-                        Some(serde_json::from_str(s).map_err(StorageError::serialization)?)
-                    }
-                    _ => None,
-                };
+                    }]
+                });
+                let finish_reason: Option<FinishReason> = parse_json_column(&r.finish_reason)?;
                 Ok(SessionMessageWithParts {
                     id: r.id.to_string(),
                     session_key: r.session_key,
@@ -774,7 +779,7 @@ impl SessionRepo {
     ) -> Result<(), StorageError> {
         let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         sqlx::query(
-            "UPDATE sessions SET workspace_id = ?1, updated_at = ?2 WHERE key = ?3",
+            "UPDATE sessions SET workspace_id = ?1, updated_at = ?2 WHERE key = ?3 AND (workspace_id IS NULL OR workspace_id != ?1)",
         )
         .bind(workspace_id)
         .bind(now)
@@ -790,8 +795,9 @@ impl SessionRepo {
         session_key: &str,
         ephemeral: bool,
     ) -> Result<(), StorageError> {
-        sqlx::query("UPDATE sessions SET ephemeral = ?1 WHERE key = ?2")
-            .bind(if ephemeral { 1i64 } else { 0i64 })
+        let val = if ephemeral { 1i64 } else { 0i64 };
+        sqlx::query("UPDATE sessions SET ephemeral = ?1 WHERE key = ?2 AND ephemeral != ?1")
+            .bind(val)
             .bind(session_key)
             .execute(&self.pool)
             .await?;
@@ -801,7 +807,7 @@ impl SessionRepo {
     /// Set the archived_at timestamp on a session.
     pub async fn archive(&self, session_key: &str) -> Result<(), StorageError> {
         let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
-        sqlx::query("UPDATE sessions SET archived_at = ?1, updated_at = ?1 WHERE key = ?2")
+        sqlx::query("UPDATE sessions SET archived_at = ?1, updated_at = ?1 WHERE key = ?2 AND archived_at IS NULL")
             .bind(now)
             .bind(session_key)
             .execute(&self.pool)
