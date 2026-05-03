@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTauriMutation } from "@/lib/query";
-import { ipc } from "@/utils/tauri-bridge";
 import { qk } from "@/lib/query/queryKeys";
+import { ipc } from "@/utils/tauri-bridge";
 import { showError } from "../lib/showError";
 import { useLauncherApi, useLauncherState } from "../store";
 import type { LauncherItem, LauncherItemKind } from "../types";
@@ -41,7 +41,8 @@ export function ActionMenu({ onExecute }: ActionMenuProps) {
 
   const item = results[selectedIndex] ?? null;
   const actions = useMemo(
-    () => (item ? getActionsForItem(item, openPath, onExecute, selectedIndex, queryClient, query) : []),
+    () =>
+      item ? getActionsForItem(item, openPath, onExecute, selectedIndex, queryClient, query) : [],
     [item, openPath, onExecute, selectedIndex, queryClient, query],
   );
 
@@ -346,11 +347,19 @@ function brewActions(kind: KindOf<"brewPackage">): Action[] {
   ];
 }
 
-function defaultActions(item: LauncherItem, onExecute?: (index: number) => void, selectedIndex?: number): Action[] {
+function defaultActions(
+  item: LauncherItem,
+  onExecute?: (index: number) => void,
+  selectedIndex?: number,
+): Action[] {
   return [
-    { label: "Execute", shortcut: "Enter", handler: () => {
-      if (onExecute && selectedIndex !== undefined) onExecute(selectedIndex);
-    } },
+    {
+      label: "Execute",
+      shortcut: "Enter",
+      handler: () => {
+        if (onExecute && selectedIndex !== undefined) onExecute(selectedIndex);
+      },
+    },
     { label: "Copy Title", handler: () => copyText(item.title) },
   ];
 }

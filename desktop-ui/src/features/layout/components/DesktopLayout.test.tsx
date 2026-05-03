@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
+
+import { __testing, setAppMode } from "@app/hooks/useAppMode";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { __testing, setAppMode } from "@app/hooks/useAppMode";
 import { DesktopLayout } from "./DesktopLayout";
 
 afterEach(() => cleanup());

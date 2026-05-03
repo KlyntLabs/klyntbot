@@ -1,12 +1,12 @@
-import { useState, memo } from "react";
-import { ChevronRight, ChevronDown, AlertCircle, Copy, Check } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
+import { memo, useState } from "react";
 import {
   eventChipColor,
-  isErrorEvent,
-  formatTimestamp,
   formatTimeDelta,
-  timeDeltaSeverity,
+  formatTimestamp,
+  isErrorEvent,
   summarizeEvent,
+  timeDeltaSeverity,
 } from "./eventHelpers";
 import type { WireEventDto } from "./types";
 
@@ -24,7 +24,16 @@ export interface WireEventCardProps {
 }
 
 export const WireEventCard = memo(function WireEventCard(props: WireEventCardProps) {
-  const { event, expanded, onToggle, onSelect, selected, prevEvent, nestLevel = 0, searchMatch } = props;
+  const {
+    event,
+    expanded,
+    onToggle,
+    onSelect,
+    selected,
+    prevEvent,
+    nestLevel = 0,
+    searchMatch,
+  } = props;
   const color = eventChipColor(event.kind);
   const isError = isErrorEvent(event);
   const [copied, setCopied] = useState(false);
@@ -44,7 +53,14 @@ export const WireEventCard = memo(function WireEventCard(props: WireEventCardPro
         style={nestLevel ? { paddingLeft: `${20 + nestLevel * 16}px` } : undefined}
         onClick={onSelect}
       >
-        <button type="button" className="cm-event-card__chevron" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
+        <button
+          type="button"
+          className="cm-event-card__chevron"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+        >
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </button>
         <span className="cm-event-card__time">{formatTimestamp(event.occurredAt)}</span>
@@ -65,9 +81,7 @@ export const WireEventCard = memo(function WireEventCard(props: WireEventCardPro
           {copied ? <Check size={12} /> : <Copy size={12} />}
         </button>
       </div>
-      {expanded && (
-        <pre className="cm-event-card__payload">{prettyPrint(event.rawJson)}</pre>
-      )}
+      {expanded && <pre className="cm-event-card__payload">{prettyPrint(event.rawJson)}</pre>}
     </>
   );
 });
@@ -77,7 +91,9 @@ function renderGap(curr: WireEventDto, prev: WireEventDto) {
   if (ms < 1000) return null;
   const sev = timeDeltaSeverity(ms);
   return (
-    <div className={`cm-gap${sev === "warn" ? " cm-gap--warn" : sev === "danger" ? " cm-gap--danger" : ""}`}>
+    <div
+      className={`cm-gap${sev === "warn" ? " cm-gap--warn" : sev === "danger" ? " cm-gap--danger" : ""}`}
+    >
       <span className="cm-gap__line" />
       <span>{formatTimeDelta(new Date(curr.occurredAt), new Date(prev.occurredAt))}</span>
       <span className="cm-gap__line" />
@@ -86,5 +102,9 @@ function renderGap(curr: WireEventDto, prev: WireEventDto) {
 }
 
 function prettyPrint(raw: string): string {
-  try { return JSON.stringify(JSON.parse(raw), null, 2); } catch { return raw; }
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
 }

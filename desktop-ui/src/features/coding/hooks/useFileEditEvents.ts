@@ -1,5 +1,5 @@
-import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { useEffect } from "react";
 import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
 import type { ConversationItem } from "@/types";
 
@@ -17,7 +17,8 @@ export function useFileEditEvents(sessionKey: string) {
     const un = listen<FileEditPayload>("agent:file_edit_with_symbols", (e) => {
       const id = `diff-${sessionKey}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const item: DiffItem = {
-        id, kind: "diff",
+        id,
+        kind: "diff",
         title: shortName(e.payload.path),
         diff: e.payload.diff,
         path: e.payload.path,
@@ -26,7 +27,9 @@ export function useFileEditEvents(sessionKey: string) {
       };
       chatStreamStore.upsertFileEdit(sessionKey, item);
     });
-    return () => { un.then((f) => f()); };
+    return () => {
+      un.then((f) => f());
+    };
   }, [sessionKey]);
 }
 

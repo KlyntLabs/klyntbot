@@ -1,38 +1,68 @@
 import type { WireEventDto } from "./types";
 
 export type ChipColor =
-  | "blue" | "purple" | "green" | "orange" | "amber"
-  | "cyan" | "indigo" | "teal" | "pink" | "neutral";
+  | "blue"
+  | "purple"
+  | "green"
+  | "orange"
+  | "amber"
+  | "cyan"
+  | "indigo"
+  | "teal"
+  | "pink"
+  | "neutral";
 
 const KIND_TO_COLOR: Record<string, ChipColor> = {
   // turn
-  turnBegin: "blue", turnEnd: "blue", steerInput: "blue",
+  turnBegin: "blue",
+  turnEnd: "blue",
+  steerInput: "blue",
   // step
-  stepBegin: "green", stepInterrupted: "amber",
+  stepBegin: "green",
+  stepInterrupted: "amber",
   // compaction
-  compactionBegin: "orange", compactionEnd: "orange", compactionApplied: "orange",
+  compactionBegin: "orange",
+  compactionEnd: "orange",
+  compactionApplied: "orange",
   // mcp
-  mcpLoadingBegin: "cyan", mcpLoadingEnd: "cyan",
+  mcpLoadingBegin: "cyan",
+  mcpLoadingEnd: "cyan",
   // status / notifications
-  statusUpdate: "neutral", notification: "amber",
+  statusUpdate: "neutral",
+  notification: "amber",
   // text
-  textPart: "neutral", thinkPart: "neutral",
+  textPart: "neutral",
+  thinkPart: "neutral",
   planDisplay: "teal",
   // tools
-  toolCall: "purple", toolResult: "purple",
-  toolCallPart: "purple", toolCallRequest: "purple",
+  toolCall: "purple",
+  toolResult: "purple",
+  toolCallPart: "purple",
+  toolCallRequest: "purple",
   // approvals
-  questionRequest: "amber", approvalRequest: "amber", approvalResponse: "amber",
+  questionRequest: "amber",
+  approvalRequest: "amber",
+  approvalResponse: "amber",
   approvalDecision: "amber",
   // sub-agents
   subagentEvent: "indigo",
   // media
-  imageUrlPart: "pink", videoUrlPart: "pink", audioUrlPart: "pink",
+  imageUrlPart: "pink",
+  videoUrlPart: "pink",
+  audioUrlPart: "pink",
   // klynt-internal-rich
-  skillActivated: "teal", recallInjected: "indigo", providerCall: "cyan",
-  fileEdit: "purple", testRun: "green", error: "neutral",
-  gitCommit: "blue", mirrorAlert: "amber", sessionStart: "blue", sessionEnd: "blue",
-  userPrompt: "blue", assistantMsg: "neutral",
+  skillActivated: "teal",
+  recallInjected: "indigo",
+  providerCall: "cyan",
+  fileEdit: "purple",
+  testRun: "green",
+  error: "neutral",
+  gitCommit: "blue",
+  mirrorAlert: "amber",
+  sessionStart: "blue",
+  sessionEnd: "blue",
+  userPrompt: "blue",
+  assistantMsg: "neutral",
 };
 
 export function eventChipColor(kind: string): ChipColor {
@@ -55,7 +85,9 @@ export function isErrorEvent(e: WireEventDto): boolean {
 
 export function formatTimestamp(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
     fractionalSecondDigits: 3,
   });
 }

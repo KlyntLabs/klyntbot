@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listReforgeCycles, fetchReforgeCycleDiff } from "@/api/endpoints/codingMemory";
+import { fetchReforgeCycleDiff, listReforgeCycles } from "@/api/endpoints/codingMemory";
 
 interface Cycle {
   cycleId: string;
@@ -8,7 +8,9 @@ interface Cycle {
   artifactsWritten: number;
 }
 
-interface Props { repoId?: string; }
+interface Props {
+  repoId?: string;
+}
 
 export function ReforgeCycleDiff({ repoId }: Props) {
   const [cycles, setCycles] = useState<Cycle[]>([]);
@@ -42,7 +44,14 @@ export function ReforgeCycleDiff({ repoId }: Props) {
             <li key={c.cycleId} className="cm-reforge__item">
               <button
                 type="button"
-                className={"cm-reforge__cycle" + (selectedBefore === c.cycleId ? " cm-reforge__cycle--before" : selectedAfter === c.cycleId ? " cm-reforge__cycle--after" : "")}
+                className={
+                  "cm-reforge__cycle" +
+                  (selectedBefore === c.cycleId
+                    ? " cm-reforge__cycle--before"
+                    : selectedAfter === c.cycleId
+                      ? " cm-reforge__cycle--after"
+                      : "")
+                }
                 onClick={() => {
                   if (!selectedBefore || selectedAfter) {
                     setSelectedBefore(c.cycleId);
@@ -60,7 +69,9 @@ export function ReforgeCycleDiff({ repoId }: Props) {
           ))}
         </ul>
         {selectedBefore && selectedAfter && (
-          <button type="button" className="cm-reforge__diff-btn" onClick={loadDiff}>Show Diff</button>
+          <button type="button" className="cm-reforge__diff-btn" onClick={loadDiff}>
+            Show Diff
+          </button>
         )}
       </div>
       {diff && (

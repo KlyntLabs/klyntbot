@@ -17,11 +17,11 @@ import X from "lucide-react/dist/esm/icons/x";
 import type { MouseEvent } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { PierreDiffBlock } from "@/features/git/components/PierreDiffBlock";
-import type { ConversationItem } from "@/types";
 import { ApprovalCard } from "@/features/coding/components/ApprovalCard";
 import { DiffPreview } from "@/features/coding/components/DiffPreview";
 import type { ApprovalDecision } from "@/features/coding/hooks/useApprovalQueue";
+import { PierreDiffBlock } from "@/features/git/components/PierreDiffBlock";
+import type { ConversationItem } from "@/types";
 import {
   basename,
   buildToolSummary,

@@ -1,5 +1,5 @@
+import { AlertCircle, Check, Clock, Copy, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { X, Copy, Check, Clock, AlertCircle } from "lucide-react";
 import { CausalGraphInspector } from "./CausalGraphInspector";
 import { formatTimestamp } from "./eventHelpers";
 import type { WireEventDto } from "./types";
@@ -38,7 +38,11 @@ function findPair(selected: WireEventDto, events: WireEventDto[]): ToolCallPair 
     if (e.kind === "toolCall" && (e.payloadDecoded as any)?.id === toolCallId && !toolCall) {
       toolCall = e;
     }
-    if (e.kind === "toolResult" && (e.payloadDecoded as any)?.tool_call_id === toolCallId && !toolResult) {
+    if (
+      e.kind === "toolResult" &&
+      (e.payloadDecoded as any)?.tool_call_id === toolCallId &&
+      !toolResult
+    ) {
       toolResult = e;
     }
   }
@@ -101,11 +105,18 @@ export function ToolCallDetail({ selectedEvent, allEvents, onClose }: ToolCallDe
       </div>
       <div className="cm-tool-detail__body">
         <div className="cm-tool-detail__col">
-          <div className="cm-tool-detail__col-title">ToolCall · {formatTimestamp(pair.toolCall.occurredAt)}</div>
+          <div className="cm-tool-detail__col-title">
+            ToolCall · {formatTimestamp(pair.toolCall.occurredAt)}
+          </div>
           <CopyableJson data={getCallArgs(pair.toolCall)} />
         </div>
         <div className="cm-tool-detail__col">
-          <div className={"cm-tool-detail__col-title" + (pair.isError ? " cm-tool-detail__col-title--error" : "")}>
+          <div
+            className={
+              "cm-tool-detail__col-title" +
+              (pair.isError ? " cm-tool-detail__col-title--error" : "")
+            }
+          >
             {pair.toolResult
               ? `ToolResult · ${formatTimestamp(pair.toolResult.occurredAt)}`
               : "ToolResult · (pending)"}
@@ -126,7 +137,11 @@ function getCallArgs(event: WireEventDto): unknown {
   if (!fn) return event.payloadDecoded;
   const argsStr = fn.arguments as string | undefined;
   if (argsStr) {
-    try { return JSON.parse(argsStr); } catch { return argsStr; }
+    try {
+      return JSON.parse(argsStr);
+    } catch {
+      return argsStr;
+    }
   }
   return fn;
 }

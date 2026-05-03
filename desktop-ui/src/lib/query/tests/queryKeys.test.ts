@@ -111,4 +111,12 @@ describe("dashboard keys", () => {
   it("calendarSync.status is namespaced", () => {
     expect(qk.calendarSync.status()).toEqual(["calendarSync", "status"]);
   });
+
+  it("productivity.calendarEvents encodes date", () => {
+    expect(qk.productivity.calendarEvents("2026-04-30")).toEqual([
+      "productivity",
+      "calendarEvents",
+      "2026-04-30",
+    ]);
+  });
 });

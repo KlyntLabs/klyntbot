@@ -1,11 +1,11 @@
 import {
+  AlertCircle,
+  ChevronDown,
   ChevronsDownUp,
   ChevronsUpDown,
-  Search,
   ChevronUp,
-  ChevronDown,
+  Search,
   X,
-  AlertCircle,
 } from "lucide-react";
 import { eventChipColor } from "./eventHelpers";
 
@@ -18,9 +18,17 @@ interface FilterPreset {
 const FILTER_PRESETS: FilterPreset[] = [
   { label: "All Events", types: new Set(), errorsOnly: false },
   { label: "Errors Only", types: new Set(), errorsOnly: true },
-  { label: "Tool Calls", types: new Set(["toolCall", "toolResult", "toolCallPart"]), errorsOnly: false },
+  {
+    label: "Tool Calls",
+    types: new Set(["toolCall", "toolResult", "toolCallPart"]),
+    errorsOnly: false,
+  },
   { label: "Thinking", types: new Set(["thinkPart", "textPart"]), errorsOnly: false },
-  { label: "Approvals", types: new Set(["approvalRequest", "approvalResponse"]), errorsOnly: false },
+  {
+    label: "Approvals",
+    types: new Set(["approvalRequest", "approvalResponse"]),
+    errorsOnly: false,
+  },
   { label: "Sub-agents", types: new Set(["subagentEvent"]), errorsOnly: false },
 ];
 
@@ -87,10 +95,7 @@ export function WireFilters({
               key={preset.label}
               type="button"
               onClick={() => onApplyPreset(preset.types, preset.errorsOnly)}
-              className={
-                "cm-preset" +
-                (activePresetIndex === i ? " cm-preset--active" : "")
-              }
+              className={"cm-preset" + (activePresetIndex === i ? " cm-preset--active" : "")}
             >
               {preset.label}
             </button>
@@ -111,28 +116,19 @@ export function WireFilters({
             className="cm-search__input"
           />
           {searchQuery && (
-            <button
-              type="button"
-              onClick={() => onSearchChange("")}
-              className="cm-search__clear"
-            >
+            <button type="button" onClick={() => onSearchChange("")} className="cm-search__clear">
               <X size={12} />
             </button>
           )}
         </div>
-        {searchQuery && (
-          <span className="cm-filters__matches">{searchMatchCount} matches</span>
-        )}
+        {searchQuery && <span className="cm-filters__matches">{searchMatchCount} matches</span>}
 
         <div className="cm-filters__divider" />
 
         <button
           type="button"
           onClick={onToggleErrorsOnly}
-          className={
-            "cm-filters__errors" +
-            (errorsOnly ? " cm-filters__errors--active" : "")
-          }
+          className={"cm-filters__errors" + (errorsOnly ? " cm-filters__errors--active" : "")}
           title="Show errors only"
         >
           <AlertCircle size={12} />
@@ -140,10 +136,20 @@ export function WireFilters({
         </button>
         {errorCount > 0 && (
           <>
-            <button type="button" onClick={onPrevError} className="cm-filters__nav-btn" title="Previous error">
+            <button
+              type="button"
+              onClick={onPrevError}
+              className="cm-filters__nav-btn"
+              title="Previous error"
+            >
               <ChevronUp size={14} />
             </button>
-            <button type="button" onClick={onNextError} className="cm-filters__nav-btn" title="Next error">
+            <button
+              type="button"
+              onClick={onNextError}
+              className="cm-filters__nav-btn"
+              title="Next error"
+            >
               <ChevronDown size={14} />
             </button>
           </>

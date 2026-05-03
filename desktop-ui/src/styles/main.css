@@ -38,9 +38,11 @@
 .app.is-plugins .main {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  box-shadow: none;
+}
+
+.app.is-calendar .main {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
 }
 
 .app.reduced-transparency .main {

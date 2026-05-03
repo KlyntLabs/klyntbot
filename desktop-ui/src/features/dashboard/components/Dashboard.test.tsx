@@ -41,10 +41,16 @@ describe("Dashboard", () => {
     expect(dayPill?.className).toContain("dashboard__view-pill--active");
   });
 
-  it("renders placeholder for non-day modes", () => {
+  it("renders week view when Week pill is clicked", () => {
     render(wrap(<Dashboard />));
     const weekPill = screen.getByText("Week").closest("button") as HTMLButtonElement;
     fireEvent.click(weekPill);
-    expect(screen.getByText(/Week view — coming in next phase/)).toBeTruthy();
+    expect(screen.getAllByTestId("week-day-header").length).toBe(7);
+  });
+
+  it("mounts FocusStateIndicator and AutoFocusToast as siblings of dashboard__content", () => {
+    render(wrap(<Dashboard />));
+    expect(screen.getByTestId("focus-state-indicator")).toBeTruthy();
+    expect(screen.getByTestId("auto-focus-toast")).toBeTruthy();
   });
 });

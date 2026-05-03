@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import { invoke } from "@/api/client";
 
 interface Props {
@@ -9,7 +9,9 @@ interface Props {
 }
 
 export function StarlarkRuleEditor({ requestId, initialDraft, onCommit, onCancel }: Props) {
-  const [src, setSrc] = useState(initialDraft ?? `prefix_rule(["git", "status"], decision="allow")\n`);
+  const [src, setSrc] = useState(
+    initialDraft ?? `prefix_rule(["git", "status"], decision="allow")\n`,
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -42,7 +44,9 @@ export function StarlarkRuleEditor({ requestId, initialDraft, onCommit, onCancel
       />
       {error && <div className="starlark-rule-editor__error">{error}</div>}
       <div className="starlark-rule-editor__actions">
-        <button onClick={onCancel} disabled={saving}>Cancel</button>
+        <button onClick={onCancel} disabled={saving}>
+          Cancel
+        </button>
         <button onClick={onSave} disabled={saving} className="starlark-rule-editor__primary">
           {saving ? "Saving..." : "Save rule"}
         </button>

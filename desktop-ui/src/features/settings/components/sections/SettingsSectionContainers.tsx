@@ -1,15 +1,15 @@
 import type { CodexSection } from "@settings/components/settingsTypes";
 import type { SettingsViewOrchestration } from "@settings/hooks/useSettingsViewOrchestration";
+import { HooksSection } from "./HooksSection";
 import { SettingsAboutSection } from "./SettingsAboutSection";
 import { SettingsAgentsSection } from "./SettingsAgentsSection";
 import { SettingsCodexSection } from "./SettingsCodexSection";
+import { SettingsCodingSection } from "./SettingsCodingSection";
 import { SettingsComposerSection } from "./SettingsComposerSection";
 import { SettingsDictationSection } from "./SettingsDictationSection";
 import { SettingsDisplaySection } from "./SettingsDisplaySection";
 import { SettingsEnvironmentsSection } from "./SettingsEnvironmentsSection";
-import { SettingsCodingSection } from "./SettingsCodingSection";
 import { SettingsFeaturesSection } from "./SettingsFeaturesSection";
-import { HooksSection } from "./HooksSection";
 import { SettingsGitSection } from "./SettingsGitSection";
 import { SettingsOpenAppsSection } from "./SettingsOpenAppsSection";
 import { SettingsProjectsSection } from "./SettingsProjectsSection";
