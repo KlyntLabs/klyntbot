@@ -5,8466 +5,5222 @@
 
 /** user-defined commands **/
 
+
 export const commands = {
-  async agentListProfiles(): Promise<Result<AgentProfileSummary[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("agent_list_profiles") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async agentReadFile(
-    agentName: string,
-    filename: string,
-  ): Promise<Result<AgentFileContent, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("agent_read_file", { agentName, filename }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async agentWriteFile(
-    agentName: string,
-    filename: string,
-    content: string,
-  ): Promise<Result<AgentFileContent, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("agent_write_file", { agentName, filename, content }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async agentCreateProfile(name: string): Promise<Result<AgentProfileSummary, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("agent_create_profile", { name }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async agentCreateSkill(
-    agentName: string,
-    skillName: string,
-  ): Promise<Result<AgentFileSummary, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("agent_create_skill", { agentName, skillName }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async agentDeleteFile(agentName: string, filename: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("agent_delete_file", { agentName, filename }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async annotationCreate(
-    params: AnnotationCreateParams,
-  ): Promise<Result<AnnotationResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("annotation_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async annotationUpdate(
-    params: AnnotationUpdateParams,
-  ): Promise<Result<AnnotationResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("annotation_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async annotationDelete(id: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("annotation_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async annotationListForNote(
-    noteId: string,
-    limit: number | null,
-  ): Promise<Result<AnnotationResponse[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("annotation_list_for_note", { noteId, limit }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async annotationGetAiSuggestion(
-    noteId: string,
-    selectedText: string,
-  ): Promise<Result<AiSuggestionResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("annotation_get_ai_suggestion", { noteId, selectedText }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteGetLinkedContext(
-    params: LinkedContextParams,
-  ): Promise<Result<LinkedContextResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_get_linked_context", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async areaList(): Promise<Result<AreaResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("area_list") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async areaCreate(params: AreaCreateParams): Promise<Result<AreaResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("area_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async areaUpdate(params: AreaUpdateParams): Promise<Result<AreaResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("area_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async areaDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("area_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async areaReorder(id: string, position: number): Promise<Result<AreaResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("area_reorder", { id, position }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async autotunerStatus(): Promise<Result<AutoTunerStatus, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("autotuner_status") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async autotunerHistory(limit: number | null): Promise<Result<ExperimentSummary[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("autotuner_history", { limit }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async autotunerRevert(): Promise<Result<ChampionSummary, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("autotuner_revert") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async autotunerPause(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("autotuner_pause") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async autotunerResume(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("autotuner_resume") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async autotunerSetPace(pace: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("autotuner_set_pace", { pace }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async autotunerGetToastCount(): Promise<Result<number, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("autotuner_get_toast_count") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async autotunerIncrementToastCount(): Promise<Result<number, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("autotuner_increment_toast_count") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async captureStatus(): Promise<Result<CaptureStatusResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("capture_status") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async captureShellHookStatus(): Promise<Result<ShellHookStatusResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("capture_shell_hook_status") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async captureInstallShellHook(): Promise<Result<string, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("capture_install_shell_hook") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async captureUninstallShellHook(): Promise<Result<string, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("capture_uninstall_shell_hook") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async captureGetIngestionToken(): Promise<Result<string, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("capture_get_ingestion_token") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async captureRegenerateIngestionToken(): Promise<Result<string, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("capture_regenerate_ingestion_token") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatThreads(): Promise<Result<ChatThreadResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("chat_threads") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatMessages(
-    sessionKey: string,
-    limit: number | null,
-  ): Promise<Result<ChatMessageResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("chat_messages", { sessionKey, limit }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatSend(
-    content: string,
-    sessionKey: string,
-    context: SessionContextInput | null,
-    mode: string | null,
-  ): Promise<Result<ChatMessageResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("chat_send", { content, sessionKey, context, mode }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatPinThread(sessionKey: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("chat_pin_thread", { sessionKey }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatRenameThread(sessionKey: string, title: string): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("chat_rename_thread", { sessionKey, title }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatDeleteThread(sessionKey: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("chat_delete_thread", { sessionKey }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatGetSession(sessionKey: string): Promise<Result<ChatSessionResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("chat_get_session", { sessionKey }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatListSessionsByProject(
-    projectId: string,
-  ): Promise<Result<ChatThreadResponse[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("chat_list_sessions_by_project", { projectId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatDeleteStaleSessions(beforeDays: number): Promise<Result<number, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("chat_delete_stale_sessions", { beforeDays }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatCancel(sessionKey: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("chat_cancel", { sessionKey }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatRespondInteraction(
-    sessionKey: string,
-    requestId: string,
-    response: unknown,
-  ): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("chat_respond_interaction", { sessionKey, requestId, response }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatRespondApproval(
-    sessionKey: string,
-    requestId: string,
-    decision: AppApprovalDecision,
-  ): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("chat_respond_approval", { sessionKey, requestId, decision }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatSetMode(sessionKey: string, mode: ChatMode): Promise<Result<SessionRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("chat_set_mode", { sessionKey, mode }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async chatSaveStarlarkRule(
-    requestId: string,
-    ruleSource: string,
-    suggestedFilename: string | null,
-  ): Promise<Result<string, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("chat_save_starlark_rule", {
-          requestId,
-          ruleSource,
-          suggestedFilename,
-        }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingHooksList(): Promise<Result<HooksTomlSnapshot, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_hooks_list") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryStatus(): Promise<Result<CodingMemoryStatusResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_status") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryDistillNow(
-    sessionId: string,
-    turnId: string | null,
-  ): Promise<Result<unknown, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_distill_now", { sessionId, turnId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryCheckDeadEnds(args: unknown): Promise<Result<unknown, string>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_check_dead_ends", { args }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryCliHealth(): Promise<Result<CliHealthRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_cli_health") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemorySessionReplay(
-    sessionId: string | null,
-    limit: number | null,
-    offset: number | null,
-  ): Promise<Result<SessionReplayEntry[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_session_replay", { sessionId, limit, offset }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemorySessionList(
-    args: SessionListArgs,
-  ): Promise<Result<SessionSummaryDto[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_session_list", { args }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemorySessionReplayTyped(
-    sessionId: string,
-    limit: number | null,
-    offset: number | null,
-  ): Promise<Result<WireEventDto[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_session_replay_typed", {
-          sessionId,
-          limit,
-          offset,
-        }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryEnableCli(cli: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_enable_cli", { cli }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryDisableCli(cli: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_disable_cli", { cli }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryDiagnoseCli(cli: string): Promise<Result<DiagnoseResult, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_diagnose_cli", { cli }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryInstallGitHook(repoRoot: string): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_install_git_hook", { repoRoot }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryBrowser(
-    limit: number | null,
-    offset: number | null,
-  ): Promise<Result<MemoryBrowserRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_browser", { limit, offset }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryActivity(days: number | null): Promise<Result<ActivityBucket[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_activity", { days }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryCost(days: number | null): Promise<Result<CostBreakdown, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_cost", { days }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemorySensitivity(
-    limit: number | null,
-    offset: number | null,
-  ): Promise<Result<SensitivityRow[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_sensitivity", { limit, offset }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryMirrorAlertsFeed(
-    args: MirrorAlertsFeedArgs,
-  ): Promise<Result<MirrorAlertRow[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_mirror_alerts_feed", { args }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryMirrorAlertAction(
-    args: MirrorAlertActionArgs,
-  ): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_mirror_alert_action", { args }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryEffectivenessTrends(
-    patternId: string,
-  ): Promise<Result<EffectivenessTrendsResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_effectiveness_trends", { patternId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryReforgeCycleList(): Promise<Result<ReforgeCycleSummary[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_reforge_cycle_list") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryReforgeCycleDiff(
-    args: ReforgeCycleDiffArgs,
-  ): Promise<Result<ReforgeCycleDiffResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_reforge_cycle_diff", { args }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryProjectSkillsForRepo(
-    repoId: string,
-  ): Promise<Result<ProjectSkillRow[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_project_skills_for_repo", { repoId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryRecallIndex(args: unknown): Promise<Result<unknown, string>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_index", { args }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryRecallTimeline(args: unknown): Promise<Result<unknown, string>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_timeline", { args }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryRecallFetch(args: unknown): Promise<Result<unknown, string>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_fetch", { args }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryRecallFactsAsOf(args: unknown): Promise<Result<unknown, string>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_recall_facts_as_of", { args }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryRecallChangeHistory(args: unknown): Promise<Result<unknown, string>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_recall_change_history", { args }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryRecallDecisionPoints(args: unknown): Promise<Result<unknown, string>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_recall_decision_points", { args }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemoryRecallLog(args: RecallLogArgs): Promise<Result<unknown, string>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_log", { args }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingMemorySessionReplayRecallOverlay(
-    args: SessionRecallOverlayArgs,
-  ): Promise<Result<unknown, string>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coding_memory_session_replay_recall_overlay", { args }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingSkillsList(): Promise<Result<SkillListItem[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_skills_list") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingSkillsInfo(name: string): Promise<Result<SkillInfo, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_skills_info", { name }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingSkillsInstall(source: string): Promise<Result<SkillListItem, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_skills_install", { source }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingSkillsUpdate(name: string): Promise<Result<SkillListItem, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_skills_update", { name }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingSkillsUninstall(name: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_skills_uninstall", { name }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingSkillsToggle(name: string, enabled: boolean): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_skills_toggle", { name, enabled }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingSkillsValidate(name: string): Promise<Result<SkillValidationResult, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_skills_validate", { name }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingSkillsReload(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_skills_reload") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingStatus(sessionKey: string): Promise<Result<CodingStatus, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_status", { sessionKey }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingDoctor(): Promise<Result<DiagnosticChecklist, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_doctor") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingTestSandbox(): Promise<Result<SandboxTestResult, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_test_sandbox") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingSessionsStar(sessionKey: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_sessions_star", { sessionKey }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingSessionsUnstar(sessionKey: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_sessions_unstar", { sessionKey }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingResume(prefix: string): Promise<Result<ResumeResult, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_resume", { prefix }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async codingHelp(command: string | null): Promise<Result<HelpEntry[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coding_help", { command }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveUserModel(): Promise<Result<UserModelSummaryResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_user_model") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveInjectEvent(
-    eventType: string,
-    payload: unknown,
-  ): Promise<Result<boolean, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("cognitive_inject_event", { eventType, payload }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveFactsList(
-    domain: string | null,
-  ): Promise<Result<SemanticFactResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_facts_list", { domain }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveEpisodicList(
-    domain: string | null,
-    limit: number | null,
-  ): Promise<Result<EpisodicMemoryResponse[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("cognitive_episodic_list", { domain, limit }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveRulesList(
-    domain: string | null,
-  ): Promise<Result<ProceduralRuleResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_rules_list", { domain }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveMemoryStats(): Promise<Result<MemoryStatsResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_memory_stats") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async memoryHealth(): Promise<Result<MemoryHealthResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("memory_health") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async coachingSituation(): Promise<Result<UserSituationResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coaching_situation") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async coachingSignals(): Promise<Result<SignalWindowResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coaching_signals") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async coachingPatterns(): Promise<Result<DetectedPatternResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coaching_patterns") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async coachingFeedbackStats(): Promise<Result<StrategyFeedbackResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coaching_feedback_stats") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async coachingRouterStatus(): Promise<Result<RouterStatusResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coaching_router_status") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async coachingPendingInterventions(): Promise<Result<DeliveredInterventionResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coaching_pending_interventions") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async memoryReferenceDetail(
-    refType: string,
-    refId: string,
-  ): Promise<Result<MemoryReferenceDetail, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("memory_reference_detail", { refType, refId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveSystemStatus(): Promise<Result<SystemStatusResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_system_status") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveFactCreate(
-    params: FactCreateParams,
-  ): Promise<Result<SemanticFactResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_fact_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveFactUpdate(
-    id: string,
-    params: FactUpdateParams,
-  ): Promise<Result<SemanticFactResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_fact_update", { id, params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveFactDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_fact_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveRuleCreate(
-    params: RuleCreateParams,
-  ): Promise<Result<ProceduralRuleResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_rule_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveRuleDeactivate(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_rule_deactivate", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveRunCompaction(): Promise<Result<CompactionResultResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_run_compaction") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async coachingResetDismissals(triggerName: string | null): Promise<Result<boolean, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coaching_reset_dismissals", { triggerName }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async coachingClearSignals(): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coaching_clear_signals") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async coachingSubmitFeedback(
-    interventionId: string,
-    response: string,
-  ): Promise<Result<boolean, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coaching_submit_feedback", { interventionId, response }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async coachingReportIgnored(interventionId: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("coaching_report_ignored", { interventionId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async coachingInterventionLog(
-    limit: number | null,
-  ): Promise<Result<InterventionLogResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coaching_intervention_log", { limit }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async coachingSeedPatterns(): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("coaching_seed_patterns") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveGraphData(): Promise<Result<CognitiveGraphData, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_graph_data") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveGraphExpandTopic(
-    params: TopicExpandParams,
-  ): Promise<Result<TopicDetail, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_graph_expand_topic", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitiveEventLog(limit: number | null): Promise<Result<DomainEventRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_event_log", { limit }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cognitivePipelineLog(limit: number | null): Promise<Result<PipelineEventRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cognitive_pipeline_log", { limit }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async customColumnList(projectId: string): Promise<Result<CustomColumnResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("custom_column_list", { projectId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async customColumnCreate(
-    params: ColumnCreateParams,
-  ): Promise<Result<CustomColumnResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("custom_column_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async customColumnUpdate(
-    params: ColumnUpdateParams,
-  ): Promise<Result<CustomColumnResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("custom_column_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async customColumnDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("custom_column_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async customColumnReorder(params: ColumnReorderParams): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("custom_column_reorder", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async customColumnValues(taskId: string): Promise<Result<CustomColumnValueResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("custom_column_values", { taskId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async customColumnValueSet(params: ColumnValueSetParams): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("custom_column_value_set", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async customColumnValueDelete(
-    taskId: string,
-    columnId: string,
-  ): Promise<Result<boolean, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("custom_column_value_delete", { taskId, columnId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cronList(includeDisabled: boolean | null): Promise<Result<CronJobResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cron_list", { includeDisabled }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cronStatus(): Promise<Result<CronStatusResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cron_status") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cronEnable(id: string, enabled: boolean): Promise<Result<CronJobResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cron_enable", { id, enabled }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cronRun(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cron_run", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cronDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cron_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cronCreate(params: CronJobCreateParams): Promise<Result<CronJobResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cron_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async cronUpdate(params: CronJobUpdateParams): Promise<Result<CronJobResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("cron_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async distractionDismiss(appName: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("distraction_dismiss", { appName }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async distractionAllowTemp(pattern: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("distraction_allow_temp", { pattern }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async distractionAllowSession(
-    appName: string,
-    windowTitle: string | null,
-    classification: string,
-  ): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("distraction_allow_session", {
-          appName,
-          windowTitle,
-          classification,
-        }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async distractionLearnedRules(): Promise<Result<LearnedRuleResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("distraction_learned_rules") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async distractionDeleteRule(id: number): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("distraction_delete_rule", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  /**
-   * Pulled by the overlay's React layer on mount to recover the latest
-   * alert if the push event was emitted before the listener was wired.
-   * Returns `None` once the overlay has acked via `clear_pending`.
-   */
-  async distractionGetPendingIntervention(): Promise<Result<InterventionPayload | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("distraction_get_pending_intervention") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async distractionClearPendingIntervention(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("distraction_clear_pending_intervention") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async entitySearch(params: EntitySearchParams): Promise<Result<EntityResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("entity_search", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async entityMerge(params: EntityMergeParams): Promise<Result<EntityResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("entity_merge", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async entityGetNeighborhood(
-    entityId: string,
-    depth: number | null,
-  ): Promise<Result<EntityNeighborhoodResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("entity_get_neighborhood", { entityId, depth }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async entityLinkCreate(
-    params: EntityLinkCreateParams,
-  ): Promise<Result<EntityLinkResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("entity_link_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async entityLinkDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("entity_link_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async entityLinksForEntity(
-    kind: string,
-    id: string,
-  ): Promise<Result<LinkedEntitiesResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("entity_links_for_entity", { kind, id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async fabricGraphBase(): Promise<Result<FabricGraphBase, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("fabric_graph_base") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async fabricGraphExpand(
-    params: FabricExpandParams,
-  ): Promise<Result<FabricExpandResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("fabric_graph_expand", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async fabricGraphAction(
-    params: FabricActionParams,
-  ): Promise<Result<FabricActionResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("fabric_graph_action", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeAccounts(): Promise<Result<FinanceAccountRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_accounts") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeTransactions(
-    limit: number | null,
-  ): Promise<Result<FinanceTransactionRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_transactions", { limit }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeTransactionsFiltered(
-    params: FinanceTransactionFilterParams,
-  ): Promise<Result<FinanceTransactionRow[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("finance_transactions_filtered", { params }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeBudgetUsage(): Promise<Result<BudgetUsageRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_budget_usage") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financePortfolios(): Promise<Result<FinancePortfolioResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_portfolios") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeInvestments(): Promise<Result<FinanceInvestmentRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_investments") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeInvestmentsFiltered(
-    portfolioId: string | null,
-  ): Promise<Result<FinanceInvestmentRow[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("finance_investments_filtered", { portfolioId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeGoals(): Promise<Result<FinanceGoalRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_goals") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeLiabilities(): Promise<Result<FinanceLiabilityRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_liabilities") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeNetWorth(): Promise<Result<FinanceNetWorthResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_net_worth") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeExchangeRates(): Promise<Result<Partial<{ [key in string]: number }>, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_exchange_rates") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeAccountCreate(
-    params: FinanceAccountCreateParams,
-  ): Promise<Result<FinanceAccountRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_account_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeAccountUpdate(
-    params: FinanceAccountUpdateParams,
-  ): Promise<Result<FinanceAccountRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_account_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeAccountDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_account_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeTransactionCreate(
-    params: FinanceTransactionCreateParams,
-  ): Promise<Result<FinanceTransactionRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_transaction_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeTransactionDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_transaction_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeBudgetCreate(
-    params: FinanceBudgetCreateParams,
-  ): Promise<Result<FinanceBudgetRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_budget_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeBudgetUpdate(
-    params: FinanceBudgetUpdateParams,
-  ): Promise<Result<FinanceBudgetRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_budget_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeBudgetDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_budget_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeGoalCreate(
-    params: FinanceGoalCreateParams,
-  ): Promise<Result<FinanceGoalRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_goal_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeGoalUpdate(
-    params: FinanceGoalUpdateParams,
-  ): Promise<Result<FinanceGoalRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_goal_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeGoalDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_goal_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeLiabilityCreate(
-    params: FinanceLiabilityCreateParams,
-  ): Promise<Result<FinanceLiabilityRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_liability_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeLiabilityUpdate(
-    params: FinanceLiabilityUpdateParams,
-  ): Promise<Result<FinanceLiabilityRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_liability_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeLiabilityDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_liability_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financePortfolioCreate(
-    params: FinancePortfolioCreateParams,
-  ): Promise<Result<FinancePortfolioRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_portfolio_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeInvestmentCreate(
-    params: FinanceInvestmentCreateParams,
-  ): Promise<Result<FinanceInvestmentRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_investment_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeInvestmentUpdate(
-    params: FinanceInvestmentUpdateParams,
-  ): Promise<Result<FinanceInvestmentRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_investment_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeAllocationTargetUpsert(
-    params: FinanceAllocationTargetUpsertParams,
-  ): Promise<Result<FinanceAllocationTargetRow, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("finance_allocation_target_upsert", { params }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeAllocationTargets(
-    portfolioId: string,
-  ): Promise<Result<FinanceAllocationTargetRow[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("finance_allocation_targets", { portfolioId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeInvestmentTxCreate(
-    params: FinanceInvestmentTxCreateParams,
-  ): Promise<Result<FinanceInvestmentTxRow, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_investment_tx_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeInvestmentTxs(
-    investmentId: string,
-  ): Promise<Result<FinanceInvestmentTxRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_investment_txs", { investmentId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeReportSpending(
-    dateFrom: string | null,
-    dateTo: string | null,
-  ): Promise<Result<FinanceCategoryReportResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("finance_report_spending", { dateFrom, dateTo }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeReportIncome(
-    dateFrom: string | null,
-    dateTo: string | null,
-  ): Promise<Result<FinanceCategoryReportResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("finance_report_income", { dateFrom, dateTo }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeReportTrends(
-    metric: string,
-    periods: number | null,
-  ): Promise<Result<FinanceTrendPoint[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("finance_report_trends", { metric, periods }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeMonthlySummary(): Promise<Result<FinanceMonthlySummaryResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("finance_monthly_summary") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financeDailySpending(
-    dateFrom: string,
-    dateTo: string,
-  ): Promise<Result<FinanceDailySpendingResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("finance_daily_spending", { dateFrom, dateTo }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async financePeriodSummary(
-    dateFrom: string,
-    dateTo: string,
-  ): Promise<Result<FinancePeriodSummaryResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("finance_period_summary", { dateFrom, dateTo }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  /**
-   * Activate a DND focus session ending at `ends_at` (RFC 3339).
-   */
-  async focusActivate(mode: FocusMode, endsAt: string): Promise<Result<FocusSession, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_activate", { mode, endsAt }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  /**
-   * Return the current active session for `mode`, or `null` if none.
-   */
-  async focusActive(mode: FocusMode): Promise<Result<FocusSession | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_active", { mode }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  /**
-   * Deactivate the active DND session for `mode`. Idempotent.
-   */
-  async focusDeactivate(mode: FocusMode): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_deactivate", { mode }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  /**
-   * Extend the active session for `mode`, setting a new end time (RFC 3339).
-   */
-  async focusExtend(mode: FocusMode, newEndsAt: string): Promise<Result<FocusSession, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_extend", { mode, newEndsAt }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  /**
-   * Extract both bundled shortcuts to a temp dir and open them in Shortcuts.app
-   * so the user is prompted to add them to their library.
-   *
-   * Non-macOS: always returns an UNSUPPORTED error.
-   */
-  async focusInstallShortcuts(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_install_shortcuts") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  /**
-   * Check whether both bundled shortcuts are already installed in the user's
-   * Shortcuts library. Returns `false` on non-macOS.
-   */
-  async focusShortcutsInstalled(): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_shortcuts_installed") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async groupList(projectId: string | null): Promise<Result<TaskGroupResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("group_list", { projectId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async groupCreate(params: TaskGroupCreateParams): Promise<Result<TaskGroupResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("group_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async groupUpdate(params: TaskGroupUpdateParams): Promise<Result<TaskGroupResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("group_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async groupDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("group_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async groupReorder(params: TaskGroupReorderParams): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("group_reorder", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async journeyMilestones(): Promise<Result<string[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("journey_milestones") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async journeyMarkComplete(milestone: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("journey_mark_complete", { milestone }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async journeyItemCount(): Promise<Result<number, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("journey_item_count") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async keyResultCreate(
-    params: KeyResultCreateParams,
-  ): Promise<Result<KeyResultResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("key_result_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async keyResultUpdate(
-    params: KeyResultUpdateParams,
-  ): Promise<Result<KeyResultResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("key_result_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async keyResultUpdateMetric(
-    id: string,
-    currentValue: number,
-  ): Promise<Result<KeyResultResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("key_result_update_metric", { id, currentValue }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async keyResultDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("key_result_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async knowledgeHealthSummary(): Promise<Result<KnowledgeHealthSummary, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("knowledge_health_summary") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async knowledgeTopicDetail(
-    params: TopicDetailParams,
-  ): Promise<Result<TopicDetailResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("knowledge_topic_detail", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async languageTranslateBreakdown(
-    params: TranslateBreakdownParams,
-  ): Promise<Result<TranslateBreakdownResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("language_translate_breakdown", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async languageEvaluateTranslation(
-    params: EvaluateTranslationParams,
-  ): Promise<Result<TranslationEvalResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("language_evaluate_translation", { params }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async languageSaveVocabulary(
-    params: VocabularySaveParams,
-  ): Promise<Result<FlashcardResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("language_save_vocabulary", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async languageDetectConfusables(
-    params: DetectConfusablesParams,
-  ): Promise<Result<ConfusableResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("language_detect_confusables", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async languageEnrichAnnotation(
-    params: EnrichAnnotationParams,
-  ): Promise<Result<AnnotationEnrichmentResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("language_enrich_annotation", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async languageQuickTranslate(
-    params: QuickTranslateParams,
-  ): Promise<Result<QuickTranslateResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("language_quick_translate", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherSearch(query: string): Promise<Result<LauncherItem[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_search", { query }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherExecute(
-    itemId: string,
-    kind: string,
-  ): Promise<Result<LauncherExecuteResult, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_execute", { itemId, kind }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherDashboard(): Promise<Result<DashboardData, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_dashboard") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherPin(itemId: string, kind: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_pin", { itemId, kind }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherUnpin(itemId: string, kind: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_unpin", { itemId, kind }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherRebuildAttention(): Promise<Result<number, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_rebuild_attention") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherListPinned(): Promise<Result<Pin[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_list_pinned") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherClipboardDelete(id: number): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_clipboard_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherClipboardPin(id: number, pinned: boolean): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_clipboard_pin", { id, pinned }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherRunScript(
-    path: string,
-    args: Partial<{ [key in string]: string }> | null,
-  ): Promise<Result<string, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_run_script", { path, args }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherSystemCommand(
-    action: SystemAction,
-    args: Partial<{ [key in string]: string }> | null,
-  ): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("launcher_system_command", { action, args }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherWindowAction(action: WindowAction): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_window_action", { action }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherOpenApp(path: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_open_app", { path }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async launcherClipboardPaste(id: number): Promise<Result<ClipboardEntry | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("launcher_clipboard_paste", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async getMirrorState(): Promise<Result<MirrorState, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("get_mirror_state") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async getRoutingHistory(days: number | null): Promise<Result<RoutingSnapshot[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("get_routing_history", { days }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async getMirrorNarratives(limit: number | null): Promise<Result<TrendNarrative[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("get_mirror_narratives", { limit }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async getPendingSnippets(): Promise<Result<NarrativeSnippet[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("get_pending_snippets") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async submitMirrorFeedback(
-    itemId: string,
-    target: FeedbackTarget,
-    feedback: UserFeedback,
-  ): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("submit_mirror_feedback", { itemId, target, feedback }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async generateMirrorResponse(query: string): Promise<Result<MirrorResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("generate_mirror_response", { query }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async approveMetaRule(ruleId: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("approve_meta_rule", { ruleId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async dismissMetaRule(ruleId: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("dismiss_meta_rule", { ruleId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async getBrainVersions(): Promise<Result<BrainVersion[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("get_brain_versions") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async revertBrainVersion(version: number): Promise<Result<BrainVersion, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("revert_brain_version", { version }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async killTrial(trialId: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("kill_trial", { trialId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async continueTrial(trialId: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("continue_trial", { trialId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async morningBriefingSummary(): Promise<Result<MorningBriefingResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("morning_briefing_summary") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteList(notebookId: string | null): Promise<Result<NoteListItem[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_list", { notebookId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteGet(id: string): Promise<Result<NoteResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_get", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteCreate(params: NoteCreateParams): Promise<Result<NoteResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteUpdate(params: NoteUpdateParams): Promise<Result<NoteResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteSearch(query: string): Promise<Result<NoteListItem[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_search", { query }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteSearchSemantic(query: string): Promise<Result<NoteListItem[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_search_semantic", { query }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteSearchHybrid(query: string): Promise<Result<HybridSearchResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_search_hybrid", { query }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteLinksAll(): Promise<Result<NoteLinkResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_links_all") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteListByEntity(
-    entityType: string,
-    entityId: string,
-  ): Promise<Result<NoteListItem[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("note_list_by_entity", { entityType, entityId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteVersionList(noteId: string): Promise<Result<NoteVersionResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_version_list", { noteId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteVersionCreate(noteId: string): Promise<Result<NoteVersionResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_version_create", { noteId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteVersionRestore(
-    versionId: string,
-    noteId: string,
-  ): Promise<Result<NoteResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("note_version_restore", { versionId, noteId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteSaveAttachment(data: string, filename: string): Promise<Result<string, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_save_attachment", { data, filename }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async notebookList(): Promise<Result<NotebookResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("notebook_list") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async notebookCreate(params: NotebookCreateParams): Promise<Result<NotebookResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("notebook_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async notebookUpdate(params: NotebookUpdateParams): Promise<Result<NotebookResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("notebook_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async notebookDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("notebook_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteArchive(id: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_archive", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteUnarchive(id: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_unarchive", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteListArchived(): Promise<Result<NoteListItem[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_list_archived") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteBacklinks(id: string): Promise<Result<BacklinkResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_backlinks", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteSuggestions(id: string): Promise<Result<NoteSuggestionsResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_suggestions", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteTagsAll(): Promise<Result<[string, number][], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_tags_all") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteUnlinkedMentions(id: string): Promise<Result<NoteResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_unlinked_mentions", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async inboxCreate(params: InboxCreateParams): Promise<Result<InboxItemResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("inbox_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async inboxList(): Promise<Result<InboxItemResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("inbox_list") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async inboxDelete(id: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("inbox_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightReview(
-    noteId: string,
-    scopeConfig: InsightScopeConfigParams | null,
-  ): Promise<Result<InsightReviewStarted, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("note_insight_review", { noteId, scopeConfig }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightCacheGet(
-    noteId: string,
-  ): Promise<Result<InsightReviewResponse | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_insight_cache_get", { noteId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightSaveFlashcards(
-    params: InsightSaveFlashcardsParams,
-  ): Promise<Result<FlashcardResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_insight_save_flashcards", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightSubmitQuiz(params: InsightQuizSubmitParams): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_insight_submit_quiz", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightRegenerateTab(
-    noteId: string,
-    tab: string,
-  ): Promise<Result<TabContent, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("note_insight_regenerate_tab", { noteId, tab }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightListVersions(
-    noteId: string,
-  ): Promise<Result<InsightVersionResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_insight_list_versions", { noteId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightGetEvolution(
-    noteId: string,
-  ): Promise<Result<InsightEvolutionResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_insight_get_evolution", { noteId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightGetVersion(insightId: string): Promise<Result<InsightReviewResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_insight_get_version", { insightId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightGenerateScenario(
-    noteId: string,
-  ): Promise<Result<ScenarioChallengeResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("note_insight_generate_scenario", { noteId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightChangesSummary(
-    noteId: string,
-  ): Promise<Result<ChangesSummaryResponse | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_insight_changes_summary", { noteId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightKnowledgeGrowth(
-    days: number | null,
-  ): Promise<Result<KnowledgeGrowthResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_insight_knowledge_growth", { days }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightPreviewScope(
-    params: ScopePreviewParams,
-  ): Promise<Result<ScopePreviewResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_insight_preview_scope", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardListDecks(): Promise<Result<DeckSummaryResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_list_decks") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardGetDue(
-    deck: string,
-    limit: number | null,
-  ): Promise<Result<FlashcardResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_get_due", { deck, limit }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardRecordReview(
-    params: FlashcardReviewParams,
-  ): Promise<Result<FlashcardResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_record_review", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardGet(id: string): Promise<Result<FlashcardResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_get", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardCreate(
-    params: FlashcardCreateParams,
-  ): Promise<Result<FlashcardResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardUpdate(
-    params: FlashcardUpdateParams,
-  ): Promise<Result<FlashcardResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardListCards(
-    params: FlashcardListParams,
-  ): Promise<Result<FlashcardResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_list_cards", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardGetAllDue(limit: number): Promise<Result<FlashcardResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_get_all_due", { limit }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardTotalDue(): Promise<Result<number, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_total_due") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardListStruggling(
-    limit: number | null,
-  ): Promise<Result<StrugglingCardResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_list_struggling", { limit }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardGenerate(
-    params: FlashcardGenerateParams,
-  ): Promise<Result<FlashcardGenerateResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_generate", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardSaveGenerated(
-    params: FlashcardSaveGeneratedParams,
-  ): Promise<Result<FlashcardResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_save_generated", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardSubmitAnswer(
-    params: FlashcardSubmitAnswerParams,
-  ): Promise<Result<GradeResultResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_submit_answer", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardExplainAnswer(
-    params: FlashcardExplainParams,
-  ): Promise<Result<FlashcardExplainResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_explain_answer", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardGenerateDistractors(
-    params: FlashcardDistractorParams,
-  ): Promise<Result<FlashcardDistractorResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("flashcard_generate_distractors", { params }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardSaveModePreference(deck: string, mode: string): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("flashcard_save_mode_preference", { deck, mode }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardGetModePreference(
-    deck: string,
-  ): Promise<Result<DeckPreferenceResponse | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_get_mode_preference", { deck }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardGetPrerequisites(cardId: string): Promise<Result<FlashcardResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_get_prerequisites", { cardId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardSaveSession(params: ReviewSessionSaveParams): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("flashcard_save_session", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async flashcardRecentLearningSessions(
-    limit: number | null,
-  ): Promise<Result<RecentLearningSession[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("flashcard_recent_learning_sessions", { limit }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteRetentionHealth(
-    noteId: string,
-  ): Promise<Result<NoteRetentionHealthResponse | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_retention_health", { noteId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteEditingFinished(params: NoteEditingFinishedParams): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_editing_finished", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightTabChat(
-    params: InsightChatParams,
-  ): Promise<Result<InsightChatStarted, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_insight_tab_chat", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteInsightClearTabChats(noteId: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_insight_clear_tab_chats", { noteId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteImportFiles(params: NoteImportParams): Promise<Result<NoteImportResult, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_import_files", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async noteExport(params: NoteExportParams): Promise<Result<NoteExportResult, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("note_export", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async objectiveCreate(
-    params: ObjectiveCreateParams,
-  ): Promise<Result<ObjectiveResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("objective_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async objectiveGet(id: string): Promise<Result<ObjectiveResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("objective_get", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async objectiveUpdate(
-    params: ObjectiveUpdateParams,
-  ): Promise<Result<ObjectiveResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("objective_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async objectiveDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("objective_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async aiToolsDetect(): Promise<Result<AiToolInfo[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("ai_tools_detect") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async aiToolsInstall(
-    params: AiToolsInstallParams,
-  ): Promise<Result<AiToolInstallResult[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("ai_tools_install", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  /**
-   * Start an OAuth flow: opens the browser and waits for the callback.
-   */
-  async mcpOauthStart(params: OAuthStartParams): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("mcp_oauth_start", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  /**
-   * Disconnect OAuth for a server (clear credentials).
-   */
-  async mcpOauthDisconnect(serverName: string): Promise<Result<McpConfigResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("mcp_oauth_disconnect", { serverName }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async approvePendingMemory(id: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("approve_pending_memory", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async dismissPendingMemory(id: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("dismiss_pending_memory", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async listPendingMemories(
-    limit: number | null,
-  ): Promise<Result<PendingMemoryResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("list_pending_memories", { limit }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async permissionsCheckAccessibility(): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("permissions_check_accessibility") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async permissionsCheckScreenRecording(): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("permissions_check_screen_recording") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async permissionsOpenAccessibility(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("permissions_open_accessibility") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async permissionsOpenScreenRecording(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("permissions_open_screen_recording") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async permissionsRequestAccessibilityForInput(): Promise<Result<boolean, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("permissions_request_accessibility_for_input"),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async permissionsRequestScreenRecording(): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("permissions_request_screen_recording") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async practiceSegmentNote(
-    params: PracticeSegmentParams,
-  ): Promise<Result<PracticeSegmentResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("practice_segment_note", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async practiceStartSession(
-    params: PracticeStartParams,
-  ): Promise<Result<PracticeSessionResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("practice_start_session", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async practiceSubmitUnit(
-    params: PracticeSubmitParams,
-  ): Promise<Result<PracticeEvalResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("practice_submit_unit", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async practiceConfirmUnit(
-    params: PracticeConfirmParams,
-  ): Promise<Result<PracticeConfirmResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("practice_confirm_unit", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async practiceGetSession(
-    params: PracticeGetParams,
-  ): Promise<Result<PracticeSessionResponse | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("practice_get_session", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async practiceCompleteSession(
-    params: PracticeCompleteParams,
-  ): Promise<Result<PracticeCompleteResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("practice_complete_session", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async practiceListSessions(
-    params: PracticeListParams,
-  ): Promise<Result<PracticeSessionResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("practice_list_sessions", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityToday(): Promise<Result<ProductivitySummaryResponse | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_today") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityTimeline(
-    date: string,
-    limit: number | null,
-    offset: number | null,
-    tzOffsetMins: number | null,
-  ): Promise<Result<ActivityTimelineResponse[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_timeline", { date, limit, offset, tzOffsetMins }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityFocusStart(
-    actionId: string | null,
-    projectId: string | null,
-    targetMins: number | null,
-  ): Promise<Result<FocusSessionResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_focus_start", { actionId, projectId, targetMins }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityFocusEnd(
-    notes: string | null,
-  ): Promise<Result<FocusSessionResponse | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_focus_end", { notes }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityFocusStatus(): Promise<Result<FocusSessionResponse | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_focus_status") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivitySessions(date: string): Promise<Result<FocusSessionResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_sessions", { date }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityIntelligenceSessions(
-    date: string,
-    tzOffsetMins: number | null,
-  ): Promise<Result<IntelligenceSessionResponse[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_intelligence_sessions", { date, tzOffsetMins }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityWeekly(): Promise<Result<ProductivitySummaryResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_weekly") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityCategories(): Promise<Result<ActivityCategoryResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_categories") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityTrackedApps(): Promise<Result<TrackedAppResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_tracked_apps") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivitySummaryRange(
-    startDate: string,
-    endDate: string,
-  ): Promise<Result<ProductivitySummaryResponse[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_summary_range", { startDate, endDate }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityActivityFeed(
-    limit: number | null,
-  ): Promise<Result<ActivityTimelineResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_activity_feed", { limit }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityGoals(): Promise<Result<GoalProgressResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_goals") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityPomodoroStart(
-    workMins: number | null,
-    breakMins: number | null,
-  ): Promise<Result<FocusSessionResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_pomodoro_start", { workMins, breakMins }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityTimeEntries(date: string): Promise<Result<TimeEntryResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_time_entries", { date }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityGoalCreate(
-    goalType: string,
-    metric: string,
-    targetValue: number,
-  ): Promise<Result<GoalProgressResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_goal_create", { goalType, metric, targetValue }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityGoalDelete(id: number): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_goal_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityGoalToggle(id: number, enabled: boolean): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_goal_toggle", { id, enabled }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityTimeEntryCreate(
-    description: string,
-    durationMins: number,
-    categoryId: string | null,
-    projectId: string | null,
-  ): Promise<Result<TimeEntryResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_time_entry_create", {
-          description,
-          durationMins,
-          categoryId,
-          projectId,
-        }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityTimeEntryDelete(id: number): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_time_entry_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityCalendarEvents(date: string): Promise<Result<CalendarEvent[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_calendar_events", { date }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async calendarSyncEvents(
-    events: CalendarEventInput[],
-  ): Promise<Result<CalendarEvent[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("calendar_sync_events", { events }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityCategoryUpsert(
-    id: string,
-    name: string,
-    categoryType: string,
-    color: string | null,
-    icon: string | null,
-    rules: CategoryRulesResponse | null,
-  ): Promise<Result<ActivityCategoryResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_category_upsert", {
-          id,
-          name,
-          categoryType,
-          color,
-          icon,
-          rules,
-        }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityCategoryDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_category_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityRecategorizeApp(
-    appName: string,
-    siteName: string | null,
-    newCategoryId: string,
-  ): Promise<Result<number, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_recategorize_app", {
-          appName,
-          siteName,
-          newCategoryId,
-        }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityInsights(
-    date: string | null,
-  ): Promise<Result<InsightCardResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_insights", { date }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityInsightDismiss(id: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_insight_dismiss", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityAutoFocusStart(): Promise<Result<FocusSessionResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_auto_focus_start") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityAutoFocusEnd(event: unknown): Promise<Result<FocusSessionResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_auto_focus_end", { event }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityAutoFocusConfirm(
-    payload: AutoFocusPayload,
-  ): Promise<Result<FocusSessionResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_auto_focus_confirm", { payload }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async distractionRespond(response: DistractionResponse): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("distraction_respond", { response }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityProjectsList(): Promise<Result<ProductivityProjectResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_projects_list") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityProjectUpsert(
-    id: string,
-    displayName: string,
-    path: string,
-    urlPatterns: string[] | null,
-    color: string | null,
-  ): Promise<Result<ProductivityProjectResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_project_upsert", {
-          id,
-          displayName,
-          path,
-          urlPatterns,
-          color,
-        }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityProjectDelete(id: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_project_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityWeeklyAssessment(
-    weekStart: string,
-  ): Promise<Result<WeeklyAssessmentResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_weekly_assessment", { weekStart }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async focusSessionStart(
-    params: FocusSessionStartParams,
-  ): Promise<Result<FocusSessionResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_session_start", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async focusSessionStop(
-    notes: string | null,
-  ): Promise<Result<FocusSessionResponse | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_session_stop", { notes }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async focusSessionStatus(): Promise<Result<FocusSessionStatusResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_session_status") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async focusSessionPause(): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_session_pause") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async focusSessionResume(): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_session_resume") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async focusSessionExtend(extraSecs: number): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_session_extend", { extraSecs }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async focusSessionExtendWork(extraMins: number): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_session_extend_work", { extraMins }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async focusSessionSkipBreak(): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_session_skip_break") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async focusSessionTakeBreak(): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_session_take_break") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async focusSessionStartBreak(): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("focus_session_start_break") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityPatterns(
-    days: number | null,
-  ): Promise<Result<ProductivityPatternsResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("productivity_patterns", { days }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async productivityHourlyBreakdown(
-    startDate: string,
-    endDate: string,
-    tzOffsetMins: number | null,
-  ): Promise<Result<HourlyBreakdownResponse[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("productivity_hourly_breakdown", {
-          startDate,
-          endDate,
-          tzOffsetMins,
-        }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectConversationsList(
-    projectId: string,
-  ): Promise<Result<SessionSummaryResponse[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("project_conversations_list", { projectId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectMemoriesList(projectId: string): Promise<Result<SemanticFactResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("project_memories_list", { projectId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectMemoriesByType(
-    projectId: string,
-    memoryType: string,
-  ): Promise<Result<SemanticFactResponse[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("project_memories_by_type", { projectId, memoryType }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectSourceCreate(
-    params: ProjectSourceCreateParams,
-  ): Promise<Result<ProjectSourceResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("project_source_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectSourceDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("project_source_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectSourceList(projectId: string): Promise<Result<ProjectSourceResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("project_source_list", { projectId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectCreate(params: ProjectCreateParams): Promise<Result<ProjectResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("project_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectUpdateInstructions(
-    id: string,
-    instructions: unknown,
-  ): Promise<Result<ProjectResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("project_update_instructions", { id, instructions }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectGet(id: string): Promise<Result<ProjectResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("project_get", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectUpdate(params: ProjectUpdateParams): Promise<Result<ProjectResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("project_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("project_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectArchive(id: string): Promise<Result<ProjectResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("project_archive", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectUpdateRole(id: string, role: string): Promise<Result<ProjectResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("project_update_role", { id, role }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectHealthMetrics(
-    projectId: string,
-  ): Promise<Result<ProjectHealthMetricsResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("project_health_metrics", { projectId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async reforgeState(): Promise<Result<ReforgeStateResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("reforge_state") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async reforgeSkillNames(): Promise<Result<SkillListResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("reforge_skill_names") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async reforgeSkillVersions(skillName: string): Promise<Result<SkillVersionResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("reforge_skill_versions", { skillName }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async reforgeSkillVersionDetail(
-    skillName: string,
-    version: number,
-  ): Promise<Result<SkillVersionDetailResponse[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("reforge_skill_version_detail", { skillName, version }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async reforgeSkillReset(
-    skillName: string,
-    filePath: string,
-    version: number,
-  ): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("reforge_skill_reset", { skillName, filePath, version }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async retentionHistory(
-    days: number,
-    byDomain: boolean | null,
-  ): Promise<Result<RetentionHistoryResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("retention_history", { days, byDomain }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async reviewStatsSummary(): Promise<Result<ReviewStatsSummaryResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("review_stats_summary") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async appInfo(): Promise<Result<AppInfoResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("app_info") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async configGetSection(section: string): Promise<Result<unknown, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("config_get_section", { section }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async configMarkSetupCompleted(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("config_mark_setup_completed") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async configUpdateSection(section: string, patch: unknown): Promise<Result<unknown, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("config_update_section", { section, patch }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async mcpGetConfig(): Promise<Result<McpConfigResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("mcp_get_config") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async mcpAddServer(params: McpAddServerParams): Promise<Result<McpConfigResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("mcp_add_server", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async mcpRemoveServer(params: McpRemoveParams): Promise<Result<McpConfigResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("mcp_remove_server", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async mcpToggleServer(params: McpToggleParams): Promise<Result<McpConfigResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("mcp_toggle_server", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async mcpUpdateServer(
-    params: McpUpdateServerParams,
-  ): Promise<Result<McpConfigResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("mcp_update_server", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async shortcutsGet(): Promise<Result<ShortcutsConfig, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("shortcuts_get") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async shortcutsUpdate(
-    launcher: string,
-    tray: string,
-  ): Promise<Result<ShortcutsConfig, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("shortcuts_update", { launcher, tray }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async agentStatus(): Promise<Result<AgentStatusResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("agent_status") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async showStatusBadge(
-    text: string,
-    kind: BadgeKind,
-    durationMs: number | null,
-  ): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("show_status_badge", { text, kind, durationMs }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async tracingListProviders(): Promise<Result<ProviderInfo[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("tracing_list_providers") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async tracingListSessions(providerId: string): Promise<Result<SessionSummary[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("tracing_list_sessions", { providerId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async tracingLoadSession(
-    providerId: string,
-    sessionId: string,
-    scope: Scope,
-  ): Promise<Result<SessionDetail, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("tracing_load_session", { providerId, sessionId, scope }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async tracingLoadContext(
-    providerId: string,
-    sessionId: string,
-    scope: Scope,
-  ): Promise<Result<ContextMessage[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("tracing_load_context", { providerId, sessionId, scope }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async tracingLoadState(
-    providerId: string,
-    sessionId: string,
-  ): Promise<Result<SessionState, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("tracing_load_state", { providerId, sessionId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async tracingListSubagents(
-    providerId: string,
-    sessionId: string,
-  ): Promise<Result<SubagentSummary[], ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("tracing_list_subagents", { providerId, sessionId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async tracingImport(providerId: string, filePath: string): Promise<Result<string, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("tracing_import", { providerId, filePath }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async tracingGetDir(providerId: string, sessionId: string): Promise<Result<string, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("tracing_get_dir", { providerId, sessionId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async tracingOpenDir(providerId: string, sessionId: string): Promise<Result<string, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("tracing_open_dir", { providerId, sessionId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async tracingStats(providerId: string): Promise<Result<StatsBundle, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("tracing_stats", { providerId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskGet(id: string): Promise<Result<TaskResponse | null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("task_get", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskList(
-    areaId: string | null,
-    projectId: string | null,
-    status: string | null,
-  ): Promise<Result<TaskResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("task_list", { areaId, projectId, status }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskCreate(params: TaskCreateParams): Promise<Result<TaskResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("task_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskUpdate(params: TaskUpdateParams): Promise<Result<TaskResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("task_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskDelete(id: string): Promise<Result<boolean, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("task_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskToggleComplete(id: string): Promise<Result<TaskResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("task_toggle_complete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskListChildren(parentId: string): Promise<Result<TaskResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("task_list_children", { parentId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async todayTasks(): Promise<Result<TodayTaskResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("today_tasks") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async projectList(areaId: string | null): Promise<Result<ProjectResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("project_list", { areaId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async objectiveList(projectId: string | null): Promise<Result<ObjectiveResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("objective_list", { projectId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskAddDependency(taskId: string, blockerId: string): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("task_add_dependency", { taskId, blockerId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskListDependencies(taskId: string): Promise<Result<TaskResponse[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("task_list_dependencies", { taskId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskAddAttachment(
-    taskId: string,
-    attachmentType: string,
-    value: string,
-    title: string | null,
-  ): Promise<Result<TaskAttachmentRow, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("task_add_attachment", { taskId, attachmentType, value, title }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskListAttachments(taskId: string): Promise<Result<TaskAttachmentRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("task_list_attachments", { taskId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskAddTimeEntry(
-    taskId: string,
-    startedAt: string,
-    durationSecs: number | null,
-    note: string | null,
-  ): Promise<Result<TaskTimeEntryRow, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("task_add_time_entry", { taskId, startedAt, durationSecs, note }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async taskListTimeEntries(taskId: string): Promise<Result<TaskTimeEntryRow[], ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("task_list_time_entries", { taskId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  /**
-   * Fire-and-forget cross-domain check. Called by frontend when a detail view mounts.
-   */
-  async crossDomainCheck(
-    domain: string,
-    id: string,
-    title: string,
-    createdAt: string | null,
-  ): Promise<Result<null, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("cross_domain_check", { domain, id, title, createdAt }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async timelineQuery(
-    startDate: string,
-    endDate: string,
-    sources: TimelineSource[] | null,
-    includePointEvents: boolean | null,
-    tzOffsetMins: number | null,
-  ): Promise<Result<TimelineResponse, ApiError>> {
-    try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("timeline_query", {
-          startDate,
-          endDate,
-          sources,
-          includePointEvents,
-          tzOffsetMins,
-        }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async viewSetActive(params: SetActiveViewParams): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("view_set_active", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async viewClearActive(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("view_clear_active") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async viewGetActive(): Promise<Result<ActiveViewResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("view_get_active") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceStartDictation(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_start_dictation") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceSimulateEvent(event: unknown): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_simulate_event", { event }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceStopDictation(): Promise<Result<string, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_stop_dictation") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceListDevices(): Promise<Result<AudioDevicesResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_list_devices") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceModelStatus(): Promise<Result<VoiceModelStatusResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_model_status") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceDownloadModel(model: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_download_model", { model }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceDeleteModel(model: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_delete_model", { model }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceTestPersona(persona: string): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_test_persona", { persona }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceConversationStart(
-    sessionKey: string | null,
-  ): Promise<Result<VoiceConversationStartResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_conversation_start", { sessionKey }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceConversationPause(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_conversation_pause") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceConversationResume(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_conversation_resume") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceConversationInterrupt(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_conversation_interrupt") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceConversationContinue(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_conversation_continue") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceConversationNewSession(): Promise<Result<VoiceConversationStartResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_conversation_new_session") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceConversationEnd(): Promise<Result<null, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_conversation_end") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async voiceConversationStatus(): Promise<Result<VoiceConversationStatusResponse, ApiError>> {
-    try {
-      return { status: "ok", data: await TAURI_INVOKE("voice_conversation_status") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async resizeWindow(label: string, height: number): Promise<void> {
+async agentListProfiles() : Promise<Result<AgentProfileSummary[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_list_profiles") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async agentReadFile(agentName: string, filename: string) : Promise<Result<AgentFileContent, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_read_file", { agentName, filename }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async agentWriteFile(agentName: string, filename: string, content: string) : Promise<Result<AgentFileContent, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_write_file", { agentName, filename, content }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async agentCreateProfile(name: string) : Promise<Result<AgentProfileSummary, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_create_profile", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async agentCreateSkill(agentName: string, skillName: string) : Promise<Result<AgentFileSummary, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_create_skill", { agentName, skillName }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async agentDeleteFile(agentName: string, filename: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_delete_file", { agentName, filename }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async annotationCreate(params: AnnotationCreateParams) : Promise<Result<AnnotationResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("annotation_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async annotationUpdate(params: AnnotationUpdateParams) : Promise<Result<AnnotationResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("annotation_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async annotationDelete(id: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("annotation_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async annotationListForNote(noteId: string, limit: number | null) : Promise<Result<AnnotationResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("annotation_list_for_note", { noteId, limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async annotationGetAiSuggestion(noteId: string, selectedText: string) : Promise<Result<AiSuggestionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("annotation_get_ai_suggestion", { noteId, selectedText }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteGetLinkedContext(params: LinkedContextParams) : Promise<Result<LinkedContextResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_get_linked_context", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async areaList() : Promise<Result<AreaResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("area_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async areaCreate(params: AreaCreateParams) : Promise<Result<AreaResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("area_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async areaUpdate(params: AreaUpdateParams) : Promise<Result<AreaResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("area_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async areaDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("area_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async areaReorder(id: string, position: number) : Promise<Result<AreaResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("area_reorder", { id, position }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async autotunerStatus() : Promise<Result<AutoTunerStatus, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("autotuner_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async autotunerHistory(limit: number | null) : Promise<Result<ExperimentSummary[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("autotuner_history", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async autotunerRevert() : Promise<Result<ChampionSummary, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("autotuner_revert") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async autotunerPause() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("autotuner_pause") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async autotunerResume() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("autotuner_resume") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async autotunerSetPace(pace: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("autotuner_set_pace", { pace }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async autotunerGetToastCount() : Promise<Result<number, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("autotuner_get_toast_count") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async autotunerIncrementToastCount() : Promise<Result<number, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("autotuner_increment_toast_count") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async captureStatus() : Promise<Result<CaptureStatusResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("capture_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async captureShellHookStatus() : Promise<Result<ShellHookStatusResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("capture_shell_hook_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async captureInstallShellHook() : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("capture_install_shell_hook") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async captureUninstallShellHook() : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("capture_uninstall_shell_hook") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async captureGetIngestionToken() : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("capture_get_ingestion_token") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async captureRegenerateIngestionToken() : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("capture_regenerate_ingestion_token") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatThreads() : Promise<Result<ChatThreadResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_threads") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatMessages(sessionKey: string, limit: number | null) : Promise<Result<ChatMessageResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_messages", { sessionKey, limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatSend(content: string, sessionKey: string, context: SessionContextInput | null, mode: string | null) : Promise<Result<ChatMessageResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_send", { content, sessionKey, context, mode }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatPinThread(sessionKey: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_pin_thread", { sessionKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatRenameThread(sessionKey: string, title: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_rename_thread", { sessionKey, title }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatDeleteThread(sessionKey: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_delete_thread", { sessionKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatGetSession(sessionKey: string) : Promise<Result<ChatSessionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_get_session", { sessionKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatListSessionsByProject(projectId: string) : Promise<Result<ChatThreadResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_list_sessions_by_project", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatDeleteStaleSessions(beforeDays: number) : Promise<Result<number, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_delete_stale_sessions", { beforeDays }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatCancel(sessionKey: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_cancel", { sessionKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatRespondInteraction(sessionKey: string, requestId: string, response: unknown) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_respond_interaction", { sessionKey, requestId, response }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatRespondApproval(sessionKey: string, requestId: string, decision: AppApprovalDecision) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_respond_approval", { sessionKey, requestId, decision }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatSetMode(sessionKey: string, mode: ChatMode) : Promise<Result<SessionRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_set_mode", { sessionKey, mode }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async chatSaveStarlarkRule(requestId: string, ruleSource: string, suggestedFilename: string | null) : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("chat_save_starlark_rule", { requestId, ruleSource, suggestedFilename }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingHooksList() : Promise<Result<HooksTomlSnapshot, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_hooks_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryStatus() : Promise<Result<CodingMemoryStatusResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryDistillNow(sessionId: string, turnId: string | null) : Promise<Result<unknown, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_distill_now", { sessionId, turnId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryCheckDeadEnds(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_check_dead_ends", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryCliHealth() : Promise<Result<CliHealthRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_cli_health") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemorySessionReplay(sessionId: string | null, limit: number | null, offset: number | null) : Promise<Result<SessionReplayEntry[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_session_replay", { sessionId, limit, offset }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemorySessionList(args: SessionListArgs) : Promise<Result<SessionSummaryDto[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_session_list", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemorySessionReplayTyped(sessionId: string, limit: number | null, offset: number | null) : Promise<Result<WireEventDto[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_session_replay_typed", { sessionId, limit, offset }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryEnableCli(cli: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_enable_cli", { cli }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryDisableCli(cli: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_disable_cli", { cli }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryDiagnoseCli(cli: string) : Promise<Result<DiagnoseResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_diagnose_cli", { cli }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryInstallGitHook(repoRoot: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_install_git_hook", { repoRoot }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryBrowser(limit: number | null, offset: number | null) : Promise<Result<MemoryBrowserRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_browser", { limit, offset }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryActivity(days: number | null) : Promise<Result<ActivityBucket[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_activity", { days }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryCost(days: number | null) : Promise<Result<CostBreakdown, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_cost", { days }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemorySensitivity(limit: number | null, offset: number | null) : Promise<Result<SensitivityRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_sensitivity", { limit, offset }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryMirrorAlertsFeed(args: MirrorAlertsFeedArgs) : Promise<Result<MirrorAlertRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_mirror_alerts_feed", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryMirrorAlertAction(args: MirrorAlertActionArgs) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_mirror_alert_action", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryEffectivenessTrends(patternId: string) : Promise<Result<EffectivenessTrendsResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_effectiveness_trends", { patternId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryReforgeCycleList() : Promise<Result<ReforgeCycleSummary[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_reforge_cycle_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryReforgeCycleDiff(args: ReforgeCycleDiffArgs) : Promise<Result<ReforgeCycleDiffResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_reforge_cycle_diff", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryProjectSkillsForRepo(repoId: string) : Promise<Result<ProjectSkillRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_project_skills_for_repo", { repoId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallIndex(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_index", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallTimeline(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_timeline", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallFetch(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_fetch", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallFactsAsOf(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_facts_as_of", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallChangeHistory(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_change_history", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallDecisionPoints(args: unknown) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_decision_points", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemoryRecallLog(args: RecallLogArgs) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_recall_log", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMemorySessionReplayRecallOverlay(args: SessionRecallOverlayArgs) : Promise<Result<unknown, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_memory_session_replay_recall_overlay", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsList() : Promise<Result<SkillListItem[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsInfo(name: string) : Promise<Result<SkillInfo, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_info", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsInstall(source: string) : Promise<Result<SkillListItem, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_install", { source }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsUpdate(name: string) : Promise<Result<SkillListItem, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_update", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsUninstall(name: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_uninstall", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsToggle(name: string, enabled: boolean) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_toggle", { name, enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsValidate(name: string) : Promise<Result<SkillValidationResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_validate", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSkillsReload() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_skills_reload") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingStatus(sessionKey: string) : Promise<Result<CodingStatus, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_status", { sessionKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingDoctor() : Promise<Result<DiagnosticChecklist, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_doctor") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingTestSandbox() : Promise<Result<SandboxTestResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_test_sandbox") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSessionsStar(sessionKey: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_star", { sessionKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSessionsUnstar(sessionKey: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_unstar", { sessionKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingResume(prefix: string) : Promise<Result<ResumeResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_resume", { prefix }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingHelp(command: string | null) : Promise<Result<HelpEntry[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_help", { command }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveUserModel() : Promise<Result<UserModelSummaryResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_user_model") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveInjectEvent(eventType: string, payload: unknown) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_inject_event", { eventType, payload }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveFactsList(domain: string | null) : Promise<Result<SemanticFactResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_facts_list", { domain }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveEpisodicList(domain: string | null, limit: number | null) : Promise<Result<EpisodicMemoryResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_episodic_list", { domain, limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveRulesList(domain: string | null) : Promise<Result<ProceduralRuleResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_rules_list", { domain }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveMemoryStats() : Promise<Result<MemoryStatsResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_memory_stats") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async memoryHealth() : Promise<Result<MemoryHealthResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("memory_health") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async coachingSituation() : Promise<Result<UserSituationResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coaching_situation") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async coachingSignals() : Promise<Result<SignalWindowResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coaching_signals") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async coachingPatterns() : Promise<Result<DetectedPatternResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coaching_patterns") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async coachingFeedbackStats() : Promise<Result<StrategyFeedbackResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coaching_feedback_stats") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async coachingRouterStatus() : Promise<Result<RouterStatusResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coaching_router_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async coachingPendingInterventions() : Promise<Result<DeliveredInterventionResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coaching_pending_interventions") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async memoryReferenceDetail(refType: string, refId: string) : Promise<Result<MemoryReferenceDetail, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("memory_reference_detail", { refType, refId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveSystemStatus() : Promise<Result<SystemStatusResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_system_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveFactCreate(params: FactCreateParams) : Promise<Result<SemanticFactResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_fact_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveFactUpdate(id: string, params: FactUpdateParams) : Promise<Result<SemanticFactResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_fact_update", { id, params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveFactDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_fact_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveRuleCreate(params: RuleCreateParams) : Promise<Result<ProceduralRuleResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_rule_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveRuleDeactivate(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_rule_deactivate", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveRunCompaction() : Promise<Result<CompactionResultResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_run_compaction") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async coachingResetDismissals(triggerName: string | null) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coaching_reset_dismissals", { triggerName }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async coachingClearSignals() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coaching_clear_signals") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async coachingSubmitFeedback(interventionId: string, response: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coaching_submit_feedback", { interventionId, response }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async coachingReportIgnored(interventionId: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coaching_report_ignored", { interventionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async coachingInterventionLog(limit: number | null) : Promise<Result<InterventionLogResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coaching_intervention_log", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async coachingSeedPatterns() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coaching_seed_patterns") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveGraphData() : Promise<Result<CognitiveGraphData, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_graph_data") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveGraphExpandTopic(params: TopicExpandParams) : Promise<Result<TopicDetail, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_graph_expand_topic", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitiveEventLog(limit: number | null) : Promise<Result<DomainEventRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_event_log", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cognitivePipelineLog(limit: number | null) : Promise<Result<PipelineEventRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cognitive_pipeline_log", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async customColumnList(projectId: string) : Promise<Result<CustomColumnResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("custom_column_list", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async customColumnCreate(params: ColumnCreateParams) : Promise<Result<CustomColumnResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("custom_column_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async customColumnUpdate(params: ColumnUpdateParams) : Promise<Result<CustomColumnResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("custom_column_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async customColumnDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("custom_column_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async customColumnReorder(params: ColumnReorderParams) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("custom_column_reorder", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async customColumnValues(taskId: string) : Promise<Result<CustomColumnValueResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("custom_column_values", { taskId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async customColumnValueSet(params: ColumnValueSetParams) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("custom_column_value_set", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async customColumnValueDelete(taskId: string, columnId: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("custom_column_value_delete", { taskId, columnId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cronList(includeDisabled: boolean | null) : Promise<Result<CronJobResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cron_list", { includeDisabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cronStatus() : Promise<Result<CronStatusResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cron_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cronEnable(id: string, enabled: boolean) : Promise<Result<CronJobResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cron_enable", { id, enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cronRun(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cron_run", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cronDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cron_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cronCreate(params: CronJobCreateParams) : Promise<Result<CronJobResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cron_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async cronUpdate(params: CronJobUpdateParams) : Promise<Result<CronJobResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cron_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async distractionDismiss(appName: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("distraction_dismiss", { appName }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async distractionAllowTemp(pattern: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("distraction_allow_temp", { pattern }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async distractionAllowSession(appName: string, windowTitle: string | null, classification: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("distraction_allow_session", { appName, windowTitle, classification }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async distractionLearnedRules() : Promise<Result<LearnedRuleResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("distraction_learned_rules") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async distractionDeleteRule(id: number) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("distraction_delete_rule", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Pulled by the overlay's React layer on mount to recover the latest
+ * alert if the push event was emitted before the listener was wired.
+ * Returns `None` once the overlay has acked via `clear_pending`.
+ */
+async distractionGetPendingIntervention() : Promise<Result<InterventionPayload | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("distraction_get_pending_intervention") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async distractionClearPendingIntervention() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("distraction_clear_pending_intervention") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async entitySearch(params: EntitySearchParams) : Promise<Result<EntityResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("entity_search", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async entityMerge(params: EntityMergeParams) : Promise<Result<EntityResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("entity_merge", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async entityGetNeighborhood(entityId: string, depth: number | null) : Promise<Result<EntityNeighborhoodResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("entity_get_neighborhood", { entityId, depth }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async entityLinkCreate(params: EntityLinkCreateParams) : Promise<Result<EntityLinkResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("entity_link_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async entityLinkDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("entity_link_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async entityLinksForEntity(kind: string, id: string) : Promise<Result<LinkedEntitiesResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("entity_links_for_entity", { kind, id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async fabricGraphBase() : Promise<Result<FabricGraphBase, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("fabric_graph_base") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async fabricGraphExpand(params: FabricExpandParams) : Promise<Result<FabricExpandResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("fabric_graph_expand", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async fabricGraphAction(params: FabricActionParams) : Promise<Result<FabricActionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("fabric_graph_action", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeAccounts() : Promise<Result<FinanceAccountRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_accounts") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeTransactions(limit: number | null) : Promise<Result<FinanceTransactionRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_transactions", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeTransactionsFiltered(params: FinanceTransactionFilterParams) : Promise<Result<FinanceTransactionRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_transactions_filtered", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeBudgetUsage() : Promise<Result<BudgetUsageRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_budget_usage") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financePortfolios() : Promise<Result<FinancePortfolioResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_portfolios") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeInvestments() : Promise<Result<FinanceInvestmentRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_investments") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeInvestmentsFiltered(portfolioId: string | null) : Promise<Result<FinanceInvestmentRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_investments_filtered", { portfolioId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeGoals() : Promise<Result<FinanceGoalRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_goals") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeLiabilities() : Promise<Result<FinanceLiabilityRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_liabilities") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeNetWorth() : Promise<Result<FinanceNetWorthResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_net_worth") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeExchangeRates() : Promise<Result<Partial<{ [key in string]: number }>, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_exchange_rates") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeAccountCreate(params: FinanceAccountCreateParams) : Promise<Result<FinanceAccountRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_account_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeAccountUpdate(params: FinanceAccountUpdateParams) : Promise<Result<FinanceAccountRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_account_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeAccountDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_account_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeTransactionCreate(params: FinanceTransactionCreateParams) : Promise<Result<FinanceTransactionRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_transaction_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeTransactionDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_transaction_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeBudgetCreate(params: FinanceBudgetCreateParams) : Promise<Result<FinanceBudgetRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_budget_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeBudgetUpdate(params: FinanceBudgetUpdateParams) : Promise<Result<FinanceBudgetRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_budget_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeBudgetDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_budget_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeGoalCreate(params: FinanceGoalCreateParams) : Promise<Result<FinanceGoalRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_goal_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeGoalUpdate(params: FinanceGoalUpdateParams) : Promise<Result<FinanceGoalRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_goal_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeGoalDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_goal_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeLiabilityCreate(params: FinanceLiabilityCreateParams) : Promise<Result<FinanceLiabilityRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_liability_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeLiabilityUpdate(params: FinanceLiabilityUpdateParams) : Promise<Result<FinanceLiabilityRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_liability_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeLiabilityDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_liability_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financePortfolioCreate(params: FinancePortfolioCreateParams) : Promise<Result<FinancePortfolioRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_portfolio_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeInvestmentCreate(params: FinanceInvestmentCreateParams) : Promise<Result<FinanceInvestmentRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_investment_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeInvestmentUpdate(params: FinanceInvestmentUpdateParams) : Promise<Result<FinanceInvestmentRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_investment_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeAllocationTargetUpsert(params: FinanceAllocationTargetUpsertParams) : Promise<Result<FinanceAllocationTargetRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_allocation_target_upsert", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeAllocationTargets(portfolioId: string) : Promise<Result<FinanceAllocationTargetRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_allocation_targets", { portfolioId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeInvestmentTxCreate(params: FinanceInvestmentTxCreateParams) : Promise<Result<FinanceInvestmentTxRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_investment_tx_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeInvestmentTxs(investmentId: string) : Promise<Result<FinanceInvestmentTxRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_investment_txs", { investmentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeReportSpending(dateFrom: string | null, dateTo: string | null) : Promise<Result<FinanceCategoryReportResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_report_spending", { dateFrom, dateTo }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeReportIncome(dateFrom: string | null, dateTo: string | null) : Promise<Result<FinanceCategoryReportResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_report_income", { dateFrom, dateTo }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeReportTrends(metric: string, periods: number | null) : Promise<Result<FinanceTrendPoint[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_report_trends", { metric, periods }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeMonthlySummary() : Promise<Result<FinanceMonthlySummaryResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_monthly_summary") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financeDailySpending(dateFrom: string, dateTo: string) : Promise<Result<FinanceDailySpendingResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_daily_spending", { dateFrom, dateTo }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async financePeriodSummary(dateFrom: string, dateTo: string) : Promise<Result<FinancePeriodSummaryResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("finance_period_summary", { dateFrom, dateTo }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Activate a DND focus session ending at `ends_at` (RFC 3339).
+ */
+async focusActivate(mode: FocusMode, endsAt: string) : Promise<Result<FocusSession, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_activate", { mode, endsAt }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Return the current active session for `mode`, or `null` if none.
+ */
+async focusActive(mode: FocusMode) : Promise<Result<FocusSession | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_active", { mode }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Deactivate the active DND session for `mode`. Idempotent.
+ */
+async focusDeactivate(mode: FocusMode) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_deactivate", { mode }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Extend the active session for `mode`, setting a new end time (RFC 3339).
+ */
+async focusExtend(mode: FocusMode, newEndsAt: string) : Promise<Result<FocusSession, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_extend", { mode, newEndsAt }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Extract both bundled shortcuts to a temp dir and open them in Shortcuts.app
+ * so the user is prompted to add them to their library.
+ * 
+ * Non-macOS: always returns an UNSUPPORTED error.
+ */
+async focusInstallShortcuts() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_install_shortcuts") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Check whether both bundled shortcuts are already installed in the user's
+ * Shortcuts library. Returns `false` on non-macOS.
+ */
+async focusShortcutsInstalled() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_shortcuts_installed") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async groupList(projectId: string | null) : Promise<Result<TaskGroupResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("group_list", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async groupCreate(params: TaskGroupCreateParams) : Promise<Result<TaskGroupResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("group_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async groupUpdate(params: TaskGroupUpdateParams) : Promise<Result<TaskGroupResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("group_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async groupDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("group_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async groupReorder(params: TaskGroupReorderParams) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("group_reorder", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async journeyMilestones() : Promise<Result<string[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("journey_milestones") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async journeyMarkComplete(milestone: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("journey_mark_complete", { milestone }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async journeyItemCount() : Promise<Result<number, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("journey_item_count") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async keyResultCreate(params: KeyResultCreateParams) : Promise<Result<KeyResultResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("key_result_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async keyResultUpdate(params: KeyResultUpdateParams) : Promise<Result<KeyResultResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("key_result_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async keyResultUpdateMetric(id: string, currentValue: number) : Promise<Result<KeyResultResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("key_result_update_metric", { id, currentValue }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async keyResultDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("key_result_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async knowledgeHealthSummary() : Promise<Result<KnowledgeHealthSummary, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("knowledge_health_summary") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async knowledgeTopicDetail(params: TopicDetailParams) : Promise<Result<TopicDetailResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("knowledge_topic_detail", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async languageTranslateBreakdown(params: TranslateBreakdownParams) : Promise<Result<TranslateBreakdownResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("language_translate_breakdown", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async languageEvaluateTranslation(params: EvaluateTranslationParams) : Promise<Result<TranslationEvalResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("language_evaluate_translation", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async languageSaveVocabulary(params: VocabularySaveParams) : Promise<Result<FlashcardResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("language_save_vocabulary", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async languageDetectConfusables(params: DetectConfusablesParams) : Promise<Result<ConfusableResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("language_detect_confusables", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async languageEnrichAnnotation(params: EnrichAnnotationParams) : Promise<Result<AnnotationEnrichmentResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("language_enrich_annotation", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async languageQuickTranslate(params: QuickTranslateParams) : Promise<Result<QuickTranslateResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("language_quick_translate", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherSearch(query: string) : Promise<Result<LauncherItem[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_search", { query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherExecute(itemId: string, kind: string) : Promise<Result<LauncherExecuteResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_execute", { itemId, kind }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherDashboard() : Promise<Result<DashboardData, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_dashboard") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherPin(itemId: string, kind: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_pin", { itemId, kind }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherUnpin(itemId: string, kind: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_unpin", { itemId, kind }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherRebuildAttention() : Promise<Result<number, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_rebuild_attention") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherListPinned() : Promise<Result<Pin[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_list_pinned") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherClipboardDelete(id: number) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_clipboard_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherClipboardPin(id: number, pinned: boolean) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_clipboard_pin", { id, pinned }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherRunScript(path: string, args: Partial<{ [key in string]: string }> | null) : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_run_script", { path, args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherSystemCommand(action: SystemAction, args: Partial<{ [key in string]: string }> | null) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_system_command", { action, args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherWindowAction(action: WindowAction) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_window_action", { action }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherOpenApp(path: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_open_app", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async launcherClipboardPaste(id: number) : Promise<Result<ClipboardEntry | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("launcher_clipboard_paste", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getMirrorState() : Promise<Result<MirrorState, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_mirror_state") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getRoutingHistory(days: number | null) : Promise<Result<RoutingSnapshot[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_routing_history", { days }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getMirrorNarratives(limit: number | null) : Promise<Result<TrendNarrative[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_mirror_narratives", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getPendingSnippets() : Promise<Result<NarrativeSnippet[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_pending_snippets") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async submitMirrorFeedback(itemId: string, target: FeedbackTarget, feedback: UserFeedback) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("submit_mirror_feedback", { itemId, target, feedback }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async generateMirrorResponse(query: string) : Promise<Result<MirrorResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("generate_mirror_response", { query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async approveMetaRule(ruleId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("approve_meta_rule", { ruleId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async dismissMetaRule(ruleId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("dismiss_meta_rule", { ruleId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getBrainVersions() : Promise<Result<BrainVersion[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_brain_versions") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async revertBrainVersion(version: number) : Promise<Result<BrainVersion, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("revert_brain_version", { version }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async killTrial(trialId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("kill_trial", { trialId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async continueTrial(trialId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("continue_trial", { trialId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async morningBriefingSummary() : Promise<Result<MorningBriefingResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("morning_briefing_summary") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteList(notebookId: string | null) : Promise<Result<NoteListItem[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_list", { notebookId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteGet(id: string) : Promise<Result<NoteResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_get", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteCreate(params: NoteCreateParams) : Promise<Result<NoteResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteUpdate(params: NoteUpdateParams) : Promise<Result<NoteResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteSearch(query: string) : Promise<Result<NoteListItem[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_search", { query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteSearchSemantic(query: string) : Promise<Result<NoteListItem[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_search_semantic", { query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteSearchHybrid(query: string) : Promise<Result<HybridSearchResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_search_hybrid", { query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteLinksAll() : Promise<Result<NoteLinkResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_links_all") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteListByEntity(entityType: string, entityId: string) : Promise<Result<NoteListItem[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_list_by_entity", { entityType, entityId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteVersionList(noteId: string) : Promise<Result<NoteVersionResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_version_list", { noteId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteVersionCreate(noteId: string) : Promise<Result<NoteVersionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_version_create", { noteId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteVersionRestore(versionId: string, noteId: string) : Promise<Result<NoteResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_version_restore", { versionId, noteId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteSaveAttachment(data: string, filename: string) : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_save_attachment", { data, filename }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async notebookList() : Promise<Result<NotebookResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("notebook_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async notebookCreate(params: NotebookCreateParams) : Promise<Result<NotebookResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("notebook_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async notebookUpdate(params: NotebookUpdateParams) : Promise<Result<NotebookResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("notebook_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async notebookDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("notebook_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteArchive(id: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_archive", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteUnarchive(id: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_unarchive", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteListArchived() : Promise<Result<NoteListItem[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_list_archived") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteBacklinks(id: string) : Promise<Result<BacklinkResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_backlinks", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteSuggestions(id: string) : Promise<Result<NoteSuggestionsResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_suggestions", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteTagsAll() : Promise<Result<([string, number])[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_tags_all") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteUnlinkedMentions(id: string) : Promise<Result<NoteResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_unlinked_mentions", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async inboxCreate(params: InboxCreateParams) : Promise<Result<InboxItemResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("inbox_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async inboxList() : Promise<Result<InboxItemResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("inbox_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async inboxDelete(id: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("inbox_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightReview(noteId: string, scopeConfig: InsightScopeConfigParams | null) : Promise<Result<InsightReviewStarted, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_review", { noteId, scopeConfig }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightCacheGet(noteId: string) : Promise<Result<InsightReviewResponse | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_cache_get", { noteId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightSaveFlashcards(params: InsightSaveFlashcardsParams) : Promise<Result<FlashcardResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_save_flashcards", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightSubmitQuiz(params: InsightQuizSubmitParams) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_submit_quiz", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightRegenerateTab(noteId: string, tab: string) : Promise<Result<TabContent, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_regenerate_tab", { noteId, tab }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightListVersions(noteId: string) : Promise<Result<InsightVersionResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_list_versions", { noteId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightGetEvolution(noteId: string) : Promise<Result<InsightEvolutionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_get_evolution", { noteId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightGetVersion(insightId: string) : Promise<Result<InsightReviewResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_get_version", { insightId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightGenerateScenario(noteId: string) : Promise<Result<ScenarioChallengeResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_generate_scenario", { noteId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightChangesSummary(noteId: string) : Promise<Result<ChangesSummaryResponse | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_changes_summary", { noteId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightKnowledgeGrowth(days: number | null) : Promise<Result<KnowledgeGrowthResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_knowledge_growth", { days }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightPreviewScope(params: ScopePreviewParams) : Promise<Result<ScopePreviewResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_preview_scope", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardListDecks() : Promise<Result<DeckSummaryResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_list_decks") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardGetDue(deck: string, limit: number | null) : Promise<Result<FlashcardResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_get_due", { deck, limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardRecordReview(params: FlashcardReviewParams) : Promise<Result<FlashcardResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_record_review", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardGet(id: string) : Promise<Result<FlashcardResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_get", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardCreate(params: FlashcardCreateParams) : Promise<Result<FlashcardResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardUpdate(params: FlashcardUpdateParams) : Promise<Result<FlashcardResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardListCards(params: FlashcardListParams) : Promise<Result<FlashcardResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_list_cards", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardGetAllDue(limit: number) : Promise<Result<FlashcardResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_get_all_due", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardTotalDue() : Promise<Result<number, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_total_due") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardListStruggling(limit: number | null) : Promise<Result<StrugglingCardResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_list_struggling", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardGenerate(params: FlashcardGenerateParams) : Promise<Result<FlashcardGenerateResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_generate", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardSaveGenerated(params: FlashcardSaveGeneratedParams) : Promise<Result<FlashcardResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_save_generated", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardSubmitAnswer(params: FlashcardSubmitAnswerParams) : Promise<Result<GradeResultResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_submit_answer", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardExplainAnswer(params: FlashcardExplainParams) : Promise<Result<FlashcardExplainResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_explain_answer", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardGenerateDistractors(params: FlashcardDistractorParams) : Promise<Result<FlashcardDistractorResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_generate_distractors", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardSaveModePreference(deck: string, mode: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_save_mode_preference", { deck, mode }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardGetModePreference(deck: string) : Promise<Result<DeckPreferenceResponse | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_get_mode_preference", { deck }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardGetPrerequisites(cardId: string) : Promise<Result<FlashcardResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_get_prerequisites", { cardId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardSaveSession(params: ReviewSessionSaveParams) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_save_session", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async flashcardRecentLearningSessions(limit: number | null) : Promise<Result<RecentLearningSession[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("flashcard_recent_learning_sessions", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteRetentionHealth(noteId: string) : Promise<Result<NoteRetentionHealthResponse | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_retention_health", { noteId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteEditingFinished(params: NoteEditingFinishedParams) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_editing_finished", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightTabChat(params: InsightChatParams) : Promise<Result<InsightChatStarted, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_tab_chat", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteInsightClearTabChats(noteId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_insight_clear_tab_chats", { noteId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteImportFiles(params: NoteImportParams) : Promise<Result<NoteImportResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_import_files", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async noteExport(params: NoteExportParams) : Promise<Result<NoteExportResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("note_export", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async objectiveCreate(params: ObjectiveCreateParams) : Promise<Result<ObjectiveResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("objective_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async objectiveGet(id: string) : Promise<Result<ObjectiveResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("objective_get", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async objectiveUpdate(params: ObjectiveUpdateParams) : Promise<Result<ObjectiveResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("objective_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async objectiveDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("objective_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async aiToolsDetect() : Promise<Result<AiToolInfo[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ai_tools_detect") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async aiToolsInstall(params: AiToolsInstallParams) : Promise<Result<AiToolInstallResult[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ai_tools_install", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Start an OAuth flow: opens the browser and waits for the callback.
+ */
+async mcpOauthStart(params: OAuthStartParams) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_oauth_start", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Disconnect OAuth for a server (clear credentials).
+ */
+async mcpOauthDisconnect(serverName: string) : Promise<Result<McpConfigResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_oauth_disconnect", { serverName }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async approvePendingMemory(id: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("approve_pending_memory", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async dismissPendingMemory(id: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("dismiss_pending_memory", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listPendingMemories(limit: number | null) : Promise<Result<PendingMemoryResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_pending_memories", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async permissionsCheckAccessibility() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("permissions_check_accessibility") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async permissionsCheckScreenRecording() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("permissions_check_screen_recording") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async permissionsOpenAccessibility() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("permissions_open_accessibility") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async permissionsOpenScreenRecording() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("permissions_open_screen_recording") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async permissionsRequestAccessibilityForInput() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("permissions_request_accessibility_for_input") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async permissionsRequestScreenRecording() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("permissions_request_screen_recording") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async practiceSegmentNote(params: PracticeSegmentParams) : Promise<Result<PracticeSegmentResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("practice_segment_note", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async practiceStartSession(params: PracticeStartParams) : Promise<Result<PracticeSessionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("practice_start_session", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async practiceSubmitUnit(params: PracticeSubmitParams) : Promise<Result<PracticeEvalResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("practice_submit_unit", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async practiceConfirmUnit(params: PracticeConfirmParams) : Promise<Result<PracticeConfirmResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("practice_confirm_unit", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async practiceGetSession(params: PracticeGetParams) : Promise<Result<PracticeSessionResponse | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("practice_get_session", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async practiceCompleteSession(params: PracticeCompleteParams) : Promise<Result<PracticeCompleteResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("practice_complete_session", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async practiceListSessions(params: PracticeListParams) : Promise<Result<PracticeSessionResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("practice_list_sessions", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityToday() : Promise<Result<ProductivitySummaryResponse | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_today") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityTimeline(date: string, limit: number | null, offset: number | null, tzOffsetMins: number | null) : Promise<Result<ActivityTimelineResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_timeline", { date, limit, offset, tzOffsetMins }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityFocusStart(actionId: string | null, projectId: string | null, targetMins: number | null) : Promise<Result<FocusSessionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_focus_start", { actionId, projectId, targetMins }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityFocusEnd(notes: string | null) : Promise<Result<FocusSessionResponse | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_focus_end", { notes }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityFocusStatus() : Promise<Result<FocusSessionResponse | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_focus_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivitySessions(date: string) : Promise<Result<FocusSessionResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_sessions", { date }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityIntelligenceSessions(date: string, tzOffsetMins: number | null) : Promise<Result<IntelligenceSessionResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_intelligence_sessions", { date, tzOffsetMins }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityWeekly() : Promise<Result<ProductivitySummaryResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_weekly") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityCategories() : Promise<Result<ActivityCategoryResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_categories") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityTrackedApps() : Promise<Result<TrackedAppResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_tracked_apps") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivitySummaryRange(startDate: string, endDate: string) : Promise<Result<ProductivitySummaryResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_summary_range", { startDate, endDate }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityActivityFeed(limit: number | null) : Promise<Result<ActivityTimelineResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_activity_feed", { limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityGoals() : Promise<Result<GoalProgressResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_goals") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityPomodoroStart(workMins: number | null, breakMins: number | null) : Promise<Result<FocusSessionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_pomodoro_start", { workMins, breakMins }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityTimeEntries(date: string) : Promise<Result<TimeEntryResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_time_entries", { date }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityGoalCreate(goalType: string, metric: string, targetValue: number) : Promise<Result<GoalProgressResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_goal_create", { goalType, metric, targetValue }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityGoalDelete(id: number) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_goal_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityGoalToggle(id: number, enabled: boolean) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_goal_toggle", { id, enabled }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityTimeEntryCreate(description: string, durationMins: number, categoryId: string | null, projectId: string | null) : Promise<Result<TimeEntryResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_time_entry_create", { description, durationMins, categoryId, projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityTimeEntryDelete(id: number) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_time_entry_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityCalendarEvents(date: string) : Promise<Result<CalendarEvent[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_calendar_events", { date }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async calendarSyncEvents(events: CalendarEventInput[]) : Promise<Result<CalendarEvent[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("calendar_sync_events", { events }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityCategoryUpsert(id: string, name: string, categoryType: string, color: string | null, icon: string | null, rules: CategoryRulesResponse | null) : Promise<Result<ActivityCategoryResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_category_upsert", { id, name, categoryType, color, icon, rules }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityCategoryDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_category_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityRecategorizeApp(appName: string, siteName: string | null, newCategoryId: string) : Promise<Result<number, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_recategorize_app", { appName, siteName, newCategoryId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityInsights(date: string | null) : Promise<Result<InsightCardResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_insights", { date }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityInsightDismiss(id: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_insight_dismiss", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityAutoFocusStart() : Promise<Result<FocusSessionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_auto_focus_start") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityAutoFocusEnd(event: unknown) : Promise<Result<FocusSessionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_auto_focus_end", { event }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityAutoFocusConfirm(payload: AutoFocusPayload) : Promise<Result<FocusSessionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_auto_focus_confirm", { payload }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async distractionRespond(response: DistractionResponse) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("distraction_respond", { response }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityProjectsList() : Promise<Result<ProductivityProjectResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_projects_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityProjectUpsert(id: string, displayName: string, path: string, urlPatterns: string[] | null, color: string | null) : Promise<Result<ProductivityProjectResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_project_upsert", { id, displayName, path, urlPatterns, color }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityProjectDelete(id: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_project_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityWeeklyAssessment(weekStart: string) : Promise<Result<WeeklyAssessmentResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_weekly_assessment", { weekStart }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusSessionStart(params: FocusSessionStartParams) : Promise<Result<FocusSessionResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_session_start", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusSessionStop(notes: string | null) : Promise<Result<FocusSessionResponse | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_session_stop", { notes }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusSessionStatus() : Promise<Result<FocusSessionStatusResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_session_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusSessionPause() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_session_pause") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusSessionResume() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_session_resume") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusSessionExtend(extraSecs: number) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_session_extend", { extraSecs }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusSessionExtendWork(extraMins: number) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_session_extend_work", { extraMins }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusSessionSkipBreak() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_session_skip_break") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusSessionTakeBreak() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_session_take_break") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async focusSessionStartBreak() : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("focus_session_start_break") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityPatterns(days: number | null) : Promise<Result<ProductivityPatternsResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_patterns", { days }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async productivityHourlyBreakdown(startDate: string, endDate: string, tzOffsetMins: number | null) : Promise<Result<HourlyBreakdownResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("productivity_hourly_breakdown", { startDate, endDate, tzOffsetMins }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectConversationsList(projectId: string) : Promise<Result<SessionSummaryResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_conversations_list", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectMemoriesList(projectId: string) : Promise<Result<SemanticFactResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_memories_list", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectMemoriesByType(projectId: string, memoryType: string) : Promise<Result<SemanticFactResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_memories_by_type", { projectId, memoryType }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectSourceCreate(params: ProjectSourceCreateParams) : Promise<Result<ProjectSourceResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_source_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectSourceDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_source_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectSourceList(projectId: string) : Promise<Result<ProjectSourceResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_source_list", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectCreate(params: ProjectCreateParams) : Promise<Result<ProjectResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectUpdateInstructions(id: string, instructions: unknown) : Promise<Result<ProjectResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_update_instructions", { id, instructions }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectGet(id: string) : Promise<Result<ProjectResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_get", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectUpdate(params: ProjectUpdateParams) : Promise<Result<ProjectResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectArchive(id: string) : Promise<Result<ProjectResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_archive", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectUpdateRole(id: string, role: string) : Promise<Result<ProjectResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_update_role", { id, role }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectHealthMetrics(projectId: string) : Promise<Result<ProjectHealthMetricsResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_health_metrics", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async reforgeState() : Promise<Result<ReforgeStateResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reforge_state") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async reforgeSkillNames() : Promise<Result<SkillListResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reforge_skill_names") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async reforgeSkillVersions(skillName: string) : Promise<Result<SkillVersionResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reforge_skill_versions", { skillName }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async reforgeSkillVersionDetail(skillName: string, version: number) : Promise<Result<SkillVersionDetailResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reforge_skill_version_detail", { skillName, version }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async reforgeSkillReset(skillName: string, filePath: string, version: number) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reforge_skill_reset", { skillName, filePath, version }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async retentionHistory(days: number, byDomain: boolean | null) : Promise<Result<RetentionHistoryResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("retention_history", { days, byDomain }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async reviewStatsSummary() : Promise<Result<ReviewStatsSummaryResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("review_stats_summary") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async appInfo() : Promise<Result<AppInfoResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("app_info") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async configGetSection(section: string) : Promise<Result<unknown, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("config_get_section", { section }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async configMarkSetupCompleted() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("config_mark_setup_completed") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async configUpdateSection(section: string, patch: unknown) : Promise<Result<unknown, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("config_update_section", { section, patch }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mcpGetConfig() : Promise<Result<McpConfigResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_get_config") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mcpAddServer(params: McpAddServerParams) : Promise<Result<McpConfigResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_add_server", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mcpRemoveServer(params: McpRemoveParams) : Promise<Result<McpConfigResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_remove_server", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mcpToggleServer(params: McpToggleParams) : Promise<Result<McpConfigResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_toggle_server", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mcpUpdateServer(params: McpUpdateServerParams) : Promise<Result<McpConfigResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mcp_update_server", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async shortcutsGet() : Promise<Result<ShortcutsConfig, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("shortcuts_get") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async shortcutsUpdate(launcher: string, tray: string) : Promise<Result<ShortcutsConfig, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("shortcuts_update", { launcher, tray }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async agentStatus() : Promise<Result<AgentStatusResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("agent_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async showStatusBadge(text: string, kind: BadgeKind, durationMs: number | null) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("show_status_badge", { text, kind, durationMs }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingListProviders() : Promise<Result<ProviderInfo[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_list_providers") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingListSessions(providerId: string) : Promise<Result<SessionSummary[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_list_sessions", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingLoadSession(providerId: string, sessionId: string, scope: Scope) : Promise<Result<SessionDetail, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_load_session", { providerId, sessionId, scope }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingLoadContext(providerId: string, sessionId: string, scope: Scope) : Promise<Result<ContextMessage[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_load_context", { providerId, sessionId, scope }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingLoadState(providerId: string, sessionId: string) : Promise<Result<SessionState, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_load_state", { providerId, sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingListSubagents(providerId: string, sessionId: string) : Promise<Result<SubagentSummary[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_list_subagents", { providerId, sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingImport(providerId: string, filePath: string) : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_import", { providerId, filePath }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingGetDir(providerId: string, sessionId: string) : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_get_dir", { providerId, sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingOpenDir(providerId: string, sessionId: string) : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_open_dir", { providerId, sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingStats(providerId: string) : Promise<Result<StatsBundle, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_stats", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskGet(id: string) : Promise<Result<TaskResponse | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_get", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskList(areaId: string | null, projectId: string | null, status: string | null) : Promise<Result<TaskResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_list", { areaId, projectId, status }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskCreate(params: TaskCreateParams) : Promise<Result<TaskResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskUpdate(params: TaskUpdateParams) : Promise<Result<TaskResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskDelete(id: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskToggleComplete(id: string) : Promise<Result<TaskResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_toggle_complete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskListChildren(parentId: string) : Promise<Result<TaskResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_list_children", { parentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async todayTasks() : Promise<Result<TodayTaskResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("today_tasks") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async projectList(areaId: string | null) : Promise<Result<ProjectResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("project_list", { areaId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async objectiveList(projectId: string | null) : Promise<Result<ObjectiveResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("objective_list", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskAddDependency(taskId: string, blockerId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_add_dependency", { taskId, blockerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskListDependencies(taskId: string) : Promise<Result<TaskResponse[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_list_dependencies", { taskId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskAddAttachment(taskId: string, attachmentType: string, value: string, title: string | null) : Promise<Result<TaskAttachmentRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_add_attachment", { taskId, attachmentType, value, title }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskListAttachments(taskId: string) : Promise<Result<TaskAttachmentRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_list_attachments", { taskId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskAddTimeEntry(taskId: string, startedAt: string, durationSecs: number | null, note: string | null) : Promise<Result<TaskTimeEntryRow, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_add_time_entry", { taskId, startedAt, durationSecs, note }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async taskListTimeEntries(taskId: string) : Promise<Result<TaskTimeEntryRow[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("task_list_time_entries", { taskId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Fire-and-forget cross-domain check. Called by frontend when a detail view mounts.
+ */
+async crossDomainCheck(domain: string, id: string, title: string, createdAt: string | null) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cross_domain_check", { domain, id, title, createdAt }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async timelineQuery(startDate: string, endDate: string, sources: TimelineSource[] | null, includePointEvents: boolean | null, tzOffsetMins: number | null) : Promise<Result<TimelineResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("timeline_query", { startDate, endDate, sources, includePointEvents, tzOffsetMins }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async viewSetActive(params: SetActiveViewParams) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("view_set_active", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async viewClearActive() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("view_clear_active") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async viewGetActive() : Promise<Result<ActiveViewResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("view_get_active") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceStartDictation() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_start_dictation") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceSimulateEvent(event: unknown) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_simulate_event", { event }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceStopDictation() : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_stop_dictation") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceListDevices() : Promise<Result<AudioDevicesResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_list_devices") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceModelStatus() : Promise<Result<VoiceModelStatusResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_model_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceDownloadModel(model: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_download_model", { model }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceDeleteModel(model: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_delete_model", { model }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceTestPersona(persona: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_test_persona", { persona }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceConversationStart(sessionKey: string | null) : Promise<Result<VoiceConversationStartResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_conversation_start", { sessionKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceConversationPause() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_conversation_pause") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceConversationResume() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_conversation_resume") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceConversationInterrupt() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_conversation_interrupt") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceConversationContinue() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_conversation_continue") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceConversationNewSession() : Promise<Result<VoiceConversationStartResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_conversation_new_session") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceConversationEnd() : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_conversation_end") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async voiceConversationStatus() : Promise<Result<VoiceConversationStatusResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("voice_conversation_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async resizeWindow(label: string, height: number) : Promise<void> {
     await TAURI_INVOKE("resize_window", { label, height });
-  },
-  async openUrl(url: string): Promise<void> {
+},
+async openUrl(url: string) : Promise<void> {
     await TAURI_INVOKE("open_url", { url });
-  },
-  async showDashboard(): Promise<void> {
+},
+async showDashboard() : Promise<void> {
     await TAURI_INVOKE("show_dashboard");
-  },
-  async quitApp(): Promise<void> {
+},
+async quitApp() : Promise<void> {
     await TAURI_INVOKE("quit_app");
-  },
-  async listWorkContexts(status: string | null): Promise<Result<WorkContextResponse[], ApiError>> {
+},
+async listWorkContexts(status: string | null) : Promise<Result<WorkContextResponse[], ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("list_work_contexts", { status }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async getWorkContext(id: string): Promise<Result<WorkContextResponse | null, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("list_work_contexts", { status }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getWorkContext(id: string) : Promise<Result<WorkContextResponse | null, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("get_work_context", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async getWorkContextDetail(id: string): Promise<Result<WorkContextDetailResponse, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("get_work_context", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getWorkContextDetail(id: string) : Promise<Result<WorkContextDetailResponse, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("get_work_context_detail", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async updateWorkContext(
-    params: WorkContextUpdateParams,
-  ): Promise<Result<WorkContextResponse, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("get_work_context_detail", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateWorkContext(params: WorkContextUpdateParams) : Promise<Result<WorkContextResponse, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("update_work_context", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async archiveWorkContext(id: string): Promise<Result<WorkContextResponse, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("update_work_context", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async archiveWorkContext(id: string) : Promise<Result<WorkContextResponse, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("archive_work_context", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async mergeWorkContexts(
-    keepId: string,
-    removeId: string,
-  ): Promise<Result<WorkContextResponse, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("archive_work_context", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mergeWorkContexts(keepId: string, removeId: string) : Promise<Result<WorkContextResponse, ApiError>> {
     try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("merge_work_contexts", { keepId, removeId }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async searchWorkContexts(query: string): Promise<Result<WorkContextResponse[], ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("merge_work_contexts", { keepId, removeId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async searchWorkContexts(query: string) : Promise<Result<WorkContextResponse[], ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("search_work_contexts", { query }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async getContextTimeline(
-    date: string,
-    tzOffsetMins: number | null,
-  ): Promise<Result<ContextTimelineBlockResponse[], ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("search_work_contexts", { query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getContextTimeline(date: string, tzOffsetMins: number | null) : Promise<Result<ContextTimelineBlockResponse[], ApiError>> {
     try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("get_context_timeline", { date, tzOffsetMins }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async getContextResumeData(contextId: string): Promise<Result<ContextResumeResponse, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("get_context_timeline", { date, tzOffsetMins }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getContextResumeData(contextId: string) : Promise<Result<ContextResumeResponse, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("get_context_resume_data", { contextId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async getInferenceStats(): Promise<Result<InferenceStatsResponse, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("get_context_resume_data", { contextId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getInferenceStats() : Promise<Result<InferenceStatsResponse, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("get_inference_stats") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async getDashboardIntelligence(
-    date: string,
-    tzOffsetMins: number | null,
-  ): Promise<Result<DashboardIntelligenceResponse, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("get_inference_stats") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getDashboardIntelligence(date: string, tzOffsetMins: number | null) : Promise<Result<DashboardIntelligenceResponse, ApiError>> {
     try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("get_dashboard_intelligence", { date, tzOffsetMins }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async updateInferenceConfig(config: InferenceConfigUpdate): Promise<Result<null, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("get_dashboard_intelligence", { date, tzOffsetMins }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateInferenceConfig(config: InferenceConfigUpdate) : Promise<Result<null, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("update_inference_config", { config }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async workflowList(): Promise<Result<StatusWorkflowResponse[], ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("update_inference_config", { config }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async workflowList() : Promise<Result<StatusWorkflowResponse[], ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("workflow_list") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async workflowGet(id: string): Promise<Result<StatusWorkflowResponse | null, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("workflow_list") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async workflowGet(id: string) : Promise<Result<StatusWorkflowResponse | null, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("workflow_get", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async workflowGetEffective(
-    projectId: string | null,
-  ): Promise<Result<StatusLabelResponse[], ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("workflow_get", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async workflowGetEffective(projectId: string | null) : Promise<Result<StatusLabelResponse[], ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("workflow_get_effective", { projectId }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async workflowCreate(
-    params: WorkflowCreateParams,
-  ): Promise<Result<StatusWorkflowResponse, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("workflow_get_effective", { projectId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async workflowCreate(params: WorkflowCreateParams) : Promise<Result<StatusWorkflowResponse, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("workflow_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async workflowDelete(id: string): Promise<Result<boolean, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("workflow_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async workflowDelete(id: string) : Promise<Result<boolean, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("workflow_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async labelCreate(params: LabelCreateParams): Promise<Result<StatusLabelResponse, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("workflow_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async labelCreate(params: LabelCreateParams) : Promise<Result<StatusLabelResponse, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("label_create", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async labelUpdate(params: LabelUpdateParams): Promise<Result<StatusLabelResponse, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("label_create", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async labelUpdate(params: LabelUpdateParams) : Promise<Result<StatusLabelResponse, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("label_update", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async labelDelete(id: string): Promise<Result<boolean, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("label_update", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async labelDelete(id: string) : Promise<Result<boolean, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("label_delete", { id }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async labelReorder(params: LabelReorderParams): Promise<Result<null, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("label_delete", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async labelReorder(params: LabelReorderParams) : Promise<Result<null, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("label_reorder", { params }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async workspaceListFiles(): Promise<Result<WorkspaceFile[], ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("label_reorder", { params }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async workspaceListFiles() : Promise<Result<WorkspaceFile[], ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("workspace_list_files") };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async workspaceReadFile(filename: string): Promise<Result<WorkspaceFileContent, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("workspace_list_files") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async workspaceReadFile(filename: string) : Promise<Result<WorkspaceFileContent, ApiError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("workspace_read_file", { filename }) };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-  async workspaceWriteFile(
-    filename: string,
-    content: string,
-  ): Promise<Result<WorkspaceFileContent, ApiError>> {
+    return { status: "ok", data: await TAURI_INVOKE("workspace_read_file", { filename }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async workspaceWriteFile(filename: string, content: string) : Promise<Result<WorkspaceFileContent, ApiError>> {
     try {
-      return {
-        status: "ok",
-        data: await TAURI_INVOKE("workspace_write_file", { filename, content }),
-      };
-    } catch (e) {
-      if (e instanceof Error) throw e;
-      else return { status: "error", error: e as any };
-    }
-  },
-};
+    return { status: "ok", data: await TAURI_INVOKE("workspace_write_file", { filename, content }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+}
+}
 
 /** user-defined events **/
 
+
 export const events = __makeEvents__<{
-  activitySwitch: ActivitySwitchPayload;
-  activityTick: ActivityTickPayload;
-  agentAgentSelected: AgentSelectedPayload;
-  agentError: AgentErrorPayload;
-  autotunerPromotion: MemoryPromotedPayload;
-  bucketCompleted: BucketPayload;
-  budgetWarningPayload: BudgetWarningPayload;
-  chatMessageAdded: ChatMessagePayload;
-  classificationCompletePayload: ClassificationCompletePayload;
-  confidenceAssessedPayload: ConfidenceAssessedPayload;
-  contentChunkPayload: ContentChunkPayload;
-  contextAssembledPayload: ContextAssembledPayload;
-  dataVersionBumpedPayload: DataVersionBumpedPayload;
-  delegationCompletedPayload: DelegationCompletedPayload;
-  delegationStartedPayload: DelegationStartedPayload;
-  distractionDetected: DistractionDetectedPayload;
-  distractionIntervention: InterventionPayload;
-  distractionVerdict: VerdictPayload;
-  donePayload: DonePayload;
-  enhancementStagePayload: EnhancementStagePayload;
-  entityCreatedPayload: EntityCreatedPayload;
-  entityUpdated: EntityUpdatedPayload;
-  executionStartedPayload: ExecutionStartedPayload;
-  focusAutoDetected: AutoFocusPayload;
-  focusDndUnavailable: FocusDndUnavailablePayload;
-  focusStateChanged: FocusStatePayload;
-  focusSync: FocusSyncPayload;
-  focusWarning: FocusWarningPayload;
-  insightGenerated: InsightPayload;
-  interactionRequestPayload: InteractionRequestPayload;
-  iterationStartPayload: IterationStartPayload;
-  learningEventPayload: LearningEventPayload;
-  mcpOauthComplete: McpOAuthCompletePayload;
-  mcpServerStatus: McpServerStatusPayload;
-  mcpStartupComplete: McpStartupCompletePayload;
-  memoryAccessPayload: MemoryAccessPayload;
-  messageSegment: MessageSegment;
-  pipelineStartedPayload: PipelineStartedPayload;
-  planGeneratedPayload: PlanGeneratedPayload;
-  planStepCompletedPayload: PlanStepCompletedPayload;
-  productivityDistraction: DistractionPayload;
-  productivityNudge: NudgePayload;
-  retrievalEnhancedPayload: RetrievalEnhancedPayload;
-  scoreUpdated: ScorePayload;
-  skillLoadedPayload: SkillLoadedPayload;
-  subagentSpawnedPayload: SubagentSpawnedPayload;
-  toolEndPayload: ToolEndPayload;
-  toolStartPayload: ToolStartPayload;
-  transparencyAgentSelected: TransparencyAgentSelected;
-  transparencyClassification: TransparencyClassification;
-  transparencyCost: TransparencyCost;
-  transparencyData: TransparencyData;
-  transparencyDelegation: TransparencyDelegation;
-  transparencyEnhancement: TransparencyEnhancement;
-  transparencyExecution: TransparencyExecution;
-  transparencyLearning: TransparencyLearning;
-  transparencyMemoryAccess: TransparencyMemoryAccess;
-  transparencyPlan: TransparencyPlan;
-  transparencySkill: TransparencySkill;
-  transparencySubagent: TransparencySubagent;
-  transparencyTiming: TransparencyTiming;
-  transparencyTool: TransparencyTool;
-  transparencyUsage: TransparencyUsage;
-  usageReportPayload: UsageReportPayload;
+activitySwitch: ActivitySwitchPayload,
+activityTick: ActivityTickPayload,
+agentAgentSelected: AgentSelectedPayload,
+agentError: AgentErrorPayload,
+autotunerPromotion: MemoryPromotedPayload,
+bucketCompleted: BucketPayload,
+budgetWarningPayload: BudgetWarningPayload,
+chatMessageAdded: ChatMessagePayload,
+classificationCompletePayload: ClassificationCompletePayload,
+confidenceAssessedPayload: ConfidenceAssessedPayload,
+contentChunkPayload: ContentChunkPayload,
+contextAssembledPayload: ContextAssembledPayload,
+dataVersionBumpedPayload: DataVersionBumpedPayload,
+delegationCompletedPayload: DelegationCompletedPayload,
+delegationStartedPayload: DelegationStartedPayload,
+distractionDetected: DistractionDetectedPayload,
+distractionIntervention: InterventionPayload,
+distractionVerdict: VerdictPayload,
+donePayload: DonePayload,
+enhancementStagePayload: EnhancementStagePayload,
+entityCreatedPayload: EntityCreatedPayload,
+entityUpdated: EntityUpdatedPayload,
+executionStartedPayload: ExecutionStartedPayload,
+focusAutoDetected: AutoFocusPayload,
+focusDndUnavailable: FocusDndUnavailablePayload,
+focusStateChanged: FocusStatePayload,
+focusSync: FocusSyncPayload,
+focusWarning: FocusWarningPayload,
+insightGenerated: InsightPayload,
+interactionRequestPayload: InteractionRequestPayload,
+iterationStartPayload: IterationStartPayload,
+learningEventPayload: LearningEventPayload,
+mcpOauthComplete: McpOAuthCompletePayload,
+mcpServerStatus: McpServerStatusPayload,
+mcpStartupComplete: McpStartupCompletePayload,
+memoryAccessPayload: MemoryAccessPayload,
+messageSegment: MessageSegment,
+pipelineStartedPayload: PipelineStartedPayload,
+planGeneratedPayload: PlanGeneratedPayload,
+planStepCompletedPayload: PlanStepCompletedPayload,
+productivityDistraction: DistractionPayload,
+productivityNudge: NudgePayload,
+retrievalEnhancedPayload: RetrievalEnhancedPayload,
+scoreUpdated: ScorePayload,
+skillLoadedPayload: SkillLoadedPayload,
+subagentSpawnedPayload: SubagentSpawnedPayload,
+toolEndPayload: ToolEndPayload,
+toolStartPayload: ToolStartPayload,
+transparencyAgentSelected: TransparencyAgentSelected,
+transparencyClassification: TransparencyClassification,
+transparencyCost: TransparencyCost,
+transparencyData: TransparencyData,
+transparencyDelegation: TransparencyDelegation,
+transparencyEnhancement: TransparencyEnhancement,
+transparencyExecution: TransparencyExecution,
+transparencyLearning: TransparencyLearning,
+transparencyMemoryAccess: TransparencyMemoryAccess,
+transparencyPlan: TransparencyPlan,
+transparencySkill: TransparencySkill,
+transparencySubagent: TransparencySubagent,
+transparencyTiming: TransparencyTiming,
+transparencyTool: TransparencyTool,
+transparencyUsage: TransparencyUsage,
+usageReportPayload: UsageReportPayload
 }>({
-  activitySwitch: "activity:switch",
-  activityTick: "activity:tick",
-  agentAgentSelected: "agent:agent_selected",
-  agentError: "agent:error",
-  autotunerPromotion: "autotuner:promotion",
-  bucketCompleted: "bucket:completed",
-  budgetWarningPayload: "budget-warning-payload",
-  chatMessageAdded: "chat:message_added",
-  classificationCompletePayload: "classification-complete-payload",
-  confidenceAssessedPayload: "confidence-assessed-payload",
-  contentChunkPayload: "content-chunk-payload",
-  contextAssembledPayload: "context-assembled-payload",
-  dataVersionBumpedPayload: "data-version-bumped-payload",
-  delegationCompletedPayload: "delegation-completed-payload",
-  delegationStartedPayload: "delegation-started-payload",
-  distractionDetected: "distraction:detected",
-  distractionIntervention: "distraction:intervention",
-  distractionVerdict: "distraction:verdict",
-  donePayload: "done-payload",
-  enhancementStagePayload: "enhancement-stage-payload",
-  entityCreatedPayload: "entity-created-payload",
-  entityUpdated: "entity:updated",
-  executionStartedPayload: "execution-started-payload",
-  focusAutoDetected: "focus:auto_detected",
-  focusDndUnavailable: "focus:dnd_unavailable",
-  focusStateChanged: "focus:state_changed",
-  focusSync: "focus:sync",
-  focusWarning: "focus:warning",
-  insightGenerated: "insight:generated",
-  interactionRequestPayload: "interaction-request-payload",
-  iterationStartPayload: "iteration-start-payload",
-  learningEventPayload: "learning-event-payload",
-  mcpOauthComplete: "mcp:oauth_complete",
-  mcpServerStatus: "mcp:server_status",
-  mcpStartupComplete: "mcp:startup_complete",
-  memoryAccessPayload: "memory-access-payload",
-  messageSegment: "message-segment",
-  pipelineStartedPayload: "pipeline-started-payload",
-  planGeneratedPayload: "plan-generated-payload",
-  planStepCompletedPayload: "plan-step-completed-payload",
-  productivityDistraction: "productivity:distraction",
-  productivityNudge: "productivity:nudge",
-  retrievalEnhancedPayload: "retrieval-enhanced-payload",
-  scoreUpdated: "score:updated",
-  skillLoadedPayload: "skill-loaded-payload",
-  subagentSpawnedPayload: "subagent-spawned-payload",
-  toolEndPayload: "tool-end-payload",
-  toolStartPayload: "tool-start-payload",
-  transparencyAgentSelected: "transparency-agent-selected",
-  transparencyClassification: "transparency-classification",
-  transparencyCost: "transparency-cost",
-  transparencyData: "transparency-data",
-  transparencyDelegation: "transparency-delegation",
-  transparencyEnhancement: "transparency-enhancement",
-  transparencyExecution: "transparency-execution",
-  transparencyLearning: "transparency-learning",
-  transparencyMemoryAccess: "transparency-memory-access",
-  transparencyPlan: "transparency-plan",
-  transparencySkill: "transparency-skill",
-  transparencySubagent: "transparency-subagent",
-  transparencyTiming: "transparency-timing",
-  transparencyTool: "transparency-tool",
-  transparencyUsage: "transparency-usage",
-  usageReportPayload: "usage-report-payload",
-});
+activitySwitch: "activity:switch",
+activityTick: "activity:tick",
+agentAgentSelected: "agent:agent_selected",
+agentError: "agent:error",
+autotunerPromotion: "autotuner:promotion",
+bucketCompleted: "bucket:completed",
+budgetWarningPayload: "budget-warning-payload",
+chatMessageAdded: "chat:message_added",
+classificationCompletePayload: "classification-complete-payload",
+confidenceAssessedPayload: "confidence-assessed-payload",
+contentChunkPayload: "content-chunk-payload",
+contextAssembledPayload: "context-assembled-payload",
+dataVersionBumpedPayload: "data-version-bumped-payload",
+delegationCompletedPayload: "delegation-completed-payload",
+delegationStartedPayload: "delegation-started-payload",
+distractionDetected: "distraction:detected",
+distractionIntervention: "distraction:intervention",
+distractionVerdict: "distraction:verdict",
+donePayload: "done-payload",
+enhancementStagePayload: "enhancement-stage-payload",
+entityCreatedPayload: "entity-created-payload",
+entityUpdated: "entity:updated",
+executionStartedPayload: "execution-started-payload",
+focusAutoDetected: "focus:auto_detected",
+focusDndUnavailable: "focus:dnd_unavailable",
+focusStateChanged: "focus:state_changed",
+focusSync: "focus:sync",
+focusWarning: "focus:warning",
+insightGenerated: "insight:generated",
+interactionRequestPayload: "interaction-request-payload",
+iterationStartPayload: "iteration-start-payload",
+learningEventPayload: "learning-event-payload",
+mcpOauthComplete: "mcp:oauth_complete",
+mcpServerStatus: "mcp:server_status",
+mcpStartupComplete: "mcp:startup_complete",
+memoryAccessPayload: "memory-access-payload",
+messageSegment: "message-segment",
+pipelineStartedPayload: "pipeline-started-payload",
+planGeneratedPayload: "plan-generated-payload",
+planStepCompletedPayload: "plan-step-completed-payload",
+productivityDistraction: "productivity:distraction",
+productivityNudge: "productivity:nudge",
+retrievalEnhancedPayload: "retrieval-enhanced-payload",
+scoreUpdated: "score:updated",
+skillLoadedPayload: "skill-loaded-payload",
+subagentSpawnedPayload: "subagent-spawned-payload",
+toolEndPayload: "tool-end-payload",
+toolStartPayload: "tool-start-payload",
+transparencyAgentSelected: "transparency-agent-selected",
+transparencyClassification: "transparency-classification",
+transparencyCost: "transparency-cost",
+transparencyData: "transparency-data",
+transparencyDelegation: "transparency-delegation",
+transparencyEnhancement: "transparency-enhancement",
+transparencyExecution: "transparency-execution",
+transparencyLearning: "transparency-learning",
+transparencyMemoryAccess: "transparency-memory-access",
+transparencyPlan: "transparency-plan",
+transparencySkill: "transparency-skill",
+transparencySubagent: "transparency-subagent",
+transparencyTiming: "transparency-timing",
+transparencyTool: "transparency-tool",
+transparencyUsage: "transparency-usage",
+usageReportPayload: "usage-report-payload"
+})
 
 /** user-defined constants **/
 
+
+
 /** user-defined types **/
 
-export type ActionSummaryResponse = {
-  id: string;
-  title: string;
-  status: string;
-  priority: string | null;
-};
+export type ActionSummaryResponse = { id: string; title: string; status: string; priority: string | null }
 /**
  * Response when getting the current active view.
  */
-export type ActiveViewResponse = {
-  dashboard: string | null;
-  focusedEntity: string | null;
-  description: string | null;
-};
+export type ActiveViewResponse = { dashboard: string | null; focusedEntity: string | null; description: string | null }
 /**
  * One bucket in the Activity Timeline panel — daily ingest event count.
  */
-export type ActivityBucket = {
-  /**
-   * ISO-8601 date (YYYY-MM-DD).
-   */
-  date: string;
-  count: number;
-};
-export type ActivityCategoryResponse = {
-  id: string;
-  name: string;
-  categoryType: string;
-  color: string | null;
-  icon: string | null;
-  isSystem: boolean;
-  rules: CategoryRulesResponse | null;
-};
-export type ActivityEventResponse = {
-  id: string;
-  timestamp: string;
-  source: string;
-  actor: string;
-  resourceName: string | null;
-  action: string;
-  contentPreview: string | null;
-  appName: string | null;
-  durationSecs: number | null;
-};
-export type ActivitySwitchPayload = {
-  fromApp: string | null;
-  toApp: string;
-  toSite: string | null;
-  categoryType: string | null;
-};
-export type ActivityTickPayload = {
-  appName: string;
-  siteName: string | null;
-  categoryType: string | null;
-  isIdle: boolean;
-};
-export type ActivityTimelineResponse = {
-  appName: string;
-  windowTitle: string | null;
-  siteName: string | null;
-  categoryId: string | null;
-  startedAt: string;
-  durationSecs: number | null;
-  isIdle: boolean;
-  projectId: string | null;
-  focusSessionId: string | null;
-};
-export type AgentErrorPayload = { sessionKey: string; message: string };
+export type ActivityBucket = { 
+/**
+ * ISO-8601 date (YYYY-MM-DD).
+ */
+date: string; count: number }
+export type ActivityCategoryResponse = { id: string; name: string; categoryType: string; color: string | null; icon: string | null; isSystem: boolean; rules: CategoryRulesResponse | null }
+export type ActivityEventResponse = { id: string; timestamp: string; source: string; actor: string; resourceName: string | null; action: string; contentPreview: string | null; appName: string | null; durationSecs: number | null }
+export type ActivitySwitchPayload = { fromApp: string | null; toApp: string; toSite: string | null; categoryType: string | null }
+export type ActivityTickPayload = { appName: string; siteName: string | null; categoryType: string | null; isIdle: boolean }
+export type ActivityTimelineResponse = { appName: string; windowTitle: string | null; siteName: string | null; categoryId: string | null; startedAt: string; durationSecs: number | null; isIdle: boolean; projectId: string | null; focusSessionId: string | null }
+export type AgentErrorPayload = { sessionKey: string; message: string }
 /**
  * Content of a single agent file.
  */
-export type AgentFileContent = {
-  agentName: string;
-  filename: string;
-  content: string;
-  isBuiltin: boolean;
-};
+export type AgentFileContent = { agentName: string; filename: string; content: string; isBuiltin: boolean }
 /**
  * Summary of a single agent file (AGENT.md or a skill).
  */
-export type AgentFileSummary = {
-  /**
-   * e.g. "AGENT.md" or "skills/todo.md"
-   */
-  filename: string;
-  /**
-   * Display name parsed from frontmatter (e.g. "todo", "daily-planner")
-   */
-  displayName: string;
-  /**
-   * Description from frontmatter
-   */
-  description: string;
-  /**
-   * Whether this file comes from the compiled-in builtin agents
-   */
-  isBuiltin: boolean;
-  /**
-   * Whether a workspace override exists for a builtin file
-   */
-  hasOverride: boolean;
-};
+export type AgentFileSummary = { 
+/**
+ * e.g. "AGENT.md" or "skills/todo.md"
+ */
+filename: string; 
+/**
+ * Display name parsed from frontmatter (e.g. "todo", "daily-planner")
+ */
+displayName: string; 
+/**
+ * Description from frontmatter
+ */
+description: string; 
+/**
+ * Whether this file comes from the compiled-in builtin agents
+ */
+isBuiltin: boolean; 
+/**
+ * Whether a workspace override exists for a builtin file
+ */
+hasOverride: boolean }
 /**
  * A full agent profile listing with its files.
  */
-export type AgentProfileSummary = {
-  name: string;
-  description: string;
-  isBuiltin: boolean;
-  hasOverride: boolean;
-  files: AgentFileSummary[];
-};
-export type AgentSelectedPayload = { sessionKey: string; name: string; description: string };
-export type AgentStatusResponse = {
-  status: string;
-  activeTaskCount: number;
-  focusTask: TaskResponse | null;
-};
-export type AiSuggestionResponse = {
-  suggestion: string | null;
-  confidence: number;
-  relatedFactIds: string[];
-};
+export type AgentProfileSummary = { name: string; description: string; isBuiltin: boolean; hasOverride: boolean; files: AgentFileSummary[] }
+export type AgentSelectedPayload = { sessionKey: string; name: string; description: string }
+export type AgentStatusResponse = { status: string; activeTaskCount: number; focusTask: TaskResponse | null }
+export type AiSuggestionResponse = { suggestion: string | null; confidence: number; relatedFactIds: string[] }
 /**
  * Info about a detected AI coding tool.
  */
-export type AiToolInfo = {
-  /**
-   * Machine ID (e.g., "claude-code", "cursor").
-   */
-  id: string;
-  /**
-   * Human-readable name (e.g., "Claude Code", "Cursor").
-   */
-  name: string;
-  /**
-   * Whether the tool was detected on this machine.
-   */
-  detected: boolean;
-  /**
-   * How it was detected (e.g., "Found ~/.claude.json").
-   */
-  detectionHint: string;
-  /**
-   * Icon identifier for the UI.
-   */
-  icon: string;
-};
+export type AiToolInfo = { 
+/**
+ * Machine ID (e.g., "claude-code", "cursor").
+ */
+id: string; 
+/**
+ * Human-readable name (e.g., "Claude Code", "Cursor").
+ */
+name: string; 
+/**
+ * Whether the tool was detected on this machine.
+ */
+detected: boolean; 
+/**
+ * How it was detected (e.g., "Found ~/.claude.json").
+ */
+detectionHint: string; 
+/**
+ * Icon identifier for the UI.
+ */
+icon: string }
 /**
  * Result of installing skills to one AI tool.
  */
-export type AiToolInstallResult = {
-  toolId: string;
-  toolName: string;
-  success: boolean;
-  filesWritten: string[];
-  message: string;
-};
+export type AiToolInstallResult = { toolId: string; toolName: string; success: boolean; filesWritten: string[]; message: string }
 /**
  * Params for installing skills to selected AI tools.
  */
-export type AiToolsInstallParams = {
-  /**
-   * List of tool IDs to install for (e.g., ["claude-code", "cursor"]).
-   */
-  tools: string[];
-};
-export type AnnotationCreateParams = {
-  noteId: string;
-  markId: string;
-  content: string;
-  quotedText: string | null;
-  rangeStart: number | null;
-  rangeEnd: number | null;
-  aiSuggestion: string | null;
-  tags: string | null;
-};
-export type AnnotationEnrichmentResponse = { translation: string; words: WordBreakdown[] };
-export type AnnotationResponse = {
-  id: string;
-  noteId: string;
-  markId: string | null;
-  content: string;
-  quotedText: string | null;
-  rangeStart: number | null;
-  rangeEnd: number | null;
-  aiSuggestion: string | null;
-  tags: string;
-  createdAt: string;
-  updatedAt: string;
-};
-export type AnnotationUpdateParams = { id: string; content: string | null; tags: string | null };
+export type AiToolsInstallParams = { 
+/**
+ * List of tool IDs to install for (e.g., ["claude-code", "cursor"]).
+ */
+tools: string[] }
+export type AnnotationCreateParams = { noteId: string; markId: string; content: string; quotedText: string | null; rangeStart: number | null; rangeEnd: number | null; aiSuggestion: string | null; tags: string | null }
+export type AnnotationEnrichmentResponse = { translation: string; words: WordBreakdown[] }
+export type AnnotationResponse = { id: string; noteId: string; markId: string | null; content: string; quotedText: string | null; rangeStart: number | null; rangeEnd: number | null; aiSuggestion: string | null; tags: string; createdAt: string; updatedAt: string }
+export type AnnotationUpdateParams = { id: string; content: string | null; tags: string | null }
 /**
  * Standardized API error response for Tauri commands.
  * Sent to the frontend with structured error information.
  */
-export type ApiError = {
-  /**
-   * Machine-readable error code (e.g., "NOT_FOUND", "INVALID_PARAMS")
-   */
-  code: string;
-  /**
-   * Human-readable error message
-   */
-  message: string;
-};
-export type AppApprovalDecision =
-  | { kind: "allow_once" }
-  | { kind: "allow_always"; rule: string | null }
-  | { kind: "deny" }
-  | { kind: "add_rule"; starlark_source: string };
-export type AppInfoResponse = { version: string; dataDir: string; setupCompleted: boolean };
-export type AppUsageResponse = { appName: string; durationSecs: number; category: string | null };
-export type AreaCreateParams = { name: string; color: string | null; icon: string | null };
-export type AreaResponse = {
-  id: string;
-  name: string;
-  color: string;
-  icon: string | null;
-  projectCount: number;
-  taskCount: number;
-};
-export type AreaUpdateParams = {
-  id: string;
-  name: string | null;
-  color: string | null;
-  icon: string | null;
-};
-export type ArgKind = { type: "text" } | { type: "number" } | { type: "choice"; values: string[] };
-export type ArgSpec = { name: string; placeholder: string; kind: ArgKind; required?: boolean };
+export type ApiError = { 
+/**
+ * Machine-readable error code (e.g., "NOT_FOUND", "INVALID_PARAMS")
+ */
+code: string; 
+/**
+ * Human-readable error message
+ */
+message: string }
+export type AppApprovalDecision = { kind: "allow_once" } | { kind: "allow_always"; rule: string | null } | { kind: "deny" } | { kind: "add_rule"; starlark_source: string }
+export type AppInfoResponse = { version: string; dataDir: string; setupCompleted: boolean }
+export type AppUsageResponse = { appName: string; durationSecs: number; category: string | null }
+export type AreaCreateParams = { name: string; color: string | null; icon: string | null }
+export type AreaResponse = { id: string; name: string; color: string; icon: string | null; projectCount: number; taskCount: number }
+export type AreaUpdateParams = { id: string; name: string | null; color: string | null; icon: string | null }
+export type ArgKind = { type: "text" } | { type: "number" } | { type: "choice"; values: string[] }
+export type ArgSpec = { name: string; placeholder: string; kind: ArgKind; required?: boolean }
 /**
  * Audio device listing for settings UI.
  */
-export type AudioDevicesResponse = {
-  input: string[];
-  output: string[];
-  /**
-   * Name of the system default input device (if available).
-   */
-  defaultInput: string | null;
-  /**
-   * Name of the system default output device (if available).
-   */
-  defaultOutput: string | null;
-};
-export type AutoFocusPayload = {
-  startedAt: string;
-  endedAt: string;
-  durationMins: number;
-  dominantApp: string;
-  productiveRatio: number;
-};
-export type AutoTunerStatus = {
-  champion: ChampionSummary;
-  activeExperiment: ExperimentSummary | null;
-  paused: boolean;
-  brainGrowth: BrainGrowth | null;
-  metricsHealth: MetricsHealth | null;
-  experimentPace: string | null;
-};
-export type BacklinkResponse = { note: NoteResponse; context: string | null };
-export type BadgeKind = "success" | "warn" | "error" | "info";
-export type BrainGrowth = {
-  correctionsCaptured7D: number;
-  trialsEvaluated7D: number;
-  promotedThisWeek: number;
-  status: string;
-};
-export type BrainVersion = {
-  version: number;
-  trialId: string | null;
-  promotedAt: string;
-  params: unknown;
-  reason: string;
-  parentVersion: number | null;
-  metricsAtPromotion: unknown;
-  reverted: boolean;
-};
-export type BucketPayload = {
-  bucketStart: string;
-  productiveSecs: number;
-  distractingSecs: number;
-  dominantApp: string | null;
-};
+export type AudioDevicesResponse = { input: string[]; output: string[]; 
+/**
+ * Name of the system default input device (if available).
+ */
+defaultInput: string | null; 
+/**
+ * Name of the system default output device (if available).
+ */
+defaultOutput: string | null }
+export type AutoFocusPayload = { startedAt: string; endedAt: string; durationMins: number; dominantApp: string; productiveRatio: number }
+export type AutoTunerStatus = { champion: ChampionSummary; activeExperiment: ExperimentSummary | null; paused: boolean; brainGrowth: BrainGrowth | null; metricsHealth: MetricsHealth | null; experimentPace: string | null }
+export type BacklinkResponse = { note: NoteResponse; context: string | null }
+export type BadgeKind = "success" | "warn" | "error" | "info"
+export type BrainGrowth = { correctionsCaptured7D: number; trialsEvaluated7D: number; promotedThisWeek: number; status: string }
+export type BrainVersion = { version: number; trialId: string | null; promotedAt: string; params: unknown; reason: string; parentVersion: number | null; metricsAtPromotion: unknown; reverted: boolean }
+export type BucketPayload = { bucketStart: string; productiveSecs: number; distractingSecs: number; dominantApp: string | null }
 /**
  * Result of the `budget_usage` join query: all budget fields plus the
  * `spent` amount (sum of matching expense transactions in the current period).
  */
-export type BudgetUsageRow = {
-  id: string;
-  name: string;
-  amount: number;
-  currency: string;
-  period: string;
-  category: string | null;
-  method: string;
-  jarType: string | null;
-  startDate: string;
-  endDate: string | null;
-  isActive: boolean;
-  alertThreshold: number;
-  createdAt: string;
-  updatedAt: string;
-  baseAmount: number;
-  baseCurrency: string;
-  exchangeRate: number;
-  /**
-   * Sum of expense amounts matching this budget's category in the current period.
-   */
-  spent: number;
-};
-export type BudgetWarningPayload = {
-  sessionKey: string;
-  monthlySpendUsd: number;
-  monthlyBudgetUsd: number;
-  usagePercent: number;
-};
-export type CalendarDashboard = {
-  eventId: string;
-  title: string;
-  startsAt: string;
-  endsAt: string;
-  minutesUntil: number;
-};
-export type CalendarEvent = {
-  id: string;
-  calendarId: string;
-  title: string;
-  description: string | null;
-  startedAt: string;
-  endedAt: string;
-  location: string | null;
-  attendeesCount: number;
-  isRecurring: boolean;
-  recurrenceId: string | null;
-  source: string;
-  externalUid: string;
-  sessionId: string | null;
-  color: string | null;
-  syncedAt: string;
-  createdAt: string;
-  updatedAt: string;
-};
-export type CalendarEventInput = {
-  title: string;
-  startedAt: string;
-  endedAt: string;
-  externalUid: string;
-  calendarId: string | null;
-  description: string | null;
-  location: string | null;
-  attendeesCount: number | null;
-  isRecurring: boolean | null;
-  recurrenceId: string | null;
-  source: string | null;
-  color: string | null;
-};
-export type CaptureStatusResponse = {
-  shellHookInstalled: boolean;
-  fileWatcherActive: boolean;
-  fileWatcherDirectories: string[];
-  ingestionApiEnabled: boolean;
-  ingestionApiPort: number;
-  eventCounts24H: Partial<{ [key in string]: number }>;
-};
-export type CategoryRulesResponse = {
-  appNames: string[];
-  bundleIds: string[];
-  urlPatterns: string[];
-};
-export type CategoryUsageResponse = {
-  categoryId: string;
-  category: string;
-  categoryType: string;
-  durationSecs: number;
-};
-export type ChampionSummary = {
-  trial_id: string | null;
-  description: string;
-  impact: string;
-  promoted_at: string;
-  days_active: number;
-};
-export type ChangesSummaryResponse = { summary: string };
-export type ChatMessagePayload = {
-  sessionKey: string;
-  /**
-   * Source that produced the message (e.g., "chat", "voice", "mcp", "cron").
-   */
-  source: string;
-};
-export type ChatMessageResponse = {
-  id: string;
-  role: string;
-  content: string;
-  timestamp: string;
-  segments?: MessageSegment[] | null;
-  transparency?: TransparencyData | null;
-};
-export type ChatMode = "chat" | "coding";
+export type BudgetUsageRow = { id: string; name: string; amount: number; currency: string; period: string; category: string | null; method: string; jarType: string | null; startDate: string; endDate: string | null; isActive: boolean; alertThreshold: number; createdAt: string; updatedAt: string; baseAmount: number; baseCurrency: string; exchangeRate: number; 
+/**
+ * Sum of expense amounts matching this budget's category in the current period.
+ */
+spent: number }
+export type BudgetWarningPayload = { sessionKey: string; monthlySpendUsd: number; monthlyBudgetUsd: number; usagePercent: number }
+export type CalendarDashboard = { eventId: string; title: string; startsAt: string; endsAt: string; minutesUntil: number }
+export type CalendarEvent = { id: string; calendarId: string; title: string; description: string | null; startedAt: string; endedAt: string; location: string | null; attendeesCount: number; isRecurring: boolean; recurrenceId: string | null; source: string; externalUid: string; sessionId: string | null; color: string | null; syncedAt: string; createdAt: string; updatedAt: string }
+export type CalendarEventInput = { title: string; startedAt: string; endedAt: string; externalUid: string; calendarId: string | null; description: string | null; location: string | null; attendeesCount: number | null; isRecurring: boolean | null; recurrenceId: string | null; source: string | null; color: string | null }
+export type CaptureStatusResponse = { shellHookInstalled: boolean; fileWatcherActive: boolean; fileWatcherDirectories: string[]; ingestionApiEnabled: boolean; ingestionApiPort: number; eventCounts24H: Partial<{ [key in string]: number }> }
+export type CategoryRulesResponse = { appNames: string[]; bundleIds: string[]; urlPatterns: string[] }
+export type CategoryUsageResponse = { categoryId: string; category: string; categoryType: string; durationSecs: number }
+export type ChampionSummary = { trial_id: string | null; description: string; impact: string; promoted_at: string; days_active: number }
+export type ChangesSummaryResponse = { summary: string }
+export type ChatMessagePayload = { sessionKey: string; 
+/**
+ * Source that produced the message (e.g., "chat", "voice", "mcp", "cron").
+ */
+source: string }
+export type ChatMessageResponse = { id: string; role: string; content: string; timestamp: string; segments?: MessageSegment[] | null; transparency?: TransparencyData | null }
+export type ChatMode = "chat" | "coding"
 /**
  * Detailed session response for `chat_get_session`.
  */
-export type ChatSessionResponse = {
-  sessionKey: string;
-  title: string;
-  messageCount: number;
-  createdAt: string;
-  updatedAt: string;
-  projectId: string | null;
-  conversationType: string | null;
-  pinned: boolean;
-};
-export type ChatThreadResponse = {
-  sessionKey: string;
-  title: string;
-  messageCount: number;
-  updatedAt: string;
-  contextType: string | null;
-  entityKind: string | null;
-  entityId: string | null;
-  areaId: string | null;
-  areaName: string | null;
-  projectId: string | null;
-  projectName: string | null;
-};
-export type ClassificationCompletePayload = {
-  sessionKey: string;
-  strategy: string;
-  confidence: number;
-  source: string;
-};
-export type CliHealthRow = {
-  cli: string;
-  enabled: boolean;
-  lastEventAt: string | null;
-  eventCount24H: number;
-};
-export type ClipboardContentType = "text" | "image" | "file";
-export type ClipboardEntry = {
-  id: number;
-  content: string;
-  content_type: string;
-  source_app: string | null;
-  preview: string | null;
-  file_path: string | null;
-  pinned: boolean;
-  created_at: string;
-};
-export type CodingMemoryStatusResponse = {
-  daemonAlive: boolean;
-  bufferedEventCount: number;
-  unprocessedEventCount: number;
-  socketPath: string;
-};
-export type CodingStatus = {
-  mode: string;
-  profile: string;
-  sandbox: string;
-  total_cost_usd: number;
-  total_tokens: number;
-  active_skills: string[];
-};
-export type CognitiveCommunity = {
-  id: string;
-  name: string;
-  color: string;
-  memberTopicIds: string[];
-};
-export type CognitiveGraphData = {
-  topics: TopicNode[];
-  edges: TopicEdge[];
-  communities: CognitiveCommunity[];
-  rules: RuleNode[];
-  stats: GraphStats;
-};
-export type ColumnCreateParams = {
-  projectId: string;
-  name: string;
-  columnType: string;
-  options: string[] | null;
-  width: number | null;
-};
-export type ColumnReorderParams = { projectId: string; ids: string[] };
-export type ColumnUpdateParams = {
-  id: string;
-  name: string | null;
-  options: string[] | null;
-  width: number | null;
-};
-export type ColumnValueSetParams = { taskId: string; columnId: string; value: unknown };
-export type CompactionResultResponse = {
-  archivedCount: number;
-  deletedEpisodic: number;
-  rulesDeactivated: number;
-};
-export type ComponentStatusResponse = {
-  name: string;
-  status: string;
-  handlerType: string;
-  notes: string;
-};
-export type ConfidenceAssessedPayload = { sessionKey: string; score: number; action: string };
-export type ConfusableResponse = {
-  hasConfusable: boolean;
-  confusableWord: string | null;
-  confusableMeaning: string | null;
-  explanation: string | null;
-};
-export type ContentChunkPayload = { sessionKey: string; data: string };
-export type ContextAssembledPayload = {
-  sessionKey: string;
-  totalTokens: number;
-  durationMs: number;
-};
-export type ContextMessage = { index: number; role: string; content: unknown };
-export type ContextResumeResponse = {
-  contextId: string;
-  contextTitle: string;
-  summary: string;
-  suggestedPrompt: string;
-  recentResources: string[];
-};
-export type ContextSummary = {
-  totalNotes: number;
-  totalWords: number;
-  strongAtoms: number;
-  fadingAtoms: number;
-  /**
-   * Number of semantic facts included (when cognitive context is on).
-   */
-  factsCount: number;
-  /**
-   * Number of episodic memories included (when cognitive context is on).
-   */
-  memoriesCount: number;
-  /**
-   * Number of entity connections (when deep dive is on).
-   */
-  entityCount: number;
-  /**
-   * Whether cognitive context is included.
-   */
-  includeCognitive: boolean;
-  /**
-   * Whether deep dive is included.
-   */
-  deepDive: boolean;
-};
-export type ContextTimelineBlockResponse = {
-  contextId: string | null;
-  contextTitle: string | null;
-  contextColor: string | null;
-  contextType: string | null;
-  startTime: string;
-  endTime: string;
-  eventCount: number;
-  isIdle: boolean;
-};
-export type Correction = {
-  original: string;
-  suggested: string;
-  explanation: string;
-  category: string;
-};
+export type ChatSessionResponse = { sessionKey: string; title: string; messageCount: number; createdAt: string; updatedAt: string; projectId: string | null; conversationType: string | null; pinned: boolean }
+export type ChatThreadResponse = { sessionKey: string; title: string; messageCount: number; updatedAt: string; contextType: string | null; entityKind: string | null; entityId: string | null; areaId: string | null; areaName: string | null; projectId: string | null; projectName: string | null }
+export type ClassificationCompletePayload = { sessionKey: string; strategy: string; confidence: number; source: string }
+export type CliHealthRow = { cli: string; enabled: boolean; lastEventAt: string | null; eventCount24H: number }
+export type ClipboardContentType = "text" | "image" | "file"
+export type ClipboardEntry = { id: number; content: string; content_type: string; source_app: string | null; preview: string | null; file_path: string | null; pinned: boolean; created_at: string }
+export type CodingMemoryStatusResponse = { daemonAlive: boolean; bufferedEventCount: number; unprocessedEventCount: number; socketPath: string }
+export type CodingStatus = { mode: string; profile: string; sandbox: string; total_cost_usd: number; total_tokens: number; active_skills: string[] }
+export type CognitiveCommunity = { id: string; name: string; color: string; memberTopicIds: string[] }
+export type CognitiveGraphData = { topics: TopicNode[]; edges: TopicEdge[]; communities: CognitiveCommunity[]; rules: RuleNode[]; stats: GraphStats }
+export type ColumnCreateParams = { projectId: string; name: string; columnType: string; options: string[] | null; width: number | null }
+export type ColumnReorderParams = { projectId: string; ids: string[] }
+export type ColumnUpdateParams = { id: string; name: string | null; options: string[] | null; width: number | null }
+export type ColumnValueSetParams = { taskId: string; columnId: string; value: unknown }
+export type CompactionResultResponse = { archivedCount: number; deletedEpisodic: number; rulesDeactivated: number }
+export type ComponentStatusResponse = { name: string; status: string; handlerType: string; notes: string }
+export type ConfidenceAssessedPayload = { sessionKey: string; score: number; action: string }
+export type ConfusableResponse = { hasConfusable: boolean; confusableWord: string | null; confusableMeaning: string | null; explanation: string | null }
+export type ContentChunkPayload = { sessionKey: string; data: string }
+export type ContextAssembledPayload = { sessionKey: string; totalTokens: number; durationMs: number }
+export type ContextMessage = { index: number; role: string; content: unknown }
+export type ContextResumeResponse = { contextId: string; contextTitle: string; summary: string; suggestedPrompt: string; recentResources: string[] }
+export type ContextSummary = { totalNotes: number; totalWords: number; strongAtoms: number; fadingAtoms: number; 
+/**
+ * Number of semantic facts included (when cognitive context is on).
+ */
+factsCount: number; 
+/**
+ * Number of episodic memories included (when cognitive context is on).
+ */
+memoriesCount: number; 
+/**
+ * Number of entity connections (when deep dive is on).
+ */
+entityCount: number; 
+/**
+ * Whether cognitive context is included.
+ */
+includeCognitive: boolean; 
+/**
+ * Whether deep dive is included.
+ */
+deepDive: boolean }
+export type ContextTimelineBlockResponse = { contextId: string | null; contextTitle: string | null; contextColor: string | null; contextType: string | null; startTime: string; endTime: string; eventCount: number; isIdle: boolean }
+export type Correction = { original: string; suggested: string; explanation: string; category: string }
 /**
  * Cost Tracker response — per-row breakdown + aggregate totals.
  */
-export type CostBreakdown = {
-  rows: CostBreakdownRow[];
-  totalCostUsd: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  totalCachedTokens: number;
-  totalRequests: number;
-  /**
-   * Number of distinct (date, model) buckets.
-   */
-  bucketCount: number;
-  /**
-   * Number of distinct models seen.
-   */
-  modelCount: number;
-  /**
-   * Number of distinct dates seen.
-   */
-  dayCount: number;
-};
+export type CostBreakdown = { rows: CostBreakdownRow[]; totalCostUsd: number; totalInputTokens: number; totalOutputTokens: number; totalCachedTokens: number; totalRequests: number; 
+/**
+ * Number of distinct (date, model) buckets.
+ */
+bucketCount: number; 
+/**
+ * Number of distinct models seen.
+ */
+modelCount: number; 
+/**
+ * Number of distinct dates seen.
+ */
+dayCount: number }
 /**
  * Per-(date × model) cost row.
  */
-export type CostBreakdownRow = {
-  /**
-   * ISO-8601 date (YYYY-MM-DD).
-   */
-  date: string;
-  /**
-   * Model id, or `"unknown"` if `sessionStart` did not specify one.
-   */
-  model: string;
-  /**
-   * Source of the row: `"klynt-cli"` (already-priced) or `"hooks"` (derived).
-   */
-  source: string;
-  /**
-   * Number of assistant messages (only meaningful for `source = "hooks"`).
-   */
-  requests: number;
-  inputTokens: number;
-  outputTokens: number;
-  cachedTokens: number;
-  inputCostUsd: number;
-  outputCostUsd: number;
-  totalCostUsd: number;
-};
-export type CronJobCreateParams = {
-  name: string;
-  schedule: unknown;
-  message: string;
-  deliver?: boolean;
-  channel: string | null;
-  to: string | null;
-  deleteAfterRun?: boolean;
-};
-export type CronJobResponse = {
-  id: string;
-  name: string;
-  enabled: boolean;
-  origin: string;
-  schedule: unknown;
-  payload: CronPayloadResponse;
-  state: CronJobStateResponse;
-  createdAtMs: number;
-  updatedAtMs: number;
-  deleteAfterRun: boolean;
-};
-export type CronJobStateResponse = {
-  nextRunAtMs?: number | null;
-  lastRunAtMs?: number | null;
-  lastStatus?: string | null;
-  lastError?: string | null;
-};
-export type CronJobUpdateParams = {
-  id: string;
-  name: string | null;
-  schedule: unknown | null;
-  message: string | null;
-  deliver: boolean | null;
-  channel: string | null;
-  to: string | null;
-};
-export type CronPayloadResponse = {
-  kind: string;
-  message: string;
-  deliver: boolean;
-  channel?: string | null;
-  to?: string | null;
-};
-export type CronStatusResponse = { enabled: boolean; jobs: number; nextWakeAtMs: number | null };
-export type CurrencyNetWorth = {
-  currency: string;
-  accounts: number;
-  investments: number;
-  liabilities: number;
-  net: number;
-};
-export type CustomColumnResponse = {
-  id: string;
-  projectId: string;
-  name: string;
-  columnType: string;
-  options: string[] | null;
-  position: number;
-  width: number;
-};
-export type CustomColumnValueResponse = { taskId: string; columnId: string; value: unknown };
-export type DailySpending = { date: string; totalSpending: number; txCount: number };
-export type DashboardData = {
-  calendar: CalendarDashboard[];
-  tasks: TaskDashboard[];
-  productivity: ProductivityDashboard;
-};
-export type DashboardIntelligenceResponse = {
-  activeContext: WorkContextSummary | null;
-  focusRecommendation: string | null;
-  sessionSummary: SessionBlock[];
-  contextSwitches: number;
-  switchQuality: string;
-  productivityScore: number;
-  scoreTrend: number;
-  patterns: string[];
-  nudges: DashboardNudge[];
-  resourceClusters: ResourceCluster[];
-};
-export type DashboardNudge = { message: string; nudgeType: string; priority: string };
-export type DataVersionBumpedPayload = { previous: number; current: number };
-export type DeckPreferenceResponse = { deck: string; answerMode: string };
-export type DeckSummaryResponse = { name: string; cardCount: number; dueCount: number };
-export type DelegationCompletedPayload = {
-  sessionKey: string;
-  fromAgent: string;
-  toAgent: string;
-  success: boolean;
-  durationMs: number;
-};
-export type DelegationStartedPayload = {
-  sessionKey: string;
-  fromAgent: string;
-  toAgent: string;
-  query: string;
-  depth: number;
-};
-export type DeliveredInterventionResponse = {
-  id: string;
-  interventionType: string;
-  message: string;
-  triggerName: string;
-  timestamp: string;
-};
-export type DetectConfusablesParams = { word: string; sourceLang: string };
-export type DetectedPatternResponse = {
-  name: string;
-  confidence: number;
-  signalCount: number;
-  description: string;
-  domain: string;
-};
-export type DiagnoseResult = { ok: boolean; message: string };
-export type DiagnosticChecklist = { items: DiagnosticItem[] };
-export type DiagnosticItem = { name: string; status: string; detail: string };
-export type DiffSegmentResponse = { text: string; status: string };
-export type DistractionDetectedPayload = {
-  appName: string;
-  sessionId: string;
-  previousApp: string;
-  previousContext: string;
-  reason: string;
-};
-export type DistractionPayload = { appName: string; sessionId: string };
-export type DistractionResponse = { action: string; appName: string | null };
-export type DomainCount = { domain: string; count: number };
+export type CostBreakdownRow = { 
+/**
+ * ISO-8601 date (YYYY-MM-DD).
+ */
+date: string; 
+/**
+ * Model id, or `"unknown"` if `sessionStart` did not specify one.
+ */
+model: string; 
+/**
+ * Source of the row: `"klynt-cli"` (already-priced) or `"hooks"` (derived).
+ */
+source: string; 
+/**
+ * Number of assistant messages (only meaningful for `source = "hooks"`).
+ */
+requests: number; inputTokens: number; outputTokens: number; cachedTokens: number; inputCostUsd: number; outputCostUsd: number; totalCostUsd: number }
+export type CronJobCreateParams = { name: string; schedule: unknown; message: string; deliver?: boolean; channel: string | null; to: string | null; deleteAfterRun?: boolean }
+export type CronJobResponse = { id: string; name: string; enabled: boolean; origin: string; schedule: unknown; payload: CronPayloadResponse; state: CronJobStateResponse; createdAtMs: number; updatedAtMs: number; deleteAfterRun: boolean }
+export type CronJobStateResponse = { nextRunAtMs?: number | null; lastRunAtMs?: number | null; lastStatus?: string | null; lastError?: string | null }
+export type CronJobUpdateParams = { id: string; name: string | null; schedule: unknown | null; message: string | null; deliver: boolean | null; channel: string | null; to: string | null }
+export type CronPayloadResponse = { kind: string; message: string; deliver: boolean; channel?: string | null; to?: string | null }
+export type CronStatusResponse = { enabled: boolean; jobs: number; nextWakeAtMs: number | null }
+export type CurrencyNetWorth = { currency: string; accounts: number; investments: number; liabilities: number; net: number }
+export type CustomColumnResponse = { id: string; projectId: string; name: string; columnType: string; options: string[] | null; position: number; width: number }
+export type CustomColumnValueResponse = { taskId: string; columnId: string; value: unknown }
+export type DailySpending = { date: string; totalSpending: number; txCount: number }
+export type DashboardData = { calendar: CalendarDashboard[]; tasks: TaskDashboard[]; productivity: ProductivityDashboard }
+export type DashboardIntelligenceResponse = { activeContext: WorkContextSummary | null; focusRecommendation: string | null; sessionSummary: SessionBlock[]; contextSwitches: number; switchQuality: string; productivityScore: number; scoreTrend: number; patterns: string[]; nudges: DashboardNudge[]; resourceClusters: ResourceCluster[] }
+export type DashboardNudge = { message: string; nudgeType: string; priority: string }
+export type DataVersionBumpedPayload = { previous: number; current: number }
+export type DeckPreferenceResponse = { deck: string; answerMode: string }
+export type DeckSummaryResponse = { name: string; cardCount: number; dueCount: number }
+export type DelegationCompletedPayload = { sessionKey: string; fromAgent: string; toAgent: string; success: boolean; durationMs: number }
+export type DelegationStartedPayload = { sessionKey: string; fromAgent: string; toAgent: string; query: string; depth: number }
+export type DeliveredInterventionResponse = { id: string; interventionType: string; message: string; triggerName: string; timestamp: string }
+export type DetectConfusablesParams = { word: string; sourceLang: string }
+export type DetectedPatternResponse = { name: string; confidence: number; signalCount: number; description: string; domain: string }
+export type DiagnoseResult = { ok: boolean; message: string }
+export type DiagnosticChecklist = { items: DiagnosticItem[] }
+export type DiagnosticItem = { name: string; status: string; detail: string }
+export type DiffSegmentResponse = { text: string; status: string }
+export type DistractionDetectedPayload = { appName: string; sessionId: string; previousApp: string; previousContext: string; reason: string }
+export type DistractionPayload = { appName: string; sessionId: string }
+export type DistractionResponse = { action: string; appName: string | null }
+export type DomainCount = { domain: string; count: number }
 /**
  * A persisted domain event row.
  */
-export type DomainEventRow = {
-  id: string;
-  event_type: string;
-  domain: string;
-  salience: string;
-  payload: string;
-  timestamp: string;
-};
-export type DomainHealthEntry = {
-  domain: string;
-  score: number;
-  totalFacts: number;
-  activeFacts: number;
-  fastFailures: number;
-};
-export type DomainHistory = { domain: string; points: RetentionPoint[] };
-export type DonePayload = { sessionKey: string; content: string };
+export type DomainEventRow = { id: string; event_type: string; domain: string; salience: string; payload: string; timestamp: string }
+export type DomainHealthEntry = { domain: string; score: number; totalFacts: number; activeFacts: number; fastFailures: number }
+export type DomainHistory = { domain: string; points: RetentionPoint[] }
+export type DonePayload = { sessionKey: string; content: string }
 /**
  * Bucket for the effectiveness chart.
  */
-export type EffectivenessTrendBucket = {
-  /**
-   * ISO date.
-   */
-  at: string;
-  /**
-   * Effectiveness after.
-   */
-  score: number;
-};
+export type EffectivenessTrendBucket = { 
+/**
+ * ISO date.
+ */
+at: string; 
+/**
+ * Effectiveness after.
+ */
+score: number }
 /**
  * Response for `coding_memory_effectiveness_trends`.
  */
-export type EffectivenessTrendsResponse = {
-  /**
-   * Pattern id.
-   */
-  patternId: string;
-  /**
-   * Pattern name (from `procedural_rules.rule`).
-   */
-  patternName: string;
-  /**
-   * Buckets ordered oldest-first.
-   */
-  buckets: EffectivenessTrendBucket[];
-};
-export type EnhancementStagePayload = {
-  name: string;
-  status: string;
-  statusDetail?: string | null;
-  latencyMs: number;
-  llmCalls: number;
-  outputSummary: string;
-};
-export type EnrichAnnotationParams = {
-  annotationId: string;
-  quotedText: string;
-  sourceLang: string;
-  targetLang: string;
-};
-export type EntityCreatedPayload = {
-  sessionKey: string;
-  /**
-   * Raw entity type string from the agent (may not map to a known EntityKind).
-   */
-  entityType: string;
-  entityId: string;
-};
-export type EntityKind =
-  | "task"
-  | "project"
-  | "objective"
-  | "area"
-  | "keyResult"
-  | "focusSession"
-  | "productivity"
-  | "note"
-  | "notebook"
-  | "finance"
-  | "source"
-  | "conversation"
-  | "mirrorSnippet"
-  | "brainVersion"
-  | "pendingMemory"
-  | "codingFact"
-  | "codingEpisode";
-export type EntityLinkCreateParams = {
-  sourceKind: string;
-  sourceId: string;
-  targetKind: string;
-  targetId: string;
-  linkType: string | null;
-  metadata: unknown | null;
-};
-export type EntityLinkResponse = {
-  id: string;
-  sourceKind: string;
-  sourceId: string;
-  targetKind: string;
-  targetId: string;
-  linkType: string;
-  metadata: unknown | null;
-  createdAt: string;
-};
-export type EntityMergeParams = { keepId: string; mergeId: string };
-export type EntityNeighborhoodResponse = {
-  center: EntityResponse;
-  neighbors: EntityRelationshipResponse[];
-};
-export type EntityRelationshipResponse = {
-  entity: EntityResponse;
-  relationshipType: string;
-  strength: number;
-  direction: string;
-};
-export type EntityResponse = {
-  id: string;
-  name: string;
-  entityType: string;
-  description: string | null;
-  mentionCount: number;
-  lastSeenAt: string;
-};
-export type EntitySearchParams = { query: string; entityType: string | null; limit: number | null };
-export type EntityUpdatedPayload = { entityKind: EntityKind; id: string };
-export type EpisodicMemoryResponse = {
-  id: string;
-  domain: string;
-  content: string;
-  summary: string | null;
-  importance: number;
-  occurredAt: string;
-  recordedAt: string;
-  stability: number;
-  accessCount: number;
-};
-export type ErrorByTool = { tool: string; errorCount: number };
-export type EvalGrades = {
-  meaning: string;
-  grammar: string;
-  naturalness: string;
-  wordChoice: string;
-};
-export type EvaluateTranslationParams = {
-  sourceText: string;
-  userTranslation: string;
-  sourceLang: string;
-  targetLang: string;
-};
-export type ExecStatus = { kind: "ok" } | { kind: "err"; message: string };
-export type ExecutionStartedPayload = { sessionKey: string; engine: string; maxIterations: number };
-export type ExperimentSummary = {
-  id: string;
-  variant_count: number;
-  messages_scored: number;
-  hypothesis: string;
-  started_at: string;
-};
-export type FabricActionParams = { action: string; payload: unknown };
-export type FabricActionResponse = { success: boolean; message: string | null };
-export type FabricCommunity = {
-  id: string;
-  name: string;
-  color: string;
-  stability: number;
-  memberCount: number;
-  memberNoteIds: string[];
-};
-export type FabricCommunityDetail = {
-  communityId: string;
-  representativePaths: string[];
-  topEntities: string[];
-  stabilityHistory: number[];
-  members: FabricMember[];
-};
-export type FabricEntitiesResponse = { entities: FabricEntity[]; edges: FabricEntityEdge[] };
-export type FabricEntity = { id: string; name: string; entityType: string; mentionCount: number };
-export type FabricEntityEdge = { entityId: string; noteId: string; weight: number };
-export type FabricExpandParams = { layer: string; scopes: string[] };
-export type FabricExpandResponse =
-  | { type: "entities"; data: FabricEntitiesResponse }
-  | { type: "tree"; data: FabricTreeNodesResponse[] }
-  | { type: "communityDetail"; data: FabricCommunityDetail[] };
-export type FabricGraphBase = {
-  notes: FabricNote[];
-  links: FabricLink[];
-  communities: FabricCommunity[];
-  suggestedPreset: string | null;
-  lastActivityTimestamp: string;
-  livePulseActive: boolean;
-};
-export type FabricLink = { sourceId: string; targetId: string; linkType: string };
-export type FabricMember = { noteId: string; treeNodeId: string; membershipScore: number };
-export type FabricNote = {
-  id: string;
-  title: string;
-  notebookId: string | null;
-  tags: string[];
-  bodyPreview: string;
-  treeSectionCount: number;
-  entityCount: number;
-};
-export type FabricTreeNode = {
-  id: string;
-  parentId: string | null;
-  nodeType: string;
-  title: string | null;
-  contentPreview: string;
-  level: number;
-};
-export type FabricTreeNodesResponse = { noteId: string; nodes: FabricTreeNode[] };
-export type FactCreateParams = {
-  domain: string;
-  subject: string;
-  predicate: string;
-  object: string;
-  confidence: number;
-};
-export type FactNode = {
-  id: string;
-  predicate: string;
-  object: string;
-  confidence: number;
-  convergenceScore: number;
-  stability: number;
-  accessCount: number;
-  source: string;
-  lastAccessed: string | null;
-};
-export type FactUpdateParams = { object: string | null; confidence: number | null };
-export type FadingAtomSummary = {
-  id: string;
-  subject: string;
-  retentionPct: number;
-  domain: string;
-};
-export type FeedbackTarget = "Narrative" | "Snippet" | "Routing";
-export type FileKind = "file" | "folder" | "image" | "document" | "code" | "archive";
-export type FinanceAccountCreateParams = {
-  name: string;
-  accountType: string;
-  currency: string | null;
-  balance: number | null;
-  institution: string | null;
-  notes: string | null;
-};
+export type EffectivenessTrendsResponse = { 
+/**
+ * Pattern id.
+ */
+patternId: string; 
+/**
+ * Pattern name (from `procedural_rules.rule`).
+ */
+patternName: string; 
+/**
+ * Buckets ordered oldest-first.
+ */
+buckets: EffectivenessTrendBucket[] }
+export type EnhancementStagePayload = { name: string; status: string; statusDetail?: string | null; latencyMs: number; llmCalls: number; outputSummary: string }
+export type EnrichAnnotationParams = { annotationId: string; quotedText: string; sourceLang: string; targetLang: string }
+export type EntityCreatedPayload = { sessionKey: string; 
+/**
+ * Raw entity type string from the agent (may not map to a known EntityKind).
+ */
+entityType: string; entityId: string }
+export type EntityKind = "task" | "project" | "objective" | "area" | "keyResult" | "focusSession" | "productivity" | "note" | "notebook" | "finance" | "source" | "conversation" | "mirrorSnippet" | "brainVersion" | "pendingMemory" | "codingFact" | "codingEpisode"
+export type EntityLinkCreateParams = { sourceKind: string; sourceId: string; targetKind: string; targetId: string; linkType: string | null; metadata: unknown | null }
+export type EntityLinkResponse = { id: string; sourceKind: string; sourceId: string; targetKind: string; targetId: string; linkType: string; metadata: unknown | null; createdAt: string }
+export type EntityMergeParams = { keepId: string; mergeId: string }
+export type EntityNeighborhoodResponse = { center: EntityResponse; neighbors: EntityRelationshipResponse[] }
+export type EntityRelationshipResponse = { entity: EntityResponse; relationshipType: string; strength: number; direction: string }
+export type EntityResponse = { id: string; name: string; entityType: string; description: string | null; mentionCount: number; lastSeenAt: string }
+export type EntitySearchParams = { query: string; entityType: string | null; limit: number | null }
+export type EntityUpdatedPayload = { entityKind: EntityKind; id: string }
+export type EpisodicMemoryResponse = { id: string; domain: string; content: string; summary: string | null; importance: number; occurredAt: string; recordedAt: string; stability: number; accessCount: number }
+export type ErrorByTool = { tool: string; errorCount: number }
+export type EvalGrades = { meaning: string; grammar: string; naturalness: string; wordChoice: string }
+export type EvaluateTranslationParams = { sourceText: string; userTranslation: string; sourceLang: string; targetLang: string }
+export type ExecStatus = { kind: "ok" } | { kind: "err"; message: string }
+export type ExecutionStartedPayload = { sessionKey: string; engine: string; maxIterations: number }
+export type ExperimentSummary = { id: string; variant_count: number; messages_scored: number; hypothesis: string; started_at: string }
+export type FabricActionParams = { action: string; payload: unknown }
+export type FabricActionResponse = { success: boolean; message: string | null }
+export type FabricCommunity = { id: string; name: string; color: string; stability: number; memberCount: number; memberNoteIds: string[] }
+export type FabricCommunityDetail = { communityId: string; representativePaths: string[]; topEntities: string[]; stabilityHistory: number[]; members: FabricMember[] }
+export type FabricEntitiesResponse = { entities: FabricEntity[]; edges: FabricEntityEdge[] }
+export type FabricEntity = { id: string; name: string; entityType: string; mentionCount: number }
+export type FabricEntityEdge = { entityId: string; noteId: string; weight: number }
+export type FabricExpandParams = { layer: string; scopes: string[] }
+export type FabricExpandResponse = { type: "entities"; data: FabricEntitiesResponse } | { type: "tree"; data: FabricTreeNodesResponse[] } | { type: "communityDetail"; data: FabricCommunityDetail[] }
+export type FabricGraphBase = { notes: FabricNote[]; links: FabricLink[]; communities: FabricCommunity[]; suggestedPreset: string | null; lastActivityTimestamp: string; livePulseActive: boolean }
+export type FabricLink = { sourceId: string; targetId: string; linkType: string }
+export type FabricMember = { noteId: string; treeNodeId: string; membershipScore: number }
+export type FabricNote = { id: string; title: string; notebookId: string | null; tags: string[]; bodyPreview: string; treeSectionCount: number; entityCount: number }
+export type FabricTreeNode = { id: string; parentId: string | null; nodeType: string; title: string | null; contentPreview: string; level: number }
+export type FabricTreeNodesResponse = { noteId: string; nodes: FabricTreeNode[] }
+export type FactCreateParams = { domain: string; subject: string; predicate: string; object: string; confidence: number }
+export type FactNode = { id: string; predicate: string; object: string; confidence: number; convergenceScore: number; stability: number; accessCount: number; source: string; lastAccessed: string | null }
+export type FactUpdateParams = { object: string | null; confidence: number | null }
+export type FadingAtomSummary = { id: string; subject: string; retentionPct: number; domain: string }
+export type FeedbackTarget = "Narrative" | "Snippet" | "Routing"
+export type FileKind = "file" | "folder" | "image" | "document" | "code" | "archive"
+export type FinanceAccountCreateParams = { name: string; accountType: string; currency: string | null; balance: number | null; institution: string | null; notes: string | null }
 /**
  * Row struct for the `finance_accounts` table.
  */
-export type FinanceAccountRow = {
-  id: string;
-  name: string;
-  accountType: string;
-  currency: string;
-  balance: number;
-  institution: string | null;
-  notes: string | null;
-  isArchived: boolean;
-  createdAt: string;
-  updatedAt: string;
-  baseBalance: number;
-  baseCurrency: string;
-  exchangeRate: number;
-};
-export type FinanceAccountUpdateParams = {
-  id: string;
-  name: string | null;
-  balance: number | null;
-  institution: string | null;
-  notes: string | null;
-  isArchived: boolean | null;
-};
+export type FinanceAccountRow = { id: string; name: string; accountType: string; currency: string; balance: number; institution: string | null; notes: string | null; isArchived: boolean; createdAt: string; updatedAt: string; baseBalance: number; baseCurrency: string; exchangeRate: number }
+export type FinanceAccountUpdateParams = { id: string; name: string | null; balance: number | null; institution: string | null; notes: string | null; isArchived: boolean | null }
 /**
  * Row struct for the `finance_allocation_targets` table.
  */
-export type FinanceAllocationTargetRow = {
-  id: string;
-  portfolioId: string;
-  assetClass: string;
-  targetWeight: string;
-  toleranceBand: string;
-  createdAt: string;
-  updatedAt: string;
-};
-export type FinanceAllocationTargetUpsertParams = {
-  portfolioId: string;
-  assetClass: string;
-  targetWeight: string;
-  toleranceBand: string;
-};
-export type FinanceBudgetCreateParams = {
-  name: string;
-  amount: number;
-  period: string;
-  currency: string | null;
-  category: string | null;
-  method: string | null;
-  startDate: string | null;
-  endDate: string | null;
-  alertThreshold: number | null;
-};
+export type FinanceAllocationTargetRow = { id: string; portfolioId: string; assetClass: string; targetWeight: string; toleranceBand: string; createdAt: string; updatedAt: string }
+export type FinanceAllocationTargetUpsertParams = { portfolioId: string; assetClass: string; targetWeight: string; toleranceBand: string }
+export type FinanceBudgetCreateParams = { name: string; amount: number; period: string; currency: string | null; category: string | null; method: string | null; startDate: string | null; endDate: string | null; alertThreshold: number | null }
 /**
  * Row struct for the `finance_budgets` table.
  */
-export type FinanceBudgetRow = {
-  id: string;
-  name: string;
-  amount: number;
-  currency: string;
-  period: string;
-  category: string | null;
-  method: string;
-  jarType: string | null;
-  startDate: string;
-  endDate: string | null;
-  isActive: boolean;
-  alertThreshold: number;
-  createdAt: string;
-  updatedAt: string;
-  baseAmount: number;
-  baseCurrency: string;
-  exchangeRate: number;
-};
-export type FinanceBudgetUpdateParams = {
-  id: string;
-  name: string | null;
-  amount: number | null;
-  category: string | null;
-  isActive: boolean | null;
-};
-export type FinanceCategoryBreakdown = { category: string; amount: number; pct: number };
-export type FinanceCategoryReportResponse = {
-  total: number;
-  breakdown: FinanceCategoryBreakdown[];
-};
-export type FinanceDailySpendingResponse = { days: DailySpending[] };
-export type FinanceGoalCreateParams = {
-  name: string;
-  goalType: string;
-  targetAmount: number;
-  currency: string | null;
-  currentAmount: number | null;
-  deadline: string | null;
-  monthlyContribution: number | null;
-  notes: string | null;
-};
+export type FinanceBudgetRow = { id: string; name: string; amount: number; currency: string; period: string; category: string | null; method: string; jarType: string | null; startDate: string; endDate: string | null; isActive: boolean; alertThreshold: number; createdAt: string; updatedAt: string; baseAmount: number; baseCurrency: string; exchangeRate: number }
+export type FinanceBudgetUpdateParams = { id: string; name: string | null; amount: number | null; category: string | null; isActive: boolean | null }
+export type FinanceCategoryBreakdown = { category: string; amount: number; pct: number }
+export type FinanceCategoryReportResponse = { total: number; breakdown: FinanceCategoryBreakdown[] }
+export type FinanceDailySpendingResponse = { days: DailySpending[] }
+export type FinanceGoalCreateParams = { name: string; goalType: string; targetAmount: number; currency: string | null; currentAmount: number | null; deadline: string | null; monthlyContribution: number | null; notes: string | null }
 /**
  * Row struct for the `finance_goals` table.
  */
-export type FinanceGoalRow = {
-  id: string;
-  name: string;
-  goalType: string;
-  targetAmount: number;
-  currentAmount: number;
-  currency: string;
-  status: string;
-  deadline: string | null;
-  monthlyContribution: number | null;
-  expectedReturnRate: number | null;
-  inflationRate: number | null;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-  baseTargetAmount: number;
-  baseCurrentAmount: number;
-  baseCurrency: string;
-  exchangeRate: number;
-};
-export type FinanceGoalUpdateParams = {
-  id: string;
-  currentAmount: number | null;
-  targetAmount: number | null;
-  monthlyContribution: number | null;
-  deadline: string | null;
-  status: string | null;
-};
-export type FinanceInvestmentCreateParams = {
-  portfolioId: string;
-  assetType: string;
-  costBasis: number;
-  quantity: string;
-  symbol: string | null;
-  name: string | null;
-  currency: string | null;
-  purchaseDate: string | null;
-  notes: string | null;
-};
+export type FinanceGoalRow = { id: string; name: string; goalType: string; targetAmount: number; currentAmount: number; currency: string; status: string; deadline: string | null; monthlyContribution: number | null; expectedReturnRate: number | null; inflationRate: number | null; notes: string | null; createdAt: string; updatedAt: string; baseTargetAmount: number; baseCurrentAmount: number; baseCurrency: string; exchangeRate: number }
+export type FinanceGoalUpdateParams = { id: string; currentAmount: number | null; targetAmount: number | null; monthlyContribution: number | null; deadline: string | null; status: string | null }
+export type FinanceInvestmentCreateParams = { portfolioId: string; assetType: string; costBasis: number; quantity: string; symbol: string | null; name: string | null; currency: string | null; purchaseDate: string | null; notes: string | null }
 /**
  * Row struct for the `finance_investments` table.
  */
-export type FinanceInvestmentRow = {
-  id: string;
-  portfolioId: string;
-  assetType: string;
-  symbol: string | null;
-  name: string;
-  quantity: string;
-  costBasis: number;
-  currency: string;
-  currentPrice: number | null;
-  currentValue: number | null;
-  purchaseDate: string | null;
-  assetClass: string | null;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-  marketCurrency: string | null;
-  baseCostBasis: number;
-  baseCurrentValue: number;
-  baseCurrency: string;
-  purchaseRate: number;
-  marketRate: number;
-};
-export type FinanceInvestmentTxCreateParams = {
-  investmentId: string;
-  txType: string;
-  totalAmount: number;
-  currency: string;
-  txDate: string;
-  quantity: number | null;
-  pricePerUnit: number | null;
-  fees: number | null;
-  notes: string | null;
-};
+export type FinanceInvestmentRow = { id: string; portfolioId: string; assetType: string; symbol: string | null; name: string; quantity: string; costBasis: number; currency: string; currentPrice: number | null; currentValue: number | null; purchaseDate: string | null; assetClass: string | null; notes: string | null; createdAt: string; updatedAt: string; marketCurrency: string | null; baseCostBasis: number; baseCurrentValue: number; baseCurrency: string; purchaseRate: number; marketRate: number }
+export type FinanceInvestmentTxCreateParams = { investmentId: string; txType: string; totalAmount: number; currency: string; txDate: string; quantity: number | null; pricePerUnit: number | null; fees: number | null; notes: string | null }
 /**
  * Row struct for the `finance_investment_transactions` table.
  */
-export type FinanceInvestmentTxRow = {
-  id: string;
-  investmentId: string;
-  txType: string;
-  quantity: number | null;
-  pricePerUnit: number | null;
-  totalAmount: number;
-  currency: string;
-  fees: number;
-  txDate: string;
-  notes: string | null;
-  createdAt: string;
-  baseTotalAmount: number;
-  baseCurrency: string;
-  exchangeRate: number;
-};
-export type FinanceInvestmentUpdateParams = {
-  id: string;
-  currentPrice: number | null;
-  currentValue: number | null;
-  quantity: string | null;
-  notes: string | null;
-};
-export type FinanceLiabilityCreateParams = {
-  name: string;
-  liabilityType: string;
-  principal: number;
-  currency: string | null;
-  remaining: number | null;
-  interestRate: number | null;
-  monthlyPayment: number | null;
-  dueDate: string | null;
-  notes: string | null;
-};
+export type FinanceInvestmentTxRow = { id: string; investmentId: string; txType: string; quantity: number | null; pricePerUnit: number | null; totalAmount: number; currency: string; fees: number; txDate: string; notes: string | null; createdAt: string; baseTotalAmount: number; baseCurrency: string; exchangeRate: number }
+export type FinanceInvestmentUpdateParams = { id: string; currentPrice: number | null; currentValue: number | null; quantity: string | null; notes: string | null }
+export type FinanceLiabilityCreateParams = { name: string; liabilityType: string; principal: number; currency: string | null; remaining: number | null; interestRate: number | null; monthlyPayment: number | null; dueDate: string | null; notes: string | null }
 /**
  * Row struct for the `finance_liabilities` table.
  */
-export type FinanceLiabilityRow = {
-  id: string;
-  name: string;
-  liabilityType: string;
-  principal: number;
-  remaining: number;
-  currency: string;
-  interestRate: number | null;
-  monthlyPayment: number | null;
-  dueDate: string | null;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-  basePrincipal: number;
-  baseRemaining: number;
-  baseCurrency: string;
-  exchangeRate: number;
-};
-export type FinanceLiabilityUpdateParams = {
-  id: string;
-  remaining: number | null;
-  monthlyPayment: number | null;
-  interestRate: number | null;
-  notes: string | null;
-};
-export type FinanceMonthlySummaryResponse = {
-  currentIncome: number;
-  currentSpending: number;
-  previousIncome: number;
-  previousSpending: number;
-};
-export type FinanceNetWorthResponse = { totalsByCurrency: CurrencyNetWorth[] };
-export type FinancePeriodSummaryResponse = { income: number; spending: number };
-export type FinancePortfolioCreateParams = {
-  name: string;
-  description: string | null;
-  currency: string | null;
-};
-export type FinancePortfolioResponse = {
-  id: string;
-  name: string;
-  description: string | null;
-  currency: string;
-  totalValue: number;
-  totalCostBasis: number;
-  holdingCount: number;
-};
+export type FinanceLiabilityRow = { id: string; name: string; liabilityType: string; principal: number; remaining: number; currency: string; interestRate: number | null; monthlyPayment: number | null; dueDate: string | null; notes: string | null; createdAt: string; updatedAt: string; basePrincipal: number; baseRemaining: number; baseCurrency: string; exchangeRate: number }
+export type FinanceLiabilityUpdateParams = { id: string; remaining: number | null; monthlyPayment: number | null; interestRate: number | null; notes: string | null }
+export type FinanceMonthlySummaryResponse = { currentIncome: number; currentSpending: number; previousIncome: number; previousSpending: number }
+export type FinanceNetWorthResponse = { totalsByCurrency: CurrencyNetWorth[] }
+export type FinancePeriodSummaryResponse = { income: number; spending: number }
+export type FinancePortfolioCreateParams = { name: string; description: string | null; currency: string | null }
+export type FinancePortfolioResponse = { id: string; name: string; description: string | null; currency: string; totalValue: number; totalCostBasis: number; holdingCount: number }
 /**
  * Row struct for the `finance_portfolios` table.
  */
-export type FinancePortfolioRow = {
-  id: string;
-  name: string;
-  description: string | null;
-  currency: string;
-  createdAt: string;
-  updatedAt: string;
-};
-export type FinanceTransactionCreateParams = {
-  accountId: string;
-  txType: string;
-  amount: number;
-  currency: string | null;
-  category: string | null;
-  subcategory: string | null;
-  counterparty: string | null;
-  txDate: string | null;
-  notes: string | null;
-};
-export type FinanceTransactionFilterParams = {
-  accountId: string | null;
-  txType: string | null;
-  category: string | null;
-  dateFrom: string | null;
-  dateTo: string | null;
-  query: string | null;
-  limit: number | null;
-};
+export type FinancePortfolioRow = { id: string; name: string; description: string | null; currency: string; createdAt: string; updatedAt: string }
+export type FinanceTransactionCreateParams = { accountId: string; txType: string; amount: number; currency: string | null; category: string | null; subcategory: string | null; counterparty: string | null; txDate: string | null; notes: string | null }
+export type FinanceTransactionFilterParams = { accountId: string | null; txType: string | null; category: string | null; dateFrom: string | null; dateTo: string | null; query: string | null; limit: number | null }
 /**
  * Row struct for the `finance_transactions` table.
  */
-export type FinanceTransactionRow = {
-  id: string;
-  accountId: string;
-  txType: string;
-  amount: number;
-  currency: string;
-  category: string | null;
-  subcategory: string | null;
-  counterparty: string | null;
-  notes: string | null;
-  txDate: string;
-  transferId: string | null;
-  isRecurring: boolean;
-  recurringRule: string | null;
-  createdAt: string;
-  updatedAt: string;
-  baseAmount: number;
-  baseCurrency: string;
-  exchangeRate: number;
-};
-export type FinanceTrendPoint = { period: string; value: number; changePct: number | null };
-export type FlashcardCreateParams = {
-  deck: string;
-  front: string;
-  back: string;
-  cardType: string;
-  tags: string[] | null;
-  sourceNoteId: string | null;
-  clozeData: unknown | null;
-  vocabData: unknown | null;
-};
-export type FlashcardDistractorParams = { cardId: string; count?: number };
-export type FlashcardDistractorResponse = { distractors: string[]; cached: boolean };
-export type FlashcardExplainParams = {
-  cardId: string;
-  userAnswer: string;
-  gradeExplanation: string;
-};
-export type FlashcardExplainResponse = { explanation: string; savedAsMemory: boolean };
-export type FlashcardGenerateParams = {
-  /**
-   * Generate from a specific note (fetches note content)
-   */
-  noteId: string | null;
-  /**
-   * Generate from raw text (clipboard, selection)
-   */
-  textContent: string | null;
-  /**
-   * Suggested deck name (optional)
-   */
-  deckHint: string | null;
-};
-export type FlashcardGenerateResponse = { cards: GeneratedCardPreview[]; deckSuggestion: string };
-export type FlashcardListParams = { deck: string; limit: number | null; offset: number | null };
-export type FlashcardResponse = {
-  id: string;
-  deck: string;
-  front: string;
-  back: string;
-  cardType: string;
-  clozeData: unknown | null;
-  vocabData: unknown | null;
-  imageData: unknown | null;
-  tags: unknown;
-  sourceNoteId: string | null;
-  sourceContext: string | null;
-  stability: number;
-  difficulty: number;
-  dueAt: string | null;
-  state: string;
-  reviewCount: number;
-  recallSpeedMs: number | null;
-  createdAt: string;
-};
-export type FlashcardReviewParams = {
-  cardId: string;
-  quality: string;
-  recallSpeedMs: number | null;
-};
-export type FlashcardSaveGeneratedParams = {
-  noteId: string | null;
-  deck: string;
-  cards: GeneratedCardPreview[];
-};
-export type FlashcardSubmitAnswerParams = { cardId: string; userAnswer: string; mode: string };
-export type FlashcardUpdateParams = {
-  id: string;
-  front: string;
-  back: string;
-  deck: string;
-  tags: string[] | null;
-  clozeData: unknown | null;
-  vocabData: unknown | null;
-};
-export type FocusDndUnavailablePayload = { message: string };
-export type FocusMode = "dnd";
-export type FocusSession = {
-  id: number;
-  mode: FocusMode;
-  startedAt: string;
-  endsAt: string;
-  endedAt: string | null;
-  alarmId: string | null;
-  source: string;
-};
-export type FocusSessionResponse = {
-  id: string;
-  actionId: string | null;
-  projectId: string | null;
-  sessionType: string;
-  targetMins: number | null;
-  startedAt: string;
-  endedAt: string | null;
-  actualMins: number | null;
-  interruptions: number;
-  qualityScore: number | null;
-  completed: boolean;
-  notes: string | null;
-};
-export type FocusSessionStartParams = {
-  workSecs: number;
-  shortBreakSecs: number;
-  longBreakSecs: number;
-  longBreakAfter: number;
-  actionId: string | null;
-  actionTitle: string | null;
-  dndEnabled: boolean | null;
-  soundEnabled: boolean | null;
-  notificationEnabled: boolean | null;
-};
-export type FocusSessionStatusResponse = {
-  active: boolean;
-  sync: FocusSyncPayload | null;
-  session: FocusSessionResponse | null;
-};
-export type FocusStatePayload = { state: string; since: string };
-export type FocusSyncPayload = {
-  phase: string;
-  remainingSecs: number;
-  totalSecs: number;
-  cyclePosition: number;
-  longBreakAfter: number;
-  paused: boolean;
-  actionTitle: string | null;
-  dndActive: boolean;
-};
-export type FocusWarningPayload = { phase: string; remainingSecs: number };
-export type GeneratedCardPreview = {
-  front: string;
-  back: string;
-  cardType: string;
-  tags: string[];
-  sourceContext: string | null;
-  clozeData: unknown | null;
-  vocabData: unknown | null;
-  difficultyEstimate: number | null;
-  prerequisiteConcepts: string[] | null;
-};
-export type GoalProgressResponse = {
-  id: number;
-  goalType: string;
-  metric: string;
-  targetValue: number;
-  currentValue: number;
-  met: boolean;
-  projectId: string | null;
-};
-export type GradeResultResponse = {
-  score: number | null;
-  suggestedRating: string;
-  gradingMethod: string;
-  explanation: string | null;
-  diffHighlights: DiffSegmentResponse[];
-  expectedAnswer: string;
-  coachingNudge: string | null;
-  socraticSuggestion: string | null;
-  keyConceptsPresent: string[];
-  keyConceptsMissing: string[];
-};
-export type GrammarPattern = { pattern: string; explanation: string; patternType: string | null };
-export type GraphStats = {
-  totalFacts: number;
-  totalTopics: number;
-  totalEdges: number;
-  totalCommunities: number;
-  avgConvergence: number;
-};
-export type HeaderStats = {
-  turnCount: number;
-  stepCount: number;
-  toolCallCount: number;
-  errorCount: number;
-  compactionCount: number;
-  agentCount: number;
-  totalDurationMs: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  cacheReadTokens: number;
-  cacheHitPct: number;
-  model: string | null;
-};
-export type HelpEntry = {
-  command: string;
-  description: string;
-  category: string;
-  arg_hint: string | null;
-};
-export type HooksTomlSnapshot = { path: string; exists: boolean; content: string };
-export type HourlyBreakdownResponse = {
-  hour: number;
-  productiveSecs: number;
-  neutralSecs: number;
-  distractingSecs: number;
-  idleSecs: number;
-  totalSecs: number;
-  productiveRatio: number;
-};
-export type HybridSearchResponse = { exact: NoteResponse[]; related: NoteResponse[] };
-export type InboxCreateParams = { content: string };
-export type InboxItemResponse = { id: string; content: string; status: string; createdAt: string };
-export type InferenceConfigUpdate = {
-  assignmentThreshold: number | null;
-  mergeThreshold: number | null;
-  semanticWeight: number | null;
-  temporalWeight: number | null;
-  resourceWeight: number | null;
-  inferenceIntervalMins: number | null;
-  maxDormancyDays: number | null;
-  maxActiveContexts: number | null;
-};
-export type InferenceStatsResponse = {
-  activeContextCount: number;
-  archivedContextCount: number;
-  eventsLastHour: number;
-  eventsLast24H: number;
-  assignmentRate: number;
-  avgConfidence: number;
-  mergesLast24H: number;
-  lastRunAt: string | null;
-};
-export type InsightCardResponse = {
-  id: string;
-  insightType: string;
-  title: string;
-  body: string;
-  sentiment: string;
-  metricValue: number | null;
-  baselineValue: number | null;
-  date: string;
-  dismissed: boolean;
-  generatedAt: string;
-};
-export type InsightChatParams = {
-  noteId: string;
-  tabName: string;
-  userMessage: string;
-  sessionKey: string;
-};
-export type InsightChatStarted = { sessionKey: string; messageId: string };
-export type InsightEvolutionPoint = {
-  version: number;
-  generatedAt: string;
-  flashcardSuccess: number;
-  semanticDrift: number;
-  gapClosure: number;
-  quizScore: number;
-  overallProgress: number;
-  changeNote: string;
-};
-export type InsightEvolutionResponse = {
-  noteId: string;
-  noteTitle: string;
-  versions: InsightEvolutionPoint[];
-};
-export type InsightPayload = { id: string; insightType: string; title: string; sentiment: string };
-export type InsightQuizSubmitParams = { insightReviewId: string; score: number; total: number };
-export type InsightReviewResponse = {
-  insightReviewId: string;
-  noteId: string;
-  version: number;
-  generatedAt: string;
-  synthesis: string | null;
-  gapAnalysis: string | null;
-  selfAssessment: QuizQuestion[] | null;
-  conceptMap: string | null;
-  perspectives: string | null;
-};
-export type InsightReviewStarted = {
-  insightReviewId: string;
-  contentHash: string;
-  cached: boolean;
-};
-export type InsightSaveFlashcardsParams = {
-  noteId: string;
-  insightReviewId: string;
-  deckName: string;
-  questions: QuizQuestion[];
-};
-export type InsightScopeConfigParams = {
-  scopeType?: string | null;
-  radius: number | null;
-  nodeIds?: string[] | null;
-  includeCognitive: boolean | null;
-  deepDive: boolean | null;
-  mergeThreshold: number | null;
-};
-export type InsightVersionResponse = {
-  id: string;
-  version: number;
-  generatedAt: string;
-  inputHash: string;
-  hasParent: boolean;
-};
-export type IntelligenceSessionResponse = {
-  id: string;
-  sessionType: string;
-  startedAt: string;
-  endedAt: string | null;
-  durationSecs: number | null;
-  dominantCategory: string | null;
-  categoryPurity: number | null;
-  qualityScore: number | null;
-  title: string | null;
-  description: string | null;
-  appBreakdown: string | null;
-  contextSwitches: number;
-  distractionCount: number;
-  source: string;
-};
-export type InteractionRequestPayload = { sessionKey: string; requestId: string; request: unknown };
-export type InterventionLogResponse = {
-  id: string;
-  interventionType: string;
-  message: string;
-  triggerName: string;
-  feedback: string | null;
-  deliveredAt: string;
-  feedbackAt: string | null;
-};
-export type InterventionPayload = {
-  appName: string;
-  windowTitle: string | null;
-  sessionId: string;
-  needsLlm: boolean;
-  heuristicVerdict: string;
-};
-export type IterationStartPayload = {
-  sessionKey: string;
-  iteration: number;
-  maxIterations: number;
-};
-export type JsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | JsonValue[]
-  | Partial<{ [key in string]: JsonValue }>;
-export type KeyResultCreateParams = {
-  objectiveId: string;
-  title: string;
-  targetValue: number | null;
-  unit: string | null;
-  trackingMode: string | null;
-};
-export type KeyResultResponse = {
-  id: string;
-  title: string;
-  progress: number;
-  current: number;
-  target: number;
-  unit: string;
-};
-export type KeyResultSummaryResponse = { id: string; title: string; progress: number };
-export type KeyResultUpdateParams = {
-  id: string;
-  title: string | null;
-  description: string | null;
-  status: string | null;
-  dueDate: string | null;
-};
-export type KimiTodo = { title: string; status: string };
-export type KnowledgeAtomResponse = {
-  id: string;
-  subject: string;
-  atomType: string;
-  domain: string;
-  sourceNoteId: string | null;
-  sourceRange: string | null;
-  sourceContext: string | null;
-  semanticFactId: string | null;
-  retentionPct: number;
-  personalImportance: number;
-  status: string;
-  salience: number;
-  lastInteractionTs: string | null;
-  metadata: string | null;
-  topicName: string | null;
-  linkedCardCount: number;
-  createdAt: string;
-};
-export type KnowledgeGrowthResponse = {
-  newFactsCount: number;
-  updatedFactsCount: number;
-  supersededFactsCount: number;
-  byDomain: DomainCount[];
-  periodDays: number;
-};
-export type KnowledgeHealthSummary = {
-  totalAtoms: number;
-  activeAtoms: number;
-  avgRetention: number;
-  topics: TopicHealthResponse[];
-};
-export type LabelCreateParams = {
-  workflowId: string;
-  name: string;
-  color: string;
-  statusGroup: string;
-  position: number | null;
-};
-export type LabelReorderParams = { workflowId: string; labelIds: string[] };
-export type LabelUpdateParams = {
-  id: string;
-  name: string | null;
-  color: string | null;
-  statusGroup: string | null;
-  position: number | null;
-};
-export type LauncherExecuteResult = {
-  status: ExecStatus;
-  message: string | null;
-  badge: BadgeKind;
-};
-export type LauncherItem = {
-  id: string;
-  title: string;
-  subtitle: string | null;
-  icon: string | null;
-  kind: LauncherItemKind;
-  score: number;
-  no_view?: boolean;
-  arguments?: ArgSpec[];
-  pinned?: boolean;
-};
-export type LauncherItemKind =
-  | { type: "application"; path: string; running: boolean }
-  | { type: "task"; task_id: string; status: string }
-  | { type: "note"; note_id: string; preview: string }
-  | { type: "clipboardEntry"; entry_id: number; content_type: ClipboardContentType }
-  | { type: "systemCommand"; action: SystemAction }
-  | { type: "script"; path: string; name: string }
-  | { type: "calculator"; expression: string; result: number }
-  | { type: "calendar"; event_id: string; starts_at: string }
-  | { type: "aiChat"; query: string }
-  | { type: "file"; path: string; kind: FileKind }
-  | { type: "contentMatch"; path: string; line: number; preview: string }
-  | { type: "contact"; name: string; email: string | null; phone: string | null }
-  | { type: "systemPref"; pane_id: string }
-  | { type: "runningApp"; pid: number; path: string }
-  | { type: "bookmark"; url: string; browser: string }
-  | { type: "browserHistory"; url: string; visited_at: string }
-  | { type: "brewPackage"; name: string; is_cask: boolean }
-  | { type: "sshHost"; host: string; user: string | null }
-  | { type: "gitRepo"; path: string }
-  | { type: "urlNavigation"; url: string }
-  | { type: "windowAction"; action: WindowAction };
-export type LearnedRuleResponse = {
-  id: number;
-  pattern: string;
-  patternType: string;
-  classification: string;
-  confidence: number;
-  hitCount: number;
-  lastUsedAt: string;
-  createdAt: string;
-};
-export type LearningEventPayload = { sessionKey: string; eventType: string; detail: string };
-export type LinkSuggestionResponse = { note: NoteResponse; score: number; reason: string };
-export type LinkedContextParams = { noteId: string; sectionText: string };
-export type LinkedContextResponse = {
-  semanticFacts: LinkedFact[];
-  episodicMemories: LinkedMemory[];
-  relatedAnnotations: AnnotationResponse[];
-  proceduralRules: LinkedRule[];
-};
-export type LinkedEntitiesResponse = {
-  tasks: ActionSummaryResponse[];
-  notes: NoteSummaryResponse[];
-  conversations: SessionSummaryResponse[];
-  sources: ProjectSourceResponse[];
-  objectives: ObjectiveSummaryResponse[];
-  keyResults: KeyResultSummaryResponse[];
-};
-export type LinkedFact = {
-  id: string;
-  subject: string;
-  predicate: string;
-  object: string;
-  confidence: number;
-  sourceNote: string | null;
-};
-export type LinkedMemory = { id: string; content: string; domain: string; createdAt: string };
-export type LinkedRule = { id: string; ruleText: string; domain: string; signalCount: number };
-export type McpAddServerParams = {
-  name: string;
-  transport: string;
-  command: string | null;
-  args: string[] | null;
-  env: Partial<{ [key in string]: string }> | null;
-  url: string | null;
-  headers: Partial<{ [key in string]: string }> | null;
-};
-export type McpConfigResponse = { enabled: boolean; servers: McpServerResponse[] };
-export type McpOAuthCompletePayload = { serverName: string; provider: string };
-export type McpRemoveParams = { name: string };
-export type McpServerResponse = {
-  name: string;
-  transport: string;
-  enabled: boolean;
-  command: string | null;
-  args: string[] | null;
-  env: Partial<{ [key in string]: string }> | null;
-  url: string | null;
-  headers: Partial<{ [key in string]: string }> | null;
-  oauthProvider?: string | null;
-  oauthConnected: boolean;
-};
-export type McpServerStatusPayload = {
-  serverName: string;
-  /**
-   * One of: "starting", "ready", "failed", "skipped"
-   */
-  status: string;
-  toolCount?: number | null;
-  error?: string | null;
-};
-export type McpStartupCompletePayload = { ready: number; failed: number; skipped: number };
-export type McpToggleParams = { name: string; enabled: boolean };
-export type McpUpdateServerParams = {
-  name: string;
-  transport: string | null;
-  command: string | null;
-  args: string[] | null;
-  env: Partial<{ [key in string]: string }> | null;
-  url: string | null;
-  headers: Partial<{ [key in string]: string }> | null;
-};
-export type MemoryAccessPayload = {
-  sessionKey: string;
-  action: string;
-  query: string | null;
-  resultsCount: number;
-};
+export type FinanceTransactionRow = { id: string; accountId: string; txType: string; amount: number; currency: string; category: string | null; subcategory: string | null; counterparty: string | null; notes: string | null; txDate: string; transferId: string | null; isRecurring: boolean; recurringRule: string | null; createdAt: string; updatedAt: string; baseAmount: number; baseCurrency: string; exchangeRate: number }
+export type FinanceTrendPoint = { period: string; value: number; changePct: number | null }
+export type FlashcardCreateParams = { deck: string; front: string; back: string; cardType: string; tags: string[] | null; sourceNoteId: string | null; clozeData: unknown | null; vocabData: unknown | null }
+export type FlashcardDistractorParams = { cardId: string; count?: number }
+export type FlashcardDistractorResponse = { distractors: string[]; cached: boolean }
+export type FlashcardExplainParams = { cardId: string; userAnswer: string; gradeExplanation: string }
+export type FlashcardExplainResponse = { explanation: string; savedAsMemory: boolean }
+export type FlashcardGenerateParams = { 
+/**
+ * Generate from a specific note (fetches note content)
+ */
+noteId: string | null; 
+/**
+ * Generate from raw text (clipboard, selection)
+ */
+textContent: string | null; 
+/**
+ * Suggested deck name (optional)
+ */
+deckHint: string | null }
+export type FlashcardGenerateResponse = { cards: GeneratedCardPreview[]; deckSuggestion: string }
+export type FlashcardListParams = { deck: string; limit: number | null; offset: number | null }
+export type FlashcardResponse = { id: string; deck: string; front: string; back: string; cardType: string; clozeData: unknown | null; vocabData: unknown | null; imageData: unknown | null; tags: unknown; sourceNoteId: string | null; sourceContext: string | null; stability: number; difficulty: number; dueAt: string | null; state: string; reviewCount: number; recallSpeedMs: number | null; createdAt: string }
+export type FlashcardReviewParams = { cardId: string; quality: string; recallSpeedMs: number | null }
+export type FlashcardSaveGeneratedParams = { noteId: string | null; deck: string; cards: GeneratedCardPreview[] }
+export type FlashcardSubmitAnswerParams = { cardId: string; userAnswer: string; mode: string }
+export type FlashcardUpdateParams = { id: string; front: string; back: string; deck: string; tags: string[] | null; clozeData: unknown | null; vocabData: unknown | null }
+export type FocusDndUnavailablePayload = { message: string }
+export type FocusMode = "dnd"
+export type FocusSession = { id: number; mode: FocusMode; startedAt: string; endsAt: string; endedAt: string | null; alarmId: string | null; source: string }
+export type FocusSessionResponse = { id: string; actionId: string | null; projectId: string | null; sessionType: string; targetMins: number | null; startedAt: string; endedAt: string | null; actualMins: number | null; interruptions: number; qualityScore: number | null; completed: boolean; notes: string | null }
+export type FocusSessionStartParams = { workSecs: number; shortBreakSecs: number; longBreakSecs: number; longBreakAfter: number; actionId: string | null; actionTitle: string | null; dndEnabled: boolean | null; soundEnabled: boolean | null; notificationEnabled: boolean | null }
+export type FocusSessionStatusResponse = { active: boolean; sync: FocusSyncPayload | null; session: FocusSessionResponse | null }
+export type FocusStatePayload = { state: string; since: string }
+export type FocusSyncPayload = { phase: string; remainingSecs: number; totalSecs: number; cyclePosition: number; longBreakAfter: number; paused: boolean; actionTitle: string | null; dndActive: boolean }
+export type FocusWarningPayload = { phase: string; remainingSecs: number }
+export type GeneratedCardPreview = { front: string; back: string; cardType: string; tags: string[]; sourceContext: string | null; clozeData: unknown | null; vocabData: unknown | null; difficultyEstimate: number | null; prerequisiteConcepts: string[] | null }
+export type GoalProgressResponse = { id: number; goalType: string; metric: string; targetValue: number; currentValue: number; met: boolean; projectId: string | null }
+export type GradeResultResponse = { score: number | null; suggestedRating: string; gradingMethod: string; explanation: string | null; diffHighlights: DiffSegmentResponse[]; expectedAnswer: string; coachingNudge: string | null; socraticSuggestion: string | null; keyConceptsPresent: string[]; keyConceptsMissing: string[] }
+export type GrammarPattern = { pattern: string; explanation: string; patternType: string | null }
+export type GraphStats = { totalFacts: number; totalTopics: number; totalEdges: number; totalCommunities: number; avgConvergence: number }
+export type HeaderStats = { turnCount: number; stepCount: number; toolCallCount: number; errorCount: number; compactionCount: number; agentCount: number; totalDurationMs: number; totalInputTokens: number; totalOutputTokens: number; cacheReadTokens: number; cacheHitPct: number; model: string | null }
+export type HelpEntry = { command: string; description: string; category: string; arg_hint: string | null }
+export type HooksTomlSnapshot = { path: string; exists: boolean; content: string }
+export type HourlyBreakdownResponse = { hour: number; productiveSecs: number; neutralSecs: number; distractingSecs: number; idleSecs: number; totalSecs: number; productiveRatio: number }
+export type HybridSearchResponse = { exact: NoteResponse[]; related: NoteResponse[] }
+export type InboxCreateParams = { content: string }
+export type InboxItemResponse = { id: string; content: string; status: string; createdAt: string }
+export type InferenceConfigUpdate = { assignmentThreshold: number | null; mergeThreshold: number | null; semanticWeight: number | null; temporalWeight: number | null; resourceWeight: number | null; inferenceIntervalMins: number | null; maxDormancyDays: number | null; maxActiveContexts: number | null }
+export type InferenceStatsResponse = { activeContextCount: number; archivedContextCount: number; eventsLastHour: number; eventsLast24H: number; assignmentRate: number; avgConfidence: number; mergesLast24H: number; lastRunAt: string | null }
+export type InsightCardResponse = { id: string; insightType: string; title: string; body: string; sentiment: string; metricValue: number | null; baselineValue: number | null; date: string; dismissed: boolean; generatedAt: string }
+export type InsightChatParams = { noteId: string; tabName: string; userMessage: string; sessionKey: string }
+export type InsightChatStarted = { sessionKey: string; messageId: string }
+export type InsightEvolutionPoint = { version: number; generatedAt: string; flashcardSuccess: number; semanticDrift: number; gapClosure: number; quizScore: number; overallProgress: number; changeNote: string }
+export type InsightEvolutionResponse = { noteId: string; noteTitle: string; versions: InsightEvolutionPoint[] }
+export type InsightPayload = { id: string; insightType: string; title: string; sentiment: string }
+export type InsightQuizSubmitParams = { insightReviewId: string; score: number; total: number }
+export type InsightReviewResponse = { insightReviewId: string; noteId: string; version: number; generatedAt: string; synthesis: string | null; gapAnalysis: string | null; selfAssessment: QuizQuestion[] | null; conceptMap: string | null; perspectives: string | null }
+export type InsightReviewStarted = { insightReviewId: string; contentHash: string; cached: boolean }
+export type InsightSaveFlashcardsParams = { noteId: string; insightReviewId: string; deckName: string; questions: QuizQuestion[] }
+export type InsightScopeConfigParams = { scopeType?: string | null; radius: number | null; nodeIds?: string[] | null; includeCognitive: boolean | null; deepDive: boolean | null; mergeThreshold: number | null }
+export type InsightVersionResponse = { id: string; version: number; generatedAt: string; inputHash: string; hasParent: boolean }
+export type IntelligenceSessionResponse = { id: string; sessionType: string; startedAt: string; endedAt: string | null; durationSecs: number | null; dominantCategory: string | null; categoryPurity: number | null; qualityScore: number | null; title: string | null; description: string | null; appBreakdown: string | null; contextSwitches: number; distractionCount: number; source: string }
+export type InteractionRequestPayload = { sessionKey: string; requestId: string; request: unknown }
+export type InterventionLogResponse = { id: string; interventionType: string; message: string; triggerName: string; feedback: string | null; deliveredAt: string; feedbackAt: string | null }
+export type InterventionPayload = { appName: string; windowTitle: string | null; sessionId: string; needsLlm: boolean; heuristicVerdict: string }
+export type IterationStartPayload = { sessionKey: string; iteration: number; maxIterations: number }
+export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
+export type KeyResultCreateParams = { objectiveId: string; title: string; targetValue: number | null; unit: string | null; trackingMode: string | null }
+export type KeyResultResponse = { id: string; title: string; progress: number; current: number; target: number; unit: string }
+export type KeyResultSummaryResponse = { id: string; title: string; progress: number }
+export type KeyResultUpdateParams = { id: string; title: string | null; description: string | null; status: string | null; dueDate: string | null }
+export type KimiTodo = { title: string; status: string }
+export type KnowledgeAtomResponse = { id: string; subject: string; atomType: string; domain: string; sourceNoteId: string | null; sourceRange: string | null; sourceContext: string | null; semanticFactId: string | null; retentionPct: number; personalImportance: number; status: string; salience: number; lastInteractionTs: string | null; metadata: string | null; topicName: string | null; linkedCardCount: number; createdAt: string }
+export type KnowledgeGrowthResponse = { newFactsCount: number; updatedFactsCount: number; supersededFactsCount: number; byDomain: DomainCount[]; periodDays: number }
+export type KnowledgeHealthSummary = { totalAtoms: number; activeAtoms: number; avgRetention: number; topics: TopicHealthResponse[] }
+export type LabelCreateParams = { workflowId: string; name: string; color: string; statusGroup: string; position: number | null }
+export type LabelReorderParams = { workflowId: string; labelIds: string[] }
+export type LabelUpdateParams = { id: string; name: string | null; color: string | null; statusGroup: string | null; position: number | null }
+export type LauncherExecuteResult = { status: ExecStatus; message: string | null; badge: BadgeKind }
+export type LauncherItem = { id: string; title: string; subtitle: string | null; icon: string | null; kind: LauncherItemKind; score: number; no_view?: boolean; arguments?: ArgSpec[]; pinned?: boolean }
+export type LauncherItemKind = { type: "application"; path: string; running: boolean } | { type: "task"; task_id: string; status: string } | { type: "note"; note_id: string; preview: string } | { type: "clipboardEntry"; entry_id: number; content_type: ClipboardContentType } | { type: "systemCommand"; action: SystemAction } | { type: "script"; path: string; name: string } | { type: "calculator"; expression: string; result: number } | { type: "calendar"; event_id: string; starts_at: string } | { type: "aiChat"; query: string } | { type: "file"; path: string; kind: FileKind } | { type: "contentMatch"; path: string; line: number; preview: string } | { type: "contact"; name: string; email: string | null; phone: string | null } | { type: "systemPref"; pane_id: string } | { type: "runningApp"; pid: number; path: string } | { type: "bookmark"; url: string; browser: string } | { type: "browserHistory"; url: string; visited_at: string } | { type: "brewPackage"; name: string; is_cask: boolean } | { type: "sshHost"; host: string; user: string | null } | { type: "gitRepo"; path: string } | { type: "urlNavigation"; url: string } | { type: "windowAction"; action: WindowAction }
+export type LearnedRuleResponse = { id: number; pattern: string; patternType: string; classification: string; confidence: number; hitCount: number; lastUsedAt: string; createdAt: string }
+export type LearningEventPayload = { sessionKey: string; eventType: string; detail: string }
+export type LinkSuggestionResponse = { note: NoteResponse; score: number; reason: string }
+export type LinkedContextParams = { noteId: string; sectionText: string }
+export type LinkedContextResponse = { semanticFacts: LinkedFact[]; episodicMemories: LinkedMemory[]; relatedAnnotations: AnnotationResponse[]; proceduralRules: LinkedRule[] }
+export type LinkedEntitiesResponse = { tasks: ActionSummaryResponse[]; notes: NoteSummaryResponse[]; conversations: SessionSummaryResponse[]; sources: ProjectSourceResponse[]; objectives: ObjectiveSummaryResponse[]; keyResults: KeyResultSummaryResponse[] }
+export type LinkedFact = { id: string; subject: string; predicate: string; object: string; confidence: number; sourceNote: string | null }
+export type LinkedMemory = { id: string; content: string; domain: string; createdAt: string }
+export type LinkedRule = { id: string; ruleText: string; domain: string; signalCount: number }
+export type McpAddServerParams = { name: string; transport: string; command: string | null; args: string[] | null; env: Partial<{ [key in string]: string }> | null; url: string | null; headers: Partial<{ [key in string]: string }> | null }
+export type McpConfigResponse = { enabled: boolean; servers: McpServerResponse[] }
+export type McpOAuthCompletePayload = { serverName: string; provider: string }
+export type McpRemoveParams = { name: string }
+export type McpServerResponse = { name: string; transport: string; enabled: boolean; command: string | null; args: string[] | null; env: Partial<{ [key in string]: string }> | null; url: string | null; headers: Partial<{ [key in string]: string }> | null; oauthProvider?: string | null; oauthConnected: boolean }
+export type McpServerStatusPayload = { serverName: string; 
+/**
+ * One of: "starting", "ready", "failed", "skipped"
+ */
+status: string; toolCount?: number | null; error?: string | null }
+export type McpStartupCompletePayload = { ready: number; failed: number; skipped: number }
+export type McpToggleParams = { name: string; enabled: boolean }
+export type McpUpdateServerParams = { name: string; transport: string | null; command: string | null; args: string[] | null; env: Partial<{ [key in string]: string }> | null; url: string | null; headers: Partial<{ [key in string]: string }> | null }
+export type MemoryAccessPayload = { sessionKey: string; action: string; query: string | null; resultsCount: number }
 /**
  * One row in the Memory Browser panel — flat triple from `semantic_facts`.
  */
-export type MemoryBrowserRow = { id: string; subject: string; predicate: string; object: string };
-export type MemoryHealthResponse = {
-  overall: number;
-  domains: DomainHealthEntry[];
-  totalFacts90D: number;
-  fastFailures90D: number;
-  trendPct: number | null;
-  computedAt: string;
-};
-export type MemoryPromotedPayload = {
-  sessionKey: string;
-  factId: string;
-  fromScope: string;
-  toScope: string;
-  subject: string;
-  predicate: string;
-};
-export type MemoryReferenceDetail = {
-  refType: string;
-  title: string;
-  subtitle: string;
-  details: Partial<{ [key in string]: string }>;
-};
-export type MemoryStatsResponse = {
-  activeFacts: number;
-  archivedFacts: number;
-  episodicCount: number;
-  rulesCount: number;
-  lastCompaction: string | null;
-};
+export type MemoryBrowserRow = { id: string; subject: string; predicate: string; object: string }
+export type MemoryHealthResponse = { overall: number; domains: DomainHealthEntry[]; totalFacts90D: number; fastFailures90D: number; trendPct: number | null; computedAt: string }
+export type MemoryPromotedPayload = { sessionKey: string; factId: string; fromScope: string; toScope: string; subject: string; predicate: string }
+export type MemoryReferenceDetail = { refType: string; title: string; subtitle: string; details: Partial<{ [key in string]: string }> }
+export type MemoryStatsResponse = { activeFacts: number; archivedFacts: number; episodicCount: number; rulesCount: number; lastCompaction: string | null }
 /**
  * Typed segment within a structured assistant message.
- *
+ * 
  * Serializes to `{ "type": "text", "content": "..." }` or
  * `{ "type": "tool", "name": "...", "success": true, "durationMs": 123 }`.
  */
-export type MessageSegment =
-  | { type: "text"; content: string }
-  | {
-      type: "tool";
-      name: string;
-      action?: string | null;
-      success: boolean;
-      durationMs: number;
-      result?: string | null;
-      estimatedTokens?: number | null;
-      agent?: string | null;
-    };
-export type MetaRule = {
-  id: string;
-  triggerCondition: string;
-  action: MetaRuleAction;
-  source: MetaRuleSource;
-  effectivenessScore: number;
-  status: MetaRuleStatus;
-  signalCount: number;
-  createdAt: string;
-  updatedAt: string;
-};
-export type MetaRuleAction =
-  | { AdjustRouting: { skill: string; direction: string } }
-  | "ForceClarification"
-  | { SwitchMode: { mode: string } }
-  | { CreateExperiment: { hypothesis: string } }
-  | { SurfaceInsight: { message: string } }
-  | { Custom: { payload: unknown } };
-export type MetaRuleSource = "UserCreated" | "ReflectionGenerated" | "CorrectionDerived";
-export type MetaRuleStatus = "Pending" | "Active" | "Disabled";
-export type MetricsHealth = {
-  correctionRateAvailable: boolean;
-  tokenRateAvailable: boolean;
-  stabilityAvailable: boolean;
-};
+export type MessageSegment = { type: "text"; content: string } | { type: "tool"; name: string; action?: string | null; success: boolean; durationMs: number; result?: string | null; estimatedTokens?: number | null; agent?: string | null }
+export type MetaRule = { id: string; triggerCondition: string; action: MetaRuleAction; source: MetaRuleSource; effectivenessScore: number; status: MetaRuleStatus; signalCount: number; createdAt: string; updatedAt: string }
+export type MetaRuleAction = { AdjustRouting: { skill: string; direction: string } } | "ForceClarification" | { SwitchMode: { mode: string } } | { CreateExperiment: { hypothesis: string } } | { SurfaceInsight: { message: string } } | { Custom: { payload: unknown } }
+export type MetaRuleSource = "UserCreated" | "ReflectionGenerated" | "CorrectionDerived"
+export type MetaRuleStatus = "Pending" | "Active" | "Disabled"
+export type MetricsHealth = { correctionRateAvailable: boolean; tokenRateAvailable: boolean; stabilityAvailable: boolean }
 /**
  * Args for `coding_memory_mirror_alert_action`.
  */
-export type MirrorAlertActionArgs = {
-  /**
-   * Alert id.
-   */
-  id: string;
-  /**
-   * `approve` | `reject` | `snooze`.
-   */
-  action: string;
-};
+export type MirrorAlertActionArgs = { 
+/**
+ * Alert id.
+ */
+id: string; 
+/**
+ * `approve` | `reject` | `snooze`.
+ */
+action: string }
 /**
  * Row in the alerts feed.
  */
-export type MirrorAlertRow = {
-  /**
-   * Snippet id.
-   */
-  id: string;
-  /**
-   * Kind.
-   */
-  kind: string;
-  /**
-   * Severity.
-   */
-  severity: string;
-  /**
-   * Headline.
-   */
-  headline: string;
-  /**
-   * JSON payload.
-   */
-  payload: string;
-  /**
-   * When created (RFC 3339).
-   */
-  createdAt: string;
-  /**
-   * Dismissed?.
-   */
-  dismissed: boolean;
-};
-export type MirrorAlertSeverity = "low" | "medium" | "high" | "critical";
-export type MirrorAlertType = "RoutingDrift" | "TrialUnpromising" | "MetaRuleProposed" | "Coding";
+export type MirrorAlertRow = { 
+/**
+ * Snippet id.
+ */
+id: string; 
+/**
+ * Kind.
+ */
+kind: string; 
+/**
+ * Severity.
+ */
+severity: string; 
+/**
+ * Headline.
+ */
+headline: string; 
+/**
+ * JSON payload.
+ */
+payload: string; 
+/**
+ * When created (RFC 3339).
+ */
+createdAt: string; 
+/**
+ * Dismissed?.
+ */
+dismissed: boolean }
+export type MirrorAlertSeverity = "low" | "medium" | "high" | "critical"
+export type MirrorAlertType = "RoutingDrift" | "TrialUnpromising" | "MetaRuleProposed" | "Coding"
 /**
  * Args for `coding_memory_mirror_alerts_feed`.
  */
-export type MirrorAlertsFeedArgs = {
-  /**
-   * Filter by kind (string form of `CodingMirrorAlertKind`).
-   */
-  kind: string | null;
-  /**
-   * Filter by severity.
-   */
-  severity: string | null;
-  /**
-   * Filter by repo.
-   */
-  repo: string | null;
-  /**
-   * Pagination limit.
-   */
-  limit: number | null;
-};
-export type MirrorResponse = {
-  answer: string;
-  dataSourcesUsed: string[];
-  proposedMetaRule: MetaRule | null;
-};
-export type MirrorState = {
-  lastRoutingSnapshot: RoutingSnapshot | null;
-  latestTrendNarrative: TrendNarrative | null;
-  pendingSnippets: NarrativeSnippet[];
-  activeMetaRules: MetaRule[];
-  pendingMetaRules: MetaRule[];
-  latestBrainVersion: BrainVersion | null;
-  recentTrialPreviews: TrialPreview[];
-};
-export type ModelStatus = { downloaded: boolean; displayName: string; dirName: string };
-export type MorningBriefingResponse = {
-  streakDays: number;
-  dueCards: number;
-  fadingAtoms: FadingAtomSummary[];
-  strongestTopic: TopicSummary | null;
-  weakestTopic: TopicSummary | null;
-  atomsReviewedThisWeek: number;
-  atomsCreatedThisWeek: number;
-};
-export type NarrativeSnippet = {
-  id: string;
-  createdAt: string;
-  alertType: MirrorAlertType;
-  headline: string;
-  body: string;
-  suggestedAction: SuggestedAction | null;
-  userFeedback: UserFeedback | null;
-  dismissedAt: string | null;
-  codingAlertKind: string | null;
-  codingAlertSeverity: MirrorAlertSeverity | null;
-};
-export type NoteCreateParams = {
-  title: string;
-  notebookId: string | null;
-  body: string | null;
-  bodyJson: string | null;
-  tags: string[] | null;
-  createdAt: string | null;
-  icon: string | null;
-  color: string | null;
-};
-export type NoteEditingFinishedParams = { noteId: string };
-export type NoteExportParams = {
-  noteIds: string[] | null;
-  notebookIds: string[] | null;
-  destination: string;
-  outputFilename: string | null;
-};
-export type NoteExportResult = { exported: number };
-export type NoteImportParams = { paths: string[]; notebookId: string | null };
-export type NoteImportResult = { imported: number; skipped: SkippedFile[] };
-export type NoteLinkResponse = { sourceId: string; targetId: string };
+export type MirrorAlertsFeedArgs = { 
+/**
+ * Filter by kind (string form of `CodingMirrorAlertKind`).
+ */
+kind: string | null; 
+/**
+ * Filter by severity.
+ */
+severity: string | null; 
+/**
+ * Filter by repo.
+ */
+repo: string | null; 
+/**
+ * Pagination limit.
+ */
+limit: number | null }
+export type MirrorResponse = { answer: string; dataSourcesUsed: string[]; proposedMetaRule: MetaRule | null }
+export type MirrorState = { lastRoutingSnapshot: RoutingSnapshot | null; latestTrendNarrative: TrendNarrative | null; pendingSnippets: NarrativeSnippet[]; activeMetaRules: MetaRule[]; pendingMetaRules: MetaRule[]; latestBrainVersion: BrainVersion | null; recentTrialPreviews: TrialPreview[] }
+export type ModelStatus = { downloaded: boolean; displayName: string; dirName: string }
+export type MorningBriefingResponse = { streakDays: number; dueCards: number; fadingAtoms: FadingAtomSummary[]; strongestTopic: TopicSummary | null; weakestTopic: TopicSummary | null; atomsReviewedThisWeek: number; atomsCreatedThisWeek: number }
+export type NarrativeSnippet = { id: string; createdAt: string; alertType: MirrorAlertType; headline: string; body: string; suggestedAction: SuggestedAction | null; userFeedback: UserFeedback | null; dismissedAt: string | null; codingAlertKind: string | null; codingAlertSeverity: MirrorAlertSeverity | null }
+export type NoteCreateParams = { title: string; notebookId: string | null; body: string | null; bodyJson: string | null; tags: string[] | null; createdAt: string | null; icon: string | null; color: string | null }
+export type NoteEditingFinishedParams = { noteId: string }
+export type NoteExportParams = { noteIds: string[] | null; notebookIds: string[] | null; destination: string; outputFilename: string | null }
+export type NoteExportResult = { exported: number }
+export type NoteImportParams = { paths: string[]; notebookId: string | null }
+export type NoteImportResult = { imported: number; skipped: SkippedFile[] }
+export type NoteLinkResponse = { sourceId: string; targetId: string }
 /**
  * Lightweight note for list views — excludes body, HTML, split/perspective data.
  */
-export type NoteListItem = {
-  id: string;
-  notebookId: string | null;
-  title: string;
-  pinned: boolean;
-  archived: boolean;
-  icon: string | null;
-  color: string | null;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-};
-export type NoteResponse = {
-  id: string;
-  notebookId: string | null;
-  title: string;
-  body: string;
-  bodyHtml: string | null;
-  pinned: boolean;
-  archived: boolean;
-  icon: string | null;
-  color: string | null;
-  splitContent: string | null;
-  splitMode: string | null;
-  perspectiveConfig: string | null;
-  lastVisitedAt: string | null;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-};
-export type NoteRetentionHealthResponse = {
-  avgStability: number;
-  totalCards: number;
-  totalLapses: number;
-  healthScore: number;
-};
-export type NoteSuggestionsResponse = {
-  relatedNotes: ScoredNoteResponse[];
-  linkSuggestions: LinkSuggestionResponse[];
-  suggestedTags: string[];
-};
-export type NoteSummaryResponse = { id: string; title: string; updatedAt: string };
-export type NoteUpdateParams = {
-  id: string;
-  title: string | null;
-  body: string | null;
-  bodyHtml: string | null;
-  bodyJson: string | null;
-  pinned: boolean | null;
-  /**
-   * `None` = don't change, `Some(None)` = move to root, `Some(Some(id))` = move to folder
-   */
-  notebookId?: string | null;
-  tags: string[] | null;
-  /**
-   * `None` = don't change, `Some(None)` = clear icon, `Some(Some(emoji))` = set icon
-   */
-  icon?: string | null;
-  /**
-   * `None` = don't change, `Some(None)` = clear color, `Some(Some(hex))` = set color
-   */
-  color?: string | null;
-  /**
-   * `None` = don't change, `Some(None)` = clear split_content, `Some(Some(json))` = set split_content
-   */
-  splitContent?: string | null;
-  /**
-   * `None` = don't change, `Some(None)` = clear split_mode, `Some(Some(mode))` = set split_mode
-   */
-  splitMode?: string | null;
-  /**
-   * `None` = don't change, `Some(None)` = clear perspective_config, `Some(Some(json))` = set perspective_config
-   */
-  perspectiveConfig?: string | null;
-};
-export type NoteVersionResponse = { id: string; noteId: string; body: string; createdAt: string };
-export type NotebookCreateParams = {
-  title: string;
-  parentId: string | null;
-  icon: string | null;
-  color: string | null;
-};
-export type NotebookResponse = {
-  id: string;
-  parentId: string | null;
-  title: string;
-  icon: string | null;
-  color: string | null;
-  sortOrder: number;
-  noteCount: number;
-};
-export type NotebookUpdateParams = {
-  id: string;
-  title: string | null;
-  /**
-   * `None` = don't change, `Some(None)` = clear icon, `Some(Some(name))` = set icon
-   */
-  icon?: string | null;
-  /**
-   * `None` = don't change, `Some(None)` = clear color, `Some(Some(hex))` = set color
-   */
-  color?: string | null;
-  parentId?: string | null;
-};
-export type NudgePayload = { nudgeType: string; message: string };
-export type OAuthStartParams = { provider: string; serverName: string };
-export type ObjectiveCreateParams = {
-  title: string;
-  projectId: string;
-  description: string | null;
-  priority: number | null;
-  dueDate: string | null;
-};
-export type ObjectiveResponse = {
-  id: string;
-  title: string;
-  status: string;
-  progress: number;
-  projectId: string;
-  keyResults: KeyResultResponse[] | null;
-};
-export type ObjectiveSummaryResponse = {
-  id: string;
-  title: string;
-  progress: number;
-  status: string;
-};
-export type ObjectiveUpdateParams = {
-  id: string;
-  title: string | null;
-  description: string | null;
-  status: string | null;
-  priority: number | null;
-  dueDate: string | null;
-};
-export type PendingMemoryResponse = {
-  id: string;
-  fact: unknown;
-  reason: string;
-  createdAt: string;
-};
-export type Pin = { item_id: string; kind: string; position: number };
+export type NoteListItem = { id: string; notebookId: string | null; title: string; pinned: boolean; archived: boolean; icon: string | null; color: string | null; tags: string[]; createdAt: string; updatedAt: string }
+export type NoteResponse = { id: string; notebookId: string | null; title: string; body: string; bodyHtml: string | null; pinned: boolean; archived: boolean; icon: string | null; color: string | null; splitContent: string | null; splitMode: string | null; perspectiveConfig: string | null; lastVisitedAt: string | null; tags: string[]; createdAt: string; updatedAt: string }
+export type NoteRetentionHealthResponse = { avgStability: number; totalCards: number; totalLapses: number; healthScore: number }
+export type NoteSuggestionsResponse = { relatedNotes: ScoredNoteResponse[]; linkSuggestions: LinkSuggestionResponse[]; suggestedTags: string[] }
+export type NoteSummaryResponse = { id: string; title: string; updatedAt: string }
+export type NoteUpdateParams = { id: string; title: string | null; body: string | null; bodyHtml: string | null; bodyJson: string | null; pinned: boolean | null; 
+/**
+ * `None` = don't change, `Some(None)` = move to root, `Some(Some(id))` = move to folder
+ */
+notebookId?: string | null; tags: string[] | null; 
+/**
+ * `None` = don't change, `Some(None)` = clear icon, `Some(Some(emoji))` = set icon
+ */
+icon?: string | null; 
+/**
+ * `None` = don't change, `Some(None)` = clear color, `Some(Some(hex))` = set color
+ */
+color?: string | null; 
+/**
+ * `None` = don't change, `Some(None)` = clear split_content, `Some(Some(json))` = set split_content
+ */
+splitContent?: string | null; 
+/**
+ * `None` = don't change, `Some(None)` = clear split_mode, `Some(Some(mode))` = set split_mode
+ */
+splitMode?: string | null; 
+/**
+ * `None` = don't change, `Some(None)` = clear perspective_config, `Some(Some(json))` = set perspective_config
+ */
+perspectiveConfig?: string | null }
+export type NoteVersionResponse = { id: string; noteId: string; body: string; createdAt: string }
+export type NotebookCreateParams = { title: string; parentId: string | null; icon: string | null; color: string | null }
+export type NotebookResponse = { id: string; parentId: string | null; title: string; icon: string | null; color: string | null; sortOrder: number; noteCount: number }
+export type NotebookUpdateParams = { id: string; title: string | null; 
+/**
+ * `None` = don't change, `Some(None)` = clear icon, `Some(Some(name))` = set icon
+ */
+icon?: string | null; 
+/**
+ * `None` = don't change, `Some(None)` = clear color, `Some(Some(hex))` = set color
+ */
+color?: string | null; parentId?: string | null }
+export type NudgePayload = { nudgeType: string; message: string }
+export type OAuthStartParams = { provider: string; serverName: string }
+export type ObjectiveCreateParams = { title: string; projectId: string; description: string | null; priority: number | null; dueDate: string | null }
+export type ObjectiveResponse = { id: string; title: string; status: string; progress: number; projectId: string; keyResults: KeyResultResponse[] | null }
+export type ObjectiveSummaryResponse = { id: string; title: string; progress: number; status: string }
+export type ObjectiveUpdateParams = { id: string; title: string | null; description: string | null; status: string | null; priority: number | null; dueDate: string | null }
+export type PendingMemoryResponse = { id: string; fact: unknown; reason: string; createdAt: string }
+export type Pin = { item_id: string; kind: string; position: number }
 /**
  * A persisted pipeline event row.
  */
-export type PipelineEventRow = {
-  id: string;
-  event_kind: string;
-  observation: string | null;
-  facts_extracted: number | null;
-  operation: string | null;
-  fact_triple: string | null;
-  timestamp: string;
-};
-export type PipelineStartedPayload = { sessionKey: string };
-export type PlanGeneratedPayload = { sessionKey: string; steps: string[]; rawPlan: string };
-export type PlanStepCompletedPayload = {
-  sessionKey: string;
-  stepIndex: number;
-  description: string;
-  toolName: string;
-};
-export type PracticeCompleteParams = { sessionId: string; saveToSr: boolean };
-export type PracticeCompleteResponse = {
-  averageScore: number;
-  weakUnitCount: number;
-  flashcardsCreated: number;
-};
-export type PracticeConfirmParams = {
-  sessionId: string;
-  index: number;
-  finalTranslation: string;
-  confidenceRating: number;
-  edited: boolean;
-  overallGrade: string;
-  scoresJson?: string | null;
-};
-export type PracticeConfirmResponse = { nextIndex: number; isComplete: boolean };
-export type PracticeCorrection = { original: string; suggested: string; explanation: string };
-export type PracticeEvalResponse = {
-  overallGrade: string;
-  scores: PracticeScores;
-  corrections: PracticeCorrection[];
-  modelTranslation: string;
-  encouragement: string;
-  improvementHint: string | null;
-  coachingNudge?: string | null;
-};
-export type PracticeGetParams = { sessionId?: string | null; noteId?: string | null };
-export type PracticeListParams = { noteId: string };
-export type PracticeScores = {
-  meaning: string;
-  grammar: string;
-  naturalness: string;
-  wordChoice: string;
-};
-export type PracticeSegment = {
-  index: number;
-  text: string;
-  segmentType: string;
-  suggestedFocus: string;
-  skipped?: boolean;
-};
-export type PracticeSegmentParams = { noteId: string; sourceLang: string; targetLang: string };
-export type PracticeSegmentResponse = {
-  segments: PracticeSegment[];
-  estimatedMins: number;
-  cachedAt: string | null;
-};
-export type PracticeSessionResponse = {
-  id: string;
-  noteId: string;
-  sourceLang: string;
-  targetLang: string;
-  status: string;
-  segments: string;
-  currentIndex: number;
-  results: string;
-  userTranslationDoc: string | null;
-  averageScore: number | null;
-  startedAt: string;
-  completedAt: string | null;
-};
-export type PracticeStartParams = {
-  noteId: string;
-  segments: PracticeSegment[];
-  sourceLang: string;
-  targetLang: string;
-  startIndex?: number | null;
-};
-export type PracticeSubmitParams = { sessionId: string; index: number; userTranslation: string };
-export type PreviewRecommendation = "Continue" | "Kill" | "NeedMoreData";
-export type ProceduralRuleResponse = {
-  id: string;
-  domain: string;
-  ruleText: string;
-  confidence: number;
-  source: string;
-  signalCount: number;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-export type ProductivityDashboard = {
-  totalMinutes: number;
-  topCategory: string;
-  topCategoryPct: number;
-  score: number;
-};
-export type ProductivityPatternsResponse = {
-  peakFocusHours: number[];
-  avgSessionMins: number;
-  productiveRatio: number;
-  avgContextSwitches: number;
-  bestDayOfWeek: string | null;
-  daysAnalyzed: number;
-};
-export type ProductivityProjectResponse = {
-  id: string;
-  displayName: string;
-  path: string;
-  urlPatterns: string[];
-  color: string | null;
-  isAutoDetected: boolean;
-};
-export type ProductivitySummaryResponse = {
-  date: string;
-  totalActiveSecs: number;
-  totalFocusSecs: number;
-  totalBreakSecs: number;
-  totalIdleSecs: number;
-  productiveSecs: number;
-  neutralSecs: number;
-  distractingSecs: number;
-  focusSessionsCount: number;
-  avgSessionQuality: number | null;
-  interruptionsCount: number;
-  contextSwitches: number;
-  topApps: AppUsageResponse[];
-  topCategories: CategoryUsageResponse[];
-  topProjects: ProjectUsageResponse[];
-  aiSummary: string | null;
-  productivityScore: number | null;
-  scoreTrend: number | null;
-  focusTimeTrend: number | null;
-  activeTimeTrend: number | null;
-  deepWorkBlocks: number;
-  deepWorkSecs: number;
-  avgRecoverySecs: number | null;
-};
-export type ProjectCreateParams = {
-  name: string;
-  areaId: string;
-  color: string | null;
-  description: string | null;
-  tags: string[] | null;
-};
+export type PipelineEventRow = { id: string; event_kind: string; observation: string | null; facts_extracted: number | null; operation: string | null; fact_triple: string | null; timestamp: string }
+export type PipelineStartedPayload = { sessionKey: string }
+export type PlanGeneratedPayload = { sessionKey: string; steps: string[]; rawPlan: string }
+export type PlanStepCompletedPayload = { sessionKey: string; stepIndex: number; description: string; toolName: string }
+export type PracticeCompleteParams = { sessionId: string; saveToSr: boolean }
+export type PracticeCompleteResponse = { averageScore: number; weakUnitCount: number; flashcardsCreated: number }
+export type PracticeConfirmParams = { sessionId: string; index: number; finalTranslation: string; confidenceRating: number; edited: boolean; overallGrade: string; scoresJson?: string | null }
+export type PracticeConfirmResponse = { nextIndex: number; isComplete: boolean }
+export type PracticeCorrection = { original: string; suggested: string; explanation: string }
+export type PracticeEvalResponse = { overallGrade: string; scores: PracticeScores; corrections: PracticeCorrection[]; modelTranslation: string; encouragement: string; improvementHint: string | null; coachingNudge?: string | null }
+export type PracticeGetParams = { sessionId?: string | null; noteId?: string | null }
+export type PracticeListParams = { noteId: string }
+export type PracticeScores = { meaning: string; grammar: string; naturalness: string; wordChoice: string }
+export type PracticeSegment = { index: number; text: string; segmentType: string; suggestedFocus: string; skipped?: boolean }
+export type PracticeSegmentParams = { noteId: string; sourceLang: string; targetLang: string }
+export type PracticeSegmentResponse = { segments: PracticeSegment[]; estimatedMins: number; cachedAt: string | null }
+export type PracticeSessionResponse = { id: string; noteId: string; sourceLang: string; targetLang: string; status: string; segments: string; currentIndex: number; results: string; userTranslationDoc: string | null; averageScore: number | null; startedAt: string; completedAt: string | null }
+export type PracticeStartParams = { noteId: string; segments: PracticeSegment[]; sourceLang: string; targetLang: string; startIndex?: number | null }
+export type PracticeSubmitParams = { sessionId: string; index: number; userTranslation: string }
+export type PreviewRecommendation = "Continue" | "Kill" | "NeedMoreData"
+export type ProceduralRuleResponse = { id: string; domain: string; ruleText: string; confidence: number; source: string; signalCount: number; active: boolean; createdAt: string; updatedAt: string }
+export type ProductivityDashboard = { totalMinutes: number; topCategory: string; topCategoryPct: number; score: number }
+export type ProductivityPatternsResponse = { peakFocusHours: number[]; avgSessionMins: number; productiveRatio: number; avgContextSwitches: number; bestDayOfWeek: string | null; daysAnalyzed: number }
+export type ProductivityProjectResponse = { id: string; displayName: string; path: string; urlPatterns: string[]; color: string | null; isAutoDetected: boolean }
+export type ProductivitySummaryResponse = { date: string; totalActiveSecs: number; totalFocusSecs: number; totalBreakSecs: number; totalIdleSecs: number; productiveSecs: number; neutralSecs: number; distractingSecs: number; focusSessionsCount: number; avgSessionQuality: number | null; interruptionsCount: number; contextSwitches: number; topApps: AppUsageResponse[]; topCategories: CategoryUsageResponse[]; topProjects: ProjectUsageResponse[]; aiSummary: string | null; productivityScore: number | null; scoreTrend: number | null; focusTimeTrend: number | null; activeTimeTrend: number | null; deepWorkBlocks: number; deepWorkSecs: number; avgRecoverySecs: number | null }
+export type ProjectCreateParams = { name: string; areaId: string; color: string | null; description: string | null; tags: string[] | null }
 /**
  * Health metrics for a project (focus quality, insight freshness).
  */
-export type ProjectHealthMetricsResponse = {
-  /**
-   * Average focus session quality score (0-1), or null if no sessions.
-   */
-  focusQuality: number | null;
-  /**
-   * Average insight freshness across linked notes (0-1), or null if no linked notes.
-   */
-  insightFreshness: number | null;
-};
-export type ProjectResponse = {
-  id: string;
-  name: string;
-  color: string;
-  areaId: string;
-  taskCount: number;
-  completedCount: number;
-  objectiveIds: string[] | null;
-  workflowId: string | null;
-  description: string | null;
-  instructions: unknown | null;
-  aiPersonality: string | null;
-  userRole: string | null;
-  startDate: string | null;
-  targetEndDate: string | null;
-  settings: unknown | null;
-};
+export type ProjectHealthMetricsResponse = { 
+/**
+ * Average focus session quality score (0-1), or null if no sessions.
+ */
+focusQuality: number | null; 
+/**
+ * Average insight freshness across linked notes (0-1), or null if no linked notes.
+ */
+insightFreshness: number | null }
+export type ProjectResponse = { id: string; name: string; color: string; areaId: string; taskCount: number; completedCount: number; objectiveIds: string[] | null; workflowId: string | null; description: string | null; instructions: unknown | null; aiPersonality: string | null; userRole: string | null; startDate: string | null; targetEndDate: string | null; settings: unknown | null }
 /**
  * Project-skill row for the in-app skill listing.
  */
-export type ProjectSkillRow = {
-  /**
-   * Skill name.
-   */
-  skillName: string;
-  /**
-   * Repo id.
-   */
-  repoId: string;
-  /**
-   * Active version.
-   */
-  activeVersion: number;
-  /**
-   * Status.
-   */
-  status: string;
-  /**
-   * Effectiveness score (live).
-   */
-  effectiveness: number;
-};
-export type ProjectSourceCreateParams = {
-  projectId: string;
-  sourceType: string;
-  title: string;
-  content: string | null;
-  url: string | null;
-  filePath: string | null;
-  metadata: unknown | null;
-  tags: string[] | null;
-};
-export type ProjectSourceResponse = {
-  id: string;
-  projectId: string;
-  sourceType: string;
-  title: string;
-  content: string | null;
-  url: string | null;
-  filePath: string | null;
-  metadata: unknown | null;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-};
-export type ProjectTotals = {
-  projectBasename: string;
-  cwd: string;
-  sessionCount: number;
-  turnCount: number;
-  toolCallCount: number;
-  errorCount: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  cacheReadTokens: number;
-};
-export type ProjectUpdateParams = {
-  id: string;
-  name: string | null;
-  areaId: string | null;
-  color: string | null;
-  description: string | null;
-  tags: string[] | null;
-  status: string | null;
-  workflowId: string | null;
-  instructions: unknown | null;
-  aiPersonality: string | null;
-  userRole: string | null;
-  startDate: string | null;
-  targetEndDate: string | null;
-  settings: unknown | null;
-};
-export type ProjectUsageResponse = {
-  projectId: string;
-  displayName: string;
-  durationSecs: number;
-  color: string | null;
-};
-export type ProviderInfo = { id: string; displayName: string; sessionCount: number };
-export type QuickTranslateParams = { text: string; sourceLang: string; targetLang: string };
-export type QuickTranslateResponse = { translation: string; words: WordBreakdown[] };
-export type QuizQuestion = {
-  id: string;
-  type: string;
-  question: string;
-  choices: string[] | null;
-  correctAnswer: string;
-  explanation: string;
-  sourceNotes: string[];
-  difficulty: string;
-  difficultyScore: number;
-};
+export type ProjectSkillRow = { 
+/**
+ * Skill name.
+ */
+skillName: string; 
+/**
+ * Repo id.
+ */
+repoId: string; 
+/**
+ * Active version.
+ */
+activeVersion: number; 
+/**
+ * Status.
+ */
+status: string; 
+/**
+ * Effectiveness score (live).
+ */
+effectiveness: number }
+export type ProjectSourceCreateParams = { projectId: string; sourceType: string; title: string; content: string | null; url: string | null; filePath: string | null; metadata: unknown | null; tags: string[] | null }
+export type ProjectSourceResponse = { id: string; projectId: string; sourceType: string; title: string; content: string | null; url: string | null; filePath: string | null; metadata: unknown | null; tags: string[]; createdAt: string; updatedAt: string }
+export type ProjectTotals = { projectBasename: string; cwd: string; sessionCount: number; turnCount: number; toolCallCount: number; errorCount: number; totalInputTokens: number; totalOutputTokens: number; cacheReadTokens: number }
+export type ProjectUpdateParams = { id: string; name: string | null; areaId: string | null; color: string | null; description: string | null; tags: string[] | null; status: string | null; workflowId: string | null; instructions: unknown | null; aiPersonality: string | null; userRole: string | null; startDate: string | null; targetEndDate: string | null; settings: unknown | null }
+export type ProjectUsageResponse = { projectId: string; displayName: string; durationSecs: number; color: string | null }
+export type ProviderInfo = { id: string; displayName: string; sessionCount: number }
+export type QuickTranslateParams = { text: string; sourceLang: string; targetLang: string }
+export type QuickTranslateResponse = { translation: string; words: WordBreakdown[] }
+export type QuizQuestion = { id: string; type: string; question: string; choices: string[] | null; correctAnswer: string; explanation: string; sourceNotes: string[]; difficulty: string; difficultyScore: number }
 /**
  * Args for `coding_memory_recall_log`.
  */
-export type RecallLogArgs = { layer: string | null; limit?: number; offset?: number };
-export type RecentLearningSession = {
-  sessionKey: string;
-  title: string;
-  updatedAt: string;
-  preview: string;
-};
+export type RecallLogArgs = { layer: string | null; limit?: number; offset?: number }
+export type RecentLearningSession = { sessionKey: string; title: string; updatedAt: string; preview: string }
 /**
  * Args for `coding_memory_reforge_cycle_diff`.
  */
-export type ReforgeCycleDiffArgs = {
-  /**
-   * Repo id.
-   */
-  repoId: string;
-  /**
-   * Artifact (`claude_md` | `agents_md` | `cursorrules` | `continue_rules`).
-   */
-  artifact: string;
-  /**
-   * Cycle id (left side).
-   */
-  beforeCycleId: string | null;
-  /**
-   * Cycle id (right side); `None` ⇒ current.
-   */
-  afterCycleId: string | null;
-};
+export type ReforgeCycleDiffArgs = { 
+/**
+ * Repo id.
+ */
+repoId: string; 
+/**
+ * Artifact (`claude_md` | `agents_md` | `cursorrules` | `continue_rules`).
+ */
+artifact: string; 
+/**
+ * Cycle id (left side).
+ */
+beforeCycleId: string | null; 
+/**
+ * Cycle id (right side); `None` ⇒ current.
+ */
+afterCycleId: string | null }
 /**
  * Response for `coding_memory_reforge_cycle_diff`.
  */
-export type ReforgeCycleDiffResponse = {
-  /**
-   * Left body.
-   */
-  beforeBody: string;
-  /**
-   * Right body.
-   */
-  afterBody: string;
-  /**
-   * Section labels for color-coding the diff.
-   */
-  sectionLabels: string[];
-};
+export type ReforgeCycleDiffResponse = { 
+/**
+ * Left body.
+ */
+beforeBody: string; 
+/**
+ * Right body.
+ */
+afterBody: string; 
+/**
+ * Section labels for color-coding the diff.
+ */
+sectionLabels: string[] }
 /**
  * Cycle summary row.
  */
-export type ReforgeCycleSummary = {
-  /**
-   * Cycle id.
-   */
-  cycleId: string;
-  /**
-   * When run.
-   */
-  ranAt: string;
-  /**
-   * Repos affected.
-   */
-  repos: string[];
-  /**
-   * Artifacts written.
-   */
-  artifactsWritten: number;
-};
-export type ReforgeStateResponse = {
-  lastRunAt: string | null;
-  lastRunStats: unknown | null;
-  runCount: number;
-};
-export type ResourceCluster = { resources: string[]; accessCount: number };
-export type ResumeResult = { session_key: string; title: string };
-export type RetentionHistoryResponse = { overall: RetentionPoint[]; domains: DomainHistory[] };
-export type RetentionPoint = { date: string; avgRetention: number; reviewCount: number };
-export type RetrievalEnhancedPayload = {
-  sessionKey: string;
-  stages: EnhancementStagePayload[];
-  totalLatencyMs: number;
-  totalLlmCalls: number;
-};
-export type ReviewSessionSaveParams = {
-  sessionId: string;
-  cardsReviewed: number;
-  avgScore: number;
-  durationSeconds: number;
-  modesUsed: string[];
-  propagationCount: number;
-  weakCardIds: string[];
-  sessionData: string;
-  /**
-   * "completed" | "abandoned"
-   */
-  status: string;
-};
-export type ReviewStatsSummaryResponse = {
-  streak: number;
-  retention: number;
-  weekly: WeeklyStatPoint[];
-};
-export type RouterStatusResponse = {
-  hourlyCount: number;
-  hourlyLimit: number;
-  dailyCount: number;
-  dailyLimit: number;
-};
-export type RoutingSnapshot = {
-  id: string;
-  capturedAt: string;
-  windowHours: number;
-  totalMessages: number;
-  distribution: Partial<{ [key in string]: SkillRouteStats }>;
-  fallbackRate: number;
-  avgRoutingConfidence: number;
-  lowConfidenceCount: number;
-  userFeedback: UserFeedback | null;
-};
-export type RuleCreateParams = { domain: string; ruleText: string; confidence: number };
-export type RuleNode = {
-  id: string;
-  ruleText: string;
-  domain: string;
-  signalCount: number;
-  confidence: number;
-};
-export type SandboxTestResult = { ok: boolean; details: string };
-export type ScenarioChallengeResponse = {
-  title: string;
-  situation: string;
-  questions: string[];
-  modelAnswer: string;
-  sourceNotes: string[];
-  difficultyScore: number;
-};
+export type ReforgeCycleSummary = { 
+/**
+ * Cycle id.
+ */
+cycleId: string; 
+/**
+ * When run.
+ */
+ranAt: string; 
+/**
+ * Repos affected.
+ */
+repos: string[]; 
+/**
+ * Artifacts written.
+ */
+artifactsWritten: number }
+export type ReforgeStateResponse = { lastRunAt: string | null; lastRunStats: unknown | null; runCount: number }
+export type ResourceCluster = { resources: string[]; accessCount: number }
+export type ResumeResult = { session_key: string; title: string }
+export type RetentionHistoryResponse = { overall: RetentionPoint[]; domains: DomainHistory[] }
+export type RetentionPoint = { date: string; avgRetention: number; reviewCount: number }
+export type RetrievalEnhancedPayload = { sessionKey: string; stages: EnhancementStagePayload[]; totalLatencyMs: number; totalLlmCalls: number }
+export type ReviewSessionSaveParams = { sessionId: string; cardsReviewed: number; avgScore: number; durationSeconds: number; modesUsed: string[]; propagationCount: number; weakCardIds: string[]; sessionData: string; 
+/**
+ * "completed" | "abandoned"
+ */
+status: string }
+export type ReviewStatsSummaryResponse = { streak: number; retention: number; weekly: WeeklyStatPoint[] }
+export type RouterStatusResponse = { hourlyCount: number; hourlyLimit: number; dailyCount: number; dailyLimit: number }
+export type RoutingSnapshot = { id: string; capturedAt: string; windowHours: number; totalMessages: number; distribution: Partial<{ [key in string]: SkillRouteStats }>; fallbackRate: number; avgRoutingConfidence: number; lowConfidenceCount: number; userFeedback: UserFeedback | null }
+export type RuleCreateParams = { domain: string; ruleText: string; confidence: number }
+export type RuleNode = { id: string; ruleText: string; domain: string; signalCount: number; confidence: number }
+export type SandboxTestResult = { ok: boolean; details: string }
+export type ScenarioChallengeResponse = { title: string; situation: string; questions: string[]; modelAnswer: string; sourceNotes: string[]; difficultyScore: number }
 /**
  * Selector for "main agent" vs a specific subagent within a session.
  */
-export type Scope = { kind: "main" } | { kind: "subagent"; agentId: string };
-export type ScopePreviewLink = { sourceId: string; targetId: string };
-export type ScopePreviewNote = {
-  id: string;
-  title: string;
-  notebookId: string | null;
-  /**
-   * Approximate word count of the note body (0 = empty).
-   */
-  wordCount: number;
-};
-export type ScopePreviewParams = {
-  scopeType?: string | null;
-  radius: number | null;
-  nodeIds?: string[] | null;
-  includeCognitive: boolean | null;
-  deepDive: boolean | null;
-  mergeThreshold: number | null;
-} & { noteId: string };
-export type ScopePreviewResponse = {
-  notes: ScopePreviewNote[];
-  links: ScopePreviewLink[];
-  /**
-   * Summary of what context the AI will see.
-   */
-  contextSummary: ContextSummary;
-};
-export type ScorePayload = { score: number; productiveSecs: number; distractingSecs: number };
-export type ScoredNoteResponse = { note: NoteResponse; score: number; reason: string };
+export type Scope = { kind: "main" } | { kind: "subagent"; agentId: string }
+export type ScopePreviewLink = { sourceId: string; targetId: string }
+export type ScopePreviewNote = { id: string; title: string; notebookId: string | null; 
+/**
+ * Approximate word count of the note body (0 = empty).
+ */
+wordCount: number }
+export type ScopePreviewParams = ({ scopeType?: string | null; radius: number | null; nodeIds?: string[] | null; includeCognitive: boolean | null; deepDive: boolean | null; mergeThreshold: number | null }) & { noteId: string }
+export type ScopePreviewResponse = { notes: ScopePreviewNote[]; links: ScopePreviewLink[]; 
+/**
+ * Summary of what context the AI will see.
+ */
+contextSummary: ContextSummary }
+export type ScorePayload = { score: number; productiveSecs: number; distractingSecs: number }
+export type ScoredNoteResponse = { note: NoteResponse; score: number; reason: string }
 /**
  * Closed semantic category the UI dispatches per event card.
  */
-export type SemanticCategory =
-  | "turnBegin"
-  | "turnEnd"
-  | "stepBegin"
-  | "stepInterrupted"
-  | "thinking"
-  | "assistantText"
-  | "userInput"
-  | "toolCall"
-  | "toolCallStream"
-  | "toolResult"
-  | "statusUpdate"
-  | "subagent"
-  | "compactionBegin"
-  | "compactionEnd"
-  | "error"
-  | "other";
-export type SemanticFactResponse = {
-  id: string;
-  domain: string;
-  subject: string;
-  predicate: string;
-  object: string;
-  confidence: number;
-  source: string;
-  validFrom: string;
-  validUntil: string | null;
-  stability: number;
-  retrievability: number;
-  lastAccessed: string | null;
-  accessCount: number;
-  status: string;
-};
+export type SemanticCategory = "turnBegin" | "turnEnd" | "stepBegin" | "stepInterrupted" | "thinking" | "assistantText" | "userInput" | "toolCall" | "toolCallStream" | "toolResult" | "statusUpdate" | "subagent" | "compactionBegin" | "compactionEnd" | "error" | "other"
+export type SemanticFactResponse = { id: string; domain: string; subject: string; predicate: string; object: string; confidence: number; source: string; validFrom: string; validUntil: string | null; stability: number; retrievability: number; lastAccessed: string | null; accessCount: number; status: string }
 /**
  * One row in the Sensitivity Inspector panel.
  */
-export type SensitivityRow = {
-  id: string;
-  subject: string;
-  predicate: string;
-  object: string;
-  /**
-   * `"public" | "redactable" | "secret"` — extracted from `metadata.sensitivity`
-   * when present, else `"public"`.
-   */
-  sensitivity: string;
-};
-export type SessionBlock = {
-  contextType: string;
-  totalDurationMins: number;
-  sessionCount: number;
-  color: string;
-};
+export type SensitivityRow = { id: string; subject: string; predicate: string; object: string; 
+/**
+ * `"public" | "redactable" | "secret"` — extracted from `metadata.sensitivity`
+ * when present, else `"public"`.
+ */
+sensitivity: string }
+export type SessionBlock = { contextType: string; totalDurationMins: number; sessionCount: number; color: string }
 /**
  * Optional session context sent from the frontend alongside a chat message.
  */
-export type SessionContextInput = {
-  entityKind: string | null;
-  entityId: string | null;
-  contextType: string | null;
-  isEphemeral: boolean | null;
-};
-export type SessionDetail = {
-  sessionId: string;
-  providerId: string;
-  scope: Scope;
-  stats: HeaderStats;
-  events: TraceEvent[];
-  /**
-   * `true` when events were truncated due to file-size guardrail.
-   */
-  truncated: boolean;
-  totalEventCount: number;
-};
+export type SessionContextInput = { entityKind: string | null; entityId: string | null; contextType: string | null; isEphemeral: boolean | null }
+export type SessionDetail = { sessionId: string; providerId: string; scope: Scope; stats: HeaderStats; events: TraceEvent[]; 
+/**
+ * `true` when events were truncated due to file-size guardrail.
+ */
+truncated: boolean; totalEventCount: number }
 /**
  * Filters for `coding_memory_session_list`.
  */
-export type SessionListArgs = {
-  /**
-   * Optional source filter (`"claudeCode" | "codex" | "kimiCli" | "openCode"`).
-   */
-  source: string | null;
-  /**
-   * Optional repo id.
-   */
-  repoId: string | null;
-  /**
-   * Look back N days. Defaults to 14.
-   */
-  sinceDays?: number;
-  limit?: number;
-  offset?: number;
-};
+export type SessionListArgs = { 
+/**
+ * Optional source filter (`"claudeCode" | "codex" | "kimiCli" | "openCode"`).
+ */
+source: string | null; 
+/**
+ * Optional repo id.
+ */
+repoId: string | null; 
+/**
+ * Look back N days. Defaults to 14.
+ */
+sinceDays?: number; limit?: number; offset?: number }
 /**
  * Args for `coding_memory_session_replay_recall_overlay`.
  */
-export type SessionRecallOverlayArgs = { sessionId: string; limit?: number; offset?: number };
-export type SessionReplayEntry = {
-  id: string;
-  source: string;
-  sessionId: string;
-  kind: string;
-  occurredAt: string;
-  payload: string;
-};
+export type SessionRecallOverlayArgs = { sessionId: string; limit?: number; offset?: number }
+export type SessionReplayEntry = { id: string; source: string; sessionId: string; kind: string; occurredAt: string; payload: string }
 /**
  * Row struct for the `sessions` table.
  */
-export type SessionRow = {
-  key: string;
-  metadata: JsonValue;
-  createdAt: string;
-  updatedAt: string;
-  projectId: string | null;
-  conversationType: string | null;
-  pinned: boolean;
-  cwd: string | null;
-  repoId: string | null;
-  repoBranch: string | null;
-  toolProfile: string | null;
-  approvalMode: string;
-  totalCostUsd: number;
-  totalTokens: number;
-  parentSessionId: string | null;
-};
-export type SessionState = {
-  customTitle: string | null;
-  planMode: boolean;
-  archived: boolean;
-  todos: KimiTodo[];
-  /**
-   * Verbatim parsed state.json for the State tab's "raw" view.
-   */
-  raw: unknown;
-};
-export type SessionSummary = {
-  sessionId: string;
-  providerId: string;
-  sourceDir: string;
-  cwd: string | null;
-  projectBasename: string | null;
-  customTitle: string | null;
-  startedAt: string;
-  lastEventAt: string;
-  sizeBytes: number;
-  turnCount: number;
-  stepCount: number;
-  toolCallCount: number;
-  errorCount: number;
-  subagentCount: number;
-  hasWire: boolean;
-  hasContext: boolean;
-  imported: boolean;
-};
+export type SessionRow = { key: string; metadata: JsonValue; createdAt: string; updatedAt: string; projectId: string | null; conversationType: string | null; pinned: boolean; cwd: string | null; repoId: string | null; repoBranch: string | null; toolProfile: string | null; approvalMode: string; totalCostUsd: number; totalTokens: number; parentSessionId: string | null }
+export type SessionState = { customTitle: string | null; planMode: boolean; archived: boolean; todos: KimiTodo[]; 
+/**
+ * Verbatim parsed state.json for the State tab's "raw" view.
+ */
+raw: unknown }
+export type SessionSummary = { sessionId: string; providerId: string; sourceDir: string; cwd: string | null; projectBasename: string | null; customTitle: string | null; startedAt: string; lastEventAt: string; sizeBytes: number; turnCount: number; stepCount: number; toolCallCount: number; errorCount: number; subagentCount: number; hasWire: boolean; hasContext: boolean; imported: boolean }
 /**
  * One row in the Plugins → Coding Memory session list.
  */
-export type SessionSummaryDto = {
-  sessionId: string;
-  source: string;
-  cwd: string | null;
-  repoId: string | null;
-  startedAt: string;
-  lastEventAt: string;
-  eventCount: number;
-  turnCount: number;
-  toolCallCount: number;
-  errorCount: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  totalCostUsd: number;
-};
-export type SessionSummaryResponse = {
-  key: string;
-  title: string | null;
-  conversationType: string | null;
-  updatedAt: string;
-};
+export type SessionSummaryDto = { sessionId: string; source: string; cwd: string | null; repoId: string | null; startedAt: string; lastEventAt: string; eventCount: number; turnCount: number; toolCallCount: number; errorCount: number; totalInputTokens: number; totalOutputTokens: number; totalCostUsd: number }
+export type SessionSummaryResponse = { key: string; title: string | null; conversationType: string | null; updatedAt: string }
 /**
  * Parameters for setting the active desktop view.
  */
-export type SetActiveViewParams = {
-  /**
-   * Dashboard identifier (e.g., "finance", "tasks", "projects", "notes", "dashboard").
-   */
-  dashboard: string;
-  /**
-   * Specific entity focused within the dashboard (e.g., "FIRE projection", project ID).
-   */
-  focusedEntity: string | null;
-  /**
-   * Human-readable description of what the user is looking at.
-   * Used by the LLM rewriter for context.
-   */
-  description: string | null;
-};
-export type ShellHookStatusResponse = { installed: boolean; shell: string; rcFile: string };
-export type ShortcutsConfig = { launcher: string; tray: string };
-export type SignalResponse = { eventType: string; timestamp: string; metadata: string };
-export type SignalWindowResponse = {
-  windowSize: number;
-  signals: SignalResponse[];
-  triggers: TriggerConditionResponse[];
-};
-export type SkillInfo = {
-  name: string;
-  description: string;
-  allowed_tools: string[];
-  paths: string[];
-  tags: string[];
-  sensitivity: string | null;
-  source: string;
-  source_path: string;
-  references: SkillReferenceInfo[];
-};
-export type SkillListItem = {
-  name: string;
-  description: string;
-  source: string;
-  source_path: string;
-  tags: string[];
-  enabled: boolean;
-};
-export type SkillListResponse = { skillNames: string[] };
-export type SkillLoadedPayload = {
-  sessionKey: string;
-  name: string;
-  trigger: string;
-  agent?: string | null;
-};
-export type SkillReferenceInfo = { name: string; file: string; load: string };
-export type SkillRouteStats = {
-  count: number;
-  percentage: number;
-  avgConfidence: number;
-  topTriggers: string[];
-};
-export type SkillValidationResult = { ok: boolean; errors: string[]; warnings: string[] };
-export type SkillVersionDetailResponse = {
-  id: string;
-  skillName: string;
-  version: number;
-  filePath: string;
-  content: string;
-  diff: string | null;
-  source: string;
-  reason: string | null;
-  createdAt: string;
-};
-export type SkillVersionResponse = {
-  id: string;
-  skillName: string;
-  version: number;
-  filePath: string;
-  diff: string | null;
-  source: string;
-  reason: string | null;
-  createdAt: string;
-};
-export type SkippedFile = { path: string; reason: string };
-export type SourceBreakdown = { source: TimelineSource; durationSecs: number; count: number };
-export type StatsBundle = {
-  perProject: ProjectTotals[];
-  toolUsage: ToolUsage[];
-  errorsByTool: ErrorByTool[];
-  tokenSeries: TokenSeriesPoint[];
-  subagentTypes: SubagentTypeCount[];
-  cacheHitPct: number;
-};
-export type StatusLabelResponse = {
-  id: string;
-  workflowId: string;
-  name: string;
-  color: string;
-  statusGroup: string;
-  position: number;
-};
-export type StatusWorkflowResponse = {
-  id: string;
-  name: string;
-  isTemplate: boolean;
-  isGlobalDefault: boolean;
-  labels: StatusLabelResponse[];
-};
-export type StrategyFeedbackResponse = {
-  strategyType: string;
-  domain: string;
-  timesUsed: number;
-  acceptanceRate: number;
-  effectiveness: number;
-  behavioralPositive: number;
-  behavioralNegative: number;
-};
-export type StrugglingCardResponse = {
-  id: string;
-  front: string;
-  back: string;
-  deck: string;
-  lapses: number;
-  reviewCount: number;
-  sourceNoteId: string | null;
-};
-export type SubagentSpawnedPayload = { sessionKey: string; label: string; profile: string };
-export type SubagentSummary = {
-  agentId: string;
-  subagentType: string;
-  status: string;
-  description: string | null;
-  createdAt: string;
-  updatedAt: string;
-  eventCount: number;
-};
-export type SubagentTypeCount = { subagentType: string; count: number };
-export type SuggestedAction =
-  | { BoostSkill: { skill: string } }
-  | "ViewDetails"
-  | { ApproveMetaRule: { rule_id: string } }
-  | { DismissMetaRule: { rule_id: string } }
-  | { KillTrial: { trial_id: string } }
-  | { ContinueTrial: { trial_id: string } }
-  | { RevertBrainVersion: { version: number } }
-  | "Unknown";
-export type SystemAction =
-  | "lockScreen"
-  | "sleep"
-  | "restart"
-  | "shutdown"
-  | "emptyTrash"
-  | "toggleDarkMode"
-  | "toggleDoNotDisturb"
-  | "ejectAll";
-export type SystemStatusResponse = {
-  domainBusSubscribers: number;
-  domainBusPublished: number;
-  backgroundServiceRunning: boolean;
-  backgroundEventsProcessed: number;
-  activeFacts: number;
-  episodicCount: number;
-  rulesCount: number;
-  components: ComponentStatusResponse[];
-};
-export type TabContent = { tab: string; content: string };
+export type SetActiveViewParams = { 
+/**
+ * Dashboard identifier (e.g., "finance", "tasks", "projects", "notes", "dashboard").
+ */
+dashboard: string; 
+/**
+ * Specific entity focused within the dashboard (e.g., "FIRE projection", project ID).
+ */
+focusedEntity: string | null; 
+/**
+ * Human-readable description of what the user is looking at.
+ * Used by the LLM rewriter for context.
+ */
+description: string | null }
+export type ShellHookStatusResponse = { installed: boolean; shell: string; rcFile: string }
+export type ShortcutsConfig = { launcher: string; tray: string }
+export type SignalResponse = { eventType: string; timestamp: string; metadata: string }
+export type SignalWindowResponse = { windowSize: number; signals: SignalResponse[]; triggers: TriggerConditionResponse[] }
+export type SkillInfo = { name: string; description: string; allowed_tools: string[]; paths: string[]; tags: string[]; sensitivity: string | null; source: string; source_path: string; references: SkillReferenceInfo[] }
+export type SkillListItem = { name: string; description: string; source: string; source_path: string; tags: string[]; enabled: boolean }
+export type SkillListResponse = { skillNames: string[] }
+export type SkillLoadedPayload = { sessionKey: string; name: string; trigger: string; agent?: string | null }
+export type SkillReferenceInfo = { name: string; file: string; load: string }
+export type SkillRouteStats = { count: number; percentage: number; avgConfidence: number; topTriggers: string[] }
+export type SkillValidationResult = { ok: boolean; errors: string[]; warnings: string[] }
+export type SkillVersionDetailResponse = { id: string; skillName: string; version: number; filePath: string; content: string; diff: string | null; source: string; reason: string | null; createdAt: string }
+export type SkillVersionResponse = { id: string; skillName: string; version: number; filePath: string; diff: string | null; source: string; reason: string | null; createdAt: string }
+export type SkippedFile = { path: string; reason: string }
+export type SourceBreakdown = { source: TimelineSource; durationSecs: number; count: number }
+export type StatsBundle = { perProject: ProjectTotals[]; toolUsage: ToolUsage[]; errorsByTool: ErrorByTool[]; tokenSeries: TokenSeriesPoint[]; subagentTypes: SubagentTypeCount[]; cacheHitPct: number }
+export type StatusLabelResponse = { id: string; workflowId: string; name: string; color: string; statusGroup: string; position: number }
+export type StatusWorkflowResponse = { id: string; name: string; isTemplate: boolean; isGlobalDefault: boolean; labels: StatusLabelResponse[] }
+export type StrategyFeedbackResponse = { strategyType: string; domain: string; timesUsed: number; acceptanceRate: number; effectiveness: number; behavioralPositive: number; behavioralNegative: number }
+export type StrugglingCardResponse = { id: string; front: string; back: string; deck: string; lapses: number; reviewCount: number; sourceNoteId: string | null }
+export type SubagentSpawnedPayload = { sessionKey: string; label: string; profile: string }
+export type SubagentSummary = { agentId: string; subagentType: string; status: string; description: string | null; createdAt: string; updatedAt: string; eventCount: number }
+export type SubagentTypeCount = { subagentType: string; count: number }
+export type SuggestedAction = { BoostSkill: { skill: string } } | "ViewDetails" | { ApproveMetaRule: { rule_id: string } } | { DismissMetaRule: { rule_id: string } } | { KillTrial: { trial_id: string } } | { ContinueTrial: { trial_id: string } } | { RevertBrainVersion: { version: number } } | "Unknown"
+export type SystemAction = "lockScreen" | "sleep" | "restart" | "shutdown" | "emptyTrash" | "toggleDarkMode" | "toggleDoNotDisturb" | "ejectAll"
+export type SystemStatusResponse = { domainBusSubscribers: number; domainBusPublished: number; backgroundServiceRunning: boolean; backgroundEventsProcessed: number; activeFacts: number; episodicCount: number; rulesCount: number; components: ComponentStatusResponse[] }
+export type TabContent = { tab: string; content: string }
 /**
  * Row struct for the `task_attachments` table.
  */
-export type TaskAttachmentRow = {
-  id: string;
-  taskId: string;
-  attachmentType: string;
-  value: string;
-  title: string | null;
-  tags: string[];
-  createdAt: string;
-  source: string;
-};
-export type TaskCreateParams = {
-  title: string;
-  description: string | null;
-  areaId: string | null;
-  projectId: string | null;
-  priority: number | null;
-  dueDate: string | null;
-  tags: string[] | null;
-  parentId: string | null;
-  statusLabelId: string | null;
-  groupId: string | null;
-  taskType: string | null;
-  energyLevel: string | null;
-  estimatedMinutes: number | null;
-};
-export type TaskDashboard = {
-  id: string;
-  title: string;
-  status: string;
-  projectName: string | null;
-  dueDate: string | null;
-};
-export type TaskGroupCreateParams = {
-  projectId: string | null;
-  name: string;
-  color: string | null;
-};
-export type TaskGroupReorderParams = { projectId: string | null; groupIds: string[] };
-export type TaskGroupResponse = {
-  id: string;
-  projectId: string | null;
-  name: string;
-  color: string | null;
-  position: number;
-  taskCount: number;
-};
-export type TaskGroupUpdateParams = {
-  id: string;
-  name: string | null;
-  color: string | null;
-  position: number | null;
-};
-export type TaskResponse = {
-  id: string;
-  title: string;
-  completed: boolean;
-  priority: string | null;
-  status: string;
-  dueDate: string | null;
-  tags: string[];
-  projectId: string | null;
-  areaId: string;
-  objectiveId: string | null;
-  description: string | null;
-  parentId: string | null;
-  subtaskCount: number;
-  subtaskCompletedCount: number;
-  statusLabelId: string | null;
-  statusLabel: StatusLabelResponse | null;
-  groupId: string | null;
-  taskType: string | null;
-  executionState: string | null;
-  energyLevel: string | null;
-  estimatedMinutes: number | null;
-  actualMinutes: number | null;
-  complexityScore: number | null;
-  totalTrackedSecs: number | null;
-  focusedAt: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-  scheduledStart: string | null;
-  scheduledEnd: string | null;
-};
+export type TaskAttachmentRow = { id: string; taskId: string; attachmentType: string; value: string; title: string | null; tags: string[]; createdAt: string; source: string }
+export type TaskCreateParams = { title: string; description: string | null; areaId: string | null; projectId: string | null; priority: number | null; dueDate: string | null; tags: string[] | null; parentId: string | null; statusLabelId: string | null; groupId: string | null; taskType: string | null; energyLevel: string | null; estimatedMinutes: number | null }
+export type TaskDashboard = { id: string; title: string; status: string; projectName: string | null; dueDate: string | null }
+export type TaskGroupCreateParams = { projectId: string | null; name: string; color: string | null }
+export type TaskGroupReorderParams = { projectId: string | null; groupIds: string[] }
+export type TaskGroupResponse = { id: string; projectId: string | null; name: string; color: string | null; position: number; taskCount: number }
+export type TaskGroupUpdateParams = { id: string; name: string | null; color: string | null; position: number | null }
+export type TaskResponse = { id: string; title: string; completed: boolean; priority: string | null; status: string; dueDate: string | null; tags: string[]; projectId: string | null; areaId: string; objectiveId: string | null; description: string | null; parentId: string | null; subtaskCount: number; subtaskCompletedCount: number; statusLabelId: string | null; statusLabel: StatusLabelResponse | null; groupId: string | null; taskType: string | null; executionState: string | null; energyLevel: string | null; estimatedMinutes: number | null; actualMinutes: number | null; complexityScore: number | null; totalTrackedSecs: number | null; focusedAt: string | null; createdAt: string | null; updatedAt: string | null; scheduledStart: string | null; scheduledEnd: string | null }
 /**
  * Row struct for the `task_time_entries` table.
  */
-export type TaskTimeEntryRow = {
-  id: string;
-  taskId: string;
-  source: string;
-  startedAt: string;
-  endedAt: string | null;
-  durationSecs: number | null;
-  note: string | null;
-  energyLevel: string | null;
-};
-export type TaskUpdateParams = {
-  id: string;
-  title: string | null;
-  description: string | null;
-  priority: number | null;
-  status: string | null;
-  dueDate: string | null;
-  projectId: string | null;
-  areaId: string | null;
-  tags: string[] | null;
-  keyResultId: string | null;
-  statusLabelId: string | null;
-  position: number | null;
-  groupId: string | null;
-  taskType: string | null;
-  energyLevel: string | null;
-  estimatedMinutes: number | null;
-  scheduledStart: string | null;
-  scheduledEnd: string | null;
-};
-export type TimeEntryResponse = {
-  id: number;
-  description: string;
-  categoryId: string | null;
-  projectId: string | null;
-  startedAt: string;
-  durationSecs: number;
-  source: string;
-};
-export type TimelineEntry = {
-  id: string;
-  source: TimelineSource;
-  entryType: TimelineEntryType;
-  title: string;
-  description: string | null;
-  startedAt: string;
-  endedAt: string | null;
-  durationSecs: number | null;
-  entityId: string | null;
-  entityRoute: string | null;
-  color: string;
-  metadata: unknown | null;
-};
-export type TimelineEntryType =
-  | "appUsage"
-  | "focusSession"
-  | "taskTimeEntry"
-  | "taskCreated"
-  | "taskCompleted"
-  | "taskUpdated"
-  | "taskDue"
-  | "noteCreated"
-  | "noteUpdated"
-  | "transactionRecorded"
-  | "expenseRecorded"
-  | "incomeRecorded"
-  | "systemEvent"
-  | "calendarEvent"
-  | "taskStatusChanged"
-  | "taskPriorityChanged"
-  | "taskFieldUpdated";
-export type TimelineResponse = { entries: TimelineEntry[]; summary: TimelineSummary };
-export type TimelineSource =
-  | "productivity"
-  | "focus"
-  | "task"
-  | "todo"
-  | "note"
-  | "finance"
-  | "system"
-  | "calendar";
-export type TimelineSummary = {
-  totalTrackedSecs: number;
-  focusSecs: number;
-  tasksCompleted: number;
-  tasksCreated: number;
-  notesTouched: number;
-  transactionsCount: number;
-  topApps: TopAppSummary[];
-  sourceBreakdown: SourceBreakdown[];
-};
-export type TodayTaskResponse = {
-  id: string;
-  title: string;
-  priority: string | null;
-  status: string;
-  completed: boolean;
-  isOverdue: boolean;
-  isDueToday: boolean;
-  dueDisplay: string | null;
-};
-export type TokenSeriesPoint = {
-  /**
-   * Day key in `YYYY-MM-DD`.
-   */
-  day: string;
-  inputTokens: number;
-  outputTokens: number;
-};
-export type ToolEndPayload = {
-  sessionKey: string;
-  name: string;
-  action?: string | null;
-  success: boolean;
-  durationMs: number;
-  result?: string | null;
-  estimatedTokens?: number | null;
-  agent?: string | null;
-};
-export type ToolStartPayload = {
-  sessionKey: string;
-  name: string;
-  action?: string | null;
-  agent?: string | null;
-};
-export type ToolUsage = { tool: string; callCount: number; errorCount: number };
-export type TopAppSummary = { appName: string; durationSecs: number; percentage: number };
-export type TopicDetail = { topicId: string; facts: FactNode[] };
-export type TopicDetailParams = { topicId: string };
-export type TopicDetailResponse = { topic: TopicHealthResponse; atoms: KnowledgeAtomResponse[] };
-export type TopicEdge = { sourceTopicId: string; targetTopicId: string; strength: number };
-export type TopicExpandParams = { subject: string; domain: string };
-export type TopicHealthResponse = {
-  id: string;
-  name: string;
-  domain: string;
-  atomCount: number;
-  avgRetention: number;
-};
-export type TopicNode = {
-  id: string;
-  subject: string;
-  domain: string;
-  factCount: number;
-  avgConvergence: number;
-  maxConfidence: number;
-  totalAccessCount: number;
-  lastAccessed: string | null;
-  communityId: string | null;
-};
-export type TopicSummary = { name: string; avgRetention: number; atomCount: number };
+export type TaskTimeEntryRow = { id: string; taskId: string; source: string; startedAt: string; endedAt: string | null; durationSecs: number | null; note: string | null; energyLevel: string | null }
+export type TaskUpdateParams = { id: string; title: string | null; description: string | null; priority: number | null; status: string | null; dueDate: string | null; projectId: string | null; areaId: string | null; tags: string[] | null; keyResultId: string | null; statusLabelId: string | null; position: number | null; groupId: string | null; taskType: string | null; energyLevel: string | null; estimatedMinutes: number | null; scheduledStart: string | null; scheduledEnd: string | null }
+export type TimeEntryResponse = { id: number; description: string; categoryId: string | null; projectId: string | null; startedAt: string; durationSecs: number; source: string }
+export type TimelineEntry = { id: string; source: TimelineSource; entryType: TimelineEntryType; title: string; description: string | null; startedAt: string; endedAt: string | null; durationSecs: number | null; entityId: string | null; entityRoute: string | null; color: string; metadata: unknown | null }
+export type TimelineEntryType = "appUsage" | "focusSession" | "taskTimeEntry" | "taskCreated" | "taskCompleted" | "taskUpdated" | "taskDue" | "noteCreated" | "noteUpdated" | "transactionRecorded" | "expenseRecorded" | "incomeRecorded" | "systemEvent" | "calendarEvent" | "taskStatusChanged" | "taskPriorityChanged" | "taskFieldUpdated"
+export type TimelineResponse = { entries: TimelineEntry[]; summary: TimelineSummary }
+export type TimelineSource = "productivity" | "focus" | "task" | "todo" | "note" | "finance" | "system" | "calendar"
+export type TimelineSummary = { totalTrackedSecs: number; focusSecs: number; tasksCompleted: number; tasksCreated: number; notesTouched: number; transactionsCount: number; topApps: TopAppSummary[]; sourceBreakdown: SourceBreakdown[] }
+export type TodayTaskResponse = { id: string; title: string; priority: string | null; status: string; completed: boolean; isOverdue: boolean; isDueToday: boolean; dueDisplay: string | null }
+export type TokenSeriesPoint = { 
+/**
+ * Day key in `YYYY-MM-DD`.
+ */
+day: string; inputTokens: number; outputTokens: number }
+export type ToolEndPayload = { sessionKey: string; name: string; action?: string | null; success: boolean; durationMs: number; result?: string | null; estimatedTokens?: number | null; agent?: string | null }
+export type ToolStartPayload = { sessionKey: string; name: string; action?: string | null; agent?: string | null }
+export type ToolUsage = { tool: string; callCount: number; errorCount: number }
+export type TopAppSummary = { appName: string; durationSecs: number; percentage: number }
+export type TopicDetail = { topicId: string; facts: FactNode[] }
+export type TopicDetailParams = { topicId: string }
+export type TopicDetailResponse = { topic: TopicHealthResponse; atoms: KnowledgeAtomResponse[] }
+export type TopicEdge = { sourceTopicId: string; targetTopicId: string; strength: number }
+export type TopicExpandParams = { subject: string; domain: string }
+export type TopicHealthResponse = { id: string; name: string; domain: string; atomCount: number; avgRetention: number }
+export type TopicNode = { id: string; subject: string; domain: string; factCount: number; avgConvergence: number; maxConfidence: number; totalAccessCount: number; lastAccessed: string | null; communityId: string | null }
+export type TopicSummary = { name: string; avgRetention: number; atomCount: number }
 /**
  * One event in a session's wire stream, in provider-agnostic form.
  */
-export type TraceEvent = {
-  /**
-   * Per-session-monotonic sequence (line index in wire.jsonl, skipping metadata).
-   */
-  seq: number;
-  /**
-   * Provider id ("kimi", "claudeCode", …).
-   */
-  providerId: string;
-  /**
-   * Verbatim raw kind string from the source ("TurnBegin", "ContentPart", …).
-   */
-  rawKind: string;
-  /**
-   * Verbatim payload from the source.
-   */
-  payload: unknown;
-  occurredAt: string;
-  category: SemanticCategory;
-  turnIndex: number | null;
-  stepIndex: number | null;
-  parentSubagentId: string | null;
-};
-export type TrackedAppResponse = {
-  displayName: string;
-  appName: string;
-  siteName: string | null;
-  categoryId: string | null;
-  categoryName: string | null;
-  totalSecs: number;
-  eventCount: number;
-};
-export type TranslateBreakdownParams = {
-  text: string;
-  sourceLang: string;
-  targetLang: string;
-  noteId?: string | null;
-  isSelection?: boolean;
-};
-export type TranslateBreakdownResponse = {
-  translation: string;
-  words: WordBreakdown[];
-  grammarPatterns: GrammarPattern[];
-};
-export type TranslationEvalResponse = {
-  grades: EvalGrades;
-  corrections: Correction[];
-  modelTranslation: string;
-};
-export type TransparencyAgentSelected = { name: string; description: string };
-export type TransparencyClassification = { strategy: string; confidence: number; source: string };
-export type TransparencyCost = { estimatedUsd: number; model: string };
+export type TraceEvent = { 
+/**
+ * Per-session-monotonic sequence (line index in wire.jsonl, skipping metadata).
+ */
+seq: number; 
+/**
+ * Provider id ("kimi", "claudeCode", …).
+ */
+providerId: string; 
+/**
+ * Verbatim raw kind string from the source ("TurnBegin", "ContentPart", …).
+ */
+rawKind: string; 
+/**
+ * Verbatim payload from the source.
+ */
+payload: unknown; occurredAt: string; category: SemanticCategory; turnIndex: number | null; stepIndex: number | null; parentSubagentId: string | null }
+export type TrackedAppResponse = { displayName: string; appName: string; siteName: string | null; categoryId: string | null; categoryName: string | null; totalSecs: number; eventCount: number }
+export type TranslateBreakdownParams = { text: string; sourceLang: string; targetLang: string; noteId?: string | null; isSelection?: boolean }
+export type TranslateBreakdownResponse = { translation: string; words: WordBreakdown[]; grammarPatterns: GrammarPattern[] }
+export type TranslationEvalResponse = { grades: EvalGrades; corrections: Correction[]; modelTranslation: string }
+export type TransparencyAgentSelected = { name: string; description: string }
+export type TransparencyClassification = { strategy: string; confidence: number; source: string }
+export type TransparencyCost = { estimatedUsd: number; model: string }
 /**
  * Accumulated transparency data for an assistant message.
  * Serialized into `SessionMessage.metadata.transparency`.
  */
-export type TransparencyData = {
-  usage?: TransparencyUsage | null;
-  cost?: TransparencyCost | null;
-  timing?: TransparencyTiming | null;
-  tools?: TransparencyTool[];
-  toolTokensTotal?: number | null;
-  memoryAccesses?: TransparencyMemoryAccess[];
-  skills?: TransparencySkill[];
-  execution?: TransparencyExecution | null;
-  classification?: TransparencyClassification | null;
-  agentSelected?: TransparencyAgentSelected | null;
-  subagents?: TransparencySubagent[];
-  learning?: TransparencyLearning[];
-  delegations?: TransparencyDelegation[];
-  plan?: TransparencyPlan | null;
-  enhancement?: TransparencyEnhancement | null;
-};
-export type TransparencyDelegation = {
-  fromAgent: string;
-  toAgent: string;
-  query: string;
-  depth: number;
-  status: string;
-  durationMs?: number | null;
-};
-export type TransparencyEnhancement = {
-  stages: EnhancementStagePayload[];
-  totalLatencyMs: number;
-  totalLlmCalls: number;
-};
-export type TransparencyExecution = {
-  engine: string;
-  iterations: number;
-  maxIterations: number;
-  escalations: number;
-};
-export type TransparencyLearning = { eventType: string; detail: string };
-export type TransparencyMemoryAccess = {
-  action: string;
-  query: string | null;
-  resultsCount: number;
-};
-export type TransparencyPlan = { steps: string[]; completedSteps: number[] };
-export type TransparencySkill = { name: string; trigger: string; agent?: string | null };
-export type TransparencySubagent = { label: string; profile: string };
-export type TransparencyTiming = {
-  totalMs: number;
-  classificationMs: number | null;
-  contextAssemblyMs: number | null;
-};
-export type TransparencyTool = {
-  name: string;
-  action?: string | null;
-  success: boolean;
-  durationMs: number;
-  estimatedTokens?: number | null;
-  agent?: string | null;
-};
-export type TransparencyUsage = {
-  promptTokens: number;
-  completionTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-};
-export type TrendDirection = "Rising" | "Falling" | "Stable";
-export type TrendNarrative = {
-  id: string;
-  generatedAt: string;
-  periodStart: string;
-  periodEnd: string;
-  routingSummary: string;
-  improvementHighlights: string[];
-  experimentSummary: string;
-  metaRuleUpdates: string[];
-  fullNarrative: string;
-  userFeedback: UserFeedback | null;
-};
-export type TrialEarlySignals = {
-  correctionRateDelta: number;
-  confidenceTrend: TrendDirection;
-  dominantSkillShift: string | null;
-  messagesScored?: number;
-};
+export type TransparencyData = { usage?: TransparencyUsage | null; cost?: TransparencyCost | null; timing?: TransparencyTiming | null; tools?: TransparencyTool[]; toolTokensTotal?: number | null; memoryAccesses?: TransparencyMemoryAccess[]; skills?: TransparencySkill[]; execution?: TransparencyExecution | null; classification?: TransparencyClassification | null; agentSelected?: TransparencyAgentSelected | null; subagents?: TransparencySubagent[]; learning?: TransparencyLearning[]; delegations?: TransparencyDelegation[]; plan?: TransparencyPlan | null; enhancement?: TransparencyEnhancement | null }
+export type TransparencyDelegation = { fromAgent: string; toAgent: string; query: string; depth: number; status: string; durationMs?: number | null }
+export type TransparencyEnhancement = { stages: EnhancementStagePayload[]; totalLatencyMs: number; totalLlmCalls: number }
+export type TransparencyExecution = { engine: string; iterations: number; maxIterations: number; escalations: number }
+export type TransparencyLearning = { eventType: string; detail: string }
+export type TransparencyMemoryAccess = { action: string; query: string | null; resultsCount: number }
+export type TransparencyPlan = { steps: string[]; completedSteps: number[] }
+export type TransparencySkill = { name: string; trigger: string; agent?: string | null }
+export type TransparencySubagent = { label: string; profile: string }
+export type TransparencyTiming = { totalMs: number; classificationMs: number | null; contextAssemblyMs: number | null }
+export type TransparencyTool = { name: string; action?: string | null; success: boolean; durationMs: number; estimatedTokens?: number | null; agent?: string | null }
+export type TransparencyUsage = { promptTokens: number; completionTokens: number; cacheReadTokens: number; cacheWriteTokens: number }
+export type TrendDirection = "Rising" | "Falling" | "Stable"
+export type TrendNarrative = { id: string; generatedAt: string; periodStart: string; periodEnd: string; routingSummary: string; improvementHighlights: string[]; experimentSummary: string; metaRuleUpdates: string[]; fullNarrative: string; userFeedback: UserFeedback | null }
+export type TrialEarlySignals = { correctionRateDelta: number; confidenceTrend: TrendDirection; dominantSkillShift: string | null; messagesScored?: number }
 /**
  * 4-hour early evaluation of an autotuner trial
  */
-export type TrialPreview = {
-  id: string;
-  trialId: string;
-  startedAt: string;
-  previewAt: string;
-  messagesScored: number;
-  earlySignals: TrialEarlySignals;
-  recommendation: PreviewRecommendation;
-  narrative: string;
-};
-export type TriggerConditionResponse = {
-  name: string;
-  cooldownRemainingSecs: number;
-  lastFired: string | null;
-};
-export type UsageReportPayload = {
-  sessionKey: string;
-  promptTokens: number;
-  completionTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  estimatedCostUsd: number;
-  model: string;
-  responseTimeMs: number;
-};
-export type UserFeedback = "Helpful" | "NotHelpful" | "Dismissed";
-export type UserModelSummaryResponse = {
-  identityCount: number;
-  energyCount: number;
-  workCount: number;
-  financeCount: number;
-  learningCount: number;
-  preferencesCount: number;
-  identityPreview: string[];
-  energyPreview: string[];
-  workPreview: string[];
-  financePreview: string[];
-  learningPreview: string[];
-  preferencesPreview: string[];
-};
-export type UserSituationResponse = {
-  energyLevel: number;
-  focusState: number;
-  deadlinePressure: number;
-  distractionRisk: number;
-  coachingReceptivity: number;
-  taskAvoidanceDetected: boolean;
-  hoursActiveToday: number;
-  minsSinceBreak: number;
-  hourOfDay: number;
-  recentContextSwitches: number;
-};
-export type VerdictPayload = { classification: string; displayText: string };
-export type VocabItem = {
-  word: string;
-  reading: string | null;
-  meaning: string;
-  partOfSpeech: string;
-  exampleSentence: string | null;
-};
-export type VocabularySaveParams = { words: VocabItem[]; noteId: string | null; deck: string };
-export type VoiceConversationStartResponse = {
-  sessionKey: string;
-  sessionTitle: string;
-  isContinuing: boolean;
-};
-export type VoiceConversationStatusResponse = {
-  phase: string;
-  sessionKey: string | null;
-  sessionTitle: string | null;
-  turnCount: number;
-  paused: boolean;
-  continueAvailable: boolean;
-  engineKind: string | null;
-};
+export type TrialPreview = { id: string; trialId: string; startedAt: string; previewAt: string; messagesScored: number; earlySignals: TrialEarlySignals; recommendation: PreviewRecommendation; narrative: string }
+export type TriggerConditionResponse = { name: string; cooldownRemainingSecs: number; lastFired: string | null }
+export type UsageReportPayload = { sessionKey: string; promptTokens: number; completionTokens: number; cacheReadTokens: number; cacheWriteTokens: number; estimatedCostUsd: number; model: string; responseTimeMs: number }
+export type UserFeedback = "Helpful" | "NotHelpful" | "Dismissed"
+export type UserModelSummaryResponse = { identityCount: number; energyCount: number; workCount: number; financeCount: number; learningCount: number; preferencesCount: number; identityPreview: string[]; energyPreview: string[]; workPreview: string[]; financePreview: string[]; learningPreview: string[]; preferencesPreview: string[] }
+export type UserSituationResponse = { energyLevel: number; focusState: number; deadlinePressure: number; distractionRisk: number; coachingReceptivity: number; taskAvoidanceDetected: boolean; hoursActiveToday: number; minsSinceBreak: number; hourOfDay: number; recentContextSwitches: number }
+export type VerdictPayload = { classification: string; displayText: string }
+export type VocabItem = { word: string; reading: string | null; meaning: string; partOfSpeech: string; exampleSentence: string | null }
+export type VocabularySaveParams = { words: VocabItem[]; noteId: string | null; deck: string }
+export type VoiceConversationStartResponse = { sessionKey: string; sessionTitle: string; isContinuing: boolean }
+export type VoiceConversationStatusResponse = { phase: string; sessionKey: string | null; sessionTitle: string | null; turnCount: number; paused: boolean; continueAvailable: boolean; engineKind: string | null }
 /**
  * Per-model download status for settings UI.
  */
-export type VoiceModelStatusResponse = {
-  asr: ModelStatus;
-  tts: ModelStatus;
-  ttsInstruct: ModelStatus;
-  /**
-   * Whether the STT engine is loaded and ready.
-   */
-  sttLoaded: boolean;
-  /**
-   * Whether the TTS engine is loaded and ready.
-   */
-  ttsLoaded: boolean;
-};
-export type WeeklyAssessmentResponse = {
-  id: string;
-  weekStart: string;
-  weekEnd: string;
-  avgScore: number | null;
-  totalFocusMins: number | null;
-  totalProductiveSecs: number | null;
-  totalDistractingSecs: number | null;
-  topApps: string | null;
-  summary: string | null;
-};
-export type WeeklyStatPoint = { date: string; reviews: number; atomsCreated: number };
-export type WindowAction =
-  | "leftHalf"
-  | "rightHalf"
-  | "topHalf"
-  | "bottomHalf"
-  | "leftThird"
-  | "centerThird"
-  | "rightThird"
-  | "maximize"
-  | "center"
-  | "restore"
-  | { preset: string };
+export type VoiceModelStatusResponse = { asr: ModelStatus; tts: ModelStatus; ttsInstruct: ModelStatus; 
+/**
+ * Whether the STT engine is loaded and ready.
+ */
+sttLoaded: boolean; 
+/**
+ * Whether the TTS engine is loaded and ready.
+ */
+ttsLoaded: boolean }
+export type WeeklyAssessmentResponse = { id: string; weekStart: string; weekEnd: string; avgScore: number | null; totalFocusMins: number | null; totalProductiveSecs: number | null; totalDistractingSecs: number | null; topApps: string | null; summary: string | null }
+export type WeeklyStatPoint = { date: string; reviews: number; atomsCreated: number }
+export type WindowAction = "leftHalf" | "rightHalf" | "topHalf" | "bottomHalf" | "leftThird" | "centerThird" | "rightThird" | "maximize" | "center" | "restore" | { preset: string }
 /**
  * Decoded form of `SessionReplayEntry` for the FE viewer. The original
  * `payload` is kept as `raw_json` for the detail panel; `payload_decoded`
  * is the parsed structured value when valid JSON.
  */
-export type WireEventDto = {
-  id: string;
-  source: string;
-  sessionId: string;
-  kind: string;
-  occurredAt: string;
-  /**
-   * Structured payload when `payload` parsed as JSON; `null` otherwise.
-   */
-  payloadDecoded: unknown;
-  /**
-   * Raw JSON string (always present, exactly as stored in `ingest_event_log`).
-   */
-  rawJson: string;
-};
-export type WordBreakdown = {
-  word: string;
-  reading: string | null;
-  meaning: string;
-  partOfSpeech: string;
-  proficiencyLevel: string | null;
-  exampleSentence: string | null;
-  isNew?: boolean;
-};
-export type WorkContextDetailResponse = {
-  context: WorkContextResponse;
-  resources: WorkResourceResponse[];
-  linkedTaskIds: string[];
-  recentEvents: ActivityEventResponse[];
-};
-export type WorkContextResponse = {
-  id: string;
-  title: string;
-  description: string | null;
-  status: string;
-  contextType: string;
-  linkedProjectId: string | null;
-  color: string | null;
-  tags: string[];
-  confidence: number;
-  firstSeenAt: string;
-  lastActiveAt: string;
-  totalDurationSecs: number;
-  eventCount: number;
-};
-export type WorkContextSummary = {
-  id: string;
-  title: string;
-  contextType: string;
-  color: string | null;
-  durationMins: number;
-  confidence: number;
-};
-export type WorkContextUpdateParams = {
-  id: string;
-  title: string | null;
-  color: string | null;
-  status: string | null;
-  linkedProjectId: string | null;
-};
-export type WorkResourceResponse = {
-  id: string;
-  resourceType: string;
-  resourceName: string;
-  resourcePath: string | null;
-  resourceUri: string | null;
-  accessCount: number;
-};
-export type WorkflowCreateParams = {
-  name: string;
-  isTemplate: boolean | null;
-  sourceWorkflowId: string | null;
-};
-export type WorkspaceFile = { name: string; description: string; exists: boolean };
-export type WorkspaceFileContent = { name: string; content: string };
+export type WireEventDto = { id: string; source: string; sessionId: string; kind: string; occurredAt: string; 
+/**
+ * Structured payload when `payload` parsed as JSON; `null` otherwise.
+ */
+payloadDecoded: unknown; 
+/**
+ * Raw JSON string (always present, exactly as stored in `ingest_event_log`).
+ */
+rawJson: string }
+export type WordBreakdown = { word: string; reading: string | null; meaning: string; partOfSpeech: string; proficiencyLevel: string | null; exampleSentence: string | null; isNew?: boolean }
+export type WorkContextDetailResponse = { context: WorkContextResponse; resources: WorkResourceResponse[]; linkedTaskIds: string[]; recentEvents: ActivityEventResponse[] }
+export type WorkContextResponse = { id: string; title: string; description: string | null; status: string; contextType: string; linkedProjectId: string | null; color: string | null; tags: string[]; confidence: number; firstSeenAt: string; lastActiveAt: string; totalDurationSecs: number; eventCount: number }
+export type WorkContextSummary = { id: string; title: string; contextType: string; color: string | null; durationMins: number; confidence: number }
+export type WorkContextUpdateParams = { id: string; title: string | null; color: string | null; status: string | null; linkedProjectId: string | null }
+export type WorkResourceResponse = { id: string; resourceType: string; resourceName: string; resourcePath: string | null; resourceUri: string | null; accessCount: number }
+export type WorkflowCreateParams = { name: string; isTemplate: boolean | null; sourceWorkflowId: string | null }
+export type WorkspaceFile = { name: string; description: string; exists: boolean }
+export type WorkspaceFileContent = { name: string; content: string }
 
 /** tauri-specta globals **/
 
-import { Channel as TAURI_CHANNEL, invoke as TAURI_INVOKE } from "@tauri-apps/api/core";
+import {
+	invoke as TAURI_INVOKE,
+	Channel as TAURI_CHANNEL,
+} from "@tauri-apps/api/core";
 import * as TAURI_API_EVENT from "@tauri-apps/api/event";
-import type { WebviewWindow as __WebviewWindow__ } from "@tauri-apps/api/webviewWindow";
+import { type WebviewWindow as __WebviewWindow__ } from "@tauri-apps/api/webviewWindow";
 
 type __EventObj__<T> = {
-  listen: (cb: TAURI_API_EVENT.EventCallback<T>) => ReturnType<typeof TAURI_API_EVENT.listen<T>>;
-  once: (cb: TAURI_API_EVENT.EventCallback<T>) => ReturnType<typeof TAURI_API_EVENT.once<T>>;
-  emit: null extends T
-    ? (payload?: T) => ReturnType<typeof TAURI_API_EVENT.emit>
-    : (payload: T) => ReturnType<typeof TAURI_API_EVENT.emit>;
+	listen: (
+		cb: TAURI_API_EVENT.EventCallback<T>,
+	) => ReturnType<typeof TAURI_API_EVENT.listen<T>>;
+	once: (
+		cb: TAURI_API_EVENT.EventCallback<T>,
+	) => ReturnType<typeof TAURI_API_EVENT.once<T>>;
+	emit: null extends T
+		? (payload?: T) => ReturnType<typeof TAURI_API_EVENT.emit>
+		: (payload: T) => ReturnType<typeof TAURI_API_EVENT.emit>;
 };
 
-export type Result<T, E> = { status: "ok"; data: T } | { status: "error"; error: E };
+export type Result<T, E> =
+	| { status: "ok"; data: T }
+	| { status: "error"; error: E };
 
-function __makeEvents__<T extends Record<string, any>>(mappings: Record<keyof T, string>) {
-  return new Proxy(
-    {} as unknown as {
-      [K in keyof T]: __EventObj__<T[K]> & ((handle: __WebviewWindow__) => __EventObj__<T[K]>);
-    },
-    {
-      get: (_, event) => {
-        const name = mappings[event as keyof T];
+function __makeEvents__<T extends Record<string, any>>(
+	mappings: Record<keyof T, string>,
+) {
+	return new Proxy(
+		{} as unknown as {
+			[K in keyof T]: __EventObj__<T[K]> & {
+				(handle: __WebviewWindow__): __EventObj__<T[K]>;
+			};
+		},
+		{
+			get: (_, event) => {
+				const name = mappings[event as keyof T];
 
-        return new Proxy((() => {}) as any, {
-          apply: (_, __, [window]: [__WebviewWindow__]) => ({
-            listen: (arg: any) => window.listen(name, arg),
-            once: (arg: any) => window.once(name, arg),
-            emit: (arg: any) => window.emit(name, arg),
-          }),
-          get: (_, command: keyof __EventObj__<any>) => {
-            switch (command) {
-              case "listen":
-                return (arg: any) => TAURI_API_EVENT.listen(name, arg);
-              case "once":
-                return (arg: any) => TAURI_API_EVENT.once(name, arg);
-              case "emit":
-                return (arg: any) => TAURI_API_EVENT.emit(name, arg);
-            }
-          },
-        });
-      },
-    },
-  );
+				return new Proxy((() => {}) as any, {
+					apply: (_, __, [window]: [__WebviewWindow__]) => ({
+						listen: (arg: any) => window.listen(name, arg),
+						once: (arg: any) => window.once(name, arg),
+						emit: (arg: any) => window.emit(name, arg),
+					}),
+					get: (_, command: keyof __EventObj__<any>) => {
+						switch (command) {
+							case "listen":
+								return (arg: any) => TAURI_API_EVENT.listen(name, arg);
+							case "once":
+								return (arg: any) => TAURI_API_EVENT.once(name, arg);
+							case "emit":
+								return (arg: any) => TAURI_API_EVENT.emit(name, arg);
+						}
+					},
+				});
+			},
+		},
+	);
 }
