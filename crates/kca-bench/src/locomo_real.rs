@@ -316,31 +316,51 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
         );
         let ctx = ReplayContext::new().await?;
 
-        // T1.1 — per-turn ingest. When KCA_PER_TURN_INGEST=1, send each
-        // turn as its own chat_complete call so the extraction handler
-        // sees small dialog units instead of a 2-4KB session blob.
-        // Mirrors how Letta-style agents see incoming messages and gives
-        // the LLM extractor better signal-to-noise on long-history data.
-        // Cost: ~15× LLM extraction calls per conversation.
-        let per_turn = matches!(
-            std::env::var("KCA_PER_TURN_INGEST").ok().as_deref(),
-            Some("1") | Some("true") | Some("yes")
-        );
+        // T1.1 — chunked-turn ingest. When KCA_PER_TURN_INGEST is set
+        // to a positive integer N, group turns into windows of N and
+        // send each window as one chat_complete call. N=1 → strict per
+        // turn (190 calls/conv, very slow); N=5 → 38 calls/conv (~3×
+        // baseline cost, feasible for bench); the original blob path
+        // is N=0 (unset / default).
+        //
+        // Smaller windows give the LLM extractor cleaner dialog units;
+        // larger windows preserve cross-turn coreference.
+        let per_turn_window: usize = std::env::var("KCA_PER_TURN_INGEST")
+            .ok()
+            .and_then(|s| s.parse::<usize>().ok())
+            .filter(|&n| n > 0)
+            .or_else(|| {
+                // Backwards-compat: KCA_PER_TURN_INGEST=1/true/yes → N=1
+                if matches!(
+                    std::env::var("KCA_PER_TURN_INGEST").ok().as_deref(),
+                    Some("true") | Some("yes")
+                ) {
+                    Some(1)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0);
 
         for (idx, dt, turns) in conv.ordered_sessions() {
             let session_key = common::SessionKey::from_parts("locomo-real", &conv.sample_id);
-            if per_turn {
+            if per_turn_window > 0 {
                 let header = match &dt {
                     Some(dt) => format!("[Session {idx} — {dt}]"),
                     None => format!("[Session {idx}]"),
                 };
-                for t in &turns {
-                    let payload = format!("{header}\n{}: {}", t.speaker, t.text);
+                for chunk in turns.chunks(per_turn_window) {
+                    let mut payload = format!("{header}\n");
+                    for t in chunk {
+                        payload.push_str(&format!("{}: {}\n", t.speaker, t.text));
+                    }
                     report.total_input_chars += payload.len() as u64;
                     let reply = ctx.chat_complete(payload, session_key.to_string()).await?;
                     report.total_output_chars += reply.len() as u64;
-                    ctx.await_cognitive_idle().await;
                 }
+                // Single idle-wait per session — extraction completes
+                // in background while subsequent windows enqueue.
+                ctx.await_cognitive_idle().await;
             } else {
                 // Default: one bulk message per session
                 let mut blob = String::new();
