@@ -7,3 +7,4 @@ pub mod resume_handler;
 pub mod sessions_handler;
 pub mod skills_handler;
 pub mod status_handler;
+pub mod thread_handler;
