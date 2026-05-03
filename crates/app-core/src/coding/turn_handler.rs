@@ -66,6 +66,7 @@ impl AppCore {
         let agent = self.agent.clone();
         let active_streams = self.active_streams.clone();
         let thread_events = self.thread_events.clone();
+        let cost_events = self.cost_events.clone();
         let thread_id_owned = thread_id.to_string();
         let turn_id_clone = turn_id.clone();
         let text_owned = text.to_string();
@@ -88,6 +89,7 @@ impl AppCore {
                     // Bridge AgentEvent → ThreadEvent
                     let mut event_rx = handle.event_rx;
                     let broker = thread_events.clone();
+                    let cost_broker = cost_events.clone();
                     let tid = thread_id_owned.clone();
                     let tuid_bridge = turn_id_clone.clone();
 
@@ -221,6 +223,23 @@ impl AppCore {
                                         turn_id: tuid_bridge.clone(),
                                         path,
                                         change,
+                                    });
+                                }
+                                agent::AgentEvent::UsageReport {
+                                    model,
+                                    prompt_tokens,
+                                    completion_tokens,
+                                    estimated_cost_usd,
+                                    ..
+                                } => {
+                                    cost_broker.publish(desktop_shared::coding::CostUpdate {
+                                        thread_id: Some(tid.clone()),
+                                        provider: model,
+                                        prompt_tokens_delta: prompt_tokens as u64,
+                                        completion_tokens_delta: completion_tokens as u64,
+                                        usd_delta: estimated_cost_usd,
+                                        thread_total_usd: None,
+                                        ceiling_breached: false,
                                     });
                                 }
                                 _ => {

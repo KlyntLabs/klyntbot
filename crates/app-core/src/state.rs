@@ -197,6 +197,8 @@ pub struct AppCore {
     // ── Phase 4: Coding thread events ─────────────────────────────────
     /// Typed broker for ThreadEvent — publish from agent loop, subscribe from Tauri adapter.
     pub thread_events: bus::TypedBroker<desktop_shared::coding::ThreadEvent>,
+    /// Typed broker for CostUpdate — publish after each provider call.
+    pub cost_events: bus::TypedBroker<desktop_shared::coding::CostUpdate>,
     /// Active thread subscriptions keyed by subscription_id.
     pub thread_subscriptions: Arc<dashmap::DashMap<String, ThreadSubscription>>,
 }

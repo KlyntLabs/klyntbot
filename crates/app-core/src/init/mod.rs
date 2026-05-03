@@ -1242,6 +1242,7 @@ impl AppCore {
                 storage_pool.clone(),
             ))),
             thread_events: bus::TypedBroker::new(1024),
+            cost_events: bus::TypedBroker::new(1024),
             thread_subscriptions: Arc::new(dashmap::DashMap::new()),
         };
 
