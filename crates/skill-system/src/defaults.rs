@@ -130,5 +130,24 @@ pub fn compiled_skill_defaults() -> HashMap<String, Vec<(&'static str, &'static 
         ],
     );
 
+    // ── coding-orchestrator ─────────────────────────────────────────────────
+    map.insert(
+        "coding-orchestrator".to_string(),
+        vec![
+            (
+                "SKILL.md",
+                include_str!("../../../skills/coding-orchestrator/SKILL.md"),
+            ),
+            (
+                "references/tool-usage.md",
+                include_str!("../../../skills/coding-orchestrator/references/tool-usage.md"),
+            ),
+            (
+                "references/approval-policy.md",
+                include_str!("../../../skills/coding-orchestrator/references/approval-policy.md"),
+            ),
+        ],
+    );
+
     map
 }

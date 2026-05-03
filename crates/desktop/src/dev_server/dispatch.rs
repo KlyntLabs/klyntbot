@@ -54,6 +54,18 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::workspace_files::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::coding_review::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::coding_mcp::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::coding_thread_metadata::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::providers::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::tasks::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }

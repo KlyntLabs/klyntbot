@@ -1,27 +1,21 @@
 import { useEffect, useState } from "react";
-
-type ProviderListItem = {
-  id: string;
-  displayName: string;
-  hasApiKey: boolean;
-  defaultModel: string | null;
-};
+import type { ProviderListItem, ProviderStatusResult } from "@/api/endpoints/providers";
 
 export function ProvidersSubsection() {
   const [providers, setProviders] = useState<ProviderListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
-  const [testResult, setTestResult] = useState<Record<string, { ok: boolean; message: string }>>({});
+  const [testResult, setTestResult] = useState<Record<string, ProviderStatusResult>>({});
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const { providersList } = await import("@/api/endpoints/providers");
-        const list = await providersList();
+        const result = await providersList();
         if (mounted) {
-          setProviders(list);
+          setProviders(result.providers);
           setLoading(false);
         }
       } catch (e) {
@@ -38,7 +32,6 @@ export function ProvidersSubsection() {
 
   const handleTest = async (providerId: string) => {
     setTestingId(providerId);
-    setTestResult((prev) => ({ ...prev, [providerId]: undefined as never }));
     try {
       const { providerStatus } = await import("@/api/endpoints/providers");
       const result = await providerStatus(providerId);
@@ -46,7 +39,7 @@ export function ProvidersSubsection() {
     } catch (e) {
       setTestResult((prev) => ({
         ...prev,
-        [providerId]: { ok: false, message: e instanceof Error ? e.message : "Test failed" },
+        [providerId]: { id: providerId, available: false, error: e instanceof Error ? e.message : "Test failed" },
       }));
     } finally {
       setTestingId(null);
@@ -71,7 +64,7 @@ export function ProvidersSubsection() {
           {providers.map((p) => (
             <li key={p.id} className="providers-subsection__item">
               <div className="providers-subsection__item-info">
-                <span className="providers-subsection__name">{p.displayName}</span>
+                <span className="providers-subsection__name">{p.name}</span>
                 <span className="providers-subsection__status">
                   {p.hasApiKey ? "✓ API key set" : "✗ No API key"}
                 </span>
@@ -90,9 +83,9 @@ export function ProvidersSubsection() {
                 </button>
                 {testResult[p.id] && (
                   <span
-                    className={`providers-subsection__test-result ${testResult[p.id].ok ? "success" : "error"}`}
+                    className={`providers-subsection__test-result ${testResult[p.id].available ? "success" : "error"}`}
                   >
-                    {testResult[p.id].message}
+                    {testResult[p.id].available ? "OK" : testResult[p.id].error}
                   </span>
                 )}
               </div>
