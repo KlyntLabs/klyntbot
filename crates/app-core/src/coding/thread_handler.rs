@@ -38,8 +38,17 @@ impl AppCore {
         // 4. Resolve sandbox profile
         let sandbox = resolve_sandbox();
 
-        // 5. Walk AGENTS.md (populated in Track 4)
-        let instruction_sources: Vec<InstructionSource> = vec![];
+        // 5. Walk AGENTS.md from workspace path
+        let workspace_path = std::path::Path::new(&ws.path);
+        let agents_sources = coding_agents_md::walk_agents_md(workspace_path);
+        let instruction_sources: Vec<InstructionSource> = agents_sources
+            .iter()
+            .map(|s| InstructionSource {
+                path: s.path.to_string_lossy().into_owned(),
+                bytes: s.contents.len() as u64,
+                is_global: false,
+            })
+            .collect();
 
         // 6. Allocate session
         let session_key = format!("coding:{}", uuid::Uuid::new_v4());
@@ -65,6 +74,25 @@ impl AppCore {
             .set_ephemeral(&session_key, ephemeral)
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+
+        // 7. Inject AGENTS.md bundle as synthetic user message
+        if !agents_sources.is_empty() {
+            let bundle = coding_agents_md::format_agents_md_bundle(&agents_sources);
+            let agents_msg_id = uuid::Uuid::new_v4();
+            let agents_parts = vec![MessagePart::Text { text: bundle }];
+            self.repos
+                .sessions
+                .add_message_with_parts(
+                    &session_key,
+                    agents_msg_id,
+                    "user",
+                    &agents_parts,
+                    None,
+                    None,
+                )
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        }
 
         let now = jiff::Timestamp::now().as_millisecond();
 
