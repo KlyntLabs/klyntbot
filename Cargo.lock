@@ -2546,6 +2546,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "coding-agents-md"
+version = "0.1.1"
+dependencies = [
+ "jiff",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
 name = "coding-ingest"
 version = "0.1.1"
 dependencies = [

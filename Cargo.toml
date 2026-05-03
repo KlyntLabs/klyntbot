@@ -61,6 +61,7 @@ members = [
     "crates/klynt-truncation",
     "crates/klynt-git-utils",
     "crates/lsp-client",
+    "crates/coding-agents-md",
 ]
 
 [workspace.package]
