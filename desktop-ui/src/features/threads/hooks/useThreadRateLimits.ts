@@ -46,11 +46,11 @@ export function useThreadRateLimits({
           label: "account/rateLimits/read response",
           payload: response,
         });
+        const r = response as Record<string, unknown> | null | undefined;
+        const result = (r?.result as Record<string, unknown> | undefined) ?? r;
         const rateLimits =
-          (response?.result?.rateLimits as Record<string, unknown> | undefined) ??
-          (response?.result?.rate_limits as Record<string, unknown> | undefined) ??
-          (response?.rateLimits as Record<string, unknown> | undefined) ??
-          (response?.rate_limits as Record<string, unknown> | undefined);
+          (result?.rateLimits as Record<string, unknown> | undefined) ??
+          (result?.rate_limits as Record<string, unknown> | undefined);
         if (rateLimits) {
           const previousRateLimits = getCurrentRateLimitsRef.current?.(targetId) ?? null;
           dispatch({

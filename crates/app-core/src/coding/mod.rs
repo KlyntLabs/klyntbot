@@ -1,3 +1,4 @@
+pub mod app_icon_handler;
 pub mod approval_handler;
 pub mod chat_send_routing;
 pub mod doctor_handler;

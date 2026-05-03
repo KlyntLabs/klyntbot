@@ -34,17 +34,17 @@ async function normalizeImagesForRpc(images?: string[]): Promise<string[] | null
 }
 
 export async function startThread(workspaceId: string) {
-  return invoke<any>("coding_thread_start", { workspaceId, model: null, approvalPolicy: null, ephemeral: false });
+  return invoke<Record<string, unknown>>("coding_thread_start", { workspaceId, model: null, approvalPolicy: null, ephemeral: false });
 }
 
 export async function forkThread(workspaceId: string, threadId: string) {
   void workspaceId;
-  return invoke<any>("coding_thread_fork", { threadId, fromMessageId: null });
+  return invoke<Record<string, unknown>>("coding_thread_fork", { threadId, fromMessageId: null });
 }
 
 export async function compactThread(workspaceId: string, threadId: string) {
   void workspaceId;
-  return invoke<any>("coding_thread_compact", { threadId });
+  return invoke<Record<string, unknown>>("coding_thread_compact", { threadId });
 }
 
 export async function sendUserMessage(
@@ -144,7 +144,7 @@ export async function listThreads(
   limit?: number | null,
   sortKey?: "created_at" | "updated_at" | null,
 ) {
-  return invoke<any>("coding_thread_list", { workspaceId, cursor, limit, sortKey });
+  return invoke<Record<string, unknown>>("coding_thread_list", { workspaceId, cursor, limit, sortKey });
 }
 
 export async function listMcpServerStatus(
@@ -152,37 +152,37 @@ export async function listMcpServerStatus(
   cursor?: string | null,
   limit?: number | null,
 ) {
-  return invoke<any>("list_mcp_server_status", { workspaceId, cursor, limit });
+  return invoke<Record<string, unknown>>("list_mcp_server_status", { workspaceId, cursor, limit });
 }
 
 export async function resumeThread(workspaceId: string, threadId: string) {
   void workspaceId;
-  return invoke<any>("coding_thread_resume", { threadId, includeItems: true });
+  return invoke<Record<string, unknown>>("coding_thread_resume", { threadId, includeItems: true });
 }
 
 export async function readThread(workspaceId: string, threadId: string) {
   void workspaceId;
-  return invoke<any>("coding_thread_read", { threadId, cursor: null, limit: null });
+  return invoke<Record<string, unknown>>("coding_thread_read", { threadId, cursor: null, limit: null });
 }
 
 export async function threadLiveSubscribe(workspaceId: string, threadId: string) {
   void workspaceId;
-  return invoke<any>("coding_thread_subscribe", { threadId });
+  return invoke<Record<string, unknown>>("coding_thread_subscribe", { threadId });
 }
 
 export async function threadLiveUnsubscribe(workspaceId: string, threadId: string) {
   void workspaceId;
-  return invoke<any>("coding_thread_unsubscribe", { subscriptionId: threadId });
+  return invoke<Record<string, unknown>>("coding_thread_unsubscribe", { subscriptionId: threadId });
 }
 
 export async function archiveThread(workspaceId: string, threadId: string) {
   void workspaceId;
-  return invoke<any>("coding_thread_archive", { threadId });
+  return invoke<Record<string, unknown>>("coding_thread_archive", { threadId });
 }
 
 export async function setThreadName(workspaceId: string, threadId: string, name: string) {
   void workspaceId;
-  return invoke<any>("coding_thread_set_name", { threadId, name });
+  return invoke<Record<string, unknown>>("coding_thread_set_name", { threadId, name });
 }
 
 export async function setTrayRecentThreads(entries: TrayRecentThreadEntry[]) {
@@ -201,11 +201,11 @@ export async function generateRunMetadata(workspaceId: string, prompt: string) {
 }
 
 export async function getAccountRateLimits(workspaceId: string) {
-  return invoke<any>("account_rate_limits", { workspaceId });
+  return invoke<Record<string, unknown>>("account_rate_limits", { workspaceId });
 }
 
 export async function getAccountInfo(workspaceId: string) {
-  return invoke<any>("account_read", { workspaceId });
+  return invoke<Record<string, unknown>>("account_read", { workspaceId });
 }
 
 export async function runCodexLogin(workspaceId: string) {

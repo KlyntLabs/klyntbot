@@ -174,7 +174,7 @@ pub async fn run_for_test(
                 mirror_min_approvals,
                 mirror_cooldown_seconds,
                 now_unix: jiff::Timestamp::now().as_second(),
-                thread_id: None,
+                thread_id: Some(session_id.clone()),
                 turn_id: None,
             };
             let approval = evaluate(guard_ctx, "web_fetch", &args.url).await;

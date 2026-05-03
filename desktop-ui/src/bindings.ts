@@ -55,6 +55,14 @@ async agentDeleteFile(agentName: string, filename: string) : Promise<Result<bool
     else return { status: "error", error: e  as any };
 }
 },
+async appIconRead(appName: string) : Promise<Result<string | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("app_icon_read", { appName }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async approvalRespond(approvalId: string, decision: ApprovalDecisionDto) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("approval_respond", { approvalId, decision }) };

@@ -11,6 +11,7 @@ metadata:
   klyntbot:
     type: orchestrator
     tools: [bash, read, write, edit, apply_patch, glob, grep, recall_turns, enter_plan_mode, exit_plan_mode, ask_user, skill_reference]
+    mcp_tools: ["*"]
     can_delegate_to: []
     max_iterations: 20
     always_skills: []

@@ -6,7 +6,9 @@ use std::path::PathBuf;
 fn resolves_relative_path_under_cwd() {
     let cwd = PathBuf::from("/tmp");
     let r = resolve_under_cwd("foo.txt", &cwd, &PrivacyGuard::from_globs(&[]).unwrap()).unwrap();
-    assert_eq!(r, PathBuf::from("/tmp/foo.txt"));
+    // /tmp may symlink to /private/tmp on macOS; assert against canonical cwd.
+    let expected = cwd.canonicalize().unwrap_or(cwd).join("foo.txt");
+    assert_eq!(r, expected);
 }
 
 #[test]
@@ -27,11 +29,13 @@ fn rejects_privacy_excluded_path() {
 fn expands_tilde() {
     // Just verify it doesn't error; actual home expansion depends on $HOME env.
     std::env::set_var("HOME", "/tmp");
+    let cwd = PathBuf::from("/tmp");
     let r = resolve_under_cwd(
         "~/sub/file.txt",
-        &PathBuf::from("/tmp"),
+        &cwd,
         &PrivacyGuard::from_globs(&[]).unwrap(),
     )
     .unwrap();
-    assert_eq!(r, PathBuf::from("/tmp/sub/file.txt"));
+    let expected = cwd.canonicalize().unwrap_or(cwd).join("sub/file.txt");
+    assert_eq!(r, expected);
 }

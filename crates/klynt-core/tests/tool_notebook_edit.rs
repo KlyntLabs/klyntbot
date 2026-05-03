@@ -22,7 +22,7 @@ async fn replaces_cell_source() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("nb.ipynb"), NB).unwrap();
     let perms = CodingPermissions {
-        allow: vec!["NotebookEdit(./**)".into()],
+        allow: vec!["NotebookEdit(**)".into()],
         ..Default::default()
     };
     let l1 = Arc::new(Layer1::compile(&perms).unwrap());
@@ -70,7 +70,7 @@ async fn rejects_out_of_range_index() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("nb.ipynb"), NB).unwrap();
     let perms = CodingPermissions {
-        allow: vec!["NotebookEdit(./**)".into()],
+        allow: vec!["NotebookEdit(**)".into()],
         ..Default::default()
     };
     let l1 = Arc::new(Layer1::compile(&perms).unwrap());

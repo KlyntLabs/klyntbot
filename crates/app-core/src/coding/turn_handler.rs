@@ -62,11 +62,43 @@ impl AppCore {
             started_at,
         });
 
-        // 4. Spawn agent task via process_direct_streaming
+        // 4. Register a steer receiver for this turn and spawn a drain task
+        // that persists each pushed steer as a synthetic user message in the
+        // session — the next iteration's prompt assembly will pick it up.
+        let steer_rx = self.steer_queue.register_turn(&turn_id);
+        {
+            let repos_drain = self.repos.clone();
+            let thread_id_drain = thread_id.to_string();
+            let turn_id_drain = turn_id.clone();
+            tokio::spawn(async move {
+                let mut rx = steer_rx;
+                while let Some(text) = rx.recv().await {
+                    let msg_id = uuid::Uuid::new_v4();
+                    let parts = vec![MessagePart::Text { text }];
+                    if let Err(e) = repos_drain
+                        .sessions
+                        .add_message_with_parts(
+                            &thread_id_drain,
+                            msg_id,
+                            "user",
+                            &parts,
+                            Some(&turn_id_drain),
+                            None,
+                        )
+                        .await
+                    {
+                        tracing::error!("steer persist failed for turn {turn_id_drain}: {e}");
+                    }
+                }
+            });
+        }
+
+        // 5. Spawn agent task via process_direct_streaming
         let agent = self.agent.clone();
         let active_streams = self.active_streams.clone();
         let thread_events = self.thread_events.clone();
         let cost_events = self.cost_events.clone();
+        let steer_queue = self.steer_queue.clone();
         let thread_id_owned = thread_id.to_string();
         let turn_id_clone = turn_id.clone();
         let text_owned = text.to_string();
@@ -271,11 +303,13 @@ impl AppCore {
                         duration_ms,
                     });
 
-                    // Clean up active stream
+                    // Clean up active stream + steer queue (closes drain task)
                     active_streams.remove(&turn_id_clone);
+                    steer_queue.unregister_turn(&turn_id_clone);
                 }
                 Err(e) => {
                     tracing::error!("coding turn failed to start: {e}");
+                    steer_queue.unregister_turn(&turn_id_clone);
                     let completed_at = jiff::Timestamp::now().as_millisecond();
                     thread_events.publish(ThreadEvent::TurnCompleted {
                         thread_id: thread_id_owned,
@@ -316,6 +350,11 @@ impl AppCore {
     }
 
     /// Steer an active coding turn — inject a mid-turn user correction.
+    ///
+    /// Pushes the text onto the per-turn `SteerQueue`. The turn handler's
+    /// drain task picks it up between iterations and persists it as a
+    /// synthetic user message in the session — the next iteration's prompt
+    /// assembly then includes it. Errors if the turn isn't active.
     #[tracing::instrument(skip(self), err)]
     pub async fn coding_turn_steer(
         &self,
@@ -323,14 +362,7 @@ impl AppCore {
         turn_id: &str,
         text: &str,
     ) -> Result<()> {
-        // The SteerQueue is registered per-turn; push text into it.
-        // If the turn isn't active or no SteerQueue is registered, return error.
-        // For now, we store steer messages as a synthetic user message in the session.
-        // Full SteerQueue wiring with LiveContextRefresher is a future enhancement.
-        let _ = (turn_id, text);
-        Err(common::KlyntbotError::StorageNotFound(
-            "steer not yet wired to execution loop".into(),
-        ))
+        self.steer_queue.push(turn_id, text.to_string())
     }
 }
 

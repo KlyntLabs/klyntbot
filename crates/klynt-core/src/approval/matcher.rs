@@ -35,10 +35,19 @@ impl CompiledRules {
         Ok(Self { sets })
     }
     pub fn find_match(&self, tool: &str, payload: &str) -> Option<String> {
-        let (set, raws) = self.sets.get(&tool.to_lowercase())?;
+        let (set, raws) = self.sets.get(&normalize_tool(tool))?;
         let m: Vec<usize> = set.matches(payload);
         m.first().map(|&i| raws[i].clone())
     }
+}
+
+/// Normalize a tool name for matcher lookup so that `ApplyPatch`, `apply_patch`,
+/// and `applypatch` all hash to the same bucket.
+fn normalize_tool(s: &str) -> String {
+    s.chars()
+        .filter(|c| !matches!(c, '_' | '-'))
+        .flat_map(|c| c.to_lowercase())
+        .collect()
 }
 
 fn parse_rule(rule: &str) -> Result<(String, String), MatcherError> {
@@ -49,7 +58,7 @@ fn parse_rule(rule: &str) -> Result<(String, String), MatcherError> {
         return Err(MatcherError::BadShape(rule.into()));
     }
     Ok((
-        rule[..open].trim().to_lowercase(),
+        normalize_tool(rule[..open].trim()),
         rule[open + 1..rule.len() - 1].to_string(),
     ))
 }

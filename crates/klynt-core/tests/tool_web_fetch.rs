@@ -11,15 +11,12 @@ use tokio_util::sync::CancellationToken;
 
 #[tokio::test]
 async fn fetches_text_from_local_server() {
-    use std::net::TcpListener;
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    // Bind in the main task before spawning so there's no port-reuse race
+    // between drop() + rebind() in the spawn that produced flaky failures.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
-    drop(listener);
 
     let server = tokio::spawn(async move {
-        let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
-            .await
-            .unwrap();
         let (mut s, _) = listener.accept().await.unwrap();
         let mut buf = [0u8; 1024];
         let _ = tokio::io::AsyncReadExt::read(&mut s, &mut buf).await;

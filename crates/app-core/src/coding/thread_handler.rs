@@ -38,9 +38,9 @@ impl AppCore {
         // 4. Resolve sandbox profile
         let sandbox = resolve_sandbox();
 
-        // 5. Walk AGENTS.md from workspace path
         let workspace_path = std::path::Path::new(&ws.path);
-        let agents_sources = coding_agents_md::walk_agents_md(workspace_path);
+        let agents_walker = coding_agents_md::WorkspaceAgentsSource::new(workspace_path.into());
+        let agents_sources = agents_walker.walk();
         let instruction_sources: Vec<InstructionSource> = agents_sources
             .iter()
             .map(|s| InstructionSource {

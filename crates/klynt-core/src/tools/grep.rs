@@ -121,8 +121,9 @@ impl ToolExecute for GrepTool {
                             for j in lo..hi {
                                 let marker = if j == i { ":" } else { "-" };
                                 out.push(format!(
-                                    "{}:{}{}:{}",
+                                    "{}{}{}{}{}",
                                     rel.display(),
+                                    marker,
                                     j + 1,
                                     marker,
                                     file_lines[j]

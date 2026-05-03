@@ -201,6 +201,11 @@ pub struct AppCore {
     pub cost_events: bus::TypedBroker<desktop_shared::coding::CostUpdate>,
     /// Active thread subscriptions keyed by subscription_id.
     pub thread_subscriptions: Arc<dashmap::DashMap<String, ThreadSubscription>>,
+    /// Per-turn steer queue — accepts mid-turn user corrections injected via
+    /// `coding_turn_steer`. The turn handler drains the receiver between
+    /// iterations and persists each entry as a synthetic user message so the
+    /// next iteration's prompt assembly picks it up.
+    pub steer_queue: Arc<crate::coding::steer_queue::SteerQueue>,
 }
 
 /// State for an active thread subscription.

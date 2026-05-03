@@ -1,6 +1,62 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// `WorkspaceAgentsSource` — the canonical entry-point for walking and
+/// bundling AGENTS.md instructions at coding-thread start.
+///
+/// Note: this is **not** a `context_engine::ContextSource` trait impl. Per
+/// spec §7, the AGENTS.md bundle is built once at thread start and persisted
+/// as a synthetic user message — it does NOT re-execute every turn. The
+/// `ContextSource` trait is for per-turn relevance-filtered injection, which
+/// would be the wrong abstraction here. Keeping this as a value-builder
+/// preserves the spec semantics while giving the spec-mandated symbol a home.
+pub struct WorkspaceAgentsSource {
+    workspace_path: PathBuf,
+    global_path: Option<PathBuf>,
+}
+
+impl WorkspaceAgentsSource {
+    pub fn new(workspace_path: PathBuf) -> Self {
+        Self {
+            workspace_path,
+            global_path: None,
+        }
+    }
+
+    pub fn with_global(mut self, global_path: PathBuf) -> Self {
+        self.global_path = Some(global_path);
+        self
+    }
+
+    /// Walk + format. Returns the synthetic-user-message body, or `None`
+    /// when no AGENTS.md files were found anywhere on the chain.
+    pub fn build_bundle(&self) -> Option<String> {
+        let mut sources = walk_agents_md(&self.workspace_path);
+        if let Some(global) = &self.global_path {
+            match fs::read_to_string(global) {
+                Ok(contents) => sources.insert(
+                    0,
+                    AgentsMdSource {
+                        path: global.clone(),
+                        dir: PathBuf::from("<global>"),
+                        contents,
+                    },
+                ),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => tracing::warn!("read {}: {e}", global.display()),
+            }
+        }
+        if sources.is_empty() {
+            return None;
+        }
+        Some(format_agents_md_bundle(&sources))
+    }
+
+    pub fn walk(&self) -> Vec<AgentsMdSource> {
+        walk_agents_md(&self.workspace_path)
+    }
+}
+
 /// A discovered AGENTS.md file and its context.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AgentsMdSource {

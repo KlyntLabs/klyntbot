@@ -1244,6 +1244,7 @@ impl AppCore {
             thread_events: bus::TypedBroker::new(1024),
             cost_events: bus::TypedBroker::new(1024),
             thread_subscriptions: Arc::new(dashmap::DashMap::new()),
+            steer_queue: Arc::new(crate::coding::steer_queue::SteerQueue::new()),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────

@@ -141,7 +141,16 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
             min_approvals: ctx.mirror_min_approvals,
             cooldown_seconds: ctx.mirror_cooldown_seconds,
         };
-        let args_json = ctx.args.as_ref().map(|v| v.to_string()).unwrap_or_default();
+        // Hash from `ctx.args` when present (structured); otherwise fall back to
+        // the raw `payload` we're evaluating so call-sites that don't populate
+        // `ctx.args` (e.g. unit tests, simple bash gates) still hash the same
+        // shape that record() uses.
+        let args_json = ctx
+            .args
+            .as_ref()
+            .map(|v| v.to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| payload.to_string());
         let hash = crate::approval::layer3::args_hash_for_relevance(tool, &args_json);
         let summary = repo
             .summary(tool, &hash, &ctx.repo_id)

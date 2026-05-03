@@ -13,9 +13,9 @@ use tools_core::events::ToolEvent;
 fn allow_all_perms() -> CodingPermissions {
     CodingPermissions {
         allow: vec![
-            "Write(./**)".into(),
-            "Edit(./**)".into(),
-            "ApplyPatch(./**)".into(),
+            "Write(**)".into(),
+            "Edit(**)".into(),
+            "ApplyPatch(**)".into(),
         ],
         ..Default::default()
     }
