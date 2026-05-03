@@ -73,6 +73,21 @@ export function ApprovalCard({ item, onRespond }: Props) {
           </>
         )}
       </dl>
+      {item.layerDecisions && (
+        <details className="approval-card__why">
+          <summary>Why am I being asked?</summary>
+          <dl className="approval-card__layer-audit">
+            <dt>Privacy</dt>
+            <dd>{item.layerDecisions.privacy.reason}</dd>
+            <dt>Layer 1 (declarative)</dt>
+            <dd>{item.layerDecisions.layer1.reason}</dd>
+            <dt>Layer 2 (Starlark)</dt>
+            <dd>{item.layerDecisions.layer2.reason}</dd>
+            <dt>Layer 3 (Mirror)</dt>
+            <dd>{item.layerDecisions.layer3.reason}</dd>
+          </dl>
+        </details>
+      )}
       <div className="approval-card__buttons">
         <button type="button" onClick={() => onRespond(item.requestId, { kind: "allow_once" })}>
           Allow once (a)
