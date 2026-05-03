@@ -498,12 +498,18 @@ impl AgentRuntime {
         // ── Phase 2: Execute ─────────────────────────────────────
         let safety_timeout = Duration::from_secs(safety_timeout_secs.max(1));
 
-        // Phase 4 (KCA_PHASE_4=1): clone messages before move so we can
-        // retry once if the response looks like a memory refusal. The
-        // clone is cheap relative to the LLM call and only matters when
-        // the retry actually fires.
+        // Tier 0 (T0.4): the user-nudge retry path was measured to
+        // regress -3.4pp on LoCoMo (n=80) — the "attempt a best-effort
+        // answer / provide concrete details" prompt induces fabrication
+        // when retrieval is genuinely empty. The Tier 2 redesign
+        // (KCA_PHASE_4_TOOL_DRIVEN=1) replaces it with a tool-call
+        // nudge. Both flags must be set to opt in to the legacy path
+        // for A/B testing.
         let phase_4_on = matches!(
             std::env::var("KCA_PHASE_4").ok().as_deref(),
+            Some("1") | Some("true") | Some("yes")
+        ) && matches!(
+            std::env::var("KCA_PHASE_4_LEGACY_NUDGE").ok().as_deref(),
             Some("1") | Some("true") | Some("yes")
         );
         let messages_for_retry: Option<Vec<providers::types::Message>> = if phase_4_on {

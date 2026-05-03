@@ -440,45 +440,40 @@ impl SignalConsumer for IngestionConsumer {
                                             .map(|f| f.object)
                                     })
                                     .or(user_name);
-                                let audd_on = matches!(
-                                    std::env::var("KCA_AUDD").ok().as_deref(),
-                                    Some("1") | Some("true") | Some("yes")
-                                );
                                 let mut written = 0usize;
                                 for ext in &result.extractions {
                                     for f in &ext.facts {
                                         let mut fact = to_semantic_fact(f, &obs);
 
                                         // AUDD (Mem0 pattern): when a
-                                        // resolver is wired AND KCA_AUDD=1,
-                                        // ask it whether to ADD/UPDATE/DELETE/
-                                        // NOOP this candidate vs existing
-                                        // facts on the same (subject,
-                                        // predicate). Default behavior (no
-                                        // resolver / flag off) is the
-                                        // pre-AUDD Add-only path.
+                                        // resolver is wired, ask it whether
+                                        // to ADD/UPDATE/DELETE/NOOP this
+                                        // candidate vs existing facts on
+                                        // the same (subject, predicate).
+                                        // Default-on as of Tier 0 — falls
+                                        // back to Add-only when no resolver
+                                        // is wired (e.g., no cognitive
+                                        // provider).
                                         let mut decision =
                                             crate::services::extraction::ConflictDecision::Add;
-                                        if audd_on {
-                                            if let Some(resolver) = &conflict_resolver {
-                                                let existing = repo
-                                                    .find_by_subject_predicate(
-                                                        &fact.subject,
-                                                        &fact.predicate,
-                                                    )
-                                                    .await
-                                                    .ok()
-                                                    .map(|rows| {
-                                                        rows.into_iter()
-                                                            .filter(|r| r.superseded_at.is_none())
-                                                            .collect::<Vec<_>>()
-                                                    })
-                                                    .unwrap_or_default();
-                                                if !existing.is_empty() {
-                                                    decision = resolver
-                                                        .classify(f, &existing)
-                                                        .await;
-                                                }
+                                        if let Some(resolver) = &conflict_resolver {
+                                            let existing = repo
+                                                .find_by_subject_predicate(
+                                                    &fact.subject,
+                                                    &fact.predicate,
+                                                )
+                                                .await
+                                                .ok()
+                                                .map(|rows| {
+                                                    rows.into_iter()
+                                                        .filter(|r| r.superseded_at.is_none())
+                                                        .collect::<Vec<_>>()
+                                                })
+                                                .unwrap_or_default();
+                                            if !existing.is_empty() {
+                                                decision = resolver
+                                                    .classify(f, &existing)
+                                                    .await;
                                             }
                                         }
                                         match decision {

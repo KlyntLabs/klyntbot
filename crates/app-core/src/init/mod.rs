@@ -663,24 +663,17 @@ impl AppCore {
                     Arc::new(LlmExtractionHandler::new(cp.clone(), params))
                         as Arc<dyn ::cognitive::ExtractionHandler>
                 });
-            // Wire AUDD conflict resolver when KCA_AUDD=1. Resolver is
-            // optional; when absent the consumer's default Add-only path
-            // runs (pre-AUDD behavior). Production callers stay safe by
-            // default.
+            // Tier 0 — AUDD on by default whenever a cognitive provider
+            // is configured. Falls back to Add-only when no provider
+            // exists (e.g., offline). Removes the prior KCA_AUDD env
+            // gate; opt-out is via cognitive provider absence.
             let audd_resolver: Option<
                 Arc<dyn ::cognitive::services::extraction::ConflictResolver>,
-            > = if matches!(
-                std::env::var("KCA_AUDD").ok().as_deref(),
-                Some("1") | Some("true") | Some("yes")
-            ) {
-                cognitive_provider.clone().map(|cp| {
-                    let params = providers::cognitive_chat_params(&config, 1024);
-                    Arc::new(LlmConflictResolver::new(cp, params))
-                        as Arc<dyn ::cognitive::services::extraction::ConflictResolver>
-                })
-            } else {
-                None
-            };
+            > = cognitive_provider.clone().map(|cp| {
+                let params = providers::cognitive_chat_params(&config, 1024);
+                Arc::new(LlmConflictResolver::new(cp, params))
+                    as Arc<dyn ::cognitive::services::extraction::ConflictResolver>
+            });
             let mut ingestion_inner = ::cognitive::consumers::IngestionConsumer::new(
                 observation_repo,
                 entity_repo,

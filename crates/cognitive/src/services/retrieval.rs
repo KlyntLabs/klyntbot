@@ -16,11 +16,43 @@ use crate::repos::{CoActivationRepo, SemanticFactRepo};
 use crate::services::scoring::{self, CommunityCache, KnowledgeDepthCache};
 use crate::types::SemanticFact;
 
-/// Minimum vector results before fallback kicks in.
-const MIN_VECTOR_RESULTS: usize = 3;
-
 /// Default RRF k parameter (shared with tools-core rrf_merge).
 const DEFAULT_RRF_K: f64 = 60.0;
+
+/// Wave-A: reciprocal rank fusion of two ScoredFact lists. Dedupes by
+/// fact id; for facts present in both, RRF scores sum (boost). Score
+/// field is replaced with the RRF score and list is sorted descending.
+fn rrf_merge(a: Vec<ScoredFact>, b: Vec<ScoredFact>) -> Vec<ScoredFact> {
+    let k = DEFAULT_RRF_K;
+    let mut by_id: std::collections::HashMap<String, (ScoredFact, f64)> = Default::default();
+    for (rank, sf) in a.into_iter().enumerate() {
+        let s = 1.0 / (k + (rank + 1) as f64);
+        by_id
+            .entry(sf.fact.id.clone())
+            .and_modify(|v| v.1 += s)
+            .or_insert((sf, s));
+    }
+    for (rank, sf) in b.into_iter().enumerate() {
+        let s = 1.0 / (k + (rank + 1) as f64);
+        by_id
+            .entry(sf.fact.id.clone())
+            .and_modify(|v| v.1 += s)
+            .or_insert((sf, s));
+    }
+    let mut out: Vec<_> = by_id
+        .into_iter()
+        .map(|(_, (mut sf, score))| {
+            sf.score = score;
+            sf
+        })
+        .collect();
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    out
+}
 
 /// A scored retrieval result with optional similarity from vector search.
 #[derive(Debug, Clone)]
@@ -140,19 +172,17 @@ pub async fn retrieve_relevant_facts(
             .search_similar(query, domains, params.vector_top_k, params.min_similarity)
             .await
         {
-            Ok(hits) if hits.len() >= MIN_VECTOR_RESULTS => {
-                crate::bench_hooks::record_hits(hits.len() as u32, 0, 0);
-                vector_path(repo, &hits, params.situational_boost, &weights, depth_cache).await?
-            }
             Ok(hits) => {
                 crate::bench_hooks::record_hits(hits.len() as u32, 0, 0);
-                // Too few vector results — merge with fallback
-                let mut vector_scored =
+                // Wave-A: hybrid RRF merge — always run both vector and
+                // fallback (FTS-anchored) paths and combine via reciprocal
+                // rank fusion. Replaces the prior one-or-other branch
+                // where vector_path silently masked the FTS-primary
+                // signal whenever it returned ≥3 hits.
+                let vector_scored =
                     vector_path(repo, &hits, params.situational_boost, &weights, depth_cache)
                         .await?;
-                let vector_ids: std::collections::HashSet<String> =
-                    vector_scored.iter().map(|s| s.fact.id.clone()).collect();
-                let mut fallback = fallback_path(
+                let fallback_scored = fallback_path(
                     repo,
                     domains,
                     params.situational_boost,
@@ -161,9 +191,7 @@ pub async fn retrieve_relevant_facts(
                     depth_cache,
                 )
                 .await?;
-                fallback.retain(|s| !vector_ids.contains(&s.fact.id));
-                vector_scored.append(&mut fallback);
-                vector_scored
+                rrf_merge(vector_scored, fallback_scored)
             }
             Err(e) => {
                 warn!("Vector search failed, using fallback: {e}");
