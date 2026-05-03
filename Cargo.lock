@@ -389,6 +389,7 @@ dependencies = [
  "base64 0.22.1",
  "bus",
  "channels",
+ "coding-agents-md",
  "coding-ingest",
  "coding-memory",
  "cognitive",

@@ -112,6 +112,8 @@ const menuComposerCycleModelHub = createEventHub<void>("menu-composer-cycle-mode
 const menuComposerCycleAccessHub = createEventHub<void>("menu-composer-cycle-access");
 const menuComposerCycleReasoningHub = createEventHub<void>("menu-composer-cycle-reasoning");
 const menuComposerCycleCollaborationHub = createEventHub<void>("menu-composer-cycle-collaboration");
+const approvalRequestHub = createEventHub<Record<string, unknown>>("agent:approval_request");
+const costUpdateHub = createEventHub<Record<string, unknown>>("agent:cost_update");
 
 export function subscribeAppServerEvents(
   onEvent: (event: AppServerEvent) => void,
@@ -362,4 +364,27 @@ export function subscribeMenuComposerCycleCollaboration(
   return menuComposerCycleCollaborationHub.subscribe(() => {
     onEvent();
   }, options);
+}
+
+export function subscribeApprovalRequest(
+  onEvent: (payload: Record<string, unknown>) => void,
+  options?: SubscriptionOptions,
+): Unsubscribe {
+  return approvalRequestHub.subscribe(onEvent, options);
+}
+
+export function subscribeCostUpdate(
+  onEvent: (payload: Record<string, unknown>) => void,
+  options?: SubscriptionOptions,
+): Unsubscribe {
+  return costUpdateHub.subscribe(onEvent, options);
+}
+
+export function subscribeThreadEvent(
+  subscriptionId: string,
+  onEvent: (payload: Record<string, unknown>) => void,
+  options?: SubscriptionOptions,
+): Unsubscribe {
+  const hub = createEventHub<Record<string, unknown>>(`agent:thread_event#${subscriptionId}`);
+  return hub.subscribe(onEvent, options);
 }

@@ -156,7 +156,7 @@ describe("tauri invoke wrappers", () => {
       defaultPath: "my-plan.md",
       filters: [{ name: "Markdown", extensions: ["md"] }],
     });
-    expect(invokeMock).toHaveBeenCalledWith("write_text_file", {
+    expect(invokeMock).toHaveBeenCalledWith("text_file_write", {
       path: "/tmp/plan.md",
       content: "# Plan",
     });
@@ -249,9 +249,9 @@ describe("tauri invoke wrappers", () => {
 
     await forkThread("ws-9", "thread-9");
 
-    expect(invokeMock).toHaveBeenCalledWith("fork_thread", {
-      workspaceId: "ws-9",
+    expect(invokeMock).toHaveBeenCalledWith("coding_thread_fork", {
       threadId: "thread-9",
+      fromMessageId: null,
     });
   });
 
@@ -261,8 +261,7 @@ describe("tauri invoke wrappers", () => {
 
     await compactThread("ws-10", "thread-10");
 
-    expect(invokeMock).toHaveBeenCalledWith("compact_thread", {
-      workspaceId: "ws-10",
+    expect(invokeMock).toHaveBeenCalledWith("coding_thread_compact", {
       threadId: "thread-10",
     });
   });
@@ -273,8 +272,7 @@ describe("tauri invoke wrappers", () => {
 
     await setThreadName("ws-9", "thread-9", "New Name");
 
-    expect(invokeMock).toHaveBeenCalledWith("set_thread_name", {
-      workspaceId: "ws-9",
+    expect(invokeMock).toHaveBeenCalledWith("coding_thread_set_name", {
       threadId: "thread-9",
       name: "New Name",
     });
@@ -299,7 +297,7 @@ describe("tauri invoke wrappers", () => {
 
     await listThreads("ws-10", "cursor-1", 25, "updated_at");
 
-    expect(invokeMock).toHaveBeenCalledWith("list_threads", {
+    expect(invokeMock).toHaveBeenCalledWith("coding_thread_list", {
       workspaceId: "ws-10",
       cursor: "cursor-1",
       limit: 25,
@@ -313,9 +311,10 @@ describe("tauri invoke wrappers", () => {
 
     await readThread("ws-10", "thread-1");
 
-    expect(invokeMock).toHaveBeenCalledWith("read_thread", {
-      workspaceId: "ws-10",
+    expect(invokeMock).toHaveBeenCalledWith("coding_thread_read", {
       threadId: "thread-1",
+      cursor: null,
+      limit: null,
     });
   });
 
@@ -487,7 +486,7 @@ describe("tauri invoke wrappers", () => {
 
     await readAgentMd("ws-agent");
 
-    expect(invokeMock).toHaveBeenCalledWith("file_read", {
+    expect(invokeMock).toHaveBeenCalledWith("workspace_meta_read", {
       scope: "workspace",
       kind: "agents",
       workspaceId: "ws-agent",
@@ -500,7 +499,7 @@ describe("tauri invoke wrappers", () => {
 
     await writeAgentMd("ws-agent", "# Agent");
 
-    expect(invokeMock).toHaveBeenCalledWith("file_write", {
+    expect(invokeMock).toHaveBeenCalledWith("workspace_meta_write", {
       scope: "workspace",
       kind: "agents",
       workspaceId: "ws-agent",
@@ -514,10 +513,10 @@ describe("tauri invoke wrappers", () => {
 
     await readGlobalAgentsMd();
 
-    expect(invokeMock).toHaveBeenCalledWith("file_read", {
+    expect(invokeMock).toHaveBeenCalledWith("workspace_meta_read", {
       scope: "global",
       kind: "agents",
-      workspaceId: undefined,
+      workspaceId: "",
     });
   });
 
@@ -527,10 +526,10 @@ describe("tauri invoke wrappers", () => {
 
     await writeGlobalAgentsMd("# Global");
 
-    expect(invokeMock).toHaveBeenCalledWith("file_write", {
+    expect(invokeMock).toHaveBeenCalledWith("workspace_meta_write", {
       scope: "global",
       kind: "agents",
-      workspaceId: undefined,
+      workspaceId: "",
       content: "# Global",
     });
   });
@@ -545,10 +544,10 @@ describe("tauri invoke wrappers", () => {
 
     await readGlobalCodexConfigToml();
 
-    expect(invokeMock).toHaveBeenCalledWith("file_read", {
+    expect(invokeMock).toHaveBeenCalledWith("workspace_meta_read", {
       scope: "global",
       kind: "config",
-      workspaceId: undefined,
+      workspaceId: "",
     });
   });
 
@@ -558,10 +557,10 @@ describe("tauri invoke wrappers", () => {
 
     await writeGlobalCodexConfigToml('model = "gpt-5"');
 
-    expect(invokeMock).toHaveBeenCalledWith("file_write", {
+    expect(invokeMock).toHaveBeenCalledWith("workspace_meta_write", {
       scope: "global",
       kind: "config",
-      workspaceId: undefined,
+      workspaceId: "",
       content: 'model = "gpt-5"',
     });
   });
@@ -715,14 +714,10 @@ describe("tauri invoke wrappers", () => {
       images: ["image.png"],
     });
 
-    expect(invokeMock).toHaveBeenLastCalledWith("send_user_message", {
-      workspaceId: "ws-4",
+    expect(invokeMock).toHaveBeenLastCalledWith("coding_message_send", {
       threadId: "thread-1",
       text: "hello",
       model: null,
-      effort: null,
-      accessMode: "full-access",
-      images: ["image.png"],
     });
   });
 
@@ -734,15 +729,10 @@ describe("tauri invoke wrappers", () => {
       serviceTier: null,
     });
 
-    expect(invokeMock).toHaveBeenLastCalledWith("send_user_message", {
-      workspaceId: "ws-4",
+    expect(invokeMock).toHaveBeenLastCalledWith("coding_message_send", {
       threadId: "thread-1",
       text: "hello",
       model: null,
-      effort: null,
-      serviceTier: null,
-      accessMode: null,
-      images: null,
     });
   });
 
@@ -752,7 +742,7 @@ describe("tauri invoke wrappers", () => {
 
     await readImageAsDataUrl("/tmp/image.png");
 
-    expect(invokeMock).toHaveBeenCalledWith("read_image_as_data_url", {
+    expect(invokeMock).toHaveBeenCalledWith("image_data_url", {
       path: "/tmp/image.png",
     });
   });
@@ -779,14 +769,10 @@ describe("tauri invoke wrappers", () => {
       images: ["/tmp/image.png"],
     });
 
-    expect(invokeMock).toHaveBeenLastCalledWith("send_user_message", {
-      workspaceId: "ws-4",
+    expect(invokeMock).toHaveBeenLastCalledWith("coding_message_send", {
       threadId: "thread-1",
       text: "hello",
       model: null,
-      effort: null,
-      accessMode: null,
-      images: ["data:image/png;base64,abc"],
     });
   });
 
@@ -798,15 +784,10 @@ describe("tauri invoke wrappers", () => {
       appMentions: [{ name: "Calendar", path: "app://connector_calendar" }],
     });
 
-    expect(invokeMock).toHaveBeenCalledWith("send_user_message", {
-      workspaceId: "ws-4",
+    expect(invokeMock).toHaveBeenCalledWith("coding_message_send", {
       threadId: "thread-1",
       text: "hello $calendar",
       model: null,
-      effort: null,
-      accessMode: null,
-      images: null,
-      appMentions: [{ name: "Calendar", path: "app://connector_calendar" }],
     });
   });
 
@@ -816,12 +797,10 @@ describe("tauri invoke wrappers", () => {
 
     await steerTurn("ws-4", "thread-1", "turn-2", "continue", ["image.png"]);
 
-    expect(invokeMock).toHaveBeenCalledWith("turn_steer", {
-      workspaceId: "ws-4",
+    expect(invokeMock).toHaveBeenCalledWith("coding_turn_steer", {
       threadId: "thread-1",
       turnId: "turn-2",
       text: "continue",
-      images: ["image.png"],
     });
   });
 
@@ -845,12 +824,10 @@ describe("tauri invoke wrappers", () => {
 
     await steerTurn("ws-4", "thread-1", "turn-2", "continue", ["/tmp/image.jpg"]);
 
-    expect(invokeMock).toHaveBeenCalledWith("turn_steer", {
-      workspaceId: "ws-4",
+    expect(invokeMock).toHaveBeenCalledWith("coding_turn_steer", {
       threadId: "thread-1",
       turnId: "turn-2",
       text: "continue",
-      images: ["data:image/jpeg;base64,xyz"],
     });
   });
 
@@ -876,14 +853,10 @@ describe("tauri invoke wrappers", () => {
       images: ["/private/var/mobile/sample.png"],
     });
 
-    expect(invokeMock).toHaveBeenLastCalledWith("send_user_message", {
-      workspaceId: "ws-4",
+    expect(invokeMock).toHaveBeenLastCalledWith("coding_message_send", {
       threadId: "thread-1",
       text: "hello",
       model: null,
-      effort: null,
-      accessMode: null,
-      images: ["data:image/png;base64,mobile"],
     });
   });
 
@@ -899,7 +872,7 @@ describe("tauri invoke wrappers", () => {
       if (command === "is_mobile_runtime") {
         return false;
       }
-      if (command === "read_image_as_data_url") {
+      if (command === "image_data_url") {
         throw new Error("conversion failed");
       }
       return undefined;
@@ -908,7 +881,7 @@ describe("tauri invoke wrappers", () => {
     await expect(
       sendUserMessage("ws-4", "thread-1", "hello", { images: ["/tmp/image.png"] }),
     ).rejects.toThrow("conversion failed");
-    expect(invokeMock).not.toHaveBeenCalledWith("send_user_message", expect.anything());
+    expect(invokeMock).not.toHaveBeenCalledWith("coding_message_send", expect.anything());
   });
 
   it("omits delivery when starting reviews without override", async () => {
@@ -944,10 +917,9 @@ describe("tauri invoke wrappers", () => {
 
     await respondToServerRequest("ws-6", 101, "accept");
 
-    expect(invokeMock).toHaveBeenCalledWith("respond_to_server_request", {
-      workspaceId: "ws-6",
-      requestId: 101,
-      result: { decision: "accept" },
+    expect(invokeMock).toHaveBeenCalledWith("approval_respond", {
+      approvalId: "101",
+      decision: { kind: "accept" },
     });
   });
 
@@ -959,14 +931,9 @@ describe("tauri invoke wrappers", () => {
       confirm_path: { answers: ["Yes"] },
     });
 
-    expect(invokeMock).toHaveBeenCalledWith("respond_to_server_request", {
-      workspaceId: "ws-7",
-      requestId: 202,
-      result: {
-        answers: {
-          confirm_path: { answers: ["Yes"] },
-        },
-      },
+    expect(invokeMock).toHaveBeenCalledWith("approval_respond", {
+      approvalId: "202",
+      decision: { kind: "accept" },
     });
   });
 
@@ -981,12 +948,9 @@ describe("tauri invoke wrappers", () => {
 
     await respondToUserInputRequest("ws-8", 303, answers);
 
-    expect(invokeMock).toHaveBeenCalledWith("respond_to_server_request", {
-      workspaceId: "ws-8",
-      requestId: 303,
-      result: {
-        answers,
-      },
+    expect(invokeMock).toHaveBeenCalledWith("approval_respond", {
+      approvalId: "303",
+      decision: { kind: "accept" },
     });
   });
 
