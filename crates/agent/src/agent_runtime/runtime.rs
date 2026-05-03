@@ -498,20 +498,29 @@ impl AgentRuntime {
         // ── Phase 2: Execute ─────────────────────────────────────
         let safety_timeout = Duration::from_secs(safety_timeout_secs.max(1));
 
-        // Tier 0 (T0.4): the user-nudge retry path was measured to
-        // regress -3.4pp on LoCoMo (n=80) — the "attempt a best-effort
-        // answer / provide concrete details" prompt induces fabrication
-        // when retrieval is genuinely empty. The Tier 2 redesign
-        // (KCA_PHASE_4_TOOL_DRIVEN=1) replaces it with a tool-call
-        // nudge. Both flags must be set to opt in to the legacy path
-        // for A/B testing.
-        let phase_4_on = matches!(
+        // Tier 2 (T2.1): tool-driven retry. When the first response
+        // signals a memory refusal, re-run execute_loop ONCE with a
+        // system-message nudge instructing the model to call the
+        // memory.search_all tool with named entities. This is the
+        // Letta-style agentic recovery — distinct from the legacy
+        // user-nudge path (T0.4) which induced fabrication.
+        //
+        // Mode selection:
+        //   KCA_PHASE_4_TOOL_DRIVEN=1 → tool-call nudge (Tier 2)
+        //   KCA_PHASE_4=1 + KCA_PHASE_4_LEGACY_NUDGE=1 → legacy nudge (A/B only)
+        //   Default: no retry
+        let phase_4_tool_driven = matches!(
+            std::env::var("KCA_PHASE_4_TOOL_DRIVEN").ok().as_deref(),
+            Some("1") | Some("true") | Some("yes")
+        );
+        let phase_4_legacy = matches!(
             std::env::var("KCA_PHASE_4").ok().as_deref(),
             Some("1") | Some("true") | Some("yes")
         ) && matches!(
             std::env::var("KCA_PHASE_4_LEGACY_NUDGE").ok().as_deref(),
             Some("1") | Some("true") | Some("yes")
         );
+        let phase_4_on = phase_4_tool_driven || phase_4_legacy;
         let messages_for_retry: Option<Vec<providers::types::Message>> = if phase_4_on {
             Some(assembled.messages.clone())
         } else {
@@ -550,14 +559,21 @@ impl AgentRuntime {
                 retry_messages.push(providers::types::Message::assistant(
                     loop_result.content.clone(),
                 ));
-                retry_messages.push(providers::types::Message::user(
+                let nudge = if phase_4_tool_driven {
+                    "Your previous answer signals a retrieval gap. Before answering, \
+                     call the `memory` tool with action=`search_all` and the named \
+                     entities from the user's question (people, places, dates). \
+                     Use the search results to answer. If the search returns nothing \
+                     relevant, say so plainly — do NOT fabricate details."
+                } else {
                     "Re-search the conversation history with broader effort. \
                      Focus on specific named entities, dates, places, and concrete \
                      details that appear in the question. Even if your initial \
                      recall returned nothing, attempt a best-effort answer based on \
                      what is most likely true given the conversation. Provide a \
-                     concrete answer with specific names and details where possible.",
-                ));
+                     concrete answer with specific names and details where possible."
+                };
+                retry_messages.push(providers::types::Message::user(nudge.to_string()));
                 let mut retry_budget = ExecutionBudget::new(depth);
                 let retry_result = tokio::time::timeout(
                     safety_timeout,
