@@ -14,6 +14,7 @@ use tracing::{info, warn};
 
 use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 
+use crate::allowlist::McpChannelAllowlist;
 use crate::client::circuit_breaker::McpCircuitBreaker;
 use crate::client::events::McpStartupEvent;
 use crate::client::handler::KlyntbotClientHandler;
@@ -54,6 +55,8 @@ pub struct McpManager {
     /// Client handler options (retained for reconnect).
     client_data_dir: Option<String>,
     client_sampling: Option<Arc<dyn super::handler::SamplingDelegate>>,
+    /// Per-channel allowlist for MCP servers.
+    channel_allowlist: Arc<McpChannelAllowlist>,
 }
 
 impl McpManager {
@@ -80,6 +83,10 @@ impl McpManager {
         let retained_data_dir = options.data_dir;
         let retained_sampling = options.sampling_delegate;
 
+        // Build per-channel allowlist from config
+        let channel_allowlist =
+            Arc::new(McpChannelAllowlist::from(config.channel_allowlists.clone()));
+
         // Connect to all enabled servers in parallel
         let mut join_set = tokio::task::JoinSet::new();
         for server_def in &config.servers {
@@ -101,6 +108,7 @@ impl McpManager {
             let tlc_tx = tool_list_changed_tx.clone();
             let opts_data_dir = retained_data_dir.clone();
             let opts_sampling = retained_sampling.clone();
+            let al = Arc::clone(&channel_allowlist);
             join_set.spawn(async move {
                 let name = def.name.clone();
                 if let Some(ref tx) = tx {
@@ -111,7 +119,8 @@ impl McpManager {
                         .await;
                 }
                 let result =
-                    Self::connect_one(&def, &cb, Some(&tlc_tx), opts_data_dir, opts_sampling).await;
+                    Self::connect_one(&def, &cb, Some(&tlc_tx), opts_data_dir, opts_sampling, al)
+                        .await;
                 (name, result, tx)
             });
         }
@@ -169,6 +178,7 @@ impl McpManager {
             tool_list_changed_rx: Some(tool_list_changed_rx),
             client_data_dir: retained_data_dir,
             client_sampling: retained_sampling,
+            channel_allowlist,
         }
     }
 
@@ -182,6 +192,7 @@ impl McpManager {
         tool_list_changed_tx: Option<&tokio::sync::mpsc::Sender<String>>,
         data_dir: Option<String>,
         sampling_delegate: Option<Arc<dyn super::handler::SamplingDelegate>>,
+        channel_allowlist: Arc<McpChannelAllowlist>,
     ) -> anyhow::Result<McpConnection> {
         let startup_timeout = Duration::from_secs(server_def.startup_timeout_sec);
         let tool_timeout = Duration::from_secs(server_def.tool_timeout_sec);
@@ -195,6 +206,7 @@ impl McpManager {
                 tool_list_changed_tx,
                 data_dir,
                 sampling_delegate,
+                channel_allowlist,
             ),
         )
         .await
@@ -219,6 +231,7 @@ impl McpManager {
         tool_list_changed_tx: Option<&tokio::sync::mpsc::Sender<String>>,
         data_dir: Option<String>,
         sampling_delegate: Option<Arc<dyn super::handler::SamplingDelegate>>,
+        channel_allowlist: Arc<McpChannelAllowlist>,
     ) -> anyhow::Result<McpConnection> {
         let name = &server_def.name;
         let handler = {
@@ -291,6 +304,7 @@ impl McpManager {
                     Arc::clone(&peer),
                     tool_timeout,
                     Arc::clone(circuit_breaker),
+                    Arc::clone(&channel_allowlist),
                 ))
             })
             .collect();
@@ -366,6 +380,7 @@ impl McpManager {
             Some(&self.tool_list_changed_tx),
             self.client_data_dir.clone(),
             self.client_sampling.clone(),
+            Arc::clone(&self.channel_allowlist),
         )
         .await
         {
@@ -576,6 +591,7 @@ mod tests {
             enabled: true,
             servers: vec![test_server_def("disabled", "nonexistent", false)],
             server: Default::default(),
+            channel_allowlists: HashMap::new(),
         };
         let manager = McpManager::connect_all(&config, None, McpClientOptions::default()).await;
         assert_eq!(manager.connected_count(), 0);
@@ -591,6 +607,7 @@ mod tests {
                 true,
             )],
             server: Default::default(),
+            channel_allowlists: HashMap::new(),
         };
         // Should not panic — logs warning and skips
         let manager = McpManager::connect_all(&config, None, McpClientOptions::default()).await;
@@ -607,6 +624,7 @@ mod tests {
                 test_server_def("bad-srv", "nonexistent-binary", true),
             ],
             server: Default::default(),
+            channel_allowlists: HashMap::new(),
         };
 
         let _manager =
@@ -618,17 +636,25 @@ mod tests {
         }
 
         // Should have: Skipped + Starting + Failed + Complete
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, McpStartupEvent::Skipped { .. })));
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, McpStartupEvent::Starting { .. })));
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, McpStartupEvent::Failed { .. })));
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, McpStartupEvent::Complete { .. })));
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, McpStartupEvent::Skipped { .. }))
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, McpStartupEvent::Starting { .. }))
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, McpStartupEvent::Failed { .. }))
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, McpStartupEvent::Complete { .. }))
+        );
     }
 }

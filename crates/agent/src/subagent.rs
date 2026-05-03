@@ -116,7 +116,8 @@ pub struct SubagentManager {
     /// Cache of base ToolRegistry builds keyed by (profile, cwd).
     /// The cache stores the registry *before* AgentTaskTool is added,
     /// so each invocation can clone the base and append its task tool.
-    registry_cache: std::sync::Mutex<HashMap<(SubagentProfile, PathBuf), Arc<RwLock<ToolRegistry>>>>,
+    registry_cache:
+        std::sync::Mutex<HashMap<(SubagentProfile, PathBuf), Arc<RwLock<ToolRegistry>>>>,
 }
 
 /// Builder for SubagentManager

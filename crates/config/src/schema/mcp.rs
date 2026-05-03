@@ -19,6 +19,11 @@ pub struct McpConfig {
     pub servers: Vec<McpServerDef>,
     #[serde(default)]
     pub server: McpServerSettings,
+    /// Per-channel MCP server allowlists. Keys are channel names (e.g. "coding",
+    /// "chat"), values are lists of allowed server names. Unconfigured channels
+    /// allow all servers (back-compat).
+    #[serde(default)]
+    pub channel_allowlists: HashMap<String, Vec<String>>,
 }
 
 impl McpConfig {
@@ -34,6 +39,7 @@ impl Default for McpConfig {
             enabled: true,
             servers: Vec::new(),
             server: McpServerSettings::default(),
+            channel_allowlists: HashMap::new(),
         }
     }
 }

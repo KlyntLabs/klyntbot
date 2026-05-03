@@ -1,5 +1,6 @@
 use storage::repos::ApprovalHistorySummary;
 
+#[derive(Debug)]
 pub struct Layer3Config {
     pub enabled: bool,
     pub min_approvals: u32,

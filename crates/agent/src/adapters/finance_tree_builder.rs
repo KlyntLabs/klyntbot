@@ -317,8 +317,8 @@ pub fn build_alert_nodes(
 
 #[cfg(test)]
 mod tests {
-    use crate::adapters::tree_builder_base::{compose_embedding_text, slugify};
     use super::*;
+    use crate::adapters::tree_builder_base::{compose_embedding_text, slugify};
 
     // --- slugify ---
 

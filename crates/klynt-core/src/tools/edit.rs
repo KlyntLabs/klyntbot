@@ -1,6 +1,6 @@
-use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
+use crate::approval::{GuardCtx, Layer1, PendingApprovalsMap, evaluate};
 use crate::privacy::PrivacyGuard;
-use crate::tools::shared::file_edit_event::{emit_file_edit, unified_diff, FileEditEvent};
+use crate::tools::shared::file_edit_event::{FileEditEvent, emit_file_edit, unified_diff};
 use crate::tools::shared::fs_resolve::resolve_under_cwd;
 use crate::tools::shared::hook_emit::{
     fire_post_file_edit, fire_post_tool_use, fire_pre_file_edit, fire_pre_tool_use,
@@ -186,7 +186,7 @@ pub async fn run_for_test(
             Err(e) => return Err(e.into()),
         };
         let _ = repo
-            .record(
+            .try_record_with_ghost(
                 &session_id,
                 message_id.as_deref(),
                 &resolved.to_string_lossy(),
@@ -273,6 +273,7 @@ pub async fn run_for_test(
                 bytes: final_content.len() as u64,
                 diff_full: diff,
             },
+            None,
         )
         .await;
         Ok(format!(

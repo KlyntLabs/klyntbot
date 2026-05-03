@@ -19,6 +19,11 @@ pub struct CodingConfig {
     pub sessions: CodingSessionsConfig,
     #[serde(default)]
     pub cost_ceiling: CostCeilingConfig,
+    /// Tool-result truncation budgets. Currently used by the truncation crate's
+    /// defaults — runtime override is Phase 4 work (requires plumbing into
+    /// `MidLoopCompressor` initialisation).
+    #[serde(default)]
+    pub tool_result_truncation: ToolResultTruncationConfig,
 }
 
 impl Default for CodingConfig {
@@ -32,6 +37,7 @@ impl Default for CodingConfig {
             skills: Default::default(),
             sessions: Default::default(),
             cost_ceiling: Default::default(),
+            tool_result_truncation: Default::default(),
         }
     }
 }
@@ -146,6 +152,24 @@ impl Default for CostCeilingConfig {
         Self {
             per_thread_usd: None,
             alert_at_percent: default_cost_alert_pct(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ToolResultTruncationConfig {
+    /// Bytes budget for tool results injected into the conversation.
+    pub model_facing_bytes: usize,
+    /// Bytes budget for the result snippet sent on the WebSocket "tool finished" event.
+    pub ws_payload_bytes: usize,
+}
+
+impl Default for ToolResultTruncationConfig {
+    fn default() -> Self {
+        Self {
+            model_facing_bytes: 50_000,
+            ws_payload_bytes: 2_048,
         }
     }
 }

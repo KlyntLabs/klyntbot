@@ -65,7 +65,11 @@ pub(crate) async fn dispatch_dev(
         }
         "is_workspace_path_dir" => {
             let path = try_field!(dev::get_str(body, "path"));
-            dev::val(core.is_workspace_path_dir(path).await.map_err(ApiError::from))
+            dev::val(
+                core.is_workspace_path_dir(path)
+                    .await
+                    .map_err(ApiError::from),
+            )
         }
         "remove_workspace" => {
             let id = try_field!(dev::get_str(body, "id"));

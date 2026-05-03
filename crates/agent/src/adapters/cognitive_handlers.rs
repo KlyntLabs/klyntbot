@@ -1677,11 +1677,11 @@ mod tests {
     use std::sync::Arc;
 
     use crate::test_utils::MockProvider;
-    use common::{KlyntbotError, ProviderError};
     use cognitive::situation::UserSituation;
     use cognitive::types::{SemanticFact, DEFAULT_MEMORY_TYPE};
+    use common::{KlyntbotError, ProviderError};
     use feature_coaching::signal_accumulator::TriggerFired;
-    use providers::{LlmProvider, LlmResponse, Usage, ProviderCapabilities, ProviderHealth};
+    use providers::{LlmProvider, LlmResponse, ProviderCapabilities, ProviderHealth, Usage};
     use serde_json::Value;
 
     // ── Test helpers ──

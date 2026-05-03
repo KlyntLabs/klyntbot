@@ -6,14 +6,17 @@ license = "Apache-2.0"
 description = "Klynt skill discovery + paths-conditional activation + dynamic discovery. Extends skill-system."
 
 [dependencies]
+async-trait = { workspace = true }
 common = { path = "../common" }
 config = { path = "../config" }
 skill-system = { path = "../skill-system" }
 serde = { workspace = true }
+serde_json = { workspace = true }
 serde_yaml = "0.9"
 globset = "0.4"
 walkdir = "2.5"
 lru = "0.12"
+reqwest = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 tempfile = { workspace = true }

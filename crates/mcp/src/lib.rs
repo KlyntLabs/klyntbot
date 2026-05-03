@@ -4,6 +4,7 @@
 //! - `McpManager`: connects to external MCP servers, discovers tools
 //! - `McpTool`: adapts MCP server tools to `tools_core::Tool`
 
+pub mod allowlist;
 pub mod client;
 pub mod dispatch;
 pub mod server;
@@ -15,5 +16,5 @@ pub use client::events::McpStartupEvent;
 pub use client::handler::SamplingDelegate;
 pub use client::manager::{McpClientOptions, McpManager};
 pub use client::sanitize;
-pub use dispatch::{dispatch_entity_update, EntityUpdate};
+pub use dispatch::{EntityUpdate, dispatch_entity_update};
 pub use server::security;

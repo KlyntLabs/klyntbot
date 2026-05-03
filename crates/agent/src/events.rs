@@ -476,7 +476,7 @@ pub enum AgentEvent {
         failed_tests: u32,
         newly_passing: Vec<String>,
         newly_failing: Vec<String>,
-        coverage_delta: Option<f64>,
+        coverage_delta: Option<common::coverage::CoverageDelta>,
         duration_ms: u64,
     },
 
