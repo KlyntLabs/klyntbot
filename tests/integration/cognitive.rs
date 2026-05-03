@@ -75,6 +75,7 @@ fn test_fact(id: &str, predicate: &str, object: &str) -> SemanticFact {
         scope_repo_id: None,
         metadata: None,
         scope_id: None,
+        speaker: None,
     }
 }
 

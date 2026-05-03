@@ -74,6 +74,7 @@ pub async fn execute_promotions(
                         scope_id: None,
                         scope_repo_id: None,
                         metadata: None,
+                        speaker: None,
                     };
                     if let Err(e) = fact_repo.upsert(&fact).await {
                         warn!("Writer: failed to create fact: {e}");

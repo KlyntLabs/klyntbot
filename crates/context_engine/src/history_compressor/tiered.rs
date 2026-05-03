@@ -62,6 +62,28 @@ impl TieredHistoryCompressor {
         _budget_tokens: usize,
         tier0_count: usize,
     ) -> CompressedHistory {
+        // KCA bench escape hatch: when KCA_DISABLE_COMPRESSION=1 is set,
+        // skip the entire summarization pipeline and keep every turn
+        // verbatim. Letta's 74% LoCoMo result comes from exactly this
+        // policy (no lossy compression at ingest, search verbatim at
+        // query time). Production paths see identical behavior to
+        // pre-flag when the env var is unset.
+        let bench_no_compress = matches!(
+            std::env::var("KCA_DISABLE_COMPRESSION").ok().as_deref(),
+            Some("1") | Some("true") | Some("yes")
+        );
+        if bench_no_compress {
+            return CompressedHistory {
+                summaries: vec![],
+                recent_messages: history.to_vec(),
+                preamble: vec![],
+                total_tokens: history
+                    .iter()
+                    .map(|m| token_counter::estimate_message_tokens(&*self.token_counter, m))
+                    .sum(),
+            };
+        }
+
         // Quick turn count estimate for early exit (avoids microcompaction + grouping)
         let estimated_turns = count_user_messages(history);
         if estimated_turns <= tier0_count {

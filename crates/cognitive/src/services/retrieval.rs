@@ -104,7 +104,12 @@ pub async fn retrieve_relevant_facts(
     co_activation_repo: Option<&CoActivationRepo>,
     depth_cache: Option<&KnowledgeDepthCache>,
     community_cache: Option<&CommunityCache>,
+    entity_repo: Option<&crate::repos::EntityRepo>,
 ) -> Result<Vec<ScoredFact>, sqlx::Error> {
+    // Wave 1: extract once at function-top so Wave 2 (speaker boost) and
+    // the BM25 alias-expansion block can share the same entity set.
+    let query_entities = crate::services::graph_retrieval::extract_query_entities(query);
+
     let use_vector = !query.is_empty() && embedder.map(|e| e.is_available()).unwrap_or(false);
 
     let weights = RelevanceWeights {
@@ -194,54 +199,136 @@ pub async fn retrieve_relevant_facts(
             None
         };
 
-        // Phase 2 (KCA_PHASE_2=1): build a per-entity FTS term list so proper
-        // nouns aren't drowned out by question filler words under BM25.
-        // Falls back to the raw query when no entities are detected.
-        let phase_2_on = matches!(
-            std::env::var("KCA_PHASE_2").ok().as_deref(),
-            Some("1") | Some("true") | Some("yes")
-        );
-        let fts_terms: Vec<String> = if phase_2_on {
-            let entities = crate::services::graph_retrieval::extract_query_entities(query);
-            crate::bench_hooks::record_entities(&entities);
-            if entities.is_empty() {
-                vec![query.to_string()]
-            } else {
-                let mut terms: Vec<String> = entities
-                    .iter()
-                    .map(|e| format!("\"{}\"", e.replace('"', "")))
-                    .collect();
-                terms.push(query.to_string());
-                terms
-            }
-        } else {
+        // Build a per-entity FTS term list so proper nouns aren't
+        // drowned out by question filler words under BM25. When an
+        // EntityRepo is wired, expand each detected entity through its
+        // alias table (possessive / short-form / nickname forms) so
+        // questions phrased as "Caroline's necklace" or "Mel's husband"
+        // resolve to the canonical entity. Always-on now that Tier 1's
+        // FTS-as-candidate fix is in place; production paths see
+        // identical behavior to pre-Tier 1 when no entity is in the
+        // query.
+        let entities = &query_entities;
+        crate::bench_hooks::record_entities(entities);
+        let fts_terms: Vec<String> = if entities.is_empty() {
             vec![query.to_string()]
+        } else {
+            let mut terms_set: std::collections::BTreeSet<String> =
+                std::collections::BTreeSet::new();
+            for e in entities {
+                terms_set.insert(format!("\"{}\"", e.replace('"', "")));
+                if let Some(er) = entity_repo {
+                    if let Ok(rows) = er.find_by_name(e).await {
+                        for row in rows {
+                            if let Ok(aliases) = er.list_aliases(&row.id).await {
+                                for alias in aliases {
+                                    terms_set
+                                        .insert(format!("\"{}\"", alias.replace('"', "")));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            let mut terms: Vec<String> = terms_set.into_iter().collect();
+            terms.push(query.to_string());
+            terms
         };
 
-        let mut merged_ranks: std::collections::HashMap<String, usize> =
+        // Collect rank + full fact row for every FTS hit across all terms.
+        // Keeping the SemanticFact (not just the id) lets us PROMOTE hits
+        // that the vector/fallback path missed into the scored pool — a
+        // pure rank-only merge previously dropped them, which produced
+        // 100% zero-retrieval refusals on questions containing proper
+        // nouns the embedder under-weighted.
+        let mut merged: std::collections::HashMap<String, (usize, SemanticFact)> =
             std::collections::HashMap::new();
         let mut total_hits = 0usize;
         for term in &fts_terms {
             if let Ok(bm25_hits) = repo.search_fts(term, bm25_domain, params.limit * 2).await {
                 total_hits += bm25_hits.len();
-                for (rank, f) in bm25_hits.iter().enumerate() {
-                    merged_ranks
+                for (rank, f) in bm25_hits.into_iter().enumerate() {
+                    merged
                         .entry(f.id.clone())
-                        .and_modify(|r| {
+                        .and_modify(|(r, _)| {
                             if rank < *r {
                                 *r = rank;
                             }
                         })
-                        .or_insert(rank);
+                        .or_insert_with(|| (rank, f));
                 }
             }
         }
         crate::bench_hooks::record_hits(0, total_hits as u32, 0);
 
+        let scored_ids: std::collections::HashSet<String> =
+            scored.iter().map(|s| s.fact.id.clone()).collect();
+        let now = Timestamp::now();
+
         for result in &mut scored {
-            if let Some(&rank) = merged_ranks.get(&result.fact.id) {
+            if let Some(&(rank, _)) = merged.get(&result.fact.id) {
                 let bm25_boost = 1.0 / (DEFAULT_RRF_K + rank as f64 + 1.0);
                 result.score += bm25_boost;
+            }
+        }
+
+        // Promote FTS-only hits into the scored pool. Score them with the
+        // same relevance formula fallback_path uses (neutral similarity)
+        // plus the RRF rank bonus, so they land on the same scale as
+        // fallback candidates and pass the downstream MIN_FACT_SCORE
+        // floor. Without this, a fact correctly stored under
+        // `subject="Alice"` but missed by the vector path is invisible —
+        // which is the root cause of the 100%-zero-retrieval pattern
+        // observed in p1-confirm-001.
+        for (id, (rank, fact)) in merged {
+            if scored_ids.contains(&id) {
+                continue;
+            }
+            let (r, freq) = compute_decay_and_freq(&fact, &now);
+            let temporal = temporal_recency_score(&fact.valid_from);
+            let hierarchy = match depth_cache {
+                Some(cache) => cache.get_or_compute(&fact, repo).await,
+                None => 0.0,
+            };
+            let cross_note = scoring::convergence_score(&fact);
+            let base = relevance_score(
+                0.5,
+                r,
+                fact.confidence,
+                freq,
+                params.situational_boost,
+                temporal,
+                hierarchy,
+                0.5,
+                0.0,
+                cross_note,
+                0.0,
+                0.0,
+                &weights,
+            );
+            let bm25_boost = 1.0 / (DEFAULT_RRF_K + rank as f64 + 1.0);
+            scored.push(ScoredFact {
+                fact,
+                score: base + bm25_boost,
+                similarity: None,
+            });
+        }
+    }
+
+    // Wave 2: speaker-match boost. When the query mentions a person whose
+    // name appears as a fact `speaker`, bump those facts. This is the
+    // single-pool minimum-viable form of ENGRAM's R̃(q,A)/R̃(q,B) speaker
+    // split — full pool partitioning is a future wave. Boost is small
+    // (additive 0.10) so a wrong speaker match doesn't displace a strong
+    // semantic match.
+    if !query_entities.is_empty() {
+        let entity_set: std::collections::HashSet<String> =
+            query_entities.iter().map(|e| e.to_lowercase()).collect();
+        for result in &mut scored {
+            if let Some(spk) = &result.fact.speaker {
+                if entity_set.contains(&spk.to_lowercase()) {
+                    result.score += 0.10;
+                }
             }
         }
     }
@@ -467,7 +554,10 @@ pub async fn retrieve_all_domains(
         ..RetrievalParams::new(0)
     };
     // retrieve_relevant_facts already returns results sorted by score.
-    retrieve_relevant_facts(repo, embedder, query, domains, &params, None, None, None).await
+    retrieve_relevant_facts(
+        repo, embedder, query, domains, &params, None, None, None, None,
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -513,6 +603,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         }
     }
 
@@ -587,6 +678,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -615,6 +707,7 @@ mod tests {
             "anything",
             &["productivity"],
             &default_params(10),
+            None,
             None,
             None,
             None,
@@ -647,6 +740,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -672,6 +766,7 @@ mod tests {
             "query",
             &["productivity"],
             &default_params(10),
+            None,
             None,
             None,
             None,
@@ -707,6 +802,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -730,6 +826,7 @@ mod tests {
             "",
             &["productivity"],
             &default_params(10),
+            None,
             None,
             None,
             None,
@@ -762,6 +859,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -779,6 +877,7 @@ mod tests {
             "",
             &["nonexistent"],
             &default_params(10),
+            None,
             None,
             None,
             None,
@@ -808,6 +907,7 @@ mod tests {
             "morning routine",
             &["productivity"],
             &default_params(10),
+            None,
             None,
             None,
             None,

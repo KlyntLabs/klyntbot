@@ -22,7 +22,8 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         object: obj.trim().trim_end_matches('.').to_string(),
         confidence: 0.9,
         source: "regex_backstop".into(),
-    };
+    
+        speaker: None,};
 
     // "I moved to {city} ..." / "I'm now in {city}" → lives_in
     for prefix in [
@@ -33,10 +34,7 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         "i am in ",
         "i'm now in ",
     ] {
-        if let Some(rest) = lc
-            .strip_prefix(prefix)
-            .or_else(|| lc.find(prefix).map(|i| &lc[i + prefix.len()..]))
-        {
+        if let Some(rest) = lc.strip_prefix(prefix).or_else(|| lc.find(prefix).map(|i| &lc[i + prefix.len()..])) {
             // Take up to first separator
             let city = rest
                 .split(|c: char| c == ',' || c == '.' || c == '!' || c == ';')
@@ -47,8 +45,7 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
                 .trim_end_matches(" recently");
             if !city.is_empty() && city.len() < 60 {
                 // Restore original casing by finding the slice in `content`
-                let case_corrected =
-                    original_case(content, city).unwrap_or_else(|| city.to_string());
+                let case_corrected = original_case(content, city).unwrap_or_else(|| city.to_string());
                 out.push(mk("identity", "lives_in", &case_corrected));
                 if prefix.contains("moved") {
                     out.push(mk("identity", "moved_to", &case_corrected));
@@ -68,7 +65,8 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
                 .unwrap_or("")
                 .trim();
             if !org.is_empty() && org.len() < 40 {
-                let case_corrected = original_case(content, org).unwrap_or_else(|| org.to_string());
+                let case_corrected =
+                    original_case(content, org).unwrap_or_else(|| org.to_string());
                 out.push(mk("work", "works_at", &case_corrected));
                 break;
             }
@@ -79,7 +77,10 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
     for prefix in ["i'm ", "i am ", "my name is "] {
         if let Some(idx) = lc.find(prefix) {
             let rest = &content[idx + prefix.len()..];
-            let first_token: String = rest.chars().take_while(|c| c.is_alphabetic()).collect();
+            let first_token: String = rest
+                .chars()
+                .take_while(|c| c.is_alphabetic())
+                .collect();
             if first_token.len() >= 2
                 && first_token.chars().next().is_some_and(|c| c.is_uppercase())
             {
@@ -105,31 +106,11 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         let is_proper = subj_clean.len() >= 2
             && subj_clean.chars().next().is_some_and(|c| c.is_uppercase())
             && subj_clean.chars().all(|c| c.is_alphabetic())
-            && !matches!(
-                subj_clean,
-                "I" | "We"
-                    | "You"
-                    | "He"
-                    | "She"
-                    | "It"
-                    | "They"
-                    | "Her"
-                    | "His"
-                    | "Their"
-                    | "Them"
-                    | "Us"
-                    | "Our"
-                    | "My"
-                    | "Hi"
-                    | "Hello"
-                    | "Hey"
-                    | "The"
-                    | "A"
-                    | "An"
-            );
-        if !is_proper {
-            continue;
-        }
+            && !matches!(subj_clean,
+                "I" | "We" | "You" | "He" | "She" | "It" | "They"
+                | "Her" | "His" | "Their" | "Them" | "Us" | "Our"
+                | "My" | "Hi" | "Hello" | "Hey" | "The" | "A" | "An");
+        if !is_proper { continue }
         let Some(verb) = toks.next() else { continue };
         let pred = match verb.to_lowercase().as_str() {
             "loves" | "love" => "loves",
@@ -143,22 +124,14 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
             "plays" | "play" => "plays",
             "works" => {
                 // "Alice works at Anthropic" → works_at + skip "at"
-                match toks.next() {
-                    Some("at") => "works_at",
-                    _ => continue,
-                }
+                match toks.next() { Some("at") => "works_at", _ => continue }
             }
-            "lives" => match toks.next() {
-                Some("in") => "lives_in",
-                _ => continue,
-            },
+            "lives" => match toks.next() { Some("in") => "lives_in", _ => continue },
             _ => continue,
         };
         let obj: String = toks.collect::<Vec<_>>().join(" ");
         let obj = obj.trim_end_matches(|c: char| !c.is_alphanumeric()).trim();
-        if obj.is_empty() || obj.len() > 80 {
-            continue;
-        }
+        if obj.is_empty() || obj.len() > 80 { continue }
         out.push(ExtractedFact {
             domain: domain.to_string(),
             subject: subj_clean.to_string(),
@@ -166,7 +139,8 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
             object: obj.to_string(),
             confidence: 0.85,
             source: "regex_backstop_3p".into(),
-        });
+        
+            speaker: None,});
     }
 
     out
@@ -191,6 +165,7 @@ pub struct IngestionConsumer {
     episodic_repo: EpisodicMemoryRepo,
     extraction_handler: Option<Arc<dyn ExtractionHandler>>,
     fact_repo: Option<SemanticFactRepo>,
+    conflict_resolver: Option<Arc<dyn crate::services::extraction::ConflictResolver>>,
     episodic_importance_threshold: f64,
 }
 
@@ -207,8 +182,21 @@ impl IngestionConsumer {
             episodic_repo,
             extraction_handler,
             fact_repo: None,
+            conflict_resolver: None,
             episodic_importance_threshold: 0.7,
         }
+    }
+
+    /// Wire an LLM-backed AUDD conflict resolver (Mem0 pattern). When
+    /// absent, ingestion uses the default Add-only behavior. Gated by
+    /// `KCA_AUDD=1` at the call site so production stays safe by
+    /// default.
+    pub fn with_conflict_resolver(
+        mut self,
+        resolver: Arc<dyn crate::services::extraction::ConflictResolver>,
+    ) -> Self {
+        self.conflict_resolver = Some(resolver);
+        self
     }
 
     /// Wire the semantic fact repo so extracted facts are persisted (not
@@ -273,6 +261,8 @@ impl SignalConsumer for IngestionConsumer {
                 let handler = handler.clone();
                 let obs = observation.clone();
                 let fact_repo = self.fact_repo.clone();
+                let entity_repo = self.entity_repo.clone();
+                let conflict_resolver = self.conflict_resolver.clone();
                 tokio::spawn(async move {
                     // Look up persisted user-name BEFORE extraction so we can
                     // both (a) prepend identity context to the prompt and
@@ -313,27 +303,104 @@ impl SignalConsumer for IngestionConsumer {
                             // letting upsert dedupe is simpler and more
                             // robust. The backstop only fires for the
                             // identity/location/work patterns it knows.
-                            let regex_facts = regex_backstop_facts(&obs.content, &obs.domain);
+                            let regex_facts =
+                                regex_backstop_facts(&obs.content, &obs.domain);
                             if !regex_facts.is_empty() {
                                 tracing::info!(
                                     regex_facts = regex_facts.len(),
                                     "ingestion: regex backstop contributed facts"
                                 );
-                                result.extractions.push(
-                                    crate::services::extraction::BatchExtraction {
-                                        observation_index: 0,
-                                        facts: regex_facts,
-                                    },
-                                );
+                                result.extractions.push(crate::services::extraction::BatchExtraction {
+                                    observation_index: 0,
+                                    facts: regex_facts,
+                                });
                             }
 
-                            let n_facts: usize =
-                                result.extractions.iter().map(|e| e.facts.len()).sum();
+                            let n_facts: usize = result.extractions.iter().map(|e| e.facts.len()).sum();
                             tracing::info!(
                                 n_extractions = result.extractions.len(),
                                 n_facts,
+                                n_entities = result.entities.len(),
+                                n_relationships = result.relationships.len(),
                                 "ingestion: LLM extraction completed"
                             );
+
+                            // Persist entities + relationships discovered by
+                            // the LLM. Without this loop, `BatchExtractionResult.entities`
+                            // is computed and dropped — the entities table
+                            // only ever sees the single `signal.entity` set
+                            // upstream, which means graph_path_boost,
+                            // entity-aware FTS expansion, and PPR
+                            // retrieval all see a near-empty graph
+                            // regardless of what the extractor found.
+                            for ent in &result.entities {
+                                match entity_repo
+                                    .upsert_entity(&crate::repos::NewEntity {
+                                        name: ent.name.clone(),
+                                        entity_type: ent.entity_type.clone(),
+                                        description: ent.description.clone(),
+                                        source: "extraction".to_string(),
+                                        source_id: None,
+                                        metadata: None,
+                                    })
+                                    .await
+                                {
+                                    Ok(row) => {
+                                        // Auto-derive possessive + short-form
+                                        // aliases so retrieval finds the entity
+                                        // when the question phrases it as
+                                        // "Caroline's" or "Mel".
+                                        for (alias, alias_type) in
+                                            crate::repos::entity::derive_name_aliases(&ent.name)
+                                        {
+                                            let _ = entity_repo
+                                                .upsert_alias(
+                                                    &row.id,
+                                                    &alias,
+                                                    alias_type,
+                                                    "derived",
+                                                )
+                                                .await;
+                                        }
+                                    }
+                                    Err(e) => tracing::warn!(
+                                        error = %e,
+                                        name = %ent.name,
+                                        "entity upsert failed"
+                                    ),
+                                }
+                            }
+                            for rel in &result.relationships {
+                                let src = entity_repo
+                                    .find_by_name(&rel.source_name)
+                                    .await
+                                    .ok()
+                                    .and_then(|rows| rows.into_iter().next());
+                                let tgt = entity_repo
+                                    .find_by_name(&rel.target_name)
+                                    .await
+                                    .ok()
+                                    .and_then(|rows| rows.into_iter().next());
+                                if let (Some(s), Some(t)) = (src, tgt) {
+                                    if let Err(e) = entity_repo
+                                        .upsert_relationship(&crate::repos::NewRelationship {
+                                            source_entity_id: s.id.clone(),
+                                            target_entity_id: t.id.clone(),
+                                            relationship_type: rel.relationship_type.clone(),
+                                            evidence: None,
+                                            source: "extraction".to_string(),
+                                        })
+                                        .await
+                                    {
+                                        tracing::warn!(
+                                            error = %e,
+                                            source = %rel.source_name,
+                                            target = %rel.target_name,
+                                            "relationship upsert failed"
+                                        );
+                                    }
+                                }
+                            }
                             // Persist extracted facts. Without this, the
                             // extraction work is wasted — facts only
                             // exist in memory and never reach the FTS5
@@ -356,14 +423,86 @@ impl SignalConsumer for IngestionConsumer {
                                             .map(|f| f.object)
                                     })
                                     .or(user_name);
+                                let audd_on = matches!(
+                                    std::env::var("KCA_AUDD").ok().as_deref(),
+                                    Some("1") | Some("true") | Some("yes")
+                                );
                                 let mut written = 0usize;
                                 for ext in &result.extractions {
                                     for f in &ext.facts {
-                                        let fact = to_semantic_fact(f, &obs);
-                                        match repo.upsert(&fact).await {
-                                            Ok(()) => written += 1,
-                                            Err(e) => {
-                                                tracing::warn!(error = %e, "fact upsert failed")
+                                        let mut fact = to_semantic_fact(f, &obs);
+
+                                        // AUDD (Mem0 pattern): when a
+                                        // resolver is wired AND KCA_AUDD=1,
+                                        // ask it whether to ADD/UPDATE/DELETE/
+                                        // NOOP this candidate vs existing
+                                        // facts on the same (subject,
+                                        // predicate). Default behavior (no
+                                        // resolver / flag off) is the
+                                        // pre-AUDD Add-only path.
+                                        let mut decision =
+                                            crate::services::extraction::ConflictDecision::Add;
+                                        if audd_on {
+                                            if let Some(resolver) = &conflict_resolver {
+                                                let existing = repo
+                                                    .find_by_subject_predicate(
+                                                        &fact.subject,
+                                                        &fact.predicate,
+                                                    )
+                                                    .await
+                                                    .ok()
+                                                    .map(|rows| {
+                                                        rows.into_iter()
+                                                            .filter(|r| r.superseded_at.is_none())
+                                                            .collect::<Vec<_>>()
+                                                    })
+                                                    .unwrap_or_default();
+                                                if !existing.is_empty() {
+                                                    decision = resolver
+                                                        .classify(f, &existing)
+                                                        .await;
+                                                }
+                                            }
+                                        }
+                                        match decision {
+                                            crate::services::extraction::ConflictDecision::Noop => {
+                                                tracing::debug!(
+                                                    subject = %fact.subject,
+                                                    predicate = %fact.predicate,
+                                                    "AUDD: NOOP (equivalent fact exists)"
+                                                );
+                                            }
+                                            crate::services::extraction::ConflictDecision::Update {
+                                                existing_id,
+                                            } => {
+                                                fact.id = existing_id;
+                                                if let Err(e) = repo.upsert(&fact).await {
+                                                    tracing::warn!(error = %e, "AUDD UPDATE failed");
+                                                } else {
+                                                    written += 1;
+                                                }
+                                            }
+                                            crate::services::extraction::ConflictDecision::Delete {
+                                                existing_id,
+                                            } => {
+                                                if let Err(e) = repo
+                                                    .supersede_fact(&existing_id, &fact.id)
+                                                    .await
+                                                {
+                                                    tracing::warn!(error = %e, "AUDD DELETE supersede failed");
+                                                }
+                                                if let Err(e) = repo.upsert(&fact).await {
+                                                    tracing::warn!(error = %e, "AUDD DELETE+ADD failed");
+                                                } else {
+                                                    written += 1;
+                                                }
+                                            }
+                                            crate::services::extraction::ConflictDecision::Add => {
+                                                if let Err(e) = repo.upsert(&fact).await {
+                                                    tracing::warn!(error = %e, "fact upsert failed");
+                                                } else {
+                                                    written += 1;
+                                                }
                                             }
                                         }
                                         // Mirror to proper-noun subject when
@@ -371,7 +510,9 @@ impl SignalConsumer for IngestionConsumer {
                                         // and a name binding already exists.
                                         // Skip the name predicate itself — it
                                         // would create `Alice→name=Alice`.
-                                        if fact.subject == "user" && fact.predicate != "name" {
+                                        if fact.subject == "user"
+                                            && fact.predicate != "name"
+                                        {
                                             if let Some(name) = &user_name {
                                                 let mut mirrored = fact.clone();
                                                 mirrored.subject = name.clone();
@@ -383,6 +524,29 @@ impl SignalConsumer for IngestionConsumer {
                                                         "mirrored fact upsert failed"
                                                     ),
                                                 }
+                                            }
+                                        } else if fact.predicate != "name"
+                                            && user_name
+                                                .as_ref()
+                                                .is_some_and(|n| n == &fact.subject)
+                                        {
+                                            // Reverse mirror: when the LLM
+                                            // emits a third-person fact about
+                                            // the named user (e.g. user said
+                                            // "I'm Alice" once, then later
+                                            // "Alice loves hiking"), also
+                                            // write the `subject="user"`
+                                            // copy so first-person queries
+                                            // ("what do I love") still hit.
+                                            let mut mirrored = fact.clone();
+                                            mirrored.subject = "user".to_string();
+                                            mirrored.id = uuid::Uuid::new_v4().to_string();
+                                            match repo.upsert(&mirrored).await {
+                                                Ok(()) => written += 1,
+                                                Err(e) => tracing::warn!(
+                                                    error = %e,
+                                                    "reverse-mirrored fact upsert failed"
+                                                ),
                                             }
                                         }
                                     }

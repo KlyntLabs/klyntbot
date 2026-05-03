@@ -72,10 +72,27 @@ fn weight_for_edge_type(t: &EdgeType) -> f64 {
 
 /// Extract potential entity names from a query string.
 /// Capitalized words that aren't sentence starters.
+/// Wave 1: heuristic entity extractor with two layers.
+///
+/// Layer A (capitalized, high precision): keeps tokens that begin with an
+/// uppercase letter and aren't at sentence start — "Alice", "Rust",
+/// "Klynt". Existing behavior, kept verbatim.
+///
+/// Layer B (lowercase fallback): when Layer A returns empty (e.g.
+/// `"what is alice's job"`), keeps tokens ≥5 chars that aren't in a
+/// small stopword set of common conversational fillers. This catches
+/// chat-style queries that downcase proper nouns. False-positive risk is
+/// bounded by the FTS5 query — non-entity tokens rarely match indexed
+/// subjects.
+///
+/// We do not lookup against the entity table here because the function
+/// is sync. Wave 3 adds an async `_with_repo` variant that does proper
+/// alias resolution.
 pub(crate) fn extract_query_entities(query: &str) -> Vec<String> {
     let words: Vec<&str> = query.split_whitespace().collect();
     let mut entities = Vec::new();
 
+    // Layer A
     for (i, word) in words.iter().enumerate() {
         let is_sentence_start = i == 0
             || words.get(i.wrapping_sub(1)).is_some_and(|prev| {
@@ -94,7 +111,34 @@ pub(crate) fn extract_query_entities(query: &str) -> Vec<String> {
         }
     }
 
-    entities.dedup();
+    if !entities.is_empty() {
+        entities.dedup();
+        return entities;
+    }
+
+    // Layer B — lowercase fallback. Stopword list deliberately small;
+    // generic (no LoCoMo-specific words) per anti-tuning rule 5.
+    const STOPWORDS: &[&str] = &[
+        "about", "above", "after", "again", "against", "before", "below",
+        "between", "could", "doing", "during", "every", "first", "going",
+        "having", "knows", "might", "ought", "other", "place", "should",
+        "since", "still", "their", "there", "these", "thing", "think",
+        "those", "through", "today", "tonight", "until", "where", "which",
+        "while", "would", "yesterday",
+    ];
+    for word in &words {
+        // Strip surrounding punctuation, then split on apostrophe to drop
+        // possessive suffix ("alice's" → "alice"). Skip token if any char
+        // remaining is non-alphabetic.
+        let trimmed = word.trim_matches(|c: char| c.is_ascii_punctuation());
+        let stem = trimmed.split('\'').next().unwrap_or("").to_lowercase();
+        if stem.len() < 5 { continue; }
+        if !stem.chars().all(|c| c.is_alphabetic()) { continue; }
+        if STOPWORDS.contains(&stem.as_str()) { continue; }
+        if !entities.iter().any(|e: &String| e.eq_ignore_ascii_case(&stem)) {
+            entities.push(stem);
+        }
+    }
     entities
 }
 
@@ -120,5 +164,26 @@ mod tests {
     fn extract_entities_strips_punctuation() {
         let entities = extract_query_entities("I was talking to Sarah, about the project.");
         assert!(entities.contains(&"Sarah".to_string()));
+    }
+
+    #[test]
+    fn wave1_lowercase_fallback_catches_chat_proper_nouns() {
+        // Chat-style downcased query — Layer A returns empty; Layer B
+        // should keep ≥5-char alphabetic tokens that aren't stopwords.
+        let entities = extract_query_entities("what is alice's favorite color");
+        assert!(entities.iter().any(|e| e == "alice"),
+            "Expected lowercase 'alice' (after stripping possessive); got {:?}", entities);
+        assert!(entities.iter().any(|e| e == "favorite"),
+            "Expected 'favorite' (5 chars, not stopword); got {:?}", entities);
+        // "color" is 5 chars and not in our stoplist; it'll appear too.
+        // Acceptable: FTS will harmlessly miss on non-entity tokens.
+    }
+
+    #[test]
+    fn wave1_short_query_still_empty() {
+        // Original test contract: "what time is it" yields no entities.
+        // Layer B requires ≥5 chars — "what" (4) and "time" (4) excluded.
+        let entities = extract_query_entities("what time is it");
+        assert!(entities.is_empty(), "got {:?}", entities);
     }
 }

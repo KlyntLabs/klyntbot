@@ -1054,6 +1054,48 @@ async fn apply_graph_link_output(
     Ok(())
 }
 
+/// Phase 3: Run graph consolidation over the current active fact set.
+///
+/// Reuses `run_post_consolidation_linker` over a snapshot of active
+/// facts, marking each as a synthetic Add op. Call between batch
+/// ingest and QA in the bench path; in production the same function
+/// fires periodically when the per-conversation fact counter crosses
+/// `cognitive.consolidate_threshold`.
+///
+/// Returns the number of facts processed.
+pub async fn run_graph_consolidation(
+    fact_repo: &SemanticFactRepo,
+    entity_repo: &crate::repos::EntityRepo,
+    handler: Arc<dyn crate::services::graph_linker::GraphLinkHandler>,
+    max_facts: usize,
+) -> u32 {
+    // Load a bounded snapshot of recent active facts. We don't process
+    // the full table to keep latency predictable for large datasets;
+    // the most recent N is where the new entity edges will land
+    // anyway.
+    let facts = match fact_repo.list_all_active().await {
+        Ok(rows) => rows.into_iter().take(max_facts).collect::<Vec<_>>(),
+        Err(e) => {
+            tracing::warn!(error = %e, "graph_consolidation: failed to list active facts");
+            return 0;
+        }
+    };
+    let count = facts.len() as u32;
+    if count == 0 {
+        return 0;
+    }
+    let written: Vec<(crate::types::SemanticFact, crate::types::MemoryOp)> = facts
+        .into_iter()
+        .map(|f| {
+            let id = f.id.clone();
+            (f, crate::types::MemoryOp::Add { id })
+        })
+        .collect();
+    run_post_consolidation_linker(fact_repo, entity_repo, handler, written, None).await;
+    tracing::info!(facts_processed = count, "graph consolidation complete");
+    count
+}
+
 /// Create a type key for an event (used as accumulator key). Retained for
 /// now as it is still referenced by legacy unit tests; primary pipeline
 /// flow is via `IngestionConsumer` + `AiSignal::event_kind`.
@@ -1371,6 +1413,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         let fact2 = crate::types::SemanticFact {
             id: "f2".into(),
@@ -1395,6 +1438,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         fact_repo.upsert(&fact1).await.unwrap();
         fact_repo.upsert(&fact2).await.unwrap();
@@ -1423,6 +1467,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
 
         let candidates = prefetch_existing(&fact_repo, &entity_repo, vec![new_fact.clone()]).await;
@@ -1534,6 +1579,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         fact_repo.upsert(&new_fact).await.unwrap();
 
@@ -1591,6 +1637,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         fact_repo.upsert(&new_fact).await.unwrap();
 

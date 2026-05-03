@@ -239,6 +239,7 @@ async fn ppr_boost_retrieves_facts_for_related_entities() {
         scope_id: None,
         scope_repo_id: None,
         metadata: None,
+        speaker: None,
     };
     fact_repo.upsert(&bob_fact).await.unwrap();
 

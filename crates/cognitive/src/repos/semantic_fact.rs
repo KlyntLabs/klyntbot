@@ -99,8 +99,8 @@ impl SemanticFactRepo {
             INSERT INTO semantic_facts (id, domain, subject, predicate, object, confidence, source,
                 valid_from, valid_until, recorded_at, superseded_at, superseded_by,
                 stability, last_accessed, access_count, convergence_score, project_id, memory_type,
-                scope_type, scope_id)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+                scope_type, scope_id, speaker)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
             ON CONFLICT (id) DO UPDATE SET
                 domain = excluded.domain,
                 subject = excluded.subject,
@@ -119,7 +119,8 @@ impl SemanticFactRepo {
                 project_id = excluded.project_id,
                 memory_type = excluded.memory_type,
                 scope_type = excluded.scope_type,
-                scope_id = excluded.scope_id
+                scope_id = excluded.scope_id,
+                speaker = excluded.speaker
             "#,
         )
         .bind(&fact.id)
@@ -142,6 +143,7 @@ impl SemanticFactRepo {
         .bind(&fact.memory_type)
         .bind(&fact.scope_type)
         .bind(&fact.scope_id)
+        .bind(&fact.speaker)
         .execute(&self.pool)
         .await?;
         if let Some(ref cl) = self.changelog {
@@ -547,6 +549,31 @@ impl SemanticFactRepo {
         .bind(predicate)
         .fetch_all(&self.pool)
         .await
+    }
+
+    /// Mark `existing_id` as superseded by `new_id`. Used by AUDD's
+    /// DELETE path: the candidate fact contradicts the existing one,
+    /// so we tomb the old row (it stays queryable as historical fact)
+    /// and the caller separately upserts the new one.
+    pub async fn supersede_fact(
+        &self,
+        existing_id: &str,
+        new_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        let now = jiff::Timestamp::now().to_string();
+        sqlx::query(
+            r#"
+            UPDATE semantic_facts
+            SET superseded_at = ?1, superseded_by = ?2
+            WHERE id = ?3 AND superseded_at IS NULL
+            "#,
+        )
+        .bind(&now)
+        .bind(new_id)
+        .bind(existing_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     /// Returns up to `limit` facts where the given entity_id is referenced as either the subject
@@ -958,6 +985,7 @@ impl SemanticFactRepo {
             scope_id: None,
             scope_repo_id: scope_repo_id.map(str::to_string),
             metadata: None,
+            speaker: None,
         };
         self.upsert(&fact)
             .await
@@ -1014,6 +1042,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         }
     }
 
@@ -1370,6 +1399,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         repo.upsert(&fact).await.unwrap();
 
@@ -1408,6 +1438,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         repo.upsert(&f1).await.unwrap();
 
@@ -1436,6 +1467,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         repo.upsert(&f2).await.unwrap();
 
@@ -1478,6 +1510,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         repo.upsert(&f1).await.unwrap();
 
@@ -1522,6 +1555,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         repo.upsert(&f1).await.unwrap();
 
@@ -1549,6 +1583,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         repo.upsert(&f2).await.unwrap();
 
@@ -1630,6 +1665,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         let fact_obj = SemanticFact {
             id: "f2".into(),
@@ -1654,6 +1690,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         let fact_unrelated = SemanticFact {
             id: "f3".into(),
@@ -1678,6 +1715,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
 
         repo.upsert(&fact_subj).await.unwrap();

@@ -43,6 +43,10 @@ pub struct SemanticFact {
     pub scope_id: Option<String>,
     pub scope_repo_id: Option<String>,
     pub metadata: Option<String>,
+    /// Speaker attribution. NULL when the speaker IS the subject (the
+    /// single-user prod case); Some when the LLM extractor reports a
+    /// distinct speaker (multi-party transcripts).
+    pub speaker: Option<String>,
 }
 
 /// An episodic memory entry.

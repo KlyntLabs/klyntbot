@@ -34,7 +34,8 @@ impl HeuristicExtractionHandler {
             object: observation.content.clone(),
             confidence,
             source: source.into(),
-        };
+        
+            speaker: None,};
         let od = observation.domain.as_str();
 
         match observation.source_event.as_str() {
@@ -67,7 +68,8 @@ impl HeuristicExtractionHandler {
                         object,
                         confidence: 0.8,
                         source: "user_stated".into(),
-                    }]
+                    
+                        speaker: None,}]
                 }
             }
             bus::DomainEvent::KIND_BUDGET_ALERT => {
@@ -189,6 +191,117 @@ impl CoachingReasonerHandler for HeuristicCoachingReasonerHandler {
 
 // ── LLM-backed handlers ────────────────────────────────────────────────────
 
+// ── AUDD conflict resolver (Mem0 pattern) ──
+
+const AUDD_SYSTEM_PROMPT: &str = "\
+You are a memory-conflict resolver. Given a CANDIDATE fact (newly extracted) \
+and a list of EXISTING facts on the same (subject, predicate), decide ONE \
+of:\n\
+- ADD : the candidate is new information not already represented.\n\
+- UPDATE id=<existing_id>: the candidate refines / completes one specific \
+existing fact (same meaning, more accurate).\n\
+- DELETE id=<existing_id>: the candidate contradicts one specific existing \
+fact (the new one is right, mark the old superseded).\n\
+- NOOP : the candidate is semantically equivalent to an existing fact \
+already stored.\n\n\
+Return EXACTLY ONE line: `ADD`, `UPDATE id=<existing_id>`, `DELETE \
+id=<existing_id>`, or `NOOP`.";
+
+pub struct LlmConflictResolver {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmConflictResolver {
+    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
+        Self { provider, params }
+    }
+}
+
+#[async_trait]
+impl cognitive::services::extraction::ConflictResolver for LlmConflictResolver {
+    async fn classify(
+        &self,
+        candidate: &ExtractedFact,
+        nearest: &[cognitive::types::SemanticFact],
+    ) -> cognitive::services::extraction::ConflictDecision {
+        if nearest.is_empty() {
+            return cognitive::services::extraction::ConflictDecision::Add;
+        }
+        let mut user_msg = String::new();
+        user_msg.push_str("CANDIDATE:\n");
+        user_msg.push_str(&format!(
+            "  {} | {} | {} (confidence={})\n",
+            candidate.subject, candidate.predicate, candidate.object, candidate.confidence
+        ));
+        user_msg.push_str("\nEXISTING:\n");
+        for f in nearest {
+            user_msg.push_str(&format!(
+                "  id={}: {} | {} | {}\n",
+                f.id, f.subject, f.predicate, f.object
+            ));
+        }
+        user_msg.push_str("\nDecision:");
+
+        let messages = vec![
+            Message::system(AUDD_SYSTEM_PROMPT.to_string()),
+            Message::user(user_msg),
+        ];
+        let response = match self.provider.chat(&messages, None, &self.params).await {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!(error = %e, "AUDD classify failed, defaulting to ADD");
+                return cognitive::services::extraction::ConflictDecision::Add;
+            }
+        };
+        let line = response
+            .content
+            .unwrap_or_default()
+            .lines()
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        let upper = line.to_uppercase();
+        if upper == "NOOP" {
+            cognitive::services::extraction::ConflictDecision::Noop
+        } else if upper == "ADD" {
+            cognitive::services::extraction::ConflictDecision::Add
+        } else if let Some(rest) = upper.strip_prefix("UPDATE ID=") {
+            let id = rest.split_whitespace().next().unwrap_or("").trim();
+            // Find the matching existing fact (case-sensitive id), fall back to ADD
+            // if the LLM hallucinated.
+            if nearest.iter().any(|f| f.id.eq_ignore_ascii_case(id)) {
+                cognitive::services::extraction::ConflictDecision::Update {
+                    existing_id: nearest
+                        .iter()
+                        .find(|f| f.id.eq_ignore_ascii_case(id))
+                        .map(|f| f.id.clone())
+                        .unwrap_or_default(),
+                }
+            } else {
+                cognitive::services::extraction::ConflictDecision::Add
+            }
+        } else if let Some(rest) = upper.strip_prefix("DELETE ID=") {
+            let id = rest.split_whitespace().next().unwrap_or("").trim();
+            if nearest.iter().any(|f| f.id.eq_ignore_ascii_case(id)) {
+                cognitive::services::extraction::ConflictDecision::Delete {
+                    existing_id: nearest
+                        .iter()
+                        .find(|f| f.id.eq_ignore_ascii_case(id))
+                        .map(|f| f.id.clone())
+                        .unwrap_or_default(),
+                }
+            } else {
+                cognitive::services::extraction::ConflictDecision::Add
+            }
+        } else {
+            tracing::warn!(line = %line, "AUDD: unparseable response, defaulting to ADD");
+            cognitive::services::extraction::ConflictDecision::Add
+        }
+    }
+}
+
 // ── Extraction ──
 
 const EXTRACTION_SYSTEM_PROMPT: &str = "\
@@ -211,10 +324,17 @@ multiple facts (name=Alice, works_at=Anthropic).\n\
 - Questions (e.g., 'What is my name?') are NOT facts — return empty for questions\n\
 - Be specific in predicates — use snake_case (\"name\", \"works_at\", \"lives_in\")\n\
 - Be concise in objects — just the value, not the full sentence\n\
+- PRESERVE SPECIFIC NOUNS EXACTLY. Names, places, items, dates, numbers, brands, colors, kinship terms (grandma, husband, sister) must appear in the object verbatim — never paraphrase \"a gold necklace from grandma\" as \"jewelry\" or \"Mel's husband\" as \"family member\". Incidental detail recall depends on this.\n\
 - IDENTITY BINDING: when an observation contains \"I'm X\", \"I am X\", or \"My name is X\", \
 emit BOTH a {subject:\"user\", predicate:\"name\", object:\"X\"} fact AND apply X as a \
 parallel subject for every first-person fact in the SAME observation.\n\
-- For non-self proper nouns (e.g., \"Max loves pizza\"), emit subject=\"Max\" directly.\n\n\
+- For non-self proper nouns (e.g., \"Max loves pizza\"), emit subject=\"Max\" directly.\n\
+- SPEAKER ATTRIBUTION (Wave 2): when the source observation includes a speaker label \
+(lines like \"Alice: I went hiking today\"), set the optional \"speaker\" field on each fact \
+to the label string (e.g., \"speaker\": \"Alice\"). For first-person facts derived from Alice's \
+text, the SUBJECT is \"Alice\" AND the speaker is \"Alice\". For third-person facts within \
+Alice's text (\"Bob mentioned he likes pizza\"), the subject is \"Bob\" but the speaker stays \
+\"Alice\". Omit the speaker field when no label is present. NEVER invent a speaker.\n\n\
 Additionally, extract named entities (people, orgs, projects, technologies, places) \
 and relationships. Only extract entities explicitly mentioned — do not infer.\n\n\
 RESPONSE FORMAT — return one object per observation, indexed from 1:\n\
@@ -277,6 +397,10 @@ struct ExtractedFactJson {
     object: String,
     confidence: f64,
     source: String,
+    /// Wave 2: speaker label parsed from the source observation. None when
+    /// the speaker IS the subject or the LLM omitted it.
+    #[serde(default)]
+    speaker: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -332,7 +456,8 @@ fn bind_user_identity(extractions: &mut Vec<cognitive::BatchExtraction>) {
                     object: fact.object.clone(),
                     confidence: fact.confidence,
                     source: fact.source.clone(),
-                });
+                
+                    speaker: None,});
             }
         }
         ext.facts.extend(additions);
@@ -427,6 +552,7 @@ impl ExtractionHandler for LlmExtractionHandler {
                                             object: f.object,
                                             confidence: f.confidence,
                                             source: f.source,
+                                            speaker: f.speaker,
                                         })
                                         .collect(),
                                 }
@@ -1594,6 +1720,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         }
     }
 
@@ -1987,6 +2114,7 @@ mod tests {
                 scope_id: None,
                 scope_repo_id: None,
                 metadata: None,
+                speaker: None,
             },
             existing: vec![],
             subject_neighborhood: vec![("Bob".into(), "knows".into())],
@@ -2014,6 +2142,7 @@ mod tests {
                 scope_id: None,
                 scope_repo_id: None,
                 metadata: None,
+                speaker: None,
             }],
         };
 

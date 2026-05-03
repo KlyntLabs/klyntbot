@@ -22,11 +22,17 @@ CREATE TABLE IF NOT EXISTS semantic_facts (
     scope_type      TEXT NOT NULL DEFAULT 'system',
     scope_id        TEXT,
     scope_repo_id   TEXT,
-    metadata        TEXT
+    metadata        TEXT,
+    -- Speaker attribution: who *uttered* the fact (often the user, but in
+    -- multi-party transcripts e.g. 'Alice told me Bob is sick' →
+    -- speaker=Alice, subject=Bob). NULL means the speaker is the subject
+    -- (the common single-user case). Indexed for query-side filtering.
+    speaker         TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_domain ON semantic_facts(domain);
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_subject ON semantic_facts(subject, predicate);
+CREATE INDEX IF NOT EXISTS idx_semantic_facts_speaker ON semantic_facts(speaker) WHERE speaker IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_active ON semantic_facts(valid_until) WHERE valid_until IS NULL;
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_scope ON semantic_facts(scope_type, scope_id);
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_recorded_at ON semantic_facts(recorded_at);
@@ -358,6 +364,25 @@ CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
     content_rowid='rowid',
     tokenize='porter unicode61'
 );
+
+-- Aliases for an entity. Closes the gap where the question references
+-- an entity by a non-canonical form ("Mel" for "Melissa", "Caroline's"
+-- for "Caroline"). Populated at extraction time; expanded at query
+-- time inside `extract_query_entities`. alias_type is purely advisory
+-- — retrieval treats all aliases as equivalent matches.
+CREATE TABLE IF NOT EXISTS entity_aliases (
+    id TEXT PRIMARY KEY,
+    entity_id TEXT NOT NULL,
+    alias TEXT NOT NULL,
+    alias_type TEXT NOT NULL,        -- 'short_form' | 'possessive' | 'nickname' | 'full_form' | 'spelling'
+    source TEXT NOT NULL,            -- 'derived' | 'extraction' | 'manual'
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE,
+    UNIQUE(entity_id, alias)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_aliases_alias ON entity_aliases(alias);
+CREATE INDEX IF NOT EXISTS idx_entity_aliases_entity ON entity_aliases(entity_id);
 
 CREATE TRIGGER IF NOT EXISTS entities_ai AFTER INSERT ON entities BEGIN
     INSERT INTO entities_fts(rowid, name, description)

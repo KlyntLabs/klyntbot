@@ -1315,6 +1315,7 @@ fn new_semantic_fact(id: &str, fu: &FactUpdate, now: &str) -> SemanticFact {
         scope_id: None,
         scope_repo_id: None,
         metadata: None,
+        speaker: None,
     }
 }
 

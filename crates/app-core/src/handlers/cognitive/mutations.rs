@@ -43,6 +43,7 @@ impl AppCore {
             scope_id: None,
             metadata: None,
             scope_repo_id: None,
+            speaker: None,
         };
 
         fact_repo.upsert(&fact).await.map_err(map_cognitive_err)?;

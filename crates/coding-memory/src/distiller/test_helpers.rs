@@ -86,6 +86,7 @@ pub async fn distill_test_turn(
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         let _ = fact_repo.upsert(&fact).await;
         write_entity_edges_for_distiller_fact(&fact, entity_repo).await;

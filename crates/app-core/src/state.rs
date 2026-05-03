@@ -745,6 +745,44 @@ fn workspace_row_to_dto(row: storage::repos::WorkspaceRow) -> serde_json::Value 
 }
 
 impl AppCore {
+    /// Phase 3: trigger graph consolidation over the active fact set.
+    ///
+    /// Composes existing primitives — semantic fact repo, entity repo,
+    /// LLM-backed graph link handler — into a one-shot consolidation
+    /// pass. Bench callers fire this between ingest and QA;
+    /// production callers fire it on a fact-counter threshold.
+    /// Returns the number of facts processed.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn trigger_graph_consolidation(&self) -> common::Result<u32> {
+        use std::sync::Arc;
+        let provider = match self.cognitive_provider.clone() {
+            Some(p) => p,
+            None => {
+                tracing::warn!("graph_consolidation: no cognitive provider, skipping");
+                return Ok(0);
+            }
+        };
+        let cfg_guard = self.config.read().await;
+        let params = providers::cognitive_chat_params(&cfg_guard, 1024);
+        drop(cfg_guard);
+        let handler: Arc<dyn cognitive::services::graph_linker::GraphLinkHandler> =
+            Arc::new(agent::cognitive_handlers::LlmGraphLinkHandler::new(
+                provider, params,
+            ));
+        let fact_repo =
+            cognitive::repos::SemanticFactRepo::new(self.storage_pool.inner().clone());
+        let entity_repo =
+            cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
+        let count = cognitive::services::background::run_graph_consolidation(
+            &fact_repo,
+            &entity_repo,
+            handler,
+            500,
+        )
+        .await;
+        Ok(count)
+    }
+
     /// Minimal AppCore for unit tests — uses in-memory storage and default config.
     pub async fn for_test(data_dir: Option<std::path::PathBuf>) -> Result<Self, String> {
         let mut config = config::Config::default();
