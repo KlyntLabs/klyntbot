@@ -182,9 +182,21 @@ const GRADER_TEMPLATE: &str = include_str!("locomo_grader_template.txt");
 /// Grade a single (question, gold, predicted) triple via OpenAI gpt-4.1.
 /// Returns "A" / "B" / "C" matching Letta's mapping.
 pub async fn grade_sample(question: &str, target: &str, predicted: &str) -> common::Result<char> {
-    let api_key = std::env::var("OPENAI_API_KEY").map_err(|_| {
-        common::KlyntbotError::Storage("OPENAI_API_KEY not set — required for LoCoMo grader".into())
-    })?;
+    // Grader endpoint is OpenAI-compatible; allow override via env so we can
+    // route to Mimo (https://token-plan-cn.xiaomimimo.com/v1) when the
+    // primary OpenAI key is rate-limited. Setting `KCA_LOCOMO_GRADER_URL`
+    // implies `KCA_LOCOMO_GRADER_KEY` is read instead of `OPENAI_API_KEY`.
+    // ⚠️ Switching grader model breaks comparability with the Letta
+    // leaderboard — scores become self-consistent only.
+    let base_url = std::env::var("KCA_LOCOMO_GRADER_URL")
+        .unwrap_or_else(|_| "https://api.openai.com/v1/chat/completions".into());
+    let api_key = std::env::var("KCA_LOCOMO_GRADER_KEY")
+        .or_else(|_| std::env::var("OPENAI_API_KEY"))
+        .map_err(|_| {
+            common::KlyntbotError::Storage(
+                "KCA_LOCOMO_GRADER_KEY or OPENAI_API_KEY required for LoCoMo grader".into(),
+            )
+        })?;
     let model = std::env::var("KCA_LOCOMO_GRADER_MODEL").unwrap_or_else(|_| "gpt-4.1".into());
 
     let prompt = GRADER_TEMPLATE
@@ -195,7 +207,11 @@ pub async fn grade_sample(question: &str, target: &str, predicted: &str) -> comm
     let body = serde_json::json!({
         "model": model,
         "temperature": 0,
-        "max_tokens": 16,
+        // Reasoning models (Mimo, DeepSeek-R1, o1) emit `reasoning_content`
+        // before `content`; a 16-token budget gets eaten entirely by
+        // reasoning, leaving content="" and forcing default 'C'. 256 is
+        // enough headroom on Mimo without inflating cost on gpt-4.1.
+        "max_tokens": 256,
         "messages": [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": prompt}
@@ -206,13 +222,34 @@ pub async fn grade_sample(question: &str, target: &str, predicted: &str) -> comm
         .timeout(std::time::Duration::from_secs(60))
         .build()
         .map_err(|e| common::KlyntbotError::Storage(format!("grader client: {e}")))?;
-    let resp = client
-        .post("https://api.openai.com/v1/chat/completions")
-        .bearer_auth(&api_key)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(format!("grader request: {e}")))?;
+    // Mimo SGP intermittently returns network errors; retry up to 3× with
+    // backoff so a transient blip doesn't kill the entire bench run.
+    let mut last_err: Option<reqwest::Error> = None;
+    let mut resp = None;
+    for attempt in 0..3 {
+        match client
+            .post(&base_url)
+            .bearer_auth(&api_key)
+            .json(&body)
+            .send()
+            .await
+        {
+            Ok(r) => {
+                resp = Some(r);
+                break;
+            }
+            Err(e) => {
+                last_err = Some(e);
+                tokio::time::sleep(std::time::Duration::from_millis(500 * (1 << attempt))).await;
+            }
+        }
+    }
+    let resp = resp.ok_or_else(|| {
+        common::KlyntbotError::Storage(format!(
+            "grader request after 3 retries: {}",
+            last_err.map(|e| e.to_string()).unwrap_or_default()
+        ))
+    })?;
     let status = resp.status();
     let json: serde_json::Value = resp
         .json()
