@@ -15,6 +15,9 @@ pub struct ExtractedFact {
     pub object: String,
     pub confidence: f64,
     pub source: String,
+    /// Wave 2: who said this. NULL when the speaker IS the subject (i.e.
+    /// first-person fact) or unknown.
+    pub speaker: Option<String>,
 }
 
 /// Maps extracted facts back to their source observation in a batch.
@@ -67,6 +70,63 @@ pub trait ExtractionHandler: Send + Sync {
         &self,
         observations: &[Observation],
     ) -> common::Result<BatchExtractionResult>;
+}
+
+/// AUDD operation classifier (Mem0 pattern).
+///
+/// For each candidate fact extracted from an observation, the
+/// ingestion consumer can ask a `ConflictResolver` how to apply it
+/// against existing memory: ADD a new row, UPDATE an existing one,
+/// DELETE a contradicted one, or NOOP if equivalent. Without this,
+/// every extraction appends and the memory store accumulates
+/// contradictions over time.
+///
+/// Implementation lives in the agent crate (LLM-backed). Default
+/// `NoopConflictResolver` returns `Add` for every candidate, matching
+/// pre-AUDD behavior.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConflictDecision {
+    Add,
+    /// Update the existing fact with the candidate's content.
+    /// `existing_id` references the fact to overwrite.
+    Update {
+        existing_id: String,
+    },
+    /// Mark `existing_id` as superseded.
+    /// `superseded_by` is the candidate (which is also Added fresh).
+    Delete {
+        existing_id: String,
+    },
+    Noop,
+}
+
+#[async_trait]
+pub trait ConflictResolver: Send + Sync {
+    /// Decide what to do with a candidate fact given the closest
+    /// existing facts (typically top-k semantically similar). Implementations
+    /// MUST be pure-ish — no side effects on storage; the caller applies
+    /// the chosen operation.
+    async fn classify(
+        &self,
+        candidate: &ExtractedFact,
+        nearest: &[crate::types::SemanticFact],
+    ) -> ConflictDecision;
+}
+
+/// Default no-op resolver: always ADD. Used when KCA_AUDD is off or
+/// no LLM-backed resolver is wired. Preserves pre-AUDD ingestion
+/// semantics.
+pub struct NoopConflictResolver;
+
+#[async_trait]
+impl ConflictResolver for NoopConflictResolver {
+    async fn classify(
+        &self,
+        _candidate: &ExtractedFact,
+        _nearest: &[crate::types::SemanticFact],
+    ) -> ConflictDecision {
+        ConflictDecision::Add
+    }
 }
 
 /// Classify a fact's memory type based on trigger phrases in the object text.
@@ -136,6 +196,7 @@ pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) ->
         scope_id: None,
         scope_repo_id: None,
         metadata: None,
+        speaker: candidate.speaker.clone(),
     }
 }
 
@@ -167,7 +228,8 @@ mod tests {
                         object: "10am-12pm".into(),
                         confidence: 0.8,
                         source: "observed".into(),
-                    }],
+                    
+                        speaker: None,}],
                 },
                 BatchExtraction {
                     observation_index: 1,
@@ -238,7 +300,8 @@ mod tests {
             object: "10am-12pm".into(),
             confidence: 0.8,
             source: "observed".into(),
-        };
+        
+            speaker: None,};
         let obs = test_observation();
         let fact = to_semantic_fact(&candidate, &obs);
 

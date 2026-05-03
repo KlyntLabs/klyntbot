@@ -60,6 +60,9 @@ function ComposerHarness({
       collaborationModes={[]}
       selectedCollaborationModeId={null}
       onSelectCollaborationMode={() => {}}
+      providers={[]}
+      selectedProviderId={null}
+      onSelectProvider={() => {}}
       models={[]}
       selectedModelId={null}
       onSelectModel={() => {}}

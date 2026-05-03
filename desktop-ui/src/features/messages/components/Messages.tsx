@@ -3,6 +3,7 @@ import { RequestUserInputMessage } from "@app/components/RequestUserInputMessage
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import { memo, useCallback } from "react";
+import { CostCeilingBanner } from "@/features/coding/components/CostCeilingBanner";
 import { DeadEndWarning } from "@/features/coding/components/DeadEndWarning";
 import { RecallTrayCard } from "@/features/coding/components/RecallTrayCard";
 import { useApprovalQueue } from "@/features/coding/hooks/useApprovalQueue";
@@ -265,6 +266,7 @@ export const Messages = memo(function Messages({
   return (
     <div className="messages messages-full" ref={containerRef} onScroll={updateAutoScroll}>
       <div className="messages-inner">
+        <CostCeilingBanner sessionKey={threadId ?? ""} />
         {groupedItems.map((entry) => {
           if (entry.kind === "toolGroup") {
             const { group } = entry;

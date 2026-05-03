@@ -1,6 +1,7 @@
 // MUST be first — installs window.__TAURI_INTERNALS__ before any
 // @tauri-apps/api/* import resolves it. No-op inside the real Tauri webview.
 import "./services/__mocks__/tauri-browser-shim";
+import "./tracing/styles/tracing.css";
 import * as Sentry from "@sentry/react";
 import React from "react";
 import ReactDOM from "react-dom/client";

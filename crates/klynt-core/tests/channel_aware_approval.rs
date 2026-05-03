@@ -22,6 +22,8 @@ fn build_ask_layer1() -> Arc<Layer1> {
         ask: vec![],
         default_if_no_match: "ask".to_string(),
         mirror_learning: false,
+        mirror_cooldown_hours: 24,
+        mirror_min_approvals: 5,
     };
     Arc::new(Layer1::compile(&perms).expect("Layer1 compile"))
 }
@@ -49,6 +51,17 @@ fn build_ctx<'a>(
         cwd: None,
         channel,
         non_ui_policy,
+        history_repo: None,
+        repo_id: String::new(),
+        mirror_learning_enabled: false,
+        mirror_min_approvals: 5,
+        mirror_cooldown_seconds: 86400,
+        now_unix: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
+        thread_id: None,
+        turn_id: None,
     }
 }
 

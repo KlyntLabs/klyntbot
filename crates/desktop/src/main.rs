@@ -107,6 +107,10 @@ fn main() {
         std::process::exit(coding_ingest::hook_cli::run(hook_args));
     }
 
+    // Pre-main hardening: ptrace deny, core-dump disable, env-var scrub.
+    // Must run before any allocator setup that may inspect env vars.
+    klynt_process_hardening::pre_main_hardening();
+
     configure_mimalloc();
     let cli = Cli::parse();
 

@@ -8,6 +8,7 @@ pub mod event_domain;
 pub mod events;
 pub mod learning_events;
 pub mod queue;
+pub mod typed_broker;
 
 pub use context_updates::{ContextUpdate, ContextUpdateQueue, ContextUpdateReason, UpdatePriority};
 pub use domain_events::{
@@ -17,3 +18,4 @@ pub use event_domain::EventDomain;
 pub use events::{InboundMessage, MessageKind, OutboundMessage};
 pub use learning_events::{LearningEvent, LearningEventBus};
 pub use queue::MessageBus;
+pub use typed_broker::TypedBroker;

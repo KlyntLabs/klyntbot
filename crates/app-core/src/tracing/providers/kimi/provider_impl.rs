@@ -8,7 +8,7 @@ use crate::tracing::provider::TracingProvider;
 use crate::tracing::providers::kimi::{
     cache::SessionCache, context_loader::load_context, discovery::discover_sessions,
     import::import_from_file, loader::load_session_events, state_loader::load_state,
-    stats::aggregate, subagent_loader::list_subagents,
+    stats::aggregate, subagent_loader::list_subagents, summary,
 };
 use crate::tracing::types::*;
 use jiff::Timestamp;
@@ -54,6 +54,23 @@ impl KimiTracingProvider {
     }
 
     async fn resolve_session_dir(&self, session_id: &str) -> Result<PathBuf> {
+        // Accept either bare UUID or "<hash>/<uuid>" composite form.
+        // The UI composes the latter from list_sessions output; legacy
+        // callers may pass the bare UUID. Both must resolve.
+        if let Some((hash, uuid)) = session_id.split_once('/') {
+            let direct = self.kimi_root.join(hash).join(uuid);
+            if direct.is_dir() {
+                return Ok(direct);
+            }
+            let imp = self.imported_root.join(uuid);
+            if imp.is_dir() {
+                return Ok(imp);
+            }
+            return Err(common::KlyntbotError::StorageNotFound(format!(
+                "session {session_id}"
+            )));
+        }
+
         // Native session: <kimi_root>/<hash>/<session_id>/
         let mut entries = match tokio::fs::read_dir(&self.kimi_root).await {
             Ok(d) => d,
@@ -72,7 +89,7 @@ impl KimiTracingProvider {
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("dir iter: {e}")))?
         {
-            if !h.file_type().await.map_or(false, |t| t.is_dir()) {
+            if !h.file_type().await.is_ok_and(|t| t.is_dir()) {
                 continue;
             }
             let candidate = h.path().join(session_id);
@@ -170,11 +187,25 @@ impl TracingProvider for KimiTracingProvider {
                 has_wire: true,
                 has_context,
                 imported: d.imported,
+
+                work_dir_hash: d.hash.clone().unwrap_or_default(),
+                has_state: tokio::fs::try_exists(&state_path).await.unwrap_or(false),
+                wire_size: tokio::fs::metadata(&wire)
+                    .await
+                    .map(|m| m.len())
+                    .unwrap_or(0),
+                context_size,
+                state_size: tokio::fs::metadata(&state_path)
+                    .await
+                    .map(|m| m.len())
+                    .unwrap_or(0),
+                total_size: size_bytes,
+                metadata: None,
             };
             self.cache.put(wire, mtime, summary.clone()).await;
             out.push(summary);
         }
-        out.sort_by(|a, b| b.last_event_at.cmp(&a.last_event_at));
+        out.sort_by_key(|b| std::cmp::Reverse(b.last_event_at));
         Ok(out)
     }
 
@@ -232,6 +263,39 @@ impl TracingProvider for KimiTracingProvider {
     async fn stats(&self) -> Result<StatsBundle> {
         let sessions = self.list_sessions().await?;
         aggregate(&sessions).await
+    }
+
+    async fn session_summary(&self, session_id: &str) -> Result<SessionSummary> {
+        let dir = self.resolve_session_dir(session_id).await?;
+        summary::compute(&dir).await
+    }
+
+    async fn load_subagent_session(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+    ) -> Result<SessionDetail> {
+        self.load_session(
+            session_id,
+            Scope::Subagent {
+                agent_id: agent_id.to_string(),
+            },
+        )
+        .await
+    }
+
+    async fn load_subagent_context(
+        &self,
+        session_id: &str,
+        agent_id: &str,
+    ) -> Result<Vec<ContextMessage>> {
+        self.load_context(
+            session_id,
+            Scope::Subagent {
+                agent_id: agent_id.to_string(),
+            },
+        )
+        .await
     }
 }
 

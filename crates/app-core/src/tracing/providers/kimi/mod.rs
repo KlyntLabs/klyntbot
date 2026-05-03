@@ -10,5 +10,6 @@ mod provider_impl;
 pub mod state_loader;
 pub mod stats;
 pub mod subagent_loader;
+pub mod summary;
 
 pub use provider_impl::KimiTracingProvider;

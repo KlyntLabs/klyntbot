@@ -41,6 +41,7 @@ async fn repeat_attempt_yields_warning() {
         scope_id: None,
         scope_repo_id: Some("repo:demo".into()),
         metadata: Some(r#"{"memory_type":"counterfactual","reason":"too slow","attempt_id":"00000000-0000-0000-0000-000000000001","problem_hash":"abc"}"#.into()),
+        speaker: None,
     };
     fact_repo
         .upsert_with_metadata(&cf, cf.scope_repo_id.as_deref(), cf.metadata.as_deref())

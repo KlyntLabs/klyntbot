@@ -5,6 +5,8 @@
 
 /// CLI adapter stubs — see Task 6.
 pub mod adapters;
+/// Per-framework coverage parsers (lcov, cobertura, tarpaulin, llvm-cov).
+pub mod coverage;
 /// Daemon stub — see Task 8.
 pub mod daemon;
 /// `desktop.lock` heartbeat helpers.

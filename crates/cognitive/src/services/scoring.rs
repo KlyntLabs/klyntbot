@@ -225,6 +225,7 @@ mod tests {
             scope_id: None,
             scope_repo_id: None,
             metadata: None,
+            speaker: None,
         };
         assert!((convergence_score(&fact) - 0.42).abs() < f64::EPSILON);
     }

@@ -161,6 +161,7 @@ fn build_fact(
             scope_id: effective_scope_repo.clone(),
             scope_repo_id: effective_scope_repo.clone(),
             metadata: None,
+            speaker: None,
         },
         metadata_json: Some(serde_json::json!({ "reasoning": obs.reasoning })),
         scope_repo_id: effective_scope_repo,

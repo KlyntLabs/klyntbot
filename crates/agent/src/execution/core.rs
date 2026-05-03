@@ -57,6 +57,8 @@ const MAX_CONCURRENT_TOOLS: usize = 10;
 /// Tool results accumulate across 500+ messages per session, so this
 /// limit directly bounds session cache footprint.
 const MAX_TOOL_RESULT_LENGTH: usize = 50_000;
+const TOOL_RESULT_TRUNCATION_POLICY: klynt_truncation::TruncationPolicy =
+    klynt_truncation::TruncationPolicy::Bytes(MAX_TOOL_RESULT_LENGTH);
 
 /// Partition tool calls by `Tool::is_concurrency_safe`.
 ///
@@ -93,19 +95,10 @@ fn sanitize_tool_result(input: &str) -> String {
         .chars()
         .filter(|c| !c.is_control() || *c == '\n' || *c == '\t' || *c == '\r')
         .collect();
-
-    if cleaned.len() > MAX_TOOL_RESULT_LENGTH {
-        // Find a valid UTF-8 char boundary at or before MAX_TOOL_RESULT_LENGTH
-        let mut truncate_at = MAX_TOOL_RESULT_LENGTH;
-        while truncate_at > 0 && !cleaned.is_char_boundary(truncate_at) {
-            truncate_at -= 1;
-        }
-        let mut truncated = cleaned[..truncate_at].to_string();
-        truncated.push_str("\n[truncated - result exceeded 50KB]");
-        truncated
-    } else {
-        cleaned
+    if cleaned.len() <= MAX_TOOL_RESULT_LENGTH {
+        return cleaned;
     }
+    klynt_truncation::formatted_truncate_text(&cleaned, TOOL_RESULT_TRUNCATION_POLICY)
 }
 
 /// Hash a `serde_json::Value` without serializing to a string.
@@ -674,18 +667,10 @@ impl ExecutionCore {
 
                         // Emit ToolEnd AFTER executing
                         // Truncate result to 2KB to avoid huge WebSocket payloads
-                        let truncated = if result_str.len() > 2048 {
-                            // Find a valid UTF-8 char boundary at or before 2048
-                            let end = (0..=2048)
-                                .rev()
-                                .find(|&i| result_str.is_char_boundary(i))
-                                .unwrap_or(0);
-                            let mut s = result_str[..end].to_string();
-                            s.push_str("…[truncated]");
-                            Some(s)
-                        } else {
-                            Some(result_str.clone())
-                        };
+                        let truncated = Some(klynt_truncation::truncate_text(
+                            &result_str,
+                            klynt_truncation::TruncationPolicy::Bytes(2048),
+                        ));
                         fan_out_event(
                             tx.as_ref(),
                             self.domain_event_bus.as_ref(),
@@ -1222,7 +1207,11 @@ mod tests {
     fn sanitize_tool_result_caps_length() {
         let long = "x".repeat(200_000);
         let result = sanitize_tool_result(&long);
-        assert!(result.len() <= MAX_TOOL_RESULT_LENGTH + 50);
+        assert!(
+            result.len() <= MAX_TOOL_RESULT_LENGTH + 200,
+            "result.len() = {}",
+            result.len()
+        );
     }
 
     #[test]

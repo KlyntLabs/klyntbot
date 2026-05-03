@@ -1083,6 +1083,15 @@ pub async fn relay_chat_stream(
                         // Auto-allow / auto-deny / privacy: telemetry only — UI doesn't need them.
                     }
                     AgentEvent::ApprovalRequested { ref request_id, ref tool, ref args_hash, ref layer, ref rule_matched, ref mirror_history, ref sandbox_summary, requires_user_input, ref args, ref cwd, ref layer_reason } => {
+                        if let Some(ref bus) = domain_event_bus {
+                            bus.publish(bus::DomainEvent::ApprovalRequested {
+                                request_id: request_id.clone(),
+                                tool: tool.clone(),
+                                args_hash: args_hash.clone(),
+                                layer: layer.clone(),
+                                repo_id: None,
+                            });
+                        }
                         let payload = serde_json::json!({
                             "request_id": request_id,
                             "tool": tool,
@@ -1109,6 +1118,13 @@ pub async fn relay_chat_stream(
                         }
                     }
                     AgentEvent::ApprovalResolved { ref request_id, ref decision, ref decision_reason, ref latency_ms, ref persisted_rule, ref decided_by } => {
+                        if let Some(ref bus) = domain_event_bus {
+                            bus.publish(bus::DomainEvent::ApprovalResolved {
+                                request_id: request_id.clone(),
+                                decision: decision.clone(),
+                                decided_by: decided_by.clone(),
+                            });
+                        }
                         let payload = serde_json::json!({
                             "request_id": request_id,
                             "decision": decision,

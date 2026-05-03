@@ -190,6 +190,24 @@ pub struct AppCore {
     pub session_end_fired: Arc<dashmap::DashMap<String, ()>>,
     /// Skill activator for coding mode — path-conditional + dynamic discovery.
     pub coding_skill_activator: Arc<tokio::sync::Mutex<Option<klynt_skill_loader::SkillActivator>>>,
+    /// Mirror-learned approval history repo (Phase 2 Layer 3).
+    pub coding_approval_history_repo: Option<Arc<storage::repos::CodingApprovalHistoryRepo>>,
+    /// File snapshot repo for /sessions rewind (Phase 2).
+    pub snapshot_repo: Option<Arc<klynt_core::snapshots::SnapshotRepo>>,
+    // ── Phase 4: Coding thread events ─────────────────────────────────
+    /// Typed broker for ThreadEvent — publish from agent loop, subscribe from Tauri adapter.
+    pub thread_events: bus::TypedBroker<desktop_shared::coding::ThreadEvent>,
+    /// Typed broker for CostUpdate — publish after each provider call.
+    pub cost_events: bus::TypedBroker<desktop_shared::coding::CostUpdate>,
+    /// Active thread subscriptions keyed by subscription_id.
+    pub thread_subscriptions: Arc<dashmap::DashMap<String, ThreadSubscription>>,
+}
+
+/// State for an active thread subscription.
+#[derive(Debug, Clone)]
+pub struct ThreadSubscription {
+    pub thread_id: String,
+    pub created_at: i64,
 }
 
 impl AppCore {
@@ -553,9 +571,232 @@ impl AppCore {
             content,
         })
     }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_permissions_clear_mirror(
+        &self,
+        tool: String,
+        repo_id: Option<String>,
+    ) -> common::Result<u64> {
+        let repo = self.coding_approval_history_repo.clone().ok_or_else(|| {
+            common::KlyntbotError::Storage("approval history repo not initialized".into())
+        })?;
+        repo.clear_for_tool(&tool, repo_id.as_deref()).await
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_sessions_rewind(
+        &self,
+        session_key: String,
+        message_id: String,
+    ) -> common::Result<desktop_shared::RewindResult> {
+        let snap_repo = self.snapshot_repo.clone().ok_or_else(|| {
+            common::KlyntbotError::Storage("snapshot repo not initialized".into())
+        })?;
+        let snaps: Vec<klynt_core::snapshots::Snapshot> = snap_repo
+            .list_after_message(&session_key, &message_id)
+            .await?;
+        let mut restored: usize = 0;
+        let mut deleted: usize = 0;
+        // Apply newest-first to undo in reverse order
+        for snap in snaps.iter().rev() {
+            if snap.file_existed {
+                tokio::fs::write(&snap.file_path, &snap.content_before).await?;
+                restored += 1;
+            } else {
+                // file didn't exist before — undo by deleting
+                let _ = tokio::fs::remove_file(&snap.file_path).await;
+                deleted += 1;
+            }
+        }
+        let removed = self
+            .repos
+            .sessions
+            .rewind_to_message(&session_key, &message_id)
+            .await?;
+        Ok(desktop_shared::RewindResult {
+            messages_removed: removed,
+            files_restored: restored,
+            files_deleted: deleted,
+        })
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_sessions_export(
+        &self,
+        session_key: String,
+        format: desktop_shared::ExportFormat,
+    ) -> common::Result<desktop_shared::SessionExportResult> {
+        let bytes = match format {
+            desktop_shared::ExportFormat::Md => {
+                self.repos.sessions.export_session_md(&session_key).await?
+            }
+            desktop_shared::ExportFormat::Json => {
+                self.repos
+                    .sessions
+                    .export_session_json(&session_key)
+                    .await?
+            }
+        };
+        let dir = self.config.read().await.data_dir_path().join("exports");
+        tokio::fs::create_dir_all(&dir).await?;
+        let ext = match format {
+            desktop_shared::ExportFormat::Md => "md",
+            desktop_shared::ExportFormat::Json => "json",
+        };
+        let path = dir.join(format!("{session_key}.{ext}"));
+        tokio::fs::write(&path, &bytes).await?;
+        Ok(desktop_shared::SessionExportResult {
+            path: path.to_string_lossy().into_owned(),
+            bytes_written: bytes.len(),
+        })
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_sessions_fork(
+        &self,
+        session_key: String,
+        up_to_message: Option<String>,
+    ) -> common::Result<desktop_shared::SessionForkResult> {
+        let new_key = self
+            .repos
+            .sessions
+            .fork_session(&session_key, up_to_message.as_deref())
+            .await?;
+        Ok(desktop_shared::SessionForkResult {
+            new_session_key: new_key,
+        })
+    }
+
+    // ── Workspace lifecycle (Cursor/Codex-style "open folder") ────────────
+    //
+    // Workspaces are registered folders on disk. The `id` UUID flows into
+    // `sessions.repo_id`, `coding_approval_history.repo_id`, and `GuardCtx.repo_id`
+    // (Phase 2). `project_id` (optional) links to a Klyntbot organizational
+    // project; null for one-off folders.
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn list_workspaces(&self) -> common::Result<serde_json::Value> {
+        let rows = self.repos.workspaces.list_all().await?;
+        let dtos: Vec<_> = rows.into_iter().map(workspace_row_to_dto).collect();
+        Ok(serde_json::Value::Array(dtos))
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn add_workspace(&self, path: String) -> common::Result<serde_json::Value> {
+        let abs = std::path::PathBuf::from(&path);
+        let canonical = tokio::fs::canonicalize(&abs).await.map_err(|e| {
+            common::KlyntbotError::Storage(format!("invalid workspace path '{path}': {e}"))
+        })?;
+        let meta = tokio::fs::metadata(&canonical).await.map_err(|e| {
+            common::KlyntbotError::Storage(format!("workspace path stat failed: {e}"))
+        })?;
+        if !meta.is_dir() {
+            return Err(common::KlyntbotError::Storage(format!(
+                "workspace path is not a directory: {path}"
+            )));
+        }
+        let path_str = canonical.to_string_lossy().into_owned();
+        if let Some(existing) = self.repos.workspaces.get_by_path(&path_str).await? {
+            return Ok(workspace_row_to_dto(existing));
+        }
+        let name = canonical
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("workspace")
+            .to_string();
+        let id = format!("ws-{}", uuid::Uuid::new_v4());
+        let row = self
+            .repos
+            .workspaces
+            .insert(storage::repos::NewWorkspace {
+                id: &id,
+                name: &name,
+                path: &path_str,
+                kind: "main",
+                parent_id: None,
+                project_id: None,
+                settings_json: "{}",
+            })
+            .await?;
+        Ok(workspace_row_to_dto(row))
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn is_workspace_path_dir(&self, path: String) -> common::Result<bool> {
+        match tokio::fs::metadata(&path).await {
+            Ok(m) => Ok(m.is_dir()),
+            Err(_) => Ok(false),
+        }
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn remove_workspace(&self, id: String) -> common::Result<()> {
+        self.repos.workspaces.remove(&id).await?;
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn connect_workspace(&self, id: String) -> common::Result<()> {
+        self.repos.workspaces.set_connected(&id, true).await?;
+        Ok(())
+    }
+}
+
+fn workspace_row_to_dto(row: storage::repos::WorkspaceRow) -> serde_json::Value {
+    let settings: serde_json::Value =
+        serde_json::from_str(&row.settings).unwrap_or_else(|_| serde_json::json!({}));
+    serde_json::json!({
+        "id": row.id,
+        "name": row.name,
+        "path": row.path,
+        "connected": row.connected != 0,
+        "kind": row.kind,
+        "parentId": row.parent_id,
+        "projectId": row.project_id,
+        "settings": settings,
+    })
 }
 
 impl AppCore {
+    /// Phase 3: trigger graph consolidation over the active fact set.
+    ///
+    /// Composes existing primitives — semantic fact repo, entity repo,
+    /// LLM-backed graph link handler — into a one-shot consolidation
+    /// pass. Bench callers fire this between ingest and QA;
+    /// production callers fire it on a fact-counter threshold.
+    /// Returns the number of facts processed.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn trigger_graph_consolidation(&self) -> common::Result<u32> {
+        use std::sync::Arc;
+        let provider = match self.cognitive_provider.clone() {
+            Some(p) => p,
+            None => {
+                tracing::warn!("graph_consolidation: no cognitive provider, skipping");
+                return Ok(0);
+            }
+        };
+        let cfg_guard = self.config.read().await;
+        let params = providers::cognitive_chat_params(&cfg_guard, 1024);
+        drop(cfg_guard);
+        let handler: Arc<dyn cognitive::services::graph_linker::GraphLinkHandler> =
+            Arc::new(agent::cognitive_handlers::LlmGraphLinkHandler::new(
+                provider, params,
+            ));
+        let fact_repo =
+            cognitive::repos::SemanticFactRepo::new(self.storage_pool.inner().clone());
+        let entity_repo =
+            cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
+        let count = cognitive::services::background::run_graph_consolidation(
+            &fact_repo,
+            &entity_repo,
+            handler,
+            500,
+        )
+        .await;
+        Ok(count)
+    }
+
     /// Minimal AppCore for unit tests — uses in-memory storage and default config.
     pub async fn for_test(data_dir: Option<std::path::PathBuf>) -> Result<Self, String> {
         let mut config = config::Config::default();

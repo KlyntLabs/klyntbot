@@ -50,12 +50,12 @@ export async function exportMarkdownFile(
   if (!selection) {
     return null;
   }
-  await invoke("write_text_file", { path: selection, content });
+  await invoke("text_file_write", { path: selection, content });
   return selection;
 }
 
 export async function readImageAsDataUrl(path: string): Promise<string> {
-  return invoke<string>("read_image_as_data_url", { path });
+  return invoke<string>("image_data_url", { path });
 }
 
 export type TextFileResponse = {
@@ -76,7 +76,14 @@ export async function fileRead(
   kind: FileKind,
   workspaceId?: string,
 ): Promise<TextFileResponse> {
-  return invoke<TextFileResponse>("file_read", { scope, kind, workspaceId });
+  if (!workspaceId && scope === "workspace") {
+    throw new Error("workspaceId required for workspace scope");
+  }
+  return invoke<TextFileResponse>("workspace_meta_read", {
+    workspaceId: workspaceId ?? "",
+    scope,
+    kind,
+  });
 }
 
 export async function fileWrite(
@@ -85,23 +92,31 @@ export async function fileWrite(
   content: string,
   workspaceId?: string,
 ): Promise<void> {
-  return invoke("file_write", { scope, kind, workspaceId, content });
+  if (!workspaceId && scope === "workspace") {
+    throw new Error("workspaceId required for workspace scope");
+  }
+  return invoke("workspace_meta_write", {
+    workspaceId: workspaceId ?? "",
+    scope,
+    kind,
+    content,
+  });
 }
 
 export async function readGlobalAgentsMd(): Promise<GlobalAgentsResponse> {
-  return fileRead("global", "agents");
+  return invoke<TextFileResponse>("workspace_meta_read", { workspaceId: "", scope: "global", kind: "agents" });
 }
 
 export async function writeGlobalAgentsMd(content: string): Promise<void> {
-  return fileWrite("global", "agents", content);
+  return invoke("workspace_meta_write", { workspaceId: "", scope: "global", kind: "agents", content });
 }
 
 export async function readGlobalCodexConfigToml(): Promise<GlobalCodexConfigResponse> {
-  return fileRead("global", "config");
+  return invoke<TextFileResponse>("workspace_meta_read", { workspaceId: "", scope: "global", kind: "config" });
 }
 
 export async function writeGlobalCodexConfigToml(content: string): Promise<void> {
-  return fileWrite("global", "config", content);
+  return invoke("workspace_meta_write", { workspaceId: "", scope: "global", kind: "config", content });
 }
 
 export async function readAgentMd(workspaceId: string): Promise<AgentMdResponse> {
@@ -113,14 +128,14 @@ export async function writeAgentMd(workspaceId: string, content: string): Promis
 }
 
 export async function getWorkspaceFiles(workspaceId: string) {
-  return invoke<string[]>("list_workspace_files", { workspaceId });
+  return invoke<string[]>("workspace_files_list", { workspaceId, query: null, limit: null });
 }
 
 export async function readWorkspaceFile(
   workspaceId: string,
   path: string,
 ): Promise<{ content: string; truncated: boolean }> {
-  return invoke<{ content: string; truncated: boolean }>("read_workspace_file", {
+  return invoke<{ content: string; truncated: boolean }>("workspace_file_read", {
     workspaceId,
     path,
   });

@@ -37,6 +37,8 @@ import { useComposerDraftEffects } from "../hooks/useComposerDraftEffects";
 import { useComposerKeyDown } from "../hooks/useComposerKeyDown";
 import { useComposerSuggestionStyle } from "../hooks/useComposerSuggestionStyle";
 import { usePromptHistory } from "../hooks/usePromptHistory";
+import { CodingModePill } from "@/features/coding/components/CodingModePill";
+import { CostPill } from "@/features/coding/components/CostPill";
 import { ComposerInput } from "./ComposerInput";
 import { ComposerMetaBar } from "./ComposerMetaBar";
 import { ComposerQueue } from "./ComposerQueue";
@@ -59,7 +61,10 @@ type ComposerProps = {
   collaborationModes: { id: string; label: string }[];
   selectedCollaborationModeId: string | null;
   onSelectCollaborationMode: (id: string | null) => void;
-  models: { id: string; displayName: string; model: string }[];
+  providers: { id: string; displayName: string; hasApiKey: boolean }[];
+  selectedProviderId: string | null;
+  onSelectProvider: (id: string | null) => void;
+  models: { id: string; displayName: string; model: string; provider: string | null }[];
   selectedModelId: string | null;
   onSelectModel: (id: string) => void;
   reasoningOptions: string[];
@@ -168,6 +173,9 @@ export const Composer = memo(function Composer({
   collaborationModes,
   selectedCollaborationModeId,
   onSelectCollaborationMode,
+  providers = [],
+  selectedProviderId = null,
+  onSelectProvider,
   models,
   selectedModelId,
   onSelectModel,
@@ -266,6 +274,17 @@ export const Composer = memo(function Composer({
       ? "Steer"
       : "Queue"
     : sendLabel;
+  const ctxWindow = contextUsage?.modelContextWindow ?? 0;
+  const ctxUsed =
+    contextUsage?.last.totalTokens || contextUsage?.total.totalTokens || 0;
+  const contextFreePercent =
+    ctxWindow > 0 && ctxUsed > 0
+      ? Math.max(0, 100 - Math.min(100, (ctxUsed / ctxWindow) * 100))
+      : null;
+  const contextFreeLabel =
+    contextFreePercent === null
+      ? "Context free --"
+      : `Context free ${Math.round(contextFreePercent)}%`;
   const {
     expandFenceOnSpace,
     expandFenceOnEnter,
@@ -638,6 +657,7 @@ export const Composer = memo(function Composer({
           ))}
         </div>
       ) : null}
+      <div className="composer-shell">
       <ComposerInput
         text={text}
         disabled={disabled}
@@ -692,12 +712,17 @@ export const Composer = memo(function Composer({
         onReviewPromptConfirmCommit={onReviewPromptConfirmCommit}
         onReviewPromptUpdateCustomInstructions={onReviewPromptUpdateCustomInstructions}
         onReviewPromptConfirmCustom={onReviewPromptConfirmCustom}
+        contextFreePercent={contextFreePercent}
+        contextFreeLabel={contextFreeLabel}
       />
       <ComposerMetaBar
         disabled={disabled}
         collaborationModes={collaborationModes}
         selectedCollaborationModeId={selectedCollaborationModeId}
         onSelectCollaborationMode={onSelectCollaborationMode}
+        providers={providers}
+        selectedProviderId={selectedProviderId}
+        onSelectProvider={onSelectProvider}
         models={models}
         selectedModelId={selectedModelId}
         onSelectModel={onSelectModel}
@@ -711,12 +736,11 @@ export const Composer = memo(function Composer({
         onSelectCodexArgsOverride={onSelectCodexArgsOverride}
         accessMode={accessMode}
         onSelectAccessMode={onSelectAccessMode}
-        contextUsage={contextUsage}
       >
         <CodingModePill threadId={historyKey} />
-        <SandboxStatusPill threadId={historyKey} />
         <CostPill threadId={historyKey} />
       </ComposerMetaBar>
+      </div>
     </footer>
   );
 });

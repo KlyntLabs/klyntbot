@@ -11,6 +11,8 @@ fn perms(allow: &[&str], deny: &[&str], ask: &[&str], default: &str) -> CodingPe
         ask: ask.iter().map(|s| s.to_string()).collect(),
         default_if_no_match: default.into(),
         mirror_learning: false,
+        mirror_cooldown_hours: 24,
+        mirror_min_approvals: 5,
     }
 }
 

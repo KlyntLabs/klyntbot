@@ -371,6 +371,7 @@ impl AppCore {
                         scope_id: None,
                         metadata: None,
                         scope_repo_id: None,
+                        speaker: None,
                     };
                     let _ = sf_repo.upsert(&fact).await;
 

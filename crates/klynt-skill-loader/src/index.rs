@@ -1,23 +1,28 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SkillSource {
     User,
     Project,
     ReforgePrivate,
     ReforgeTeam,
+    Mcp { server_name: String },
+    SkillsMarketplace { name: String, version: String },
 }
 
 impl SkillSource {
     /// Lower priority loses to higher priority on name collision.
-    pub fn priority(self) -> u8 {
+    pub fn priority(&self) -> u8 {
         match self {
             SkillSource::User => 0,
             SkillSource::ReforgePrivate => 1,
             SkillSource::ReforgeTeam => 2,
             SkillSource::Project => 3,
+            SkillSource::Mcp { .. } => 4,
+            SkillSource::SkillsMarketplace { .. } => 5,
         }
     }
 }

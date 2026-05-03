@@ -47,6 +47,11 @@ pub struct WebFetchTool {
     client: reqwest::Client,
     non_ui_policy: common::tool_channel::NonUiPolicy,
     host_cache: Arc<HostApprovalCache>,
+    pub history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
+    pub mirror_learning_enabled: bool,
+    pub mirror_min_approvals: u32,
+    pub mirror_cooldown_seconds: i64,
+    pub repo_id: String,
 }
 
 impl WebFetchTool {
@@ -72,6 +77,11 @@ impl WebFetchTool {
             client,
             non_ui_policy,
             host_cache,
+            history_repo: None,
+            mirror_learning_enabled: false,
+            mirror_min_approvals: 5,
+            mirror_cooldown_seconds: 86400,
+            repo_id: String::new(),
         }
     }
 }
@@ -102,6 +112,11 @@ impl ToolExecute for WebFetchTool {
             self.host_cache.clone(),
             ctx.hook_engine.clone(),
             session_id,
+            self.history_repo.clone(),
+            self.mirror_learning_enabled,
+            self.mirror_min_approvals,
+            self.mirror_cooldown_seconds,
+            self.repo_id.clone(),
         )
         .await
     }
@@ -123,6 +138,11 @@ pub async fn run_for_test(
     host_cache: Arc<HostApprovalCache>,
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     session_id: String,
+    history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
+    mirror_learning_enabled: bool,
+    mirror_min_approvals: u32,
+    mirror_cooldown_seconds: i64,
+    repo_id: String,
 ) -> Result<String> {
     let host_key = HostKey::from_url(&args.url)?;
     let host_decision = match host_cache.check_or_register(host_key.clone()) {
@@ -148,6 +168,14 @@ pub async fn run_for_test(
                 cwd: None,
                 channel,
                 non_ui_policy,
+                history_repo,
+                repo_id,
+                mirror_learning_enabled,
+                mirror_min_approvals,
+                mirror_cooldown_seconds,
+                now_unix: jiff::Timestamp::now().as_second(),
+                thread_id: None,
+                turn_id: None,
             };
             let approval = evaluate(guard_ctx, "web_fetch", &args.url).await;
             let host_decision = if approval.allowed() {

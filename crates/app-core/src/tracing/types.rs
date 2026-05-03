@@ -149,6 +149,15 @@ pub struct SessionSummary {
     pub has_wire: bool,
     pub has_context: bool,
     pub imported: bool,
+
+    // ── Tracing UI port additions ──
+    pub work_dir_hash: String,
+    pub has_state: bool,
+    pub wire_size: u64,
+    pub context_size: u64,
+    pub state_size: u64,
+    pub total_size: u64,
+    pub metadata: Option<SessionMetadataInfo>,
 }
 
 // ── Phase 4.3: SessionDetail ────────────────────────────────────────────
@@ -280,4 +289,39 @@ pub struct ProviderInfo {
     pub id: String,
     pub display_name: String,
     pub session_count: u32,
+}
+
+// ── Tracing UI port: SessionMetadataInfo ────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionMetadataInfo {
+    pub session_id: String,
+    pub title: String,
+    pub title_generated: bool,
+    pub archived: bool,
+    pub archived_at: Option<i64>,
+    pub auto_archive_exempt: bool,
+    pub wire_mtime: Option<i64>,
+}
+
+#[cfg(test)]
+mod metadata_tests {
+    use super::*;
+    #[test]
+    fn metadata_serializes_camel_case() {
+        let m = SessionMetadataInfo {
+            session_id: "s1".into(),
+            title: "t".into(),
+            title_generated: false,
+            archived: false,
+            archived_at: None,
+            auto_archive_exempt: false,
+            wire_mtime: Some(1_700_000_000),
+        };
+        let s = serde_json::to_string(&m).unwrap();
+        assert!(s.contains(r#""sessionId":"s1""#));
+        assert!(s.contains(r#""titleGenerated":false"#));
+        assert!(s.contains(r#""wireMtime":1700000000"#));
+    }
 }

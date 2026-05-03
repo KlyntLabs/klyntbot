@@ -1,3 +1,4 @@
+pub mod coding;
 pub mod cognitive_commands;
 pub mod commands;
 pub mod entity_link_types;
@@ -15,6 +16,62 @@ pub struct HooksTomlSnapshot {
     pub path: String,
     pub exists: bool,
     pub content: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct RewindResult {
+    pub messages_removed: u64,
+    pub files_restored: usize,
+    pub files_deleted: usize,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct SessionExportResult {
+    pub path: String,
+    pub bytes_written: usize,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub enum ExportFormat {
+    Md,
+    Json,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct SessionForkResult {
+    pub new_session_key: String,
+}
+
+/// Args for `coding_sessions_export`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionExportArgs {
+    pub session_key: String,
+    pub format: ExportFormat,
+}
+
+/// Args for `coding_sessions_fork`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionForkArgs {
+    pub session_key: String,
+    pub up_to_message: Option<String>,
+}
+
+/// Args for `coding_sessions_rewind`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRewindArgs {
+    pub session_key: String,
+    pub message_id: String,
+}
+
+/// Args for `coding_permissions_clear_mirror`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ClearMirrorCacheArgs {
+    pub tool: String,
+    pub repo_id: Option<String>,
 }
 
 #[cfg(test)]

@@ -26,12 +26,14 @@ cargo nextest run -p kca-e2e --test full_pipeline
 echo "===== Step 4: KCA Benchmark build check ====="
 cargo check -p kca-bench
 
-echo "===== Step 5: KCA Benchmarks (subset, real API) ====="
+echo "===== Step 5: KCA Benchmark — real LoCoMo (Letta-comparable) ====="
 mkdir -p docs/architecture
-# Run a small subset by default; full benchmark is expensive with real LLM
-KCA_BENCH_LIMIT="${KCA_BENCH_LIMIT:-5}" \
-  cargo run -p kca-bench --release --bin run-bench -- \
-  --output docs/architecture/kca-game-changer.md
+# Default: 2 conversations × 10 QA = ~20 questions, ~3 min. Override with
+# KCA_LOCOMO_LIMIT / KCA_LOCOMO_QA_LIMIT for fuller runs (full = 10 × ~150 ≈ 1500).
+# Requires OPENAI_API_KEY for the SimpleQA grader (gpt-4.1).
+KCA_LOCOMO_LIMIT="${KCA_LOCOMO_LIMIT:-2}" \
+KCA_LOCOMO_QA_LIMIT="${KCA_LOCOMO_QA_LIMIT:-10}" \
+  cargo run -p kca-bench --release --bin run-locomo-real
 
 if [[ -n "${RUN_SOAK:-}" ]]; then
     echo "===== Step 6: Soak test (RUN_SOAK=1) ====="

@@ -23,6 +23,12 @@ pub struct SessionRow {
     pub total_cost_usd: f64,
     pub total_tokens: i64,
     pub parent_session_id: Option<String>,
+    // Phase 4 fields
+    pub workspace_id: Option<String>,
+    pub forked_from_id: Option<String>,
+    pub summary_message_id: Option<String>,
+    pub ephemeral: i64,
+    pub archived_at: Option<i64>,
 }
 
 /// Row struct for the `session_messages` table.
@@ -33,6 +39,9 @@ pub struct SessionMessageRow {
     pub session_key: String,
     pub role: String,
     pub content: String,
+    pub parts: Option<String>,
+    pub turn_id: Option<String>,
+    pub finish_reason: Option<String>,
     pub timestamp: SqlTs,
     pub request_id: Option<String>,
     pub tool_calls: Option<serde_json::Value>,

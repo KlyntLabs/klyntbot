@@ -5,6 +5,7 @@ pub mod area;
 pub mod brain_signal;
 pub mod coaching_intervention_log;
 pub mod coaching_strategy;
+pub mod coding_approval_history;
 pub mod cron;
 pub mod custom_column;
 pub mod decision_log;
@@ -49,12 +50,16 @@ pub mod tests;
 pub mod tool_usage;
 pub mod trial_repo;
 pub mod usage;
+pub mod workspace;
 
 pub use agent_task::AgentTaskRepo;
 pub use area::AreaRepo;
 pub use brain_signal::{BrainSignalFeedbackRepo, BrainSignalFeedbackRow};
 pub use coaching_intervention_log::{CoachingInterventionLogRepo, InterventionLogRow};
 pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
+pub use coding_approval_history::{
+    ApprovalHistorySummary, CodingApprovalHistoryRepo, HistoryEntry,
+};
 pub use cron::CronRepo;
 pub use custom_column::CustomColumnRepo;
 pub use decision_log::DecisionLogRepo;
@@ -96,6 +101,7 @@ pub use task_repo::{TaskFilter, TaskPatch, TaskRepo, TimeEntryWithTask};
 pub use tool_usage::ToolUsageRepo;
 pub use trial_repo::TrialRepo;
 pub use usage::UsageRepo;
+pub use workspace::{NewWorkspace, WorkspaceRepo, WorkspaceRow};
 
 /// Aggregate counts by status — shared between actions and tasks.
 #[derive(Debug, Clone, Default, serde::Serialize)]
@@ -162,6 +168,8 @@ pub struct Repos {
     pub skill_version: SkillVersionRepo,
     pub notification_log: NotificationLogRepo,
     pub held_notifications: HeldNotificationsRepo,
+    pub coding_approval_history: CodingApprovalHistoryRepo,
+    pub workspaces: WorkspaceRepo,
 }
 
 impl Repos {
@@ -200,6 +208,8 @@ impl Repos {
             skill_version: SkillVersionRepo::new(db.clone()),
             notification_log: NotificationLogRepo::new(db.clone()),
             held_notifications: HeldNotificationsRepo::new(db.clone()),
+            coding_approval_history: CodingApprovalHistoryRepo::new(pool.clone()),
+            workspaces: WorkspaceRepo::new(db.clone()),
             pool: db,
         }
     }

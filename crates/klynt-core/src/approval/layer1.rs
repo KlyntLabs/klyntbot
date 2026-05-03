@@ -38,10 +38,10 @@ impl Layer1 {
             };
         }
         if let Some(rule) = self.ask.find_match(tool, payload) {
-            return ApprovalDecision::Ask {
-                layer: ApprovalLayer::Layer1Declarative,
-                reason: format!("layer-1 ask: {rule}"),
-            };
+            return ApprovalDecision::ask(
+                ApprovalLayer::Layer1Declarative,
+                format!("layer-1 ask: {rule}"),
+            );
         }
         match self.default_if_no_match.as_str() {
             "allow" => ApprovalDecision::Auto {
@@ -56,10 +56,10 @@ impl Layer1 {
                 reason: "layer-1 default: deny".into(),
                 rule_matched: None,
             },
-            _ => ApprovalDecision::Ask {
-                layer: ApprovalLayer::Layer1Declarative,
-                reason: "layer-1 default: ask".into(),
-            },
+            _ => ApprovalDecision::ask(
+                ApprovalLayer::Layer1Declarative,
+                "layer-1 default: ask",
+            ),
         }
     }
 }

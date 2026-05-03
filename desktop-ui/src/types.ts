@@ -168,6 +168,12 @@ export type ConversationItem =
         | "default_mode";
       layerReason: string;
       mirrorHistory?: { approvalCount: number; denialCount: number };
+      layerDecisions?: {
+        privacy: { outcome: string; reason: string; ruleMatched: string | null };
+        layer1: { outcome: string; reason: string; ruleMatched?: string | null };
+        layer2: { outcome: string; reason: string; ruleMatched?: string | null };
+        layer3: { outcome: string; reason: string; ruleMatched?: string | null };
+      };
       status:
         | "pending"
         | "approved-once"
@@ -666,6 +672,7 @@ export type ModelOption = {
   model: string;
   displayName: string;
   description: string;
+  provider: string | null;
   supportedReasoningEfforts: { reasoningEffort: string; description: string }[];
   defaultReasoningEffort: string | null;
   isDefault: boolean;

@@ -20,7 +20,11 @@ pub(crate) async fn dispatch_dev(
     Some(match cmd {
         "coding_status" => {
             let session_key = try_field!(dev::get_str(body, "sessionKey"));
-            dev::val(core.coding_status(&session_key).await.map_err(desktop_shared::errors::ApiError::from))
+            dev::val(
+                core.coding_status(&session_key)
+                    .await
+                    .map_err(desktop_shared::errors::ApiError::from),
+            )
         }
         _ => return None,
     })

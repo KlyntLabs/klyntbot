@@ -142,21 +142,32 @@ CREATE TABLE sessions (
     approval_mode          TEXT NOT NULL DEFAULT 'default',
     total_cost_usd         REAL NOT NULL DEFAULT 0,
     total_tokens           INTEGER NOT NULL DEFAULT 0,
-    parent_session_id      TEXT
+    parent_session_id      TEXT,
+    -- Phase 4 columns (added 2026-05-03 per spec 2026-05-03-klynt-coding-in-chat-phase4-design.md)
+    workspace_id           TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
+    forked_from_id         TEXT REFERENCES sessions(key) ON DELETE SET NULL,
+    summary_message_id     TEXT,
+    ephemeral              INTEGER NOT NULL DEFAULT 0,
+    archived_at            INTEGER
 );
+
+CREATE INDEX IF NOT EXISTS idx_sessions_workspace_archived ON sessions(workspace_id, archived_at);
 
 -- ============================================================
 -- Session Messages
 -- ============================================================
 CREATE TABLE session_messages (
-    id          TEXT PRIMARY KEY,
-    session_key TEXT NOT NULL REFERENCES sessions(key) ON DELETE CASCADE,
-    role        TEXT NOT NULL,
-    content     TEXT NOT NULL,
-    timestamp   INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
-    request_id  TEXT,
-    tool_calls  TEXT,
-    metadata    TEXT
+    id            TEXT PRIMARY KEY,
+    session_key   TEXT NOT NULL REFERENCES sessions(key) ON DELETE CASCADE,
+    role          TEXT NOT NULL,
+    content       TEXT NOT NULL DEFAULT '',
+    parts         TEXT,                            -- Phase 4: JSON Vec<MessagePart>; NULL for legacy rows
+    turn_id       TEXT,                            -- Phase 4: UI turn grouping
+    finish_reason TEXT,                            -- Phase 4: typed FinishReason JSON
+    timestamp     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    request_id    TEXT,
+    tool_calls    TEXT,
+    metadata      TEXT
 );
 CREATE INDEX idx_session_messages_key_ts ON session_messages(session_key, timestamp);
 
@@ -842,3 +853,67 @@ CREATE TABLE IF NOT EXISTS response_warnings (
 
 CREATE INDEX IF NOT EXISTS idx_response_warnings_created
     ON response_warnings(created_at);
+
+-- Phase 2: Mirror-learned approval cache (Layer 3)
+-- Append-only log of every ApprovalResolved event keyed by (tool, args_hash, repo_id).
+CREATE TABLE IF NOT EXISTS coding_approval_history (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    tool            TEXT NOT NULL,
+    args_hash       TEXT NOT NULL,
+    repo_id         TEXT NOT NULL DEFAULT '',
+    decision        TEXT NOT NULL,           -- 'allow' | 'deny'
+    decided_by      TEXT NOT NULL,           -- 'user' | 'auto_allow' | 'auto_deny' | 'timeout' | 'cancelled'
+    layer           TEXT NOT NULL,           -- which layer fired
+    created_at      INTEGER NOT NULL DEFAULT (cast(strftime('%s','now') as integer))
+);
+
+CREATE INDEX IF NOT EXISTS idx_coding_approval_history_key
+  ON coding_approval_history(tool, args_hash, repo_id);
+
+CREATE INDEX IF NOT EXISTS idx_coding_approval_history_clear
+  ON coding_approval_history(tool, repo_id);
+
+-- Phase 2: file snapshots for /sessions rewind
+CREATE TABLE IF NOT EXISTS coding_snapshots (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_key     TEXT NOT NULL,
+    message_id      TEXT,                    -- which assistant turn produced the edit (nullable)
+    file_path       TEXT NOT NULL,
+    content_before  BLOB NOT NULL,           -- raw bytes pre-edit; '' if file did not exist OR ghost-mode
+    file_existed    INTEGER NOT NULL DEFAULT 1,  -- 0 means restoring should delete the file
+    content_hash    TEXT NOT NULL,           -- blake3 of content_before; sha "ghost" when ghost_commit_sha is set
+    ghost_commit_sha TEXT NULL,              -- when set, restore via klynt_git_utils::restore_ghost_commit instead of BLOB
+    ghost_repo_root  TEXT NULL,              -- absolute path of the git repo at snapshot time
+    ghost_preexisting_untracked_json TEXT NULL,  -- JSON array of preexisting untracked file paths at snapshot time
+    created_at      INTEGER NOT NULL DEFAULT (cast(strftime('%s','now') as integer))
+);
+
+CREATE INDEX IF NOT EXISTS idx_coding_snapshots_session
+  ON coding_snapshots(session_key, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_coding_snapshots_ghost
+  ON coding_snapshots(session_key, ghost_commit_sha) WHERE ghost_commit_sha IS NOT NULL;
+
+-- ============================================================
+-- Workspaces (code editor workspace lifecycle, Cursor/Codex-style)
+-- ============================================================
+-- A registered folder on disk. Phase 2 surfaces (sessions.repo_id,
+-- coding_approval_history.repo_id, GuardCtx.repo_id) carry this id as
+-- a freeform string. project_id is an optional link to a Klyntbot
+-- organizational project; null for one-off folders.
+CREATE TABLE IF NOT EXISTS workspaces (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    path        TEXT NOT NULL UNIQUE,
+    connected   INTEGER NOT NULL DEFAULT 1,
+    kind        TEXT NOT NULL DEFAULT 'main',
+    parent_id   TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
+    project_id  TEXT REFERENCES projects(id) ON DELETE SET NULL,
+    settings    TEXT NOT NULL DEFAULT '{}',
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_workspaces_path ON workspaces(path);
+CREATE INDEX IF NOT EXISTS idx_workspaces_project_id ON workspaces(project_id);
+CREATE INDEX IF NOT EXISTS idx_workspaces_parent_id ON workspaces(parent_id);

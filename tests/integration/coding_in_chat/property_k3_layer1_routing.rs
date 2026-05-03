@@ -14,6 +14,8 @@ proptest! {
         let perms = CodingPermissions {
             allow, deny: deny.clone(), ask: vec!["Bash(*)".into()],
             default_if_no_match: "ask".into(), mirror_learning: false,
+            mirror_min_approvals: 5,
+            mirror_cooldown_hours: 24,
         };
         let l1 = Layer1::compile(&perms).unwrap();
         let d1 = l1.evaluate("bash", &payload);

@@ -64,6 +64,14 @@ mod tests {
             has_wire: true,
             has_context: false,
             imported: false,
+
+            work_dir_hash: String::new(),
+            has_state: false,
+            wire_size: 0,
+            context_size: 0,
+            state_size: 0,
+            total_size: 0,
+            metadata: None,
         }
     }
 

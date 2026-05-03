@@ -6,6 +6,7 @@
 // ── Modules ─────────────────────────────────────────────────────────────
 
 pub mod autotuner;
+pub mod coverage;
 pub mod date;
 pub mod entity_card;
 pub mod error;
@@ -33,7 +34,7 @@ pub use prompts::{
 pub use tool_channel::{Channel, ChannelMask};
 pub use types::{
     AppMode, ChannelName, ChatId, MessageRole, SessionKey, CLI_CHANNEL, CODING_CHANNEL,
-    MCP_CHANNEL, SYSTEM_CHANNEL, TELEGRAM_RESET_SENDER,
+    MCP_CHANNEL, MIRROR_ALERT_COST_THRESHOLD_CROSSED, SYSTEM_CHANNEL, TELEGRAM_RESET_SENDER,
 };
 
 // ── Re-exports: commonly used utilities ─────────────────────────────────

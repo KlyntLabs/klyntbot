@@ -42,6 +42,11 @@ pub struct BashTool {
     pending: Arc<PendingApprovalsMap>,
     bus: Arc<DomainEventBus>,
     non_ui_policy: common::tool_channel::NonUiPolicy,
+    pub history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
+    pub mirror_learning_enabled: bool,
+    pub mirror_min_approvals: u32,
+    pub mirror_cooldown_seconds: i64,
+    pub repo_id: String,
 }
 
 impl BashTool {
@@ -60,6 +65,11 @@ impl BashTool {
             pending,
             bus,
             non_ui_policy,
+            history_repo: None,
+            mirror_learning_enabled: false,
+            mirror_min_approvals: 5,
+            mirror_cooldown_seconds: 86400,
+            repo_id: String::new(),
         }
     }
 }
@@ -86,6 +96,14 @@ impl ToolExecute for BashTool {
             cwd: args.cwd.clone(),
             channel: common::tool_channel::Channel::from_name(ctx.channel.as_str()),
             non_ui_policy: self.non_ui_policy,
+            history_repo: self.history_repo.clone(),
+            repo_id: self.repo_id.clone(),
+            mirror_learning_enabled: self.mirror_learning_enabled,
+            mirror_min_approvals: self.mirror_min_approvals,
+            mirror_cooldown_seconds: self.mirror_cooldown_seconds,
+            now_unix: jiff::Timestamp::now().as_second(),
+            thread_id: None,
+            turn_id: None,
         };
         let decision = evaluate(guard_ctx, "bash", &args.command).await;
         if !decision.allowed() {

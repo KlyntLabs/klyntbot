@@ -55,6 +55,14 @@ async agentDeleteFile(agentName: string, filename: string) : Promise<Result<bool
     else return { status: "error", error: e  as any };
 }
 },
+async approvalRespond(approvalId: string, decision: ApprovalDecisionDto) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("approval_respond", { approvalId, decision }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async annotationCreate(params: AnnotationCreateParams) : Promise<Result<AnnotationResponse, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("annotation_create", { params }) };
@@ -679,6 +687,21 @@ async codingStatus(sessionKey: string) : Promise<Result<CodingStatus, ApiError>>
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Open a coding window for a specific repo.
+ * 
+ * Creates a `coding:{repo_id}` window if it doesn't exist, or focuses
+ * the existing one. The `repo_id` must be ASCII alphanumeric with
+ * dashes/underscores, 1–64 characters.
+ */
+async codingOpenRepoWindow(repoId: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_open_repo_window", { repoId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async codingDoctor() : Promise<Result<DiagnosticChecklist, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_doctor") };
@@ -706,6 +729,230 @@ async codingSessionsStar(sessionKey: string) : Promise<Result<null, ApiError>> {
 async codingSessionsUnstar(sessionKey: string) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_sessions_unstar", { sessionKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingPermissionsClearMirror(args: ClearMirrorCacheArgs) : Promise<Result<number, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_permissions_clear_mirror", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSessionsRewind(args: SessionRewindArgs) : Promise<Result<RewindResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_rewind", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSessionsExport(args: SessionExportArgs) : Promise<Result<SessionExportResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_export", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingSessionsFork(args: SessionForkArgs) : Promise<Result<SessionForkResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_sessions_fork", { args }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingThreadStart(workspaceId: string, model: string | null, approvalPolicy: ApprovalPolicy | null, ephemeral: boolean | null) : Promise<Result<Thread, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_thread_start", { workspaceId, model, approvalPolicy, ephemeral }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingThreadResume(threadId: string, includeItems: boolean | null) : Promise<Result<Thread, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_thread_resume", { threadId, includeItems }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingThreadRead(threadId: string, cursor: string | null, limit: number | null) : Promise<Result<Thread, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_thread_read", { threadId, cursor, limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingThreadList(workspaceId: string, cursor: string | null, limit: number | null, sortKey: string | null) : Promise<Result<ThreadSummary[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_thread_list", { workspaceId, cursor, limit, sortKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingThreadFork(threadId: string, fromMessageId: string | null) : Promise<Result<Thread, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_thread_fork", { threadId, fromMessageId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingThreadCompact(threadId: string) : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_thread_compact", { threadId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingThreadArchive(threadId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_thread_archive", { threadId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingThreadSetName(threadId: string, name: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_thread_set_name", { threadId, name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingThreadSubscribe(threadId: string) : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_thread_subscribe", { threadId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingThreadUnsubscribe(subscriptionId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_thread_unsubscribe", { subscriptionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingMessageSend(threadId: string, text: string, model: string | null) : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_message_send", { threadId, text, model }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingTurnInterrupt(threadId: string, turnId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_turn_interrupt", { threadId, turnId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingTurnSteer(threadId: string, turnId: string, text: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_turn_steer", { threadId, turnId, text }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listWorkspaces() : Promise<Result<unknown, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_workspaces") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async addWorkspace(path: string) : Promise<Result<unknown, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_workspace", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async isWorkspacePathDir(path: string) : Promise<Result<boolean, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("is_workspace_path_dir", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async removeWorkspace(id: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_workspace", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async connectWorkspace(id: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("connect_workspace", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async workspaceMetaRead(workspaceId: string, scope: string, kind: string) : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("workspace_meta_read", { workspaceId, scope, kind }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async workspaceMetaWrite(workspaceId: string, scope: string, kind: string, content: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("workspace_meta_write", { workspaceId, scope, kind, content }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async workspaceFileRead(workspaceId: string, path: string) : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("workspace_file_read", { workspaceId, path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async workspaceFilesList(workspaceId: string, query: string | null, limit: number | null) : Promise<Result<string[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("workspace_files_list", { workspaceId, query, limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async textFileWrite(path: string, content: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("text_file_write", { path, content }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async imageDataUrl(path: string) : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("image_data_url", { path }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -3400,6 +3647,22 @@ async tracingLoadState(providerId: string, sessionId: string) : Promise<Result<S
     else return { status: "error", error: e  as any };
 }
 },
+async tracingLoadSubagentContext(providerId: string, sessionId: string, agentId: string) : Promise<Result<ContextMessage[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_load_subagent_context", { providerId, sessionId, agentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingLoadSubagentSession(providerId: string, sessionId: string, agentId: string) : Promise<Result<SessionDetail, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_load_subagent_session", { providerId, sessionId, agentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async tracingListSubagents(providerId: string, sessionId: string) : Promise<Result<SubagentSummary[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("tracing_list_subagents", { providerId, sessionId }) };
@@ -3427,6 +3690,14 @@ async tracingGetDir(providerId: string, sessionId: string) : Promise<Result<stri
 async tracingOpenDir(providerId: string, sessionId: string) : Promise<Result<string, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("tracing_open_dir", { providerId, sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingSessionSummary(providerId: string, sessionId: string) : Promise<Result<SessionSummary, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_session_summary", { providerId, sessionId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -4196,6 +4467,8 @@ message: string }
 export type AppApprovalDecision = { kind: "allow_once" } | { kind: "allow_always"; rule: string | null } | { kind: "deny" } | { kind: "add_rule"; starlark_source: string }
 export type AppInfoResponse = { version: string; dataDir: string; setupCompleted: boolean }
 export type AppUsageResponse = { appName: string; durationSecs: number; category: string | null }
+export type ApprovalDecisionDto = { kind: "accept" } | { kind: "decline" } | { kind: "accept_for_session" } | { kind: "accept_with_execpolicy_amendment"; execpolicy_amendment: ExecpolicyAmendment } | { kind: "cancel" }
+export type ApprovalPolicy = "ask_always" | "ask_on_risky" | "ask_on_failure" | "yolo_mode"
 export type AreaCreateParams = { name: string; color: string | null; icon: string | null }
 export type AreaResponse = { id: string; name: string; color: string; icon: string | null; projectCount: number; taskCount: number }
 export type AreaUpdateParams = { id: string; name: string | null; color: string | null; icon: string | null }
@@ -4251,6 +4524,10 @@ export type ChatMode = "chat" | "coding"
 export type ChatSessionResponse = { sessionKey: string; title: string; messageCount: number; createdAt: string; updatedAt: string; projectId: string | null; conversationType: string | null; pinned: boolean }
 export type ChatThreadResponse = { sessionKey: string; title: string; messageCount: number; updatedAt: string; contextType: string | null; entityKind: string | null; entityId: string | null; areaId: string | null; areaName: string | null; projectId: string | null; projectName: string | null }
 export type ClassificationCompletePayload = { sessionKey: string; strategy: string; confidence: number; source: string }
+/**
+ * Args for `coding_permissions_clear_mirror`.
+ */
+export type ClearMirrorCacheArgs = { tool: string; repoId: string | null }
 export type CliHealthRow = { cli: string; enabled: boolean; lastEventAt: string | null; eventCount24H: number }
 export type ClipboardContentType = "text" | "image" | "file"
 export type ClipboardEntry = { id: number; content: string; content_type: string; source_app: string | null; preview: string | null; file_path: string | null; pinned: boolean; created_at: string }
@@ -4414,8 +4691,10 @@ export type ErrorByTool = { tool: string; errorCount: number }
 export type EvalGrades = { meaning: string; grammar: string; naturalness: string; wordChoice: string }
 export type EvaluateTranslationParams = { sourceText: string; userTranslation: string; sourceLang: string; targetLang: string }
 export type ExecStatus = { kind: "ok" } | { kind: "err"; message: string }
+export type ExecpolicyAmendment = { commandPattern: string[]; starlarkSource: string | null }
 export type ExecutionStartedPayload = { sessionKey: string; engine: string; maxIterations: number }
 export type ExperimentSummary = { id: string; variant_count: number; messages_scored: number; hypothesis: string; started_at: string }
+export type ExportFormat = "Md" | "Json"
 export type FabricActionParams = { action: string; payload: unknown }
 export type FabricActionResponse = { success: boolean; message: string | null }
 export type FabricCommunity = { id: string; name: string; color: string; stability: number; memberCount: number; memberNoteIds: string[] }
@@ -4556,6 +4835,7 @@ export type InsightReviewStarted = { insightReviewId: string; contentHash: strin
 export type InsightSaveFlashcardsParams = { noteId: string; insightReviewId: string; deckName: string; questions: QuizQuestion[] }
 export type InsightScopeConfigParams = { scopeType?: string | null; radius: number | null; nodeIds?: string[] | null; includeCognitive: boolean | null; deepDive: boolean | null; mergeThreshold: number | null }
 export type InsightVersionResponse = { id: string; version: number; generatedAt: string; inputHash: string; hasParent: boolean }
+export type InstructionSource = { path: string; bytes: number; isGlobal: boolean }
 export type IntelligenceSessionResponse = { id: string; sessionType: string; startedAt: string; endedAt: string | null; durationSecs: number | null; dominantCategory: string | null; categoryPurity: number | null; qualityScore: number | null; title: string | null; description: string | null; appBreakdown: string | null; contextSwitches: number; distractionCount: number; source: string }
 export type InteractionRequestPayload = { sessionKey: string; requestId: string; request: unknown }
 export type InterventionLogResponse = { id: string; interventionType: string; message: string; triggerName: string; feedback: string | null; deliveredAt: string; feedbackAt: string | null }
@@ -4607,6 +4887,7 @@ export type MemoryHealthResponse = { overall: number; domains: DomainHealthEntry
 export type MemoryPromotedPayload = { sessionKey: string; factId: string; fromScope: string; toScope: string; subject: string; predicate: string }
 export type MemoryReferenceDetail = { refType: string; title: string; subtitle: string; details: Partial<{ [key in string]: string }> }
 export type MemoryStatsResponse = { activeFacts: number; archivedFacts: number; episodicCount: number; rulesCount: number; lastCompaction: string | null }
+export type MessageDto = { id: string; sessionId: string; role: string; parts: JsonValue[]; model: string | null; turnId: string | null; createdAt: number; finishReason: JsonValue | null }
 /**
  * Typed segment within a structured assistant message.
  * 
@@ -4898,10 +5179,12 @@ export type ReviewSessionSaveParams = { sessionId: string; cardsReviewed: number
  */
 status: string }
 export type ReviewStatsSummaryResponse = { streak: number; retention: number; weekly: WeeklyStatPoint[] }
+export type RewindResult = { messages_removed: number; files_restored: number; files_deleted: number }
 export type RouterStatusResponse = { hourlyCount: number; hourlyLimit: number; dailyCount: number; dailyLimit: number }
 export type RoutingSnapshot = { id: string; capturedAt: string; windowHours: number; totalMessages: number; distribution: Partial<{ [key in string]: SkillRouteStats }>; fallbackRate: number; avgRoutingConfidence: number; lowConfidenceCount: number; userFeedback: UserFeedback | null }
 export type RuleCreateParams = { domain: string; ruleText: string; confidence: number }
 export type RuleNode = { id: string; ruleText: string; domain: string; signalCount: number; confidence: number }
+export type SandboxKind = "macos_seatbelt" | "linux_bwrap_landlock" | "disabled"
 export type SandboxTestResult = { ok: boolean; details: string }
 export type ScenarioChallengeResponse = { title: string; situation: string; questions: string[]; modelAnswer: string; sourceNotes: string[]; difficultyScore: number }
 /**
@@ -4947,6 +5230,16 @@ export type SessionDetail = { sessionId: string; providerId: string; scope: Scop
  */
 truncated: boolean; totalEventCount: number }
 /**
+ * Args for `coding_sessions_export`.
+ */
+export type SessionExportArgs = { sessionKey: string; format: ExportFormat }
+export type SessionExportResult = { path: string; bytes_written: number }
+/**
+ * Args for `coding_sessions_fork`.
+ */
+export type SessionForkArgs = { sessionKey: string; upToMessage: string | null }
+export type SessionForkResult = { new_session_key: string }
+/**
  * Filters for `coding_memory_session_list`.
  */
 export type SessionListArgs = { 
@@ -4962,21 +5255,26 @@ repoId: string | null;
  * Look back N days. Defaults to 14.
  */
 sinceDays?: number; limit?: number; offset?: number }
+export type SessionMetadataInfo = { sessionId: string; title: string; titleGenerated: boolean; archived: boolean; archivedAt: number | null; autoArchiveExempt: boolean; wireMtime: number | null }
 /**
  * Args for `coding_memory_session_replay_recall_overlay`.
  */
 export type SessionRecallOverlayArgs = { sessionId: string; limit?: number; offset?: number }
 export type SessionReplayEntry = { id: string; source: string; sessionId: string; kind: string; occurredAt: string; payload: string }
 /**
+ * Args for `coding_sessions_rewind`.
+ */
+export type SessionRewindArgs = { sessionKey: string; messageId: string }
+/**
  * Row struct for the `sessions` table.
  */
-export type SessionRow = { key: string; metadata: JsonValue; createdAt: string; updatedAt: string; projectId: string | null; conversationType: string | null; pinned: boolean; cwd: string | null; repoId: string | null; repoBranch: string | null; toolProfile: string | null; approvalMode: string; totalCostUsd: number; totalTokens: number; parentSessionId: string | null }
+export type SessionRow = { key: string; metadata: JsonValue; createdAt: string; updatedAt: string; projectId: string | null; conversationType: string | null; pinned: boolean; cwd: string | null; repoId: string | null; repoBranch: string | null; toolProfile: string | null; approvalMode: string; totalCostUsd: number; totalTokens: number; parentSessionId: string | null; workspaceId: string | null; forkedFromId: string | null; summaryMessageId: string | null; ephemeral: number; archivedAt: number | null }
 export type SessionState = { customTitle: string | null; planMode: boolean; archived: boolean; todos: KimiTodo[]; 
 /**
  * Verbatim parsed state.json for the State tab's "raw" view.
  */
 raw: unknown }
-export type SessionSummary = { sessionId: string; providerId: string; sourceDir: string; cwd: string | null; projectBasename: string | null; customTitle: string | null; startedAt: string; lastEventAt: string; sizeBytes: number; turnCount: number; stepCount: number; toolCallCount: number; errorCount: number; subagentCount: number; hasWire: boolean; hasContext: boolean; imported: boolean }
+export type SessionSummary = { sessionId: string; providerId: string; sourceDir: string; cwd: string | null; projectBasename: string | null; customTitle: string | null; startedAt: string; lastEventAt: string; sizeBytes: number; turnCount: number; stepCount: number; toolCallCount: number; errorCount: number; subagentCount: number; hasWire: boolean; hasContext: boolean; imported: boolean; workDirHash: string; hasState: boolean; wireSize: number; contextSize: number; stateSize: number; totalSize: number; metadata: SessionMetadataInfo | null }
 /**
  * One row in the Plugins → Coding Memory session list.
  */
@@ -5042,6 +5340,8 @@ export type TaskResponse = { id: string; title: string; completed: boolean; prio
  */
 export type TaskTimeEntryRow = { id: string; taskId: string; source: string; startedAt: string; endedAt: string | null; durationSecs: number | null; note: string | null; energyLevel: string | null }
 export type TaskUpdateParams = { id: string; title: string | null; description: string | null; priority: number | null; status: string | null; dueDate: string | null; projectId: string | null; areaId: string | null; tags: string[] | null; keyResultId: string | null; statusLabelId: string | null; position: number | null; groupId: string | null; taskType: string | null; energyLevel: string | null; estimatedMinutes: number | null; scheduledStart: string | null; scheduledEnd: string | null }
+export type Thread = { id: string; workspaceId: string; cwd: string; model: string | null; approvalPolicy: ApprovalPolicy; sandbox: SandboxKind; instructionSources: InstructionSource[]; createdAt: number; updatedAt: number; title: string | null; starred: boolean; archivedAt: number | null; ephemeral: boolean; forkedFromId: string | null; summaryMessageId: string | null; totalCostUsd: number; totalTokens: number; items: MessageDto[] }
+export type ThreadSummary = { id: string; title: string | null; workspaceId: string; messageCount: number; totalCostUsd: number; createdAt: number; updatedAt: number; archivedAt: number | null }
 export type TimeEntryResponse = { id: number; description: string; categoryId: string | null; projectId: string | null; startedAt: string; durationSecs: number; source: string }
 export type TimelineEntry = { id: string; source: TimelineSource; entryType: TimelineEntryType; title: string; description: string | null; startedAt: string; endedAt: string | null; durationSecs: number | null; entityId: string | null; entityRoute: string | null; color: string; metadata: unknown | null }
 export type TimelineEntryType = "appUsage" | "focusSession" | "taskTimeEntry" | "taskCreated" | "taskCompleted" | "taskUpdated" | "taskDue" | "noteCreated" | "noteUpdated" | "transactionRecorded" | "expenseRecorded" | "incomeRecorded" | "systemEvent" | "calendarEvent" | "taskStatusChanged" | "taskPriorityChanged" | "taskFieldUpdated"

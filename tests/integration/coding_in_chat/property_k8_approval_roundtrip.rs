@@ -1,14 +1,14 @@
 use bus::DomainEventBus;
-use config::schema::CodingPermissions;
 use common::tool_channel::{Channel, NonUiPolicy};
+use config::schema::CodingPermissions;
 use klynt_core::approval::{guard::evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_execpolicy::Policy;
-use tools_core::events::ToolEvent;
 use proptest::prelude::*;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use tools_core::events::ToolEvent;
 
 proptest! {
     #![proptest_config(ProptestConfig { cases: 32, .. ProptestConfig::default() })]
@@ -40,6 +40,12 @@ proptest! {
                     cwd: None,
                     channel: Channel::Coding,
                     non_ui_policy: NonUiPolicy::Allow,
+                    history_repo: None,
+                    repo_id: String::new(),
+                    mirror_learning_enabled: false,
+                    mirror_min_approvals: 5,
+                    mirror_cooldown_seconds: 86400,
+                    now_unix: jiff::Timestamp::now().as_second(),
                 };
                 let _ = evaluate(ctx, "bash", "echo k8").await;
             }

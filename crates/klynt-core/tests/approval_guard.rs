@@ -14,6 +14,45 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tools_core::events::ToolEvent;
 
+fn guard_ctx_with_history<'a>(
+    layer1: &'a Layer1,
+    policy: &'a Policy,
+    privacy: &'a PrivacyGuard,
+    pending: &'a Arc<PendingApprovalsMap>,
+    event_tx: Option<&'a mpsc::Sender<ToolEvent>>,
+    bus: &'a Arc<DomainEventBus>,
+    history_repo: Option<Arc<storage::repos::CodingApprovalHistoryRepo>>,
+    mirror_learning: bool,
+    now_offset_h: i64,
+) -> GuardCtx<'a> {
+    GuardCtx {
+        layer1,
+        policy,
+        privacy,
+        pending,
+        event_tx,
+        domain_bus: bus,
+        cancel: CancellationToken::new(),
+        request_id: "test-mirror".into(),
+        args: None,
+        cwd: None,
+        channel: Channel::Coding,
+        non_ui_policy: NonUiPolicy::Allow,
+        history_repo,
+        repo_id: "test-repo".into(),
+        mirror_learning_enabled: mirror_learning,
+        mirror_min_approvals: 5,
+        mirror_cooldown_seconds: 86400,
+        now_unix: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64
+            + now_offset_h * 3600,
+        thread_id: None,
+        turn_id: None,
+    }
+}
+
 #[tokio::test]
 async fn privacy_blocks_first() {
     let perms = CodingPermissions {
@@ -40,6 +79,17 @@ async fn privacy_blocks_first() {
         cwd: None,
         channel: Channel::Coding,
         non_ui_policy: NonUiPolicy::Allow,
+        history_repo: None,
+        repo_id: String::new(),
+        mirror_learning_enabled: false,
+        mirror_min_approvals: 5,
+        mirror_cooldown_seconds: 86400,
+        now_unix: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
+        thread_id: None,
+        turn_id: None,
     };
     let d = evaluate(ctx, "bash", "cat .env").await;
     assert!(matches!(d, ApprovalDecision::PrivacyDenied { .. }));
@@ -77,6 +127,17 @@ async fn auto_allow_emits_pair_no_user_input() {
         cwd: None,
         channel: Channel::Coding,
         non_ui_policy: NonUiPolicy::Allow,
+        history_repo: None,
+        repo_id: String::new(),
+        mirror_learning_enabled: false,
+        mirror_min_approvals: 5,
+        mirror_cooldown_seconds: 86400,
+        now_unix: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
+        thread_id: None,
+        turn_id: None,
     };
     let d = evaluate(ctx, "bash", "echo hi").await;
     assert!(d.allowed());
@@ -137,7 +198,68 @@ async fn ask_path_awaits_user_decision() {
         cwd: None,
         channel: Channel::Coding,
         non_ui_policy: NonUiPolicy::Allow,
+        history_repo: None,
+        repo_id: String::new(),
+        mirror_learning_enabled: false,
+        mirror_min_approvals: 5,
+        mirror_cooldown_seconds: 86400,
+        now_unix: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
+        thread_id: None,
+        turn_id: None,
     };
     let d = evaluate(ctx, "bash", "rm something").await;
     assert!(d.allowed());
+}
+
+#[tokio::test]
+async fn layer3_auto_allows_after_5_prior_approvals_when_enabled() {
+    use storage::repos::{CodingApprovalHistoryRepo, HistoryEntry};
+    let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+    let history = CodingApprovalHistoryRepo::new(pool.clone());
+    for _ in 0..5 {
+        history
+            .record(HistoryEntry {
+                tool: "bash".into(),
+                args_hash: klynt_core::approval::layer3::args_hash_for_relevance(
+                    "bash",
+                    r#"{"command":"echo hi"}"#,
+                ),
+                repo_id: "test-repo".into(),
+                decision: "allow".into(),
+                decided_by: "user".into(),
+                layer: "ask".into(),
+            })
+            .await
+            .unwrap();
+    }
+    let perms = CodingPermissions {
+        allow: vec![],
+        ask: vec!["Bash(*)".into()],
+        default_if_no_match: "ask".into(),
+        mirror_learning: true,
+        ..Default::default()
+    };
+    let l1 = Layer1::compile(&perms).unwrap();
+    let privacy = PrivacyGuard::from_globs(&[]).unwrap();
+    let policy = Policy::empty();
+    let bus = Arc::new(DomainEventBus::new(64));
+    let pending = Arc::new(PendingApprovalsMap::new());
+
+    let ctx = guard_ctx_with_history(
+        &l1,
+        &policy,
+        &privacy,
+        &pending,
+        None,
+        &bus,
+        Some(Arc::new(history.clone())),
+        true,
+        25,
+    );
+    let decision = evaluate(ctx, "bash", r#"{"command":"echo hi"}"#).await;
+    assert!(matches!(decision.layer(), ApprovalLayer::Layer3Mirror));
+    assert!(decision.allowed(), "expected auto-allow, got {decision:?}");
 }

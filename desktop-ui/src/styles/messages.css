@@ -294,8 +294,8 @@
 
 .message.user .bubble {
   max-width: min(72%, 560px);
-  background: var(--cm-surface-panel-active);
-  border-color: color-mix(in srgb, var(--border-accent) 28%, transparent);
+  background: var(--surface-right-panel);
+  border-color: color-mix(in srgb, var(--text-primary) 14%, transparent);
 }
 
 .message.assistant .bubble {

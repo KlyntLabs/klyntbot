@@ -1,19 +1,19 @@
 use bus::DomainEventBus;
+use common::tool_channel::{Channel, NonUiPolicy};
 use config::schema::CodingPermissions;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
-use common::tool_channel::{Channel, NonUiPolicy};
 use klynt_core::tools::{
     apply_patch::{run_for_test as patch_run, ApplyPatchArgs},
     edit::{run_for_test as edit_run, EditArgs},
     write::{run_for_test as write_run, WriteArgs},
 };
 use klynt_execpolicy::Policy;
-use tools_core::events::ToolEvent;
 use proptest::prelude::*;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use tools_core::events::ToolEvent;
 
 fn perms() -> CodingPermissions {
     CodingPermissions {
@@ -47,20 +47,20 @@ proptest! {
                 0 => { let _ = tokio::time::timeout(Duration::from_secs(5),
                         write_run(WriteArgs { path: "f.txt".into(), content: content.clone() },
                             dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string()))
+                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string(), None))
                         .await; }
                 1 => { let _ = tokio::time::timeout(Duration::from_secs(5),
                         edit_run(EditArgs { path: "f.txt".into(),
                                 old_text: "seed".into(), new_text: content.clone() },
                             dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string()))
+                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string(), None))
                         .await; }
                 2 => {
                     let patch = "--- f.txt\n+++ f.txt\n@@ -1 +1 @@\n-seed\n+changed\n".to_string();
                     let _ = tokio::time::timeout(Duration::from_secs(5),
                         patch_run(ApplyPatchArgs { path: "f.txt".into(), patch },
                             dir.path().to_path_buf(), l1, pol, pri, pen, Some(tx), bus, CancellationToken::new(),
-                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string()))
+                            Channel::Coding, NonUiPolicy::Allow, None, "k5-test".to_string(), None))
                         .await;
                 }
                 _ => unreachable!(),

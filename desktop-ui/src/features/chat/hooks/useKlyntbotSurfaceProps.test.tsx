@@ -382,14 +382,6 @@ describe("useKlyntbotSurfaceProps", () => {
     expect(sendSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("supplies a single-item models[] so the model pill renders", () => {
-    const { result } = renderHook(() => useKlyntbotSurfaceProps("session-1"));
-    expect(result.current?.composerProps.models).toEqual([
-      { id: "klyntbot", displayName: "klyntbot", model: "klyntbot" },
-    ]);
-    expect(result.current?.composerProps.selectedModelId).toBe("klyntbot");
-  });
-
   it("supplies a default collaboration mode so the pill stays visible", () => {
     const { result } = renderHook(() => useKlyntbotSurfaceProps("session-1"));
     expect(result.current?.composerProps.collaborationModes).toEqual([

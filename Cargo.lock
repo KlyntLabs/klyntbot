@@ -75,6 +75,8 @@ dependencies = [
  "common",
  "config",
  "context_engine",
+ "criterion",
+ "dashmap",
  "feature-alarms",
  "feature-coaching",
  "feature-finance",
@@ -85,7 +87,9 @@ dependencies = [
  "futures-util",
  "jiff",
  "klynt-core",
+ "klynt-execpolicy",
  "klynt-hooks",
+ "klynt-truncation",
  "mcp",
  "plugin-runtime",
  "providers",
@@ -385,6 +389,7 @@ dependencies = [
  "base64 0.22.1",
  "bus",
  "channels",
+ "coding-agents-md",
  "coding-ingest",
  "coding-memory",
  "cognitive",
@@ -415,6 +420,7 @@ dependencies = [
  "notify",
  "notify-debouncer-mini",
  "platform-macos",
+ "proptest",
  "providers",
  "scheduling",
  "serde",
@@ -867,6 +873,26 @@ dependencies = [
  "event-listener 5.4.1",
  "event-listener-strategy",
  "pin-project-lite",
+]
+
+[[package]]
+name = "async-lsp"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8b8fd1e175c5ee3108095da452e816519de618beccea23aa053c00cf5e344b9"
+dependencies = [
+ "futures",
+ "lsp-types 0.95.1",
+ "pin-project-lite",
+ "rustix 1.1.4",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+ "waitpid-any",
 ]
 
 [[package]]
@@ -2518,6 +2544,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fa961b519f0b462e3a3b4a34b64d119eeaca1d59af726fe450bbba07a9fc0a1"
 dependencies = [
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "coding-agents-md"
+version = "0.1.1"
+dependencies = [
+ "jiff",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
 ]
 
 [[package]]
@@ -4458,6 +4496,7 @@ dependencies = [
  "feature-productivity",
  "futures-util",
  "jiff",
+ "klynt-process-hardening",
  "klyntbot-server",
  "linkme",
  "mcp-bridge",
@@ -5598,6 +5637,15 @@ name = "float_next_after"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8bf7cc16383c4b8d58b9905a8509f02926ce3058053c056376248d958c9df1e8"
+
+[[package]]
+name = "fluent-uri"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17c704e9dbe1ddd863da1e6ff3567795087b1eb201ce80d8fa81162e1516500d"
+dependencies = [
+ "bitflags 1.3.2",
+]
 
 [[package]]
 name = "flume"
@@ -7897,6 +7945,7 @@ dependencies = [
  "kca-e2e",
  "petgraph 0.7.1",
  "providers",
+ "reqwest 0.13.3",
  "serde",
  "serde_json",
  "sqlx",
@@ -7951,19 +8000,24 @@ name = "klynt-core"
 version = "0.0.1"
 dependencies = [
  "async-trait",
+ "blake3",
  "bstr",
  "bus",
  "common",
  "config",
  "dashmap",
+ "desktop-shared",
  "diffy",
  "dirs",
  "globset",
  "html2text",
+ "jiff",
  "klynt-execpolicy",
+ "klynt-git-utils",
  "klynt-hooks",
  "klynt-protocol",
  "klynt-sandbox",
+ "lsp-client",
  "proptest",
  "regex",
  "reqwest 0.13.3",
@@ -7971,6 +8025,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "shellexpand",
+ "sqlx",
  "storage",
  "tempfile",
  "thiserror 2.0.18",
@@ -8003,6 +8058,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "klynt-git-utils"
+version = "0.1.1"
+dependencies = [
+ "common",
+ "once_cell",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "walkdir",
+]
+
+[[package]]
 name = "klynt-hooks"
 version = "0.0.1"
 dependencies = [
@@ -8022,6 +8092,14 @@ dependencies = [
  "toml 0.8.2",
  "tracing",
  "walkdir",
+]
+
+[[package]]
+name = "klynt-process-hardening"
+version = "0.1.1"
+dependencies = [
+ "libc",
+ "pretty_assertions",
 ]
 
 [[package]]
@@ -8069,17 +8147,30 @@ dependencies = [
 name = "klynt-skill-loader"
 version = "0.0.1"
 dependencies = [
+ "async-trait",
  "common",
  "config",
  "globset",
+ "lru",
  "proptest",
+ "reqwest 0.13.3",
  "serde",
+ "serde_json",
  "serde_yaml",
  "skill-system",
  "tempfile",
  "thiserror 2.0.18",
  "tracing",
  "walkdir",
+]
+
+[[package]]
+name = "klynt-truncation"
+version = "0.1.1"
+dependencies = [
+ "pretty_assertions",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -9182,6 +9273,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
+name = "lsp-client"
+version = "0.1.1"
+dependencies = [
+ "async-lsp",
+ "common",
+ "lsp-types 0.97.0",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "lsp-types"
 version = "0.94.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9192,6 +9296,32 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "url",
+]
+
+[[package]]
+name = "lsp-types"
+version = "0.95.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e34d33a8e9b006cd3fc4fe69a921affa097bae4bb65f76271f4644f9a334365"
+dependencies = [
+ "bitflags 1.3.2",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "url",
+]
+
+[[package]]
+name = "lsp-types"
+version = "0.97.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53353550a17c04ac46c585feb189c2db82154fc84b79c7a66c96c2c644f66071"
+dependencies = [
+ "bitflags 1.3.2",
+ "fluent-uri",
+ "serde",
+ "serde_json",
+ "serde_repr",
 ]
 
 [[package]]
@@ -11446,6 +11576,16 @@ checksum = "d0de1b847b39c8131db0467e9df1ff60e6d0562ab8e9a16e568ad0fdb372e2f2"
 dependencies = [
  "predicates-core",
  "termtree",
+]
+
+[[package]]
+name = "pretty_assertions"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae130e2f271fbc2ac3a40fb1d07180839cdbbe443c7a27e1e3c13c5cac0116d"
+dependencies = [
+ "diff",
+ "yansi",
 ]
 
 [[package]]
@@ -14260,7 +14400,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "logos",
- "lsp-types",
+ "lsp-types 0.94.1",
  "memchr",
  "num-bigint",
  "num-traits",
@@ -14311,6 +14451,7 @@ dependencies = [
  "dashmap",
  "futures-util",
  "jiff",
+ "klynt-git-utils",
  "lance",
  "lance-io",
  "lancedb",
@@ -16496,6 +16637,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "waitpid-any"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18aa3ce681e189f125c4c1e1388c03285e2fd434ef52c7203084012ac29c5e4a"
+dependencies = [
+ "rustix 1.1.4",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "walkdir"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -18225,6 +18376,12 @@ name = "y4m"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a5a4b21e1a62b67a2970e6831bc091d7b87e119e7f9791aef9702e3bef04448"
+
+[[package]]
+name = "yansi"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
 
 [[package]]
 name = "yoke"

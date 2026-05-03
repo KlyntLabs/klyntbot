@@ -1,0 +1,3 @@
+{"role":"_system_prompt","content":"You are a researcher subagent."}
+{"role":"user","content":"Find all references to X"}
+{"role":"assistant","content":"Found 5 matches."}

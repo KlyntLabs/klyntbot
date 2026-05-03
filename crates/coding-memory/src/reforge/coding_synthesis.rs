@@ -428,6 +428,7 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
                     })
                     .to_string(),
                 ),
+                speaker: None,
             };
             handlers.fact_repo.upsert(&f).await?;
         }

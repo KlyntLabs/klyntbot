@@ -10,9 +10,23 @@ export type SkillListItem = {
   enabled: boolean;
 };
 
+type InstallStatus =
+  | { kind: "idle" }
+  | { kind: "installing" }
+  | { kind: "ok"; text: string }
+  | { kind: "err"; text: string };
+
+function isValidSource(src: string): boolean {
+  if (!src) return false;
+  if (src.startsWith("http://") || src.startsWith("https://")) return true;
+  if (src.startsWith("/") || src.startsWith(".")) return true;
+  return false;
+}
+
 export function SkillsSubsection() {
   const [skills, setSkills] = useState<SkillListItem[]>([]);
   const [installSrc, setInstallSrc] = useState("");
+  const [installStatus, setInstallStatus] = useState<InstallStatus>({ kind: "idle" });
 
   const reload = useCallback(async () => {
     const list = (await invoke("coding_skills_list")) as SkillListItem[];
@@ -22,6 +36,23 @@ export function SkillsSubsection() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  const handleInstall = async () => {
+    if (!installSrc) return;
+    if (!isValidSource(installSrc)) {
+      setInstallStatus({ kind: "err", text: "Enter a valid URL (http/https) or local path." });
+      return;
+    }
+    setInstallStatus({ kind: "installing" });
+    try {
+      await invoke("coding_skills_install", { source: installSrc });
+      setInstallSrc("");
+      setInstallStatus({ kind: "ok", text: "Skill installed successfully." });
+      reload();
+    } catch (e) {
+      setInstallStatus({ kind: "err", text: String(e) });
+    }
+  };
 
   return (
     <section>
@@ -56,23 +87,28 @@ export function SkillsSubsection() {
       <h3>Install a new skill</h3>
       <input
         value={installSrc}
-        onChange={(e) => setInstallSrc(e.target.value)}
+        onChange={(e) => {
+          setInstallSrc(e.target.value);
+          if (installStatus.kind !== "idle") setInstallStatus({ kind: "idle" });
+        }}
         placeholder="Local path or git URL"
       />
-      <button
-        type="button"
-        onClick={async () => {
-          if (!installSrc) return;
-          await invoke("coding_skills_install", { source: installSrc });
-          setInstallSrc("");
-          reload();
-        }}
-      >
-        Install
+      <button type="button" onClick={handleInstall} disabled={installStatus.kind === "installing"}>
+        {installStatus.kind === "installing" ? "Installing…" : "Install"}
       </button>
       <button type="button" onClick={() => invoke("coding_skills_reload").then(reload)}>
         Reload
       </button>
+      {installStatus.kind === "err" && (
+        <p className="skills-subsection__feedback skills-subsection__feedback--err">
+          {installStatus.text}
+        </p>
+      )}
+      {installStatus.kind === "ok" && (
+        <p className="skills-subsection__feedback skills-subsection__feedback--ok">
+          {installStatus.text}
+        </p>
+      )}
     </section>
   );
 }

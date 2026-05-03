@@ -4,10 +4,11 @@ use async_trait::async_trait;
 use jiff::Timestamp;
 use uuid::Uuid;
 
-use common::Result;
+use common::{Result, MIRROR_ALERT_COST_THRESHOLD_CROSSED};
 
 use crate::mirror::{
-    MetaRule, MirrorAlert, MirrorAlertType, NarrativeContext, NarrativeSnippet, SuggestedAction,
+    MetaRule, MirrorAlert, MirrorAlertSeverity, MirrorAlertType, NarrativeContext,
+    NarrativeSnippet, SuggestedAction,
 };
 
 /// Generated components of a narrative output from an LLM call.
@@ -136,6 +137,25 @@ pub fn snippet_from_alert(alert: &MirrorAlert) -> NarrativeSnippet {
             dismissed_at: None,
             coding_alert_kind: Some(kind.clone()),
             coding_alert_severity: Some(severity.clone()),
+        },
+        MirrorAlert::CostThresholdCrossed {
+            session_key,
+            spend_usd,
+            ceiling_usd,
+            percent,
+        } => NarrativeSnippet {
+            id: Uuid::new_v4(),
+            created_at: Timestamp::now(),
+            alert_type: MirrorAlertType::Coding,
+            headline: format!("Cost alert: ${spend_usd:.2} / ${ceiling_usd:.2}"),
+            body: format!(
+                "Session {session_key} has reached {percent:.0}% of its cost ceiling (${ceiling_usd:.2})."
+            ),
+            suggested_action: Some(SuggestedAction::ViewDetails),
+            user_feedback: None,
+            dismissed_at: None,
+            coding_alert_kind: Some(MIRROR_ALERT_COST_THRESHOLD_CROSSED.into()),
+            coding_alert_severity: Some(MirrorAlertSeverity::Medium),
         },
     }
 }

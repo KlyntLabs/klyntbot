@@ -22,10 +22,13 @@ pub fn get_or_create_window(app: &AppHandle, label: &str) -> Option<WebviewWindo
         WINDOW_TRAY => build_tray(app),
         "distraction-overlay" => build_distraction_overlay(app),
         "voice-orb" => build_voice_orb(app),
-        _ => {
-            warn!("get_or_create_window: unknown label '{label}'");
-            return None;
-        }
+        _ => match parse_coding_label(label) {
+            Some(repo_id) => build_coding_window(app, label, repo_id),
+            None => {
+                warn!("get_or_create_window: unknown label '{label}'");
+                return None;
+            }
+        },
     };
 
     match window {
@@ -142,4 +145,28 @@ fn build_voice_orb(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         .skip_taskbar(true)
         .focused(false)
         .build()
+}
+
+/// Parse a `coding:{repo_id}` label, returning the repo_id if valid.
+///
+/// Returns `None` for non-coding labels or empty repo_ids.
+pub fn parse_coding_label(label: &str) -> Option<&str> {
+    label.strip_prefix("coding:").filter(|s| !s.is_empty())
+}
+
+fn build_coding_window(
+    app: &AppHandle,
+    label: &str,
+    repo_id: &str,
+) -> tauri::Result<WebviewWindow> {
+    WebviewWindowBuilder::new(
+        app,
+        label,
+        WebviewUrl::App(format!("index.html#/coding/{repo_id}").into()),
+    )
+    .title(format!("Klynt — {repo_id}"))
+    .inner_size(1200.0, 800.0)
+    .min_inner_size(700.0, 500.0)
+    .visible(true)
+    .build()
 }

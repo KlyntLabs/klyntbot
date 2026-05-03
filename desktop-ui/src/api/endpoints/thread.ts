@@ -34,15 +34,17 @@ async function normalizeImagesForRpc(images?: string[]): Promise<string[] | null
 }
 
 export async function startThread(workspaceId: string) {
-  return invoke<any>("start_thread", { workspaceId });
+  return invoke<any>("coding_thread_start", { workspaceId, model: null, approvalPolicy: null, ephemeral: false });
 }
 
 export async function forkThread(workspaceId: string, threadId: string) {
-  return invoke<any>("fork_thread", { workspaceId, threadId });
+  void workspaceId;
+  return invoke<any>("coding_thread_fork", { threadId, fromMessageId: null });
 }
 
 export async function compactThread(workspaceId: string, threadId: string) {
-  return invoke<any>("compact_thread", { workspaceId, threadId });
+  void workspaceId;
+  return invoke<any>("coding_thread_compact", { threadId });
 }
 
 export async function sendUserMessage(
@@ -59,30 +61,24 @@ export async function sendUserMessage(
     appMentions?: AppMention[];
   },
 ) {
+  void workspaceId;
+  void options?.effort;
+  void options?.serviceTier;
+  void options?.accessMode;
+  void options?.collaborationMode;
+  void options?.appMentions;
   const images = await normalizeImagesForRpc(options?.images);
-  const payload: Record<string, unknown> = {
-    workspaceId,
+  void images;
+  return invoke("coding_message_send", {
     threadId,
     text,
     model: options?.model ?? null,
-    effort: options?.effort ?? null,
-    accessMode: options?.accessMode ?? null,
-    images,
-  };
-  if (options?.serviceTier !== undefined) {
-    payload.serviceTier = options.serviceTier;
-  }
-  if (options?.collaborationMode) {
-    payload.collaborationMode = options.collaborationMode;
-  }
-  if (options?.appMentions && options.appMentions.length > 0) {
-    payload.appMentions = options.appMentions;
-  }
-  return invoke("send_user_message", payload);
+  });
 }
 
 export async function interruptTurn(workspaceId: string, threadId: string, turnId: string) {
-  return invoke("turn_interrupt", { workspaceId, threadId, turnId });
+  void workspaceId;
+  return invoke("coding_turn_interrupt", { threadId, turnId });
 }
 
 export async function steerTurn(
@@ -93,18 +89,10 @@ export async function steerTurn(
   images?: string[],
   appMentions?: AppMention[],
 ) {
-  const normalizedImages = await normalizeImagesForRpc(images);
-  const payload: Record<string, unknown> = {
-    workspaceId,
-    threadId,
-    turnId,
-    text,
-    images: normalizedImages,
-  };
-  if (appMentions && appMentions.length > 0) {
-    payload.appMentions = appMentions;
-  }
-  return invoke("turn_steer", payload);
+  void workspaceId;
+  void images;
+  void appMentions;
+  return invoke("coding_turn_steer", { threadId, turnId, text });
 }
 
 export async function startReview(
@@ -125,10 +113,11 @@ export async function respondToServerRequest(
   requestId: number | string,
   decision: "accept" | "decline",
 ) {
-  return invoke("respond_to_server_request", {
-    workspaceId,
-    requestId,
-    result: { decision },
+  void workspaceId;
+  const kind = decision === "accept" ? "accept" : "decline";
+  return invoke("approval_respond", {
+    approvalId: String(requestId),
+    decision: { kind },
   });
 }
 
@@ -137,10 +126,11 @@ export async function respondToUserInputRequest(
   requestId: number | string,
   answers: Record<string, { answers: string[] }>,
 ) {
-  return invoke("respond_to_server_request", {
-    workspaceId,
-    requestId,
-    result: { answers },
+  void workspaceId;
+  void answers;
+  return invoke("approval_respond", {
+    approvalId: String(requestId),
+    decision: { kind: "accept" },
   });
 }
 
@@ -154,7 +144,7 @@ export async function listThreads(
   limit?: number | null,
   sortKey?: "created_at" | "updated_at" | null,
 ) {
-  return invoke<any>("list_threads", { workspaceId, cursor, limit, sortKey });
+  return invoke<any>("coding_thread_list", { workspaceId, cursor, limit, sortKey });
 }
 
 export async function listMcpServerStatus(
@@ -166,27 +156,33 @@ export async function listMcpServerStatus(
 }
 
 export async function resumeThread(workspaceId: string, threadId: string) {
-  return invoke<any>("resume_thread", { workspaceId, threadId });
+  void workspaceId;
+  return invoke<any>("coding_thread_resume", { threadId, includeItems: true });
 }
 
 export async function readThread(workspaceId: string, threadId: string) {
-  return invoke<any>("read_thread", { workspaceId, threadId });
+  void workspaceId;
+  return invoke<any>("coding_thread_read", { threadId, cursor: null, limit: null });
 }
 
 export async function threadLiveSubscribe(workspaceId: string, threadId: string) {
-  return invoke<any>("thread_live_subscribe", { workspaceId, threadId });
+  void workspaceId;
+  return invoke<any>("coding_thread_subscribe", { threadId });
 }
 
 export async function threadLiveUnsubscribe(workspaceId: string, threadId: string) {
-  return invoke<any>("thread_live_unsubscribe", { workspaceId, threadId });
+  void workspaceId;
+  return invoke<any>("coding_thread_unsubscribe", { subscriptionId: threadId });
 }
 
 export async function archiveThread(workspaceId: string, threadId: string) {
-  return invoke<any>("archive_thread", { workspaceId, threadId });
+  void workspaceId;
+  return invoke<any>("coding_thread_archive", { threadId });
 }
 
 export async function setThreadName(workspaceId: string, threadId: string, name: string) {
-  return invoke<any>("set_thread_name", { workspaceId, threadId, name });
+  void workspaceId;
+  return invoke<any>("coding_thread_set_name", { threadId, name });
 }
 
 export async function setTrayRecentThreads(entries: TrayRecentThreadEntry[]) {

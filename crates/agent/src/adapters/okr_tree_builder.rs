@@ -173,8 +173,8 @@ pub fn build_goal_progress_nodes(
 
 #[cfg(test)]
 mod tests {
-    use super::tree_builder_base::compose_embedding_text;
     use super::*;
+    use crate::adapters::tree_builder_base::compose_embedding_text;
 
     // --- compose_embedding_text ---
 

@@ -1,8 +1,10 @@
 //! Session repository — sessions + session_messages tables.
 
+use sqlx::Row;
 use sqlx::SqlitePool;
 
 use crate::error::{OptionExt, StorageError};
+use crate::messages::parts::{FinishReason, MessagePart};
 use crate::rows::session::{SessionListRow, SessionMessageRow, SessionRow};
 
 /// Repository for session and message persistence.
@@ -454,7 +456,7 @@ impl SessionRepo {
     pub async fn delete_stale_sessions(&self, ttl_days: u32) -> Result<u64, StorageError> {
         let cutoff =
             jiff::Timestamp::now() - jiff::SignedDuration::from_hours((ttl_days as i64) * 24);
-        let result = sqlx::query("DELETE FROM sessions WHERE updated_at < ?1")
+        let result = sqlx::query("DELETE FROM sessions WHERE updated_at < ?1 AND pinned = 0")
             .bind(cutoff.as_millisecond())
             .execute(&self.pool)
             .await?;
@@ -530,4 +532,293 @@ impl SessionRepo {
             .await?;
         Ok(())
     }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn rewind_to_message(
+        &self,
+        session_key: &str,
+        anchor_id: &str,
+    ) -> Result<u64, StorageError> {
+        let anchor_uuid = uuid::Uuid::parse_str(anchor_id)
+            .map_err(|e| StorageError::NotFound(format!("invalid anchor uuid: {e}")))?;
+
+        // Restore ghost snapshots recorded after the anchor message.
+        // We only need the earliest snapshot per repo (MIN id) because each
+        // ghost commit captures the full tree state; later ghosts for the same
+        // repo would overwrite earlier ones.
+        let ghost_rows = sqlx::query(
+            "SELECT ghost_commit_sha, ghost_repo_root, ghost_preexisting_untracked_json \
+             FROM coding_snapshots \
+             WHERE session_key = ? AND ghost_commit_sha IS NOT NULL \
+             AND id > COALESCE( \
+               (SELECT MAX(id) FROM coding_snapshots WHERE session_key = ? AND message_id = ?), 0 \
+             ) GROUP BY ghost_repo_root ORDER BY MIN(id) ASC",
+        )
+        .bind(session_key)
+        .bind(session_key)
+        .bind(anchor_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        for row in ghost_rows {
+            let sha: String = row.try_get("ghost_commit_sha")?;
+            let root: String = row.try_get("ghost_repo_root")?;
+            let preexisting_json: Option<String> =
+                row.try_get("ghost_preexisting_untracked_json")?;
+            let preexisting: Vec<std::path::PathBuf> = preexisting_json
+                .and_then(|j| serde_json::from_str(&j).ok())
+                .unwrap_or_default();
+            let ghost =
+                klynt_git_utils::GhostCommit::new(sha.clone(), None, preexisting, Vec::new());
+            if let Err(e) =
+                klynt_git_utils::restore_ghost_commit(std::path::Path::new(&root), &ghost).await
+            {
+                tracing::error!(?e, ghost_sha = %sha, "ghost restore failed");
+            }
+        }
+
+        let res = sqlx::query(
+            "DELETE FROM session_messages WHERE session_key = ? AND id IN ( \
+                SELECT id FROM session_messages WHERE session_key = ? \
+                  AND timestamp > (SELECT timestamp FROM session_messages WHERE id = ? AND session_key = ?) \
+             )",
+        )
+        .bind(session_key).bind(session_key).bind(anchor_uuid).bind(session_key)
+        .execute(&self.pool).await?;
+        Ok(res.rows_affected())
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn export_session_md(&self, session_key: &str) -> Result<String, StorageError> {
+        let session = self.get_session(session_key).await?;
+        let messages = self.get_messages(session_key).await?;
+        let mut out = format!("# Session {}\n\n", session.key);
+        for m in messages {
+            out.push_str(&format!("### {}\n{}\n\n", m.role, m.content));
+        }
+        Ok(out)
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn export_session_json(&self, session_key: &str) -> Result<String, StorageError> {
+        let session = self.get_session(session_key).await?;
+        let messages = self.get_messages(session_key).await?;
+        let json = serde_json::json!({
+            "session": {
+                "key": session.key,
+                "metadata": session.metadata,
+                "created_at": session.created_at,
+                "updated_at": session.updated_at,
+            },
+            "messages": messages.iter().map(|m| serde_json::json!({
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "timestamp": m.timestamp,
+                "request_id": m.request_id,
+                "tool_calls": m.tool_calls,
+                "metadata": m.metadata,
+            })).collect::<Vec<_>>(),
+        });
+        Ok(json.to_string())
+    }
+
+    /// Decrement the `starred` counter and return sessions that should be pruned.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn decrement_starred_prune(
+        &self,
+        ttl_days: i64,
+    ) -> Result<Vec<String>, StorageError> {
+        let cutoff = jiff::Timestamp::now().as_second() - (ttl_days * 86400);
+        let rows = sqlx::query_scalar::<_, String>(
+            "SELECT key FROM sessions \
+             WHERE pinned = 0 AND updated_at < ?1 \
+             AND key NOT IN (SELECT session_key FROM session_messages WHERE role = 'user' AND timestamp > ?1) \
+             ORDER BY updated_at ASC LIMIT 100"
+        )
+        .bind(cutoff)
+        .fetch_all(&self.pool).await?;
+        Ok(rows)
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn fork_session(
+        &self,
+        source_key: &str,
+        up_to_message: Option<&str>,
+    ) -> Result<String, StorageError> {
+        let new_key = format!("fork-{}", uuid::Uuid::new_v4());
+        let metadata = self.get_session(source_key).await?.metadata;
+        sqlx::query(
+            "INSERT INTO sessions (key, metadata, parent_session_id, conversation_type, approval_mode) \
+             SELECT ?, ?, key, conversation_type, approval_mode FROM sessions WHERE key = ?"
+        ).bind(&new_key).bind(&metadata).bind(source_key)
+            .execute(&self.pool).await?;
+        let cutoff_clause = match up_to_message {
+            Some(_) => "AND timestamp <= (SELECT timestamp FROM session_messages WHERE id = ? AND session_key = ?)",
+            None => "",
+        };
+        let q = format!(
+            "INSERT INTO session_messages (session_key, id, role, content, timestamp, request_id, tool_calls, metadata) \
+             SELECT ?, id || '-fork', role, content, timestamp, request_id, tool_calls, metadata \
+             FROM session_messages WHERE session_key = ? {cutoff_clause} ORDER BY timestamp ASC"
+        );
+        let mut query = sqlx::query(&q).bind(&new_key).bind(source_key);
+        if let Some(anchor) = up_to_message {
+            query = query.bind(anchor).bind(source_key);
+        }
+        query.execute(&self.pool).await?;
+        Ok(new_key)
+    }
+
+    // ── Phase 4: Parts-aware methods ────────────────────────────────────
+
+    /// Insert a message with typed `Vec<MessagePart>` content.
+    ///
+    /// The `content` column is set to empty string; the real content lives in `parts`.
+    /// For legacy compatibility, callers that still use `content: String` should use
+    /// `add_message` instead.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn add_message_with_parts(
+        &self,
+        session_key: &str,
+        message_id: uuid::Uuid,
+        role: &str,
+        parts: &[MessagePart],
+        turn_id: Option<&str>,
+        finish_reason: Option<&FinishReason>,
+    ) -> Result<(), StorageError> {
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
+        let parts_json = serde_json::to_string(parts).map_err(StorageError::serialization)?;
+        let finish_json = finish_reason
+            .map(|f| serde_json::to_string(f))
+            .transpose()
+            .map_err(StorageError::serialization)?;
+
+        // Touch session updated_at
+        sqlx::query("UPDATE sessions SET updated_at = ?1 WHERE key = ?2")
+            .bind(now)
+            .bind(session_key)
+            .execute(&self.pool)
+            .await?;
+
+        sqlx::query(
+            "INSERT INTO session_messages \
+             (id, session_key, role, content, parts, turn_id, finish_reason, timestamp) \
+             VALUES (?1, ?2, ?3, '', ?4, ?5, ?6, ?7)",
+        )
+        .bind(message_id)
+        .bind(session_key)
+        .bind(role)
+        .bind(&parts_json)
+        .bind(turn_id)
+        .bind(finish_json)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Get messages for a session with Parts deserialized.
+    ///
+    /// Falls back to wrapping legacy `content` in a `Text` part when `parts` is NULL.
+    pub async fn get_messages_parts(
+        &self,
+        session_key: &str,
+        limit: i64,
+    ) -> Result<Vec<SessionMessageWithParts>, StorageError> {
+        let rows: Vec<SessionMessageRow> = sqlx::query_as(
+            "SELECT * FROM session_messages \
+             WHERE session_key = ?1 ORDER BY timestamp ASC LIMIT ?2",
+        )
+        .bind(session_key)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter()
+            .map(|r| {
+                let parts: Vec<MessagePart> = match r.parts.as_deref() {
+                    Some(s) if !s.is_empty() => {
+                        serde_json::from_str(s).map_err(StorageError::serialization)?
+                    }
+                    _ => vec![MessagePart::Text {
+                        text: r.content.clone(),
+                    }],
+                };
+                let finish_reason: Option<FinishReason> = match r.finish_reason.as_deref() {
+                    Some(s) if !s.is_empty() => {
+                        Some(serde_json::from_str(s).map_err(StorageError::serialization)?)
+                    }
+                    _ => None,
+                };
+                Ok(SessionMessageWithParts {
+                    id: r.id.to_string(),
+                    session_key: r.session_key,
+                    role: r.role,
+                    parts,
+                    turn_id: r.turn_id,
+                    finish_reason,
+                    timestamp: r.timestamp.into(),
+                    metadata: r.metadata,
+                })
+            })
+            .collect()
+    }
+
+    /// Set the workspace_id on a session.
+    pub async fn set_workspace_id(
+        &self,
+        session_key: &str,
+        workspace_id: &str,
+    ) -> Result<(), StorageError> {
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
+        sqlx::query(
+            "UPDATE sessions SET workspace_id = ?1, updated_at = ?2 WHERE key = ?3",
+        )
+        .bind(workspace_id)
+        .bind(now)
+        .bind(session_key)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Set the ephemeral flag on a session.
+    pub async fn set_ephemeral(
+        &self,
+        session_key: &str,
+        ephemeral: bool,
+    ) -> Result<(), StorageError> {
+        sqlx::query("UPDATE sessions SET ephemeral = ?1 WHERE key = ?2")
+            .bind(if ephemeral { 1i64 } else { 0i64 })
+            .bind(session_key)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Set the archived_at timestamp on a session.
+    pub async fn archive(&self, session_key: &str) -> Result<(), StorageError> {
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
+        sqlx::query("UPDATE sessions SET archived_at = ?1, updated_at = ?1 WHERE key = ?2")
+            .bind(now)
+            .bind(session_key)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+}
+
+/// A message with deserialized Parts — returned by `get_messages_parts`.
+#[derive(Debug, Clone)]
+pub struct SessionMessageWithParts {
+    pub id: String,
+    pub session_key: String,
+    pub role: String,
+    pub parts: Vec<MessagePart>,
+    pub turn_id: Option<String>,
+    pub finish_reason: Option<FinishReason>,
+    pub timestamp: jiff::Timestamp,
+    pub metadata: Option<serde_json::Value>,
 }

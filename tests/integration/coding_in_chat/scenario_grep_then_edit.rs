@@ -1,17 +1,17 @@
 use bus::DomainEventBus;
-use config::schema::CodingPermissions;
 use common::tool_channel::{Channel, NonUiPolicy};
+use config::schema::CodingPermissions;
 use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::{
     edit::{run_for_test as edit_run, EditArgs},
     grep::GrepTool,
 };
-use tools_core::events::ToolEvent;
 use klynt_execpolicy::Policy;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use tools_core::events::ToolEvent;
 use tools_core::{RoutingContext, Tool};
 
 #[tokio::test]
@@ -31,11 +31,11 @@ async fn grep_then_edit_emits_diff() {
         .execute(serde_json::json!({"pattern":"old_name"}), &ctx)
         .await
         .unwrap();
-    assert!(grep_out.contains("f.rs:1:fn old_name"));
+    assert!(grep_out.contains("f.rs:1::fn old_name"));
 
     // edit
     let perms = CodingPermissions {
-        allow: vec!["Edit(./**)".into()],
+        allow: vec!["Edit(**)".into()],
         ..Default::default()
     };
     let l1 = Arc::new(Layer1::compile(&perms).unwrap());
@@ -61,6 +61,7 @@ async fn grep_then_edit_emits_diff() {
         NonUiPolicy::Allow,
         None,
         "scenario-test".to_string(),
+        None,
     )
     .await
     .unwrap();

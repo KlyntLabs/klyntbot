@@ -8,6 +8,8 @@ export type SlashLeaf = {
   category: SlashCategory;
   argHint?: string;
   tauriCommand?: string;
+  requiresConfirmation?: boolean;
+  agentTransform?: () => string;
 };
 
 export type SlashBranch = {

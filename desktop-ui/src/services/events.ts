@@ -115,6 +115,8 @@ const menuComposerCycleReasoningHub = createEventHub<void>("menu-composer-cycle-
 const menuComposerCycleCollaborationHub = createEventHub<void>("menu-composer-cycle-collaboration");
 const focusStateChangedHub = createEventHub<FocusStatePayload>("focus:state_changed");
 const focusAutoDetectedHub = createEventHub<AutoFocusPayload>("focus:auto_detected");
+const approvalRequestHub = createEventHub<Record<string, unknown>>("agent:approval_request");
+const costUpdateHub = createEventHub<Record<string, unknown>>("agent:cost_update");
 
 export function subscribeAppServerEvents(
   onEvent: (event: AppServerEvent) => void,
@@ -379,4 +381,27 @@ export function subscribeFocusAutoDetected(
   options?: SubscriptionOptions,
 ): Unsubscribe {
   return focusAutoDetectedHub.subscribe(onEvent, options);
+}
+
+export function subscribeApprovalRequest(
+  onEvent: (payload: Record<string, unknown>) => void,
+  options?: SubscriptionOptions,
+): Unsubscribe {
+  return approvalRequestHub.subscribe(onEvent, options);
+}
+
+export function subscribeCostUpdate(
+  onEvent: (payload: Record<string, unknown>) => void,
+  options?: SubscriptionOptions,
+): Unsubscribe {
+  return costUpdateHub.subscribe(onEvent, options);
+}
+
+export function subscribeThreadEvent(
+  subscriptionId: string,
+  onEvent: (payload: Record<string, unknown>) => void,
+  options?: SubscriptionOptions,
+): Unsubscribe {
+  const hub = createEventHub<Record<string, unknown>>(`agent:thread_event#${subscriptionId}`);
+  return hub.subscribe(onEvent, options);
 }

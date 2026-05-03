@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { listCodingSessions } from "@/api/endpoints/codingMemory";
+import { TracingApp } from "@/tracing";
 import { ProviderChips } from "./ProviderChips";
 import { ReforgeCycleDiff } from "./ReforgeCycleDiff";
 import { SessionList } from "./SessionList";
-import { TracingTab } from "./tracing/TracingTab";
 import type { ProviderId, SessionSummaryDto } from "./types";
 import { WireViewer } from "./WireViewer";
 
@@ -155,7 +155,7 @@ export function CodingMemoryPlugin() {
           </main>
         ) : (
           <main className="cm-plugin__main">
-            <TracingTab />
+            <TracingApp />
           </main>
         )}
       </div>

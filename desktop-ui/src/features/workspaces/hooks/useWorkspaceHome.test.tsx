@@ -36,6 +36,7 @@ const models: ModelOption[] = [
     model: "gpt-5.1-max",
     displayName: "GPT-5.1 Max",
     description: "Test model",
+    provider: "openai",
     supportedReasoningEfforts: [
       { reasoningEffort: "low", description: "Low effort" },
       { reasoningEffort: "medium", description: "Medium effort" },

@@ -476,7 +476,7 @@ pub enum AgentEvent {
         failed_tests: u32,
         newly_passing: Vec<String>,
         newly_failing: Vec<String>,
-        coverage_delta: Option<f64>,
+        coverage_delta: Option<common::coverage::CoverageDelta>,
         duration_ms: u64,
     },
 
@@ -705,7 +705,7 @@ mod coding_specific_variant_tests {
         };
         let v = serde_json::to_value(&event).unwrap();
         assert_eq!(v["type"], "testRunDetailed");
-        assert_eq!(v["passedTests"], 42);
+        assert_eq!(v["passed_tests"], 42);
     }
 
     #[test]

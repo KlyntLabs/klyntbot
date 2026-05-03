@@ -1,4 +1,5 @@
 import type { ModelOption } from "@/types";
+import { deriveProviderFromModel } from "./deriveProvider";
 
 export function normalizeEffortValue(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -91,6 +92,7 @@ export function parseModelListResponse(response: unknown): ModelOption[] {
         model: modelSlug,
         displayName,
         description: String(record.description ?? ""),
+        provider: deriveProviderFromModel(modelSlug),
         supportedReasoningEfforts: parseReasoningEfforts(record),
         defaultReasoningEffort: normalizeEffortValue(
           record.defaultReasoningEffort ?? record.default_reasoning_effort,

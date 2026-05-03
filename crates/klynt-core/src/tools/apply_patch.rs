@@ -1,6 +1,6 @@
-use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
+use crate::approval::{GuardCtx, Layer1, PendingApprovalsMap, evaluate};
 use crate::privacy::PrivacyGuard;
-use crate::tools::shared::file_edit_event::{emit_file_edit, FileEditEvent};
+use crate::tools::shared::file_edit_event::{FileEditEvent, emit_file_edit};
 use crate::tools::shared::fs_resolve::resolve_under_cwd;
 use crate::tools::shared::hook_emit::{
     fire_post_file_edit, fire_post_tool_use, fire_pre_file_edit, fire_pre_tool_use,
@@ -50,6 +50,12 @@ pub struct ApplyPatchTool {
     pending: Arc<PendingApprovalsMap>,
     bus: Arc<DomainEventBus>,
     non_ui_policy: common::tool_channel::NonUiPolicy,
+    pub snapshot_repo: Option<std::sync::Arc<crate::snapshots::SnapshotRepo>>,
+    pub history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
+    pub mirror_learning_enabled: bool,
+    pub mirror_min_approvals: u32,
+    pub mirror_cooldown_seconds: i64,
+    pub repo_id: String,
 }
 
 impl ApplyPatchTool {
@@ -70,6 +76,12 @@ impl ApplyPatchTool {
             pending,
             bus,
             non_ui_policy,
+            snapshot_repo: None,
+            history_repo: None,
+            mirror_learning_enabled: false,
+            mirror_min_approvals: 5,
+            mirror_cooldown_seconds: 86400,
+            repo_id: String::new(),
         }
     }
 }
@@ -99,6 +111,13 @@ impl ToolExecute for ApplyPatchTool {
             self.non_ui_policy,
             ctx.hook_engine.clone(),
             session_id,
+            self.snapshot_repo.clone(),
+            self.history_repo.clone(),
+            self.mirror_learning_enabled,
+            self.mirror_min_approvals,
+            self.mirror_cooldown_seconds,
+            self.repo_id.clone(),
+            ctx.message_id.clone(),
         )
         .await
     }
@@ -119,6 +138,13 @@ pub async fn run_for_test(
     non_ui_policy: common::tool_channel::NonUiPolicy,
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     session_id: String,
+    snapshot_repo: Option<std::sync::Arc<crate::snapshots::SnapshotRepo>>,
+    history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
+    mirror_learning_enabled: bool,
+    mirror_min_approvals: u32,
+    mirror_cooldown_seconds: i64,
+    repo_id: String,
+    message_id: Option<String>,
 ) -> Result<String> {
     let resolved = resolve_under_cwd(&args.path, &cwd, &privacy)
         .map_err(|e| KlyntbotError::Tool(ToolError::PermissionDenied(e.to_string())))?;
@@ -137,12 +163,37 @@ pub async fn run_for_test(
         cwd: Some(cwd.to_string_lossy().into_owned()),
         channel,
         non_ui_policy,
+        history_repo,
+        repo_id,
+        mirror_learning_enabled,
+        mirror_min_approvals,
+        mirror_cooldown_seconds,
+        now_unix: jiff::Timestamp::now().as_second(),
+        thread_id: None,
+        turn_id: None,
     };
     let decision = evaluate(guard_ctx, "apply_patch", &path_str).await;
     if !decision.allowed() {
         return Err(KlyntbotError::Tool(ToolError::PermissionDenied(format!(
             "{decision:?}"
         ))));
+    }
+
+    if let Some(repo) = snapshot_repo.as_ref() {
+        let (content, existed) = match tokio::fs::read(&resolved).await {
+            Ok(bytes) => (bytes, true),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (Vec::new(), false),
+            Err(e) => return Err(e.into()),
+        };
+        let _ = repo
+            .try_record_with_ghost(
+                &session_id,
+                message_id.as_deref(),
+                &resolved.to_string_lossy(),
+                &content,
+                existed,
+            )
+            .await;
     }
 
     if let Err(reason) = fire_pre_tool_use(
@@ -214,6 +265,7 @@ pub async fn run_for_test(
                 bytes: final_content.len() as u64,
                 diff_full: args.patch.clone(),
             },
+            None,
         )
         .await;
         Ok(format!(

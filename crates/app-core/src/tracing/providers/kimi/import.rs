@@ -2,7 +2,7 @@
 //! into `{klyntbot_data}/coding_memory/imported_wire/<new_uuid>/`.
 
 use common::Result;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use uuid::Uuid;
 
 pub async fn import_from_file(imported_root: &Path, source_wire: &Path) -> Result<String> {

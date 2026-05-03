@@ -79,6 +79,8 @@ pub struct AgentRuntime {
     tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
     /// Hook engine for firing lifecycle and tool-use hooks.
     hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
+    /// Domain event bus for emitting cross-cutting events (e.g. Mirror alerts).
+    domain_event_bus: Option<Arc<bus::DomainEventBus>>,
 }
 
 impl AgentRuntime {
@@ -118,6 +120,7 @@ impl AgentRuntime {
             predictions_per_turn: 3,
             tool_kit: std::sync::Mutex::new(None),
             hook_engine: std::sync::Mutex::new(None),
+            domain_event_bus: None,
         }
     }
 
@@ -188,6 +191,11 @@ impl AgentRuntime {
 
     pub fn with_context_update_queue(mut self, queue: Arc<bus::ContextUpdateQueue>) -> Self {
         self.context_update_queue = Some(queue);
+        self
+    }
+
+    pub fn with_domain_event_bus(mut self, bus: Arc<bus::DomainEventBus>) -> Self {
+        self.domain_event_bus = Some(bus);
         self
     }
 
@@ -490,7 +498,21 @@ impl AgentRuntime {
         // ── Phase 2: Execute ─────────────────────────────────────
         let safety_timeout = Duration::from_secs(safety_timeout_secs.max(1));
 
-        let loop_result = tokio::time::timeout(
+        // Phase 4 (KCA_PHASE_4=1): clone messages before move so we can
+        // retry once if the response looks like a memory refusal. The
+        // clone is cheap relative to the LLM call and only matters when
+        // the retry actually fires.
+        let phase_4_on = matches!(
+            std::env::var("KCA_PHASE_4").ok().as_deref(),
+            Some("1") | Some("true") | Some("yes")
+        );
+        let messages_for_retry: Option<Vec<providers::types::Message>> = if phase_4_on {
+            Some(assembled.messages.clone())
+        } else {
+            None
+        };
+
+        let mut loop_result = tokio::time::timeout(
             safety_timeout,
             execute_loop(
                 &self.core,
@@ -508,6 +530,54 @@ impl AgentRuntime {
                 "Safety timeout ({safety_timeout_secs}s) — this is a bug, please report it"
             ))
         })??;
+
+        // Phase 4 retry: if the answer matched a memory-refusal phrase,
+        // re-run execute_loop ONCE with an appended user nudge. The
+        // mechanism — let the agent grep the conversation history again
+        // with broader effort — mirrors Letta's filesystem-tool agentic
+        // retrieval pattern. Single retry per QA, capped to bound cost.
+        if let Some(retry_messages_base) = messages_for_retry {
+            if crate::output::validator::detect_memory_refusal(&loop_result.content)
+                .is_some()
+            {
+                let mut retry_messages = retry_messages_base;
+                retry_messages.push(providers::types::Message::assistant(
+                    loop_result.content.clone(),
+                ));
+                retry_messages.push(providers::types::Message::user(
+                    "Re-search the conversation history with broader effort. \
+                     Focus on specific named entities, dates, places, and concrete \
+                     details that appear in the question. Even if your initial \
+                     recall returned nothing, attempt a best-effort answer based on \
+                     what is most likely true given the conversation. Provide a \
+                     concrete answer with specific names and details where possible.",
+                ));
+                let mut retry_budget = ExecutionBudget::new(depth);
+                let retry_result = tokio::time::timeout(
+                    safety_timeout,
+                    execute_loop(
+                        &self.core,
+                        retry_messages,
+                        tool_definitions,
+                        &params,
+                        &mut retry_budget,
+                        ctx,
+                        event_tx.clone(),
+                    ),
+                )
+                .await;
+                if let Ok(Ok(retried)) = retry_result {
+                    // Take retry only if it produced a non-refusal answer.
+                    // A retry that ALSO refuses just doubles latency without
+                    // signal; keep the original in that case.
+                    if crate::output::validator::detect_memory_refusal(&retried.content)
+                        .is_none()
+                    {
+                        loop_result = retried;
+                    }
+                }
+            }
+        }
 
         // ── Phase 3: Record ──────────────────────────────────────
         let mode_name = depth.to_string();
@@ -623,6 +693,9 @@ impl AgentRuntime {
                             crate::output::validator::ValidationWarning::LowQuality { reason } => {
                                 ("low_quality", Some(reason.clone()))
                             }
+                            crate::output::validator::ValidationWarning::MemoryRefusal {
+                                pattern,
+                            } => ("memory_refusal", Some(pattern.clone())),
                         };
                         let _ = warning_repo
                             .insert(&request_id, wtype, detail.as_deref(), Some(&chat_id))
@@ -830,6 +903,42 @@ impl AgentRuntime {
             .await
         {
             warn!("AgentRuntime: failed to record usage: {}", e);
+        }
+
+        if let Some(ref session_key) = ctx.session_key {
+            self.cost_tracker.record_for_session(
+                session_key.as_str(),
+                usage,
+                &self.execution_model,
+            );
+
+            // Per-session cost ceiling check → Mirror alert
+            let hot = self.hot_config.read().await;
+            let ceiling_usd = hot.per_thread_cost_ceiling_usd.unwrap_or(0.0);
+            let alert_at = hot.cost_alert_at_percent;
+            drop(hot);
+
+            if ceiling_usd > 0.0 {
+                if let Some(alert) = self.cost_tracker.check_session_ceiling(
+                    session_key.as_str(),
+                    ceiling_usd,
+                    alert_at,
+                ) {
+                    if let Some(ref bus) = self.domain_event_bus {
+                        let payload = serde_json::json!({
+                            "session_key": &alert.session_key,
+                            "spend_usd": alert.spend_usd,
+                            "ceiling_usd": alert.ceiling_usd,
+                            "percent": alert.percent,
+                        });
+                        bus.publish(bus::DomainEvent::CodingMirrorAlert {
+                            kind: common::MIRROR_ALERT_COST_THRESHOLD_CROSSED.to_string(),
+                            severity: "medium".to_string(),
+                            payload: payload.to_string(),
+                        });
+                    }
+                }
+            }
         }
 
         if let Some(ref tx) = event_tx {

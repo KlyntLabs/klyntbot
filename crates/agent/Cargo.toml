@@ -19,7 +19,9 @@ session.workspace = true
 tools.workspace = true
 tools-core.workspace = true
 klynt-core.workspace = true
+klynt-execpolicy.workspace = true
 klynt-hooks.workspace = true
+klynt-truncation = { path = "../klynt-truncation" }
 feature-alarms.workspace = true
 feature-tasks.workspace = true
 feature-finance.workspace = true
@@ -46,6 +48,12 @@ tokio-util.workspace = true
 async-trait.workspace = true
 regex.workspace = true
 sha2.workspace = true
+dashmap = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true
+criterion = { version = "0.5", features = ["async_tokio"] }
+
+[[bench]]
+name = "chat_send_to_first_token"
+harness = false
