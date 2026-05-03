@@ -184,9 +184,9 @@ function DaySummary({
         </div>
       )}
 
-      {hasProductivity && <PatternsCard />}
+      <PatternsCard />
 
-      {hasProductivity && <HourlyHeatmap startDate={date} endDate={date} />}
+      <HourlyHeatmap startDate={date} endDate={date} />
 
       {hasProductivity && ps.topApps.length > 0 && (
         <section className="dashboard__summary-section">
@@ -208,9 +208,9 @@ function DaySummary({
         </section>
       )}
 
-      {intel && (intel.patterns.length > 0 || intel.nudges.length > 0) && (
-        <section className="dashboard__summary-section">
-          <h4 className="dashboard__summary-heading">Insights</h4>
+      <section className="dashboard__summary-section">
+        <h4 className="dashboard__summary-heading">Insights</h4>
+        {intel && (intel.patterns.length > 0 || intel.nudges.length > 0) ? (
           <div className="dashboard__summary-insights">
             {intel.patterns.map((p) => (
               <div key={`p-${p}`} className="dashboard__summary-insight-item">
@@ -228,8 +228,14 @@ function DaySummary({
               </div>
             ))}
           </div>
-        </section>
-      )}
+        ) : (
+          <div className="dashboard__summary-insights dashboard__summary-insights--empty">
+            <span className="dashboard__sparkline-empty-msg">
+              Insights appear once we detect patterns and nudges.
+            </span>
+          </div>
+        )}
+      </section>
 
       {ps?.aiSummary && (
         <section className="dashboard__summary-aibox">

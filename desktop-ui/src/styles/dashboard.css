@@ -1388,7 +1388,8 @@
   transition: all 0.3s ease;
 }
 .dashboard__hourly--empty,
-.dashboard__patterns--empty {
+.dashboard__patterns--empty,
+.dashboard__summary-insights--empty {
   opacity: 0.7;
 }
 .dashboard__hourly-empty-msg {

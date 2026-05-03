@@ -25,6 +25,15 @@
   --ds-text-subtle: var(--text-subtle);
   --ds-text-faint: var(--text-faint);
 
+  /* Aliases consumed by the dashboard port (Phase 3). The dashboard CSS came
+     from a design system that named these tokens directly; map them to the
+     existing themed tokens so theme switching still works. */
+  --brand: var(--text-accent-cyan);
+  --success: var(--status-success);
+  --destructive: var(--status-error);
+  --surface-raised: var(--surface-control);
+  --text-muted-foreground: var(--text-muted);
+
   --ds-modal-backdrop: rgba(6, 8, 12, 0.55);
   --ds-modal-card-bg: var(--ds-surface-card);
   --ds-modal-card-border: var(--ds-border-strong);
