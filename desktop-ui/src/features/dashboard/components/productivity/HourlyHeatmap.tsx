@@ -32,9 +32,17 @@ export function HourlyHeatmap({ startDate, endDate }: Props) {
     staleTime: 60_000,
   });
 
-  if (!data || data.length === 0) return null;
-  const working = data.filter((h) => h.hour >= 6 && h.hour <= 22);
-  if (working.length === 0) return null;
+  const working = (data ?? []).filter((h) => h.hour >= 6 && h.hour <= 22);
+  if (working.length === 0) {
+    return (
+      <div className="dashboard__hourly dashboard__hourly--empty">
+        <div className="dashboard__hourly-title">Hourly Productivity</div>
+        <div className="dashboard__hourly-empty-msg">
+          Hourly breakdown appears after a full day of tracking.
+        </div>
+      </div>
+    );
+  }
 
   const maxRatio = Math.max(...working.map((h) => h.productiveRatio), 0.01);
   const peakHour = working.reduce((best, h) =>

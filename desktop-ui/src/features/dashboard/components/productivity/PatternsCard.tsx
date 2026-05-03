@@ -20,7 +20,19 @@ export function PatternsCard() {
     staleTime: 5 * 60 * 1000,
   });
 
-  if (!data || data.daysAnalyzed < 3) return null;
+  if (!data || data.daysAnalyzed < 3) {
+    const remaining = Math.max(0, 3 - (data?.daysAnalyzed ?? 0));
+    return (
+      <div className="dashboard__patterns dashboard__patterns--empty">
+        <div className="dashboard__patterns-title">Your Patterns</div>
+        <div className="dashboard__patterns-row">
+          {remaining === 3
+            ? "Patterns appear after 3 days of tracking."
+            : `${remaining} more day${remaining === 1 ? "" : "s"} of tracking until patterns appear.`}
+        </div>
+      </div>
+    );
+  }
 
   const peakLabel =
     data.peakFocusHours.length > 0 ? data.peakFocusHours.map((h) => `${h}:00`).join(", ") : "—";

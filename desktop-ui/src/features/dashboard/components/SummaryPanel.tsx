@@ -14,7 +14,7 @@ import type {
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
 import { formatHumanDuration, TZ_OFFSET_MINS, todayISO } from "@/utils/dashboardDates";
-import { resolveActivityColor, resolveCategoryLabel } from "../lib/productivity";
+import { getAppColor, resolveActivityColor, resolveCategoryLabel } from "../lib/productivity";
 import { GoalsProgress } from "./productivity/GoalsProgress";
 import { HourlyHeatmap } from "./productivity/HourlyHeatmap";
 import { PatternsCard } from "./productivity/PatternsCard";
@@ -174,7 +174,15 @@ function DaySummary({
         <p className="dashboard__summary-recommendation">{intel.focusRecommendation}</p>
       )}
 
-      {weeklyData && weeklyData.length >= 2 && <WeeklySparkline data={weeklyData} />}
+      {weeklyData && weeklyData.length >= 2 ? (
+        <WeeklySparkline data={weeklyData} />
+      ) : (
+        <div className="dashboard__sparkline dashboard__sparkline--empty">
+          <span className="dashboard__sparkline-empty-msg">
+            Weekly trend appears after 2+ days of tracking.
+          </span>
+        </div>
+      )}
 
       {hasProductivity && <PatternsCard />}
 
@@ -244,6 +252,7 @@ function TopAppsChart({
     <div className="dashboard__summary-apps">
       {apps.slice(0, 5).map((app) => {
         const pct = maxSecs > 0 ? (app.durationSecs / maxSecs) * 100 : 0;
+        const color = getAppColor(app.appName, app.category ?? null);
         return (
           <div key={app.appName} className="dashboard__summary-app-row">
             <span className="dashboard__summary-app-name" title={app.appName}>
@@ -252,7 +261,11 @@ function TopAppsChart({
             <div className="dashboard__summary-app-track">
               <div
                 className="dashboard__summary-app-fill"
-                style={{ width: `${Math.max(pct, 4)}%` }}
+                style={{
+                  width: `${Math.max(pct, 4)}%`,
+                  backgroundColor: color,
+                  opacity: 0.6 + (pct / 100) * 0.4,
+                }}
               />
             </div>
             <span className="dashboard__summary-app-dur">
