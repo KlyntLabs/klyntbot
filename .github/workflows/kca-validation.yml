@@ -2,9 +2,9 @@ name: KCA Validation
 
 on:
   push:
-    branches: [main, feat/kca-*]
+    branches: []
   pull_request:
-    branches: [main]
+    branches: []
 
 jobs:
   validation:
