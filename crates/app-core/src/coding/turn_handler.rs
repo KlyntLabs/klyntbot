@@ -146,6 +146,7 @@ impl AppCore {
                                     });
                                 }
                                 agent::AgentEvent::ToolEnd {
+                                    name,
                                     success,
                                     duration_ms,
                                     ..
@@ -157,6 +158,15 @@ impl AppCore {
                                         success,
                                         duration_ms,
                                     });
+                                    // For bash tools, also emit CommandExecuted
+                                    if name == "bash" {
+                                        broker.publish(ThreadEvent::CommandExecuted {
+                                            thread_id: tid.clone(),
+                                            turn_id: tuid_bridge.clone(),
+                                            command: vec![name.clone()],
+                                            exit_code: if success { Some(0) } else { Some(1) },
+                                        });
+                                    }
                                 }
                                 agent::AgentEvent::ContextCompressed {
                                     before_tokens,
@@ -193,6 +203,25 @@ impl AppCore {
                                 }
                                 agent::AgentEvent::TurnComplete { .. } => {
                                     // Will be followed by Done — handled there
+                                }
+                                agent::AgentEvent::FileEditWithSymbols {
+                                    path, op, ..
+                                } => {
+                                    let change = match op.as_str() {
+                                        "write" => {
+                                            desktop_shared::coding::FileChangeKindDto::Created
+                                        }
+                                        "edit" | "apply_patch" => {
+                                            desktop_shared::coding::FileChangeKindDto::Modified
+                                        }
+                                        _ => desktop_shared::coding::FileChangeKindDto::Modified,
+                                    };
+                                    broker.publish(ThreadEvent::FileChanged {
+                                        thread_id: tid.clone(),
+                                        turn_id: tuid_bridge.clone(),
+                                        path,
+                                        change,
+                                    });
                                 }
                                 _ => {
                                     // Other AgentEvent variants — ignore for now
