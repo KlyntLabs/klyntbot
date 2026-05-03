@@ -1,4 +1,5 @@
 pub mod agents;
+pub mod approval;
 pub mod annotations;
 pub mod areas;
 pub mod autotuner;

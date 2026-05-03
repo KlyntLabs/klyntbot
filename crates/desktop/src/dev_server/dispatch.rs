@@ -42,6 +42,9 @@ pub(super) async fn dispatch(
     }
 
     // ── Per-module dispatch (co-located with Tauri commands) ─────────
+    if let Some(r) = commands::approval::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::tasks::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
