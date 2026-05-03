@@ -239,6 +239,33 @@ impl AppCore {
         let appcore_embedding_engine = Some(Arc::clone(&embedding_engine));
         let appcore_vector_store = vector_store.clone();
 
+        // Wave-pre fix: cognitive fact embedder for IngestionConsumer.
+        // Without this, semantic_facts is SQLite-only and `vector_hits=0`
+        // across the entire system (the only embed path was the nightly
+        // reforge consolidation, which doesn't run during chat ingest).
+        //
+        // Gated behind KCA_VECTOR=1 because naively activating vector
+        // retrieval regressed LoCoMo dev bench -5pp (26.2% → 21.2%):
+        // `retrieval.rs::retrieve_relevant_facts` branches one-or-the-
+        // other on vector availability, demoting FTS to fallback-only.
+        // FTS-primary is more precise on date-heavy questions. Hybrid
+        // RRF-merge is on the wave plan; until that lands, default OFF.
+        let cognitive_fact_embedder: Option<Arc<dyn ::cognitive::SemanticFactEmbedder>> =
+            if std::env::var("KCA_VECTOR").ok().as_deref() == Some("1") {
+                if let Some(ref vs) = vector_store {
+                    Some(Arc::new(
+                        ::agent::adapters::cognitive_embedder::SemanticFactEmbedderImpl::new(
+                            Arc::clone(&embedding_engine),
+                            vs.clone(),
+                        ),
+                    ))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
         // ── Insight embedder (reuses the same EmbeddingEngine) ──
         let insight_embedder: Arc<dyn feature_insights::InsightEmbedder> =
             if let Some(ref vs) = vector_store {
@@ -663,6 +690,9 @@ impl AppCore {
             .with_fact_repo(::cognitive::SemanticFactRepo::new(
                 storage_pool.inner().clone(),
             ));
+            if let Some(emb) = cognitive_fact_embedder.clone() {
+                ingestion_inner = ingestion_inner.with_embedder(emb);
+            }
             if let Some(resolver) = audd_resolver {
                 ingestion_inner = ingestion_inner.with_conflict_resolver(resolver);
             }
@@ -975,8 +1005,10 @@ impl AppCore {
                     None,
                 ))
             });
-            let retriever = Arc::new(::cognitive::UnifiedMemoryService::new(fact_repo))
-                as Arc<dyn context_engine::MemoryRetriever>;
+            let retriever = Arc::new(
+                ::cognitive::UnifiedMemoryService::new(fact_repo)
+                    .with_embedder_opt(cognitive_fact_embedder.clone()),
+            ) as Arc<dyn context_engine::MemoryRetriever>;
             let mut distiller_cfg = coding_memory::distiller::DistillerConfig::default();
             // Respect coding-memory config model if set.
             distiller_cfg.model = config.coding_memory.distiller.model.clone();
@@ -1485,7 +1517,8 @@ impl AppCore {
                     let retriever = ::cognitive::UnifiedMemoryService::new(fact_repo)
                         .with_co_activation_repo(::cognitive::CoActivationRepo::new(
                             storage_pool.inner().clone(),
-                        ));
+                        ))
+                        .with_embedder_opt(cognitive_fact_embedder.clone());
                     Some(Arc::new(retriever) as Arc<dyn context_engine::MemoryRetriever>)
                 };
 
