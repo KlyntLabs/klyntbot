@@ -14,6 +14,7 @@ pub mod coding_sessions_v2;
 pub mod coding_skills;
 pub mod coding_status;
 pub mod coding_thread;
+pub mod coding_turn;
 pub mod coding_window;
 pub mod cognitive;
 pub mod columns;

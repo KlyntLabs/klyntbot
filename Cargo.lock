@@ -7993,6 +7993,7 @@ dependencies = [
  "common",
  "config",
  "dashmap",
+ "desktop-shared",
  "diffy",
  "dirs",
  "globset",

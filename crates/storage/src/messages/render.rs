@@ -31,6 +31,7 @@ pub fn extract_tool_results(parts: &[MessagePart]) -> Vec<(String, String, bool)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messages::parts::ToolOutput;
 
     #[test]
     fn extract_text_joins_text_parts() {

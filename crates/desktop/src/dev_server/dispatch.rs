@@ -48,6 +48,9 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::coding_thread::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::coding_turn::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::tasks::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
