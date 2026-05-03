@@ -494,7 +494,7 @@ pub async fn productivity_patterns(days: Option<u32>) -> ProductivityPatternsRes
 }
 
 #[klynt_raw_command]
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 #[specta::specta]
 pub async fn productivity_hourly_breakdown(
     state: State<'_, Arc<AppCore>>,
