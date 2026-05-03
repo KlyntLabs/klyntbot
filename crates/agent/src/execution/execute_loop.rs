@@ -33,6 +33,8 @@ pub struct ExecuteLoopResult {
     pub budget_exhausted: bool,
     /// All tool calls made during execution.
     pub tool_calls: Vec<String>,
+    /// Why the loop terminated: "completed", "budget_exhausted", "cancelled", "error".
+    pub finish_reason: String,
 }
 
 /// Run the unified execute loop.
@@ -79,6 +81,7 @@ pub async fn execute_loop(
                     turns: budget.turns_used(),
                     budget_exhausted: true,
                     tool_calls: all_tool_calls,
+                    finish_reason: "budget_exhausted".into(),
                 });
             }
             // Already tried synthesis once — stop to avoid infinite loop
@@ -91,6 +94,7 @@ pub async fn execute_loop(
                     turns: budget.turns_used(),
                     budget_exhausted: true,
                     tool_calls: all_tool_calls,
+                    finish_reason: "budget_exhausted".into(),
                 });
             }
             synthesis_attempted = true;
@@ -118,6 +122,7 @@ pub async fn execute_loop(
                     turns: budget.turns_used(),
                     budget_exhausted: false,
                     tool_calls: all_tool_calls,
+                    finish_reason: "cancelled".into(),
                 });
             }
         }
@@ -169,6 +174,7 @@ pub async fn execute_loop(
                     turns: budget.turns_used(),
                     budget_exhausted: false,
                     tool_calls: all_tool_calls,
+                    finish_reason: "completed".into(),
                 });
             }
 
@@ -191,6 +197,7 @@ pub async fn execute_loop(
                         turns: budget.turns_used(),
                         budget_exhausted: false,
                         tool_calls: all_tool_calls,
+                        finish_reason: "completed".into(),
                     });
                 }
                 if !budget.exhausted() {
@@ -205,6 +212,7 @@ pub async fn execute_loop(
                     turns: budget.turns_used(),
                     budget_exhausted: true,
                     tool_calls: all_tool_calls,
+                    finish_reason: "budget_exhausted".into(),
                 });
             }
         }
