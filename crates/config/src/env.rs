@@ -57,6 +57,37 @@ pub async fn load_with_env_overrides() -> Result<Config> {
         "KLYNTBOT_AGENTS__DEFAULTS__WORKSPACE",
         config.agents.defaults.workspace
     );
+    if let Ok(val) = std::env::var("KLYNTBOT_AGENTS__DEFAULTS__PROVIDER") {
+        config.agents.defaults.provider = Some(val);
+    }
+    if let Ok(val) = std::env::var("KLYNTBOT_COGNITIVE__PROVIDER") {
+        config.cognitive.provider = Some(val);
+    }
+    if let Ok(val) = std::env::var("KLYNTBOT_COGNITIVE__MODEL") {
+        config.cognitive.model = Some(val);
+    }
+    // Allow overriding any provider's api_base — needed to route an
+    // OpenAI-compat endpoint (Mimo, vLLM, etc.) through an existing
+    // provider slot without adding a new ProviderRegistry entry.
+    macro_rules! env_api_base {
+        ($name:literal, $field:expr) => {
+            if let Ok(val) = std::env::var($name) {
+                $field = Some(val);
+            }
+        };
+    }
+    env_api_base!(
+        "KLYNTBOT_PROVIDERS__DEEPSEEK__API_BASE",
+        config.providers.deepseek.api_base
+    );
+    env_api_base!(
+        "KLYNTBOT_PROVIDERS__OPENAI__API_BASE",
+        config.providers.openai.api_base
+    );
+    env_api_base!(
+        "KLYNTBOT_PROVIDERS__OPENROUTER__API_BASE",
+        config.providers.openrouter.api_base
+    );
     env_parse!(
         "KLYNTBOT_AGENTS__DEFAULTS__TEMPERATURE",
         config.agents.defaults.temperature,
