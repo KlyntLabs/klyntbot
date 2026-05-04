@@ -367,12 +367,24 @@ async fn call_provider_streaming(
         }
     };
 
-    Ok(providers::LlmResponse {
-        content: if content.is_empty() {
+    // Reasoning-model fallback: when streamed `content` is empty but the
+    // model emitted `reasoning_content` (Mimo, deepseek-r1, qwq, glm-zero),
+    // promote the reasoning to be the answer. Without this, finish_reason=
+    // length truncations mid-thought produce silent empty output across the
+    // whole agent. Mirrors the equivalent fallback in the non-streaming
+    // path at openai_compat.rs::parse_response.
+    let resolved_content = if content.trim().is_empty() {
+        if reasoning.trim().is_empty() {
             None
         } else {
-            Some(content)
-        },
+            Some(reasoning.clone())
+        }
+    } else {
+        Some(content)
+    };
+
+    Ok(providers::LlmResponse {
+        content: resolved_content,
         tool_calls,
         finish_reason,
         usage,
