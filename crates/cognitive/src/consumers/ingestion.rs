@@ -166,6 +166,7 @@ pub struct IngestionConsumer {
     extraction_handler: Option<Arc<dyn ExtractionHandler>>,
     fact_repo: Option<SemanticFactRepo>,
     conflict_resolver: Option<Arc<dyn crate::services::extraction::ConflictResolver>>,
+    embedder: Option<Arc<dyn crate::embedder::SemanticFactEmbedder>>,
     episodic_importance_threshold: f64,
 }
 
@@ -183,6 +184,7 @@ impl IngestionConsumer {
             extraction_handler,
             fact_repo: None,
             conflict_resolver: None,
+            embedder: None,
             episodic_importance_threshold: 0.7,
         }
     }
@@ -204,6 +206,20 @@ impl IngestionConsumer {
     /// result is discarded — facts never reach `semantic_facts`.
     pub fn with_fact_repo(mut self, fact_repo: SemanticFactRepo) -> Self {
         self.fact_repo = Some(fact_repo);
+        self
+    }
+
+    /// Wire a fact embedder so newly persisted facts are also written to
+    /// the vector store. Without this, `vector_hits` stays 0 across the
+    /// entire system because facts are SQLite-only — the only path that
+    /// embeds is the nightly reforge consolidation, which doesn't run
+    /// during a bench replay. Pre-existing dead-vector bug surfaced in
+    /// trace-w0-w3-dev-ds.jsonl (vector_hits=0 on every event).
+    pub fn with_embedder(
+        mut self,
+        embedder: Arc<dyn crate::embedder::SemanticFactEmbedder>,
+    ) -> Self {
+        self.embedder = Some(embedder);
         self
     }
 
@@ -263,6 +279,7 @@ impl SignalConsumer for IngestionConsumer {
                 let fact_repo = self.fact_repo.clone();
                 let entity_repo = self.entity_repo.clone();
                 let conflict_resolver = self.conflict_resolver.clone();
+                let embedder = self.embedder.clone();
                 tokio::spawn(async move {
                     // Look up persisted user-name BEFORE extraction so we can
                     // both (a) prepend identity context to the prompt and
@@ -423,45 +440,40 @@ impl SignalConsumer for IngestionConsumer {
                                             .map(|f| f.object)
                                     })
                                     .or(user_name);
-                                let audd_on = matches!(
-                                    std::env::var("KCA_AUDD").ok().as_deref(),
-                                    Some("1") | Some("true") | Some("yes")
-                                );
                                 let mut written = 0usize;
                                 for ext in &result.extractions {
                                     for f in &ext.facts {
                                         let mut fact = to_semantic_fact(f, &obs);
 
                                         // AUDD (Mem0 pattern): when a
-                                        // resolver is wired AND KCA_AUDD=1,
-                                        // ask it whether to ADD/UPDATE/DELETE/
-                                        // NOOP this candidate vs existing
-                                        // facts on the same (subject,
-                                        // predicate). Default behavior (no
-                                        // resolver / flag off) is the
-                                        // pre-AUDD Add-only path.
+                                        // resolver is wired, ask it whether
+                                        // to ADD/UPDATE/DELETE/NOOP this
+                                        // candidate vs existing facts on
+                                        // the same (subject, predicate).
+                                        // Default-on as of Tier 0 — falls
+                                        // back to Add-only when no resolver
+                                        // is wired (e.g., no cognitive
+                                        // provider).
                                         let mut decision =
                                             crate::services::extraction::ConflictDecision::Add;
-                                        if audd_on {
-                                            if let Some(resolver) = &conflict_resolver {
-                                                let existing = repo
-                                                    .find_by_subject_predicate(
-                                                        &fact.subject,
-                                                        &fact.predicate,
-                                                    )
-                                                    .await
-                                                    .ok()
-                                                    .map(|rows| {
-                                                        rows.into_iter()
-                                                            .filter(|r| r.superseded_at.is_none())
-                                                            .collect::<Vec<_>>()
-                                                    })
-                                                    .unwrap_or_default();
-                                                if !existing.is_empty() {
-                                                    decision = resolver
-                                                        .classify(f, &existing)
-                                                        .await;
-                                                }
+                                        if let Some(resolver) = &conflict_resolver {
+                                            let existing = repo
+                                                .find_by_subject_predicate(
+                                                    &fact.subject,
+                                                    &fact.predicate,
+                                                )
+                                                .await
+                                                .ok()
+                                                .map(|rows| {
+                                                    rows.into_iter()
+                                                        .filter(|r| r.superseded_at.is_none())
+                                                        .collect::<Vec<_>>()
+                                                })
+                                                .unwrap_or_default();
+                                            if !existing.is_empty() {
+                                                decision = resolver
+                                                    .classify(f, &existing)
+                                                    .await;
                                             }
                                         }
                                         match decision {
@@ -480,6 +492,11 @@ impl SignalConsumer for IngestionConsumer {
                                                     tracing::warn!(error = %e, "AUDD UPDATE failed");
                                                 } else {
                                                     written += 1;
+                                                    if let Some(emb) = &embedder {
+                                                        if let Err(e) = emb.embed_and_store_fact(&fact).await {
+                                                            tracing::warn!(error = %e, "embed_and_store_fact failed");
+                                                        }
+                                                    }
                                                 }
                                             }
                                             crate::services::extraction::ConflictDecision::Delete {
@@ -495,6 +512,11 @@ impl SignalConsumer for IngestionConsumer {
                                                     tracing::warn!(error = %e, "AUDD DELETE+ADD failed");
                                                 } else {
                                                     written += 1;
+                                                    if let Some(emb) = &embedder {
+                                                        if let Err(e) = emb.embed_and_store_fact(&fact).await {
+                                                            tracing::warn!(error = %e, "embed_and_store_fact failed");
+                                                        }
+                                                    }
                                                 }
                                             }
                                             crate::services::extraction::ConflictDecision::Add => {
@@ -502,6 +524,11 @@ impl SignalConsumer for IngestionConsumer {
                                                     tracing::warn!(error = %e, "fact upsert failed");
                                                 } else {
                                                     written += 1;
+                                                    if let Some(emb) = &embedder {
+                                                        if let Err(e) = emb.embed_and_store_fact(&fact).await {
+                                                            tracing::warn!(error = %e, "embed_and_store_fact failed");
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -518,7 +545,14 @@ impl SignalConsumer for IngestionConsumer {
                                                 mirrored.subject = name.clone();
                                                 mirrored.id = uuid::Uuid::new_v4().to_string();
                                                 match repo.upsert(&mirrored).await {
-                                                    Ok(()) => written += 1,
+                                                    Ok(()) => {
+                                                        written += 1;
+                                                        if let Some(emb) = &embedder {
+                                                            if let Err(e) = emb.embed_and_store_fact(&mirrored).await {
+                                                                tracing::warn!(error = %e, "embed mirrored failed");
+                                                            }
+                                                        }
+                                                    }
                                                     Err(e) => tracing::warn!(
                                                         error = %e,
                                                         "mirrored fact upsert failed"
@@ -542,7 +576,14 @@ impl SignalConsumer for IngestionConsumer {
                                             mirrored.subject = "user".to_string();
                                             mirrored.id = uuid::Uuid::new_v4().to_string();
                                             match repo.upsert(&mirrored).await {
-                                                Ok(()) => written += 1,
+                                                Ok(()) => {
+                                                    written += 1;
+                                                    if let Some(emb) = &embedder {
+                                                        if let Err(e) = emb.embed_and_store_fact(&mirrored).await {
+                                                            tracing::warn!(error = %e, "embed reverse-mirrored failed");
+                                                        }
+                                                    }
+                                                }
                                                 Err(e) => tracing::warn!(
                                                     error = %e,
                                                     "reverse-mirrored fact upsert failed"

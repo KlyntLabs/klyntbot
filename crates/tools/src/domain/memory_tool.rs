@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use crate::conversation_recall::{ConversationRecallHandler, PurgeFilter, RecallSearchResult};
 use crate::embedding_engine::EmbeddingHandler;
+use crate::semantic_fact_search::SemanticFactSearchHandler;
 use crate::todo_types::Action;
 use crate::{RoutingContext, Tool};
 use common::Result;
@@ -32,6 +33,10 @@ pub struct MemoryTool {
     domain_bus: Option<Arc<DomainEventBus>>,
     /// Shared store of the most recent query enhancement trace.
     enhancement_trace: Option<Arc<LatestEnhancementTrace>>,
+    /// T2.2: semantic-fact retriever for `search_all`. When wired,
+    /// `search_all` queries both conversation embeddings AND the
+    /// cognitive semantic-fact pool (same pool as pre-injection).
+    fact_search_handler: Option<Arc<dyn SemanticFactSearchHandler>>,
 }
 
 impl MemoryTool {
@@ -46,7 +51,17 @@ impl MemoryTool {
             embedding_store: None,
             domain_bus: None,
             enhancement_trace: None,
+            fact_search_handler: None,
         }
+    }
+
+    /// Inject semantic-fact search handler (T2.2).
+    pub fn with_fact_search_handler(
+        mut self,
+        handler: Arc<dyn SemanticFactSearchHandler>,
+    ) -> Self {
+        self.fact_search_handler = Some(handler);
+        self
     }
 
     /// Inject conversation recall handler for semantic search.
@@ -157,6 +172,10 @@ impl Tool for MemoryTool {
                     "minimum": 0.0,
                     "maximum": 1.0,
                     "description": "Cosine similarity threshold (default: 0.5)"
+                },
+                "widen": {
+                    "type": "boolean",
+                    "description": "When true, search_all probes the cognitive fact pool with broader thresholds (lowered similarity, doubled limits). Use this on retrieval-empty refusals."
                 },
                 "filter": {
                     "type": "string",
@@ -276,6 +295,39 @@ impl MemoryTool {
             return Ok(
                 "Semantic search is not available (embedding model not loaded).".to_string(),
             );
+        }
+
+        // T2.2 — query semantic-fact pool ONLY when the caller
+        // requests widened search (typically the Tier 2 refusal-retry
+        // path). Default search_all calls stay on conversation+todo
+        // index to avoid drowning the model in widened-pool noise.
+        // The bench measured -26pp regression when this fired on
+        // every search_all call.
+        let widen = args
+            .get("widen")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let mut facts_block = String::new();
+        if widen {
+            if let Some(fh) = &self.fact_search_handler {
+                let fact_limit = limit.max(20);
+                match fh.search_facts(query, fact_limit, true).await {
+                    Ok(facts) if !facts.is_empty() => {
+                        facts_block.push_str("## Semantic Facts\n");
+                        for f in &facts {
+                            facts_block.push_str(&format!(
+                                "- [{:.2}] {}: {} = {} ({})\n",
+                                f.score, f.subject, f.predicate, f.object, f.domain
+                            ));
+                        }
+                        facts_block.push('\n');
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!(error = %e, "fact search failed in search_all");
+                    }
+                }
+            }
         }
 
         // 1. Search conversations (service already overfetches internally for decay filtering)
@@ -415,17 +467,22 @@ impl MemoryTool {
 
         // 4. Format output
         if merged.is_empty() {
+            // Even when no conv/todo hits, return facts_block if present.
+            if !facts_block.is_empty() {
+                return Ok(facts_block);
+            }
             return Ok(format!(
                 "No results found matching '{}' (threshold: {:.2}).",
                 query, threshold
             ));
         }
 
-        let mut output = format!(
+        let mut output = facts_block.clone();
+        output.push_str(&format!(
             "{} result(s) matching '{}' (unified search: todos + conversations):\n",
             merged.len().min(limit),
             query
-        );
+        ));
 
         for (result, rrf_score, source) in merged.iter().take(limit) {
             match result {

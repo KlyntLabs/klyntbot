@@ -316,25 +316,67 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
         );
         let ctx = ReplayContext::new().await?;
 
-        // Replay every session as conversation history.
+        // T1.1 — chunked-turn ingest. When KCA_PER_TURN_INGEST is set
+        // to a positive integer N, group turns into windows of N and
+        // send each window as one chat_complete call. N=1 → strict per
+        // turn (190 calls/conv, very slow); N=5 → 38 calls/conv (~3×
+        // baseline cost, feasible for bench); the original blob path
+        // is N=0 (unset / default).
+        //
+        // Smaller windows give the LLM extractor cleaner dialog units;
+        // larger windows preserve cross-turn coreference.
+        let per_turn_window: usize = std::env::var("KCA_PER_TURN_INGEST")
+            .ok()
+            .and_then(|s| s.parse::<usize>().ok())
+            .filter(|&n| n > 0)
+            .or_else(|| {
+                // Backwards-compat: KCA_PER_TURN_INGEST=1/true/yes → N=1
+                if matches!(
+                    std::env::var("KCA_PER_TURN_INGEST").ok().as_deref(),
+                    Some("true") | Some("yes")
+                ) {
+                    Some(1)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0);
+
         for (idx, dt, turns) in conv.ordered_sessions() {
             let session_key = common::SessionKey::from_parts("locomo-real", &conv.sample_id);
-            // One bulk message per session: prefix with date_time + speaker
-            // labels so the agent can attribute facts. Replaying every turn
-            // individually would multiply LLM cost ~30× for marginal gain.
-            let mut blob = String::new();
-            if let Some(dt) = &dt {
-                blob.push_str(&format!("[Session {idx} — {dt}]\n"));
+            if per_turn_window > 0 {
+                let header = match &dt {
+                    Some(dt) => format!("[Session {idx} — {dt}]"),
+                    None => format!("[Session {idx}]"),
+                };
+                for chunk in turns.chunks(per_turn_window) {
+                    let mut payload = format!("{header}\n");
+                    for t in chunk {
+                        payload.push_str(&format!("{}: {}\n", t.speaker, t.text));
+                    }
+                    report.total_input_chars += payload.len() as u64;
+                    let reply = ctx.chat_complete(payload, session_key.to_string()).await?;
+                    report.total_output_chars += reply.len() as u64;
+                }
+                // Single idle-wait per session — extraction completes
+                // in background while subsequent windows enqueue.
+                ctx.await_cognitive_idle().await;
             } else {
-                blob.push_str(&format!("[Session {idx}]\n"));
+                // Default: one bulk message per session
+                let mut blob = String::new();
+                if let Some(dt) = &dt {
+                    blob.push_str(&format!("[Session {idx} — {dt}]\n"));
+                } else {
+                    blob.push_str(&format!("[Session {idx}]\n"));
+                }
+                for t in &turns {
+                    blob.push_str(&format!("{}: {}\n", t.speaker, t.text));
+                }
+                report.total_input_chars += blob.len() as u64;
+                let reply = ctx.chat_complete(blob, session_key.to_string()).await?;
+                report.total_output_chars += reply.len() as u64;
+                ctx.await_cognitive_idle().await;
             }
-            for t in &turns {
-                blob.push_str(&format!("{}: {}\n", t.speaker, t.text));
-            }
-            report.total_input_chars += blob.len() as u64;
-            let reply = ctx.chat_complete(blob, session_key.to_string()).await?;
-            report.total_output_chars += reply.len() as u64;
-            ctx.await_cognitive_idle().await;
         }
 
         // Phase 3 (KCA_PHASE_3=1): fire graph consolidation between

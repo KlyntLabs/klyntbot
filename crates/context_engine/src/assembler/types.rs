@@ -10,7 +10,18 @@ use providers::Message;
 /// 5-cut buries the chain. 12 is a compromise: enough head-room for multi-
 /// hop while keeping the system-prompt token budget under ~2K
 /// (12 × ~150 chars per fact).
-pub(crate) const DEFAULT_MEMORY_RETRIEVAL_LIMIT: usize = 12;
+/// Wave 1: raised 5 → 12. **Wave-B (option B)**: raised 12 → 30.
+///
+/// Rationale: trace-w0-w3-vec analysis (n=80) showed 42% of failures
+/// were "refusal-despite-context" — agent had 977+ FTS hits but said
+/// "no mention of X". The mechanism: the right fact was retrieved by
+/// FTS (high BM25 score on entity match) but didn't make the top-12
+/// after relevance re-ranking, because high-stability `user:*` rows
+/// crowd out per-person facts. Bumping to 30 keeps the right fact in
+/// the agent-visible set while still fitting comfortably under the
+/// system-prompt token budget (30 × ~150 chars = ~4.5K chars ≈ ~1.1K
+/// tokens, well under the 2K target).
+pub(crate) const DEFAULT_MEMORY_RETRIEVAL_LIMIT: usize = 30;
 
 /// Determines how the agent should process a request.
 #[derive(Debug, Clone)]
