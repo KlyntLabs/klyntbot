@@ -231,6 +231,42 @@ impl ReplayContext {
         Ok(answer)
     }
 
+    /// Bench-only Wave 6 helper: write a raw turn blob as one
+    /// `episodic_memories` row so the bench-direct retrieval path can
+    /// surface it via FTS5. Bypasses `IngestionConsumer` (which the bench
+    /// flow doesn't reach uniformly), giving us deterministic episodic
+    /// preservation for benchmarks. Gated by KCA_RAW_EPISODE_PERSIST=1.
+    pub async fn record_raw_episode(
+        &self,
+        domain: &str,
+        content: &str,
+        occurred_at: &str,
+    ) -> common::Result<()> {
+        if !matches!(
+            std::env::var("KCA_RAW_EPISODE_PERSIST").ok().as_deref(),
+            Some("1") | Some("true") | Some("yes")
+        ) {
+            return Ok(());
+        }
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = jiff::Timestamp::now().to_string();
+        sqlx::query(
+            "INSERT INTO episodic_memories \
+             (id, domain, content, importance, occurred_at, recorded_at, stability, \
+              access_count, scope_type, tier, child_count) \
+             VALUES (?, ?, ?, 1.0, ?, ?, 1.0, 0, 'system', 'raw', 0)",
+        )
+        .bind(id)
+        .bind(domain)
+        .bind(content)
+        .bind(occurred_at)
+        .bind(now)
+        .execute(self.pool.inner())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("record_raw_episode: {e}")))?;
+        Ok(())
+    }
+
     /// Bench-only direct path: bypass the agent runtime entirely.
     /// Retrieves top semantic facts via the cognitive layer, formats them
     /// into a plain prompt, calls the configured cognitive provider via

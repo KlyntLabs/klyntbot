@@ -355,6 +355,8 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
                         payload.push_str(&format!("{}: {}\n", t.speaker, t.text));
                     }
                     report.total_input_chars += payload.len() as u64;
+                    let occurred = dt.clone().unwrap_or_else(|| "unknown".into());
+                    let _ = ctx.record_raw_episode("general", &payload, &occurred).await;
                     let reply = ctx.chat_complete(payload, session_key.to_string()).await?;
                     report.total_output_chars += reply.len() as u64;
                 }
@@ -373,6 +375,8 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
                     blob.push_str(&format!("{}: {}\n", t.speaker, t.text));
                 }
                 report.total_input_chars += blob.len() as u64;
+                let occurred = dt.clone().unwrap_or_else(|| "unknown".into());
+                let _ = ctx.record_raw_episode("general", &blob, &occurred).await;
                 let reply = ctx.chat_complete(blob, session_key.to_string()).await?;
                 report.total_output_chars += reply.len() as u64;
                 ctx.await_cognitive_idle().await;
