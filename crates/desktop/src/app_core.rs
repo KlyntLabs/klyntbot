@@ -569,13 +569,20 @@ fn wire_event_channels(
                         Ok(bus::DomainEvent::Generic { kind, payload })
                             if kind == "agent_event" =>
                         {
+                            // ToolEvent uses #[serde(tag="type", rename_all="camelCase")]
+                            // so ApprovalRequest variants serialize with "type":"approvalRequest"
+                            // (internally tagged; no outer "ApprovalRequest" key). The dual-probe
+                            // is kept for defensive forward-compat with externally-tagged variants.
                             let is_approval = payload.get("ApprovalRequest").is_some()
-                                || payload.get("type").and_then(|v| v.as_str())
-                                    == Some("ApprovalRequest");
+                                || matches!(
+                                    payload.get("type").and_then(|v| v.as_str()),
+                                    Some("approvalRequest" | "ApprovalRequest")
+                                );
                             if is_approval {
                                 let inner = payload.get("ApprovalRequest")
                                     .and_then(|v| v.get("payload"))
                                     .cloned()
+                                    .or_else(|| payload.get("payload").cloned())
                                     .unwrap_or(payload);
                                 if let Err(e) = handle.emit("agent:approval_request", &inner) {
                                     warn!("failed to emit agent:approval_request: {e}");

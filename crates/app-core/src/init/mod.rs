@@ -1856,7 +1856,25 @@ impl AppCore {
                 .clone()
                 .unwrap_or_else(|| Arc::new(bus::DomainEventBus::new(64)));
 
-            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            // Toolkit cwd: walk up from the running binary's cwd to find the
+            // outermost workspace root (`.git` marker). Fixes the case where
+            // `cargo tauri dev` cd's into `crates/desktop`, leaving tools
+            // sandboxed to that subdir instead of the actual repo.
+            let cwd = {
+                let start = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+                let mut cur = start.clone();
+                let mut found = None;
+                loop {
+                    if cur.join(".git").exists() {
+                        found = Some(cur.clone());
+                    }
+                    match cur.parent() {
+                        Some(p) if p != cur => cur = p.to_path_buf(),
+                        _ => break,
+                    }
+                }
+                found.unwrap_or(start)
+            };
             let non_ui_policy = config_guard.tools.approval_policy.non_ui_channels;
             let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
 

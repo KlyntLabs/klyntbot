@@ -436,7 +436,7 @@ pub async fn emit_approval_request(
         id: ctx.request_id.clone(),
         payload,
     };
-    fan_out_tool_event(ctx.event_tx, None, evt).await;
+    fan_out_tool_event(ctx.event_tx, Some(ctx.domain_bus), evt).await;
 }
 
 pub(crate) async fn fan_out_tool_event(
