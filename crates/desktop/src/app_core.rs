@@ -24,7 +24,7 @@ static BRIDGE_SERVER: OnceLock<mcp_bridge::BridgeServer> = OnceLock::new();
 /// Process-wide token for the PRAGMA data_version polling fallback.
 /// The watcher task exits when this token is cancelled (on graceful
 /// shutdown) or when the runtime drops (on process exit).
-static DATA_VERSION_WATCHER: OnceLock<tokio_util::sync::CancellationToken> = OnceLock::new();
+static DATA_VERSION_WATCHER: OnceLock<storage::DataVersionWatcherHandle> = OnceLock::new();
 
 /// Latest distraction intervention awaiting display. Populated each time a
 /// `DistractionAlert` is forwarded; cleared when the overlay's React layer
@@ -129,8 +129,7 @@ pub async fn init(
         .start_data_version_watcher(
             channels.domain_event_bus.clone(),
             std::time::Duration::from_secs(5),
-        )
-        .await;
+        );
     if DATA_VERSION_WATCHER.set(dv_token).is_err() {
         tracing::warn!("data_version_watcher: already initialized");
     }
