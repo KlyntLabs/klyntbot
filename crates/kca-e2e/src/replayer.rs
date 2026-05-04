@@ -360,7 +360,8 @@ impl ReplayContext {
             for s in scored.iter().take(20) {
                 seen_ids.insert(s.fact.id.clone());
                 ctx.push_str(&format!(
-                    "- {}: {} = {}{}\n",
+                    "- [{}] {}: {} = {}{}\n",
+                    s.fact.valid_from,
                     s.fact.subject,
                     s.fact.predicate,
                     s.fact.object,
@@ -377,7 +378,8 @@ impl ReplayContext {
                     continue;
                 }
                 ctx.push_str(&format!(
-                    "- {}: {} = {}{}\n",
+                    "- [{}] {}: {} = {}{}\n",
+                    f.valid_from,
                     f.subject,
                     f.predicate,
                     f.object,

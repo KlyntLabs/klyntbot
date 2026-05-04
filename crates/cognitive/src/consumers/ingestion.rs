@@ -24,6 +24,7 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         source: "regex_backstop".into(),
         speaker: None,
         valid_until: None,
+        valid_from: None,
     };
 
     // "I moved to {city} ..." / "I'm now in {city}" → lives_in
@@ -142,6 +143,7 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
             source: "regex_backstop_3p".into(),
             speaker: None,
             valid_until: None,
+            valid_from: None,
         });
     }
 
