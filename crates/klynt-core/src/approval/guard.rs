@@ -316,10 +316,7 @@ fn layer_outcome_from_decision(d: &ApprovalDecision) -> desktop_shared::coding::
             rule_matched,
             ..
         } => desktop_shared::coding::LayerOutcome::Allowed {
-            reason: format!(
-                "allowed: {}",
-                rule_matched.as_deref().unwrap_or("?")
-            ),
+            reason: format!("allowed: {}", rule_matched.as_deref().unwrap_or("?")),
             rule_matched: rule_matched.clone(),
         },
         ApprovalDecision::Auto {
@@ -328,17 +325,12 @@ fn layer_outcome_from_decision(d: &ApprovalDecision) -> desktop_shared::coding::
             rule_matched,
             ..
         } => desktop_shared::coding::LayerOutcome::Denied {
-            reason: format!(
-                "denied: {}",
-                rule_matched.as_deref().unwrap_or("?")
-            ),
+            reason: format!("denied: {}", rule_matched.as_deref().unwrap_or("?")),
             rule_matched: rule_matched.clone(),
         },
-        ApprovalDecision::Ask { reason, .. } => {
-            desktop_shared::coding::LayerOutcome::Deferred {
-                reason: format!("ask: {reason}"),
-            }
-        }
+        ApprovalDecision::Ask { reason, .. } => desktop_shared::coding::LayerOutcome::Deferred {
+            reason: format!("ask: {reason}"),
+        },
         _ => desktop_shared::coding::LayerOutcome::Skipped {
             reason: "skipped".into(),
         },
@@ -346,9 +338,7 @@ fn layer_outcome_from_decision(d: &ApprovalDecision) -> desktop_shared::coding::
 }
 
 /// Map an `ExecDecision` into the frontend `LayerOutcome` type.
-fn layer_outcome_from_exec_decision(
-    d: &ExecDecision,
-) -> desktop_shared::coding::LayerOutcome {
+fn layer_outcome_from_exec_decision(d: &ExecDecision) -> desktop_shared::coding::LayerOutcome {
     match d {
         ExecDecision::Allow => desktop_shared::coding::LayerOutcome::Allowed {
             reason: "layer-2 allow".into(),
@@ -378,11 +368,7 @@ fn get_arg_str(args: &Option<serde_json::Value>, key: &str) -> Option<String> {
 /// Emit a typed `ApprovalRequest` event for the coding surface.
 ///
 /// No-op if `event_tx` is None.
-pub async fn emit_approval_request(
-    ctx: &GuardCtx<'_>,
-    tool: &str,
-    audit: &LayerOutcomeAudit,
-) {
+pub async fn emit_approval_request(ctx: &GuardCtx<'_>, tool: &str, audit: &LayerOutcomeAudit) {
     if ctx.event_tx.is_none() {
         return;
     }

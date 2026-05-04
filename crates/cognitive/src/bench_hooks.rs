@@ -115,9 +115,15 @@ mod tests {
             .unwrap();
         });
         let h = read_hit_counts();
-        assert_eq!(h.vector_hits, 7, "worker-thread write must be visible to main");
+        assert_eq!(
+            h.vector_hits, 7,
+            "worker-thread write must be visible to main"
+        );
         assert_eq!(h.fts_hits, 3);
         assert_eq!(h.episodic_hits, 2);
-        assert_eq!(read_entities(), vec!["Alice".to_string(), "Bob".to_string()]);
+        assert_eq!(
+            read_entities(),
+            vec!["Alice".to_string(), "Bob".to_string()]
+        );
     }
 }

@@ -56,10 +56,7 @@ impl MemoryTool {
     }
 
     /// Inject semantic-fact search handler (T2.2).
-    pub fn with_fact_search_handler(
-        mut self,
-        handler: Arc<dyn SemanticFactSearchHandler>,
-    ) -> Self {
+    pub fn with_fact_search_handler(mut self, handler: Arc<dyn SemanticFactSearchHandler>) -> Self {
         self.fact_search_handler = Some(handler);
         self
     }
@@ -303,10 +300,7 @@ impl MemoryTool {
         // index to avoid drowning the model in widened-pool noise.
         // The bench measured -26pp regression when this fired on
         // every search_all call.
-        let widen = args
-            .get("widen")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+        let widen = args.get("widen").and_then(|v| v.as_bool()).unwrap_or(false);
         let mut facts_block = String::new();
         if widen {
             if let Some(fh) = &self.fact_search_handler {

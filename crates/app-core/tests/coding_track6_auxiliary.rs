@@ -91,8 +91,14 @@ async fn providers_list_returns_known_providers() {
     assert!(!result.providers.is_empty());
 
     let ids: Vec<String> = result.providers.iter().map(|p| p.id.clone()).collect();
-    assert!(ids.contains(&"anthropic".into()), "expected anthropic in provider list");
-    assert!(ids.contains(&"openai".into()), "expected openai in provider list");
+    assert!(
+        ids.contains(&"anthropic".into()),
+        "expected anthropic in provider list"
+    );
+    assert!(
+        ids.contains(&"openai".into()),
+        "expected openai in provider list"
+    );
 
     // Each provider should have a name and id
     for p in &result.providers {

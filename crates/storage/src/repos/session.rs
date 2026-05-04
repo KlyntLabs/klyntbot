@@ -12,7 +12,9 @@ fn parse_json_column<T: serde::de::DeserializeOwned>(
     col: &Option<String>,
 ) -> Result<Option<T>, StorageError> {
     match col.as_deref() {
-        Some(s) if !s.is_empty() => serde_json::from_str(s).map_err(StorageError::serialization).map(Some),
+        Some(s) if !s.is_empty() => serde_json::from_str(s)
+            .map_err(StorageError::serialization)
+            .map(Some),
         _ => Ok(None),
     }
 }
@@ -253,6 +255,29 @@ impl SessionRepo {
                 .fetch_one(&self.pool)
                 .await?;
         Ok(row.0)
+    }
+
+    /// Update the synthetic AGENTS.md message for a session.
+    pub async fn update_synthetic_agents_md(
+        &self,
+        session_id: &str,
+        new_body: &str,
+    ) -> Result<bool, StorageError> {
+        let result = sqlx::query(
+            "UPDATE session_messages
+             SET content = ?1,
+                 parts = ?2
+             WHERE session_key = ?3 AND role = 'user'
+               AND content LIKE '%AGENTS.md instructions for%'
+             ORDER BY timestamp ASC
+             LIMIT 1",
+        )
+        .bind(new_body)
+        .bind(serde_json::json!([{"type":"text","text":new_body}]).to_string())
+        .bind(session_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
     }
 
     /// Compact a session by keeping only the most recent `keep_count` messages.

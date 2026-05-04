@@ -153,10 +153,7 @@ impl AppCore {
         }
 
         std::fs::write(&path, content).map_err(|e| {
-            common::KlyntbotError::Storage(format!(
-                "failed to write {}: {e}",
-                path.display()
-            ))
+            common::KlyntbotError::Storage(format!("failed to write {}: {e}", path.display()))
         })?;
 
         Ok(())
@@ -181,12 +178,12 @@ impl AppCore {
         let full_path = ws_root.join(rel_path);
 
         // Canonicalize and validate path doesn't escape workspace
-        let canonical = full_path.canonicalize().map_err(|e| {
-            common::KlyntbotError::Storage(format!("invalid path: {e}"))
-        })?;
-        let ws_canonical = ws_root.canonicalize().map_err(|e| {
-            common::KlyntbotError::Storage(format!("invalid workspace path: {e}"))
-        })?;
+        let canonical = full_path
+            .canonicalize()
+            .map_err(|e| common::KlyntbotError::Storage(format!("invalid path: {e}")))?;
+        let ws_canonical = ws_root
+            .canonicalize()
+            .map_err(|e| common::KlyntbotError::Storage(format!("invalid workspace path: {e}")))?;
         if !canonical.starts_with(&ws_canonical) {
             return Err(common::KlyntbotError::Storage(
                 "path escapes workspace boundary".into(),
@@ -194,10 +191,7 @@ impl AppCore {
         }
 
         let raw = std::fs::read_to_string(&canonical).map_err(|e| {
-            common::KlyntbotError::Storage(format!(
-                "failed to read {}: {e}",
-                canonical.display()
-            ))
+            common::KlyntbotError::Storage(format!("failed to read {}: {e}", canonical.display()))
         })?;
 
         let truncated = raw.len() > MAX_FILE_BYTES;
@@ -287,9 +281,8 @@ impl AppCore {
                 ))
             })?;
         }
-        std::fs::write(p, content).map_err(|e| {
-            common::KlyntbotError::Storage(format!("failed to write {path}: {e}"))
-        })
+        std::fs::write(p, content)
+            .map_err(|e| common::KlyntbotError::Storage(format!("failed to write {path}: {e}")))
     }
 
     /// Read an image file and return a data URL.
@@ -382,9 +375,6 @@ mod tests {
             mime_guess(std::path::Path::new("foo.json")),
             "application/json"
         );
-        assert_eq!(
-            mime_guess(std::path::Path::new("foo.png")),
-            "image/png"
-        );
+        assert_eq!(mime_guess(std::path::Path::new("foo.png")), "image/png");
     }
 }

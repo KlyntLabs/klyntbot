@@ -6,8 +6,9 @@ import { SandboxSubsection } from "./coding/SandboxSubsection";
 import { SessionsSubsection } from "./coding/SessionsSubsection";
 import { SkillsSubsection } from "./coding/SkillsSubsection";
 import { ToolsSubsection } from "./coding/ToolsSubsection";
+import { CodingRecallStats } from "../CodingRecallStats";
 
-const TABS = ["General", "Tools", "Permissions", "Sandbox", "Skills", "Sessions", "Hooks"] as const;
+const TABS = ["General", "Tools", "Permissions", "Sandbox", "Skills", "Sessions", "Hooks", "Recall"] as const;
 type Tab = (typeof TABS)[number];
 
 export function SettingsCodingSection() {
@@ -34,6 +35,7 @@ export function SettingsCodingSection() {
         {tab === "Skills" && <SkillsSubsection />}
         {tab === "Sessions" && <SessionsSubsection />}
         {tab === "Hooks" && <HooksSubsection />}
+        {tab === "Recall" && <CodingRecallStats workspaceId="default" />}
       </div>
     </div>
   );

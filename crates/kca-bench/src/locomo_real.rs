@@ -556,9 +556,13 @@ mod tests {
     #[test]
     fn wave0_generic_refusal_phrases_detected() {
         assert!(detect_refusal("There is no mention of John's birthday."));
-        assert!(detect_refusal("That detail does not appear in the history."));
+        assert!(detect_refusal(
+            "That detail does not appear in the history."
+        ));
         assert!(detect_refusal("I don't see any record of that event."));
-        assert!(detect_refusal("The date is not specified in the conversations."));
+        assert!(detect_refusal(
+            "The date is not specified in the conversations."
+        ));
         assert!(detect_refusal("Could not find the requested information."));
     }
 

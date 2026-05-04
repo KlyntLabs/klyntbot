@@ -13,13 +13,7 @@ use cognitive::SemanticFactEmbedder;
 use tools::semantic_fact_search::{FactSearchResult, SemanticFactSearchHandler};
 
 const ALL_DOMAINS: &[&str] = &[
-    "personal",
-    "work",
-    "health",
-    "finance",
-    "learning",
-    "general",
-    "coding",
+    "personal", "work", "health", "finance", "learning", "general", "coding",
 ];
 
 pub struct SemanticFactSearchHandlerImpl {
@@ -67,9 +61,7 @@ impl SemanticFactSearchHandler for SemanticFactSearchHandlerImpl {
             self.entity_repo.as_ref(),
         )
         .await
-        .map_err(|e| {
-            common::KlyntbotError::Storage(format!("fact search failed: {e}"))
-        })?;
+        .map_err(|e| common::KlyntbotError::Storage(format!("fact search failed: {e}")))?;
 
         Ok(scored
             .into_iter()

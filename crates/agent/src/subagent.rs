@@ -90,6 +90,20 @@ struct SubagentHandle {
     label: String,
     profile: SubagentProfile,
     spawned_at: std::time::Instant,
+    iteration: std::sync::atomic::AtomicU32,
+    last_tool: std::sync::Mutex<Option<String>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SubagentHandleSummary {
+    pub agent_id: String,
+    pub label: String,
+    pub profile: String,
+    pub iteration: u32,
+    pub status: String,
+    pub started_at: i64,
+    pub last_tool: Option<String>,
+    pub duration_ms: u64,
 }
 
 /// Configuration for subagent execution
@@ -118,6 +132,9 @@ pub struct SubagentManager {
     /// so each invocation can clone the base and append its task tool.
     registry_cache:
         std::sync::Mutex<HashMap<(SubagentProfile, PathBuf), Arc<RwLock<ToolRegistry>>>>,
+    event_tx: std::sync::Mutex<
+        Option<tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>>,
+    >,
 }
 
 /// Builder for SubagentManager
@@ -131,6 +148,8 @@ pub struct SubagentManagerBuilder {
     agent_task_repo: Option<AgentTaskRepo>,
     tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    event_sender:
+        Option<tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>>,
 }
 
 impl SubagentManagerBuilder {
@@ -197,6 +216,7 @@ impl SubagentManagerBuilder {
             tool_kit: std::sync::Mutex::new(self.tool_kit),
             hook_engine: std::sync::Mutex::new(self.hook_engine),
             registry_cache: std::sync::Mutex::new(HashMap::new()),
+            event_tx: std::sync::Mutex::new(self.event_sender),
         }
     }
 }
@@ -219,6 +239,14 @@ impl SubagentManager {
     pub fn set_hook_engine(&self, engine: Arc<klynt_hooks::HookEngine>) {
         let mut lock = self.hook_engine.lock().unwrap();
         *lock = Some(engine);
+    }
+
+    pub fn set_event_sender(
+        &self,
+        tx: tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>,
+    ) {
+        let mut lock = self.event_tx.lock().unwrap();
+        *lock = Some(tx);
     }
 
     /// Returns the total semaphore permit count (max concurrent subagents).
@@ -300,8 +328,24 @@ impl SubagentManager {
                     label: label_text.clone(),
                     profile,
                     spawned_at: std::time::Instant::now(),
+                    iteration: std::sync::atomic::AtomicU32::new(0),
+                    last_tool: std::sync::Mutex::new(None),
                 },
             );
+        }
+
+        // Emit Spawned event
+        {
+            let tx = self.event_tx.lock().unwrap();
+            if let Some(ref sender) = *tx {
+                let _ = sender.send(crate::subagent_events::SubagentLifecycleEvent::Spawned {
+                    agent_id: short_id.clone(),
+                    label: label_text.clone(),
+                    profile: profile.to_string(),
+                    parent_session_id: origin_key.clone(),
+                    spawned_at: jiff::Timestamp::now().as_millisecond(),
+                });
+            }
         }
         let subagent_id_clone = subagent_id.clone();
         let label_clone = label_text.clone();
@@ -344,6 +388,10 @@ impl SubagentManager {
         let semaphore = Arc::clone(&self.semaphore);
         let handles_ref = Arc::clone(&self.handles);
         let short_id_clone = short_id.clone();
+        let event_tx_clone = {
+            let lock = self.event_tx.lock().unwrap();
+            lock.clone()
+        };
 
         tokio::spawn(async move {
             // Acquire permit before running — limits concurrent subagents.
@@ -370,8 +418,19 @@ impl SubagentManager {
                 handles.remove(&short_id_clone);
             }
 
+            let duration_ms = std::time::Instant::now().elapsed().as_millis() as u64;
             match result {
                 Ok((status, result_text)) => {
+                    if let Some(ref tx) = event_tx_clone {
+                        let _ =
+                            tx.send(crate::subagent_events::SubagentLifecycleEvent::Completed {
+                                agent_id: short_id_clone.clone(),
+                                success: status == "ok",
+                                summary: result_text.clone(),
+                                tokens_used: 0,
+                                duration_ms,
+                            });
+                    }
                     announce_result(
                         &inbound_tx,
                         &subagent_id_clone,
@@ -384,6 +443,14 @@ impl SubagentManager {
                     .await;
                 }
                 Err(e) => {
+                    if let Some(ref tx) = event_tx_clone {
+                        let _ =
+                            tx.send(crate::subagent_events::SubagentLifecycleEvent::Cancelled {
+                                agent_id: short_id_clone.clone(),
+                                reason: e.to_string(),
+                                cancelled_at: jiff::Timestamp::now().as_millisecond(),
+                            });
+                    }
                     let error_msg = format!("Error: {}", e);
                     announce_result(
                         &inbound_tx,
@@ -400,6 +467,9 @@ impl SubagentManager {
 
             info!("Subagent {} completed", subagent_id_clone);
         });
+
+        // Note: Completed/Cancelled events are emitted inside the spawned task above.
+        // For simplicity we emit them via a cloned sender inside the task.
 
         format!(
             "Subagent spawned (ID: {}). Working on '{}' in the background...",
@@ -423,6 +493,29 @@ impl SubagentManager {
             ))
             .into())
         }
+    }
+
+    /// List active subagents filtered by parent session key prefix.
+    pub async fn list_active(&self, session_key: &str) -> Vec<SubagentHandleSummary> {
+        let handles = self.handles.lock().await;
+        handles
+            .iter()
+            .filter(|(_, h)| h.cancel_token.is_cancelled() == false)
+            .filter(|(_, h)| {
+                // No session_key stored on handle; filter by all for now
+                true
+            })
+            .map(|(id, h)| SubagentHandleSummary {
+                agent_id: id.clone(),
+                label: h.label.clone(),
+                profile: h.profile.to_string(),
+                iteration: h.iteration.load(std::sync::atomic::Ordering::Relaxed),
+                status: "running".into(),
+                started_at: h.spawned_at.elapsed().as_millis() as i64,
+                last_tool: h.last_tool.lock().unwrap().clone(),
+                duration_ms: h.spawned_at.elapsed().as_millis() as u64,
+            })
+            .collect()
     }
 
     /// Get status of all running subagents.

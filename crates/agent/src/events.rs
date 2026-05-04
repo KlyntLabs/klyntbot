@@ -157,7 +157,46 @@ pub enum AgentEvent {
     AgentSelected { name: String, description: String },
 
     /// A subagent was spawned.
-    SubagentSpawned { label: String, profile: String },
+    SubagentSpawned {
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        label: String,
+        profile: String,
+        #[serde(rename = "parentSessionId")]
+        parent_session_id: String,
+        #[serde(rename = "spawnedAt")]
+        spawned_at: i64,
+    },
+
+    /// A subagent reported per-iteration progress.
+    SubagentProgress {
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        iteration: u32,
+        #[serde(rename = "lastTool")]
+        last_tool: Option<String>,
+    },
+
+    /// A subagent completed (success or error).
+    SubagentCompleted {
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        success: bool,
+        summary: String,
+        #[serde(rename = "tokensUsed")]
+        tokens_used: u64,
+        #[serde(rename = "durationMs")]
+        duration_ms: u64,
+    },
+
+    /// A subagent was cancelled.
+    SubagentCancelled {
+        #[serde(rename = "agentId")]
+        agent_id: String,
+        reason: String,
+        #[serde(rename = "cancelledAt")]
+        cancelled_at: i64,
+    },
 
     /// An agent delegation has started (agent-to-agent handoff).
     DelegationStarted {

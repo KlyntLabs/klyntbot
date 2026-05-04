@@ -26,6 +26,10 @@ impl<E: Clone + Send + 'static> TypedBroker<E> {
     pub fn receiver_count(&self) -> usize {
         self.sender.receiver_count()
     }
+
+    pub fn sender_clone(&self) -> tokio::sync::broadcast::Sender<E> {
+        self.sender.clone()
+    }
 }
 
 #[cfg(test)]

@@ -77,25 +77,12 @@ pub enum ThreadEvent {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum PartDelta {
-    Text {
-        append: String,
-    },
-    Reasoning {
-        append: String,
-        redacted: bool,
-    },
-    ToolCallArgs {
-        json_patch: serde_json::Value,
-    },
-    CommandStdout {
-        append: String,
-    },
-    CommandStderr {
-        append: String,
-    },
-    FileChangeProgress {
-        bytes_written: u64,
-    },
+    Text { append: String },
+    Reasoning { append: String, redacted: bool },
+    ToolCallArgs { json_patch: serde_json::Value },
+    CommandStdout { append: String },
+    CommandStderr { append: String },
+    FileChangeProgress { bytes_written: u64 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

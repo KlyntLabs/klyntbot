@@ -31,6 +31,21 @@ pub enum MessagePart {
     Finish {
         reason: FinishReason,
     },
+    ReviewResult {
+        review_id: String,
+        summary: String,
+        issues: Vec<ReviewIssue>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewIssue {
+    pub severity: String,
+    pub file: Option<String>,
+    pub line: Option<u32>,
+    pub description: String,
+    pub suggestion: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

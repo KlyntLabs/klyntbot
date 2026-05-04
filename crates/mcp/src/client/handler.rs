@@ -5,10 +5,10 @@
 
 use std::sync::Arc;
 
-use rmcp::ErrorData as McpError;
 use rmcp::handler::client::ClientHandler;
 use rmcp::model::*;
 use rmcp::service::{NotificationContext, RequestContext, RoleClient};
+use rmcp::ErrorData as McpError;
 use tracing::{debug, info, warn};
 
 /// Trait for delegating sampling (LLM completion) requests.

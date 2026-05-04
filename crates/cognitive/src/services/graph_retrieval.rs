@@ -119,12 +119,44 @@ pub(crate) fn extract_query_entities(query: &str) -> Vec<String> {
     // Layer B — lowercase fallback. Stopword list deliberately small;
     // generic (no LoCoMo-specific words) per anti-tuning rule 5.
     const STOPWORDS: &[&str] = &[
-        "about", "above", "after", "again", "against", "before", "below",
-        "between", "could", "doing", "during", "every", "first", "going",
-        "having", "knows", "might", "ought", "other", "place", "should",
-        "since", "still", "their", "there", "these", "thing", "think",
-        "those", "through", "today", "tonight", "until", "where", "which",
-        "while", "would", "yesterday",
+        "about",
+        "above",
+        "after",
+        "again",
+        "against",
+        "before",
+        "below",
+        "between",
+        "could",
+        "doing",
+        "during",
+        "every",
+        "first",
+        "going",
+        "having",
+        "knows",
+        "might",
+        "ought",
+        "other",
+        "place",
+        "should",
+        "since",
+        "still",
+        "their",
+        "there",
+        "these",
+        "thing",
+        "think",
+        "those",
+        "through",
+        "today",
+        "tonight",
+        "until",
+        "where",
+        "which",
+        "while",
+        "would",
+        "yesterday",
     ];
     for word in &words {
         // Strip surrounding punctuation, then split on apostrophe to drop
@@ -132,10 +164,19 @@ pub(crate) fn extract_query_entities(query: &str) -> Vec<String> {
         // remaining is non-alphabetic.
         let trimmed = word.trim_matches(|c: char| c.is_ascii_punctuation());
         let stem = trimmed.split('\'').next().unwrap_or("").to_lowercase();
-        if stem.len() < 5 { continue; }
-        if !stem.chars().all(|c| c.is_alphabetic()) { continue; }
-        if STOPWORDS.contains(&stem.as_str()) { continue; }
-        if !entities.iter().any(|e: &String| e.eq_ignore_ascii_case(&stem)) {
+        if stem.len() < 5 {
+            continue;
+        }
+        if !stem.chars().all(|c| c.is_alphabetic()) {
+            continue;
+        }
+        if STOPWORDS.contains(&stem.as_str()) {
+            continue;
+        }
+        if !entities
+            .iter()
+            .any(|e: &String| e.eq_ignore_ascii_case(&stem))
+        {
             entities.push(stem);
         }
     }
@@ -171,10 +212,16 @@ mod tests {
         // Chat-style downcased query — Layer A returns empty; Layer B
         // should keep ≥5-char alphabetic tokens that aren't stopwords.
         let entities = extract_query_entities("what is alice's favorite color");
-        assert!(entities.iter().any(|e| e == "alice"),
-            "Expected lowercase 'alice' (after stripping possessive); got {:?}", entities);
-        assert!(entities.iter().any(|e| e == "favorite"),
-            "Expected 'favorite' (5 chars, not stopword); got {:?}", entities);
+        assert!(
+            entities.iter().any(|e| e == "alice"),
+            "Expected lowercase 'alice' (after stripping possessive); got {:?}",
+            entities
+        );
+        assert!(
+            entities.iter().any(|e| e == "favorite"),
+            "Expected 'favorite' (5 chars, not stopword); got {:?}",
+            entities
+        );
         // "color" is 5 chars and not in our stoplist; it'll appear too.
         // Acceptable: FTS will harmlessly miss on non-entity tokens.
     }

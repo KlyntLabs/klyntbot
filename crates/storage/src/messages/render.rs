@@ -43,9 +43,7 @@ mod tests {
     #[test]
     fn extract_text_joins_text_parts() {
         let parts = vec![
-            MessagePart::Text {
-                text: "hi".into(),
-            },
+            MessagePart::Text { text: "hi".into() },
             MessagePart::Reasoning {
                 text: "thinking".into(),
                 redacted: false,

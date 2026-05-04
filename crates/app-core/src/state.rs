@@ -199,6 +199,8 @@ pub struct AppCore {
     pub thread_events: bus::TypedBroker<desktop_shared::coding::ThreadEvent>,
     /// Typed broker for CostUpdate — publish after each provider call.
     pub cost_events: bus::TypedBroker<desktop_shared::coding::CostUpdate>,
+    /// Typed broker for SubagentEvent — publish from subagent manager, subscribe from Tauri.
+    pub subagent_events: bus::TypedBroker<desktop_shared::coding::SubagentEvent>,
     /// Active thread subscriptions keyed by subscription_id.
     pub thread_subscriptions: Arc<dashmap::DashMap<String, ThreadSubscription>>,
     /// Per-turn steer queue — accepts mid-turn user corrections injected via
@@ -784,14 +786,11 @@ impl AppCore {
         let cfg_guard = self.config.read().await;
         let params = providers::cognitive_chat_params(&cfg_guard, 1024);
         drop(cfg_guard);
-        let handler: Arc<dyn cognitive::services::graph_linker::GraphLinkHandler> =
-            Arc::new(agent::cognitive_handlers::LlmGraphLinkHandler::new(
-                provider, params,
-            ));
-        let fact_repo =
-            cognitive::repos::SemanticFactRepo::new(self.storage_pool.inner().clone());
-        let entity_repo =
-            cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
+        let handler: Arc<dyn cognitive::services::graph_linker::GraphLinkHandler> = Arc::new(
+            agent::cognitive_handlers::LlmGraphLinkHandler::new(provider, params),
+        );
+        let fact_repo = cognitive::repos::SemanticFactRepo::new(self.storage_pool.inner().clone());
+        let entity_repo = cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
         let count = cognitive::services::background::run_graph_consolidation(
             &fact_repo,
             &entity_repo,

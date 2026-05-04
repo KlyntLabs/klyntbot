@@ -1,9 +1,13 @@
 import { useMemo } from "react";
 import type { MessageDto } from "../hooks/useThreadEvents";
 import { PartRenderer } from "./parts";
+import { AgentsMdPanel } from "./AgentsMdPanel";
+import { SubagentTray } from "./SubagentTray";
 
 type Props = {
   items: MessageDto[];
+  threadId?: string;
+  instructionSources?: Array<{ path: string; dir: string; contents: string }>;
 };
 
 function partKey(itemId: string, part: unknown, index: number): string {
@@ -18,7 +22,7 @@ function partKey(itemId: string, part: unknown, index: number): string {
 
 /// Coding-thread item list — renders each MessageDto by dispatching its
 /// `parts` array through `PartRenderer`. Pure presentational.
-export function ThreadItemList({ items }: Props) {
+export function ThreadItemList({ items, threadId, instructionSources }: Props) {
   const itemsWithKeys = useMemo(
     () =>
       items.map((item) => ({
@@ -29,7 +33,8 @@ export function ThreadItemList({ items }: Props) {
   );
 
   return (
-    <ol className="thread-item-list" aria-label="Coding thread items">
+    <div className="thread-layout">
+      <ol className="thread-item-list" aria-label="Coding thread items">
       {itemsWithKeys.map((item) => (
         <li
           key={item.id}
@@ -45,5 +50,12 @@ export function ThreadItemList({ items }: Props) {
         </li>
       ))}
     </ol>
+    {threadId && (
+      <aside className="thread-layout__side">
+        <AgentsMdPanel threadId={threadId} initialSources={instructionSources ?? []} />
+        <SubagentTray threadId={threadId} />
+      </aside>
+    )}
+    </div>
   );
 }

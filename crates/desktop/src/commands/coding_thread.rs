@@ -1,3 +1,4 @@
+use coding_agents_md::AgentsMdSource;
 use desktop_macros::klynt_command;
 use desktop_shared::coding::{ApprovalPolicy, Thread, ThreadSummary};
 use desktop_shared::errors::ApiError;
@@ -23,10 +24,7 @@ pub async fn coding_thread_start(
 }
 
 #[klynt_command]
-pub async fn coding_thread_resume(
-    thread_id: String,
-    include_items: Option<bool>,
-) -> Thread {
+pub async fn coding_thread_resume(thread_id: String, include_items: Option<bool>) -> Thread {
     state
         .coding_thread_resume(&thread_id, include_items.unwrap_or(true))
         .await
@@ -59,10 +57,7 @@ pub async fn coding_thread_list(
 }
 
 #[klynt_command]
-pub async fn coding_thread_fork(
-    thread_id: String,
-    from_message_id: Option<String>,
-) -> Thread {
+pub async fn coding_thread_fork(thread_id: String, from_message_id: Option<String>) -> Thread {
     state
         .coding_thread_fork(&thread_id, from_message_id)
         .await
@@ -95,10 +90,7 @@ pub async fn coding_thread_set_name(thread_id: String, name: String) -> () {
 
 #[klynt_command]
 pub async fn coding_thread_subscribe(thread_id: String) -> serde_json::Value {
-    let sub_id = state
-        .coding_thread_subscribe(&thread_id)
-        .await
-        ?;
+    let sub_id = state.coding_thread_subscribe(&thread_id).await?;
     Ok(serde_json::json!({ "subscriptionId": sub_id }))
 }
 
@@ -106,6 +98,14 @@ pub async fn coding_thread_subscribe(thread_id: String) -> serde_json::Value {
 pub async fn coding_thread_unsubscribe(subscription_id: String) -> () {
     state
         .coding_thread_unsubscribe(&subscription_id)
+        .await
+        .map_err(ApiError::from)
+}
+
+#[klynt_command]
+pub async fn coding_thread_refresh_agents_md(thread_id: String) -> Vec<AgentsMdSource> {
+    state
+        .coding_thread_refresh_agents_md(&thread_id)
         .await
         .map_err(ApiError::from)
 }
@@ -124,7 +124,10 @@ pub(crate) async fn dispatch_dev(
             let approval_policy: Option<ApprovalPolicy> = body
                 .get("approvalPolicy")
                 .and_then(|v| serde_json::from_value(v.clone()).ok());
-            let ephemeral = body.get("ephemeral").and_then(|v| v.as_bool()).unwrap_or(false);
+            let ephemeral = body
+                .get("ephemeral")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             dev::val(
                 core.coding_thread_start(&workspace_id, model, approval_policy, ephemeral)
                     .await
@@ -145,7 +148,10 @@ pub(crate) async fn dispatch_dev(
         }
         "coding_thread_read" => {
             let thread_id = try_field!(dev::get_str(body, "threadId"));
-            let cursor = body.get("cursor").and_then(|v| v.as_str()).map(String::from);
+            let cursor = body
+                .get("cursor")
+                .and_then(|v| v.as_str())
+                .map(String::from);
             let limit = body.get("limit").and_then(|v| v.as_i64());
             dev::val(
                 core.coding_thread_read(&thread_id, cursor, limit)
@@ -155,9 +161,15 @@ pub(crate) async fn dispatch_dev(
         }
         "coding_thread_list" => {
             let workspace_id = try_field!(dev::get_str(body, "workspaceId"));
-            let cursor = body.get("cursor").and_then(|v| v.as_str()).map(String::from);
+            let cursor = body
+                .get("cursor")
+                .and_then(|v| v.as_str())
+                .map(String::from);
             let limit = body.get("limit").and_then(|v| v.as_i64());
-            let sort_key = body.get("sortKey").and_then(|v| v.as_str()).map(String::from);
+            let sort_key = body
+                .get("sortKey")
+                .and_then(|v| v.as_str())
+                .map(String::from);
             dev::val(
                 core.coding_thread_list(&workspace_id, cursor, limit, sort_key)
                     .await

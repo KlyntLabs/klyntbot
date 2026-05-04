@@ -243,6 +243,15 @@ export const REGISTRY: Record<string, SlashNode> = {
     category: "help",
     argHint: "[command]",
   },
+  review: {
+    kind: "leaf",
+    path: "direct",
+    command: "review",
+    tauriCommand: "coding_review_start",
+    description: "Run a code review on the current thread or a target file",
+    category: "agent",
+    argHint: "[target]",
+  },
 };
 
 function buildFlatCatalog(): Array<{

@@ -86,6 +86,19 @@ CREATE INDEX IF NOT EXISTS idx_memory_util_memory
 CREATE INDEX IF NOT EXISTS idx_memory_util_session
     ON memory_utilization(session_id);
 
+CREATE TABLE IF NOT EXISTS coding_reviews (
+    id            TEXT PRIMARY KEY,
+    session_id    TEXT NOT NULL,
+    summary       TEXT NOT NULL,
+    issues_json   TEXT NOT NULL,
+    target        TEXT,
+    delivery      TEXT,
+    created_at    TEXT NOT NULL,
+    FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_coding_reviews_session
+  ON coding_reviews(session_id, created_at DESC);
+
 -- === klynt_sessions (owned by klynt-cli spec; consolidated here per §4) ====
 
 CREATE TABLE IF NOT EXISTS klynt_sessions (

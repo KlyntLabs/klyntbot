@@ -1,8 +1,10 @@
 use crate::AppCore;
+use coding_agents_md::{format_agents_md_bundle, WorkspaceAgentsSource};
 use common::Result;
 use desktop_shared::coding::{
     ApprovalPolicy, InstructionSource, MessageDto, SandboxKind, Thread, ThreadSummary,
 };
+use std::path::PathBuf;
 use storage::messages::parts::MessagePart;
 
 impl AppCore {
@@ -16,12 +18,7 @@ impl AppCore {
         ephemeral: bool,
     ) -> Result<Thread> {
         // 1. Load workspace
-        let ws = self
-            .repos
-            .workspaces
-            .get(workspace_id)
-            .await
-            ?;
+        let ws = self.repos.workspaces.get(workspace_id).await?;
 
         // 2. Privacy: refuse risky workspace paths
         validate_workspace_path(&ws.path)?;
@@ -30,7 +27,11 @@ impl AppCore {
         let config = self.config.read().await;
         let resolved_model = model.or_else(|| {
             let m = config.agents.defaults.model.clone();
-            if m.is_empty() { None } else { Some(m) }
+            if m.is_empty() {
+                None
+            } else {
+                Some(m)
+            }
         });
         drop(config);
         let resolved_policy = approval_policy.unwrap_or_default();
@@ -62,18 +63,15 @@ impl AppCore {
         self.repos
             .sessions
             .upsert_session(&session_key, &metadata)
-            .await
-            ?;
+            .await?;
         self.repos
             .sessions
             .set_workspace_id(&session_key, &ws.id)
-            .await
-            ?;
+            .await?;
         self.repos
             .sessions
             .set_ephemeral(&session_key, ephemeral)
-            .await
-            ?;
+            .await?;
 
         // 7. Inject AGENTS.md bundle as synthetic user message
         if !agents_sources.is_empty() {
@@ -90,8 +88,7 @@ impl AppCore {
                     None,
                     None,
                 )
-                .await
-                ?;
+                .await?;
         }
 
         let now = jiff::Timestamp::now().as_millisecond();
@@ -126,31 +123,19 @@ impl AppCore {
         thread_id: &str,
         include_items: bool,
     ) -> Result<Thread> {
-        let session = self
-            .repos
-            .sessions
-            .get_session(thread_id)
-            .await
-            ?;
+        let session = self.repos.sessions.get_session(thread_id).await?;
 
-        let ws_id = session
-            .workspace_id
-            .as_deref()
-            .ok_or_else(|| common::KlyntbotError::StorageNotFound("session has no workspace".into()))?;
+        let ws_id = session.workspace_id.as_deref().ok_or_else(|| {
+            common::KlyntbotError::StorageNotFound("session has no workspace".into())
+        })?;
 
-        let ws = self
-            .repos
-            .workspaces
-            .get(ws_id)
-            .await
-            ?;
+        let ws = self.repos.workspaces.get(ws_id).await?;
 
         let items = if include_items {
             self.repos
                 .sessions
                 .get_messages_parts(thread_id, 1000)
-                .await
-                ?
+                .await?
                 .into_iter()
                 .map(message_with_parts_to_dto)
                 .collect()
@@ -159,10 +144,7 @@ impl AppCore {
         };
 
         let meta = session.metadata;
-        let resolved_model = meta
-            .get("model")
-            .and_then(|v| v.as_str())
-            .map(String::from);
+        let resolved_model = meta.get("model").and_then(|v| v.as_str()).map(String::from);
         let resolved_policy = meta
             .get("approval_policy")
             .and_then(|v| v.as_str())
@@ -211,12 +193,14 @@ impl AppCore {
         limit: Option<i64>,
     ) -> Result<Thread> {
         // For now, delegate to resume with items. Cursor support can be added later.
-        self.coding_thread_resume(thread_id, true).await.map(|mut t| {
-            if let Some(lim) = limit {
-                t.items.truncate(lim as usize);
-            }
-            t
-        })
+        self.coding_thread_resume(thread_id, true)
+            .await
+            .map(|mut t| {
+                if let Some(lim) = limit {
+                    t.items.truncate(lim as usize);
+                }
+                t
+            })
     }
 
     /// List coding threads for a workspace.
@@ -228,20 +212,12 @@ impl AppCore {
         limit: Option<i64>,
         _sort_key: Option<String>,
     ) -> Result<Vec<ThreadSummary>> {
-        let sessions = self
-            .repos
-            .sessions
-            .list_sessions()
-            .await
-            ?;
+        let sessions = self.repos.sessions.list_sessions().await?;
 
         let summaries: Vec<ThreadSummary> = sessions
             .into_iter()
             .filter(|s| {
-                s.metadata
-                    .get("workspace_id")
-                    .and_then(|v| v.as_str())
-                    == Some(workspace_id)
+                s.metadata.get("workspace_id").and_then(|v| v.as_str()) == Some(workspace_id)
             })
             .filter(|s| {
                 // Exclude archived unless explicitly requested
@@ -249,7 +225,11 @@ impl AppCore {
             })
             .take(limit.unwrap_or(50) as usize)
             .map(|s| {
-                let title = s.metadata.get("title").and_then(|v| v.as_str()).map(String::from);
+                let title = s
+                    .metadata
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
                 ThreadSummary {
                     id: s.key,
                     title,
@@ -277,8 +257,7 @@ impl AppCore {
             .repos
             .sessions
             .fork_session(thread_id, from_message_id.as_deref())
-            .await
-            ?;
+            .await?;
 
         // Set forked_from_id
         let pool = self.repos.pool();
@@ -286,18 +265,14 @@ impl AppCore {
             .bind(thread_id)
             .bind(&new_key)
             .execute(pool)
-            .await
-            ?;
+            .await?;
 
         self.coding_thread_resume(&new_key, true).await
     }
 
     /// Compact a coding thread by summarizing older messages.
     #[tracing::instrument(skip(self), err)]
-    pub async fn coding_thread_compact(
-        &self,
-        thread_id: &str,
-    ) -> Result<serde_json::Value> {
+    pub async fn coding_thread_compact(&self, thread_id: &str) -> Result<serde_json::Value> {
         // For now, just return a placeholder. Full compaction uses the provider to summarize.
         let summary_id = format!("summary-{}", uuid::Uuid::new_v4());
         let pool = self.repos.pool();
@@ -306,8 +281,7 @@ impl AppCore {
         let parts = vec![MessagePart::Text {
             text: "[Thread compacted — summary not yet implemented]".into(),
         }];
-        let parts_json = serde_json::to_string(&parts)
-            ?;
+        let parts_json = serde_json::to_string(&parts)?;
         sqlx::query(
             "INSERT INTO session_messages (id, session_key, role, content, parts, timestamp) \
              VALUES (?1, ?2, 'system', '', ?3, unixepoch('now') * 1000)",
@@ -316,16 +290,14 @@ impl AppCore {
         .bind(thread_id)
         .bind(&parts_json)
         .execute(pool)
-        .await
-        ?;
+        .await?;
 
         // Set summary_message_id
         sqlx::query("UPDATE sessions SET summary_message_id = ?1 WHERE key = ?2")
             .bind(&summary_id)
             .bind(thread_id)
             .execute(pool)
-            .await
-            ?;
+            .await?;
 
         Ok(serde_json::json!({ "summaryMessageId": summary_id }))
     }
@@ -333,26 +305,61 @@ impl AppCore {
     /// Archive a coding thread.
     #[tracing::instrument(skip(self), err)]
     pub async fn coding_thread_archive(&self, thread_id: &str) -> Result<()> {
-        self.repos
-            .sessions
-            .archive(thread_id)
-            .await?;
+        self.repos.sessions.archive(thread_id).await?;
         Ok(())
     }
 
     /// Set the name/title of a coding thread.
     #[tracing::instrument(skip(self), err)]
-    pub async fn coding_thread_set_name(
+    pub async fn coding_thread_set_name(&self, thread_id: &str, name: &str) -> Result<()> {
+        self.repos.sessions.rename_session(thread_id, name).await?;
+        Ok(())
+    }
+
+    /// Refresh AGENTS.md synthetic message for a thread.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_thread_refresh_agents_md(
         &self,
         thread_id: &str,
-        name: &str,
-    ) -> Result<()> {
-        self.repos
+    ) -> Result<Vec<coding_agents_md::AgentsMdSource>> {
+        let session = self
+            .repos
             .sessions
-            .rename_session(thread_id, name)
+            .get_session(thread_id)
             .await
-            ?;
-        Ok(())
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let workspace_id = session
+            .workspace_id
+            .as_deref()
+            .ok_or_else(|| common::KlyntbotError::InvalidArgument("not a coding session".into()))?;
+        let workspace = self
+            .repos
+            .workspaces
+            .get(workspace_id)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+
+        let global_path = self
+            .config
+            .read()
+            .await
+            .paths
+            .klyntbot_home()
+            .join("AGENTS.md");
+
+        let source =
+            WorkspaceAgentsSource::new(PathBuf::from(&workspace.path)).with_global(global_path);
+        let new_sources = source.walk();
+
+        if let Some(bundle) = source.build_bundle() {
+            self.repos
+                .sessions
+                .update_synthetic_agents_md(&session.id, &bundle)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        }
+
+        Ok(new_sources)
     }
 }
 
@@ -391,9 +398,7 @@ fn resolve_sandbox() -> SandboxKind {
     }
 }
 
-fn message_with_parts_to_dto(
-    m: storage::repos::session::SessionMessageWithParts,
-) -> MessageDto {
+fn message_with_parts_to_dto(m: storage::repos::session::SessionMessageWithParts) -> MessageDto {
     MessageDto {
         id: m.id,
         session_id: m.session_key,

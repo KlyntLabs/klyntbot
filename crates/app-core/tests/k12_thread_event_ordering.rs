@@ -54,11 +54,17 @@ fn arb_thread_event() -> impl Strategy<Value = ThreadEvent> {
 fn event_id(e: &ThreadEvent) -> String {
     // Stable identity for ordering comparison — discriminant + per-variant key.
     match e {
-        ThreadEvent::TurnStarted { turn_id, started_at, .. } => {
+        ThreadEvent::TurnStarted {
+            turn_id,
+            started_at,
+            ..
+        } => {
             format!("ts:{turn_id}:{started_at}")
         }
         ThreadEvent::ItemStarted { item, .. } => format!("is:{}", item.id),
-        ThreadEvent::ItemDelta { item_id, part_idx, .. } => {
+        ThreadEvent::ItemDelta {
+            item_id, part_idx, ..
+        } => {
             format!("id:{item_id}:{part_idx}")
         }
         ThreadEvent::ItemCompleted { item, .. } => format!("ic:{}", item.id),
@@ -66,10 +72,18 @@ fn event_id(e: &ThreadEvent) -> String {
         ThreadEvent::ToolCallCompleted { call_id, .. } => format!("tcc:{call_id}"),
         ThreadEvent::FileChanged { path, .. } => format!("fc:{path}"),
         ThreadEvent::CommandExecuted { command, .. } => format!("ce:{}", command.join(" ")),
-        ThreadEvent::ContextCompressed { before_tokens, after_tokens, .. } => {
+        ThreadEvent::ContextCompressed {
+            before_tokens,
+            after_tokens,
+            ..
+        } => {
             format!("cc:{before_tokens}:{after_tokens}")
         }
-        ThreadEvent::TurnCompleted { turn_id, completed_at, .. } => {
+        ThreadEvent::TurnCompleted {
+            turn_id,
+            completed_at,
+            ..
+        } => {
             format!("tc:{turn_id}:{completed_at}")
         }
         ThreadEvent::Heartbeat { server_time, .. } => format!("hb:{server_time}"),

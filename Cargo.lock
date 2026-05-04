@@ -4488,6 +4488,7 @@ dependencies = [
  "cognitive",
  "common",
  "config",
+ "criterion",
  "dashmap",
  "desktop-macros",
  "desktop-shared",
