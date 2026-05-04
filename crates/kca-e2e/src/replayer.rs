@@ -287,10 +287,78 @@ impl ReplayContext {
         .await
         .unwrap_or_default();
 
+        // Subject-anchored augmentation: when the question contains
+        // capitalised entity tokens (proper nouns), pull *all* facts whose
+        // subject matches one of those entities, ordered by confidence.
+        // BM25/vector retrieval can miss these when the question phrasing
+        // doesn't lexically match the fact's predicate/object. Merge with
+        // similarity-ranked results, dedupe by id.
+        let entities: Vec<String> = question
+            .split_whitespace()
+            .filter_map(|w| {
+                let cleaned = w.trim_matches(|c: char| !c.is_alphanumeric());
+                if cleaned.len() >= 3 && cleaned.chars().next().is_some_and(|c| c.is_uppercase())
+                {
+                    Some(cleaned.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let mut anchored: Vec<cognitive::types::SemanticFact> = Vec::new();
+        if !entities.is_empty() {
+            // SQLite doesn't have COLLATE NOCASE on LOWER() chains in
+            // arbitrary places — use LIKE with case-folded comparison.
+            let placeholders = entities.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+            let sql = format!(
+                "SELECT id, domain, subject, predicate, object, confidence, source, \
+                 valid_from, valid_until, recorded_at, superseded_at, superseded_by, \
+                 stability, last_accessed, access_count, convergence_score, project_id, \
+                 memory_type, scope_type, scope_id, scope_repo_id, metadata, speaker \
+                 FROM semantic_facts \
+                 WHERE LOWER(subject) IN ({placeholders}) AND superseded_at IS NULL \
+                 ORDER BY confidence DESC LIMIT 30"
+            );
+            let mut q = sqlx::query_as::<_, cognitive::types::SemanticFact>(&sql);
+            for e in &entities {
+                q = q.bind(e.to_lowercase());
+            }
+            if let Ok(rows) = q.fetch_all(self.pool.inner()).await {
+                anchored = rows;
+            }
+        }
+
+        // Diagnostic: count facts with valid_until set so we can verify
+        // Wave 5 (temporal extraction prompt) is actually populating the
+        // field. Emits once per call to stderr when KCA_BENCH_DIRECT_DIAG=1.
+        if matches!(
+            std::env::var("KCA_BENCH_DIRECT_DIAG").ok().as_deref(),
+            Some("1")
+        ) {
+            let with_until: Option<(i64,)> = sqlx::query_as(
+                "SELECT COUNT(*) FROM semantic_facts WHERE valid_until IS NOT NULL",
+            )
+            .fetch_optional(self.pool.inner())
+            .await
+            .unwrap_or(None);
+            let total: Option<(i64,)> = sqlx::query_as("SELECT COUNT(*) FROM semantic_facts")
+                .fetch_optional(self.pool.inner())
+                .await
+                .unwrap_or(None);
+            eprintln!(
+                "[bench-direct-diag] semantic_facts: total={} valid_until!=NULL={} entities_extracted={}",
+                total.map(|t| t.0).unwrap_or(-1),
+                with_until.map(|t| t.0).unwrap_or(-1),
+                entities.len()
+            );
+        }
+
         let mut ctx = String::new();
-        if !scored.is_empty() {
+        let mut seen_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+        if !scored.is_empty() || !anchored.is_empty() {
             ctx.push_str("## Memory (extracted facts)\n");
             for s in scored.iter().take(20) {
+                seen_ids.insert(s.fact.id.clone());
                 ctx.push_str(&format!(
                     "- {}: {} = {}{}\n",
                     s.fact.subject,
@@ -298,6 +366,22 @@ impl ReplayContext {
                     s.fact.object,
                     s.fact
                         .valid_until
+                        .as_ref()
+                        .map(|u| format!(" (until {u})"))
+                        .unwrap_or_default()
+                ));
+            }
+            // Append anchored facts not already shown
+            for f in anchored.iter().take(30) {
+                if seen_ids.contains(&f.id) {
+                    continue;
+                }
+                ctx.push_str(&format!(
+                    "- {}: {} = {}{}\n",
+                    f.subject,
+                    f.predicate,
+                    f.object,
+                    f.valid_until
                         .as_ref()
                         .map(|u| format!(" (until {u})"))
                         .unwrap_or_default()
