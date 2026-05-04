@@ -114,11 +114,12 @@ macro_rules! focus_impl {
                 Ok(result.rows_affected() > 0)
             }
 
-            /// Unfocus an item.
+            /// Unfocus an item. Returns `true` only if the row was actually focused.
             pub async fn unfocus(&self, id: &str) -> Result<bool, $crate::error::StorageError> {
                 let result = sqlx::query(concat!(
                     "UPDATE ", $table,
-                    " SET focused_at = NULL, focus_deadline = NULL, updated_at = (unixepoch('now') * 1000) WHERE id = ?1",
+                    " SET focused_at = NULL, focus_deadline = NULL, updated_at = (unixepoch('now') * 1000)",
+                    " WHERE id = ?1 AND focused_at IS NOT NULL",
                 ))
                 .bind(id)
                 .execute(&self.pool)
@@ -195,7 +196,12 @@ macro_rules! get_by_ids_impl {
 ///
 /// Used by `search_by_keyword` in `TaskRepo` and `FinanceTransactionRepo`.
 pub fn escape_like(s: &str) -> String {
-    s.replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_")
+    let mut out = String::with_capacity(s.len() + 8);
+    for ch in s.chars() {
+        if matches!(ch, '\\' | '%' | '_') {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out
 }

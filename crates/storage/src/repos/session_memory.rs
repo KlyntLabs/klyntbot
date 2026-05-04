@@ -75,17 +75,7 @@ impl SessionMemoryRepo {
         Ok(rows)
     }
 
-    /// Delete session memory entries not updated within `days` days.
-    /// Returns the number of rows removed.
-    pub async fn delete_older_than(&self, days: i64) -> Result<u64, StorageError> {
-        let cutoff =
-            (jiff::Timestamp::now() - jiff::SignedDuration::from_hours(days * 24)).as_millisecond();
-        let result = sqlx::query("DELETE FROM session_memory WHERE updated_at < ?1")
-            .bind(cutoff)
-            .execute(&self.pool)
-            .await?;
-        Ok(result.rows_affected())
-    }
+    delete_older_than_impl!("session_memory", "updated_at");
 }
 
 #[cfg(test)]
@@ -168,7 +158,7 @@ mod tests {
             .await
             .unwrap();
 
-        let deleted = repo.delete_older_than(90).await.unwrap();
+        let deleted = repo.delete_older_than(90, jiff::Timestamp::now()).await.unwrap();
         assert_eq!(deleted, 1);
 
         assert!(repo.get("old-session").await.unwrap().is_none());

@@ -128,6 +128,46 @@ impl FinanceBudgetRepo {
     // Budget Usage (SQL JOIN)
     // -----------------------------------------------------------------------
 
+    /// Shared CTE + join logic for budget-usage queries.
+    const BUDGET_USAGE_SQL: &str = r#"
+        SELECT
+            b.id,
+            b.name,
+            b.amount,
+            b.currency,
+            b.period,
+            b.category,
+            b.method,
+            b.jar_type,
+            b.start_date,
+            b.end_date,
+            b.is_active,
+            b.alert_threshold,
+            b.created_at,
+            b.updated_at,
+            b.base_amount,
+            b.base_currency,
+            b.exchange_rate,
+            COALESCE(SUM(ft.base_amount), 0) AS spent
+        FROM finance_budgets b
+        LEFT JOIN finance_transactions ft ON
+            ft.tx_type = 'expense'
+            AND ft.base_currency = b.base_currency
+            AND (b.category IS NULL OR ft.category = b.category)
+            AND ft.tx_date >= CASE
+                WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month')
+                WHEN b.period = 'weekly'  THEN date('now', 'localtime', '-' || ((strftime('%w', 'now', 'localtime') + 6) % 7) || ' days')
+                WHEN b.period = 'yearly'  THEN date('now', 'localtime', 'start of year')
+                ELSE b.start_date
+            END
+            AND ft.tx_date <= CASE
+                WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month', '+1 month', '-1 day')
+                WHEN b.period = 'weekly'  THEN date('now', 'localtime', '-' || ((strftime('%w', 'now', 'localtime') + 6) % 7) || ' days', '+6 days')
+                WHEN b.period = 'yearly'  THEN date('now', 'localtime', 'start of year', '+1 year', '-1 day')
+                ELSE COALESCE(b.end_date, date('now', 'localtime'))
+            END
+    "#;
+
     /// Return the budget row for `budget_id` with the `spent` amount calculated
     /// by summing matching expense transactions (in base currency) in the budget's current period.
     pub async fn budget_usage(
@@ -135,46 +175,7 @@ impl FinanceBudgetRepo {
         budget_id: &str,
     ) -> Result<BudgetUsageRow, crate::error::StorageError> {
         let row = sqlx::query_as::<_, BudgetUsageRow>(
-            r#"
-            SELECT
-                b.id,
-                b.name,
-                b.amount,
-                b.currency,
-                b.period,
-                b.category,
-                b.method,
-                b.jar_type,
-                b.start_date,
-                b.end_date,
-                b.is_active,
-                b.alert_threshold,
-                b.created_at,
-                b.updated_at,
-                b.base_amount,
-                b.base_currency,
-                b.exchange_rate,
-                COALESCE(SUM(ft.base_amount), 0) AS spent
-            FROM finance_budgets b
-            LEFT JOIN finance_transactions ft ON
-                ft.tx_type = 'expense'
-                AND ft.base_currency = b.base_currency
-                AND (b.category IS NULL OR ft.category = b.category)
-                AND ft.tx_date >= CASE
-                    WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month')
-                    WHEN b.period = 'weekly'  THEN date('now', 'localtime', '-' || ((strftime('%w', 'now', 'localtime') + 6) % 7) || ' days')
-                    WHEN b.period = 'yearly'  THEN date('now', 'localtime', 'start of year')
-                    ELSE b.start_date
-                END
-                AND ft.tx_date <= CASE
-                    WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month', '+1 month', '-1 day')
-                    WHEN b.period = 'weekly'  THEN date('now', 'localtime', '-' || ((strftime('%w', 'now', 'localtime') + 6) % 7) || ' days', '+6 days')
-                    WHEN b.period = 'yearly'  THEN date('now', 'localtime', 'start of year', '+1 year', '-1 day')
-                    ELSE COALESCE(b.end_date, date('now', 'localtime'))
-                END
-            WHERE b.id = ?
-            GROUP BY b.id
-            "#,
+            &format!("{} WHERE b.id = ? GROUP BY b.id", Self::BUDGET_USAGE_SQL),
         )
         .bind(budget_id)
         .fetch_optional(&self.pool)
@@ -190,47 +191,7 @@ impl FinanceBudgetRepo {
         &self,
     ) -> Result<Vec<BudgetUsageRow>, crate::error::StorageError> {
         let rows = sqlx::query_as::<_, BudgetUsageRow>(
-            r#"
-            SELECT
-                b.id,
-                b.name,
-                b.amount,
-                b.currency,
-                b.period,
-                b.category,
-                b.method,
-                b.jar_type,
-                b.start_date,
-                b.end_date,
-                b.is_active,
-                b.alert_threshold,
-                b.created_at,
-                b.updated_at,
-                b.base_amount,
-                b.base_currency,
-                b.exchange_rate,
-                COALESCE(SUM(ft.base_amount), 0) AS spent
-            FROM finance_budgets b
-            LEFT JOIN finance_transactions ft ON
-                ft.tx_type = 'expense'
-                AND ft.base_currency = b.base_currency
-                AND (b.category IS NULL OR ft.category = b.category)
-                AND ft.tx_date >= CASE
-                    WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month')
-                    WHEN b.period = 'weekly'  THEN date('now', 'localtime', '-' || ((strftime('%w', 'now', 'localtime') + 6) % 7) || ' days')
-                    WHEN b.period = 'yearly'  THEN date('now', 'localtime', 'start of year')
-                    ELSE b.start_date
-                END
-                AND ft.tx_date <= CASE
-                    WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month', '+1 month', '-1 day')
-                    WHEN b.period = 'weekly'  THEN date('now', 'localtime', '-' || ((strftime('%w', 'now', 'localtime') + 6) % 7) || ' days', '+6 days')
-                    WHEN b.period = 'yearly'  THEN date('now', 'localtime', 'start of year', '+1 year', '-1 day')
-                    ELSE COALESCE(b.end_date, date('now', 'localtime'))
-                END
-            WHERE b.is_active = TRUE
-            GROUP BY b.id
-            ORDER BY b.created_at
-            "#,
+            &format!("{} WHERE b.is_active = TRUE GROUP BY b.id ORDER BY b.created_at", Self::BUDGET_USAGE_SQL),
         )
         .fetch_all(&self.pool)
         .await?;

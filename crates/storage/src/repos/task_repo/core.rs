@@ -100,6 +100,9 @@ impl TaskRepo {
 
     /// Update mutable fields on a task. Only non-None fields are overwritten.
     pub async fn update(&self, patch: &TaskPatch) -> Result<TaskRow, StorageError> {
+        if patch.is_empty() {
+            return self.get_or_err(&patch.id).await;
+        }
         let row = sqlx::query_as::<_, TaskRow>(
             r#"
             UPDATE tasks SET
@@ -128,7 +131,11 @@ impl TaskRepo {
                 task_type          = COALESCE(?31, task_type),
                 energy_level       = CASE WHEN ?32 THEN ?33 ELSE energy_level END,
                 complexity_score   = CASE WHEN ?34 THEN ?35 ELSE complexity_score END,
-                completed          = COALESCE(?36, completed),
+                completed          = CASE
+                    WHEN ?10 = 'done' THEN 1
+                    WHEN ?10 IS NOT NULL AND ?10 != 'done' THEN 0
+                    ELSE COALESCE(?36, completed)
+                END,
                 actual_minutes     = CASE WHEN ?37 THEN ?38 ELSE actual_minutes END,
                 objective_id       = CASE WHEN ?39 THEN ?40 ELSE objective_id END,
                 scheduled_start    = CASE WHEN ?41 THEN ?42 ELSE scheduled_start END,

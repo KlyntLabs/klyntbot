@@ -478,7 +478,7 @@ mod tests {
         }
         let result = repos
             .transactions
-            .sum_by_period("expense", 6, "month", "USD")
+            .sum_by_period("expense", 6, "USD")
             .await
             .unwrap();
         assert!(!result.is_empty());

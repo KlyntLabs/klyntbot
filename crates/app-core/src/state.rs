@@ -588,7 +588,7 @@ impl AppCore {
         let repo = self.coding_approval_history_repo.clone().ok_or_else(|| {
             common::KlyntbotError::Storage("approval history repo not initialized".into())
         })?;
-        repo.clear_for_tool(&tool, repo_id.as_deref()).await
+        repo.clear_for_tool(&tool, repo_id.as_deref()).await.map_err(Into::into)
     }
 
     #[tracing::instrument(skip(self), err)]

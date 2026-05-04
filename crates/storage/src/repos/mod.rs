@@ -211,8 +211,8 @@ impl Repos {
             skill_version: SkillVersionRepo::new(db.clone()),
             notification_log: NotificationLogRepo::new(db.clone()),
             held_notifications: HeldNotificationsRepo::new(db.clone()),
-            coding_approval_history: CodingApprovalHistoryRepo::new(pool.clone()),
-            coding_reviews: CodingReviewsRepo::new(pool.clone()),
+            coding_approval_history: CodingApprovalHistoryRepo::new(db.clone()),
+            coding_reviews: CodingReviewsRepo::new(db.clone()),
             workspaces: WorkspaceRepo::new(db.clone()),
             pool: db,
         }

@@ -18,7 +18,7 @@ impl FinanceSnapshotRepo {
     }
 
     /// Insert a new net-worth snapshot. Returns the inserted row.
-    #[allow(clippy::too_many_arguments)]
+    /// `net_worth` is computed as `accounts_total + investments_total - liabilities_total`.
     pub async fn add(
         &self,
         snapshot_date: &str,
@@ -26,7 +26,6 @@ impl FinanceSnapshotRepo {
         accounts_total: i64,
         investments_total: i64,
         liabilities_total: i64,
-        net_worth: i64,
         breakdown_json: &str,
     ) -> Result<FinanceNetWorthSnapshotRow, StorageError> {
         let id = Uuid::new_v4().to_string();
@@ -35,7 +34,7 @@ impl FinanceSnapshotRepo {
             INSERT INTO finance_net_worth_snapshots
                 (id, snapshot_date, currency, accounts_total, investments_total,
                  liabilities_total, net_worth, breakdown, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+            VALUES (?, ?, ?, ?, ?, ?, ? + ? - ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
             RETURNING *
             "#,
         )
@@ -45,7 +44,9 @@ impl FinanceSnapshotRepo {
         .bind(accounts_total)
         .bind(investments_total)
         .bind(liabilities_total)
-        .bind(net_worth)
+        .bind(accounts_total)
+        .bind(investments_total)
+        .bind(liabilities_total)
         .bind(breakdown_json)
         .fetch_one(&self.pool)
         .await?;

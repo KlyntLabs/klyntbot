@@ -57,7 +57,6 @@ impl FinanceTool {
                 accounts_total,
                 investments_total,
                 liabilities_total,
-                net_worth,
                 &breakdown_json,
             )
             .await?;

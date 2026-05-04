@@ -1,9 +1,8 @@
-use crate::pool::StoragePool;
-use common::Result;
+use crate::error::StorageError;
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
+use sqlx::SqlitePool;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CodingReviewRow {
     pub id: String,
     pub session_id: String,
@@ -16,15 +15,15 @@ pub struct CodingReviewRow {
 
 #[derive(Debug, Clone)]
 pub struct CodingReviewsRepo {
-    pool: StoragePool,
+    pool: SqlitePool,
 }
 
 impl CodingReviewsRepo {
-    pub fn new(pool: StoragePool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
-    pub async fn insert(&self, row: &CodingReviewRow) -> Result<()> {
+    pub async fn insert(&self, row: &CodingReviewRow) -> Result<(), StorageError> {
         sqlx::query(
             "INSERT INTO coding_reviews (id, session_id, summary, issues_json, target, delivery, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -36,9 +35,8 @@ impl CodingReviewsRepo {
         .bind(&row.target)
         .bind(&row.delivery)
         .bind(&row.created_at)
-        .execute(self.pool.inner())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 
@@ -46,28 +44,16 @@ impl CodingReviewsRepo {
         &self,
         session_id: &str,
         limit: u32,
-    ) -> Result<Vec<CodingReviewRow>> {
-        let rows = sqlx::query(
+    ) -> Result<Vec<CodingReviewRow>, StorageError> {
+        let rows = sqlx::query_as::<_, CodingReviewRow>(
             "SELECT id, session_id, summary, issues_json, target, delivery, created_at
              FROM coding_reviews WHERE session_id = ? ORDER BY created_at DESC LIMIT ?",
         )
         .bind(session_id)
         .bind(limit as i64)
-        .fetch_all(self.pool.inner())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        .fetch_all(&self.pool)
+        .await?;
 
-        Ok(rows
-            .into_iter()
-            .map(|r| CodingReviewRow {
-                id: r.get(0),
-                session_id: r.get(1),
-                summary: r.get(2),
-                issues_json: r.get(3),
-                target: r.get(4),
-                delivery: r.get(5),
-                created_at: r.get(6),
-            })
-            .collect())
+        Ok(rows)
     }
 }

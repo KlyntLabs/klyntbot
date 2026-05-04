@@ -523,7 +523,7 @@ impl AppCore {
 
         // ── Phase 8: Mirror self-reflection layer (before SignalRouter so consumers can be wired in)
         let coding_approval_history_repo =
-            ::storage::repos::CodingApprovalHistoryRepo::new(storage_pool.clone());
+            ::storage::repos::CodingApprovalHistoryRepo::new(storage_pool.inner().clone());
         let (mirror_facade, mirror_consumers, mirror_flush_handles, mirror_shutdown) = {
             let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
             let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =

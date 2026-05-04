@@ -3,21 +3,14 @@ use super::parts::MessagePart;
 /// Joins all `Text` parts in a message into a single string.
 /// Used by cognitive subsystems that operate on prose.
 pub fn extract_text_from_parts(parts: &[MessagePart]) -> String {
-    let mut out = String::new();
-    for (i, text) in parts
+    parts
         .iter()
         .filter_map(|p| match p {
             MessagePart::Text { text } => Some(text.as_str()),
             _ => None,
         })
-        .enumerate()
-    {
-        if i > 0 {
-            out.push('\n');
-        }
-        out.push_str(text);
-    }
-    out
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Returns `(call_id, output_text, is_error)` for every `ToolResult` part.

@@ -195,13 +195,11 @@ impl FinanceTool {
                 self.storage.transactions.sum_by_period(
                     "income",
                     periods,
-                    "month",
                     &self.default_currency
                 ),
                 self.storage.transactions.sum_by_period(
                     "expense",
                     periods,
-                    "month",
                     &self.default_currency
                 ),
             )?;
@@ -254,7 +252,7 @@ impl FinanceTool {
             let period_data = self
                 .storage
                 .transactions
-                .sum_by_period(tx_type, periods, "month", &self.default_currency)
+                .sum_by_period(tx_type, periods, &self.default_currency)
                 .await?;
 
             let values: Vec<i64> = period_data.iter().map(|(_, v)| *v).collect();

@@ -39,8 +39,7 @@ async fn watcher_fires_when_other_pool_writes() {
     let bus = Arc::new(DomainEventBus::new(8));
     let mut rx = bus.subscribe();
     let _token = pool_a
-        .start_data_version_watcher(bus.clone(), Duration::from_millis(50))
-        .await;
+        .start_data_version_watcher(bus.clone(), Duration::from_millis(50));
 
     // Yield long enough for the watcher to read its initial baseline.
     tokio::time::sleep(Duration::from_millis(120)).await;
@@ -82,8 +81,7 @@ async fn watcher_does_not_fire_without_writes() {
     let bus = Arc::new(DomainEventBus::new(8));
     let mut rx = bus.subscribe();
     let _token = pool
-        .start_data_version_watcher(bus.clone(), Duration::from_millis(50))
-        .await;
+        .start_data_version_watcher(bus.clone(), Duration::from_millis(50));
 
     let res = timeout(Duration::from_millis(300), rx.recv()).await;
     assert!(res.is_err(), "watcher fired despite no writes: {res:?}");
@@ -103,10 +101,10 @@ async fn cancelling_token_stops_the_watcher() {
 
     let bus = Arc::new(DomainEventBus::new(8));
     let mut rx = bus.subscribe();
-    let token = pool
-        .start_data_version_watcher(bus.clone(), Duration::from_millis(50))
-        .await;
-    token.cancel();
+    let _token = pool
+        .start_data_version_watcher(bus.clone(), Duration::from_millis(50));
+    // Dropping the handle cancels the watcher.
+    drop(_token);
     tokio::time::sleep(Duration::from_millis(120)).await;
 
     // Now write — the watcher should have already exited.

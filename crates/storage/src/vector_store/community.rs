@@ -101,7 +101,6 @@ impl VectorStore {
                 }
             }
         }
-        out.sort_by(|a, b| b.score.total_cmp(&a.score));
         Ok(out)
     }
 

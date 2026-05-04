@@ -107,7 +107,6 @@ impl VectorStore {
                 }
             }
         }
-        out.sort_by(|a, b| b.score.total_cmp(&a.score));
         Ok(out)
     }
 
@@ -167,7 +166,6 @@ impl VectorStore {
                 }
             }
         }
-        out.sort_by(|a, b| b.1.total_cmp(&a.1));
         Ok(out)
     }
 

@@ -272,12 +272,12 @@ impl VectorStore {
                     tracing::warn!("Failed to optimize {table_name}: {e}");
                 }
             }
-
-            // Force the allocator to return freed pages to the OS immediately.
-            // Without this, mimalloc retains large freed blocks for reuse,
-            // causing RSS to stay elevated after compaction.
-            common::memory::purge_freed_memory();
         }
+
+        // Force the allocator to return freed pages to the OS once after all
+        // tables are compacted. Without this, mimalloc retains large freed
+        // blocks for reuse, causing RSS to stay elevated after compaction.
+        common::memory::purge_freed_memory();
 
         Ok(())
     }

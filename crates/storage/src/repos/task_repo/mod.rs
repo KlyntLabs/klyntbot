@@ -70,6 +70,37 @@ pub struct TaskPatch {
     pub scheduled_end: Option<Option<jiff::Timestamp>>,
 }
 
+impl TaskPatch {
+    /// Returns `true` if no fields other than `id` are set.
+    pub fn is_empty(&self) -> bool {
+        self.title.is_none()
+            && self.description.is_none()
+            && self.priority.is_none()
+            && self.due_date.is_none()
+            && self.tags.is_none()
+            && self.status.is_none()
+            && self.calendar_event_uid.is_none()
+            && self.next_instance_date.is_none()
+            && self.last_reminded_at.is_none()
+            && self.estimated_minutes.is_none()
+            && self.recurrence_rule.is_none()
+            && self.area_id.is_none()
+            && self.project_id.is_none()
+            && self.key_result_id.is_none()
+            && self.status_label_id.is_none()
+            && self.position.is_none()
+            && self.group_id.is_none()
+            && self.task_type.is_none()
+            && self.energy_level.is_none()
+            && self.complexity_score.is_none()
+            && self.completed.is_none()
+            && self.actual_minutes.is_none()
+            && self.objective_id.is_none()
+            && self.scheduled_start.is_none()
+            && self.scheduled_end.is_none()
+    }
+}
+
 /// A time entry joined with the parent task's title, for timeline display.
 #[derive(Debug, Clone, sqlx::FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -349,12 +349,12 @@ impl FinanceInvestmentRepo {
             r#"
             SELECT
                 p.id                                              AS portfolio_id,
-                COALESCE(SUM(i.base_cost_basis), 0)               AS total_cost_basis,
-                COALESCE(SUM(i.base_current_value), 0)            AS total_current_value,
+                COALESCE(SUM(CASE WHEN i.base_currency = ?1 THEN i.base_cost_basis END), 0)   AS total_cost_basis,
+                COALESCE(SUM(CASE WHEN i.base_currency = ?1 THEN i.base_current_value END), 0) AS total_current_value,
                 COUNT(i.id)                                       AS holding_count
             FROM finance_portfolios p
-            LEFT JOIN finance_investments i ON i.portfolio_id = p.id AND i.base_currency = ?
-            WHERE p.id = ?
+            LEFT JOIN finance_investments i ON i.portfolio_id = p.id
+            WHERE p.id = ?2
             GROUP BY p.id
             "#,
         )
