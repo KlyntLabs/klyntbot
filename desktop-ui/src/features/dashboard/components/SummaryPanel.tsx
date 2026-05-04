@@ -195,14 +195,14 @@ function DaySummary({
 
       {hasProductivity && ps.topApps.length > 0 && (
         <section className="dashboard__summary-section">
-          <h4 className="dashboard__summary-heading">Top Apps</h4>
+          <h3 className="dashboard__summary-heading">Top Apps</h3>
           <TopAppsChart apps={ps.topApps} />
         </section>
       )}
 
       {!hasProductivity && summary.topApps.length > 0 && (
         <section className="dashboard__summary-section">
-          <h4 className="dashboard__summary-heading">Top Apps</h4>
+          <h3 className="dashboard__summary-heading">Top Apps</h3>
           <TopAppsChart
             apps={summary.topApps.map((a) => ({
               appName: a.appName,
@@ -214,7 +214,7 @@ function DaySummary({
       )}
 
       <section className="dashboard__summary-section">
-        <h4 className="dashboard__summary-heading">Insights</h4>
+        <h3 className="dashboard__summary-heading">Insights</h3>
         {intel && (intel.patterns.length > 0 || intel.nudges.length > 0) ? (
           <div className="dashboard__summary-insights">
             {intel.patterns.map((p) => (
@@ -365,7 +365,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
   return (
     <aside className="dashboard__summary-panel">
       <div className="dashboard__summary-detail-header">
-        <h3 className="dashboard__summary-heading">Activity Session</h3>
+        <h2 className="dashboard__summary-heading">Activity Session</h2>
         <button
           type="button"
           onClick={onClose}
@@ -433,7 +433,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
 
       {session.appBreakdown.length > 0 && (
         <div>
-          <h4 className="dashboard__summary-heading">Apps in this session</h4>
+          <h3 className="dashboard__summary-heading">Apps in this session</h3>
           <div>
             {session.appBreakdown.map((app) => {
               const appCatColor = resolveActivityColor(app.catType, false);
@@ -456,7 +456,7 @@ function EntryDetail({ entry, onClose }: { entry: TimelineEntry; onClose: () => 
   return (
     <aside className="dashboard__summary-panel">
       <div className="dashboard__summary-detail-header">
-        <h3 className="dashboard__summary-heading">Details</h3>
+        <h2 className="dashboard__summary-heading">Details</h2>
         <button
           type="button"
           onClick={onClose}
@@ -507,8 +507,9 @@ function TrendArrow({ value, label }: { value?: number | null; label?: string })
   const cls = isUp
     ? "dashboard__sparkline-trend dashboard__sparkline-trend--up"
     : "dashboard__sparkline-trend dashboard__sparkline-trend--down";
+  const ariaLabel = `${isUp ? "Up" : "Down"} ${pct}%${label ? ` ${label}` : ""}`;
   return (
-    <span className={cls} title={label ? `${isUp ? "+" : "-"}${pct}% ${label}` : undefined}>
+    <span className={cls} title={label ? `${isUp ? "+" : "-"}${pct}% ${label}` : undefined} aria-label={ariaLabel}>
       {isUp ? "↑" : "↓"}
       {pct > 0 && `${pct}%`}
     </span>

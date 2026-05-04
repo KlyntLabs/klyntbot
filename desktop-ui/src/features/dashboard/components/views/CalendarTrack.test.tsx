@@ -54,7 +54,7 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
 }
 
 describe("CalendarTrack", () => {
-  it("renders nothing when no events", async () => {
+  it("renders empty state when no events", async () => {
     mockedCalendarEvents.mockResolvedValue([]);
     const { container } = render(
       wrap(
@@ -67,7 +67,7 @@ describe("CalendarTrack", () => {
       ),
     );
     await waitFor(() => {
-      expect(container.firstChild).toBeNull();
+      expect(container.textContent).toContain("No calendar events for this day");
     });
   });
 
@@ -190,7 +190,7 @@ describe("CalendarTrack", () => {
     expect(styleA).not.toEqual(styleB);
   });
 
-  it("returns null with no children when productivityCalendarEvents returns empty", async () => {
+  it("shows empty state when productivityCalendarEvents returns empty", async () => {
     mockedCalendarEvents.mockResolvedValue([]);
     const { container } = render(
       wrap(
@@ -202,6 +202,6 @@ describe("CalendarTrack", () => {
         />,
       ),
     );
-    await waitFor(() => expect(container.firstChild).toBeNull());
+    await waitFor(() => expect(container.textContent).toContain("No calendar events for this day"));
   });
 });

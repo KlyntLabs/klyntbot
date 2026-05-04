@@ -47,7 +47,7 @@ const COLUMNS: ColumnDef[] = [
   {
     key: "activity",
     label: "Activity",
-    icon: "⬡",
+    icon: "activity",
     color: "var(--timeline-app-productive)",
     flex: 1.2,
     filter: (e) => e.entryType === "appUsage",
@@ -55,7 +55,7 @@ const COLUMNS: ColumnDef[] = [
   {
     key: "calendar",
     label: "Calendar",
-    icon: "📅",
+    icon: "calendar",
     color: "var(--timeline-focus)",
     flex: 1.4,
     filter: () => false, // Calendar uses its own data source
@@ -63,7 +63,7 @@ const COLUMNS: ColumnDef[] = [
   {
     key: "timeEntries",
     label: "Time Entries",
-    icon: "☰",
+    icon: "clock",
     color: "var(--timeline-task)",
     flex: 1.8,
     filter: (e) => e.entryType === "taskTimeEntry",
@@ -71,7 +71,7 @@ const COLUMNS: ColumnDef[] = [
   {
     key: "tasks",
     label: "Tasks",
-    icon: "☑",
+    icon: "check-square",
     color: "var(--timeline-todo)",
     flex: 1.8,
     filter: (e) => e.entryType === "taskDue",
@@ -79,7 +79,7 @@ const COLUMNS: ColumnDef[] = [
   {
     key: "transactions",
     label: "Transactions",
-    icon: "$",
+    icon: "dollar-sign",
     color: "var(--timeline-finance)",
     flex: 1.2,
     filter: (e) =>
@@ -90,7 +90,7 @@ const COLUMNS: ColumnDef[] = [
   {
     key: "notes",
     label: "Notes",
-    icon: "✎",
+    icon: "file-text",
     color: "var(--timeline-note)",
     flex: 1.2,
     filter: (e) => e.entryType === "noteCreated" || e.entryType === "noteUpdated",

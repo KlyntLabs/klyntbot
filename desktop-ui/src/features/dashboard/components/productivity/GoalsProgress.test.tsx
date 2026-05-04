@@ -38,7 +38,10 @@ vi.mock("@/api/endpoints/dashboard", async () => {
 
 import { GoalsProgress } from "./GoalsProgress";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 function wrap(node: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
@@ -62,12 +65,25 @@ describe("GoalsProgress", () => {
     expect(screen.getByText("Add Goal")).toBeTruthy();
   });
 
-  it("calls productivityGoalDelete when trash button clicked", async () => {
+  it("calls productivityGoalDelete when trash button clicked and confirmed", async () => {
     const { productivityGoalDelete } = await import("@/api/endpoints/dashboard");
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     render(wrap(<GoalsProgress />));
     await waitFor(() => expect(screen.getByText("MET")).toBeTruthy());
     const deleteButtons = screen.getAllByLabelText("Delete goal");
     fireEvent.click(deleteButtons[0]);
     await waitFor(() => expect(productivityGoalDelete).toHaveBeenCalledWith(1));
+    confirmSpy.mockRestore();
+  });
+
+  it("does not delete when user cancels confirmation", async () => {
+    const { productivityGoalDelete } = await import("@/api/endpoints/dashboard");
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(wrap(<GoalsProgress />));
+    await waitFor(() => expect(screen.getByText("MET")).toBeTruthy());
+    const deleteButtons = screen.getAllByLabelText("Delete goal");
+    fireEvent.click(deleteButtons[0]);
+    expect(productivityGoalDelete).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 });

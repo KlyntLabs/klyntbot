@@ -47,7 +47,26 @@ export function CalendarTrack({
     return computeOverlapLayout(items);
   }, [events]);
 
-  if (events.length === 0) return null;
+  if (events.length === 0) {
+    return (
+      <div
+        className="dashboard__calendar-empty"
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "var(--fs-2xs)",
+          color: "var(--ds-text-subtle)",
+          padding: 16,
+          textAlign: "center",
+        }}
+      >
+        No calendar events for this day
+      </div>
+    );
+  }
 
   return (
     <>

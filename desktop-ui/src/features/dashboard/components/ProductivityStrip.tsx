@@ -87,6 +87,8 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
         type="button"
         onClick={() => setExpanded(!expanded)}
         className="dashboard__strip-toggle"
+        aria-expanded={expanded}
+        aria-controls="productivity-strip-detail"
       >
         <MiniScore score={summary.productivityScore} />
         <div>
@@ -119,7 +121,7 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
       </button>
 
       {expanded && (
-        <div className="dashboard__strip-detail">
+        <div id="productivity-strip-detail" className="dashboard__strip-detail">
           <TopAppsMini summary={summary} />
           <div className="dashboard__strip-breakdown">
             <span>

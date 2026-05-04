@@ -89,7 +89,7 @@ export function HourlyHeatmap({ startDate, endDate }: Props) {
     : null;
 
   return (
-    <div className="dashboard__hourly">
+    <div className="dashboard__hourly" role="img" aria-label="Hourly productivity breakdown">
       <div className="dashboard__hourly-title">
         Hourly Productivity
         {peakHour && <span className="dashboard__hourly-peak"> Peak: {peakHour.hour}:00</span>}
