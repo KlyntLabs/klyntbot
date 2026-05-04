@@ -253,7 +253,7 @@ impl ReplayContext {
 
         let mut ctx = String::new();
         if !scored.is_empty() {
-            ctx.push_str("## Memory\n");
+            ctx.push_str("## Memory (extracted facts)\n");
             for s in scored.iter().take(20) {
                 ctx.push_str(&format!(
                     "- {}: {} = {}{}\n",
@@ -267,6 +267,41 @@ impl ReplayContext {
                         .unwrap_or_default()
                 ));
             }
+            ctx.push('\n');
+        }
+
+        // Wave 6 path: also pull verbatim turns from episodic_memories.
+        // Triples lose temporal/spatial detail; raw turns preserve dates,
+        // names, and the speaker's own phrasing. Significant lift on
+        // category-2 (multi-hop/temporal) questions.
+        match cognitive::search::bm25::search_episodic_memories(
+            self.pool.inner(),
+            question,
+            None,
+            10,
+        )
+        .await
+        {
+            Ok(hits) if !hits.is_empty() => {
+                ctx.push_str("## Conversation episodes (verbatim)\n");
+                for h in hits.iter().take(10) {
+                    let row: Option<(String, Option<String>, String)> = sqlx::query_as(
+                        "SELECT content, summary, occurred_at FROM episodic_memories WHERE id = ?",
+                    )
+                    .bind(&h.id)
+                    .fetch_optional(self.pool.inner())
+                    .await
+                    .unwrap_or(None);
+                    if let Some((content, summary, occurred_at)) = row {
+                        let body = summary.unwrap_or(content);
+                        let trimmed: String = body.chars().take(400).collect();
+                        ctx.push_str(&format!("- [{occurred_at}] {trimmed}\n"));
+                    }
+                }
+                ctx.push('\n');
+            }
+            Ok(_) => {}
+            Err(e) => tracing::debug!(error = %e, "episodic FTS lookup failed"),
         }
 
         let api_base = std::env::var("KLYNTBOT_PROVIDERS__DEEPSEEK__API_BASE")
