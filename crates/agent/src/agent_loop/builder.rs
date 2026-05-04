@@ -1437,18 +1437,27 @@ impl AgentLoopBuilder {
 
                 // T2.2 — wire semantic-fact search so memory.search_all
                 // queries the same fact pool as pre-injection retrieval.
-                if let Some(pool) = &self.pool {
-                    let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
-                    let entity_repo =
-                        Some(cognitive::repos::EntityRepo::new(pool.clone()));
-                    let fact_search_handler = Arc::new(
-                        crate::adapters::semantic_fact_search::SemanticFactSearchHandlerImpl::new(
-                            fact_repo,
-                            cognitive_embedder.clone(),
-                            entity_repo,
-                        ),
-                    ) as Arc<dyn tools::semantic_fact_search::SemanticFactSearchHandler>;
-                    memory_tool = memory_tool.with_fact_search_handler(fact_search_handler);
+                // GATED: produced -26pp regression in dev bench (5.03%
+                // and empty-prediction failure mode). Code preserved
+                // for redesign; wire only behind KCA_FACT_SEARCH_HANDLER=1.
+                let fact_handler_on = matches!(
+                    std::env::var("KCA_FACT_SEARCH_HANDLER").ok().as_deref(),
+                    Some("1") | Some("true") | Some("yes")
+                );
+                if fact_handler_on {
+                    if let Some(pool) = &self.pool {
+                        let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
+                        let entity_repo =
+                            Some(cognitive::repos::EntityRepo::new(pool.clone()));
+                        let fact_search_handler = Arc::new(
+                            crate::adapters::semantic_fact_search::SemanticFactSearchHandlerImpl::new(
+                                fact_repo,
+                                cognitive_embedder.clone(),
+                                entity_repo,
+                            ),
+                        ) as Arc<dyn tools::semantic_fact_search::SemanticFactSearchHandler>;
+                        memory_tool = memory_tool.with_fact_search_handler(fact_search_handler);
+                    }
                 }
 
                 tool_registry.register(memory_tool);
