@@ -194,8 +194,16 @@ impl EmbeddingEngine {
         let base = api_base.as_deref().unwrap_or("https://api.openai.com/v1");
         let url = format!("{}/embeddings", base.trim_end_matches('/'));
 
+        // T3.1 (minimal): allow swapping the OpenAI embedding model via env
+        // without changing the dimension. text-embedding-3-large at 384 dims
+        // (Matryoshka) is a higher-quality representation than -3-small at the
+        // same dim, no LanceDB schema change required.
+        // Default: text-embedding-3-small. Set KCA_OPENAI_EMBED_MODEL=
+        // text-embedding-3-large to compare.
+        let model_name = std::env::var("KCA_OPENAI_EMBED_MODEL")
+            .unwrap_or_else(|_| "text-embedding-3-small".to_string());
         let body = serde_json::json!({
-            "model": "text-embedding-3-small",
+            "model": model_name,
             "input": texts,
             "dimensions": EMBEDDING_DIM,
         });

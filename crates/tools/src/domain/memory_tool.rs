@@ -468,8 +468,16 @@ impl MemoryTool {
         // 4. Format output
         if merged.is_empty() {
             // Even when no conv/todo hits, return facts_block if present.
+            // Prepend a one-line preamble so the model has an anchor describing
+            // what the bullet list represents (otherwise it tends to produce
+            // empty output when faced with an unframed list of triples).
             if !facts_block.is_empty() {
-                return Ok(facts_block);
+                return Ok(format!(
+                    "Found {} fact(s) for '{}' from semantic memory (no conversation/todo matches):\n\n{}",
+                    facts_block.matches("\n- ").count(),
+                    query,
+                    facts_block
+                ));
             }
             return Ok(format!(
                 "No results found matching '{}' (threshold: {:.2}).",
