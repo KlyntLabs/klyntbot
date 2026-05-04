@@ -117,7 +117,11 @@ pub(super) async fn sse_handler(
         },
     );
 
-    Sse::new(stream).keep_alive(KeepAlive::default())
+    Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(std::time::Duration::from_secs(15))
+            .text("ping"),
+    )
 }
 
 /// Handle `note_insight_tab_chat` separately because it needs SSE channel state to relay
@@ -183,7 +187,11 @@ pub(super) async fn insight_sse_handler(
         }
     });
 
-    Sse::new(stream).keep_alive(KeepAlive::default())
+    Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(std::time::Duration::from_secs(15))
+            .text("ping"),
+    )
 }
 
 /// SSE endpoint — streams global app events (brain:ambient, provider:degraded, etc.).
@@ -216,7 +224,11 @@ pub(super) async fn global_sse_handler(
         }
     });
 
-    Sse::new(stream).keep_alive(KeepAlive::default())
+    Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(std::time::Duration::from_secs(15))
+            .text("ping"),
+    )
 }
 
 /// State for the cognitive SSE stream unfold.
@@ -330,5 +342,9 @@ pub(super) async fn cognitive_sse_handler(
         }
     });
 
-    Sse::new(stream).keep_alive(KeepAlive::default())
+    Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(std::time::Duration::from_secs(15))
+            .text("ping"),
+    )
 }

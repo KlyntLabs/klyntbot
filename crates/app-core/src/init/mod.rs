@@ -16,8 +16,8 @@ mod temporal_scheduler;
 
 use std::sync::Arc;
 
-use ::agent::cognitive_handlers::{LlmConflictResolver, LlmExtractionHandler};
 use ::agent::cognitive_handlers::{HeuristicCoachingReasonerHandler, LlmCoachingReasonerHandler};
+use ::agent::cognitive_handlers::{LlmConflictResolver, LlmExtractionHandler};
 use ::agent::AgentLoop;
 use ::channels::ChannelManager;
 use ::cognitive::pipeline::{
@@ -1268,6 +1268,7 @@ impl AppCore {
             ))),
             thread_events: bus::TypedBroker::new(1024),
             cost_events: bus::TypedBroker::new(1024),
+            subagent_events: bus::TypedBroker::new(256),
             thread_subscriptions: Arc::new(dashmap::DashMap::new()),
             steer_queue: Arc::new(crate::coding::steer_queue::SteerQueue::new()),
         };
@@ -1861,7 +1862,8 @@ impl AppCore {
             // `cargo tauri dev` cd's into `crates/desktop`, leaving tools
             // sandboxed to that subdir instead of the actual repo.
             let cwd = {
-                let start = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+                let start =
+                    std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
                 let mut cur = start.clone();
                 let mut found = None;
                 loop {
@@ -1927,6 +1929,8 @@ impl AppCore {
                 core.agent.runtime().set_hook_engine(Arc::clone(engine));
                 core.agent.set_subagent_hook_engine(Arc::clone(engine));
             }
+            core.agent
+                .set_subagent_event_sender(core.subagent_events.sender_clone());
         }
 
         // ── Register TemporalTool in agent's tool registry (post-init) ────

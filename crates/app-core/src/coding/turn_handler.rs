@@ -33,23 +33,19 @@ impl AppCore {
         }];
         self.repos
             .sessions
-            .add_message_with_parts(
-                thread_id,
-                user_msg_id,
-                "user",
-                &parts,
-                Some(&turn_id),
-                None,
-            )
-            .await
-            ?;
+            .add_message_with_parts(thread_id, user_msg_id, "user", &parts, Some(&turn_id), None)
+            .await?;
 
         // 2. Resolve model
         let config = self.config.read().await;
         let resolved_model = model
             .or_else(|| {
                 let m = config.agents.defaults.model.clone();
-                if m.is_empty() { None } else { Some(m) }
+                if m.is_empty() {
+                    None
+                } else {
+                    Some(m)
+                }
             })
             .unwrap_or_else(|| "default".into());
         drop(config);
@@ -134,8 +130,7 @@ impl AppCore {
                             match evt {
                                 agent::AgentEvent::ContentChunk { data, .. } => {
                                     if !item_started {
-                                        item_id =
-                                            format!("msg-{}", uuid::Uuid::new_v4());
+                                        item_id = format!("msg-{}", uuid::Uuid::new_v4());
                                         let placeholder = MessageDto {
                                             id: item_id.clone(),
                                             session_id: tid.clone(),
@@ -143,8 +138,7 @@ impl AppCore {
                                             parts: vec![],
                                             model: None,
                                             turn_id: Some(tuid_bridge.clone()),
-                                            created_at: jiff::Timestamp::now()
-                                                .as_millisecond(),
+                                            created_at: jiff::Timestamp::now().as_millisecond(),
                                             finish_reason: None,
                                         };
                                         broker.publish(ThreadEvent::ItemStarted {
@@ -164,9 +158,7 @@ impl AppCore {
                                         },
                                     });
                                 }
-                                agent::AgentEvent::ToolStart {
-                                    name, args, ..
-                                } => {
+                                agent::AgentEvent::ToolStart { name, args, .. } => {
                                     let call_id = args
                                         .get("call_id")
                                         .and_then(|v| v.as_str())
@@ -224,8 +216,7 @@ impl AppCore {
                                             parts: vec![],
                                             model: None,
                                             turn_id: Some(tuid_bridge.clone()),
-                                            created_at: jiff::Timestamp::now()
-                                                .as_millisecond(),
+                                            created_at: jiff::Timestamp::now().as_millisecond(),
                                             finish_reason: None,
                                         };
                                         broker.publish(ThreadEvent::ItemCompleted {
@@ -239,9 +230,7 @@ impl AppCore {
                                 agent::AgentEvent::TurnComplete { .. } => {
                                     // Will be followed by Done — handled there
                                 }
-                                agent::AgentEvent::FileEditWithSymbols {
-                                    path, op, ..
-                                } => {
+                                agent::AgentEvent::FileEditWithSymbols { path, op, .. } => {
                                     let change = match op.as_str() {
                                         "write" => {
                                             desktop_shared::coding::FileChangeKindDto::Created
@@ -334,11 +323,7 @@ impl AppCore {
 
     /// Interrupt an active coding turn.
     #[tracing::instrument(skip(self), err)]
-    pub async fn coding_turn_interrupt(
-        &self,
-        _thread_id: &str,
-        turn_id: &str,
-    ) -> Result<()> {
+    pub async fn coding_turn_interrupt(&self, _thread_id: &str, turn_id: &str) -> Result<()> {
         if let Some((_, token)) = self.active_streams.remove(turn_id) {
             token.cancel();
             Ok(())

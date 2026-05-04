@@ -636,25 +636,17 @@ mod tests {
         }
 
         // Should have: Skipped + Starting + Failed + Complete
-        assert!(
-            events
-                .iter()
-                .any(|e| matches!(e, McpStartupEvent::Skipped { .. }))
-        );
-        assert!(
-            events
-                .iter()
-                .any(|e| matches!(e, McpStartupEvent::Starting { .. }))
-        );
-        assert!(
-            events
-                .iter()
-                .any(|e| matches!(e, McpStartupEvent::Failed { .. }))
-        );
-        assert!(
-            events
-                .iter()
-                .any(|e| matches!(e, McpStartupEvent::Complete { .. }))
-        );
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, McpStartupEvent::Skipped { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, McpStartupEvent::Starting { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, McpStartupEvent::Failed { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, McpStartupEvent::Complete { .. })));
     }
 }

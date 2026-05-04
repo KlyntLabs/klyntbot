@@ -34,8 +34,9 @@ impl HeuristicExtractionHandler {
             object: observation.content.clone(),
             confidence,
             source: source.into(),
-        
-            speaker: None,};
+
+            speaker: None,
+        };
         let od = observation.domain.as_str();
 
         match observation.source_event.as_str() {
@@ -68,8 +69,9 @@ impl HeuristicExtractionHandler {
                         object,
                         confidence: 0.8,
                         source: "user_stated".into(),
-                    
-                        speaker: None,}]
+
+                        speaker: None,
+                    }]
                 }
             }
             bus::DomainEvent::KIND_BUDGET_ALERT => {
@@ -456,8 +458,9 @@ fn bind_user_identity(extractions: &mut Vec<cognitive::BatchExtraction>) {
                     object: fact.object.clone(),
                     confidence: fact.confidence,
                     source: fact.source.clone(),
-                
-                    speaker: None,});
+
+                    speaker: None,
+                });
             }
         }
         ext.facts.extend(additions);

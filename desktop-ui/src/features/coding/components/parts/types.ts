@@ -19,7 +19,16 @@ export type MessagePart =
       stdout: string;
       stderr: string;
     }
-  | { kind: "finish"; reason: FinishReason };
+  | { kind: "finish"; reason: FinishReason }
+  | { kind: "review_result"; review_id: string; summary: string; issues: ReviewIssue[] };
+
+export type ReviewIssue = {
+  severity: string;
+  file: string | null;
+  line: number | null;
+  description: string;
+  suggestion: string | null;
+};
 
 export type ToolOutput = {
   text: string;

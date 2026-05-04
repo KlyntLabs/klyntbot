@@ -17,10 +17,7 @@ impl SteerQueue {
     }
 
     /// Register a new turn and return its receiver.
-    pub fn register_turn(
-        &self,
-        turn_id: &str,
-    ) -> tokio::sync::mpsc::UnboundedReceiver<String> {
+    pub fn register_turn(&self, turn_id: &str) -> tokio::sync::mpsc::UnboundedReceiver<String> {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         self.txs.insert(turn_id.to_string(), tx);
         rx
@@ -29,9 +26,8 @@ impl SteerQueue {
     /// Push a steer message into an active turn.
     pub fn push(&self, turn_id: &str, text: String) -> common::Result<()> {
         if let Some(tx) = self.txs.get(turn_id) {
-            tx.send(text).map_err(|_| {
-                common::KlyntbotError::StorageNotFound(format!("turn {turn_id}"))
-            })?;
+            tx.send(text)
+                .map_err(|_| common::KlyntbotError::StorageNotFound(format!("turn {turn_id}")))?;
             Ok(())
         } else {
             Err(common::KlyntbotError::StorageNotFound(format!(

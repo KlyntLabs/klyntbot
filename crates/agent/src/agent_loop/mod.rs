@@ -141,6 +141,16 @@ impl AgentLoop {
         }
     }
 
+    /// Inject the event sender into the subagent manager (called by app-core init).
+    pub fn set_subagent_event_sender(
+        &self,
+        tx: tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>,
+    ) {
+        if let Some(ref mgr) = self.subagent_manager {
+            mgr.set_event_sender(tx);
+        }
+    }
+
     /// Reload skill files from disk (hot-reload after UI edits).
     pub async fn reload_agents(&self) -> common::Result<()> {
         let mut store = self.skill_store.write().await;

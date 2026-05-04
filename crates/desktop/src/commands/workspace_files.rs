@@ -30,10 +30,7 @@ pub async fn workspace_meta_write(
 }
 
 #[klynt_command]
-pub async fn workspace_file_read(
-    workspace_id: String,
-    path: String,
-) -> serde_json::Value {
+pub async fn workspace_file_read(workspace_id: String, path: String) -> serde_json::Value {
     state
         .workspace_file_read(&workspace_id, &path)
         .await
@@ -48,11 +45,7 @@ pub async fn workspace_files_list(
     limit: Option<usize>,
 ) -> Vec<String> {
     state
-        .workspace_files_list(
-            &workspace_id,
-            query.as_deref(),
-            limit,
-        )
+        .workspace_files_list(&workspace_id, query.as_deref(), limit)
         .await
         .map_err(|e| ApiError::new("WORKSPACE_ERROR", e.to_string()))
 }
@@ -112,7 +105,10 @@ pub(crate) async fn dispatch_dev(
         "workspace_files_list" => {
             let workspace_id = try_field!(dev::get_str(body, "workspaceId"));
             let query = body.get("query").and_then(|v| v.as_str());
-            let limit = body.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+            let limit = body
+                .get("limit")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
             dev::val(
                 core.workspace_files_list(&workspace_id, query, limit)
                     .await
@@ -130,11 +126,7 @@ pub(crate) async fn dispatch_dev(
         }
         "image_data_url" => {
             let path = try_field!(dev::get_str(body, "path"));
-            dev::val(
-                core.image_data_url(&path)
-                    .await
-                    .map_err(ApiError::from),
-            )
+            dev::val(core.image_data_url(&path).await.map_err(ApiError::from))
         }
         _ => return None,
     })

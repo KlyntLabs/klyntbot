@@ -25,11 +25,7 @@ pub async fn coding_turn_interrupt(thread_id: String, turn_id: String) -> () {
 }
 
 #[klynt_command]
-pub async fn coding_turn_steer(
-    thread_id: String,
-    turn_id: String,
-    text: String,
-) -> () {
+pub async fn coding_turn_steer(thread_id: String, turn_id: String, text: String) -> () {
     state
         .coding_turn_steer(&thread_id, &turn_id, &text)
         .await

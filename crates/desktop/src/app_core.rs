@@ -553,6 +553,42 @@ fn wire_event_channels(
         "agent:cost_update",
         Some(global_event_tx.clone()),
     );
+    // Subagent lifecycle events — route Spawned by parent_session_id, others on global channel.
+    {
+        let mut rx = core.subagent_events.subscribe();
+        let handle = app_handle.clone();
+        let token = shutdown.clone();
+        let global_tx = global_event_tx.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    msg = rx.recv() => match msg {
+                        Ok(evt) => {
+                            let channel = match &evt {
+                                desktop_shared::coding::SubagentEvent::Spawned { parent_session_id, .. } => {
+                                    format!("agent:subagent_event#{parent_session_id}")
+                                }
+                                _ => "agent:subagent_event".to_string(),
+                            };
+                            if let Err(e) = handle.emit(&channel, &evt) {
+                                warn!("failed to emit {channel}: {e}");
+                            }
+                            if let Some(ref tx) = global_tx {
+                                if let Ok(payload) = serde_json::to_value(&evt) {
+                                    let _ = tx.send((channel, payload));
+                                }
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            warn!("subagent event forwarder lagged by {n} events");
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+            }
+        });
+    }
     // ToolEvent::ApprovalRequest rides on `DomainEvent::Generic { kind:
     // "agent_event" }`. The dual-probe (`ApprovalRequest` key OR `type` field)
     // accommodates both externally- and internally-tagged serde shapes.

@@ -228,8 +228,9 @@ mod tests {
                         object: "10am-12pm".into(),
                         confidence: 0.8,
                         source: "observed".into(),
-                    
-                        speaker: None,}],
+
+                        speaker: None,
+                    }],
                 },
                 BatchExtraction {
                     observation_index: 1,
@@ -300,8 +301,9 @@ mod tests {
             object: "10am-12pm".into(),
             confidence: 0.8,
             source: "observed".into(),
-        
-            speaker: None,};
+
+            speaker: None,
+        };
         let obs = test_observation();
         let fact = to_semantic_fact(&candidate, &obs);
 

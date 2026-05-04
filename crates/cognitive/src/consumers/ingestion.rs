@@ -22,8 +22,9 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         object: obj.trim().trim_end_matches('.').to_string(),
         confidence: 0.9,
         source: "regex_backstop".into(),
-    
-        speaker: None,};
+
+        speaker: None,
+    };
 
     // "I moved to {city} ..." / "I'm now in {city}" → lives_in
     for prefix in [
@@ -34,7 +35,10 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         "i am in ",
         "i'm now in ",
     ] {
-        if let Some(rest) = lc.strip_prefix(prefix).or_else(|| lc.find(prefix).map(|i| &lc[i + prefix.len()..])) {
+        if let Some(rest) = lc
+            .strip_prefix(prefix)
+            .or_else(|| lc.find(prefix).map(|i| &lc[i + prefix.len()..]))
+        {
             // Take up to first separator
             let city = rest
                 .split(|c: char| c == ',' || c == '.' || c == '!' || c == ';')
@@ -45,7 +49,8 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
                 .trim_end_matches(" recently");
             if !city.is_empty() && city.len() < 60 {
                 // Restore original casing by finding the slice in `content`
-                let case_corrected = original_case(content, city).unwrap_or_else(|| city.to_string());
+                let case_corrected =
+                    original_case(content, city).unwrap_or_else(|| city.to_string());
                 out.push(mk("identity", "lives_in", &case_corrected));
                 if prefix.contains("moved") {
                     out.push(mk("identity", "moved_to", &case_corrected));
@@ -65,8 +70,7 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
                 .unwrap_or("")
                 .trim();
             if !org.is_empty() && org.len() < 40 {
-                let case_corrected =
-                    original_case(content, org).unwrap_or_else(|| org.to_string());
+                let case_corrected = original_case(content, org).unwrap_or_else(|| org.to_string());
                 out.push(mk("work", "works_at", &case_corrected));
                 break;
             }
@@ -77,10 +81,7 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
     for prefix in ["i'm ", "i am ", "my name is "] {
         if let Some(idx) = lc.find(prefix) {
             let rest = &content[idx + prefix.len()..];
-            let first_token: String = rest
-                .chars()
-                .take_while(|c| c.is_alphabetic())
-                .collect();
+            let first_token: String = rest.chars().take_while(|c| c.is_alphabetic()).collect();
             if first_token.len() >= 2
                 && first_token.chars().next().is_some_and(|c| c.is_uppercase())
             {
@@ -106,11 +107,31 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         let is_proper = subj_clean.len() >= 2
             && subj_clean.chars().next().is_some_and(|c| c.is_uppercase())
             && subj_clean.chars().all(|c| c.is_alphabetic())
-            && !matches!(subj_clean,
-                "I" | "We" | "You" | "He" | "She" | "It" | "They"
-                | "Her" | "His" | "Their" | "Them" | "Us" | "Our"
-                | "My" | "Hi" | "Hello" | "Hey" | "The" | "A" | "An");
-        if !is_proper { continue }
+            && !matches!(
+                subj_clean,
+                "I" | "We"
+                    | "You"
+                    | "He"
+                    | "She"
+                    | "It"
+                    | "They"
+                    | "Her"
+                    | "His"
+                    | "Their"
+                    | "Them"
+                    | "Us"
+                    | "Our"
+                    | "My"
+                    | "Hi"
+                    | "Hello"
+                    | "Hey"
+                    | "The"
+                    | "A"
+                    | "An"
+            );
+        if !is_proper {
+            continue;
+        }
         let Some(verb) = toks.next() else { continue };
         let pred = match verb.to_lowercase().as_str() {
             "loves" | "love" => "loves",
@@ -124,14 +145,22 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
             "plays" | "play" => "plays",
             "works" => {
                 // "Alice works at Anthropic" → works_at + skip "at"
-                match toks.next() { Some("at") => "works_at", _ => continue }
+                match toks.next() {
+                    Some("at") => "works_at",
+                    _ => continue,
+                }
             }
-            "lives" => match toks.next() { Some("in") => "lives_in", _ => continue },
+            "lives" => match toks.next() {
+                Some("in") => "lives_in",
+                _ => continue,
+            },
             _ => continue,
         };
         let obj: String = toks.collect::<Vec<_>>().join(" ");
         let obj = obj.trim_end_matches(|c: char| !c.is_alphanumeric()).trim();
-        if obj.is_empty() || obj.len() > 80 { continue }
+        if obj.is_empty() || obj.len() > 80 {
+            continue;
+        }
         out.push(ExtractedFact {
             domain: domain.to_string(),
             subject: subj_clean.to_string(),
@@ -139,8 +168,9 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
             object: obj.to_string(),
             confidence: 0.85,
             source: "regex_backstop_3p".into(),
-        
-            speaker: None,});
+
+            speaker: None,
+        });
     }
 
     out
@@ -320,20 +350,22 @@ impl SignalConsumer for IngestionConsumer {
                             // letting upsert dedupe is simpler and more
                             // robust. The backstop only fires for the
                             // identity/location/work patterns it knows.
-                            let regex_facts =
-                                regex_backstop_facts(&obs.content, &obs.domain);
+                            let regex_facts = regex_backstop_facts(&obs.content, &obs.domain);
                             if !regex_facts.is_empty() {
                                 tracing::info!(
                                     regex_facts = regex_facts.len(),
                                     "ingestion: regex backstop contributed facts"
                                 );
-                                result.extractions.push(crate::services::extraction::BatchExtraction {
-                                    observation_index: 0,
-                                    facts: regex_facts,
-                                });
+                                result.extractions.push(
+                                    crate::services::extraction::BatchExtraction {
+                                        observation_index: 0,
+                                        facts: regex_facts,
+                                    },
+                                );
                             }
 
-                            let n_facts: usize = result.extractions.iter().map(|e| e.facts.len()).sum();
+                            let n_facts: usize =
+                                result.extractions.iter().map(|e| e.facts.len()).sum();
                             tracing::info!(
                                 n_extractions = result.extractions.len(),
                                 n_facts,
@@ -372,10 +404,7 @@ impl SignalConsumer for IngestionConsumer {
                                         {
                                             let _ = entity_repo
                                                 .upsert_alias(
-                                                    &row.id,
-                                                    &alias,
-                                                    alias_type,
-                                                    "derived",
+                                                    &row.id, &alias, alias_type, "derived",
                                                 )
                                                 .await;
                                         }
@@ -471,9 +500,7 @@ impl SignalConsumer for IngestionConsumer {
                                                 })
                                                 .unwrap_or_default();
                                             if !existing.is_empty() {
-                                                decision = resolver
-                                                    .classify(f, &existing)
-                                                    .await;
+                                                decision = resolver.classify(f, &existing).await;
                                             }
                                         }
                                         match decision {
@@ -537,9 +564,7 @@ impl SignalConsumer for IngestionConsumer {
                                         // and a name binding already exists.
                                         // Skip the name predicate itself — it
                                         // would create `Alice→name=Alice`.
-                                        if fact.subject == "user"
-                                            && fact.predicate != "name"
-                                        {
+                                        if fact.subject == "user" && fact.predicate != "name" {
                                             if let Some(name) = &user_name {
                                                 let mut mirrored = fact.clone();
                                                 mirrored.subject = name.clone();
@@ -548,7 +573,10 @@ impl SignalConsumer for IngestionConsumer {
                                                     Ok(()) => {
                                                         written += 1;
                                                         if let Some(emb) = &embedder {
-                                                            if let Err(e) = emb.embed_and_store_fact(&mirrored).await {
+                                                            if let Err(e) = emb
+                                                                .embed_and_store_fact(&mirrored)
+                                                                .await
+                                                            {
                                                                 tracing::warn!(error = %e, "embed mirrored failed");
                                                             }
                                                         }
@@ -579,7 +607,10 @@ impl SignalConsumer for IngestionConsumer {
                                                 Ok(()) => {
                                                     written += 1;
                                                     if let Some(emb) = &embedder {
-                                                        if let Err(e) = emb.embed_and_store_fact(&mirrored).await {
+                                                        if let Err(e) = emb
+                                                            .embed_and_store_fact(&mirrored)
+                                                            .await
+                                                        {
                                                             tracing::warn!(error = %e, "embed reverse-mirrored failed");
                                                         }
                                                     }

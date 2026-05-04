@@ -56,10 +56,7 @@ impl Layer1 {
                 reason: "layer-1 default: deny".into(),
                 rule_matched: None,
             },
-            _ => ApprovalDecision::ask(
-                ApprovalLayer::Layer1Declarative,
-                "layer-1 default: ask",
-            ),
+            _ => ApprovalDecision::ask(ApprovalLayer::Layer1Declarative, "layer-1 default: ask"),
         }
     }
 }

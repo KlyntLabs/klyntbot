@@ -2,6 +2,7 @@ import { CommandExecutionPart } from "./CommandExecutionPart";
 import { FileChangePart } from "./FileChangePart";
 import { FinishPart } from "./FinishPart";
 import { ReasoningPart } from "./ReasoningPart";
+import { ReviewResultPart } from "./ReviewResultPart";
 import { TextPart } from "./TextPart";
 import { ToolCallPart } from "./ToolCallPart";
 import { ToolResultPart } from "./ToolResultPart";
@@ -32,6 +33,12 @@ export function PartRenderer({ part }: { part: MessagePart }) {
       );
     case "finish":
       return <FinishPart reason={part.reason} />;
+    case "review_result":
+      return <ReviewResultPart
+        reviewId={part.review_id}
+        summary={part.summary}
+        issues={part.issues}
+      />;
     default:
       return null;
   }
