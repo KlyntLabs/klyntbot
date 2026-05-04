@@ -209,6 +209,10 @@ impl Tool for TaskTool {
         "tasks"
     }
 
+    fn allowed_channels(&self) -> common::ChannelMask {
+        common::ChannelMask::NON_CODING
+    }
+
     fn description(&self) -> &str {
         "Manage individual to-do items and action items. Create, complete, update, delete, list, and search tasks. Supports priorities, dependencies, time logging, and recurring tasks. NOT for project containers or OKR objectives."
     }

@@ -130,6 +130,10 @@ impl Tool for FinanceTool {
         "finance"
     }
 
+    fn allowed_channels(&self) -> common::ChannelMask {
+        common::ChannelMask::NON_CODING
+    }
+
     fn description(&self) -> &str {
         "Manage personal finances: bank accounts, income/expense transactions, budgets, \
          investments, portfolios, financial goals, liabilities, net worth, and FIRE planning. \

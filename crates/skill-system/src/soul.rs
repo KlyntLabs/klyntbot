@@ -36,43 +36,90 @@ You are Klyntbot, a personal AI assistant.
 When you genuinely don't recall something from prior conversation memory, you MAY call the `memory` tool with `action=search_all` and the named entities from the user's question (people, places, dates, specific topics) before answering. Search before refusing. If the search returns nothing relevant, say so plainly — never fabricate details.
 "#;
 
+const DEFAULT_CODING_SOUL: &str = r#"# Klyntbot Coding
+
+You are Klyntbot in coding mode — a senior software engineer pair-programming with the user inside their workspace.
+
+## Behaviour
+- Investigate before changing. Read the file you're about to edit.
+- Surgical changes only. Don't refactor adjacent code unless asked.
+- Don't add error handling, fallbacks, or validation for scenarios that can't happen.
+- Default to writing no comments. Only add a comment when WHY is non-obvious.
+- For multi-step work, state a brief plan with verification steps before acting.
+
+## Tools
+- Use `bash`, `read`, `write`, `edit`, `apply_patch` for code changes.
+- Use `recall_index`, `recall_timeline`, `check_dead_ends` to consult prior coding sessions before guessing.
+- Approval cards will appear for risky operations — explain *why* before requesting them.
+
+## Formatting (STRICT — overrides any default writing style)
+
+**Emoji rule.** Do not use any emoji, with exactly two exceptions:
+- `✅` — only as the first character of a line confirming a concrete action just succeeded.
+- `❌` — only as the first character of a line reporting a concrete action just failed.
+
+When citing code, include the file path and line number (`path/to/file.rs:42`).
+"#;
+
 /// Context source that loads KLYNTBOT.md from the data directory.
 pub struct SoulContextSource {
-    content: Arc<RwLock<String>>,
-    path: PathBuf,
-    last_mtime: Arc<RwLock<Option<SystemTime>>>,
+    assistant: Arc<RwLock<String>>,
+    coding: Arc<RwLock<String>>,
+    assistant_path: PathBuf,
+    coding_path: PathBuf,
+    last_assistant_mtime: Arc<RwLock<Option<SystemTime>>>,
+    last_coding_mtime: Arc<RwLock<Option<SystemTime>>>,
 }
 
 impl SoulContextSource {
     /// Create and load the soul file. Installs default if missing.
     pub fn load(data_dir: &Path) -> common::Result<Self> {
-        let path = data_dir.join("KLYNTBOT.md");
+        let assistant_path = data_dir.join("KLYNTBOT.md");
+        let coding_path = data_dir.join("KLYNTBOT-coding.md");
 
-        if !path.exists() {
-            std::fs::write(&path, DEFAULT_SOUL)?;
-            debug!(path = %path.display(), "Installed default KLYNTBOT.md");
+        if !assistant_path.exists() {
+            std::fs::write(&assistant_path, DEFAULT_SOUL)?;
+            debug!(path = %assistant_path.display(), "Installed default KLYNTBOT.md");
+        }
+        if !coding_path.exists() {
+            std::fs::write(&coding_path, DEFAULT_CODING_SOUL)?;
+            debug!(path = %coding_path.display(), "Installed default KLYNTBOT-coding.md");
         }
 
-        let content = std::fs::read_to_string(&path)?;
-        let mtime = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+        let assistant_content = std::fs::read_to_string(&assistant_path)?;
+        let coding_content = std::fs::read_to_string(&coding_path)?;
+        let assistant_mtime = std::fs::metadata(&assistant_path).and_then(|m| m.modified()).ok();
+        let coding_mtime = std::fs::metadata(&coding_path).and_then(|m| m.modified()).ok();
 
         Ok(Self {
-            content: Arc::new(RwLock::new(content)),
-            path,
-            last_mtime: Arc::new(RwLock::new(mtime)),
+            assistant: Arc::new(RwLock::new(assistant_content)),
+            coding: Arc::new(RwLock::new(coding_content)),
+            assistant_path,
+            coding_path,
+            last_assistant_mtime: Arc::new(RwLock::new(assistant_mtime)),
+            last_coding_mtime: Arc::new(RwLock::new(coding_mtime)),
         })
     }
 
     /// Reload from disk (for hot-reload via config watcher).
     pub async fn reload(&self) -> common::Result<()> {
-        let content = std::fs::read_to_string(&self.path)?;
-        *self.content.write().await = content;
-        if let Ok(meta) = std::fs::metadata(&self.path) {
+        let assistant_content = tokio::fs::read_to_string(&self.assistant_path).await?;
+        *self.assistant.write().await = assistant_content;
+        if let Ok(meta) = tokio::fs::metadata(&self.assistant_path).await {
             if let Ok(mtime) = meta.modified() {
-                *self.last_mtime.write().await = Some(mtime);
+                *self.last_assistant_mtime.write().await = Some(mtime);
             }
         }
-        debug!("KLYNTBOT.md reloaded");
+
+        let coding_content = tokio::fs::read_to_string(&self.coding_path).await?;
+        *self.coding.write().await = coding_content;
+        if let Ok(meta) = tokio::fs::metadata(&self.coding_path).await {
+            if let Ok(mtime) = meta.modified() {
+                *self.last_coding_mtime.write().await = Some(mtime);
+            }
+        }
+
+        debug!("KLYNTBOT.md + KLYNTBOT-coding.md reloaded");
         Ok(())
     }
 }
@@ -91,26 +138,42 @@ impl ContextSource for SoulContextSource {
         true // Never evicted by token budget
     }
 
-    async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
+    async fn provide(&self, ctx: &SourceContext) -> Option<String> {
+        let (path, content, last_mtime) = match ctx.session_mode {
+            common::SessionMode::Coding => (
+                &self.coding_path,
+                &self.coding,
+                &self.last_coding_mtime,
+            ),
+            common::SessionMode::Assistant => (
+                &self.assistant_path,
+                &self.assistant,
+                &self.last_assistant_mtime,
+            ),
+        };
+
         // Live-read so edits to KLYNTBOT.md take effect on the next turn
         // without restarting the agent. The cached copy is the fallback
         // for transient read failures (e.g. atomic mid-write swap).
         //
         // Phase-2 perf optimisation: skip the disk read when mtime hasn't
         // changed since the last successful load.
-        let needs_reload = match tokio::fs::metadata(&self.path).await {
+        // Read metadata first to avoid TOCTOU: if the file changes between
+        // metadata and read_to_string, the *next* turn will see the newer
+        // mtime and reload. We never store an mtime newer than the content.
+        let (needs_reload, current_mtime) = match tokio::fs::metadata(path).await {
             Ok(meta) => match meta.modified() {
                 Ok(mtime) => {
-                    let last = *self.last_mtime.read().await;
-                    last != Some(mtime)
+                    let last = *last_mtime.read().await;
+                    (last != Some(mtime), Some(mtime))
                 }
-                Err(_) => true,
+                Err(_) => (true, None),
             },
-            Err(_) => true,
+            Err(_) => (true, None),
         };
 
         if !needs_reload {
-            let cached = self.content.read().await;
+            let cached = content.read().await;
             return if cached.is_empty() {
                 None
             } else {
@@ -118,18 +181,16 @@ impl ContextSource for SoulContextSource {
             };
         }
 
-        match tokio::fs::read_to_string(&self.path).await {
+        match tokio::fs::read_to_string(path).await {
             Ok(fresh) => {
                 {
-                    let mut cached = self.content.write().await;
+                    let mut cached = content.write().await;
                     if *cached != fresh {
                         *cached = fresh.clone();
                     }
                 }
-                if let Ok(meta) = tokio::fs::metadata(&self.path).await {
-                    if let Ok(mtime) = meta.modified() {
-                        *self.last_mtime.write().await = Some(mtime);
-                    }
+                if let Some(mtime) = current_mtime {
+                    *last_mtime.write().await = Some(mtime);
                 }
                 if fresh.is_empty() {
                     None
@@ -138,7 +199,7 @@ impl ContextSource for SoulContextSource {
                 }
             }
             Err(_) => {
-                let cached = self.content.read().await;
+                let cached = content.read().await;
                 if cached.is_empty() {
                     None
                 } else {
@@ -173,6 +234,7 @@ mod tests {
             message: None,
             intent_summary: None,
             project_id: None,
+            session_mode: common::SessionMode::Assistant,
         };
         let content = source.provide(&ctx).await;
         assert!(content.is_some());
@@ -189,6 +251,7 @@ mod tests {
             message: None,
             intent_summary: None,
             project_id: None,
+            session_mode: common::SessionMode::Assistant,
         };
 
         // First call populates the cache.
@@ -201,7 +264,7 @@ mod tests {
         assert_eq!(first, second);
 
         // Mutate the file on disk.
-        tokio::fs::write(&source.path, "# Mutated soul\n")
+        tokio::fs::write(&source.assistant_path, "# Mutated soul\n")
             .await
             .unwrap();
 

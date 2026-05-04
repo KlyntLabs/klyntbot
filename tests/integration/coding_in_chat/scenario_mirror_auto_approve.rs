@@ -63,6 +63,8 @@ async fn scenario_mirror_layer3_auto_approves_after_5_prior_allows() {
         mirror_min_approvals: 5,
         mirror_cooldown_seconds: 86400,
         now_unix: jiff::Timestamp::now().as_second() + 25 * 3600,
+        thread_id: None,
+        turn_id: None,
     };
 
     let decision = evaluate(ctx, "bash", r#"{"command":"git status"}"#).await;

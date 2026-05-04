@@ -78,7 +78,7 @@ impl AppCore {
             .coding_reviews
             .insert(&storage::repos::coding_reviews::CodingReviewRow {
                 id: review_id,
-                session_id: session.id.clone(),
+                session_id: session.key.clone(),
                 summary: result.summary.clone(),
                 issues_json: serde_json::to_string(&result.issues).unwrap_or_default(),
                 target: target.map(String::from),
@@ -114,7 +114,7 @@ impl AppCore {
             let text = storage::messages::render::extract_text_from_parts(&m.parts);
             let msg = match m.role.as_str() {
                 "user" => providers::Message::user(text),
-                "assistant" => providers::Message::assistant(text, None, None),
+                "assistant" => providers::Message::assistant(text),
                 "system" => providers::Message::system(text),
                 _ => providers::Message::user(text),
             };

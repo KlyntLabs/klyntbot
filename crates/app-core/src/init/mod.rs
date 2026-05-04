@@ -1929,8 +1929,75 @@ impl AppCore {
                 core.agent.runtime().set_hook_engine(Arc::clone(engine));
                 core.agent.set_subagent_hook_engine(Arc::clone(engine));
             }
-            core.agent
-                .set_subagent_event_sender(core.subagent_events.sender_clone());
+            // Bridge subagent lifecycle events from agent crate to app-core broker.
+            // The agent uses `SubagentLifecycleEvent` while the UI broker uses
+            // `desktop_shared::coding::SubagentEvent`; they are structurally identical
+            // except for the `Cancelled` reason type (String vs enum).
+            {
+                let (tx, mut rx) =
+                    tokio::sync::broadcast::channel::<::agent::subagent_events::SubagentLifecycleEvent>(
+                        256,
+                    );
+                core.agent.set_subagent_event_sender(tx);
+                let broker = core.subagent_events.clone();
+                tokio::spawn(async move {
+                    loop {
+                        match rx.recv().await {
+                            Ok(ev) => {
+                                let mapped = match ev {
+                                    ::agent::subagent_events::SubagentLifecycleEvent::Spawned {
+                                        agent_id,
+                                        label,
+                                        profile,
+                                        parent_session_id,
+                                        spawned_at,
+                                    } => desktop_shared::coding::SubagentEvent::Spawned {
+                                        agent_id,
+                                        label,
+                                        profile,
+                                        parent_session_id,
+                                        spawned_at,
+                                    },
+                                    ::agent::subagent_events::SubagentLifecycleEvent::Progress {
+                                        agent_id,
+                                        iteration,
+                                        last_tool,
+                                    } => desktop_shared::coding::SubagentEvent::Progress {
+                                        agent_id,
+                                        iteration,
+                                        last_tool,
+                                    },
+                                    ::agent::subagent_events::SubagentLifecycleEvent::Completed {
+                                        agent_id,
+                                        success,
+                                        summary,
+                                        tokens_used,
+                                        duration_ms,
+                                    } => desktop_shared::coding::SubagentEvent::Completed {
+                                        agent_id,
+                                        success,
+                                        summary,
+                                        tokens_used,
+                                        duration_ms,
+                                    },
+                                    ::agent::subagent_events::SubagentLifecycleEvent::Cancelled {
+                                        agent_id,
+                                        reason: _,
+                                        cancelled_at,
+                                    } => desktop_shared::coding::SubagentEvent::Cancelled {
+                                        agent_id,
+                                        reason: desktop_shared::coding::SubagentCancelReason::UserRequested,
+                                        cancelled_at,
+                                    },
+                                };
+                                broker.publish(mapped);
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                        }
+                    }
+                });
+            }
         }
 
         // ── Register TemporalTool in agent's tool registry (post-init) ────

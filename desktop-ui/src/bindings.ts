@@ -367,14 +367,6 @@ async chatRespondApproval(sessionKey: string, requestId: string, decision: AppAp
     else return { status: "error", error: e  as any };
 }
 },
-async chatSetMode(sessionKey: string, mode: ChatMode) : Promise<Result<SessionRow, ApiError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("chat_set_mode", { sessionKey, mode }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
 async chatSaveStarlarkRule(requestId: string, ruleSource: string, suggestedFilename: string | null) : Promise<Result<string, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("chat_save_starlark_rule", { requestId, ruleSource, suggestedFilename }) };
@@ -798,7 +790,7 @@ async codingThreadRead(threadId: string, cursor: string | null, limit: number | 
     else return { status: "error", error: e  as any };
 }
 },
-async codingThreadList(workspaceId: string, cursor: string | null, limit: number | null, sortKey: string | null) : Promise<Result<ThreadSummary[], ApiError>> {
+async codingThreadList(workspaceId: string | null, cursor: string | null, limit: number | null, sortKey: string | null) : Promise<Result<ThreadSummary[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_thread_list", { workspaceId, cursor, limit, sortKey }) };
 } catch (e) {
@@ -854,6 +846,14 @@ async codingThreadUnsubscribe(subscriptionId: string) : Promise<Result<null, Api
     else return { status: "error", error: e  as any };
 }
 },
+async codingThreadRefreshAgentsMd(threadId: string) : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_thread_refresh_agents_md", { threadId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async codingMessageSend(threadId: string, text: string, model: string | null) : Promise<Result<JsonValue, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_message_send", { threadId, text, model }) };
@@ -873,6 +873,14 @@ async codingTurnInterrupt(threadId: string, turnId: string) : Promise<Result<nul
 async codingTurnSteer(threadId: string, turnId: string, text: string) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_turn_steer", { threadId, turnId, text }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingRecallStats(workspaceId: string, days: number | null) : Promise<Result<RecallStats, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_recall_stats", { workspaceId, days }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -4565,7 +4573,6 @@ export type ChatMessagePayload = { sessionKey: string;
  */
 source: string }
 export type ChatMessageResponse = { id: string; role: string; content: string; timestamp: string; segments?: MessageSegment[] | null; transparency?: TransparencyData | null }
-export type ChatMode = "chat" | "coding"
 /**
  * Detailed session response for `chat_get_session`.
  */
@@ -5158,6 +5165,7 @@ export type QuizQuestion = { id: string; type: string; question: string; choices
  * Args for `coding_memory_recall_log`.
  */
 export type RecallLogArgs = { layer: string | null; limit?: number; offset?: number }
+export type RecallStats = { totalInvocations: number; meanLatencyMs: number; topFacts: TopFact[]; daysWindow: number }
 export type RecentLearningSession = { sessionKey: string; title: string; updatedAt: string; preview: string }
 /**
  * Args for `coding_memory_reforge_cycle_diff`.
@@ -5313,10 +5321,6 @@ export type SessionReplayEntry = { id: string; source: string; sessionId: string
  * Args for `coding_sessions_rewind`.
  */
 export type SessionRewindArgs = { sessionKey: string; messageId: string }
-/**
- * Row struct for the `sessions` table.
- */
-export type SessionRow = { key: string; metadata: JsonValue; createdAt: string; updatedAt: string; projectId: string | null; conversationType: string | null; pinned: boolean; cwd: string | null; repoId: string | null; repoBranch: string | null; toolProfile: string | null; approvalMode: string; totalCostUsd: number; totalTokens: number; parentSessionId: string | null; workspaceId: string | null; forkedFromId: string | null; summaryMessageId: string | null; ephemeral: number; archivedAt: number | null }
 export type SessionState = { customTitle: string | null; planMode: boolean; archived: boolean; todos: KimiTodo[]; 
 /**
  * Verbatim parsed state.json for the State tab's "raw" view.
@@ -5406,6 +5410,7 @@ export type ToolEndPayload = { sessionKey: string; name: string; action?: string
 export type ToolStartPayload = { sessionKey: string; name: string; action?: string | null; agent?: string | null }
 export type ToolUsage = { tool: string; callCount: number; errorCount: number }
 export type TopAppSummary = { appName: string; durationSecs: number; percentage: number }
+export type TopFact = { factId: string; subject: string; predicate: string; recallCount: number }
 export type TopicDetail = { topicId: string; facts: FactNode[] }
 export type TopicDetailParams = { topicId: string }
 export type TopicDetailResponse = { topic: TopicHealthResponse; atoms: KnowledgeAtomResponse[] }

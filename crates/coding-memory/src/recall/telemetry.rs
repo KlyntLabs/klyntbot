@@ -212,6 +212,7 @@ impl RecallInvocationRepo {
 }
 
 #[derive(Debug, Clone)]
+/// A recalled fact with its metadata and recall count.
 pub struct TopFactRow {
     /// Fact UUID.
     pub fact_id: String,

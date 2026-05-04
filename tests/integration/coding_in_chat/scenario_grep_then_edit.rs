@@ -62,6 +62,12 @@ async fn grep_then_edit_emits_diff() {
         None,
         "scenario-test".to_string(),
         None,
+        None,
+        false,
+        0,
+        0,
+        "".to_string(),
+        None,
     )
     .await
     .unwrap();

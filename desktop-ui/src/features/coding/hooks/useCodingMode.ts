@@ -50,19 +50,10 @@ export function useCodingMode(threadId: string | null) {
     };
   }, [threadId]);
 
-  const setMode = useCallback(
-    async (next: CodingMode) => {
-      if (!threadId) return;
-      setLoading(true);
-      try {
-        await invoke("chat_set_mode", { sessionKey: threadId, mode: next });
-        setModeState(next);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [threadId],
-  );
+  // Session mode is immutable (set at creation time). setMode is a no-op.
+  const setMode = useCallback(async (_next: CodingMode) => {
+    console.warn("useCodingMode.setMode is a no-op — SessionMode is immutable");
+  }, []);
 
   return { mode, setMode, loading };
 }

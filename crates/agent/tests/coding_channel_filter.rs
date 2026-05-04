@@ -27,3 +27,21 @@ fn non_coding_tool_visible_everywhere() {
     assert!(mask.allows(Channel::Desktop));
     assert!(mask.allows(Channel::Other));
 }
+
+#[test]
+fn assistant_tools_hidden_in_coding() {
+    // NON_CODING mask is returned by assistant-only feature tools.
+    let mask = ChannelMask::NON_CODING;
+    assert!(
+        !mask.allows(Channel::Coding),
+        "assistant tools should be hidden in coding mode"
+    );
+    assert!(
+        mask.allows(Channel::Desktop),
+        "assistant tools should be visible on desktop"
+    );
+    assert!(
+        mask.allows(Channel::Other),
+        "assistant tools should be visible on other channels"
+    );
+}

@@ -45,13 +45,13 @@ pub async fn coding_thread_read(
 
 #[klynt_command]
 pub async fn coding_thread_list(
-    workspace_id: String,
+    workspace_id: Option<String>,
     cursor: Option<String>,
     limit: Option<i64>,
     sort_key: Option<String>,
 ) -> Vec<ThreadSummary> {
     state
-        .coding_thread_list(&workspace_id, cursor, limit, sort_key)
+        .coding_thread_list(workspace_id.as_deref(), cursor, limit, sort_key)
         .await
         .map_err(ApiError::from)
 }
@@ -103,10 +103,11 @@ pub async fn coding_thread_unsubscribe(subscription_id: String) -> () {
 }
 
 #[klynt_command]
-pub async fn coding_thread_refresh_agents_md(thread_id: String) -> Vec<AgentsMdSource> {
+pub async fn coding_thread_refresh_agents_md(thread_id: String) -> serde_json::Value {
     state
         .coding_thread_refresh_agents_md(&thread_id)
         .await
+        .map(|sources| serde_json::to_value(&sources).unwrap_or_default())
         .map_err(ApiError::from)
 }
 
@@ -160,7 +161,7 @@ pub(crate) async fn dispatch_dev(
             )
         }
         "coding_thread_list" => {
-            let workspace_id = try_field!(dev::get_str(body, "workspaceId"));
+            let workspace_id = body.get("workspaceId").and_then(|v| v.as_str()).map(String::from);
             let cursor = body
                 .get("cursor")
                 .and_then(|v| v.as_str())
@@ -171,7 +172,7 @@ pub(crate) async fn dispatch_dev(
                 .and_then(|v| v.as_str())
                 .map(String::from);
             dev::val(
-                core.coding_thread_list(&workspace_id, cursor, limit, sort_key)
+                core.coding_thread_list(workspace_id.as_deref(), cursor, limit, sort_key)
                     .await
                     .map_err(ApiError::from),
             )

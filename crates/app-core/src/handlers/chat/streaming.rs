@@ -221,9 +221,13 @@ pub async fn chat_send(
     } else {
         serde_json::json!({ "title": title })
     };
+    let session_mode = match mode.as_deref() {
+        Some("coding") => common::SessionMode::Coding,
+        _ => common::SessionMode::Assistant,
+    };
     let session_row = repos
         .sessions
-        .upsert_session(&session_key, &metadata)
+        .upsert_session_with_mode(&session_key, session_mode, &metadata)
         .await
         .map_err(map_storage_err)?;
     let is_new_session = session_row.created_at == session_row.updated_at;
@@ -896,7 +900,7 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
-                    AgentEvent::SubagentSpawned { label, profile } => {
+                    AgentEvent::SubagentSpawned { label, profile, .. } => {
                         transparency.subagents.push(TransparencySubagent {
                             label: label.clone(),
                             profile: profile.clone(),

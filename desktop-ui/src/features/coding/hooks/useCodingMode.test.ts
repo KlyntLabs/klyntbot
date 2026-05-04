@@ -9,7 +9,6 @@ vi.mock("@/api/client", () => ({
   invoke: vi.fn(async (cmd: string, args: unknown) => {
     invokeCalls.push([cmd, args]);
     if (cmd === "chat_get_session") return { conversationType: "general" };
-    if (cmd === "chat_set_mode") return undefined;
     return null;
   }),
 }));
@@ -31,13 +30,17 @@ describe("useCodingMode", () => {
     expect(result.current.mode).toBe("general");
   });
 
-  test("setMode invokes chat_set_mode", async () => {
+  test("setMode is a no-op (SessionMode is immutable)", async () => {
     const { result } = renderHook(() => useCodingMode("session-1"));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1));
+    });
+    const initialMode = result.current.mode;
     await act(async () => {
       await result.current.setMode("coding");
     });
+    expect(result.current.mode).toBe(initialMode);
     const setCall = invokeCalls.find(([c]) => c === "chat_set_mode");
-    expect(setCall).toBeTruthy();
-    expect((setCall?.[1] as { mode: string }).mode).toBe("coding");
+    expect(setCall).toBeFalsy();
   });
 });

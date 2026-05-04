@@ -1,6 +1,8 @@
 import { useAppBootstrapOrchestration } from "@app/bootstrap/useAppBootstrapOrchestration";
 import { MainAppShell } from "@app/components/MainAppShell";
 import { AppView } from "@app/constants/appViews";
+import { useAppMode } from "@app/hooks/useAppMode";
+import { useResetAppViewOnModeChange } from "@app/hooks/useResetAppViewOnModeChange";
 import { useAccountSwitching } from "@app/hooks/useAccountSwitching";
 import { useArchiveShortcut } from "@app/hooks/useArchiveShortcut";
 import { useHomeAccount } from "@app/hooks/useHomeAccount";
@@ -361,12 +363,21 @@ export default function MainApp() {
 
   const [appView, setAppView] = useState<AppView>(AppView.Home);
   const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);
+  useResetAppViewOnModeChange(setAppView);
   const { threads: chatThreads, refetch: refetchChatThreads } = useChatThreads();
 
+  const { mode } = useAppMode();
+
   const onNewChat = useCallback(() => {
+    if (mode === "code") {
+      setSelectedSessionKey(null);
+      setAppView(AppView.Home);
+      setActiveWorkspaceId(null);
+      return;
+    }
     setSelectedSessionKey(`chat:${crypto.randomUUID()}`);
-    setAppView("chat");
-  }, []);
+    setAppView(AppView.Chat);
+  }, [mode, setActiveWorkspaceId]);
 
   const onSelectPlugins = useCallback(() => {
     setAppView("plugins");

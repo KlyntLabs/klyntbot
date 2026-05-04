@@ -558,7 +558,7 @@ fn wire_event_channels(
         let mut rx = core.subagent_events.subscribe();
         let handle = app_handle.clone();
         let token = shutdown.clone();
-        let global_tx = global_event_tx.clone();
+        let global_tx = Some(global_event_tx.clone());
         tokio::spawn(async move {
             loop {
                 tokio::select! {

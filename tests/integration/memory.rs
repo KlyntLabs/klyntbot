@@ -104,6 +104,7 @@ fn test_source_ctx() -> SourceContext {
         message: None,
         intent_summary: None,
         project_id: None,
+        session_mode: ::common::SessionMode::Assistant,
     }
 }
 
@@ -463,7 +464,7 @@ async fn context_engine_init() {
     std::fs::create_dir_all(&workspace).unwrap();
 
     let engine = test_context_engine(workspace).await;
-    let prompt = engine.build_system_prompt("test", "chat123", None).await;
+    let prompt = engine.build_system_prompt("test", "chat123", None, ::common::SessionMode::Assistant).await;
 
     // Should contain identity section
     assert!(prompt.contains("# Identity"));
@@ -504,7 +505,7 @@ async fn context_engine_with_bootstrap_files() {
     .unwrap();
 
     let engine = test_context_engine(workspace).await;
-    let prompt = engine.build_system_prompt("test", "chat123", None).await;
+    let prompt = engine.build_system_prompt("test", "chat123", None, ::common::SessionMode::Assistant).await;
 
     // Should include bootstrap file content
     assert!(prompt.contains("Agent Configuration"));
@@ -520,7 +521,7 @@ async fn bootstrap_files_optional() {
 
     // No bootstrap files — should still work
     let engine = test_context_engine(workspace).await;
-    let prompt = engine.build_system_prompt("test", "chat123", None).await;
+    let prompt = engine.build_system_prompt("test", "chat123", None, ::common::SessionMode::Assistant).await;
 
     // Should contain at minimum the identity section
     assert!(prompt.contains("# Identity"));
@@ -537,10 +538,10 @@ async fn context_with_channel_info() {
 
     // Build with different channels
     let telegram_prompt = engine
-        .build_system_prompt("telegram", "chat123", None)
+        .build_system_prompt("telegram", "chat123", None, ::common::SessionMode::Assistant)
         .await;
     let discord_prompt = engine
-        .build_system_prompt("discord", "guild456", None)
+        .build_system_prompt("discord", "guild456", None, ::common::SessionMode::Assistant)
         .await;
 
     // Both should contain their channel info
@@ -572,7 +573,7 @@ async fn context_engine_source_ordering() {
     std::fs::create_dir_all(&workspace).unwrap();
 
     let engine = test_context_engine(workspace).await;
-    let prompt = engine.build_system_prompt("test", "chat123", None).await;
+    let prompt = engine.build_system_prompt("test", "chat123", None, ::common::SessionMode::Assistant).await;
 
     // Identity should render in the system prompt.
     assert!(

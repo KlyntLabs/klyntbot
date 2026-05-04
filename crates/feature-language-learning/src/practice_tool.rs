@@ -21,6 +21,10 @@ impl Tool for LanguagePracticeTool {
         "language_practice"
     }
 
+    fn allowed_channels(&self) -> common::ChannelMask {
+        common::ChannelMask::NON_CODING
+    }
+
     fn description(&self) -> &str {
         "Language learning practice tool. Actions: start_session (begin a pronunciation practice session), end_session (finish and get summary), get_feedback (retrieve pronunciation feedback for the current session), get_weak_phonemes (list phonemes that need more practice), log_exam (record an exam attempt score)."
     }

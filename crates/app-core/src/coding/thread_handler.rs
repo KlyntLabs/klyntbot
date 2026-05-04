@@ -1,5 +1,5 @@
 use crate::AppCore;
-use coding_agents_md::{format_agents_md_bundle, WorkspaceAgentsSource};
+use coding_agents_md::WorkspaceAgentsSource;
 use common::Result;
 use desktop_shared::coding::{
     ApprovalPolicy, InstructionSource, MessageDto, SandboxKind, Thread, ThreadSummary,
@@ -62,7 +62,7 @@ impl AppCore {
         });
         self.repos
             .sessions
-            .upsert_session(&session_key, &metadata)
+            .upsert_session_with_mode(&session_key, common::SessionMode::Coding, &metadata)
             .await?;
         self.repos
             .sessions
@@ -203,21 +203,27 @@ impl AppCore {
             })
     }
 
-    /// List coding threads for a workspace.
+    /// List coding threads for a workspace, or all coding threads if no workspace is given.
     #[tracing::instrument(skip(self), err)]
     pub async fn coding_thread_list(
         &self,
-        workspace_id: &str,
+        workspace_id: Option<&str>,
         _cursor: Option<String>,
         limit: Option<i64>,
         _sort_key: Option<String>,
     ) -> Result<Vec<ThreadSummary>> {
-        let sessions = self.repos.sessions.list_sessions().await?;
+        let sessions = self
+            .repos
+            .sessions
+            .list_sessions_by_mode(common::SessionMode::Coding)
+            .await?;
 
         let summaries: Vec<ThreadSummary> = sessions
             .into_iter()
             .filter(|s| {
-                s.metadata.get("workspace_id").and_then(|v| v.as_str()) == Some(workspace_id)
+                workspace_id.map_or(true, |wid| {
+                    s.metadata.get("workspace_id").and_then(|v| v.as_str()) == Some(wid)
+                })
             })
             .filter(|s| {
                 // Exclude archived unless explicitly requested
@@ -230,10 +236,16 @@ impl AppCore {
                     .get("title")
                     .and_then(|v| v.as_str())
                     .map(String::from);
+                let wid = s
+                    .metadata
+                    .get("workspace_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 ThreadSummary {
                     id: s.key,
                     title,
-                    workspace_id: workspace_id.to_string(),
+                    workspace_id: wid,
                     message_count: s.message_count,
                     total_cost_usd: 0.0,
                     created_at: s.created_at.as_millisecond(),
@@ -331,7 +343,7 @@ impl AppCore {
         let workspace_id = session
             .workspace_id
             .as_deref()
-            .ok_or_else(|| common::KlyntbotError::InvalidArgument("not a coding session".into()))?;
+            .ok_or_else(|| common::KlyntbotError::Storage("not a coding session".into()))?;
         let workspace = self
             .repos
             .workspaces
@@ -343,8 +355,7 @@ impl AppCore {
             .config
             .read()
             .await
-            .paths
-            .klyntbot_home()
+            .data_dir_path()
             .join("AGENTS.md");
 
         let source =
@@ -354,7 +365,7 @@ impl AppCore {
         if let Some(bundle) = source.build_bundle() {
             self.repos
                 .sessions
-                .update_synthetic_agents_md(&session.id, &bundle)
+                .update_synthetic_agents_md(&session.key, &bundle)
                 .await
                 .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         }

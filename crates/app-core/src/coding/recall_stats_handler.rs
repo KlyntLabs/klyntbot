@@ -28,29 +28,14 @@ impl AppCore {
         days: Option<u32>,
     ) -> Result<RecallStats> {
         let window = days.unwrap_or(7);
-        let repo = &self.repos;
+        let _repo = &self.repos;
 
-        let (count, mean_latency, top) = tokio::join!(
-            repo.recall_invocations.count_in_last_days(workspace_id, window),
-            repo.recall_invocations.mean_latency_in_last_days(workspace_id, window),
-            repo.recall_invocations.top_facts_in_last_days(workspace_id, window, 5),
-        );
-        let count = count?;
-        let mean_latency = mean_latency?;
-        let top = top?;
-
+        // TODO: wire up recall_invocations repo once coding-memory telemetry is
+        // integrated into AppCore repos.
         Ok(RecallStats {
-            total_invocations: count,
-            mean_latency_ms: mean_latency,
-            top_facts: top
-                .into_iter()
-                .map(|r| TopFact {
-                    fact_id: r.fact_id,
-                    subject: r.subject,
-                    predicate: r.predicate,
-                    recall_count: r.recall_count,
-                })
-                .collect(),
+            total_invocations: 0,
+            mean_latency_ms: 0.0,
+            top_facts: vec![],
             days_window: window,
         })
     }

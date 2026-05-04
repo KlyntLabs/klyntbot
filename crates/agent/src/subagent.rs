@@ -164,6 +164,7 @@ impl SubagentManagerBuilder {
             agent_task_repo: None,
             tool_kit: None,
             hook_engine: None,
+            event_sender: None,
         }
     }
 
@@ -587,7 +588,7 @@ async fn run_subagent_task(
     use crate::execution::types::ExecutionParams;
     use tokio::sync::RwLock;
 
-    let mut tools = if let Some(cached) = base_registry {
+    let tools = if let Some(cached) = base_registry {
         // Clone the cached base registry and append the per-invocation AgentTaskTool.
         let mut t = (*cached.read().await).clone();
         let task_handler = Arc::new(crate::adapters::agent_task::AgentTaskHandlerImpl::new(

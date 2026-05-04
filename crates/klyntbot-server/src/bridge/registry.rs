@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use common::{ChannelName, ChatId, MCP_CHANNEL};
+use common::{ChannelName, ChatId, MCP_CHANNEL, SessionMode};
 use rmcp::model::{CallToolResult, Content, Tool as McpTool};
 use rmcp::ErrorData as McpError;
 use tokio::sync::RwLock;
@@ -103,6 +103,7 @@ impl ToolRegistryBridge {
         // Build MCP routing context with per-connection session isolation
         let ctx = RoutingContext {
             channel: ChannelName::new(MCP_CHANNEL),
+            session_mode: SessionMode::Assistant,
             chat_id: ChatId::new(format!("mcp:{}", session_id)),
             interaction_tx: None,
             is_direct_mode: true,

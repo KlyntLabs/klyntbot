@@ -414,7 +414,7 @@ impl AgentRuntime {
         // tone/formatting rules that this prompt carries into every turn.
         let system_prompt = self
             .context_engine
-            .build_system_prompt(ctx.channel.as_str(), ctx.chat_id.as_str(), Some(message))
+            .build_system_prompt(ctx.channel.as_str(), ctx.chat_id.as_str(), Some(message), ctx.session_mode)
             .await;
 
         let context_request = ContextRequest {
