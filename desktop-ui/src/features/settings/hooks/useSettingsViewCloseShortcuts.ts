@@ -1,30 +1,31 @@
-import { useEffect } from "react";
+import { useCallback } from "react";
+import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 
 export const useSettingsViewCloseShortcuts = (onClose: () => void) => {
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.key !== "Escape") {
-        return;
+  const handleEscape = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
       }
-      event.preventDefault();
-      onClose();
-    };
+    },
+    [onClose],
+  );
 
-    const handleCloseShortcut = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) {
-        return;
-      }
+  const handleCloseShortcut = useCallback(
+    (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "w") {
         event.preventDefault();
         onClose();
       }
-    };
+    },
+    [onClose],
+  );
 
-    window.addEventListener("keydown", handleEscape);
-    window.addEventListener("keydown", handleCloseShortcut);
-    return () => {
-      window.removeEventListener("keydown", handleEscape);
-      window.removeEventListener("keydown", handleCloseShortcut);
-    };
-  }, [onClose]);
+  useGlobalShortcut({
+    shortcuts: [
+      { shortcut: "escape", handler: handleEscape, allowInInput: true },
+      { shortcut: "cmd+w", handler: handleCloseShortcut },
+    ],
+  });
 };

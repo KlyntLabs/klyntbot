@@ -5,9 +5,6 @@ const THREAD_LIST_SORT_KEY_STORAGE_KEY = "klynt.threadListSortKey";
 const THREAD_LIST_ORGANIZE_MODE_STORAGE_KEY = "klynt.threadListOrganizeMode";
 
 function getStoredThreadListSortKey(): ThreadListSortKey {
-  if (typeof window === "undefined") {
-    return "updated_at";
-  }
   const stored = window.localStorage.getItem(THREAD_LIST_SORT_KEY_STORAGE_KEY);
   if (stored === "created_at" || stored === "updated_at") {
     return stored;
@@ -16,9 +13,6 @@ function getStoredThreadListSortKey(): ThreadListSortKey {
 }
 
 function getStoredThreadListOrganizeMode(): ThreadListOrganizeMode {
-  if (typeof window === "undefined") {
-    return "by_project";
-  }
   const stored = window.localStorage.getItem(THREAD_LIST_ORGANIZE_MODE_STORAGE_KEY);
   if (stored === "by_project" || stored === "by_project_activity" || stored === "threads_only") {
     return stored;
@@ -36,16 +30,12 @@ export function useThreadListSortKey() {
 
   const setThreadListSortKey = useCallback((nextSortKey: ThreadListSortKey) => {
     setThreadListSortKeyState(nextSortKey);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(THREAD_LIST_SORT_KEY_STORAGE_KEY, nextSortKey);
-    }
+    window.localStorage.setItem(THREAD_LIST_SORT_KEY_STORAGE_KEY, nextSortKey);
   }, []);
 
   const setThreadListOrganizeMode = useCallback((nextOrganizeMode: ThreadListOrganizeMode) => {
     setThreadListOrganizeModeState(nextOrganizeMode);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(THREAD_LIST_ORGANIZE_MODE_STORAGE_KEY, nextOrganizeMode);
-    }
+    window.localStorage.setItem(THREAD_LIST_ORGANIZE_MODE_STORAGE_KEY, nextOrganizeMode);
   }, []);
 
   return {

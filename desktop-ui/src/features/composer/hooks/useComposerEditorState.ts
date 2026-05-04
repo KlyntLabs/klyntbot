@@ -4,9 +4,6 @@ const STORAGE_KEY = "composerEditorExpanded";
 
 export function useComposerEditorState() {
   const [isExpanded, setIsExpanded] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
     try {
       return window.localStorage.getItem(STORAGE_KEY) === "true";
     } catch {

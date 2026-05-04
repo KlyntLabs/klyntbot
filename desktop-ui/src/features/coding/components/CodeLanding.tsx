@@ -1,6 +1,6 @@
 import ArrowUp from "lucide-react/dist/esm/icons/arrow-up";
 import FolderPlus from "lucide-react/dist/esm/icons/folder-plus";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type CodeLandingProject = {
   id: string;
@@ -22,6 +22,9 @@ export function CodeLanding({
   onAddProject,
   onImportProject,
 }: CodeLandingProps) {
+  useEffect(() => {
+    import("@/styles/code-landing.css");
+  }, []);
   const [draft, setDraft] = useState("");
   const isEmpty = projects.length === 0;
 

@@ -1,5 +1,5 @@
 import { type ComponentPropsWithoutRef, forwardRef, type ReactNode, type RefObject } from "react";
-import { joinClassNames } from "../classNames";
+import { cn } from "@/utils/cn";
 
 type PopoverSurfaceProps = ComponentPropsWithoutRef<"div"> & {
   children: ReactNode;
@@ -7,7 +7,7 @@ type PopoverSurfaceProps = ComponentPropsWithoutRef<"div"> & {
 
 export const PopoverSurface = forwardRef<HTMLDivElement, PopoverSurfaceProps>(
   function PopoverSurface({ className, ...props }, ref) {
-    return <div ref={ref} className={joinClassNames("ds-popover", className)} {...props} />;
+    return <div ref={ref} className={cn("ds-popover", className)} {...props} />;
   },
 );
 
@@ -27,7 +27,7 @@ export function PopoverMenuItem({
   return (
     <button
       type="button"
-      className={joinClassNames("ds-popover-item", active && "is-active", className)}
+      className={cn("ds-popover-item", active && "is-active", className)}
       {...props}
     >
       {icon ? (
@@ -63,7 +63,7 @@ export function MenuTrigger({
       type="button"
       aria-haspopup={popupRole}
       aria-expanded={isOpen}
-      className={joinClassNames(className, isOpen && activeClassName)}
+      className={cn(className, isOpen && activeClassName)}
       data-tauri-drag-region={dragRegion ?? "false"}
       {...props}
     />

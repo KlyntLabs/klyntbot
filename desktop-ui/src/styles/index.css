@@ -26,11 +26,11 @@
 @import "./diff-viewer.css";
 @import "./file-tree.css";
 @import "./panel-tabs.css";
-@import "./prompts.css";
+
 @import "./debug.css";
-@import "./terminal.css";
+
 @import "./plan.css";
-@import "./about.css";
+
 @import "./tabbar.css";
 @import "./worktree-modal.css";
 @import "./clone-modal.css";
@@ -38,8 +38,6 @@
 @import "./mobile-remote-workspace-modal.css";
 @import "./branch-switcher-modal.css";
 @import "./git-init-modal.css";
-@import "./settings.css";
-@import "./plugins.css";
+
 @import "./coding.css";
 @import "./app-mode-switch.css";
-@import "./code-landing.css";

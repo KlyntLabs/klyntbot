@@ -1,5 +1,5 @@
 import type { MouseEventHandler, ReactNode } from "react";
-import { joinClassNames } from "../classNames";
+import { cn } from "@/utils/cn";
 
 type ModalShellProps = {
   children: ReactNode;
@@ -22,7 +22,7 @@ export function ModalShell({
 }: ModalShellProps) {
   return (
     <div
-      className={joinClassNames("ds-modal", className)}
+      className={cn("ds-modal", className)}
       role="dialog"
       aria-modal="true"
       aria-label={ariaLabel}
@@ -35,7 +35,7 @@ export function ModalShell({
         aria-label="Close dialog"
         onClick={onBackdropClick}
       />
-      <div className={joinClassNames("ds-modal-card", cardClassName)}>{children}</div>
+      <div className={cn("ds-modal-card", cardClassName)}>{children}</div>
     </div>
   );
 }

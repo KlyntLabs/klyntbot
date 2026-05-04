@@ -1,4 +1,5 @@
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import { useEffect } from "react";
 import type { TerminalTab } from "../hooks/useTerminalTabs";
 
 type TerminalDockProps = {
@@ -22,6 +23,9 @@ export function TerminalDock({
   onResizeStart,
   terminalNode,
 }: TerminalDockProps) {
+  useEffect(() => {
+    import("@/styles/terminal.css");
+  }, []);
   if (!isOpen) {
     return null;
   }

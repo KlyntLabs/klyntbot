@@ -225,11 +225,8 @@ describe("coding memory + data_version", () => {
     stop();
   });
 
-  it("data:version_bumped triggers a broad invalidate (no key prefix)", async () => {
+  it("data:version_bumped invalidates core domain keys", async () => {
     const client = new QueryClient();
-    // Seed two unrelated queries so we can prove BOTH refetch.
-    client.setQueryData(qk.tasks.today(), [{ id: "t1" }]);
-    client.setQueryData(qk.codingMemory.facts(), [{ id: "f1" }]);
     const spy = vi.spyOn(client, "invalidateQueries");
     const { listen, fire } = fakeListenFactory();
 
@@ -239,8 +236,17 @@ describe("coding memory + data_version", () => {
     );
     fire("data:version_bumped", { previous: 41, current: 42 });
 
-    // Broad invalidate: called with no queryKey filter.
-    expect(spy).toHaveBeenCalledWith();
+    // Should invalidate the main domain keys rather than the entire cache.
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.threads.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.settings.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.tasks.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.focus.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.system.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.agents.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.models.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.git.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.dashboard.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.codingMemory.all() });
     stop();
   });
 });

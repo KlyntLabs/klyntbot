@@ -79,12 +79,21 @@ export async function startTauriEventBridge(
 
   // Phase 4 broad-invalidate fallback. Fired by the desktop's
   // `start_data_version_watcher` when a foreign connection wrote and
-  // we never saw the matching `entity:updated`. Invalidating with no
-  // query-key filter matches every query in the cache — refetches are
-  // de-duped by TanStack so the cost is one network round-trip per
-  // distinct query, not per cached entry.
+  // we never saw the matching `entity:updated`. We invalidate the
+  // most common broad keys rather than the entire cache to avoid a
+  // thundering herd.
   const offBroad = await listen("data:version_bumped", () => {
-    client.invalidateQueries();
+    client.invalidateQueries({ queryKey: qk.threads.all() });
+    client.invalidateQueries({ queryKey: qk.settings.all() });
+    client.invalidateQueries({ queryKey: qk.settings.workspaces() });
+    client.invalidateQueries({ queryKey: qk.tasks.all() });
+    client.invalidateQueries({ queryKey: qk.focus.all() });
+    client.invalidateQueries({ queryKey: qk.system.all() });
+    client.invalidateQueries({ queryKey: qk.agents.all() });
+    client.invalidateQueries({ queryKey: qk.models.all() });
+    client.invalidateQueries({ queryKey: qk.git.all() });
+    client.invalidateQueries({ queryKey: qk.dashboard.all() });
+    client.invalidateQueries({ queryKey: qk.codingMemory.all() });
   });
   unlisteners.push(offBroad);
 

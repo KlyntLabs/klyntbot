@@ -1,6 +1,6 @@
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import { joinClassNames } from "../classNames";
+import { cn } from "@/utils/cn";
 
 type PanelFrameProps = {
   children: ReactNode;
@@ -8,7 +8,7 @@ type PanelFrameProps = {
 };
 
 export function PanelFrame({ children, className }: PanelFrameProps) {
-  return <aside className={joinClassNames("ds-panel", className)}>{children}</aside>;
+  return <aside className={cn("ds-panel", className)}>{children}</aside>;
 }
 
 type PanelHeaderProps = {
@@ -17,7 +17,7 @@ type PanelHeaderProps = {
 };
 
 export function PanelHeader({ children, className }: PanelHeaderProps) {
-  return <div className={joinClassNames("ds-panel-header", className)}>{children}</div>;
+  return <div className={cn("ds-panel-header", className)}>{children}</div>;
 }
 
 type PanelMetaProps = {
@@ -26,7 +26,7 @@ type PanelMetaProps = {
 };
 
 export function PanelMeta({ children, className }: PanelMetaProps) {
-  return <div className={joinClassNames("ds-panel-meta", className)}>{children}</div>;
+  return <div className={cn("ds-panel-meta", className)}>{children}</div>;
 }
 
 type PanelSearchFieldProps = Omit<ComponentPropsWithoutRef<"input">, "className" | "type"> & {
@@ -44,17 +44,13 @@ export function PanelSearchField({
   ...props
 }: PanelSearchFieldProps) {
   return (
-    <div className={joinClassNames("ds-panel-search", className)}>
+    <div className={cn("ds-panel-search", className)}>
       {icon ? (
         <span className="ds-panel-search-icon" aria-hidden>
           {icon}
         </span>
       ) : null}
-      <input
-        type="search"
-        className={joinClassNames("ds-panel-search-input", inputClassName)}
-        {...props}
-      />
+      <input type="search" className={cn("ds-panel-search-input", inputClassName)} {...props} />
       {trailing}
     </div>
   );
@@ -66,7 +62,7 @@ type PanelNavListProps = {
 };
 
 export function PanelNavList({ children, className }: PanelNavListProps) {
-  return <div className={joinClassNames("ds-panel-nav", className)}>{children}</div>;
+  return <div className={cn("ds-panel-nav", className)}>{children}</div>;
 }
 
 type PanelNavItemProps = Omit<ComponentPropsWithoutRef<"button">, "children"> & {
@@ -87,7 +83,7 @@ export function PanelNavItem({
   return (
     <button
       type="button"
-      className={joinClassNames("ds-panel-nav-item", active && "is-active", className)}
+      className={cn("ds-panel-nav-item", active && "is-active", className)}
       {...props}
     >
       <span className="ds-panel-nav-item-main">

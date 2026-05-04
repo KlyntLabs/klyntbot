@@ -1,5 +1,6 @@
 import { isMacPlatform } from "@utils/shortcuts";
-import { useEffect } from "react";
+import { useMemo } from "react";
+import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 
 type UseNewAgentShortcutOptions = {
   isEnabled: boolean;
@@ -7,19 +8,10 @@ type UseNewAgentShortcutOptions = {
 };
 
 export function useNewAgentShortcut({ isEnabled, onTrigger }: UseNewAgentShortcutOptions) {
-  useEffect(() => {
-    if (!isEnabled) {
-      return;
-    }
-    const isMac = isMacPlatform();
-    function handleKeyDown(event: KeyboardEvent) {
-      const modifierKey = isMac ? event.metaKey : event.ctrlKey;
-      if (modifierKey && event.key === "n" && !event.shiftKey) {
-        event.preventDefault();
-        onTrigger();
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isEnabled, onTrigger]);
+  const shortcut = useMemo(() => (isMacPlatform() ? "cmd+n" : "ctrl+n"), []);
+
+  useGlobalShortcut({
+    shortcuts: [{ shortcut, handler: onTrigger }],
+    enabled: isEnabled,
+  });
 }

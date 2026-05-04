@@ -509,7 +509,11 @@ function TrendArrow({ value, label }: { value?: number | null; label?: string })
     : "dashboard__sparkline-trend dashboard__sparkline-trend--down";
   const ariaLabel = `${isUp ? "Up" : "Down"} ${pct}%${label ? ` ${label}` : ""}`;
   return (
-    <span className={cls} title={label ? `${isUp ? "+" : "-"}${pct}% ${label}` : undefined} aria-label={ariaLabel}>
+    <span
+      className={cls}
+      title={label ? `${isUp ? "+" : "-"}${pct}% ${label}` : undefined}
+      aria-label={ariaLabel}
+    >
       {isUp ? "↑" : "↓"}
       {pct > 0 && `${pct}%`}
     </span>

@@ -3,6 +3,7 @@ import { useSettingsViewNavigation } from "@settings/hooks/useSettingsViewNaviga
 import { useSettingsViewOrchestration } from "@settings/hooks/useSettingsViewOrchestration";
 import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
 import X from "lucide-react/dist/esm/icons/x";
+import { useEffect } from "react";
 import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
 import type {
   AppSettings,
@@ -90,6 +91,10 @@ export function SettingsView({
   onRemoveDictationModel,
   initialSection,
 }: SettingsViewProps) {
+  useEffect(() => {
+    import("@/styles/settings.css");
+  }, []);
+
   const {
     activeSection,
     showMobileDetail,

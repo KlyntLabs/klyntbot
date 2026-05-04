@@ -1,5 +1,5 @@
-import { matchesShortcut } from "@utils/shortcuts";
-import { useEffect } from "react";
+import { useCallback } from "react";
+import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 
 type UseBranchSwitcherShortcutOptions = {
   shortcut: string | null;
@@ -12,17 +12,16 @@ export function useBranchSwitcherShortcut({
   isEnabled,
   onTrigger,
 }: UseBranchSwitcherShortcutOptions) {
-  useEffect(() => {
-    if (!isEnabled || !shortcut) {
-      return;
-    }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (matchesShortcut(event, shortcut)) {
-        event.preventDefault();
-        onTrigger();
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isEnabled, onTrigger, shortcut]);
+  const handler = useCallback(
+    (event: KeyboardEvent) => {
+      event.preventDefault();
+      onTrigger();
+    },
+    [onTrigger],
+  );
+
+  useGlobalShortcut({
+    shortcuts: [{ shortcut, handler }],
+    enabled: isEnabled,
+  });
 }

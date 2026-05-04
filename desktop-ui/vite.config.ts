@@ -190,11 +190,19 @@ export default defineConfig({
         manualChunks(id: string) {
           if (
             id.includes("node_modules/react") ||
-            id.includes("node_modules/react-dom") ||
-            id.includes("node_modules/react-markdown") ||
-            id.includes("node_modules/remark-gfm")
+            id.includes("node_modules/react-dom")
           ) {
             return "vendor-react";
+          }
+          if (
+            id.includes("node_modules/react-markdown") ||
+            id.includes("node_modules/remark-gfm") ||
+            id.includes("node_modules/remark-math") ||
+            id.includes("node_modules/rehype-katex") ||
+            id.includes("node_modules/rehype-raw") ||
+            id.includes("node_modules/rehype-sanitize")
+          ) {
+            return "vendor-markdown";
           }
           if (
             id.includes("node_modules/@tauri-apps") ||

@@ -9,10 +9,6 @@ type AudioContextConstructor = new () => AudioContext;
 let audioContext: AudioContext | null = null;
 
 function resolveAudioContextConstructor(): AudioContextConstructor | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
   return (
     window.AudioContext ??
     (

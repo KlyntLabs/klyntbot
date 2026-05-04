@@ -13,7 +13,7 @@ export const useSettingsViewNavigation = ({ initialSection }: UseSettingsViewNav
   const [showMobileDetail, setShowMobileDetail] = useState(Boolean(initialSection));
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    if (typeof window.matchMedia !== "function") {
       return;
     }
     const query = window.matchMedia(`(max-width: ${SETTINGS_MOBILE_BREAKPOINT_PX}px)`);

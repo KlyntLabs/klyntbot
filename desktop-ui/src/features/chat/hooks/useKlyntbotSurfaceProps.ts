@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ComponentProps } from "react";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { Composer } from "@/features/composer/components/Composer";
 import type { Messages } from "@/features/messages/components/Messages";
 import type { ConversationItem, RequestUserInputRequest, RequestUserInputResponse } from "@/types";
@@ -181,14 +181,16 @@ export function useKlyntbotSurfaceProps(
 ): KlyntbotSurfaceOverrides | null {
   const chat = useChatSession(sessionKey ?? "");
 
-  const processingStartedAtRef = useRef<number | null>(chat.isStreaming ? Date.now() : null);
-  const prevIsStreamingRef = useRef(chat.isStreaming);
-  if (!prevIsStreamingRef.current && chat.isStreaming) {
-    processingStartedAtRef.current = Date.now();
-  } else if (prevIsStreamingRef.current && !chat.isStreaming) {
-    processingStartedAtRef.current = null;
-  }
-  prevIsStreamingRef.current = chat.isStreaming;
+  // Track when streaming started so UI can show elapsed time.
+  // Using state instead of render-time ref mutation to avoid React concurrent-mode issues.
+  const [processingStartedAt, setProcessingStartedAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (chat.isStreaming && processingStartedAt === null) {
+      setProcessingStartedAt(Date.now());
+    } else if (!chat.isStreaming && processingStartedAt !== null) {
+      setProcessingStartedAt(null);
+    }
+  }, [chat.isStreaming, processingStartedAt]);
 
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   useEffect(() => {
@@ -203,25 +205,40 @@ export function useKlyntbotSurfaceProps(
     useCallback(() => chatStreamStore.getApprovals(sessionKey ?? ""), [sessionKey]),
   );
 
+  const items = useMemo(
+    () => buildItems(chat.messages, chat.segments, approvals),
+    [chat.messages, chat.segments, approvals],
+  );
+
+  const userInputRequests = useMemo(
+    () => buildUserInputRequests(chat.activeInteraction, sessionKey ?? ""),
+    [chat.activeInteraction, sessionKey],
+  );
+
+  const handleUserInputSubmit = useCallback(
+    (request: RequestUserInputRequest, response: RequestUserInputResponse) => {
+      if (!chat.activeInteraction) return;
+      void invoke("chat_respond_interaction", {
+        sessionKey: sessionKey ?? "",
+        requestId: String(request.request_id),
+        response: toFormResponse(response, chat.activeInteraction.request.questions),
+      });
+    },
+    [chat.activeInteraction, sessionKey],
+  );
+
   if (!sessionKey) {
     return null;
   }
 
   return {
     messagesProps: {
-      items: buildItems(chat.messages, chat.segments, approvals),
+      items,
       threadId: sessionKey,
       isThinking: chat.isStreaming,
-      processingStartedAt: processingStartedAtRef.current,
-      userInputRequests: buildUserInputRequests(chat.activeInteraction, sessionKey),
-      onUserInputSubmit: (request, response) => {
-        if (!chat.activeInteraction) return;
-        void invoke("chat_respond_interaction", {
-          sessionKey,
-          requestId: String(request.request_id),
-          response: toFormResponse(response, chat.activeInteraction.request.questions),
-        });
-      },
+      processingStartedAt,
+      userInputRequests,
+      onUserInputSubmit: handleUserInputSubmit,
     },
     composerProps: {
       onSend: () => {

@@ -25,6 +25,25 @@ export const SETTINGS_ROUTE_SECTION_IDS = [
 
 type SettingsSection = (typeof SETTINGS_SECTION_IDS)[number];
 
+export const SettingsSection = {
+  Projects: "projects",
+  Environments: "environments",
+  Display: "display",
+  About: "about",
+  Composer: "composer",
+  Dictation: "dictation",
+  Shortcuts: "shortcuts",
+  OpenApps: "open-apps",
+  Git: "git",
+  Server: "server",
+  Agents: "agents",
+  Hooks: "hooks",
+  Codex: "codex",
+  Features: "features",
+  Coding: "coding",
+  Profile: "profile",
+} as const;
+
 export type CodexSection = SettingsSection | (typeof SETTINGS_EXTRA_SECTION_IDS)[number];
 
 export type ShortcutSettingKey =

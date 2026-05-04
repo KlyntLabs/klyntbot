@@ -10,9 +10,6 @@ function getStorageKey(key: string) {
 }
 
 function readStoredHistory(key: string): string[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
   const raw = window.localStorage.getItem(getStorageKey(key));
   if (!raw) {
     return [];
@@ -29,9 +26,6 @@ function readStoredHistory(key: string): string[] {
 }
 
 function writeStoredHistory(key: string, value: string[]) {
-  if (typeof window === "undefined") {
-    return;
-  }
   if (value.length === 0) {
     window.localStorage.removeItem(getStorageKey(key));
     return;
