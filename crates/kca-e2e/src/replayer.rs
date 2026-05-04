@@ -166,9 +166,22 @@ impl ReplayContext {
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("chat_send failed: {e}")))?;
         let mut answer = String::new();
+        let mut done_content: Option<String> = None;
         while let Some(ev) = info.event_rx.recv().await {
-            if let agent::AgentEvent::ContentChunk { data } = ev {
-                answer.push_str(&data);
+            match ev {
+                agent::AgentEvent::ContentChunk { data } => answer.push_str(&data),
+                // Reasoning models (Mimo, deepseek-r1, qwq) may emit no
+                // ContentChunk events when their answer arrives via
+                // reasoning_content. The agent runtime promotes that into
+                // the final synthesis content and ships it through Done.
+                // Capture it as a fallback when the live stream was empty.
+                agent::AgentEvent::Done { content, .. } => done_content = Some(content),
+                _ => {}
+            }
+        }
+        if answer.trim().is_empty() {
+            if let Some(c) = done_content {
+                answer = c;
             }
         }
         // The bench harness drains `event_rx` directly, bypassing
