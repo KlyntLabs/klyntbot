@@ -571,13 +571,14 @@ fn wire_event_channels(
                                 }
                                 _ => "agent:subagent_event".to_string(),
                             };
-                            if let Err(e) = handle.emit(&channel, &evt) {
+                            // Serialize once to Value; emit clones the value tree instead of
+                            // re-serializing from scratch.
+                            let payload = serde_json::to_value(&evt).unwrap_or_default();
+                            if let Err(e) = handle.emit(&channel, &payload) {
                                 warn!("failed to emit {channel}: {e}");
                             }
                             if let Some(ref tx) = global_tx {
-                                if let Ok(payload) = serde_json::to_value(&evt) {
-                                    let _ = tx.send((channel, payload));
-                                }
+                                let _ = tx.send((channel, payload));
                             }
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {

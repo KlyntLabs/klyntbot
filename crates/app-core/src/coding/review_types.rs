@@ -1,54 +1,18 @@
-use crate::coding::review_handler::{ReviewIssue, ReviewResult};
+use crate::coding::review_handler::ReviewIssue;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewLlmOutput {
     pub summary: String,
-    pub issues: Vec<ReviewLlmIssue>,
+    pub issues: Vec<ReviewIssue>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReviewLlmIssue {
-    pub severity: String,
-    pub file: Option<String>,
-    pub line: Option<u32>,
-    pub description: String,
-    pub suggestion: Option<String>,
-}
-
-impl From<ReviewLlmIssue> for ReviewIssue {
-    fn from(v: ReviewLlmIssue) -> Self {
-        ReviewIssue {
-            severity: v.severity,
-            file: v.file,
-            line: v.line,
-            description: v.description,
-            suggestion: v.suggestion,
-        }
-    }
-}
-
-/// Parse LLM output, tolerating markdown fences and leading/trailing prose.
+/// Parse LLM output, tolerating markdown fences.
 pub fn parse_review_output(raw: &str) -> common::Result<ReviewLlmOutput> {
-    let trimmed = raw.trim();
-    let stripped = strip_markdown_fence(trimmed);
+    let stripped = common::helpers::strip_llm_fences(raw);
 
-    serde_json::from_str::<ReviewLlmOutput>(stripped).map_err(|e| {
-        common::KlyntbotError::Storage(format!("review parse: {e}; raw: {trimmed:.200}"))
-    })
-}
-
-fn strip_markdown_fence(s: &str) -> &str {
-    let lines = s.lines().collect::<Vec<_>>();
-    if lines.len() >= 2 && lines[0].starts_with("```") {
-        let last = lines.len() - 1;
-        if lines[last].starts_with("```") {
-            let body_start = s.find('\n').unwrap_or(0) + 1;
-            let body_end = s.rfind("\n```").unwrap_or(s.len());
-            return &s[body_start..body_end];
-        }
-    }
-    s
+    serde_json::from_str::<ReviewLlmOutput>(stripped)
+        .map_err(|e| common::KlyntbotError::Storage(format!("review parse: {e}; raw: {raw:.200}")))
 }
 
 #[cfg(test)]

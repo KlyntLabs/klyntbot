@@ -30,18 +30,14 @@ impl AppCore {
         let window = days.unwrap_or(7);
         let repo = &self.repos;
 
-        let count = repo
-            .recall_invocations
-            .count_in_last_days(workspace_id, window)
-            .await?;
-        let mean_latency = repo
-            .recall_invocations
-            .mean_latency_in_last_days(workspace_id, window)
-            .await?;
-        let top = repo
-            .recall_invocations
-            .top_facts_in_last_days(workspace_id, window, 5)
-            .await?;
+        let (count, mean_latency, top) = tokio::join!(
+            repo.recall_invocations.count_in_last_days(workspace_id, window),
+            repo.recall_invocations.mean_latency_in_last_days(workspace_id, window),
+            repo.recall_invocations.top_facts_in_last_days(workspace_id, window, 5),
+        );
+        let count = count?;
+        let mean_latency = mean_latency?;
+        let top = top?;
 
         Ok(RecallStats {
             total_invocations: count,

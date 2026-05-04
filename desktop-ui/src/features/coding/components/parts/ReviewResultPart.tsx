@@ -1,5 +1,5 @@
 import type { ReviewIssue } from "@/bindings";
-import { invoke } from "@/api/client";
+import { openWorkspaceIn } from "@/api/endpoints/workspace";
 
 type Props = {
   reviewId: string;
@@ -13,7 +13,7 @@ export function ReviewResultPart({ reviewId, summary, issues }: Props) {
   const grouped = groupBySeverity(issues);
 
   const openFile = async (file: string, line: number | null) => {
-    await invoke("open_workspace_in", { path: file, line: line ?? 0 });
+    await openWorkspaceIn(file, { line: line ?? null });
   };
 
   return (

@@ -23,7 +23,7 @@ export type MessagePart =
   | { kind: "review_result"; review_id: string; summary: string; issues: ReviewIssue[] };
 
 export type ReviewIssue = {
-  severity: string;
+  severity: "error" | "warning" | "info";
   file: string | null;
   line: number | null;
   description: string;

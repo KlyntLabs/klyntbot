@@ -90,8 +90,7 @@ struct SubagentHandle {
     label: String,
     profile: SubagentProfile,
     spawned_at: std::time::Instant,
-    iteration: std::sync::atomic::AtomicU32,
-    last_tool: std::sync::Mutex<Option<String>>,
+    spawned_at_ms: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -318,6 +317,8 @@ impl SubagentManager {
             }
         }
 
+        let spawned_at_ms = jiff::Timestamp::now().as_millisecond();
+
         // Store handle for cancel/status tracking (only after hook allows)
         {
             let mut handles = self.handles.lock().await;
@@ -328,8 +329,7 @@ impl SubagentManager {
                     label: label_text.clone(),
                     profile,
                     spawned_at: std::time::Instant::now(),
-                    iteration: std::sync::atomic::AtomicU32::new(0),
-                    last_tool: std::sync::Mutex::new(None),
+                    spawned_at_ms,
                 },
             );
         }
@@ -343,7 +343,7 @@ impl SubagentManager {
                     label: label_text.clone(),
                     profile: profile.to_string(),
                     parent_session_id: origin_key.clone(),
-                    spawned_at: jiff::Timestamp::now().as_millisecond(),
+                    spawned_at: spawned_at_ms,
                 });
             }
         }
@@ -468,8 +468,7 @@ impl SubagentManager {
             info!("Subagent {} completed", subagent_id_clone);
         });
 
-        // Note: Completed/Cancelled events are emitted inside the spawned task above.
-        // For simplicity we emit them via a cloned sender inside the task.
+
 
         format!(
             "Subagent spawned (ID: {}). Working on '{}' in the background...",
@@ -495,25 +494,24 @@ impl SubagentManager {
         }
     }
 
-    /// List active subagents filtered by parent session key prefix.
-    pub async fn list_active(&self, session_key: &str) -> Vec<SubagentHandleSummary> {
+    /// List active subagents.
+    pub async fn list_active(&self, _session_key: &str) -> Vec<SubagentHandleSummary> {
         let handles = self.handles.lock().await;
         handles
             .iter()
-            .filter(|(_, h)| h.cancel_token.is_cancelled() == false)
-            .filter(|(_, h)| {
-                // No session_key stored on handle; filter by all for now
-                true
-            })
-            .map(|(id, h)| SubagentHandleSummary {
-                agent_id: id.clone(),
-                label: h.label.clone(),
-                profile: h.profile.to_string(),
-                iteration: h.iteration.load(std::sync::atomic::Ordering::Relaxed),
-                status: "running".into(),
-                started_at: h.spawned_at.elapsed().as_millis() as i64,
-                last_tool: h.last_tool.lock().unwrap().clone(),
-                duration_ms: h.spawned_at.elapsed().as_millis() as u64,
+            .filter(|(_, h)| !h.cancel_token.is_cancelled())
+            .map(|(id, h)| {
+                let duration_ms = h.spawned_at.elapsed().as_millis() as u64;
+                SubagentHandleSummary {
+                    agent_id: id.clone(),
+                    label: h.label.clone(),
+                    profile: h.profile.to_string(),
+                    iteration: 0, // Progress events not yet wired; hard-coded default.
+                    status: "running".into(),
+                    started_at: h.spawned_at_ms,
+                    last_tool: None,
+                    duration_ms,
+                }
             })
             .collect()
     }

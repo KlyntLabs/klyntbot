@@ -9,12 +9,22 @@ export function useSubagents(threadId: string) {
   useEffect(() => {
     let cancelled = false;
     listActiveSubagents(threadId).then((s) => { if (!cancelled) setActive(s); });
-    const unlistenP = listen<SubagentEvent>(`agent:subagent_event#${threadId}`, (e) => {
-      setActive((prev) => applySubagentEvent(prev, e.payload));
-    });
+
+    // Spawned events are routed to a thread-specific channel; all other
+    // lifecycle events flow through the global channel.
+    const unlistenSpawned = listen<SubagentEvent>(
+      `agent:subagent_event#${threadId}`,
+      (e) => { if (!cancelled) setActive((prev) => applySubagentEvent(prev, e.payload)); },
+    );
+    const unlistenGlobal = listen<SubagentEvent>(
+      "agent:subagent_event",
+      (e) => { if (!cancelled) setActive((prev) => applySubagentEvent(prev, e.payload)); },
+    );
+
     return () => {
       cancelled = true;
-      unlistenP.then((fn) => fn());
+      unlistenSpawned.then((fn) => fn());
+      unlistenGlobal.then((fn) => fn());
     };
   }, [threadId]);
 
@@ -41,5 +51,7 @@ export function applySubagentEvent(
     case "completed":
     case "cancelled":
       return prev.filter((s) => s.agentId !== e.agent_id);
+    default:
+      return prev;
   }
 }

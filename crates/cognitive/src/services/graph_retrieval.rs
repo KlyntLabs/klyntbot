@@ -50,6 +50,9 @@ pub async fn compute_graph_boosts(
         for (name, edge_type) in &neighborhood {
             if name.len() > 2 && content_lower.contains(name.as_str()) {
                 weighted_score += weight_for_edge_type(edge_type);
+                if weighted_score >= 1.0 {
+                    break;
+                }
             }
         }
         if weighted_score > 0.0 {
