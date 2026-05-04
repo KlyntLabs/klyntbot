@@ -356,7 +356,13 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
                     }
                     report.total_input_chars += payload.len() as u64;
                     let occurred = dt.clone().unwrap_or_else(|| "unknown".into());
-                    let _ = ctx.record_raw_episode("general", &payload, &occurred).await;
+                    // Per-turn episodic rows: BM25 selects the specific turn
+                    // ("I went to support group yesterday") instead of a
+                    // whole-session blob. Cuts dilution and prompt-stuffing.
+                    for t in chunk {
+                        let line = format!("[{}] {}: {}", occurred, t.speaker, t.text);
+                        let _ = ctx.record_raw_episode("general", &line, &occurred).await;
+                    }
                     let reply = ctx.chat_complete(payload, session_key.to_string()).await?;
                     report.total_output_chars += reply.len() as u64;
                 }
@@ -376,7 +382,11 @@ pub async fn run_locomo_real(path: &Path) -> common::Result<LocoMoRealReport> {
                 }
                 report.total_input_chars += blob.len() as u64;
                 let occurred = dt.clone().unwrap_or_else(|| "unknown".into());
-                let _ = ctx.record_raw_episode("general", &blob, &occurred).await;
+                // Per-turn episodic rows (see comment above on chunk path).
+                for t in &turns {
+                    let line = format!("[{}] {}: {}", occurred, t.speaker, t.text);
+                    let _ = ctx.record_raw_episode("general", &line, &occurred).await;
+                }
                 let reply = ctx.chat_complete(blob, session_key.to_string()).await?;
                 report.total_output_chars += reply.len() as u64;
                 ctx.await_cognitive_idle().await;
