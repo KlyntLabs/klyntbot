@@ -16,10 +16,11 @@ export function useCustomPrompts(activeWorkspace: WorkspaceInfo | null) {
 
   const query = useTauriQuery<CustomPromptOption[]>({
     queryKey: qk.prompts.list(workspaceId),
+    staleTime: 60_000,
     queryFn: async () => {
       if (!activeWorkspace) return [];
       const list = await getPromptsList(activeWorkspace.id);
-      return list.filter((p: any) => Boolean(p.name));
+      return list.filter((p) => Boolean(p.name));
     },
     fallback: [],
     enabled: activeWorkspace !== null,

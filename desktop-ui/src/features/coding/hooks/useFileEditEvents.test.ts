@@ -9,15 +9,15 @@ import { useFileEditEvents } from "./useFileEditEvents";
 
 describe("useFileEditEvents", () => {
   it("upserts a kind: diff item on agent:file_edit_with_symbols", async () => {
-    let handler: any;
-    (listen as any).mockImplementation((_c: string, h: any) => {
-      handler = h;
+    let handler: ((e: { payload: Record<string, unknown> }) => void) | undefined;
+    vi.mocked(listen).mockImplementation((_event, h) => {
+      handler = h as (e: { payload: Record<string, unknown> }) => void;
       return Promise.resolve(() => {});
     });
     renderHook(() => useFileEditEvents("s1"));
     await waitFor(() => expect(listen).toHaveBeenCalled());
     act(() => {
-      handler({
+      handler?.({
         payload: {
           path: "/repo/src/x.rs",
           op: "edit",

@@ -385,7 +385,6 @@ export function MainHeader({
                         autoCorrect="off"
                         autoCapitalize="none"
                         spellCheck={false}
-                        autoFocus
                         data-tauri-drag-region="false"
                         aria-label="Search branches"
                       />

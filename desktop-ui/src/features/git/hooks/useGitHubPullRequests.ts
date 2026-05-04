@@ -11,6 +11,7 @@ export function useGitHubPullRequests(activeWorkspace: WorkspaceInfo | null) {
     total: number;
   }>({
     queryKey: qk.github.pulls(workspaceId),
+    staleTime: 60_000,
     queryFn: async () => {
       if (!activeWorkspace) return { pullRequests: [], total: 0 };
       return await getGitHubPullRequests(activeWorkspace.id);

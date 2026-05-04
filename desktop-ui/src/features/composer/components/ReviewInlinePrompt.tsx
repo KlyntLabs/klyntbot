@@ -269,7 +269,6 @@ const CustomStep = memo(function CustomStep({
         value={reviewPrompt.customInstructions}
         onChange={(event) => onUpdateCustomInstructions(event.target.value)}
         placeholder="Focus on correctness, edge cases, and missing tests."
-        autoFocus
         rows={6}
       />
     </div>
@@ -306,7 +305,6 @@ export const ReviewInlinePrompt = memo(function ReviewInlinePrompt({
         return "Select a commit to review";
       case "custom":
         return "Custom review instructions";
-      case "preset":
       default:
         return "Select a review preset";
     }

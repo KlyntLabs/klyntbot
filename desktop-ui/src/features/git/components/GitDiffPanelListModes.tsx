@@ -138,7 +138,7 @@ type GitLogModeContentProps = {
   logBehindEntries: GitLogEntry[];
   selectedCommitSha: string | null;
   onSelectCommit?: (entry: GitLogEntry) => void;
-  onShowLogMenu: (event: ReactMouseEvent<HTMLDivElement>, entry: GitLogEntry) => void;
+  onShowLogMenu: (event: ReactMouseEvent<HTMLButtonElement>, entry: GitLogEntry) => void;
 };
 
 export function GitLogModeContent({
@@ -271,7 +271,7 @@ type GitPullRequestsModeContentProps = {
   selectedPullRequest: number | null;
   onSelectPullRequest?: (pullRequest: GitHubPullRequest) => void;
   onShowPullRequestMenu: (
-    event: ReactMouseEvent<HTMLDivElement>,
+    event: ReactMouseEvent<HTMLButtonElement>,
     pullRequest: GitHubPullRequest,
   ) => void;
 };
@@ -295,13 +295,12 @@ export function GitPullRequestsModeContent({
         const isSelected = selectedPullRequest === pullRequest.number;
 
         return (
-          <div
+          <button
+            type="button"
             key={pullRequest.number}
             className={`git-pr-entry ${isSelected ? "active" : ""}`}
             onClick={() => onSelectPullRequest?.(pullRequest)}
             onContextMenu={(event) => onShowPullRequestMenu(event, pullRequest)}
-            role="button"
-            tabIndex={0}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
@@ -320,7 +319,7 @@ export function GitPullRequestsModeContent({
               <span className="git-pr-author-inline">@{author}</span>
               {pullRequest.isDraft && <span className="git-pr-pill git-pr-draft">Draft</span>}
             </div>
-          </div>
+          </button>
         );
       })}
     </div>

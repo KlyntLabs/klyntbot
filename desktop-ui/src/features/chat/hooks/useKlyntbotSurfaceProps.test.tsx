@@ -236,8 +236,9 @@ describe("useKlyntbotSurfaceProps", () => {
     });
 
     const { result } = renderHook(() => useKlyntbotSurfaceProps("sk"));
-    const req = result.current!.messagesProps.userInputRequests![0];
-    result.current!.messagesProps.onUserInputSubmit!(req, {
+    const req = result.current?.messagesProps.userInputRequests?.[0];
+    if (!req) throw new Error("expected request");
+    result.current?.messagesProps.onUserInputSubmit?.(req, {
       answers: { q1: { answers: ["yes"] } },
     });
 
@@ -263,8 +264,9 @@ describe("useKlyntbotSurfaceProps", () => {
     });
 
     const { result } = renderHook(() => useKlyntbotSurfaceProps("sk"));
-    const req = result.current!.messagesProps.userInputRequests![0];
-    result.current!.messagesProps.onUserInputSubmit!(req, {
+    const req = result.current?.messagesProps.userInputRequests?.[0];
+    if (!req) throw new Error("expected request");
+    result.current?.messagesProps.onUserInputSubmit?.(req, {
       answers: { q1: { answers: ["true"] } },
     });
 
@@ -297,8 +299,9 @@ describe("useKlyntbotSurfaceProps", () => {
     });
 
     const { result } = renderHook(() => useKlyntbotSurfaceProps("sk"));
-    const req = result.current!.messagesProps.userInputRequests![0];
-    result.current!.messagesProps.onUserInputSubmit!(req, {
+    const req = result.current?.messagesProps.userInputRequests?.[0];
+    if (!req) throw new Error("expected request");
+    result.current?.messagesProps.onUserInputSubmit?.(req, {
       answers: { q1: { answers: ["a"] } },
     });
 
@@ -337,8 +340,9 @@ describe("useKlyntbotSurfaceProps", () => {
     });
 
     const { result } = renderHook(() => useKlyntbotSurfaceProps("sk"));
-    const req = result.current!.messagesProps.userInputRequests![0];
-    result.current!.messagesProps.onUserInputSubmit!(req, {
+    const req = result.current?.messagesProps.userInputRequests?.[0];
+    if (!req) throw new Error("expected request");
+    result.current?.messagesProps.onUserInputSubmit?.(req, {
       answers: { q1: { answers: ["a", "b"] } },
     });
 
@@ -378,7 +382,7 @@ describe("useKlyntbotSurfaceProps", () => {
     const sendSpy = vi.fn();
     mockUseChatSession.mockReturnValue({ ...baseSession, send: sendSpy });
     const { result } = renderHook(() => useKlyntbotSurfaceProps("session-1"));
-    result.current!.composerProps.onSend("hello", []);
+    result.current?.composerProps.onSend("hello", []);
     expect(sendSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -396,7 +400,7 @@ describe("useKlyntbotSurfaceProps", () => {
     expect(result.current?.error).toBe("oops");
 
     act(() => {
-      result.current!.onDismissError();
+      result.current?.onDismissError();
     });
     rerender();
     expect(result.current?.error).toBeNull();
@@ -406,7 +410,7 @@ describe("useKlyntbotSurfaceProps", () => {
     mockUseChatSession.mockReturnValue({ ...baseSession, error: "first" });
     const { result, rerender } = renderHook(() => useKlyntbotSurfaceProps("session-1"));
     act(() => {
-      result.current!.onDismissError();
+      result.current?.onDismissError();
     });
     rerender();
     expect(result.current?.error).toBeNull();

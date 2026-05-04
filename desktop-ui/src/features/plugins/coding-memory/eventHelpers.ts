@@ -72,12 +72,13 @@ export function eventChipColor(kind: string): ChipColor {
 export function isErrorEvent(e: WireEventDto): boolean {
   if (e.kind === "error") return true;
   if (e.kind === "toolResult") {
-    const rv = (e.payloadDecoded as any)?.return_value;
-    if (rv && typeof rv === "object" && rv.is_error === true) return true;
+    const rv = (e.payloadDecoded as { return_value?: unknown } | undefined)?.return_value;
+    if (rv && typeof rv === "object" && (rv as Record<string, unknown>).is_error === true)
+      return true;
   }
   if (e.kind === "stepInterrupted") return true;
   if (e.kind === "approvalDecision" || e.kind === "approvalResponse") {
-    const r = (e.payloadDecoded as any)?.response;
+    const r = (e.payloadDecoded as { response?: unknown } | undefined)?.response;
     if (r === "reject") return true;
   }
   return false;
@@ -108,26 +109,33 @@ export function timeDeltaSeverity(ms: number): "ok" | "warn" | "danger" {
 }
 
 export function summarizeEvent(e: WireEventDto): string {
-  const p = (e.payloadDecoded ?? {}) as Record<string, unknown>;
+  const p = (e.payloadDecoded ?? {}) as Record<string, unknown> & {
+    user_input?: unknown;
+    text?: unknown;
+    function?: { name?: unknown };
+    tool_name?: unknown;
+    return_value?: unknown;
+    think?: unknown;
+  };
   switch (e.kind) {
     case "turnBegin":
     case "userPrompt":
-      return truncate(extractText((p as any).user_input ?? (p as any).text), 120);
+      return truncate(extractText(p.user_input ?? p.text), 120);
     case "toolCall":
-      return String((p as any).function?.name ?? (p as any).tool_name ?? "");
+      return String((p.function as { name?: unknown } | undefined)?.name ?? p.tool_name ?? "");
     case "toolResult":
-      return truncate(JSON.stringify((p as any).return_value ?? p), 160);
+      return truncate(JSON.stringify(p.return_value ?? p), 160);
     case "thinkPart":
-      return truncate(String((p as any).think ?? ""), 120);
+      return truncate(String(p.think ?? ""), 120);
     case "textPart":
-      return truncate(String((p as any).text ?? ""), 120);
+      return truncate(String(p.text ?? ""), 120);
     default:
       return truncate(JSON.stringify(p), 120);
   }
 }
 
 function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max) + "…" : s;
+  return s.length > max ? `${s.slice(0, max)}…` : s;
 }
 function extractText(x: unknown): string {
   if (typeof x === "string") return x;

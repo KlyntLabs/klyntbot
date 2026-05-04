@@ -8,6 +8,7 @@ export function useGitRemote(activeWorkspace: WorkspaceInfo | null) {
 
   const query = useTauriQuery<string | null>({
     queryKey: qk.git.remote(workspaceId),
+    staleTime: 30_000,
     queryFn: async () => {
       if (!activeWorkspace) return null;
       return await getGitRemote(activeWorkspace.id);

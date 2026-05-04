@@ -14,9 +14,9 @@ const mockedSubscribe = vi.mocked(subscribeAppServerEvents);
 function makeFakeSub() {
   let handler: (e: unknown) => void = () => {};
   const unsubscribe = vi.fn();
-  (mockedSubscribe as any).mockImplementation((h: (e: unknown) => void) => {
-    handler = h;
-    return unsubscribe;
+  mockedSubscribe.mockImplementation((onEvent) => {
+    handler = onEvent as (e: unknown) => void;
+    return unsubscribe as unknown as ReturnType<typeof subscribeAppServerEvents>;
   });
   return { fire: (e: unknown) => handler(e), unsubscribe };
 }

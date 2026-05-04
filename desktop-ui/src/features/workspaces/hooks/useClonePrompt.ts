@@ -143,7 +143,7 @@ export function useClonePrompt({
 
   const useSuggestedCopiesFolder = useCallback(() => {
     setClonePrompt((prev) => {
-      if (!prev || !prev.suggestedCopiesFolder) {
+      if (!prev?.suggestedCopiesFolder) {
         return prev;
       }
       return { ...prev, copiesFolder: prev.suggestedCopiesFolder, error: null };

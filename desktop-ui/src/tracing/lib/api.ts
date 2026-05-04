@@ -240,16 +240,19 @@ function normalizeWireEvents(res: WireResponse): WireResponse {
   return {
     ...res,
     events: res.events.map((e) => {
-      if (e.type === "ContentPart" && typeof (e.payload as any).type === "string") {
-        const mapped = CONTENT_PART_MAP[(e.payload as any).type];
+      if (
+        e.type === "ContentPart" &&
+        typeof (e.payload as Record<string, unknown>).type === "string"
+      ) {
+        const mapped = CONTENT_PART_MAP[(e.payload as Record<string, unknown>).type as string];
         if (mapped) return { ...e, type: mapped };
       }
       if (
         e.type === "SubagentEvent" &&
-        (e.payload as any).event &&
-        typeof (e.payload as any).event === "object"
+        (e.payload as Record<string, unknown>).event &&
+        typeof (e.payload as Record<string, unknown>).event === "object"
       ) {
-        const inner = (e.payload as any).event as Record<string, unknown>;
+        const inner = (e.payload as Record<string, unknown>).event as Record<string, unknown>;
         if (inner.type === "ContentPart" && inner.payload && typeof inner.payload === "object") {
           const innerPayload = inner.payload as Record<string, unknown>;
           const mapped = CONTENT_PART_MAP[innerPayload.type as string];

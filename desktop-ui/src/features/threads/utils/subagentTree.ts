@@ -35,7 +35,9 @@ export function getSubagentDescendantThreadIds(args: {
       descendants.push(current);
     }
     const children = childrenByParent.get(current) ?? [];
-    children.forEach((child) => queue.push(child));
+    for (const child of children) {
+      queue.push(child);
+    }
   }
 
   return descendants;

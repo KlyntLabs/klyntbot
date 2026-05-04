@@ -1,16 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { useMemo, useState } from "react";
+import { AlertCircle, ArrowRight, Check, Clock, Copy, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { WireEvent } from "@/tracing/lib/api";
-import {
-  X,
-  Copy,
-  Check,
-  Clock,
-  AlertCircle,
-  ArrowRight,
-} from "lucide-react";
 import { formatTimestamp } from "./wire-event-card";
 
 interface ToolCallPair {
@@ -32,10 +25,7 @@ interface ToolCallDetailProps {
   onNavigateToContext?: (toolCallId: string) => void;
 }
 
-function findPair(
-  selected: WireEvent,
-  events: WireEvent[],
-): ToolCallPair | null {
+function findPair(selected: WireEvent, events: WireEvent[]): ToolCallPair | null {
   let toolCallId: string | undefined;
   let toolCall: WireEvent | undefined;
   let toolResult: WireEvent | undefined;
@@ -52,37 +42,22 @@ function findPair(
 
   // Find the matching pair
   for (const e of events) {
-    if (
-      e.type === "ToolCall" &&
-      e.payload.id === toolCallId &&
-      !toolCall
-    ) {
+    if (e.type === "ToolCall" && e.payload.id === toolCallId && !toolCall) {
       toolCall = e;
     }
-    if (
-      e.type === "ToolResult" &&
-      e.payload.tool_call_id === toolCallId &&
-      !toolResult
-    ) {
+    if (e.type === "ToolResult" && e.payload.tool_call_id === toolCallId && !toolResult) {
       toolResult = e;
     }
   }
 
   if (!toolCall) return null;
 
-  const fn = toolCall.payload.function as
-    | Record<string, unknown>
-    | undefined;
+  const fn = toolCall.payload.function as Record<string, unknown> | undefined;
   const toolName = (fn?.name as string) ?? "unknown";
 
-  const durationSec =
-    toolCall && toolResult
-      ? toolResult.timestamp - toolCall.timestamp
-      : null;
+  const durationSec = toolCall && toolResult ? toolResult.timestamp - toolCall.timestamp : null;
 
-  const rv = toolResult?.payload.return_value as
-    | Record<string, unknown>
-    | undefined;
+  const rv = toolResult?.payload.return_value as Record<string, unknown> | undefined;
   const isError = rv?.is_error === true;
 
   return {
@@ -108,10 +83,7 @@ export function ToolCallDetail({
   onClose,
   onNavigateToContext,
 }: ToolCallDetailProps) {
-  const pair = useMemo(
-    () => findPair(selectedEvent, allEvents),
-    [selectedEvent, allEvents],
-  );
+  const pair = useMemo(() => findPair(selectedEvent, allEvents), [selectedEvent, allEvents]);
 
   if (!pair) return null;
 
@@ -139,6 +111,7 @@ export function ToolCallDetail({
         )}
         {onNavigateToContext && (
           <button
+            type="button"
             onClick={() => onNavigateToContext(pair.toolCallId)}
             className="flex items-center gap-0.5 text-[10px] text-blue-600 dark:text-blue-400 hover:underline ml-1"
             title="View in Context Messages"
@@ -148,6 +121,7 @@ export function ToolCallDetail({
           </button>
         )}
         <button
+          type="button"
           onClick={onClose}
           className="ml-auto rounded p-0.5 hover:bg-muted text-muted-foreground"
         >
@@ -162,18 +136,14 @@ export function ToolCallDetail({
           <div className="px-2 py-1 border-b text-[10px] font-medium text-muted-foreground bg-muted/10 shrink-0">
             ToolCall · {formatTimestamp(pair.toolCall.timestamp)}
           </div>
-          <CopyableJson
-            data={getCallArgs(pair.toolCall)}
-          />
+          <CopyableJson data={getCallArgs(pair.toolCall)} />
         </div>
 
         {/* Right: ToolResult */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <div
             className={`px-2 py-1 border-b text-[10px] font-medium bg-muted/10 shrink-0 ${
-              pair.isError
-                ? "text-red-600 dark:text-red-400"
-                : "text-muted-foreground"
+              pair.isError ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
             }`}
           >
             {pair.toolResult
@@ -181,9 +151,7 @@ export function ToolCallDetail({
               : "ToolResult · (pending)"}
           </div>
           {pair.toolResult ? (
-            <CopyableJson
-              data={getResultOutput(pair.toolResult)}
-            />
+            <CopyableJson data={getResultOutput(pair.toolResult)} />
           ) : (
             <div className="flex items-center justify-center flex-1 text-xs text-muted-foreground">
               No result yet
@@ -217,18 +185,30 @@ function getResultOutput(event: WireEvent): unknown {
 
 function CopyableJson({ data }: { data: unknown }) {
   const [copied, setCopied] = useState(false);
-  const text =
-    typeof data === "string" ? data : JSON.stringify(data, null, 2);
+  const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copiedTimeoutRef.current) {
+      clearTimeout(copiedTimeoutRef.current);
+    }
+    copiedTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   return (
     <div className="relative flex-1 overflow-auto group/json">
       <button
+        type="button"
         onClick={handleCopy}
         className="absolute top-1 right-1 rounded p-1 hover:bg-muted text-muted-foreground opacity-0 group-hover/json:opacity-100 transition-opacity z-10"
         title="Copy"

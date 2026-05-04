@@ -218,10 +218,9 @@ function buildDefaultSettings(): AppSettings {
 
 function normalizeAppSettings(settings: AppSettings): AppSettings {
   const remoteBackendSettings = normalizeRemoteBackends(settings);
-  const normalizedTargets =
-    settings.openAppTargets && settings.openAppTargets.length
-      ? normalizeOpenAppTargets(settings.openAppTargets)
-      : DEFAULT_OPEN_APP_TARGETS;
+  const normalizedTargets = settings.openAppTargets?.length
+    ? normalizeOpenAppTargets(settings.openAppTargets)
+    : DEFAULT_OPEN_APP_TARGETS;
   const storedOpenAppId =
     typeof window === "undefined" ? null : window.localStorage.getItem(OPEN_APP_STORAGE_KEY);
   const hasPersistedSelection = normalizedTargets.some(
@@ -277,6 +276,7 @@ export function useAppSettings() {
 
   const query = useTauriQuery<AppSettings>({
     queryKey: qk.settings.app(),
+    staleTime: 60_000,
     queryFn: async () => {
       try {
         const response = await getAppSettings();

@@ -342,7 +342,7 @@ export function GitDiffViewer({
 
   useEffect(() => {
     clearSelection();
-  }, [clearSelection, pullRequest?.number]);
+  }, [clearSelection]);
 
   useEffect(() => {
     onActivePathChangeRef.current = onActivePathChange;

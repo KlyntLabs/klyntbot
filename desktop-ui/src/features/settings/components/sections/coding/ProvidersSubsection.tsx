@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { providersList, providerStatus } from "@/api/endpoints/providers";
 import type { ProviderListItem, ProviderStatusResult } from "@/api/endpoints/providers";
+import { providerStatus, providersList } from "@/api/endpoints/providers";
 
 export function ProvidersSubsection() {
   const [providers, setProviders] = useState<ProviderListItem[]>([]);
@@ -39,7 +39,11 @@ export function ProvidersSubsection() {
     } catch (e) {
       setTestResult((prev) => ({
         ...prev,
-        [providerId]: { id: providerId, available: false, error: e instanceof Error ? e.message : "Test failed" },
+        [providerId]: {
+          id: providerId,
+          available: false,
+          error: e instanceof Error ? e.message : "Test failed",
+        },
       }));
     } finally {
       setTestingId(null);
@@ -47,11 +51,19 @@ export function ProvidersSubsection() {
   };
 
   if (loading) {
-    return <section className="providers-subsection"><p>Loading providers…</p></section>;
+    return (
+      <section className="providers-subsection">
+        <p>Loading providers…</p>
+      </section>
+    );
   }
 
   if (error) {
-    return <section className="providers-subsection"><p className="providers-subsection__error">{error}</p></section>;
+    return (
+      <section className="providers-subsection">
+        <p className="providers-subsection__error">{error}</p>
+      </section>
+    );
   }
 
   return (

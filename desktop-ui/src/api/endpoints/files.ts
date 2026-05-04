@@ -104,19 +104,37 @@ export async function fileWrite(
 }
 
 export async function readGlobalAgentsMd(): Promise<GlobalAgentsResponse> {
-  return invoke<TextFileResponse>("workspace_meta_read", { workspaceId: "", scope: "global", kind: "agents" });
+  return invoke<TextFileResponse>("workspace_meta_read", {
+    workspaceId: "",
+    scope: "global",
+    kind: "agents",
+  });
 }
 
 export async function writeGlobalAgentsMd(content: string): Promise<void> {
-  return invoke("workspace_meta_write", { workspaceId: "", scope: "global", kind: "agents", content });
+  return invoke("workspace_meta_write", {
+    workspaceId: "",
+    scope: "global",
+    kind: "agents",
+    content,
+  });
 }
 
 export async function readGlobalCodexConfigToml(): Promise<GlobalCodexConfigResponse> {
-  return invoke<TextFileResponse>("workspace_meta_read", { workspaceId: "", scope: "global", kind: "config" });
+  return invoke<TextFileResponse>("workspace_meta_read", {
+    workspaceId: "",
+    scope: "global",
+    kind: "config",
+  });
 }
 
 export async function writeGlobalCodexConfigToml(content: string): Promise<void> {
-  return invoke("workspace_meta_write", { workspaceId: "", scope: "global", kind: "config", content });
+  return invoke("workspace_meta_write", {
+    workspaceId: "",
+    scope: "global",
+    kind: "config",
+    content,
+  });
 }
 
 export async function readAgentMd(workspaceId: string): Promise<AgentMdResponse> {

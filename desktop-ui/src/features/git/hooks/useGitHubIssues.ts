@@ -8,6 +8,7 @@ export function useGitHubIssues(activeWorkspace: WorkspaceInfo | null) {
 
   const query = useTauriQuery<{ issues: GitHubIssue[]; total: number }>({
     queryKey: qk.github.issues(workspaceId),
+    staleTime: 60_000,
     queryFn: async () => {
       if (!activeWorkspace) return { issues: [], total: 0 };
       return await getGitHubIssues(activeWorkspace.id);

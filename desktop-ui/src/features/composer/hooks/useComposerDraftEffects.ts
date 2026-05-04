@@ -46,7 +46,7 @@ function applyQueuedMessage({
 
 export function useComposerDraftEffects({
   draftText,
-  historyKey,
+  historyKey: _historyKey,
   prefillDraft,
   onPrefillHandled,
   insertText,
@@ -69,7 +69,7 @@ export function useComposerDraftEffects({
 
   useEffect(() => {
     setAppMentionBindings([]);
-  }, [historyKey, setAppMentionBindings]);
+  }, [setAppMentionBindings]);
 
   useEffect(() => {
     if (!prefillDraft) {

@@ -153,17 +153,71 @@ export function useComposerAutocompleteState({
   const slashCommandItems = useMemo<AutocompleteItem[]>(() => {
     // Generic Codex-style slashes (no Tauri dispatch — handled by upstream chat layer).
     const generic: AutocompleteItem[] = [
-      { id: "compact", label: "compact", description: "compact the active thread context", insertText: "compact", group: "Slash" },
-      { id: "fast", label: "fast", description: "toggle Fast mode for upcoming turns", insertText: "fast", group: "Slash" },
-      { id: "fork", label: "fork", description: "branch into a new thread", insertText: "fork", group: "Slash" },
-      { id: "mcp", label: "mcp", description: "list configured MCP tools", insertText: "mcp", group: "Slash" },
-      { id: "new", label: "new", description: "start a new chat", insertText: "new", group: "Slash" },
-      { id: "review", label: "review", description: "start a code review", insertText: "review", group: "Slash" },
-      { id: "resume", label: "resume", description: "refresh the active thread", insertText: "resume", group: "Slash" },
-      { id: "status", label: "status", description: "show session status", insertText: "status", group: "Slash" },
+      {
+        id: "compact",
+        label: "compact",
+        description: "compact the active thread context",
+        insertText: "compact",
+        group: "Slash",
+      },
+      {
+        id: "fast",
+        label: "fast",
+        description: "toggle Fast mode for upcoming turns",
+        insertText: "fast",
+        group: "Slash",
+      },
+      {
+        id: "fork",
+        label: "fork",
+        description: "branch into a new thread",
+        insertText: "fork",
+        group: "Slash",
+      },
+      {
+        id: "mcp",
+        label: "mcp",
+        description: "list configured MCP tools",
+        insertText: "mcp",
+        group: "Slash",
+      },
+      {
+        id: "new",
+        label: "new",
+        description: "start a new chat",
+        insertText: "new",
+        group: "Slash",
+      },
+      {
+        id: "review",
+        label: "review",
+        description: "start a code review",
+        insertText: "review",
+        group: "Slash",
+      },
+      {
+        id: "resume",
+        label: "resume",
+        description: "refresh the active thread",
+        insertText: "resume",
+        group: "Slash",
+      },
+      {
+        id: "status",
+        label: "status",
+        description: "show session status",
+        insertText: "status",
+        group: "Slash",
+      },
     ];
     if (appsEnabled) {
-      generic.push({ id: "apps", label: "apps", description: "list available apps", insertText: "apps", group: "Slash" });
+      generic.push({
+        id: "apps",
+        label: "apps",
+        description: "list available apps",
+        insertText: "apps",
+        group: "Slash",
+      });
     }
     // Derived from FLAT_CATALOG so new registry entries surface automatically.
     const coding: AutocompleteItem[] = FLAT_CATALOG.map((entry) => {

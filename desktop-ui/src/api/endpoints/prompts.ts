@@ -1,7 +1,8 @@
+import type { CustomPromptOption } from "@/types";
 import { invoke } from "../client";
 
-export async function getPromptsList(workspaceId: string) {
-  return invoke<any>("prompts_list", { workspaceId });
+export async function getPromptsList(workspaceId: string): Promise<CustomPromptOption[]> {
+  return invoke<CustomPromptOption[]>("prompts_list", { workspaceId });
 }
 
 export async function getWorkspacePromptsDir(workspaceId: string) {
@@ -22,7 +23,7 @@ export async function createPrompt(
     content: string;
   },
 ) {
-  return invoke<any>("prompts_create", {
+  return invoke<unknown>("prompts_create", {
     workspaceId,
     scope: data.scope,
     name: data.name,
@@ -42,7 +43,7 @@ export async function updatePrompt(
     content: string;
   },
 ) {
-  return invoke<any>("prompts_update", {
+  return invoke<unknown>("prompts_update", {
     workspaceId,
     path: data.path,
     name: data.name,
@@ -53,14 +54,14 @@ export async function updatePrompt(
 }
 
 export async function deletePrompt(workspaceId: string, path: string) {
-  return invoke<any>("prompts_delete", { workspaceId, path });
+  return invoke<unknown>("prompts_delete", { workspaceId, path });
 }
 
 export async function movePrompt(
   workspaceId: string,
   data: { path: string; scope: "workspace" | "global" },
 ) {
-  return invoke<any>("prompts_move", {
+  return invoke<unknown>("prompts_move", {
     workspaceId,
     path: data.path,
     scope: data.scope,

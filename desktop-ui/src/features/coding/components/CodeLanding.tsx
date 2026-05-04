@@ -1,4 +1,5 @@
-import { ArrowUp, FolderPlus } from "lucide-react";
+import ArrowUp from "lucide-react/dist/esm/icons/arrow-up";
+import FolderPlus from "lucide-react/dist/esm/icons/folder-plus";
 import { useState } from "react";
 
 export type CodeLandingProject = {

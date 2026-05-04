@@ -43,11 +43,7 @@ const CHART_PAD_X = 40;
 const CHART_PAD_TOP = 12;
 const CHART_PAD_BOTTOM = 24;
 
-function DailyUsageChart({
-  daily,
-}: {
-  daily: AggregateStats["daily_usage"];
-}) {
+function DailyUsageChart({ daily }: { daily: AggregateStats["daily_usage"] }) {
   if (daily.length === 0) return null;
 
   const maxSessions = Math.max(1, ...daily.map((d) => d.sessions));
@@ -58,10 +54,8 @@ function DailyUsageChart({
 
   const toX = (i: number) =>
     CHART_PAD_X + (daily.length > 1 ? (i / (daily.length - 1)) * innerW : innerW / 2);
-  const toYSessions = (v: number) =>
-    CHART_PAD_TOP + (1 - v / maxSessions) * innerH;
-  const toYTurns = (v: number) =>
-    CHART_PAD_TOP + (1 - v / maxTurns) * innerH;
+  const toYSessions = (v: number) => CHART_PAD_TOP + (1 - v / maxSessions) * innerH;
+  const toYTurns = (v: number) => CHART_PAD_TOP + (1 - v / maxTurns) * innerH;
 
   // Sessions line
   const sessionsPath = daily
@@ -86,9 +80,7 @@ function DailyUsageChart({
     if (daily.length > 0) labelIndices.push(0);
   } else {
     for (let i = 0; i < labelCount; i++) {
-      labelIndices.push(
-        Math.round((i / (labelCount - 1)) * (daily.length - 1)),
-      );
+      labelIndices.push(Math.round((i / (labelCount - 1)) * (daily.length - 1)));
     }
   }
 
@@ -103,16 +95,12 @@ function DailyUsageChart({
         className="w-full"
         style={{ maxHeight: CHART_HEIGHT }}
       >
+        <title>Daily usage chart</title>
         {/* Sessions area fill */}
         <path d={sessionsArea} className="fill-blue-500/10" />
 
         {/* Sessions line */}
-        <path
-          d={sessionsPath}
-          className="stroke-blue-500"
-          strokeWidth={1.5}
-          fill="none"
-        />
+        <path d={sessionsPath} className="stroke-blue-500" strokeWidth={1.5} fill="none" />
 
         {/* Turns line */}
         <path
@@ -161,7 +149,7 @@ function DailyUsageChart({
         {daily.map((d, i) =>
           d.sessions > 0 ? (
             <circle
-              key={i}
+              key={d.date}
               cx={toX(i)}
               cy={toYSessions(d.sessions)}
               r={2}
@@ -190,11 +178,7 @@ function DailyUsageChart({
 /*  Tool Usage Bar Chart                                               */
 /* ------------------------------------------------------------------ */
 
-function ToolUsageChart({
-  tools,
-}: {
-  tools: AggregateStats["tool_usage"];
-}) {
+function ToolUsageChart({ tools }: { tools: AggregateStats["tool_usage"] }) {
   if (tools.length === 0) return null;
 
   const maxCount = tools[0].count;
@@ -208,32 +192,20 @@ function ToolUsageChart({
       <div className="flex flex-col gap-1">
         {tools.map((tool) => {
           const barPct = maxCount > 0 ? (tool.count / maxCount) * 100 : 0;
-          const errorPct =
-            tool.count > 0 ? (tool.error_count / tool.count) * 100 : 0;
+          const errorPct = tool.count > 0 ? (tool.error_count / tool.count) * 100 : 0;
           const successPct = 100 - errorPct;
 
           return (
             <div key={tool.name} className="flex items-center gap-2">
               <div className="w-[140px] shrink-0 text-right pr-1">
-                <span className="text-[11px] text-foreground truncate">
-                  {tool.name}
-                </span>
+                <span className="text-[11px] text-foreground truncate">{tool.name}</span>
               </div>
 
               <div className="flex-1 h-3 bg-muted/30 rounded-sm overflow-hidden">
-                <div
-                  className="h-full flex rounded-sm"
-                  style={{ width: `${barPct}%` }}
-                >
-                  <div
-                    className="h-full bg-blue-500/70"
-                    style={{ width: `${successPct}%` }}
-                  />
+                <div className="h-full flex rounded-sm" style={{ width: `${barPct}%` }}>
+                  <div className="h-full bg-blue-500/70" style={{ width: `${successPct}%` }} />
                   {tool.error_count > 0 && (
-                    <div
-                      className="h-full bg-red-500/70"
-                      style={{ width: `${errorPct}%` }}
-                    />
+                    <div className="h-full bg-red-500/70" style={{ width: `${errorPct}%` }} />
                   )}
                 </div>
               </div>
@@ -241,9 +213,7 @@ function ToolUsageChart({
               <span className="w-[64px] shrink-0 text-[10px] text-muted-foreground text-right tabular-nums">
                 {tool.count}
                 {tool.error_count > 0 && (
-                  <span className="text-red-500 ml-1">
-                    ({tool.error_count})
-                  </span>
+                  <span className="text-red-500 ml-1">({tool.error_count})</span>
                 )}
               </span>
             </div>
@@ -270,11 +240,7 @@ function ToolUsageChart({
 /*  Per-Project Table                                                  */
 /* ------------------------------------------------------------------ */
 
-function ProjectTable({
-  projects,
-}: {
-  projects: AggregateStats["per_project"];
-}) {
+function ProjectTable({ projects }: { projects: AggregateStats["per_project"] }) {
   if (projects.length === 0) return null;
 
   return (
@@ -297,15 +263,10 @@ function ProjectTable({
             const shortName = segments[segments.length - 1] || p.work_dir;
             return (
               <tr key={p.work_dir} className="border-b last:border-b-0">
-                <td
-                  className="py-1.5 truncate max-w-[300px]"
-                  title={p.work_dir}
-                >
+                <td className="py-1.5 truncate max-w-[300px]" title={p.work_dir}>
                   {shortName}
                 </td>
-                <td className="py-1.5 text-right tabular-nums">
-                  {p.sessions}
-                </td>
+                <td className="py-1.5 text-right tabular-nums">{p.sessions}</td>
                 <td className="py-1.5 text-right tabular-nums">{p.turns}</td>
               </tr>
             );
@@ -326,12 +287,22 @@ export function StatisticsView() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
     getAggregateStats()
-      .then(setStats)
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
-      .finally(() => setLoading(false));
+      .then((res) => {
+        if (!cancelled) setStats(res);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (loading) {
@@ -370,19 +341,14 @@ export function StatisticsView() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <SummaryCard label="Total Sessions" value={String(stats.total_sessions)} />
         <SummaryCard label="Total Turns" value={String(stats.total_turns)} />
-        <SummaryCard
-          label="Total Tokens"
-          value={formatTokens(totalTokens)}
-        />
-        <SummaryCard
-          label="Total Duration"
-          value={formatDuration(stats.total_duration_sec)}
-        />
+        <SummaryCard label="Total Tokens" value={formatTokens(totalTokens)} />
+        <SummaryCard label="Total Duration" value={formatDuration(stats.total_duration_sec)} />
       </div>
 
       {/* Token detail */}
       <div className="text-xs text-muted-foreground px-1">
-        Tokens: {formatTokens(stats.total_tokens.input)} input / {formatTokens(stats.total_tokens.output)} output
+        Tokens: {formatTokens(stats.total_tokens.input)} input /{" "}
+        {formatTokens(stats.total_tokens.output)} output
       </div>
 
       {/* Daily Usage Chart */}

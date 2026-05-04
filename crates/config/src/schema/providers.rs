@@ -44,6 +44,9 @@ pub struct ProvidersConfig {
 
     #[serde(default)]
     pub aihubmix: ProviderConfig,
+
+    #[serde(default)]
+    pub mimo: ProviderConfig,
 }
 
 /// Individual provider configuration

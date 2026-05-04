@@ -97,10 +97,16 @@ export function WorkspaceFromUrlPrompt({
         </div>
         {error && <div className="ds-modal-error">{error}</div>}
         <div className="ds-modal-actions">
-          <button className="ghost ds-modal-button" onClick={onCancel} disabled={isBusy}>
+          <button
+            type="button"
+            className="ghost ds-modal-button"
+            onClick={onCancel}
+            disabled={isBusy}
+          >
             Cancel
           </button>
           <button
+            type="button"
             className="primary ds-modal-button"
             onClick={onConfirm}
             disabled={isBusy || !canSubmit}

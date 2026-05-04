@@ -166,7 +166,6 @@ function toFormResponse(response: RequestUserInputResponse, questions: Question[
             answer: ans.answers[0] === "true" || ans.answers[0] === "yes",
           },
         };
-      case "free_text":
       default:
         return {
           question_id: questionId,

@@ -1,4 +1,10 @@
-import { Calendar, Clock, FolderPlus, LayoutGrid, Search, Settings, SquarePen } from "lucide-react";
+import Calendar from "lucide-react/dist/esm/icons/calendar";
+import Clock from "lucide-react/dist/esm/icons/clock";
+import FolderPlus from "lucide-react/dist/esm/icons/folder-plus";
+import LayoutGrid from "lucide-react/dist/esm/icons/layout-grid";
+import Search from "lucide-react/dist/esm/icons/search";
+import Settings from "lucide-react/dist/esm/icons/settings";
+import SquarePen from "lucide-react/dist/esm/icons/square-pen";
 import { memo } from "react";
 import type { ChatThread } from "@/features/chat/types";
 import { useAppMode } from "../hooks/useAppMode";

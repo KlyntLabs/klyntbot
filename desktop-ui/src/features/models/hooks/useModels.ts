@@ -49,6 +49,7 @@ export function useModels({
 
   const modelsQuery = useTauriQuery<ModelOption[]>({
     queryKey: qk.models.list(workspaceId),
+    staleTime: 60_000,
     queryFn: async () => {
       if (!activeWorkspace) return [];
       return parseModelListResponse(await getModelList(activeWorkspace.id));
@@ -59,6 +60,7 @@ export function useModels({
 
   const configModelQuery = useTauriQuery<string | null>({
     queryKey: qk.models.configModel(workspaceId),
+    staleTime: 60_000,
     queryFn: async () => {
       if (!activeWorkspace) return null;
       return await getConfigModel(activeWorkspace.id);

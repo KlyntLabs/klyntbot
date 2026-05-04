@@ -14,7 +14,7 @@ export function PlanReadyFollowupMessage({
 
   return (
     <div className="message request-user-input-message">
-      <div className="bubble request-user-input-card" role="group" aria-label="Plan ready">
+      <fieldset className="bubble request-user-input-card" aria-label="Plan ready">
         <div className="request-user-input-header">
           <div className="request-user-input-title">Plan ready</div>
         </div>
@@ -51,7 +51,7 @@ export function PlanReadyFollowupMessage({
             Implement this plan
           </button>
         </div>
-      </div>
+      </fieldset>
     </div>
   );
 }

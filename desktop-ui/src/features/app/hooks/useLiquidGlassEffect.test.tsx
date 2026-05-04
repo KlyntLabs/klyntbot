@@ -34,7 +34,7 @@ describe("useLiquidGlassEffect", () => {
     mockSetEffects = vi.fn().mockResolvedValue(undefined);
     vi.mocked(getCurrentWindow).mockReturnValue({
       setEffects: mockSetEffects,
-    } as any);
+    } as unknown as ReturnType<typeof getCurrentWindow>);
   });
 
   afterEach(() => {

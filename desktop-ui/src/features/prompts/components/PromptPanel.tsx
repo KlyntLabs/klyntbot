@@ -87,6 +87,14 @@ export function PromptPanel({
   const [pendingDeletePath, setPendingDeletePath] = useState<string | null>(null);
   const [highlightKey, setHighlightKey] = useState<string | null>(null);
   const highlightTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimer.current) {
+        window.clearTimeout(highlightTimer.current);
+      }
+    };
+  }, []);
   const normalizedQuery = query.trim().toLowerCase();
 
   const showError = (error: unknown) => {

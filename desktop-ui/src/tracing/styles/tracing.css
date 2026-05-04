@@ -8,7 +8,12 @@
 /* Bridge Tailwind's `dark:` variant to klyntbot's data-theme attribute.
  * Klyntbot writes data-theme="dark" / "dim" / "light" on <html>; the `dark`
  * class is never set. Treat both "dark" and "dim" as dark variants. */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="dim"], [data-theme="dim"] *));
+@custom-variant dark (&:where(
+    [data-theme="dark"],
+    [data-theme="dark"] *,
+    [data-theme="dim"],
+    [data-theme="dim"] *
+  ));
 
 @theme inline {
   --color-background: var(--color-background);

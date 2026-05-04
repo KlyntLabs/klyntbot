@@ -155,7 +155,7 @@ export function useReviewPrompt({
   const showPresetStep = useCallback(() => {
     setHighlightedPresetIndex(0);
     setReviewPrompt((prev) => (prev ? { ...prev, step: "preset", error: null } : prev));
-  }, [setHighlightedPresetIndex]);
+  }, []);
 
   const openReviewPrompt = useCallback(() => {
     if (!activeWorkspace) {

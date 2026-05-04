@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/react";
+import { captureException } from "@sentry/react";
 import { openWorkspaceIn } from "@services/tauri";
 import { pushErrorToast } from "@services/toasts";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -79,7 +79,7 @@ export function OpenAppMenu({
 
   const reportOpenError = (error: unknown, target: OpenTarget) => {
     const message = error instanceof Error ? error.message : String(error);
-    Sentry.captureException(error instanceof Error ? error : new Error(message), {
+    captureException(error instanceof Error ? error : new Error(message), {
       tags: {
         feature: "open-app-menu",
       },

@@ -98,7 +98,7 @@ describe("useUpdater", () => {
       version: "1.2.3",
       downloadAndInstall,
       close,
-    } as any);
+    } as unknown as NonNullable<Awaited<ReturnType<typeof check>>>);
 
     const { result } = renderHook(() => useUpdater({}));
 
@@ -127,7 +127,7 @@ describe("useUpdater", () => {
       version: "1.0.0",
       downloadAndInstall: vi.fn(),
       close,
-    } as any);
+    } as unknown as NonNullable<Awaited<ReturnType<typeof check>>>);
     const { result } = renderHook(() => useUpdater({}));
 
     await act(async () => {
@@ -153,7 +153,7 @@ describe("useUpdater", () => {
       version: "2.0.0",
       downloadAndInstall,
       close,
-    } as any);
+    } as unknown as NonNullable<Awaited<ReturnType<typeof check>>>);
     const onDebug = vi.fn();
     const { result } = renderHook(() => useUpdater({ onDebug }));
 
@@ -184,7 +184,7 @@ describe("useUpdater", () => {
       version: "9.9.9",
       downloadAndInstall: vi.fn(),
       close: vi.fn(),
-    } as any);
+    } as unknown as NonNullable<Awaited<ReturnType<typeof check>>>);
     const { result } = renderHook(() => useUpdater({ enabled: false }));
 
     await act(async () => {

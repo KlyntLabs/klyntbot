@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/react";
+import { captureException } from "@sentry/react";
 import { openWorkspaceIn } from "@services/tauri";
 import { pushErrorToast } from "@services/toasts";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
@@ -80,7 +80,7 @@ export function useFileLinkOpener(
 ) {
   const reportOpenError = useCallback((error: unknown, context: Record<string, string | null>) => {
     const message = error instanceof Error ? error.message : String(error);
-    Sentry.captureException(error instanceof Error ? error : new Error(message), {
+    captureException(error instanceof Error ? error : new Error(message), {
       tags: {
         feature: "file-link-open",
       },

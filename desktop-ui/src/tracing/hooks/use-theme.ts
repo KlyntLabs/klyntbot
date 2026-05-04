@@ -6,9 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 type Theme = "light" | "dark";
 
 function getSystemTheme(): Theme {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 export function useTheme() {
@@ -21,7 +19,7 @@ export function useTheme() {
     // Theme is governed by klyntbot's app-wide theme system; the island
     // re-renders via CSS variables in the theme-bridge. Do not toggle a
     // `dark` class on documentElement here.
-  }, [theme]);
+  }, []);
 
   const toggleTheme = useCallback(() => {
     setThemeState((prev) => (prev === "dark" ? "light" : "dark"));

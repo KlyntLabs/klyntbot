@@ -83,10 +83,12 @@ export function useMessagesViewState({
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [isNearBottom]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: effect must run on thread switch to reset scroll pin
   useLayoutEffect(() => {
     autoScrollRef.current = true;
   }, [threadId]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scrollKey + threadId drive intentional scroll-to-bottom behavior
   useLayoutEffect(() => {
     const container = containerRef.current;
     const shouldScroll = autoScrollRef.current || (container ? isNearBottom(container) : true);
@@ -272,7 +274,7 @@ export function useMessagesViewState({
     }
     setDismissedPlanFollowupByThread((prev) => ({
       ...prev,
-      [threadId]: planFollowup.planItemId!,
+      [threadId]: planFollowup.planItemId as string,
     }));
   }, [planFollowup.planItemId, threadId]);
 

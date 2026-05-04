@@ -1,12 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { memo, useState, type ComponentProps, type ReactNode } from "react";
-import { isValidElement } from "react";
-import { Streamdown, type StreamdownProps } from "streamdown";
-import { cn } from "@/tracing/lib/utils";
-import { CheckIcon, CopyIcon } from "lucide-react";
 import type { Element } from "hast";
+import { CheckIcon, CopyIcon } from "lucide-react";
+import {
+  type ComponentProps,
+  isValidElement,
+  memo,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { type ExtraProps, Streamdown, type StreamdownProps } from "streamdown";
+import { cn } from "@/tracing/lib/utils";
 
 /**
  * Escape HTML-like tags outside of code blocks.
@@ -15,11 +22,12 @@ const escapeHtmlOutsideCodeBlocks = (text: string): string => {
   const codeBlockRegex = /(^|\n)```[a-z]*\n[\s\S]*?\n```|`[^`\n]+`/g;
   const codeBlocks: { start: number; end: number }[] = [];
 
-  let match;
-  while ((match = codeBlockRegex.exec(text)) !== null) {
+  let match: RegExpExecArray | null = codeBlockRegex.exec(text);
+  while (match !== null) {
     const startsWithNewline = match[0].startsWith("\n");
     const start = startsWithNewline ? match.index + 1 : match.index;
     codeBlocks.push({ start, end: match.index + match[0].length });
+    match = codeBlockRegex.exec(text);
   }
 
   const escapeForMarkdown = (str: string): string => {
@@ -87,11 +95,23 @@ function SimpleCodeBlock({
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copiedTimeoutRef.current) {
+      clearTimeout(copiedTimeoutRef.current);
+    }
+    copiedTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -101,6 +121,7 @@ function SimpleCodeBlock({
           <span className="text-[10px] text-muted-foreground font-mono px-1">{language}</span>
         )}
         <button
+          type="button"
           onClick={handleCopy}
           className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-foreground"
         >
@@ -130,16 +151,10 @@ const MarkdownCode = ({ className, children, node, ...props }: StreamdownCodePro
     );
   }
 
-  return (
-    <SimpleCodeBlock
-      code={getCodeText(children)}
-      language={getCodeLanguage(className)}
-    />
-  );
+  return <SimpleCodeBlock code={getCodeText(children)} language={getCodeLanguage(className)} />;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const MarkdownPre = ({ children }: any) => children;
+const MarkdownPre = (props: ComponentProps<"pre"> & ExtraProps) => props.children;
 
 const markdownComponents: StreamdownProps["components"] = {
   code: MarkdownCode,
@@ -159,9 +174,7 @@ export const Markdown = memo(
       rehypePlugins={[]}
       {...props}
     >
-      {typeof children === "string"
-        ? escapeHtmlOutsideCodeBlocks(children)
-        : children}
+      {typeof children === "string" ? escapeHtmlOutsideCodeBlocks(children) : children}
     </Streamdown>
   ),
   (prev, next) => prev.children === next.children,

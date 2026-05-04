@@ -44,10 +44,9 @@ export function WorkspaceCard({
 
   return (
     <div className="workspace-card">
-      <div
+      <button
+        type="button"
         className={`workspace-row ${isActive ? "active" : ""}`}
-        role="button"
-        tabIndex={0}
         onClick={() => onSelectWorkspace(workspace.id)}
         onContextMenu={(event) => onShowWorkspaceMenu(event, workspace.id)}
         onKeyDown={(event) => {
@@ -62,6 +61,7 @@ export function WorkspaceCard({
             <div className="workspace-title">
               <span className="workspace-name">{workspaceName ?? workspace.name}</span>
               <button
+                type="button"
                 className={`workspace-toggle ${isCollapsed ? "" : "expanded"}`}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -79,6 +79,7 @@ export function WorkspaceCard({
         </div>
         <div className="workspace-actions">
           <button
+            type="button"
             className="ghost workspace-add"
             onClick={(event) => {
               event.stopPropagation();
@@ -103,7 +104,8 @@ export function WorkspaceCard({
             +
           </button>
           {!workspace.connected && (
-            <span
+            <button
+              type="button"
               className="connect"
               title="Connect workspace context to the shared Codex server"
               onClick={(event) => {
@@ -112,10 +114,10 @@ export function WorkspaceCard({
               }}
             >
               connect
-            </span>
+            </button>
           )}
         </div>
-      </div>
+      </button>
       <div
         className={`workspace-card-content${contentCollapsedClass}`}
         aria-hidden={isCollapsed}

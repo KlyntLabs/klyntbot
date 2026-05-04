@@ -1,5 +1,9 @@
-import { AlertCircle, Check, ChevronDown, ChevronRight, Copy } from "lucide-react";
-import { memo, useState } from "react";
+import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
+import Check from "lucide-react/dist/esm/icons/check";
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
+import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
+import Copy from "lucide-react/dist/esm/icons/copy";
+import { memo, useEffect, useRef, useState } from "react";
 import {
   eventChipColor,
   formatTimeDelta,
@@ -37,8 +41,20 @@ export const WireEventCard = memo(function WireEventCard(props: WireEventCardPro
   const color = eventChipColor(event.kind);
   const isError = isErrorEvent(event);
   const [copied, setCopied] = useState(false);
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const gap = prevEvent ? renderGap(event, prevEvent) : null;
+  const cardStyle: React.CSSProperties = nestLevel
+    ? { paddingLeft: `${20 + nestLevel * 16}px`, position: "relative" }
+    : { position: "relative" };
 
   return (
     <>
@@ -50,12 +66,29 @@ export const WireEventCard = memo(function WireEventCard(props: WireEventCardPro
           (searchMatch ? " cm-event-card--search-hit" : "") +
           (isError ? " cm-event-card--error" : "")
         }
-        style={nestLevel ? { paddingLeft: `${20 + nestLevel * 16}px` } : undefined}
-        onClick={onSelect}
+        style={cardStyle}
       >
+        {onSelect && (
+          <button
+            type="button"
+            className="cm-event-card-select"
+            aria-label="Select event"
+            onClick={onSelect}
+            tabIndex={0}
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 1,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+            }}
+          />
+        )}
         <button
           type="button"
           className="cm-event-card__chevron"
+          style={{ position: "relative", zIndex: 2 }}
           onClick={(e) => {
             e.stopPropagation();
             onToggle();
@@ -70,11 +103,15 @@ export const WireEventCard = memo(function WireEventCard(props: WireEventCardPro
         <button
           type="button"
           className="cm-event-card__copy"
+          style={{ position: "relative", zIndex: 2 }}
           onClick={async (e) => {
             e.stopPropagation();
             await navigator.clipboard.writeText(event.rawJson);
             setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
+            if (copiedTimeoutRef.current) {
+              clearTimeout(copiedTimeoutRef.current);
+            }
+            copiedTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
           }}
           aria-label="Copy raw JSON"
         >

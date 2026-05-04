@@ -1,6 +1,6 @@
 import { useMenuController } from "@app/hooks/useMenuController";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { useCallback } from "react";
+import { memo, useCallback } from "react";
 import {
   PopoverMenuItem,
   PopoverSurface,
@@ -14,7 +14,7 @@ type ComposerQueueProps = {
   onDeleteQueued?: (id: string) => void;
 };
 
-export function ComposerQueue({
+export const ComposerQueue = memo(function ComposerQueue({
   queuedMessages,
   pausedReason = null,
   onEditQueued,
@@ -48,7 +48,7 @@ export function ComposerQueue({
       </div>
     </div>
   );
-}
+});
 
 type QueueMenuButtonProps = {
   item: QueuedMessage;
@@ -56,7 +56,11 @@ type QueueMenuButtonProps = {
   onDeleteQueued?: (id: string) => void;
 };
 
-function QueueMenuButton({ item, onEditQueued, onDeleteQueued }: QueueMenuButtonProps) {
+const QueueMenuButton = memo(function QueueMenuButton({
+  item,
+  onEditQueued,
+  onDeleteQueued,
+}: QueueMenuButtonProps) {
   const menu = useMenuController();
   const handleToggleMenu = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
@@ -97,4 +101,4 @@ function QueueMenuButton({ item, onEditQueued, onDeleteQueued }: QueueMenuButton
       )}
     </div>
   );
-}
+});

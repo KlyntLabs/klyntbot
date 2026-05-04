@@ -295,15 +295,15 @@
   color: var(--tray-destructive);
   background: var(--tray-destructive-bg);
 }
-.tray-footer-btn .tray-icon-xs {
-  width: 15px;
-  height: 15px;
-}
-
 /* ── Generic helpers ───────────────────────────────────────────── */
 .tray-icon-xs {
   width: 14px;
   height: 14px;
+}
+
+.tray-footer-btn .tray-icon-xs {
+  width: 15px;
+  height: 15px;
 }
 .tray-icon-xs.is-info {
   color: var(--tray-info);
@@ -345,9 +345,19 @@
   align-items: center;
   justify-content: center;
   color: transparent;
+  position: relative;
   transition:
     background-color 120ms ease,
     border-color 120ms ease;
+}
+.tray-checkbox-native {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: inherit;
 }
 .tray-checkbox.is-checked {
   background: var(--tray-brand);

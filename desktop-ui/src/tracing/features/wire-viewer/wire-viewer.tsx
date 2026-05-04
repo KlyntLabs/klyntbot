@@ -2,18 +2,18 @@
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type WireEvent, getWireEvents, getSubagentWireEvents } from "@/tracing/lib/api";
-import { WireEventCard, isErrorEvent } from "./wire-event-card";
-import { WireFilters } from "./wire-filters";
-import { TurnTree } from "./turn-tree";
-import { ToolCallDetail } from "./tool-call-detail";
-import { UsageChart, ToolTokenBreakdown } from "./usage-chart";
-import { ToolStatsDashboard } from "./tool-stats-dashboard";
-import { TurnEfficiency } from "./turn-efficiency";
-import { TimelineView } from "./timeline-view";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
+import { getSubagentWireEvents, getWireEvents, type WireEvent } from "@/tracing/lib/api";
 import { DecisionPath } from "./decision-path";
 import { computeIntegrity, IntegrityPanel } from "./integrity-check";
-import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
+import { TimelineView } from "./timeline-view";
+import { ToolCallDetail } from "./tool-call-detail";
+import { ToolStatsDashboard } from "./tool-stats-dashboard";
+import { TurnEfficiency } from "./turn-efficiency";
+import { TurnTree } from "./turn-tree";
+import { ToolTokenBreakdown, UsageChart } from "./usage-chart";
+import { isErrorEvent, WireEventCard } from "./wire-event-card";
+import { WireFilters } from "./wire-filters";
 
 type ViewMode = "events" | "timeline" | "decisions";
 
@@ -49,9 +49,7 @@ function buildToolGrouping(events: WireEvent[]): Map<number, EventMeta> {
   const toolCallNames = new Map<string, string>();
 
   const getLatestActive = () =>
-    activeToolCalls.length > 0
-      ? activeToolCalls[activeToolCalls.length - 1]
-      : undefined;
+    activeToolCalls.length > 0 ? activeToolCalls[activeToolCalls.length - 1] : undefined;
 
   for (const event of events) {
     if (event.type === "ToolCall") {
@@ -94,7 +92,14 @@ function buildToolGrouping(events: WireEvent[]): Map<number, EventMeta> {
   return meta;
 }
 
-export function WireViewer({ sessionId, refreshKey = 0, onNavigateToContext, scrollToToolCallId, onScrollTargetConsumed, agentScope }: WireViewerProps) {
+export function WireViewer({
+  sessionId,
+  refreshKey = 0,
+  onNavigateToContext,
+  scrollToToolCallId,
+  onScrollTargetConsumed,
+  agentScope,
+}: WireViewerProps) {
   const [events, setEvents] = useState<WireEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -152,10 +157,7 @@ export function WireViewer({ sessionId, refreshKey = 0, onNavigateToContext, scr
   }, [events, searchQuery]);
 
   // Error indices (in original events order)
-  const errorIndices = useMemo(
-    () => events.filter(isErrorEvent).map((e) => e.index),
-    [events],
-  );
+  const errorIndices = useMemo(() => events.filter(isErrorEvent).map((e) => e.index), [events]);
 
   // Integrity check
   const integrityResult = useMemo(() => computeIntegrity(events), [events]);
@@ -223,8 +225,7 @@ export function WireViewer({ sessionId, refreshKey = 0, onNavigateToContext, scr
     });
   }, []);
 
-  const allExpanded =
-    filtered.length > 0 && filtered.every((e) => expandedSet.has(e.index));
+  const allExpanded = filtered.length > 0 && filtered.every((e) => expandedSet.has(e.index));
 
   const expandAll = useCallback(() => {
     setExpandedSet((prev) => {
@@ -242,13 +243,10 @@ export function WireViewer({ sessionId, refreshKey = 0, onNavigateToContext, scr
     });
   }, [filtered]);
 
-  const applyPreset = useCallback(
-    (types: Set<string>, newErrorsOnly: boolean) => {
-      setSelectedTypes(types);
-      setErrorsOnly(newErrorsOnly);
-    },
-    [],
-  );
+  const applyPreset = useCallback((types: Set<string>, newErrorsOnly: boolean) => {
+    setSelectedTypes(types);
+    setErrorsOnly(newErrorsOnly);
+  }, []);
 
   // Scroll to a specific event by its index in the original events array
   const scrollToEventIndex = useCallback(
@@ -266,16 +264,11 @@ export function WireViewer({ sessionId, refreshKey = 0, onNavigateToContext, scr
   );
 
   // Handle click on ToolCall / ToolResult to show detail panel
-  const handleEventSelect = useCallback(
-    (event: WireEvent) => {
-      if (event.type === "ToolCall" || event.type === "ToolResult") {
-        setSelectedToolEvent((prev) =>
-          prev?.index === event.index ? null : event,
-        );
-      }
-    },
-    [],
-  );
+  const handleEventSelect = useCallback((event: WireEvent) => {
+    if (event.type === "ToolCall" || event.type === "ToolResult") {
+      setSelectedToolEvent((prev) => (prev?.index === event.index ? null : event));
+    }
+  }, []);
 
   // Error navigation: track current error position
   const errorNavRef = useRef(0);
@@ -284,11 +277,9 @@ export function WireViewer({ sessionId, refreshKey = 0, onNavigateToContext, scr
     (direction: "next" | "prev") => {
       if (errorIndices.length === 0) return;
       if (direction === "next") {
-        errorNavRef.current =
-          (errorNavRef.current + 1) % errorIndices.length;
+        errorNavRef.current = (errorNavRef.current + 1) % errorIndices.length;
       } else {
-        errorNavRef.current =
-          (errorNavRef.current - 1 + errorIndices.length) % errorIndices.length;
+        errorNavRef.current = (errorNavRef.current - 1 + errorIndices.length) % errorIndices.length;
       }
       const targetIndex = errorIndices[errorNavRef.current];
       // Find position in filtered list
@@ -322,10 +313,7 @@ export function WireViewer({ sessionId, refreshKey = 0, onNavigateToContext, scr
       if (e.key === "j") {
         // Move focus down
         e.preventDefault();
-        focusIndexRef.current = Math.min(
-          focusIndexRef.current + 1,
-          filtered.length - 1,
-        );
+        focusIndexRef.current = Math.min(focusIndexRef.current + 1, filtered.length - 1);
         virtuosoRef.current?.scrollToIndex({
           index: focusIndexRef.current,
           align: "center",
@@ -373,9 +361,7 @@ export function WireViewer({ sessionId, refreshKey = 0, onNavigateToContext, scr
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center text-destructive">
-        Error: {error}
-      </div>
+      <div className="flex h-full items-center justify-center text-destructive">Error: {error}</div>
     );
   }
 
@@ -441,16 +427,22 @@ export function WireViewer({ sessionId, refreshKey = 0, onNavigateToContext, scr
       )}
 
       {viewMode === "timeline" ? (
-        <TimelineView events={events} onScrollToIndex={(idx) => {
-          setViewMode("events");
-          // Defer scroll to after view switch
-          setTimeout(() => scrollToEventIndex(idx), 100);
-        }} />
+        <TimelineView
+          events={events}
+          onScrollToIndex={(idx) => {
+            setViewMode("events");
+            // Defer scroll to after view switch
+            setTimeout(() => scrollToEventIndex(idx), 100);
+          }}
+        />
       ) : viewMode === "decisions" ? (
-        <DecisionPath events={events} onScrollToIndex={(idx) => {
-          setViewMode("events");
-          setTimeout(() => scrollToEventIndex(idx), 100);
-        }} />
+        <DecisionPath
+          events={events}
+          onScrollToIndex={(idx) => {
+            setViewMode("events");
+            setTimeout(() => scrollToEventIndex(idx), 100);
+          }}
+        />
       ) : (
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Turn/Step navigation sidebar */}
@@ -532,6 +524,7 @@ function KeyboardHelp() {
         </div>
       )}
       <button
+        type="button"
         onClick={() => setShow((v) => !v)}
         className="rounded-full border bg-popover shadow-md w-7 h-7 flex items-center justify-center text-sm text-muted-foreground hover:text-foreground transition-colors"
         title="Keyboard shortcuts"

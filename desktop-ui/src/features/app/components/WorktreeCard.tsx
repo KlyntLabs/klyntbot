@@ -31,11 +31,10 @@ export function WorktreeCard({
 
   return (
     <div className={`worktree-card${isDeleting ? " deleting" : ""}`}>
-      <div
+      <button
+        type="button"
         className={`worktree-row ${isActive ? "active" : ""}${isDeleting ? " deleting" : ""}`}
-        role="button"
-        tabIndex={isDeleting ? -1 : 0}
-        aria-disabled={isDeleting}
+        disabled={isDeleting}
         onClick={() => {
           if (!isDeleting) {
             onSelectWorkspace(worktree.id);
@@ -69,6 +68,7 @@ export function WorktreeCard({
           ) : (
             <>
               <button
+                type="button"
                 className={`worktree-toggle ${worktreeCollapsed ? "" : "expanded"}`}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -81,7 +81,8 @@ export function WorktreeCard({
                 <span className="worktree-toggle-icon">›</span>
               </button>
               {!worktree.connected && (
-                <span
+                <button
+                  type="button"
                   className="connect"
                   title="Connect workspace context to the shared Codex server"
                   onClick={(event) => {
@@ -90,12 +91,12 @@ export function WorktreeCard({
                   }}
                 >
                   connect
-                </span>
+                </button>
               )}
             </>
           )}
         </div>
-      </div>
+      </button>
       <div
         className={`worktree-card-content${contentCollapsedClass}`}
         aria-hidden={worktreeCollapsed}

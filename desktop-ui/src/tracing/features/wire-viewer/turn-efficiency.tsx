@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { useMemo } from "react";
 import { AlertTriangle } from "lucide-react";
+import { useMemo } from "react";
 import type { WireEvent } from "@/tracing/lib/api";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -40,8 +40,7 @@ function mean(values: number[]): number {
 
 function stddev(values: number[], avg: number): number {
   if (values.length === 0) return 0;
-  const variance =
-    values.reduce((sum, v) => sum + (v - avg) ** 2, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + (v - avg) ** 2, 0) / values.length;
   return Math.sqrt(variance);
 }
 
@@ -64,7 +63,10 @@ function computeTurnMetrics(events: WireEvent[]): TurnMetrics[] {
     if (event.type === "StatusUpdate" && inTurn) {
       const usage = event.payload.token_usage as Record<string, number> | undefined;
       if (usage) {
-        turnInputTokens += (usage.input_other ?? 0) + (usage.input_cache_read ?? 0) + (usage.input_cache_creation ?? 0);
+        turnInputTokens +=
+          (usage.input_other ?? 0) +
+          (usage.input_cache_read ?? 0) +
+          (usage.input_cache_creation ?? 0);
         turnOutputTokens += usage.output ?? 0;
       }
     }
@@ -75,7 +77,10 @@ function computeTurnMetrics(events: WireEvent[]): TurnMetrics[] {
         const innerPayload = inner.payload as Record<string, unknown> | undefined;
         const usage = innerPayload?.token_usage as Record<string, number> | undefined;
         if (usage) {
-          turnInputTokens += (usage.input_other ?? 0) + (usage.input_cache_read ?? 0) + (usage.input_cache_creation ?? 0);
+          turnInputTokens +=
+            (usage.input_other ?? 0) +
+            (usage.input_cache_read ?? 0) +
+            (usage.input_cache_creation ?? 0);
           turnOutputTokens += usage.output ?? 0;
         }
       }
@@ -112,9 +117,7 @@ function computeTurnMetrics(events: WireEvent[]): TurnMetrics[] {
   // Handle unclosed turn
   if (inTurn) {
     const lastEvent = events[events.length - 1];
-    const durationSec = lastEvent
-      ? lastEvent.timestamp - turnStartTimestamp
-      : 0;
+    const durationSec = lastEvent ? lastEvent.timestamp - turnStartTimestamp : 0;
     raw.push({
       turnNumber,
       eventIndex: turnStartIndex,
@@ -130,9 +133,7 @@ function computeTurnMetrics(events: WireEvent[]): TurnMetrics[] {
 
   // Anomaly detection: mean + 2*stddev for stepCount and totalTokens
   const stepCounts = raw.map((t) => t.stepCount);
-  const totalTokens = raw.map(
-    (t) => t.inputTokensDelta + t.outputTokensDelta,
-  );
+  const totalTokens = raw.map((t) => t.inputTokensDelta + t.outputTokensDelta);
 
   const stepMean = mean(stepCounts);
   const stepStd = stddev(stepCounts, stepMean);
@@ -147,14 +148,10 @@ function computeTurnMetrics(events: WireEvent[]): TurnMetrics[] {
     const total = t.inputTokensDelta + t.outputTokensDelta;
 
     if (stepStd > 0 && t.stepCount > stepThreshold) {
-      reasons.push(
-        `Steps (${t.stepCount}) > μ+2σ (${stepThreshold.toFixed(1)})`,
-      );
+      reasons.push(`Steps (${t.stepCount}) > μ+2σ (${stepThreshold.toFixed(1)})`);
     }
     if (tokenStd > 0 && total > tokenThreshold) {
-      reasons.push(
-        `Tokens (${total.toLocaleString()}) > μ+2σ (${tokenThreshold.toFixed(0)})`,
-      );
+      reasons.push(`Tokens (${total.toLocaleString()}) > μ+2σ (${tokenThreshold.toFixed(0)})`);
     }
 
     return {
@@ -216,15 +213,9 @@ export function TurnEfficiency({ events, onScrollToIndex }: TurnEfficiencyProps)
                 }`}
                 onClick={() => onScrollToIndex(turn.eventIndex)}
               >
-                <td className="px-2 py-1 font-mono text-xs">
-                  #{turn.turnNumber}
-                </td>
-                <td className="px-2 py-1 text-right tabular-nums">
-                  {turn.stepCount}
-                </td>
-                <td className="px-2 py-1 text-right tabular-nums">
-                  {turn.toolCallCount}
-                </td>
+                <td className="px-2 py-1 font-mono text-xs">#{turn.turnNumber}</td>
+                <td className="px-2 py-1 text-right tabular-nums">{turn.stepCount}</td>
+                <td className="px-2 py-1 text-right tabular-nums">{turn.toolCallCount}</td>
                 <td className="px-2 py-1 text-right tabular-nums">
                   {turn.inputTokensDelta.toLocaleString()}
                 </td>
@@ -240,8 +231,8 @@ export function TurnEfficiency({ events, onScrollToIndex }: TurnEfficiencyProps)
                       <AlertTriangle className="h-3 w-3" />
                       <span className="text-[10px]">anomaly</span>
                       <span className="pointer-events-none absolute bottom-full left-0 z-10 mb-1 hidden w-48 rounded border bg-popover p-1.5 text-[10px] text-popover-foreground shadow-md group-hover:block">
-                        {turn.anomalyReasons.map((r, i) => (
-                          <div key={i}>{r}</div>
+                        {turn.anomalyReasons.map((r) => (
+                          <div key={r}>{r}</div>
                         ))}
                       </span>
                     </span>

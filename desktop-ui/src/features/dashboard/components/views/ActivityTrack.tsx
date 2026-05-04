@@ -82,6 +82,7 @@ export function ActivityTrack({
   const { data: fetchedEvents } = useTauriQuery<ActivityTimelineResponse[]>({
     queryKey: qk.productivity.timeline(date),
     queryFn: () => productivityTimelineQuery(date, null, null, TZ_OFFSET_MINS),
+    staleTime: 60_000,
     fallback: [],
     enabled: !parentOwnsData,
   });
@@ -96,6 +97,7 @@ export function ActivityTrack({
   const { data: intellSessions } = useTauriQuery<IntelligenceSessionResponse[]>({
     queryKey: qk.productivity.intelligenceSessions(date),
     queryFn: () => productivityIntelligenceSessionsQuery(date, TZ_OFFSET_MINS),
+    staleTime: 60_000,
     fallback: [],
     enabled: !parentOwnsData,
   });

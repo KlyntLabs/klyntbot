@@ -35,7 +35,7 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
     setSearchQuery("");
     setErrorsOnly(false);
     setSelectedToolEvent(null);
-  }, [sessionId]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +67,7 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, refreshKey]);
+  }, [sessionId, refreshKey, events.length]);
 
   const allTypes = useMemo(() => {
     const types = new Set<string>();
@@ -256,18 +256,14 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
       <div className="cm-wire-viewer__toggles">
         <button
           type="button"
-          className={
-            "cm-wire-viewer__toggle" + (showRecall ? " cm-wire-viewer__toggle--active" : "")
-          }
+          className={`cm-wire-viewer__toggle${showRecall ? " cm-wire-viewer__toggle--active" : ""}`}
           onClick={() => setShowRecall((v) => !v)}
         >
           Recall
         </button>
         <button
           type="button"
-          className={
-            "cm-wire-viewer__toggle" + (showMirror ? " cm-wire-viewer__toggle--active" : "")
-          }
+          className={`cm-wire-viewer__toggle${showMirror ? " cm-wire-viewer__toggle--active" : ""}`}
           onClick={() => setShowMirror((v) => !v)}
         >
           Mirror

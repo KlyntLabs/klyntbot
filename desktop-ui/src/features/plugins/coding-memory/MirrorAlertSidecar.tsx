@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { actMirrorAlert, fetchMirrorAlerts } from "@/api/endpoints/codingMemory";
 import { EffectivenessTrendsChart } from "./EffectivenessTrendsChart";
 
@@ -20,18 +20,18 @@ export function MirrorAlertSidecar({ repo }: Props) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     fetchMirrorAlerts({ repo })
       .then((data) => {
         if (Array.isArray(data)) setAlerts(data as Alert[]);
       })
       .finally(() => setLoading(false));
-  };
+  }, [repo]);
 
   useEffect(() => {
     load();
-  }, [repo]);
+  }, [load]);
 
   const handleAction = async (id: string, action: "approve" | "reject" | "snooze") => {
     await actMirrorAlert(id, action);

@@ -8,10 +8,11 @@ export function useSkills(activeWorkspace: WorkspaceInfo | null) {
 
   const query = useTauriQuery<SkillOption[]>({
     queryKey: qk.skills.list(workspaceId),
+    staleTime: 60_000,
     queryFn: async () => {
       if (!activeWorkspace) return [];
       const list = await getSkillsList(activeWorkspace.id);
-      return list.filter((s: any) => Boolean(s.name));
+      return list.filter((s) => Boolean(s.name));
     },
     fallback: [],
     enabled: activeWorkspace !== null,

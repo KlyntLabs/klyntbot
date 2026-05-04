@@ -127,7 +127,7 @@ export function HomeUsageSection({
         </div>
         <div className="home-usage-control-group">
           <span className="home-usage-control-label">View</span>
-          <div className="home-usage-toggle" role="group" aria-label="Usage view">
+          <fieldset className="home-usage-toggle" aria-label="Usage view">
             <button
               type="button"
               className={
@@ -152,18 +152,28 @@ export function HomeUsageSection({
             >
               Time
             </button>
-          </div>
+          </fieldset>
         </div>
       </div>
       {showUsageSkeleton ? (
         <div className="home-usage-skeleton">
           <div className="home-usage-grid">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div className="home-usage-card" key={index}>
-                <span className="home-latest-skeleton home-usage-skeleton-label" />
-                <span className="home-latest-skeleton home-usage-skeleton-value" />
-              </div>
-            ))}
+            <div className="home-usage-card" key="skeleton-1">
+              <span className="home-latest-skeleton home-usage-skeleton-label" />
+              <span className="home-latest-skeleton home-usage-skeleton-value" />
+            </div>
+            <div className="home-usage-card" key="skeleton-2">
+              <span className="home-latest-skeleton home-usage-skeleton-label" />
+              <span className="home-latest-skeleton home-usage-skeleton-value" />
+            </div>
+            <div className="home-usage-card" key="skeleton-3">
+              <span className="home-latest-skeleton home-usage-skeleton-label" />
+              <span className="home-latest-skeleton home-usage-skeleton-value" />
+            </div>
+            <div className="home-usage-card" key="skeleton-4">
+              <span className="home-latest-skeleton home-usage-skeleton-label" />
+              <span className="home-latest-skeleton home-usage-skeleton-value" />
+            </div>
           </div>
           <div className="home-usage-chart-card">
             <span className="home-latest-skeleton home-usage-skeleton-chart" />
@@ -188,6 +198,7 @@ export function HomeUsageSection({
             <div className="home-usage-chart-nav">
               <div
                 className="home-usage-chart-range"
+                role="status"
                 aria-label={chartRangeAriaLabel}
                 aria-live="polite"
               >

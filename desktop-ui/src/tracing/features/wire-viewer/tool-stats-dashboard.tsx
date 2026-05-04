@@ -59,9 +59,7 @@ export function ToolStatsDashboard({ events }: ToolStatsDashboardProps) {
     for (const e of events) {
       if (e.type === "ToolCall") {
         const id = e.payload.id as string | undefined;
-        const fn = e.payload.function as
-          | { name: string; arguments?: string }
-          | undefined;
+        const fn = e.payload.function as { name: string; arguments?: string } | undefined;
         if (id && fn?.name) {
           openCalls.set(id, {
             name: fn.name,
@@ -76,9 +74,7 @@ export function ToolStatsDashboard({ events }: ToolStatsDashboardProps) {
         if (!open) continue;
 
         const duration = Math.max(0, e.timestamp - open.startTimestamp);
-        const returnValue = e.payload.return_value as
-          | { is_error?: boolean }
-          | undefined;
+        const returnValue = e.payload.return_value as { is_error?: boolean } | undefined;
         const isError = returnValue?.is_error === true;
 
         let entry = agg.get(open.name);
@@ -102,9 +98,7 @@ export function ToolStatsDashboard({ events }: ToolStatsDashboardProps) {
     for (const [name, data] of agg) {
       const durations = data.durations;
       const avg =
-        durations.length > 0
-          ? durations.reduce((s, d) => s + d, 0) / durations.length
-          : 0;
+        durations.length > 0 ? durations.reduce((s, d) => s + d, 0) / durations.length : 0;
       const min = durations.length > 0 ? Math.min(...durations) : 0;
       const max = durations.length > 0 ? Math.max(...durations) : 0;
 
@@ -113,10 +107,7 @@ export function ToolStatsDashboard({ events }: ToolStatsDashboardProps) {
         totalCalls: data.totalCalls,
         successCount: data.successCount,
         failureCount: data.failureCount,
-        successRate:
-          data.totalCalls > 0
-            ? (data.successCount / data.totalCalls) * 100
-            : 0,
+        successRate: data.totalCalls > 0 ? (data.successCount / data.totalCalls) * 100 : 0,
         avgDurationSec: avg,
         minDurationSec: min,
         maxDurationSec: max,
@@ -149,11 +140,10 @@ export function ToolStatsDashboard({ events }: ToolStatsDashboardProps) {
         <span className="text-[10px] font-medium text-muted-foreground">
           Tool Call Success Rates
         </span>
-        <span className="text-[10px] text-muted-foreground">
-          ({sorted.length} tools)
-        </span>
+        <span className="text-[10px] text-muted-foreground">({sorted.length} tools)</span>
         <div className="ml-auto flex items-center gap-1">
           <button
+            type="button"
             onClick={() => setSortMode("failureRate")}
             className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
               sortMode === "failureRate"
@@ -164,6 +154,7 @@ export function ToolStatsDashboard({ events }: ToolStatsDashboardProps) {
             By Failure
           </button>
           <button
+            type="button"
             onClick={() => setSortMode("callCount")}
             className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
               sortMode === "callCount"
@@ -193,11 +184,8 @@ export function ToolStatsDashboard({ events }: ToolStatsDashboardProps) {
           <tbody>
             {sorted.map((tool) => {
               const failureRate =
-                tool.totalCalls > 0
-                  ? (tool.failureCount / tool.totalCalls) * 100
-                  : 0;
-              const rowHighlight =
-                failureRate > 20 ? "bg-red-500/10" : "";
+                tool.totalCalls > 0 ? (tool.failureCount / tool.totalCalls) * 100 : 0;
+              const rowHighlight = failureRate > 20 ? "bg-red-500/10" : "";
 
               return (
                 <tr

@@ -63,7 +63,7 @@ type UseWorkspaceHomeOptions = {
       serviceTier?: ServiceTier | null | undefined;
       collaborationMode?: Record<string, unknown> | null;
     },
-  ) => Promise<void | SendMessageResult>;
+  ) => Promise<undefined | SendMessageResult>;
   onWorktreeCreated?: (worktree: WorkspaceInfo, parent: WorkspaceInfo) => Promise<void> | void;
 };
 

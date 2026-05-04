@@ -97,6 +97,7 @@ export function useGitPanelController({
   }, [refreshGitStatus]);
 
   const preloadedWorkspaceIdsRef = useRef<Set<string>>(new Set());
+  const MAX_PRELOADED_WORKSPACES = 10;
   const compactTab = isTablet ? tabletTab : activeTab;
   const diffUiVisible =
     centerMode === "diff" || (isCompact ? compactTab === "git" : gitPanelMode === "diff");
@@ -148,7 +149,14 @@ export function useGitPanelController({
     if (!isDiffLoading && !diffError && gitDiffs.length === 0) {
       return;
     }
-    preloadedWorkspaceIdsRef.current.add(activeWorkspace.id);
+    const set = preloadedWorkspaceIdsRef.current;
+    set.add(activeWorkspace.id);
+    if (set.size > MAX_PRELOADED_WORKSPACES) {
+      const first = set.values().next().value;
+      if (first !== undefined) {
+        set.delete(first);
+      }
+    }
   }, [activeWorkspace, diffError, gitDiffs.length, isDiffLoading, shouldPreloadDiffs]);
 
   const {

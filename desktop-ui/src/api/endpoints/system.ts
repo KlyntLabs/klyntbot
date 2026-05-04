@@ -13,5 +13,5 @@ export async function localUsageSnapshot(
 }
 
 export async function getModelList(workspaceId: string) {
-  return invoke<any>("model_list", { workspaceId });
+  return invoke<unknown>("model_list", { workspaceId });
 }

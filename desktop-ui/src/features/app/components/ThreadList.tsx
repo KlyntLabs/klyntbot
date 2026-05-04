@@ -1,5 +1,5 @@
 import type { ThreadStatusById } from "@utils/threadStatus";
-import { type MouseEvent, useMemo, useState } from "react";
+import { type MouseEvent, memo, useMemo, useState } from "react";
 import type { ThreadSummary } from "@/types";
 import { ThreadRow } from "./ThreadRow";
 import { buildThreadRowVisibility } from "./threadRowVisibility";
@@ -38,7 +38,7 @@ type ThreadListProps = {
   ) => void;
 };
 
-export function ThreadList({
+export const ThreadList = memo(function ThreadList({
   workspaceId,
   pinnedRows,
   unpinnedRows,
@@ -141,6 +141,7 @@ export function ThreadList({
       ))}
       {showExpandToggle && totalThreadRoots > 3 && (
         <button
+          type="button"
           className="thread-more"
           onClick={(event) => {
             event.stopPropagation();
@@ -152,6 +153,7 @@ export function ThreadList({
       )}
       {showLoadOlder && nextCursor && (isExpanded || totalThreadRoots <= 3) && (
         <button
+          type="button"
           className="thread-more"
           onClick={(event) => {
             event.stopPropagation();
@@ -164,4 +166,4 @@ export function ThreadList({
       )}
     </div>
   );
-}
+});

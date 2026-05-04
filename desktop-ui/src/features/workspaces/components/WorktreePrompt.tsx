@@ -67,7 +67,7 @@ export function WorktreePrompt({
     }
     setDidNavigateBranches(false);
     setSelectedBranchIndex(0);
-  }, [branchMenuOpen, filteredBranches.length]);
+  }, [branchMenuOpen]);
 
   useEffect(() => {
     if (!branchMenuOpen) {

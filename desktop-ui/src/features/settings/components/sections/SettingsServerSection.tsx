@@ -210,342 +210,343 @@ export function SettingsServerSection({
         </div>
       )}
 
-      <>
-        {isMobileSimplified && (
-          <>
-            <div className="settings-field">
-              <div className="settings-field-label">Saved remotes</div>
-              <div className="settings-mobile-remotes" role="list" aria-label="Saved remotes">
-                {remoteBackends.map((entry, index) => {
-                  const isActive = entry.id === activeRemoteBackendId;
-                  return (
-                    <div
-                      className={`settings-mobile-remote${isActive ? " is-active" : ""}`}
-                      role="listitem"
-                      key={entry.id}
-                    >
-                      <div className="settings-mobile-remote-main">
-                        <div className="settings-mobile-remote-name-row">
-                          <div className="settings-mobile-remote-name">{entry.name}</div>
-                          {isActive && <span className="settings-mobile-remote-badge">Active</span>}
-                        </div>
-                        <div className="settings-mobile-remote-meta">TCP · {entry.host}</div>
-                        <div className="settings-mobile-remote-last">
-                          Last connected:{" "}
-                          {typeof entry.lastConnectedAtMs === "number"
-                            ? new Date(entry.lastConnectedAtMs).toLocaleString()
-                            : "Never"}
-                        </div>
+      {isMobileSimplified && (
+        <>
+          <div className="settings-field">
+            <div className="settings-field-label">Saved remotes</div>
+            <ul
+              className="settings-mobile-remotes"
+              aria-label="Saved remotes"
+              style={{ listStyle: "none", padding: 0, margin: 0 }}
+            >
+              {remoteBackends.map((entry, index) => {
+                const isActive = entry.id === activeRemoteBackendId;
+                return (
+                  <li
+                    className={`settings-mobile-remote${isActive ? " is-active" : ""}`}
+                    key={entry.id}
+                  >
+                    <div className="settings-mobile-remote-main">
+                      <div className="settings-mobile-remote-name-row">
+                        <div className="settings-mobile-remote-name">{entry.name}</div>
+                        {isActive && <span className="settings-mobile-remote-badge">Active</span>}
                       </div>
-                      <div className="settings-mobile-remote-actions">
-                        <button
-                          type="button"
-                          className="ghost settings-mobile-remote-action"
-                          onClick={() => {
-                            void onSelectRemoteBackend(entry.id);
-                          }}
-                          disabled={isActive}
-                          aria-label={`Use ${entry.name} remote`}
-                        >
-                          {isActive ? "Using" : "Use"}
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost settings-mobile-remote-action"
-                          onClick={() => {
-                            void onMoveRemoteBackend(entry.id, "up");
-                          }}
-                          disabled={index === 0}
-                          aria-label={`Move ${entry.name} up`}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost settings-mobile-remote-action"
-                          onClick={() => {
-                            void onMoveRemoteBackend(entry.id, "down");
-                          }}
-                          disabled={index === remoteBackends.length - 1}
-                          aria-label={`Move ${entry.name} down`}
-                        >
-                          ↓
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost settings-mobile-remote-action settings-mobile-remote-action-danger"
-                          onClick={() => {
-                            setPendingDeleteRemoteId(entry.id);
-                          }}
-                          aria-label={`Delete ${entry.name}`}
-                        >
-                          Delete
-                        </button>
+                      <div className="settings-mobile-remote-meta">TCP · {entry.host}</div>
+                      <div className="settings-mobile-remote-last">
+                        Last connected:{" "}
+                        {typeof entry.lastConnectedAtMs === "number"
+                          ? new Date(entry.lastConnectedAtMs).toLocaleString()
+                          : "Never"}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-              <div className="settings-field-row">
-                <button
-                  type="button"
-                  className="button settings-button-compact"
-                  onClick={openAddRemoteModal}
-                >
-                  Add remote
-                </button>
-              </div>
-              {remoteStatusText && (
-                <div className={`settings-help${remoteStatusError ? " settings-help-error" : ""}`}>
-                  {remoteStatusText}
-                </div>
-              )}
-              <div className="settings-help">
-                Switch the active remote here. The fields below edit the active entry.
-              </div>
+                    <div className="settings-mobile-remote-actions">
+                      <button
+                        type="button"
+                        className="ghost settings-mobile-remote-action"
+                        onClick={() => {
+                          void onSelectRemoteBackend(entry.id);
+                        }}
+                        disabled={isActive}
+                        aria-label={`Use ${entry.name} remote`}
+                      >
+                        {isActive ? "Using" : "Use"}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost settings-mobile-remote-action"
+                        onClick={() => {
+                          void onMoveRemoteBackend(entry.id, "up");
+                        }}
+                        disabled={index === 0}
+                        aria-label={`Move ${entry.name} up`}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost settings-mobile-remote-action"
+                        onClick={() => {
+                          void onMoveRemoteBackend(entry.id, "down");
+                        }}
+                        disabled={index === remoteBackends.length - 1}
+                        aria-label={`Move ${entry.name} down`}
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost settings-mobile-remote-action settings-mobile-remote-action-danger"
+                        onClick={() => {
+                          setPendingDeleteRemoteId(entry.id);
+                        }}
+                        aria-label={`Delete ${entry.name}`}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="settings-field-row">
+              <button
+                type="button"
+                className="button settings-button-compact"
+                onClick={openAddRemoteModal}
+              >
+                Add remote
+              </button>
             </div>
-
-            <div className="settings-field">
-              <label className="settings-field-label" htmlFor="mobile-remote-name">
-                Remote name
-              </label>
-              <input
-                id="mobile-remote-name"
-                className="settings-input settings-input--compact"
-                value={remoteNameDraft}
-                placeholder="My desktop"
-                onChange={(event) => onSetRemoteNameDraft(event.target.value)}
-                onBlur={() => {
-                  void onCommitRemoteName();
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void onCommitRemoteName();
-                  }
-                }}
-              />
-              {remoteNameError && (
-                <div className="settings-help settings-help-error">{remoteNameError}</div>
-              )}
+            {remoteStatusText && (
+              <div className={`settings-help${remoteStatusError ? " settings-help-error" : ""}`}>
+                {remoteStatusText}
+              </div>
+            )}
+            <div className="settings-help">
+              Switch the active remote here. The fields below edit the active entry.
             </div>
-          </>
-        )}
-
-        {!isMobileSimplified && (
-          <SettingsToggleRow
-            title="Keep daemon running after app closes"
-            subtitle="If disabled, Klynt stops managed TCP daemon processes before exit."
-          >
-            <SettingsToggleSwitch
-              pressed={appSettings.keepDaemonRunningAfterAppClose}
-              onClick={() =>
-                void onUpdateAppSettings({
-                  ...appSettings,
-                  keepDaemonRunningAfterAppClose: !appSettings.keepDaemonRunningAfterAppClose,
-                })
-              }
-            />
-          </SettingsToggleRow>
-        )}
-
-        <div className="settings-field">
-          <div className="settings-field-label">Remote backend</div>
-          <div className="settings-field-row">
-            <input
-              className="settings-input settings-input--compact"
-              value={remoteHostDraft}
-              placeholder="127.0.0.1:4732"
-              onChange={(event) => onSetRemoteHostDraft(event.target.value)}
-              onBlur={() => {
-                void onCommitRemoteHost();
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void onCommitRemoteHost();
-                }
-              }}
-              aria-label="Remote backend host"
-            />
-            <input
-              type="password"
-              className="settings-input settings-input--compact"
-              value={remoteTokenDraft}
-              placeholder="Token (required)"
-              onChange={(event) => onSetRemoteTokenDraft(event.target.value)}
-              onBlur={() => {
-                void onCommitRemoteToken();
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void onCommitRemoteToken();
-                }
-              }}
-              aria-label="Remote backend token"
-            />
           </div>
-          {remoteHostError && (
-            <div className="settings-help settings-help-error">{remoteHostError}</div>
+
+          <div className="settings-field">
+            <label className="settings-field-label" htmlFor="mobile-remote-name">
+              Remote name
+            </label>
+            <input
+              id="mobile-remote-name"
+              className="settings-input settings-input--compact"
+              value={remoteNameDraft}
+              placeholder="My desktop"
+              onChange={(event) => onSetRemoteNameDraft(event.target.value)}
+              onBlur={() => {
+                void onCommitRemoteName();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void onCommitRemoteName();
+                }
+              }}
+            />
+            {remoteNameError && (
+              <div className="settings-help settings-help-error">{remoteNameError}</div>
+            )}
+          </div>
+        </>
+      )}
+
+      {!isMobileSimplified && (
+        <SettingsToggleRow
+          title="Keep daemon running after app closes"
+          subtitle="If disabled, Klynt stops managed TCP daemon processes before exit."
+        >
+          <SettingsToggleSwitch
+            pressed={appSettings.keepDaemonRunningAfterAppClose}
+            onClick={() =>
+              void onUpdateAppSettings({
+                ...appSettings,
+                keepDaemonRunningAfterAppClose: !appSettings.keepDaemonRunningAfterAppClose,
+              })
+            }
+          />
+        </SettingsToggleRow>
+      )}
+
+      <div className="settings-field">
+        <div className="settings-field-label">Remote backend</div>
+        <div className="settings-field-row">
+          <input
+            className="settings-input settings-input--compact"
+            value={remoteHostDraft}
+            placeholder="127.0.0.1:4732"
+            onChange={(event) => onSetRemoteHostDraft(event.target.value)}
+            onBlur={() => {
+              void onCommitRemoteHost();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void onCommitRemoteHost();
+              }
+            }}
+            aria-label="Remote backend host"
+          />
+          <input
+            type="password"
+            className="settings-input settings-input--compact"
+            value={remoteTokenDraft}
+            placeholder="Token (required)"
+            onChange={(event) => onSetRemoteTokenDraft(event.target.value)}
+            onBlur={() => {
+              void onCommitRemoteToken();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void onCommitRemoteToken();
+              }
+            }}
+            aria-label="Remote backend token"
+          />
+        </div>
+        {remoteHostError && (
+          <div className="settings-help settings-help-error">{remoteHostError}</div>
+        )}
+        <div className="settings-help">
+          {isMobileSimplified
+            ? "Use the Tailscale host from your desktop Klynt app (Server section), for example `macbook.your-tailnet.ts.net:4732`."
+            : "This host/token is used by mobile clients and desktop remote-mode testing."}
+        </div>
+      </div>
+
+      {isMobileSimplified && (
+        <div className="settings-field">
+          <div className="settings-field-label">Connection test</div>
+          <div className="settings-field-row">
+            <button
+              type="button"
+              className="button settings-button-compact"
+              onClick={onMobileConnectTest}
+              disabled={mobileConnectBusy}
+            >
+              {mobileConnectBusy ? "Connecting..." : "Connect & test"}
+            </button>
+          </div>
+          {mobileConnectStatusText && (
+            <div
+              className={`settings-help${mobileConnectStatusError ? " settings-help-error" : ""}`}
+            >
+              {mobileConnectStatusText}
+            </div>
           )}
           <div className="settings-help">
-            {isMobileSimplified
-              ? "Use the Tailscale host from your desktop Klynt app (Server section), for example `macbook.your-tailnet.ts.net:4732`."
-              : "This host/token is used by mobile clients and desktop remote-mode testing."}
+            Make sure your desktop app daemon is running and reachable on Tailscale, then retry this
+            test.
           </div>
         </div>
+      )}
 
-        {isMobileSimplified && (
-          <div className="settings-field">
-            <div className="settings-field-label">Connection test</div>
-            <div className="settings-field-row">
-              <button
-                type="button"
-                className="button settings-button-compact"
-                onClick={onMobileConnectTest}
-                disabled={mobileConnectBusy}
-              >
-                {mobileConnectBusy ? "Connecting..." : "Connect & test"}
-              </button>
-            </div>
-            {mobileConnectStatusText && (
-              <div
-                className={`settings-help${mobileConnectStatusError ? " settings-help-error" : ""}`}
-              >
-                {mobileConnectStatusText}
-              </div>
-            )}
-            <div className="settings-help">
-              Make sure your desktop app daemon is running and reachable on Tailscale, then retry
-              this test.
-            </div>
+      {!isMobileSimplified && (
+        <div className="settings-field">
+          <div className="settings-field-label">Mobile access daemon</div>
+          <div className="settings-field-row">
+            <button
+              type="button"
+              className="button settings-button-compact"
+              onClick={() => {
+                void onTcpDaemonStart();
+              }}
+              disabled={tcpDaemonBusyAction !== null}
+            >
+              {tcpDaemonBusyAction === "start" ? "Starting..." : "Start daemon"}
+            </button>
+            <button
+              type="button"
+              className="button settings-button-compact"
+              onClick={() => {
+                void onTcpDaemonStop();
+              }}
+              disabled={tcpDaemonBusyAction !== null}
+            >
+              {tcpDaemonBusyAction === "stop" ? "Stopping..." : "Stop daemon"}
+            </button>
+            <button
+              type="button"
+              className="button settings-button-compact"
+              onClick={() => {
+                void onTcpDaemonStatus();
+              }}
+              disabled={tcpDaemonBusyAction !== null}
+            >
+              {tcpDaemonBusyAction === "status" ? "Refreshing..." : "Refresh status"}
+            </button>
           </div>
-        )}
-
-        {!isMobileSimplified && (
-          <div className="settings-field">
-            <div className="settings-field-label">Mobile access daemon</div>
-            <div className="settings-field-row">
-              <button
-                type="button"
-                className="button settings-button-compact"
-                onClick={() => {
-                  void onTcpDaemonStart();
-                }}
-                disabled={tcpDaemonBusyAction !== null}
-              >
-                {tcpDaemonBusyAction === "start" ? "Starting..." : "Start daemon"}
-              </button>
-              <button
-                type="button"
-                className="button settings-button-compact"
-                onClick={() => {
-                  void onTcpDaemonStop();
-                }}
-                disabled={tcpDaemonBusyAction !== null}
-              >
-                {tcpDaemonBusyAction === "stop" ? "Stopping..." : "Stop daemon"}
-              </button>
-              <button
-                type="button"
-                className="button settings-button-compact"
-                onClick={() => {
-                  void onTcpDaemonStatus();
-                }}
-                disabled={tcpDaemonBusyAction !== null}
-              >
-                {tcpDaemonBusyAction === "status" ? "Refreshing..." : "Refresh status"}
-              </button>
+          {tcpRunnerStatusText && <div className="settings-help">{tcpRunnerStatusText}</div>}
+          {tcpDaemonStatus?.startedAtMs && (
+            <div className="settings-help">
+              Started at: {new Date(tcpDaemonStatus.startedAtMs).toLocaleString()}
             </div>
-            {tcpRunnerStatusText && <div className="settings-help">{tcpRunnerStatusText}</div>}
-            {tcpDaemonStatus?.startedAtMs && (
+          )}
+          <div className="settings-help">
+            Start this daemon before connecting from iOS. It uses your current token and listens on{" "}
+            <code>0.0.0.0:&lt;port&gt;</code>, matching your configured host port.
+          </div>
+        </div>
+      )}
+
+      {!isMobileSimplified && (
+        <div className="settings-field">
+          <div className="settings-field-label">Tailscale helper</div>
+          <div className="settings-field-row">
+            <button
+              type="button"
+              className="button settings-button-compact"
+              onClick={onRefreshTailscaleStatus}
+              disabled={tailscaleStatusBusy}
+            >
+              {tailscaleStatusBusy ? "Checking..." : "Detect Tailscale"}
+            </button>
+            <button
+              type="button"
+              className="button settings-button-compact"
+              onClick={onRefreshTailscaleCommandPreview}
+              disabled={tailscaleCommandBusy}
+            >
+              {tailscaleCommandBusy ? "Refreshing..." : "Refresh daemon command"}
+            </button>
+            <button
+              type="button"
+              className="button settings-button-compact"
+              disabled={!tailscaleStatus?.suggestedRemoteHost}
+              onClick={() => {
+                void onUseSuggestedTailscaleHost();
+              }}
+            >
+              Use suggested host
+            </button>
+          </div>
+          {tailscaleStatusError && (
+            <div className="settings-help settings-help-error">{tailscaleStatusError}</div>
+          )}
+          {tailscaleStatus && (
+            <>
+              <div className="settings-help">{tailscaleStatus.message}</div>
               <div className="settings-help">
-                Started at: {new Date(tcpDaemonStatus.startedAtMs).toLocaleString()}
+                {tailscaleStatus.installed
+                  ? `Version: ${tailscaleStatus.version ?? "unknown"}`
+                  : "Install Tailscale on both desktop and iOS to continue."}
               </div>
-            )}
-            <div className="settings-help">
-              Start this daemon before connecting from iOS. It uses your current token and listens
-              on <code>0.0.0.0:&lt;port&gt;</code>, matching your configured host port.
-            </div>
-          </div>
-        )}
-
-        {!isMobileSimplified && (
-          <div className="settings-field">
-            <div className="settings-field-label">Tailscale helper</div>
-            <div className="settings-field-row">
-              <button
-                type="button"
-                className="button settings-button-compact"
-                onClick={onRefreshTailscaleStatus}
-                disabled={tailscaleStatusBusy}
-              >
-                {tailscaleStatusBusy ? "Checking..." : "Detect Tailscale"}
-              </button>
-              <button
-                type="button"
-                className="button settings-button-compact"
-                onClick={onRefreshTailscaleCommandPreview}
-                disabled={tailscaleCommandBusy}
-              >
-                {tailscaleCommandBusy ? "Refreshing..." : "Refresh daemon command"}
-              </button>
-              <button
-                type="button"
-                className="button settings-button-compact"
-                disabled={!tailscaleStatus?.suggestedRemoteHost}
-                onClick={() => {
-                  void onUseSuggestedTailscaleHost();
-                }}
-              >
-                Use suggested host
-              </button>
-            </div>
-            {tailscaleStatusError && (
-              <div className="settings-help settings-help-error">{tailscaleStatusError}</div>
-            )}
-            {tailscaleStatus && (
-              <>
-                <div className="settings-help">{tailscaleStatus.message}</div>
+              {tailscaleStatus.suggestedRemoteHost && (
                 <div className="settings-help">
-                  {tailscaleStatus.installed
-                    ? `Version: ${tailscaleStatus.version ?? "unknown"}`
-                    : "Install Tailscale on both desktop and iOS to continue."}
+                  Suggested remote host: <code>{tailscaleStatus.suggestedRemoteHost}</code>
                 </div>
-                {tailscaleStatus.suggestedRemoteHost && (
-                  <div className="settings-help">
-                    Suggested remote host: <code>{tailscaleStatus.suggestedRemoteHost}</code>
-                  </div>
-                )}
-                {tailscaleStatus.tailnetName && (
-                  <div className="settings-help">
-                    Tailnet: <code>{tailscaleStatus.tailnetName}</code>
-                  </div>
-                )}
-              </>
-            )}
-            {tailscaleCommandError && (
-              <div className="settings-help settings-help-error">{tailscaleCommandError}</div>
-            )}
-            {tailscaleCommandPreview && (
-              <>
+              )}
+              {tailscaleStatus.tailnetName && (
                 <div className="settings-help">
-                  Command template (manual fallback) for starting the daemon:
+                  Tailnet: <code>{tailscaleStatus.tailnetName}</code>
                 </div>
-                <pre className="settings-command-preview">
-                  <code>{tailscaleCommandPreview.command}</code>
-                </pre>
-                {!tailscaleCommandPreview.tokenConfigured && (
-                  <div className="settings-help settings-help-error">
-                    Remote backend token is empty. Set one before exposing daemon access.
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </>
+              )}
+            </>
+          )}
+          {tailscaleCommandError && (
+            <div className="settings-help settings-help-error">{tailscaleCommandError}</div>
+          )}
+          {tailscaleCommandPreview && (
+            <>
+              <div className="settings-help">
+                Command template (manual fallback) for starting the daemon:
+              </div>
+              <pre className="settings-command-preview">
+                <code>{tailscaleCommandPreview.command}</code>
+              </pre>
+              {!tailscaleCommandPreview.tokenConfigured && (
+                <div className="settings-help settings-help-error">
+                  Remote backend token is empty. Set one before exposing daemon access.
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       <div className="settings-help">
         {isMobileSimplified

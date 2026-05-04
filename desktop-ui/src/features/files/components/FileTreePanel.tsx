@@ -71,6 +71,7 @@ type FileTreeRowEntry = {
 };
 
 const FILE_TREE_ROW_HEIGHT = 28;
+const SKELETON_KEYS = ["sk1", "sk2", "sk3", "sk4", "sk5", "sk6", "sk7", "sk8"];
 
 function buildTree(entries: FileEntry[]): { nodes: FileTreeNode[]; folderPaths: Set<string> } {
   const root = new Map<string, FileTreeBuildNode>();
@@ -270,7 +271,7 @@ export function FileTreePanel({
     setIsDragSelecting(false);
     dragAnchorLineRef.current = null;
     dragMovedRef.current = false;
-  }, [workspaceId]);
+  }, []);
 
   const closePreview = useCallback(() => {
     setPreviewPath(null);
@@ -306,9 +307,13 @@ export function FileTreePanel({
     setExpandedFolders((prev) => {
       const next = new Set(prev);
       if (allVisibleExpanded) {
-        visibleFolderPaths.forEach((path) => next.delete(path));
+        for (const path of visibleFolderPaths) {
+          next.delete(path);
+        }
       } else {
-        visibleFolderPaths.forEach((path) => next.add(path));
+        for (const path of visibleFolderPaths) {
+          next.add(path);
+        }
       }
       return next;
     });
@@ -418,10 +423,14 @@ export function FileTreePanel({
       const isExpanded = isFolder && expandedFolders.has(node.path);
       rows.push({ node, depth, isFolder, isExpanded });
       if (isFolder && isExpanded) {
-        node.children.forEach((child) => walk(child, depth + 1));
+        for (const child of node.children) {
+          walk(child, depth + 1);
+        }
       }
     };
-    nodes.forEach((node) => walk(node, 0));
+    for (const node of nodes) {
+      walk(node, 0);
+    }
     return rows;
   }, [nodes, expandedFolders]);
 
@@ -705,11 +714,11 @@ export function FileTreePanel({
       >
         {showLoading ? (
           <div className="file-tree-skeleton">
-            {Array.from({ length: 8 }).map((_, index) => (
+            {SKELETON_KEYS.map((sk, i) => (
               <div
                 className="file-tree-skeleton-row"
-                key={`file-tree-skeleton-${index}`}
-                style={{ width: `${68 + index * 3}%` }}
+                key={sk}
+                style={{ width: `${68 + i * 3}%` }}
               />
             ))}
           </div>

@@ -1,4 +1,10 @@
-import type { GitCommitDiff, GitFileDiff, GitFileStatus, GitLogResponse } from "@/types";
+import type {
+  BranchInfo,
+  GitCommitDiff,
+  GitFileDiff,
+  GitFileStatus,
+  GitLogResponse,
+} from "@/types";
 import { invoke } from "../client";
 
 export async function getGitStatus(workspace_id: string): Promise<{
@@ -112,8 +118,8 @@ export async function syncGit(workspaceId: string): Promise<void> {
   return invoke("sync_git", { workspaceId });
 }
 
-export async function listGitBranches(workspaceId: string) {
-  return invoke<any>("list_git_branches", { workspaceId });
+export async function listGitBranches(workspaceId: string): Promise<BranchInfo[]> {
+  return invoke<BranchInfo[]>("list_git_branches", { workspaceId });
 }
 
 export async function checkoutGitBranch(workspaceId: string, name: string) {

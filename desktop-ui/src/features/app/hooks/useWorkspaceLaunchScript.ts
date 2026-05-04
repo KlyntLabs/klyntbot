@@ -54,7 +54,7 @@ export function useWorkspaceLaunchScript({
     setDraftScript(launchScript ?? "");
     pendingRunRef.current = null;
     setError(null);
-  }, [activeWorkspace?.id, launchScript]);
+  }, [launchScript]);
 
   const onOpenEditor = useCallback(() => {
     setDraftScript(launchScript ?? "");

@@ -42,14 +42,13 @@ export function ToolTokenBreakdown({ events }: ToolTokenBreakdownProps) {
       if (e.type === "StatusUpdate") {
         const tu = e.payload.token_usage as Record<string, number> | undefined;
         if (tu) {
-          lastInputTotal += (tu.input_other ?? 0) + (tu.input_cache_read ?? 0) + (tu.input_cache_creation ?? 0);
+          lastInputTotal +=
+            (tu.input_other ?? 0) + (tu.input_cache_read ?? 0) + (tu.input_cache_creation ?? 0);
           lastOutputTotal += tu.output ?? 0;
         }
       } else if (e.type === "ToolCall") {
         const id = e.payload.id as string;
-        const fn = e.payload.function as
-          | { name: string; arguments: string }
-          | undefined;
+        const fn = e.payload.function as { name: string; arguments: string } | undefined;
         if (id && fn?.name) {
           openCalls.set(id, {
             name: fn.name,
@@ -95,9 +94,7 @@ export function ToolTokenBreakdown({ events }: ToolTokenBreakdownProps) {
   return (
     <div className="border-b px-4 py-2 shrink-0">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="text-[10px] font-medium text-muted-foreground">
-          Token Usage by Tool
-        </span>
+        <span className="text-[10px] font-medium text-muted-foreground">Token Usage by Tool</span>
         <span className="text-[10px] text-muted-foreground">
           ({formatTokens(grandTotal)} total)
         </span>
@@ -113,30 +110,17 @@ export function ToolTokenBreakdown({ events }: ToolTokenBreakdownProps) {
             <div key={tool.name} className="flex items-center gap-2">
               {/* Tool name + call count */}
               <div className="w-[140px] shrink-0 text-right pr-1">
-                <span className="text-[11px] text-foreground truncate">
-                  {tool.name}
-                </span>
-                <span className="text-[10px] text-muted-foreground ml-1">
-                  x{tool.calls}
-                </span>
+                <span className="text-[11px] text-foreground truncate">{tool.name}</span>
+                <span className="text-[10px] text-muted-foreground ml-1">x{tool.calls}</span>
               </div>
 
               {/* Bar */}
               <div className="flex-1 h-3 bg-muted/30 rounded-sm overflow-hidden">
-                <div
-                  className="h-full flex rounded-sm"
-                  style={{ width: `${barWidthPct}%` }}
-                >
+                <div className="h-full flex rounded-sm" style={{ width: `${barWidthPct}%` }}>
                   {/* Input tokens – blue */}
-                  <div
-                    className="h-full bg-blue-500/70"
-                    style={{ width: `${inputPct}%` }}
-                  />
+                  <div className="h-full bg-blue-500/70" style={{ width: `${inputPct}%` }} />
                   {/* Output tokens – green */}
-                  <div
-                    className="h-full bg-green-500/70"
-                    style={{ width: `${outputPct}%` }}
-                  />
+                  <div className="h-full bg-green-500/70" style={{ width: `${outputPct}%` }} />
                 </div>
               </div>
 
@@ -221,12 +205,10 @@ export function UsageChart({ events, onScrollToIndex }: UsageChartProps) {
 
   const chartWidth = 600;
   const innerWidth = chartWidth - CHART_PADDING_X * 2;
-  const innerHeight =
-    CHART_HEIGHT - CHART_PADDING_TOP - CHART_PADDING_BOTTOM;
+  const innerHeight = CHART_HEIGHT - CHART_PADDING_TOP - CHART_PADDING_BOTTOM;
 
   const toSvgX = (x: number) => CHART_PADDING_X + x * innerWidth;
-  const toSvgY = (usage: number) =>
-    CHART_PADDING_TOP + (1 - usage) * innerHeight;
+  const toSvgY = (usage: number) => CHART_PADDING_TOP + (1 - usage) * innerHeight;
 
   // Build polyline path
   const linePath = dataPoints
@@ -274,20 +256,23 @@ export function UsageChart({ events, onScrollToIndex }: UsageChartProps) {
   return (
     <div className="border-b px-4 py-2 shrink-0">
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-[10px] font-medium text-muted-foreground">
-          Context Usage
-        </span>
-        <span className="text-[10px] text-muted-foreground">
-          ({dataPoints.length} data points)
-        </span>
+        <span className="text-[10px] font-medium text-muted-foreground">Context Usage</span>
+        <span className="text-[10px] text-muted-foreground">({dataPoints.length} data points)</span>
       </div>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
         className="w-full cursor-crosshair"
         style={{ maxHeight: CHART_HEIGHT }}
+        role="img"
         onClick={handleClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            handleClick(e as unknown as React.MouseEvent<SVGSVGElement>);
+          }
+        }}
       >
+        <title>Context usage chart</title>
         {/* Danger zone background */}
         <rect
           x={CHART_PADDING_X}
@@ -323,12 +308,7 @@ export function UsageChart({ events, onScrollToIndex }: UsageChartProps) {
         <path d={areaPath} className="fill-primary/10" />
 
         {/* Line */}
-        <path
-          d={linePath}
-          className="stroke-primary"
-          strokeWidth={1.5}
-          fill="none"
-        />
+        <path d={linePath} className="stroke-primary" strokeWidth={1.5} fill="none" />
 
         {/* Compaction markers */}
         {compactions.map((c) => (

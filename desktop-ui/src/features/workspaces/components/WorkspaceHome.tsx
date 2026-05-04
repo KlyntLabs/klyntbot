@@ -223,7 +223,7 @@ export function WorkspaceHome({
 
   useEffect(() => {
     setShowIcon(true);
-  }, [workspace.id]);
+  }, []);
 
   useEffect(() => {
     if (!dictationTranscript) {

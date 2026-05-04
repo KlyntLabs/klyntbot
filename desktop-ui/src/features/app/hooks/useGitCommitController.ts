@@ -150,13 +150,13 @@ export function useGitCommitController({
         setCommitMessageLoading(false);
       }
     }
-  }, [activeWorkspace, activeWorkspaceId, commitMessageLoading, generateMsg, commitMessageModelId]);
+  }, [activeWorkspace, activeWorkspaceId, commitMessageLoading, generateMsg]);
 
   useEffect(() => {
     setCommitMessage("");
     setCommitMessageError(null);
     setCommitMessageLoading(false);
-  }, [activeWorkspaceId]);
+  }, []);
 
   const handleCommit = useCallback(async () => {
     if (!activeWorkspace || commit.isLoading || !commitMessage.trim() || !hasWorktreeChanges) {

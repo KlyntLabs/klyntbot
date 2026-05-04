@@ -34,17 +34,19 @@ export function useWorkspaceRestore({
     });
     void (async () => {
       const connectedTargets: WorkspaceInfo[] = [];
-      for (const workspace of pending) {
-        const wasConnected = workspace.connected;
-        try {
-          if (!wasConnected) {
-            await connectWorkspace(workspace);
+      await Promise.all(
+        pending.map(async (workspace) => {
+          const wasConnected = workspace.connected;
+          try {
+            if (!wasConnected) {
+              await connectWorkspace(workspace);
+            }
+            connectedTargets.push({ ...workspace, connected: true });
+          } catch {
+            // Silent: connection errors show in debug panel.
           }
-          connectedTargets.push({ ...workspace, connected: true });
-        } catch {
-          // Silent: connection errors show in debug panel.
-        }
-      }
+        }),
+      );
       if (connectedTargets.length > 0) {
         await listThreadsForWorkspaces(connectedTargets, {
           maxPages: INITIAL_THREAD_LIST_MAX_PAGES,

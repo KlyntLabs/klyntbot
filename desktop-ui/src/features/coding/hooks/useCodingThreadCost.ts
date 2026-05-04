@@ -11,22 +11,30 @@ export function useCodingThreadCost(threadId: string | null) {
     let active = true;
     let unlisten: (() => void) | undefined;
     (async () => {
-      const meta = (await invoke("chat_get_thread_meta", { sessionKey: threadId })) as {
+      const thread = (await invoke("coding_thread_read", { threadId })) as {
         totalCostUsd?: number;
         totalTokens?: number;
       };
       if (!active) return;
-      setCost(meta.totalCostUsd ?? 0);
-      setTokens(meta.totalTokens ?? 0);
-      unlisten = await listen<{ thread_id: string; cost_usd: number; tokens: number }>(
-        "agent:provider_call",
-        (e) => {
-          if (e.payload.thread_id === threadId) {
-            setCost((c) => c + e.payload.cost_usd);
-            setTokens((t) => t + e.payload.tokens);
-          }
-        },
-      );
+      setCost(thread.totalCostUsd ?? 0);
+      setTokens(thread.totalTokens ?? 0);
+      unlisten = await listen<{
+        threadId?: string | null;
+        promptTokensDelta?: number;
+        completionTokensDelta?: number;
+        usdDelta?: number;
+        threadTotalUsd?: number | null;
+      }>("agent:cost_update", (e) => {
+        const p = e.payload;
+        if (p.threadId && p.threadId !== threadId) return;
+        if (typeof p.threadTotalUsd === "number") {
+          setCost(p.threadTotalUsd);
+        } else if (typeof p.usdDelta === "number") {
+          setCost((c) => c + (p.usdDelta ?? 0));
+        }
+        const tokDelta = (p.promptTokensDelta ?? 0) + (p.completionTokensDelta ?? 0);
+        if (tokDelta) setTokens((t) => t + tokDelta);
+      });
       if (!active && unlisten) {
         unlisten();
         unlisten = undefined;

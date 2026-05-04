@@ -35,14 +35,14 @@ describe("SettingsDisplaySection", () => {
         codeFontSizeDraft={11}
         onUpdateAppSettings={onUpdateAppSettings}
         onToggleTransparency={vi.fn()}
-        onSetScaleDraft={vi.fn() as any}
+        onSetScaleDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitScale={vi.fn(async () => {})}
         onResetScale={vi.fn(async () => {})}
-        onSetUiFontDraft={vi.fn() as any}
+        onSetUiFontDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitUiFont={vi.fn(async () => {})}
-        onSetCodeFontDraft={vi.fn() as any}
+        onSetCodeFontDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitCodeFont={vi.fn(async () => {})}
-        onSetCodeFontSizeDraft={vi.fn() as any}
+        onSetCodeFontSizeDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<number>>}
         onCommitCodeFontSize={vi.fn(async () => {})}
         onTestNotificationSound={vi.fn()}
         onTestSystemNotification={vi.fn()}
@@ -87,14 +87,14 @@ describe("SettingsDisplaySection", () => {
         codeFontSizeDraft={11}
         onUpdateAppSettings={onUpdateAppSettings}
         onToggleTransparency={vi.fn()}
-        onSetScaleDraft={vi.fn() as any}
+        onSetScaleDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitScale={vi.fn(async () => {})}
         onResetScale={vi.fn(async () => {})}
-        onSetUiFontDraft={vi.fn() as any}
+        onSetUiFontDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitUiFont={vi.fn(async () => {})}
-        onSetCodeFontDraft={vi.fn() as any}
+        onSetCodeFontDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitCodeFont={vi.fn(async () => {})}
-        onSetCodeFontSizeDraft={vi.fn() as any}
+        onSetCodeFontSizeDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<number>>}
         onCommitCodeFontSize={vi.fn(async () => {})}
         onTestNotificationSound={vi.fn()}
         onTestSystemNotification={vi.fn()}
@@ -140,14 +140,14 @@ describe("SettingsDisplaySection", () => {
         codeFontSizeDraft={11}
         onUpdateAppSettings={onUpdateAppSettings}
         onToggleTransparency={vi.fn()}
-        onSetScaleDraft={vi.fn() as any}
+        onSetScaleDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitScale={vi.fn(async () => {})}
         onResetScale={vi.fn(async () => {})}
-        onSetUiFontDraft={vi.fn() as any}
+        onSetUiFontDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitUiFont={vi.fn(async () => {})}
-        onSetCodeFontDraft={vi.fn() as any}
+        onSetCodeFontDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitCodeFont={vi.fn(async () => {})}
-        onSetCodeFontSizeDraft={vi.fn() as any}
+        onSetCodeFontSizeDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<number>>}
         onCommitCodeFontSize={vi.fn(async () => {})}
         onTestNotificationSound={vi.fn()}
         onTestSystemNotification={vi.fn()}
@@ -199,14 +199,14 @@ describe("SettingsDisplaySection", () => {
         codeFontSizeDraft={11}
         onUpdateAppSettings={onUpdateAppSettings}
         onToggleTransparency={vi.fn()}
-        onSetScaleDraft={vi.fn() as any}
+        onSetScaleDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitScale={vi.fn(async () => {})}
         onResetScale={vi.fn(async () => {})}
-        onSetUiFontDraft={vi.fn() as any}
+        onSetUiFontDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitUiFont={vi.fn(async () => {})}
-        onSetCodeFontDraft={vi.fn() as any}
+        onSetCodeFontDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitCodeFont={vi.fn(async () => {})}
-        onSetCodeFontSizeDraft={vi.fn() as any}
+        onSetCodeFontSizeDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<number>>}
         onCommitCodeFontSize={vi.fn(async () => {})}
         onTestNotificationSound={vi.fn()}
         onTestSystemNotification={vi.fn()}
@@ -249,14 +249,14 @@ describe("SettingsDisplaySection", () => {
         codeFontSizeDraft={11}
         onUpdateAppSettings={onUpdateAppSettings}
         onToggleTransparency={vi.fn()}
-        onSetScaleDraft={vi.fn() as any}
+        onSetScaleDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitScale={vi.fn(async () => {})}
         onResetScale={vi.fn(async () => {})}
-        onSetUiFontDraft={vi.fn() as any}
+        onSetUiFontDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitUiFont={vi.fn(async () => {})}
-        onSetCodeFontDraft={vi.fn() as any}
+        onSetCodeFontDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitCodeFont={vi.fn(async () => {})}
-        onSetCodeFontSizeDraft={vi.fn() as any}
+        onSetCodeFontSizeDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<number>>}
         onCommitCodeFontSize={vi.fn(async () => {})}
         onTestNotificationSound={vi.fn()}
         onTestSystemNotification={vi.fn()}
@@ -307,14 +307,14 @@ describe("SettingsDisplaySection", () => {
         codeFontSizeDraft={11}
         onUpdateAppSettings={onUpdateAppSettings}
         onToggleTransparency={vi.fn()}
-        onSetScaleDraft={vi.fn() as any}
+        onSetScaleDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitScale={vi.fn(async () => {})}
         onResetScale={vi.fn(async () => {})}
-        onSetUiFontDraft={vi.fn() as any}
+        onSetUiFontDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitUiFont={vi.fn(async () => {})}
-        onSetCodeFontDraft={vi.fn() as any}
+        onSetCodeFontDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<string>>}
         onCommitCodeFont={vi.fn(async () => {})}
-        onSetCodeFontSizeDraft={vi.fn() as any}
+        onSetCodeFontSizeDraft={vi.fn() as unknown as React.Dispatch<React.SetStateAction<number>>}
         onCommitCodeFontSize={vi.fn(async () => {})}
         onTestNotificationSound={vi.fn()}
         onTestSystemNotification={vi.fn()}

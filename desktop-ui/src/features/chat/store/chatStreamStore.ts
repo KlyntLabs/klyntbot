@@ -316,14 +316,25 @@ class ChatStreamStore {
 
   // ── Internal helpers ────────────────────────────────────────────────
 
+  private notifyPending = false;
+
   private notify(): void {
     for (const l of this.listeners) l();
+  }
+
+  private scheduleNotify(): void {
+    if (this.notifyPending) return;
+    this.notifyPending = true;
+    queueMicrotask(() => {
+      this.notifyPending = false;
+      this.notify();
+    });
   }
 
   private updateState(sessionKey: string, updater: (s: StreamSnapshot) => StreamSnapshot): void {
     const current = this.states.get(sessionKey) ?? DEFAULT_SNAPSHOT;
     this.states.set(sessionKey, updater(current));
-    this.notify();
+    this.scheduleNotify();
   }
 
   private cancelRaf(sessionKey: string): void {
@@ -671,6 +682,13 @@ class ChatStreamStore {
     this.textBuffers.delete(key);
     this.rafIds.delete(key);
     this.onDoneCallbacks.delete(key);
+    this.approvalsBySession.delete(key);
+    this.fileEditsBySession.delete(key);
+    const es = this.eventSources.get(key);
+    if (es) {
+      es.close();
+      this.eventSources.delete(key);
+    }
   }
 
   private onError(payload: AgentErrorPayload): void {

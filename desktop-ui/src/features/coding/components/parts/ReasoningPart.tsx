@@ -1,4 +1,4 @@
-import { Brain } from "lucide-react";
+import Brain from "lucide-react/dist/esm/icons/brain";
 import { useState } from "react";
 
 export function ReasoningPart({ text, redacted }: { text: string; redacted: boolean }) {

@@ -255,17 +255,10 @@ function SidebarWorkspaceEntry({
           document.body,
         )}
       {isDraftNewAgent && (
-        <div
+        <button
+          type="button"
           className={`thread-row thread-row-draft${isDraftRowActive ? " active" : ""}`}
           onClick={() => onSelectWorkspace(workspace.id)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              onSelectWorkspace(workspace.id);
-            }
-          }}
         >
           <span className={`thread-status ${draftStatusClass}`} aria-hidden />
           <div className="thread-content">
@@ -273,7 +266,7 @@ function SidebarWorkspaceEntry({
               <span className="thread-name">New Agent</span>
             </div>
           </div>
-        </div>
+        </button>
       )}
       {visibleClones.length > 0 && (
         <WorktreeSection

@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { useRef } from "react";
 import {
-  Search,
   ArrowUpDown,
   FolderOpen,
   Import,
   LayoutGrid,
   List,
   Loader2,
+  Search,
   X,
 } from "lucide-react";
+import { useRef } from "react";
 import {
   Select,
   SelectContent,
@@ -83,6 +83,7 @@ export function ExplorerToolbar({
           />
           {search && (
             <button
+              type="button"
               onClick={() => onSearchChange("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
@@ -97,7 +98,10 @@ export function ExplorerToolbar({
         <div className="flex items-center gap-1 text-muted-foreground">
           <ArrowUpDown size={12} className="shrink-0" />
           <Select value={sortMode} onValueChange={(v) => onSortChange(v as SortMode)}>
-            <SelectTrigger size="sm" className="h-6 min-w-[5rem] border-none shadow-none px-1.5 py-0 text-[11px] gap-1">
+            <SelectTrigger
+              size="sm"
+              className="h-6 min-w-[5rem] border-none shadow-none px-1.5 py-0 text-[11px] gap-1"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -114,6 +118,7 @@ export function ExplorerToolbar({
 
         {/* Imported filter toggle */}
         <button
+          type="button"
           onClick={() => onFilterModeChange(filterMode === "all" ? "imported" : "all")}
           className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] transition-colors ${
             filterMode === "imported"
@@ -128,6 +133,7 @@ export function ExplorerToolbar({
 
         {/* Group toggle */}
         <button
+          type="button"
           onClick={onToggleGrouped}
           className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] transition-colors ${
             grouped
@@ -142,9 +148,8 @@ export function ExplorerToolbar({
 
         {/* View toggle */}
         <button
-          onClick={() =>
-            onViewModeChange(viewMode === "cards" ? "compact" : "cards")
-          }
+          type="button"
+          onClick={() => onViewModeChange(viewMode === "cards" ? "compact" : "cards")}
           className="flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
           title={viewMode === "cards" ? "Switch to list" : "Switch to cards"}
         >
@@ -155,6 +160,7 @@ export function ExplorerToolbar({
 
         {/* Import button */}
         <button
+          type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={importing}
           className="flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"

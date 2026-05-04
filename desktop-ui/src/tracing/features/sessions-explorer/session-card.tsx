@@ -1,14 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
+import { AlertCircle, Bot, Clock, Download, RefreshCw, Trash2, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import {
-  type SessionInfo,
-  type SessionSummary,
-  deleteSession,
-  getSessionDownloadUrl,
-  getSessionSummary,
-} from "@/tracing/lib/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +13,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/tracing/components/ui/alert-dialog";
-import { AlertCircle, Bot, Clock, Download, RefreshCw, Trash2, Zap } from "lucide-react";
+import {
+  deleteSession,
+  getSessionDownloadUrl,
+  getSessionSummary,
+  type SessionInfo,
+  type SessionSummary,
+} from "@/tracing/lib/api";
 
 function formatRelativeTime(epochSec: number): string {
   if (!epochSec) return "";
@@ -73,7 +73,13 @@ interface SessionCardProps {
   onDeleted?: (sessionId: string) => void;
 }
 
-export function SessionCard({ session, onSelect, compact, searchQuery, onDeleted }: SessionCardProps) {
+export function SessionCard({
+  session,
+  onSelect,
+  compact,
+  searchQuery,
+  onDeleted,
+}: SessionCardProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -112,8 +118,8 @@ export function SessionCard({ session, onSelect, compact, searchQuery, onDeleted
         <AlertDialogHeader>
           <AlertDialogTitle>Delete imported session?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete the imported session
-            &quot;{displayTitle}&quot;. This action cannot be undone.
+            This will permanently delete the imported session &quot;{displayTitle}&quot;. This
+            action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -130,6 +136,7 @@ export function SessionCard({ session, onSelect, compact, searchQuery, onDeleted
     return (
       <>
         <button
+          type="button"
           onClick={onSelect}
           className="flex items-center gap-3 w-full border-b px-3 py-2 text-left hover:bg-accent/50 transition-colors"
         >
@@ -141,7 +148,9 @@ export function SessionCard({ session, onSelect, compact, searchQuery, onDeleted
               imported
             </span>
           )}
-          <span className="text-xs truncate flex-1"><HighlightText text={displayTitle} query={searchQuery} /></span>
+          <span className="text-xs truncate flex-1">
+            <HighlightText text={displayTitle} query={searchQuery} />
+          </span>
           <LazyStats sessionId={sessionPath} hasWire={session.has_wire} inline />
           <span className="text-[10px] text-muted-foreground shrink-0 w-14 text-right">
             {formatBytes(session.total_size)}
@@ -149,27 +158,23 @@ export function SessionCard({ session, onSelect, compact, searchQuery, onDeleted
           <span className="text-[10px] text-muted-foreground shrink-0 w-16 text-right">
             {formatRelativeTime(session.last_updated)}
           </span>
-          <span
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
             onClick={handleDownload}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleDownload(e as unknown as React.MouseEvent); }}
-            className="rounded p-0.5 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            className="rounded p-0.5 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors shrink-0 bg-transparent border-none"
             title="Download session files"
           >
             <Download size={11} />
-          </span>
+          </button>
           {session.imported && (
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={handleDeleteClick}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleDeleteClick(e as unknown as React.MouseEvent); }}
-              className="rounded p-0.5 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
+              className="rounded p-0.5 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors shrink-0 bg-transparent border-none"
               title="Delete imported session"
             >
               <Trash2 size={11} />
-            </span>
+            </button>
           )}
         </button>
         {deleteDialog}
@@ -180,6 +185,7 @@ export function SessionCard({ session, onSelect, compact, searchQuery, onDeleted
   return (
     <>
       <button
+        type="button"
         onClick={onSelect}
         className="rounded-lg border bg-card p-3 text-left hover:bg-accent/50 hover:border-primary/30 transition-colors w-full"
       >
@@ -196,27 +202,23 @@ export function SessionCard({ session, onSelect, compact, searchQuery, onDeleted
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={handleDownload}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleDownload(e as unknown as React.MouseEvent); }}
-              className="rounded p-0.5 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              className="rounded p-0.5 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors bg-transparent border-none"
               title="Download session files"
             >
               <Download size={12} />
-            </span>
+            </button>
             {session.imported && (
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 onClick={handleDeleteClick}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleDeleteClick(e as unknown as React.MouseEvent); }}
-                className="rounded p-0.5 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
+                className="rounded p-0.5 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors bg-transparent border-none"
                 title="Delete imported session"
               >
                 <Trash2 size={12} />
-              </span>
+              </button>
             )}
             <span className="text-[10px] text-muted-foreground">
               {formatRelativeTime(session.last_updated)}
@@ -288,7 +290,9 @@ function LazyStats({
           setLoading(true);
           getSessionSummary(sessionId)
             .then(setSummary)
-            .catch((err) => { console.warn(`Failed to load summary for ${sessionId}:`, err); })
+            .catch((err) => {
+              console.warn(`Failed to load summary for ${sessionId}:`, err);
+            })
             .finally(() => setLoading(false));
           observer.disconnect();
         }
@@ -331,16 +335,11 @@ function LazyStats({
 
   if (inline) {
     return (
-      <div
-        ref={ref}
-        className="flex items-center gap-2 text-[10px] text-muted-foreground shrink-0"
-      >
+      <div ref={ref} className="flex items-center gap-2 text-[10px] text-muted-foreground shrink-0">
         <span className="text-blue-600 dark:text-blue-400">{summary.turns}T</span>
         <span className="text-green-600 dark:text-green-400">{summary.steps}S</span>
         <span className="text-purple-600 dark:text-purple-400">{summary.tool_calls}TC</span>
-        {summary.errors > 0 && (
-          <span className="text-red-500 font-medium">{summary.errors}E</span>
-        )}
+        {summary.errors > 0 && <span className="text-red-500 font-medium">{summary.errors}E</span>}
         <span>{formatTokens(summary.input_tokens + summary.output_tokens)}</span>
         <span>{formatDuration(summary.duration_sec)}</span>
       </div>

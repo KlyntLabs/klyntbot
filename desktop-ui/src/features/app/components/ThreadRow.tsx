@@ -1,5 +1,6 @@
 import { getThreadStatusClass, type ThreadStatusById } from "@utils/threadStatus";
 import type { CSSProperties, MouseEvent } from "react";
+import { memo } from "react";
 import type { ThreadSummary } from "@/types";
 
 function hashString(value: string) {
@@ -65,7 +66,7 @@ type ThreadRowProps = {
   showPinnedLabel?: boolean;
 };
 
-export function ThreadRow({
+export const ThreadRow = memo(function ThreadRow({
   thread,
   depth,
   workspaceId,
@@ -124,7 +125,8 @@ export function ThreadRow({
   );
 
   return (
-    <div
+    <button
+      type="button"
       className={`thread-row ${
         workspaceId === activeWorkspaceId && thread.id === activeThreadId ? "active" : ""
       }${hasDetails ? " has-details" : ""}${
@@ -135,8 +137,6 @@ export function ThreadRow({
       style={indentStyle}
       onClick={() => onSelectThread(workspaceId, thread.id)}
       onContextMenu={(event) => onShowThreadMenu(event, workspaceId, thread.id, canPin)}
-      role="button"
-      tabIndex={0}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
@@ -204,6 +204,6 @@ export function ThreadRow({
           relativeTime && <span className="thread-time">{relativeTime}</span>
         )}
       </div>
-    </div>
+    </button>
   );
-}
+});

@@ -114,7 +114,7 @@ export function useWorkspaceLaunchScripts({
     setError(null);
     setErrorById({});
     pendingRunRef.current = null;
-  }, [activeWorkspace?.id]);
+  }, []);
 
   const onOpenEditor = useCallback(
     (id: string) => {
@@ -290,7 +290,7 @@ export function useWorkspaceLaunchScripts({
         return;
       }
       const entry = launchScripts.find((script) => script.id === id);
-      if (!entry || !entry.script.trim()) {
+      if (!entry?.script.trim()) {
         if (entry) {
           onOpenEditor(id);
         }

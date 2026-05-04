@@ -212,6 +212,12 @@ export default defineConfig({
           if (id.includes("node_modules/@xterm")) {
             return "vendor-xterm";
           }
+          if (id.includes("node_modules/mermaid")) {
+            return "vendor-mermaid";
+          }
+          if (id.includes("node_modules/katex")) {
+            return "vendor-katex";
+          }
         },
       },
     },

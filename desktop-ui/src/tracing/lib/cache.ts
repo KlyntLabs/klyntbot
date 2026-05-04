@@ -21,11 +21,7 @@ class ApiCache {
     this.store.clear();
   }
 
-  get<T>(
-    key: string,
-    fetcher: () => Promise<T>,
-    ttlMs = DEFAULT_TTL_MS,
-  ): Promise<T> {
+  get<T>(key: string, fetcher: () => Promise<T>, ttlMs = DEFAULT_TTL_MS): Promise<T> {
     const now = Date.now();
     const existing = this.store.get(key) as CacheEntry<T> | undefined;
 

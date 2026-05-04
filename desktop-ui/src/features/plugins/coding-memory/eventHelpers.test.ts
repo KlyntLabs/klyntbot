@@ -39,14 +39,14 @@ describe("isErrorEvent", () => {
       isErrorEvent(
         ev({
           kind: "toolResult",
-          payloadDecoded: { return_value: { is_error: true } } as any,
+          payloadDecoded: { return_value: { is_error: true } },
         }),
       ),
     ).toBe(true);
   });
   it("does not flag plain toolResult", () => {
     expect(
-      isErrorEvent(ev({ kind: "toolResult", payloadDecoded: { return_value: { ok: 1 } } as any })),
+      isErrorEvent(ev({ kind: "toolResult", payloadDecoded: { return_value: { ok: 1 } } })),
     ).toBe(false);
   });
 });

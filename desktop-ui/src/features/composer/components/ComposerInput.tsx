@@ -210,7 +210,7 @@ export function ComposerInput({
     }
     setMobileActionsOpen(false);
     onAddAttachment();
-  }, [disabled, onAddAttachment]);
+  }, [disabled, onAddAttachment, setMobileActionsOpen]);
 
   const handleMobileExpandClick = useCallback(() => {
     if (disabled || !onToggleExpand) {
@@ -218,18 +218,20 @@ export function ComposerInput({
     }
     setMobileActionsOpen(false);
     onToggleExpand();
-  }, [disabled, onToggleExpand]);
+  }, [disabled, onToggleExpand, setMobileActionsOpen]);
 
   const handleMobileDictationClick = useCallback(() => {
     setMobileActionsOpen(false);
     handleMicClick();
-  }, [handleMicClick]);
+  }, [handleMicClick, setMobileActionsOpen]);
 
   return (
     <div className={`composer-input${isPhoneLayout && isPhoneTallInput ? " is-phone-tall" : ""}`}>
       <div
         className={`composer-input-area${isDragOver ? " is-drag-over" : ""}`}
         ref={dropTargetRef}
+        role="application"
+        aria-label="Drop images here"
         onDragOver={handleDragOver}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
@@ -291,6 +293,7 @@ export function ComposerInput({
           <div className="composer-input-actions">
             {onToggleExpand && (
               <button
+                type="button"
                 className={`composer-action composer-action--expand${
                   isExpanded ? " is-active" : ""
                 }`}
@@ -303,6 +306,7 @@ export function ComposerInput({
               </button>
             )}
             <button
+              type="button"
               className={`composer-action composer-action--mic${
                 isDictationBusy ? " is-active" : ""
               }${isDictationProcessing ? " is-processing is-stop" : ""}${
@@ -326,32 +330,34 @@ export function ComposerInput({
               data-tooltip={contextFreeLabel ?? "Context free --"}
               style={{ ["--context-free" as string]: contextFreePercent ?? 0 }}
             >
-            <button
-              className={`composer-action${canStop ? " is-stop" : " is-send"}${
-                canStop && isProcessing ? " is-loading" : ""
-              }`}
-              onClick={handleActionClick}
-              disabled={(disabled && !canStop) || isDictationBusy || (!canStop && !canSend)}
-              aria-label={canStop ? "Stop" : sendLabel}
-              title={canStop ? "Stop" : sendLabel}
-            >
-              {canStop ? (
-                <>
-                  <span className="composer-action-stop-square" aria-hidden />
-                  {isProcessing && <span className="composer-action-spinner" aria-hidden />}
-                </>
-              ) : (
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path
-                    d="M12 5l6 6m-6-6L6 11m6-6v14"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
-            </button>
+              <button
+                type="button"
+                className={`composer-action${canStop ? " is-stop" : " is-send"}${
+                  canStop && isProcessing ? " is-loading" : ""
+                }`}
+                onClick={handleActionClick}
+                disabled={(disabled && !canStop) || isDictationBusy || (!canStop && !canSend)}
+                aria-label={canStop ? "Stop" : sendLabel}
+                title={canStop ? "Stop" : sendLabel}
+              >
+                {canStop ? (
+                  <>
+                    <span className="composer-action-stop-square" aria-hidden />
+                    {isProcessing && <span className="composer-action-spinner" aria-hidden />}
+                  </>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <title>Send</title>
+                    <path
+                      d="M12 5l6 6m-6-6L6 11m6-6v14"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </button>
             </span>
           </div>
         </div>

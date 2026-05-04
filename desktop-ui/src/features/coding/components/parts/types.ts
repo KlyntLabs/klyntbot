@@ -3,8 +3,22 @@ export type MessagePart =
   | { kind: "tool_call"; call_id: string; name: string; args: unknown }
   | { kind: "tool_result"; call_id: string; output: ToolOutput; is_error: boolean }
   | { kind: "reasoning"; text: string; redacted: boolean }
-  | { kind: "file_change"; path: string; before: string | null; after: string; diff_unified: string; applied: boolean }
-  | { kind: "command_execution"; command: string[]; cwd: string; exit_code: number | null; stdout: string; stderr: string }
+  | {
+      kind: "file_change";
+      path: string;
+      before: string | null;
+      after: string;
+      diff_unified: string;
+      applied: boolean;
+    }
+  | {
+      kind: "command_execution";
+      command: string[];
+      cwd: string;
+      exit_code: number | null;
+      stdout: string;
+      stderr: string;
+    }
   | { kind: "finish"; reason: FinishReason };
 
 export type ToolOutput = {

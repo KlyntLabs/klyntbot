@@ -14,7 +14,17 @@ function internals(): Internals | null {
   return w.__TAURI_INTERNALS__ ?? null;
 }
 
-export const isTauri = (): boolean => internals() !== null;
+export const isTauri = (): boolean => {
+  if (internals() === null) return false;
+  // The browser dev shim installs `__TAURI_INTERNALS__` to proxy invoke calls
+  // to the dev_server. Treat that as "not Tauri" so SSE bridges (which only
+  // matter in browser mode) still mount.
+  if (typeof window !== "undefined") {
+    const w = window as unknown as { __TAURI_BROWSER_SHIM__?: boolean };
+    if (w.__TAURI_BROWSER_SHIM__) return false;
+  }
+  return true;
+};
 
 export async function invoke<T = unknown>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const i = internals();
@@ -27,7 +37,7 @@ export const ipc = invoke;
 
 export function convertFileSrc(filePath: string, protocol = "asset"): string {
   const i = internals();
-  if (!i || !i.convertFileSrc) {
+  if (!i?.convertFileSrc) {
     // Fallback used by webview asset protocol on macOS (Tauri 2 default).
     return `${protocol}://localhost/${encodeURIComponent(filePath)}`;
   }

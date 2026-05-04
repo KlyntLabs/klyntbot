@@ -260,6 +260,7 @@ fn try_create_from_spec(spec: &ProviderSpec, config: &Config, model: &str) -> Op
         "moonshot" => &config.providers.moonshot,
         "minimax" => &config.providers.minimax,
         "aihubmix" => &config.providers.aihubmix,
+        "mimo" => &config.providers.mimo,
         _ => return None,
     };
 

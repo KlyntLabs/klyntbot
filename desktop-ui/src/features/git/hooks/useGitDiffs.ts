@@ -14,6 +14,7 @@ export function useGitDiffs(activeWorkspace: WorkspaceInfo | null) {
 
   const query = useTauriQuery<GitDiffState["diffs"]>({
     queryKey: qk.git.diffs(workspaceId),
+    staleTime: 10_000,
     queryFn: async () => {
       if (!activeWorkspace) return [];
       return await getGitDiffs(activeWorkspace.id);

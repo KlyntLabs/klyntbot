@@ -1,27 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { TooltipProvider } from "@/tracing/components/ui/tooltip";
-import { SessionsExplorer } from "@/tracing/features/sessions-explorer/sessions-explorer";
-import { StatisticsView } from "@/tracing/features/statistics/statistics-view";
-import { WireViewer } from "@/tracing/features/wire-viewer/wire-viewer";
-import { ContextViewer } from "@/tracing/features/context-viewer/context-viewer";
-import { StateViewer } from "@/tracing/features/state-viewer/state-viewer";
-import { AgentsPanel } from "@/tracing/features/agents-panel/agents-panel";
-import { AgentScopeBar } from "@/tracing/features/agents-panel/agent-scope-bar";
-import { useTheme } from "@/tracing/hooks/use-theme";
-import {
-  type SessionInfo,
-  type WireEvent,
-  getSessionDownloadUrl,
-  getSubagents,
-  getVisCapabilities,
-  getWireEvents,
-  listSessions,
-  openInPath,
-} from "@/tracing/lib/api";
-import { isErrorEvent } from "@/tracing/features/wire-viewer/wire-event-card";
 import {
   ArrowLeft,
   BarChart3,
@@ -37,8 +16,33 @@ import {
   Sun,
   X,
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/tracing/components/ui/tooltip";
+import { AgentScopeBar } from "@/tracing/features/agents-panel/agent-scope-bar";
+import { AgentsPanel } from "@/tracing/features/agents-panel/agents-panel";
+import { ContextViewer } from "@/tracing/features/context-viewer/context-viewer";
 import { DualView } from "@/tracing/features/dual-view/dual-view";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/tracing/components/ui/tooltip";
+import { SessionsExplorer } from "@/tracing/features/sessions-explorer/sessions-explorer";
+import { StateViewer } from "@/tracing/features/state-viewer/state-viewer";
+import { StatisticsView } from "@/tracing/features/statistics/statistics-view";
+import { isErrorEvent } from "@/tracing/features/wire-viewer/wire-event-card";
+import { WireViewer } from "@/tracing/features/wire-viewer/wire-viewer";
+import { useTheme } from "@/tracing/hooks/use-theme";
+import {
+  getSessionDownloadUrl,
+  getSubagents,
+  getVisCapabilities,
+  getWireEvents,
+  listSessions,
+  openInPath,
+  type SessionInfo,
+  type WireEvent,
+} from "@/tracing/lib/api";
 
 type Tab = "wire" | "context" | "state" | "dual" | "agents";
 
@@ -75,7 +79,8 @@ function computeStats(events: WireEvent[]): SessionStatsData {
     if (e.type === "StatusUpdate") {
       const tu = e.payload.token_usage as Record<string, number> | undefined;
       if (tu) {
-        inputTokens += (tu.input_other ?? 0) + (tu.input_cache_read ?? 0) + (tu.input_cache_creation ?? 0);
+        inputTokens +=
+          (tu.input_other ?? 0) + (tu.input_cache_read ?? 0) + (tu.input_cache_creation ?? 0);
         outputTokens += tu.output ?? 0;
         totalCacheRead += tu.input_cache_read ?? 0;
         totalInputOther += tu.input_other ?? 0;
@@ -89,7 +94,8 @@ function computeStats(events: WireEvent[]): SessionStatsData {
         const innerPayload = inner.payload as Record<string, unknown> | undefined;
         const tu = innerPayload?.token_usage as Record<string, number> | undefined;
         if (tu) {
-          inputTokens += (tu.input_other ?? 0) + (tu.input_cache_read ?? 0) + (tu.input_cache_creation ?? 0);
+          inputTokens +=
+            (tu.input_other ?? 0) + (tu.input_cache_read ?? 0) + (tu.input_cache_creation ?? 0);
           outputTokens += tu.output ?? 0;
           totalCacheRead += tu.input_cache_read ?? 0;
           totalInputOther += tu.input_other ?? 0;
@@ -100,14 +106,22 @@ function computeStats(events: WireEvent[]): SessionStatsData {
   }
 
   const durationSec =
-    events.length >= 2
-      ? events[events.length - 1].timestamp - events[0].timestamp
-      : 0;
+    events.length >= 2 ? events[events.length - 1].timestamp - events[0].timestamp : 0;
 
   const totalInput = totalCacheRead + totalInputOther + totalCacheCreation;
   const cacheRate = totalInput > 0 ? (totalCacheRead / totalInput) * 100 : 0;
 
-  return { turns, steps, toolCalls, errors, compactions, durationSec, inputTokens, outputTokens, cacheRate };
+  return {
+    turns,
+    steps,
+    toolCalls,
+    errors,
+    compactions,
+    durationSec,
+    inputTokens,
+    outputTokens,
+    cacheRate,
+  };
 }
 
 function formatDuration(sec: number): string {
@@ -146,13 +160,26 @@ function SessionDirectoryActions({
           : "Failed to open session directory",
       );
     }
-  }, [session.session_dir]);
+  }, [session.session_id]);
+
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleCopyDirInfo = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(getSessionDir(session));
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
+      copiedTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error("Failed to copy DIR info:", error);
       window.alert("Failed to copy DIR info");
@@ -165,6 +192,7 @@ function SessionDirectoryActions({
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              type="button"
               onClick={handleOpenSessionDir}
               className="rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               aria-label="Open current session directory"
@@ -185,6 +213,7 @@ function SessionDirectoryActions({
       <Tooltip>
         <TooltipTrigger asChild>
           <button
+            type="button"
             onClick={handleCopyDirInfo}
             className="rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             aria-label="Copy current session directory info"
@@ -205,7 +234,16 @@ function SessionDirectoryActions({
 
 function SessionStats({ sessionId, refreshKey }: { sessionId: string; refreshKey: number }) {
   const [copied, setCopied] = useState(false);
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [events, setEvents] = useState<WireEvent[]>([]);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
+    };
+  }, []);
   const [loaded, setLoaded] = useState(false);
   const [agentCount, setAgentCount] = useState(0);
 
@@ -230,28 +268,31 @@ function SessionStats({ sessionId, refreshKey }: { sessionId: string; refreshKey
     `${stats.toolCalls} tool call${stats.toolCalls !== 1 ? "s" : ""}`,
   ];
   if (stats.errors > 0) parts.push(`${stats.errors} error${stats.errors !== 1 ? "s" : ""}`);
-  if (stats.compactions > 0) parts.push(`${stats.compactions} compaction${stats.compactions !== 1 ? "s" : ""}`);
+  if (stats.compactions > 0)
+    parts.push(`${stats.compactions} compaction${stats.compactions !== 1 ? "s" : ""}`);
   if (agentCount > 0) parts.push(`${agentCount} agent${agentCount !== 1 ? "s" : ""}`);
 
   return (
     <div className="min-w-0 flex flex-1 items-center gap-2 overflow-x-auto px-4 py-1.5 text-xs text-muted-foreground">
       <Tooltip>
         <TooltipTrigger asChild>
-          <span
-            className="font-mono shrink-0 cursor-pointer hover:text-foreground transition-colors"
+          <button
+            type="button"
+            className="font-mono shrink-0 cursor-pointer hover:text-foreground transition-colors bg-transparent border-none p-0"
             onClick={() => {
               const fullId = sessionId.split("/").pop() ?? sessionId;
               navigator.clipboard.writeText(fullId).catch(() => {});
               setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
+              if (copiedTimeoutRef.current) {
+                clearTimeout(copiedTimeoutRef.current);
+              }
+              copiedTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
             }}
           >
             {sessionId.split("/").pop() ?? sessionId}
-          </span>
+          </button>
         </TooltipTrigger>
-        <TooltipContent>
-          {copied ? "Copied!" : "Click to copy"}
-        </TooltipContent>
+        <TooltipContent>{copied ? "Copied!" : "Click to copy"}</TooltipContent>
       </Tooltip>
       <span className="text-border">|</span>
       <span className="shrink-0">{parts.join(" · ")}</span>
@@ -297,7 +338,16 @@ export function TracingApp() {
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openInSupported, setOpenInSupported] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, []);
   // Agent scope: null = main agent, string = sub-agent ID
   const [agentScope, setAgentScope] = useState<string | null>(null);
   // Cross-reference navigation targets
@@ -338,7 +388,9 @@ export function TracingApp() {
   // Dynamic page title
   const [sessions, setSessions] = useState<Awaited<ReturnType<typeof listSessions>>>([]);
   useEffect(() => {
-    listSessions().then(setSessions).catch(() => {});
+    listSessions()
+      .then(setSessions)
+      .catch(() => {});
   }, []);
   useEffect(() => {
     getVisCapabilities()
@@ -353,14 +405,19 @@ export function TracingApp() {
     return sessions.find((s) => `${s.work_dir_hash}/${s.session_id}` === sessionId) ?? null;
   }, [sessionId, sessions]);
   useEffect(() => {
+    const previousTitle = document.title;
     if (!sessionId) {
       document.title = "Agent Tracing";
-      return;
+      return () => {
+        document.title = previousTitle;
+      };
     }
     const rawId = sessionId.split("/").pop() ?? sessionId;
-    const label =
-      currentSession?.metadata?.title || currentSession?.title || rawId.slice(0, 8);
+    const label = currentSession?.metadata?.title || currentSession?.title || rawId.slice(0, 8);
     document.title = `${label} — Agent Tracing`;
+    return () => {
+      document.title = previousTitle;
+    };
   }, [currentSession, sessionId]);
 
   // Global keyboard shortcuts: 1/2/3 to switch tabs
@@ -392,238 +449,270 @@ export function TracingApp() {
 
   return (
     <TooltipProvider>
-    <div className="tracing-root flex h-full min-h-0 flex-1 flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between border-b px-4 py-3">
-        <h1
-          className={`text-lg font-semibold tracking-tight flex items-center gap-2 ${
-            sessionId ? "cursor-pointer hover:text-primary transition-colors" : ""
-          }`}
-          onClick={() => sessionId && handleSessionChange(null)}
-          title={sessionId ? "Back to Sessions Explorer" : undefined}
-        >
-          {sessionId && <ArrowLeft size={16} className="text-muted-foreground" />}
-          Agent Tracing
-        </h1>
-        <button
-          onClick={toggleTheme}
-          className="rounded-md p-2 hover:bg-accent"
-          title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-        >
-          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
-      </header>
-
-      {/* Session Stats */}
-      {sessionId && (
-        <div className="flex items-center border-b">
-          <SessionStats sessionId={sessionId} refreshKey={refreshKey} />
-          {currentSession && (
-            <SessionDirectoryActions
-              session={currentSession}
-              openInSupported={openInSupported}
-            />
-          )}
-          <a
-            href={getSessionDownloadUrl(sessionId)}
-            download
-            className="shrink-0 rounded-md p-1.5 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-            title="Download session files as ZIP"
-          >
-            <Download size={14} />
-          </a>
-          <button
-            onClick={() => {
-              setRefreshing(true);
-              setRefreshKey((k) => k + 1);
-              listSessions(true).then(setSessions).catch(() => {});
-              setTimeout(() => setRefreshing(false), 600);
+      <div className="tracing-root flex h-full min-h-0 flex-1 flex-col">
+        {/* Header */}
+        <header className="flex items-center justify-between border-b px-4 py-3">
+          <h1
+            className={`text-lg font-semibold tracking-tight flex items-center gap-2 ${
+              sessionId ? "cursor-pointer hover:text-primary transition-colors" : ""
+            }`}
+            onClick={() => sessionId && handleSessionChange(null)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && sessionId) {
+                handleSessionChange(null);
+              }
             }}
-            className="mr-3 shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            title="Refresh session data"
+            tabIndex={sessionId ? 0 : undefined}
+            role={sessionId ? "button" : undefined}
+            title={sessionId ? "Back to Sessions Explorer" : undefined}
           >
-            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+            {sessionId && <ArrowLeft size={16} className="text-muted-foreground" />}
+            Agent Tracing
+          </h1>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="rounded-md p-2 hover:bg-accent"
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
-        </div>
-      )}
+        </header>
 
-      {/* Tabs */}
-      {sessionId && (
-        <>
-          <div className="flex border-b px-4">
-            {(
-              [
-                { key: "wire", label: "Wire Events", icon: null },
-                { key: "context", label: "Context Messages", icon: null },
-                { key: "state", label: "State", icon: null },
-                { key: "dual", label: "Dual", icon: <Columns size={14} /> },
-                { key: "agents", label: "Agents", icon: <Bot size={14} /> },
-              ] as const
-            ).map(({ key, label, icon }) => (
-              <button
-                key={key}
-                onClick={() => setActiveTab(key)}
-                className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors ${
-                  activeTab === key
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {icon}
-                {label}
-                {activeTab === key && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Agent Scope Bar - shown on wire/context/dual tabs */}
-          {(activeTab === "wire" || activeTab === "context" || activeTab === "dual") && (
-            <AgentScopeBar
-              sessionId={sessionId}
-              refreshKey={refreshKey}
-              selectedAgentId={agentScope}
-              onSelectAgent={(id) => {
-                setAgentScope(id);
+        {/* Session Stats */}
+        {sessionId && (
+          <div className="flex items-center border-b">
+            <SessionStats sessionId={sessionId} refreshKey={refreshKey} />
+            {currentSession && (
+              <SessionDirectoryActions session={currentSession} openInSupported={openInSupported} />
+            )}
+            <a
+              href={getSessionDownloadUrl(sessionId)}
+              download
+              className="shrink-0 rounded-md p-1.5 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              title="Download session files as ZIP"
+            >
+              <Download size={14} />
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                setRefreshing(true);
+                setRefreshKey((k) => k + 1);
+                listSessions(true)
+                  .then(setSessions)
+                  .catch(() => {});
+                if (refreshTimeoutRef.current) {
+                  clearTimeout(refreshTimeoutRef.current);
+                }
+                refreshTimeoutRef.current = setTimeout(() => setRefreshing(false), 600);
               }}
-            />
-          )}
+              className="mr-3 shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              title="Refresh session data"
+            >
+              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+            </button>
+          </div>
+        )}
 
-          {/* Tab Content */}
-          <div className="flex-1 min-h-0 overflow-hidden">
-            {activeTab === "wire" && (
-              <WireViewer
-                sessionId={sessionId}
-                refreshKey={refreshKey}
-                onNavigateToContext={handleNavigateToContext}
-                scrollToToolCallId={wireScrollTarget}
-                onScrollTargetConsumed={() => setWireScrollTarget(null)}
-                agentScope={agentScope}
-              />
-            )}
-            {activeTab === "context" && (
-              <ContextViewer
-                sessionId={sessionId}
-                refreshKey={refreshKey}
-                onNavigateToWire={handleNavigateToWire}
-                scrollToToolCallId={contextScrollTarget}
-                onScrollTargetConsumed={() => setContextScrollTarget(null)}
-                agentScope={agentScope}
-              />
-            )}
-            {activeTab === "state" && <StateViewer sessionId={sessionId} refreshKey={refreshKey} />}
-            {activeTab === "dual" && <DualView sessionId={sessionId} refreshKey={refreshKey} agentScope={agentScope} />}
-            {activeTab === "agents" && (
-              <AgentsPanel
+        {/* Tabs */}
+        {sessionId && (
+          <>
+            <div className="flex border-b px-4">
+              {(
+                [
+                  { key: "wire", label: "Wire Events", icon: null },
+                  { key: "context", label: "Context Messages", icon: null },
+                  { key: "state", label: "State", icon: null },
+                  { key: "dual", label: "Dual", icon: <Columns size={14} /> },
+                  { key: "agents", label: "Agents", icon: <Bot size={14} /> },
+                ] as const
+              ).map(({ key, label, icon }) => (
+                <button
+                  type="button"
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors ${
+                    activeTab === key
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {icon}
+                  {label}
+                  {activeTab === key && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Agent Scope Bar - shown on wire/context/dual tabs */}
+            {(activeTab === "wire" || activeTab === "context" || activeTab === "dual") && (
+              <AgentScopeBar
                 sessionId={sessionId}
                 refreshKey={refreshKey}
                 selectedAgentId={agentScope}
-                onSelectAgent={(agentId) => {
-                  setAgentScope(agentId);
-                  setActiveTab("wire");
-                }}
-                onSelectMain={() => {
-                  setAgentScope(null);
-                  setActiveTab("wire");
+                onSelectAgent={(id) => {
+                  setAgentScope(id);
                 }}
               />
             )}
-          </div>
-        </>
-      )}
 
-      {!sessionId && (
-        <div className="flex h-full flex-col overflow-hidden">
-          {/* Explorer view tabs */}
-          <div className="flex items-center gap-1 border-b px-4 py-1.5">
-            {(
-              [
-                { key: "sessions", label: "Sessions", icon: <List size={14} /> },
-                { key: "statistics", label: "Statistics", icon: <BarChart3 size={14} /> },
-              ] as const
-            ).map(({ key, label, icon }) => (
-              <button
-                key={key}
-                onClick={() => setExplorerView(key)}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  explorerView === key
-                    ? "bg-accent text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                }`}
-              >
-                {icon}
-                {label}
-              </button>
-            ))}
-          </div>
+            {/* Tab Content */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {activeTab === "wire" && (
+                <WireViewer
+                  sessionId={sessionId}
+                  refreshKey={refreshKey}
+                  onNavigateToContext={handleNavigateToContext}
+                  scrollToToolCallId={wireScrollTarget}
+                  onScrollTargetConsumed={() => setWireScrollTarget(null)}
+                  agentScope={agentScope}
+                />
+              )}
+              {activeTab === "context" && (
+                <ContextViewer
+                  sessionId={sessionId}
+                  refreshKey={refreshKey}
+                  onNavigateToWire={handleNavigateToWire}
+                  scrollToToolCallId={contextScrollTarget}
+                  onScrollTargetConsumed={() => setContextScrollTarget(null)}
+                  agentScope={agentScope}
+                />
+              )}
+              {activeTab === "state" && (
+                <StateViewer sessionId={sessionId} refreshKey={refreshKey} />
+              )}
+              {activeTab === "dual" && (
+                <DualView sessionId={sessionId} refreshKey={refreshKey} agentScope={agentScope} />
+              )}
+              {activeTab === "agents" && (
+                <AgentsPanel
+                  sessionId={sessionId}
+                  refreshKey={refreshKey}
+                  selectedAgentId={agentScope}
+                  onSelectAgent={(agentId) => {
+                    setAgentScope(agentId);
+                    setActiveTab("wire");
+                  }}
+                  onSelectMain={() => {
+                    setAgentScope(null);
+                    setActiveTab("wire");
+                  }}
+                />
+              )}
+            </div>
+          </>
+        )}
 
-          {/* Explorer content */}
-          {explorerView === "sessions" ? (
-            <SessionsExplorer onSelectSession={handleSessionChange} />
-          ) : (
-            <StatisticsView />
-          )}
-        </div>
-      )}
-
-      {/* Shortcut Help Overlay */}
-      {showShortcutHelp && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => setShowShortcutHelp(false)}
-        >
-          <div
-            className="relative w-full max-w-lg rounded-lg border bg-popover p-6 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Keyboard Shortcuts</h2>
-              <button
-                onClick={() => setShowShortcutHelp(false)}
-                className="rounded-md p-1 hover:bg-accent"
-              >
-                <X size={16} />
-              </button>
+        {!sessionId && (
+          <div className="flex h-full flex-col overflow-hidden">
+            {/* Explorer view tabs */}
+            <div className="flex items-center gap-1 border-b px-4 py-1.5">
+              {(
+                [
+                  { key: "sessions", label: "Sessions", icon: <List size={14} /> },
+                  { key: "statistics", label: "Statistics", icon: <BarChart3 size={14} /> },
+                ] as const
+              ).map(({ key, label, icon }) => (
+                <button
+                  type="button"
+                  key={key}
+                  onClick={() => setExplorerView(key)}
+                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    explorerView === key
+                      ? "bg-accent text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  }`}
+                >
+                  {icon}
+                  {label}
+                </button>
+              ))}
             </div>
 
-            <div className="space-y-4 text-sm">
-              <div>
-                <h3 className="text-xs font-medium uppercase text-muted-foreground mb-2">Global</h3>
-                <div className="space-y-1.5">
-                  <ShortcutRow keys="1" desc="Wire Events" />
-                  <ShortcutRow keys="2" desc="Context Messages" />
-                  <ShortcutRow keys="3" desc="State" />
-                  <ShortcutRow keys="4" desc="Dual View" />
-                  <ShortcutRow keys="5" desc="Agents" />
-                  <ShortcutRow keys="?" desc="Show shortcuts" />
-                </div>
-              </div>
+            {/* Explorer content */}
+            {explorerView === "sessions" ? (
+              <SessionsExplorer onSelectSession={handleSessionChange} />
+            ) : (
+              <StatisticsView />
+            )}
+          </div>
+        )}
 
-              <div>
-                <h3 className="text-xs font-medium uppercase text-muted-foreground mb-2">Wire Events</h3>
-                <div className="space-y-1.5">
-                  <ShortcutRow keys="j / k" desc="Navigate events" />
-                  <ShortcutRow keys="Enter" desc="Expand / collapse" />
-                  <ShortcutRow keys="e" desc="Next error" />
-                  <ShortcutRow keys="/" desc="Search" />
-                  <ShortcutRow keys="Esc" desc="Close panel" />
+        {/* Shortcut Help Overlay */}
+        {showShortcutHelp && (
+          <>
+            <button
+              type="button"
+              className="fixed inset-0 z-50 bg-black/50"
+              aria-label="Close"
+              onClick={() => setShowShortcutHelp(false)}
+            />
+            <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+              <div
+                role="dialog"
+                aria-modal="true"
+                className="relative w-full max-w-lg rounded-lg border bg-popover p-6 shadow-lg pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold">Keyboard Shortcuts</h2>
+                  <button
+                    type="button"
+                    onClick={() => setShowShortcutHelp(false)}
+                    className="rounded-md p-1 hover:bg-accent"
+                  >
+                    <X size={16} />
+                  </button>
                 </div>
-              </div>
 
-              <div>
-                <h3 className="text-xs font-medium uppercase text-muted-foreground mb-2">Context Messages</h3>
-                <div className="space-y-1.5">
-                  <ShortcutRow keys="/" desc="Search" />
-                  <ShortcutRow keys="Enter" desc="Next match" />
-                  <ShortcutRow keys="Shift+Enter" desc="Previous match" />
+                <div className="space-y-4 text-sm">
+                  <div>
+                    <h3 className="text-xs font-medium uppercase text-muted-foreground mb-2">
+                      Global
+                    </h3>
+                    <div className="space-y-1.5">
+                      <ShortcutRow keys="1" desc="Wire Events" />
+                      <ShortcutRow keys="2" desc="Context Messages" />
+                      <ShortcutRow keys="3" desc="State" />
+                      <ShortcutRow keys="4" desc="Dual View" />
+                      <ShortcutRow keys="5" desc="Agents" />
+                      <ShortcutRow keys="?" desc="Show shortcuts" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-medium uppercase text-muted-foreground mb-2">
+                      Wire Events
+                    </h3>
+                    <div className="space-y-1.5">
+                      <ShortcutRow keys="j / k" desc="Navigate events" />
+                      <ShortcutRow keys="Enter" desc="Expand / collapse" />
+                      <ShortcutRow keys="e" desc="Next error" />
+                      <ShortcutRow keys="/" desc="Search" />
+                      <ShortcutRow keys="Esc" desc="Close panel" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-medium uppercase text-muted-foreground mb-2">
+                      Context Messages
+                    </h3>
+                    <div className="space-y-1.5">
+                      <ShortcutRow keys="/" desc="Search" />
+                      <ShortcutRow keys="Enter" desc="Next match" />
+                      <ShortcutRow keys="Shift+Enter" desc="Previous match" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+          </>
+        )}
+      </div>
     </TooltipProvider>
   );
 }

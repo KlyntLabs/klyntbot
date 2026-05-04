@@ -440,9 +440,9 @@ function normalizeListIndentation(value: string) {
 function LinkBlock({ urls }: LinkBlockProps) {
   return (
     <div className="markdown-linkblock">
-      {urls.map((url, index) => (
+      {urls.map((url) => (
         <a
-          key={`${url}-${index}`}
+          key={url}
           href={url}
           onClick={(event) => {
             event.preventDefault();
@@ -579,7 +579,7 @@ function CodeBlock({ className, value, copyUseModifier }: CodeBlockProps) {
       <span className="visually-hidden" aria-live="polite" role="status">
         {copied ? "Code copied to clipboard" : ""}
       </span>
-      <pre tabIndex={0}>
+      <pre>
         <code
           className={className}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: highlightLine escapes input before tokenizing
@@ -606,7 +606,7 @@ function PreBlock({ node, children, copyUseModifier }: PreProps) {
   if (isSingleLine) {
     const singleHtml = highlightLine(value, resolvePrismLanguage(extractLanguageTag(className)));
     return (
-      <pre className="markdown-codeblock-single" tabIndex={0}>
+      <pre className="markdown-codeblock-single">
         <code
           className={className}
           // biome-ignore lint/security/noDangerouslySetInnerHtml: highlightLine escapes input before tokenizing

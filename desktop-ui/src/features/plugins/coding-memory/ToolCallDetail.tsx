@@ -1,5 +1,9 @@
-import { AlertCircle, Check, Clock, Copy, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
+import Check from "lucide-react/dist/esm/icons/check";
+import Clock from "lucide-react/dist/esm/icons/clock";
+import Copy from "lucide-react/dist/esm/icons/copy";
+import X from "lucide-react/dist/esm/icons/x";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CausalGraphInspector } from "./CausalGraphInspector";
 import { formatTimestamp } from "./eventHelpers";
 import type { WireEventDto } from "./types";
@@ -25,22 +29,30 @@ function findPair(selected: WireEventDto, events: WireEventDto[]): ToolCallPair 
   let toolResult: WireEventDto | undefined;
 
   if (selected.kind === "toolCall") {
-    toolCallId = (selected.payloadDecoded as any)?.id as string | undefined;
+    toolCallId = (selected.payloadDecoded as Record<string, unknown> | undefined)?.id as
+      | string
+      | undefined;
     toolCall = selected;
   } else if (selected.kind === "toolResult") {
-    toolCallId = (selected.payloadDecoded as any)?.tool_call_id as string | undefined;
+    toolCallId = (selected.payloadDecoded as Record<string, unknown> | undefined)?.tool_call_id as
+      | string
+      | undefined;
     toolResult = selected;
   }
 
   if (!toolCallId) return null;
 
   for (const e of events) {
-    if (e.kind === "toolCall" && (e.payloadDecoded as any)?.id === toolCallId && !toolCall) {
+    if (
+      e.kind === "toolCall" &&
+      (e.payloadDecoded as Record<string, unknown> | undefined)?.id === toolCallId &&
+      !toolCall
+    ) {
       toolCall = e;
     }
     if (
       e.kind === "toolResult" &&
-      (e.payloadDecoded as any)?.tool_call_id === toolCallId &&
+      (e.payloadDecoded as Record<string, unknown> | undefined)?.tool_call_id === toolCallId &&
       !toolResult
     ) {
       toolResult = e;
@@ -49,16 +61,17 @@ function findPair(selected: WireEventDto, events: WireEventDto[]): ToolCallPair 
 
   if (!toolCall) return null;
 
-  const fn = (toolCall.payloadDecoded as any)?.function;
-  const toolName = (fn?.name as string) ?? "unknown";
+  const fn = (toolCall.payloadDecoded as Record<string, unknown> | undefined)?.function;
+  const toolName = ((fn as { name?: unknown } | undefined)?.name as string) ?? "unknown";
 
   const durationMs =
     toolCall && toolResult
       ? new Date(toolResult.occurredAt).getTime() - new Date(toolCall.occurredAt).getTime()
       : null;
 
-  const rv = toolResult?.payloadDecoded as any;
-  const isError = rv?.return_value?.is_error === true;
+  const rv = toolResult?.payloadDecoded as Record<string, unknown> | undefined;
+  const isError =
+    ((rv?.return_value as Record<string, unknown> | undefined)?.is_error as boolean) === true;
 
   return {
     toolCall,
@@ -133,9 +146,9 @@ export function ToolCallDetail({ selectedEvent, allEvents, onClose }: ToolCallDe
 }
 
 function getCallArgs(event: WireEventDto): unknown {
-  const fn = (event.payloadDecoded as any)?.function;
+  const fn = (event.payloadDecoded as Record<string, unknown> | undefined)?.function;
   if (!fn) return event.payloadDecoded;
-  const argsStr = fn.arguments as string | undefined;
+  const argsStr = (fn as { arguments?: unknown }).arguments as string | undefined;
   if (argsStr) {
     try {
       return JSON.parse(argsStr);
@@ -147,15 +160,15 @@ function getCallArgs(event: WireEventDto): unknown {
 }
 
 function getResultOutput(event: WireEventDto): unknown {
-  const p = event.payloadDecoded as any;
+  const p = event.payloadDecoded as Record<string, unknown> | undefined;
   if (p?.return_value !== undefined) return p.return_value;
   return p;
 }
 
 function getRecallIds(event: WireEventDto | null): string[] {
   if (!event) return [];
-  const p = event.payloadDecoded as any;
-  const ids = p?.return_value?.recall_ids;
+  const p = event.payloadDecoded as Record<string, unknown> | undefined;
+  const ids = (p?.return_value as Record<string, unknown> | undefined)?.recall_ids;
   if (Array.isArray(ids)) return ids.filter((x): x is string => typeof x === "string");
   return [];
 }
@@ -163,6 +176,16 @@ function getRecallIds(event: WireEventDto | null): string[] {
 function CopyableJson({ data }: { data: unknown }) {
   const [copied, setCopied] = useState(false);
   const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="cm-tool-detail__json">
       <button
@@ -171,7 +194,10 @@ function CopyableJson({ data }: { data: unknown }) {
         onClick={async () => {
           await navigator.clipboard.writeText(text);
           setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
+          if (copiedTimeoutRef.current) {
+            clearTimeout(copiedTimeoutRef.current);
+          }
+          copiedTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
         }}
       >
         {copied ? <Check size={12} /> : <Copy size={12} />}

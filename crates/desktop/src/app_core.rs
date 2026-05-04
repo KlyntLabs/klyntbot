@@ -544,12 +544,14 @@ fn wire_event_channels(
         app_handle,
         shutdown,
         "agent:thread_event",
+        Some(global_event_tx.clone()),
     );
     spawn_broker_forwarder(
         core.cost_events.subscribe(),
         app_handle,
         shutdown,
         "agent:cost_update",
+        Some(global_event_tx.clone()),
     );
     // ToolEvent::ApprovalRequest rides on `DomainEvent::Generic { kind:
     // "agent_event" }`. The dual-probe (`ApprovalRequest` key OR `type` field)
@@ -558,6 +560,7 @@ fn wire_event_channels(
         let mut rx = channels.domain_event_bus.subscribe();
         let handle = app_handle.clone();
         let token = shutdown.clone();
+        let global_tx = global_event_tx.clone();
         tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -577,6 +580,8 @@ fn wire_event_channels(
                                 if let Err(e) = handle.emit("agent:approval_request", &inner) {
                                     warn!("failed to emit agent:approval_request: {e}");
                                 }
+                                let _ = global_tx
+                                    .send(("agent:approval_request".to_string(), inner));
                             }
                         }
                         Ok(_) => {}
@@ -664,6 +669,7 @@ fn spawn_broker_forwarder<T>(
     app_handle: &tauri::AppHandle,
     shutdown_token: &CancellationToken,
     event_name: &'static str,
+    global_event_tx: Option<broadcast::Sender<(String, Value)>>,
 ) where
     T: Clone + serde::Serialize + Send + 'static,
 {
@@ -677,6 +683,12 @@ fn spawn_broker_forwarder<T>(
                     Ok(evt) => {
                         if let Err(e) = handle.emit(event_name, &evt) {
                             warn!("failed to emit {event_name}: {e}");
+                        }
+                        // Mirror to dev_server SSE so browser-only dev mode also receives.
+                        if let Some(ref tx) = global_event_tx {
+                            if let Ok(payload) = serde_json::to_value(&evt) {
+                                let _ = tx.send((event_name.to_string(), payload));
+                            }
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {

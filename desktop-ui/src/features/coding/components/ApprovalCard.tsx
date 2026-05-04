@@ -38,11 +38,7 @@ export function ApprovalCard({ item, onRespond }: Props) {
   }
 
   return (
-    <div
-      className="approval-card approval-card--pending"
-      role="region"
-      aria-label="Approval needed"
-    >
+    <section className="approval-card approval-card--pending" aria-label="Approval needed">
       <header>Approval needed</header>
       <dl>
         <dt>Tool</dt>
@@ -106,7 +102,7 @@ export function ApprovalCard({ item, onRespond }: Props) {
           onCancel={() => setEditorOpen(false)}
         />
       )}
-    </div>
+    </section>
   );
 }
 

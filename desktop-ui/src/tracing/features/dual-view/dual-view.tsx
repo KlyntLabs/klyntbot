@@ -2,17 +2,17 @@
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  type WireEvent,
-  type ContextMessage,
-  getWireEvents,
-  getSubagentWireEvents,
-  getContextMessages,
-  getSubagentContextMessages,
-  normalizeContent,
-} from "@/tracing/lib/api";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { formatTimestamp } from "@/tracing/features/wire-viewer/wire-event-card";
+import {
+  type ContextMessage,
+  getContextMessages,
+  getSubagentContextMessages,
+  getSubagentWireEvents,
+  getWireEvents,
+  normalizeContent,
+  type WireEvent,
+} from "@/tracing/lib/api";
 
 interface DualViewProps {
   sessionId: string;
@@ -90,8 +90,7 @@ function getWireSummary(event: WireEvent): string {
       return `tool_call_id: ${p.tool_call_id}`;
     }
     case "StatusUpdate": {
-      if (p.context_usage != null)
-        return `ctx: ${((p.context_usage as number) * 100).toFixed(1)}%`;
+      if (p.context_usage != null) return `ctx: ${((p.context_usage as number) * 100).toFixed(1)}%`;
       return "";
     }
     case "ApprovalRequest":
@@ -169,15 +168,22 @@ export function DualView({ sessionId, refreshKey = 0, agentScope }: DualViewProp
   // Fetch data
   useEffect(() => {
     const forceRefresh = refreshKey > 0;
+    const cancelled = false;
     setWireLoading(true);
     setWireError(null);
     const wireFetch = agentScope
       ? getSubagentWireEvents(sessionId, agentScope, forceRefresh)
       : getWireEvents(sessionId, forceRefresh);
     wireFetch
-      .then((res) => setWireEvents(res.events))
-      .catch((err) => setWireError(err.message))
-      .finally(() => setWireLoading(false));
+      .then((res) => {
+        if (!cancelled) setWireEvents(res.events);
+      })
+      .catch((err) => {
+        if (!cancelled) setWireError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setWireLoading(false);
+      });
 
     setContextLoading(true);
     setContextError(null);
@@ -185,8 +191,12 @@ export function DualView({ sessionId, refreshKey = 0, agentScope }: DualViewProp
       ? getSubagentContextMessages(sessionId, agentScope, forceRefresh)
       : getContextMessages(sessionId, forceRefresh);
     ctxFetch
-      .then((res) => setContextMessages(res.messages.filter((m) => !m.role.startsWith("_"))))
-      .catch((err) => setContextError(err.message))
+      .then((res) => {
+        if (!cancelled) setContextMessages(res.messages.filter((m) => !m.role.startsWith("_")));
+      })
+      .catch((err) => {
+        if (!cancelled) setContextError(err.message);
+      })
       .finally(() => setContextLoading(false));
   }, [sessionId, refreshKey, agentScope]);
 
@@ -293,15 +303,15 @@ export function DualView({ sessionId, refreshKey = 0, agentScope }: DualViewProp
               const summary = getWireSummary(event);
 
               return (
-                <div
-                  className={`flex items-center gap-1.5 border-b px-3 py-1 transition-all duration-300 ${
-                    isHighlighted
-                      ? "ring-1 ring-blue-500/30 bg-blue-500/10"
-                      : ""
+                <button
+                  type="button"
+                  className={`flex items-center gap-1.5 border-b px-3 py-1 transition-all duration-300 w-full text-left ${
+                    isHighlighted ? "ring-1 ring-blue-500/30 bg-blue-500/10" : ""
                   } ${isClickable ? "cursor-pointer hover:bg-muted/50" : ""}`}
                   onClick={() => {
                     if (tcId) handleHighlight(tcId, "wire");
                   }}
+                  disabled={!isClickable}
                 >
                   {/* Timestamp */}
                   <span className="shrink-0 font-mono text-[10px] text-muted-foreground w-[72px]">
@@ -319,11 +329,9 @@ export function DualView({ sessionId, refreshKey = 0, agentScope }: DualViewProp
 
                   {/* Summary */}
                   {summary && (
-                    <span className="truncate text-[11px] text-muted-foreground">
-                      {summary}
-                    </span>
+                    <span className="truncate text-[11px] text-muted-foreground">{summary}</span>
                   )}
-                </div>
+                </button>
               );
             }}
           />
@@ -350,22 +358,20 @@ export function DualView({ sessionId, refreshKey = 0, agentScope }: DualViewProp
             data={contextMessages}
             itemContent={(_idx, message) => {
               const tcIds = getContextToolCallIds(message);
-              const isHighlighted = tcIds.some(
-                (id) => id === highlightedToolCallId,
-              );
+              const isHighlighted = tcIds.some((id) => id === highlightedToolCallId);
               const isClickable = tcIds.length > 0;
               const summary = getContextSummary(message);
 
               return (
-                <div
-                  className={`flex items-center gap-1.5 border-b px-3 py-1 transition-all duration-300 ${
-                    isHighlighted
-                      ? "ring-1 ring-blue-500/30 bg-blue-500/10"
-                      : ""
+                <button
+                  type="button"
+                  className={`flex items-center gap-1.5 border-b px-3 py-1 transition-all duration-300 w-full text-left ${
+                    isHighlighted ? "ring-1 ring-blue-500/30 bg-blue-500/10" : ""
                   } ${isClickable ? "cursor-pointer hover:bg-muted/50" : ""}`}
                   onClick={() => {
                     if (tcIds.length > 0) handleHighlight(tcIds[0], "context");
                   }}
+                  disabled={!isClickable}
                 >
                   {/* Role badge */}
                   <span
@@ -385,11 +391,9 @@ export function DualView({ sessionId, refreshKey = 0, agentScope }: DualViewProp
 
                   {/* Summary */}
                   {summary && (
-                    <span className="truncate text-[11px] text-muted-foreground">
-                      {summary}
-                    </span>
+                    <span className="truncate text-[11px] text-muted-foreground">{summary}</span>
                   )}
-                </div>
+                </button>
               );
             }}
           />

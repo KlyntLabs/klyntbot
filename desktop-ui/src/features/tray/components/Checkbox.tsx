@@ -5,18 +5,22 @@ interface Props {
   onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
   className?: string;
+  id?: string;
 }
 
-export function Checkbox({ checked, onCheckedChange, disabled, className }: Props) {
+export function Checkbox({ checked, onCheckedChange, disabled, className, id }: Props) {
   return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onCheckedChange(!checked)}
+    <span
       className={`tray-checkbox${checked ? " is-checked" : ""}${className ? ` ${className}` : ""}`}
     >
+      <input
+        type="checkbox"
+        id={id}
+        checked={checked}
+        onChange={() => onCheckedChange(!checked)}
+        disabled={disabled}
+        className="tray-checkbox-native"
+      />
       {checked && (
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <path
@@ -29,6 +33,6 @@ export function Checkbox({ checked, onCheckedChange, disabled, className }: Prop
           />
         </svg>
       )}
-    </button>
+    </span>
   );
 }

@@ -2,13 +2,8 @@
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
 import { type UIEvent, useEffect, useMemo, useRef, useState } from "react";
-import { type SessionInfo, importSession, listSessions } from "@/tracing/lib/api";
-import {
-  ExplorerToolbar,
-  type FilterMode,
-  type SortMode,
-  type ViewMode,
-} from "./explorer-toolbar";
+import { importSession, listSessions, type SessionInfo } from "@/tracing/lib/api";
+import { ExplorerToolbar, type FilterMode, type SortMode, type ViewMode } from "./explorer-toolbar";
 import { ProjectGroup } from "./project-group";
 import { SessionCard } from "./session-card";
 
@@ -45,7 +40,7 @@ export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
   // Reset display count when filters change
   useEffect(() => {
     setDisplayCount(PAGE_SIZE);
-  }, [search, sortMode, filterMode, grouped]);
+  }, []);
 
   const refreshSessions = async () => {
     try {
@@ -113,7 +108,7 @@ export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
         (s) =>
           s.session_id.toLowerCase().includes(q) ||
           s.title.toLowerCase().includes(q) ||
-          (s.work_dir && s.work_dir.toLowerCase().includes(q)),
+          s.work_dir?.toLowerCase().includes(q),
       );
     }
 
@@ -165,10 +160,7 @@ export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
     return dirs.size;
   }, [sessions]);
 
-  const totalSize = useMemo(
-    () => sessions.reduce((sum, s) => sum + s.total_size, 0),
-    [sessions],
-  );
+  const totalSize = useMemo(() => sessions.reduce((sum, s) => sum + s.total_size, 0), [sessions]);
 
   // Infinite scroll handler — called via React onScroll prop
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
@@ -181,10 +173,7 @@ export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
   };
 
   // Paginated sessions for flat views
-  const displayedSessions = useMemo(
-    () => sorted.slice(0, displayCount),
-    [sorted, displayCount],
-  );
+  const displayedSessions = useMemo(() => sorted.slice(0, displayCount), [sorted, displayCount]);
 
   // Paginated groups
   const displayedGroups = useMemo((): ProjectGroupData[] => {
@@ -316,7 +305,8 @@ export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
           <div className="flex flex-col items-center justify-center text-muted-foreground py-12 gap-2">
             <span className="text-lg">No sessions found</span>
             <span className="text-sm">
-              Run <code className="font-mono bg-muted px-1.5 py-0.5 rounded">agent</code> to create your first session, or import a session ZIP.
+              Run <code className="font-mono bg-muted px-1.5 py-0.5 rounded">agent</code> to create
+              your first session, or import a session ZIP.
             </span>
           </div>
         )}
@@ -326,7 +316,9 @@ export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
       <div className="border-t px-4 py-1.5 text-[11px] text-muted-foreground flex items-center gap-2">
         <span>{sessions.length} sessions</span>
         <span className="opacity-30">·</span>
-        <span>{uniqueProjects} project{uniqueProjects !== 1 ? "s" : ""}</span>
+        <span>
+          {uniqueProjects} project{uniqueProjects !== 1 ? "s" : ""}
+        </span>
         {totalSize > 0 && (
           <>
             <span className="opacity-30">·</span>

@@ -1,4 +1,7 @@
-import { Brain, ExternalLink, Lightbulb, X } from "lucide-react";
+import Brain from "lucide-react/dist/esm/icons/brain";
+import ExternalLink from "lucide-react/dist/esm/icons/external-link";
+import Lightbulb from "lucide-react/dist/esm/icons/lightbulb";
+import X from "lucide-react/dist/esm/icons/x";
 import {
   dashboardIntelligenceQuery,
   productivitySummaryRangeQuery,
@@ -72,12 +75,14 @@ function DaySummary({
   const { data: intel } = useTauriQuery<DashboardIntelligenceResponse | null>({
     queryKey: qk.dashboard.intelligence(date),
     queryFn: () => dashboardIntelligenceQuery(date, TZ_OFFSET_MINS),
+    staleTime: 5 * 60_000,
     fallback: null,
   });
 
   const { data: weeklyData } = useTauriQuery<ProductivitySummaryResponse[]>({
     queryKey: qk.productivity.weekly(),
     queryFn: () => productivityWeeklyQuery(),
+    staleTime: 5 * 60_000,
     fallback: [],
   });
 

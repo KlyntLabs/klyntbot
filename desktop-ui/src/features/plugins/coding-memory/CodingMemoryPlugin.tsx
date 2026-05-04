@@ -92,7 +92,7 @@ export function CodingMemoryPlugin() {
         <ProviderChips active={provider} onChange={setProvider} counts={counts} />
         <button
           type="button"
-          className={"cm-plugin__live-toggle" + (live ? " cm-plugin__live-toggle--on" : "")}
+          className={`cm-plugin__live-toggle${live ? " cm-plugin__live-toggle--on" : ""}`}
           onClick={() => setLive((v) => !v)}
           title={live ? "Click to pause auto-refresh" : "Click to resume auto-refresh"}
         >
@@ -113,18 +113,14 @@ export function CodingMemoryPlugin() {
         </button>
         <button
           type="button"
-          className={
-            "cm-plugin__sec-tab" + (secondaryTab === "reforge" ? " cm-plugin__sec-tab--active" : "")
-          }
+          className={`cm-plugin__sec-tab${secondaryTab === "reforge" ? " cm-plugin__sec-tab--active" : ""}`}
           onClick={() => setSecondaryTab("reforge")}
         >
           Reforge
         </button>
         <button
           type="button"
-          className={
-            "cm-plugin__sec-tab" + (secondaryTab === "tracing" ? " cm-plugin__sec-tab--active" : "")
-          }
+          className={`cm-plugin__sec-tab${secondaryTab === "tracing" ? " cm-plugin__sec-tab--active" : ""}`}
           onClick={() => setSecondaryTab("tracing")}
         >
           Tracing

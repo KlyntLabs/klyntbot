@@ -59,6 +59,7 @@ export function SidebarThreadsOnlySection({
       <div className="sidebar-section-header workspace-group-header-all-threads">
         <div className="sidebar-section-title">Recent conversations</div>
         <button
+          type="button"
           className="ghost all-threads-add"
           onClick={onToggleAddMenu}
           data-tauri-drag-region="false"

@@ -1,28 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
+import { ChevronDown, ChevronRight, FolderOpen, Shield, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getSessionState } from "@/tracing/lib/api";
-import {
-  ChevronDown,
-  ChevronRight,
-  Shield,
-  Users,
-  FolderOpen,
-} from "lucide-react";
 
 interface StateViewerProps {
   sessionId: string;
   refreshKey?: number;
 }
 
-function JsonValue({
-  value,
-  depth = 0,
-}: {
-  value: unknown;
-  depth?: number;
-}) {
+function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   const [expanded, setExpanded] = useState(depth < 2);
 
   if (value === null) {
@@ -31,7 +19,9 @@ function JsonValue({
 
   if (typeof value === "boolean") {
     return (
-      <span className={value ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}>
+      <span
+        className={value ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}
+      >
         {String(value)}
       </span>
     );
@@ -42,11 +32,7 @@ function JsonValue({
   }
 
   if (typeof value === "string") {
-    return (
-      <span className="text-amber-700 dark:text-amber-300">
-        &quot;{value}&quot;
-      </span>
-    );
+    return <span className="text-amber-700 dark:text-amber-300">&quot;{value}&quot;</span>;
   }
 
   if (Array.isArray(value)) {
@@ -56,6 +42,7 @@ function JsonValue({
     return (
       <div>
         <button
+          type="button"
           onClick={() => setExpanded(!expanded)}
           className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground"
         >
@@ -65,10 +52,8 @@ function JsonValue({
         {expanded && (
           <div className="ml-4 border-l border-border pl-3">
             {value.map((item, i) => (
-              <div key={i} className="py-0.5">
-                <span className="text-muted-foreground text-[11px] mr-2">
-                  {i}:
-                </span>
+              <div key={JSON.stringify(item)} className="py-0.5">
+                <span className="text-muted-foreground text-[11px] mr-2">{i}:</span>
                 <JsonValue value={item} depth={depth + 1} />
               </div>
             ))}
@@ -86,6 +71,7 @@ function JsonValue({
     return (
       <div>
         <button
+          type="button"
           onClick={() => setExpanded(!expanded)}
           className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground"
         >
@@ -133,9 +119,7 @@ export function StateViewer({ sessionId, refreshKey = 0 }: StateViewerProps) {
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center text-destructive">
-        Error: {error}
-      </div>
+      <div className="flex h-full items-center justify-center text-destructive">Error: {error}</div>
     );
   }
 
@@ -172,9 +156,7 @@ export function StateViewer({ sessionId, refreshKey = 0 }: StateViewerProps) {
                 </span>
               </div>
               <div>
-                <span className="text-muted-foreground">
-                  Auto-approved actions:
-                </span>
+                <span className="text-muted-foreground">Auto-approved actions:</span>
                 {Array.isArray(approval.auto_approve_actions) &&
                 approval.auto_approve_actions.length > 0 ? (
                   <div className="mt-1 flex flex-wrap gap-1">
@@ -204,11 +186,11 @@ export function StateViewer({ sessionId, refreshKey = 0 }: StateViewerProps) {
           <div className="text-xs">
             {subagents && subagents.length > 0 ? (
               <div className="space-y-1">
-                {subagents.map((sa, i) => {
+                {subagents.map((sa) => {
                   const agent = sa as Record<string, unknown>;
                   return (
                     <div
-                      key={i}
+                      key={String(agent.name ?? "unnamed")}
                       className="rounded bg-secondary px-2 py-1 font-mono"
                     >
                       {String(agent.name ?? "unnamed")}

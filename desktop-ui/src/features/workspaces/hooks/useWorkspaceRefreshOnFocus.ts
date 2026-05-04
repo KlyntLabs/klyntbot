@@ -5,7 +5,7 @@ export const REMOTE_WORKSPACE_REFRESH_INTERVAL_MS = 15_000;
 
 type WorkspaceRefreshOptions = {
   workspaces: WorkspaceInfo[];
-  refreshWorkspaces: () => Promise<WorkspaceInfo[] | void>;
+  refreshWorkspaces: () => Promise<WorkspaceInfo[] | undefined>;
   listThreadsForWorkspaces: (
     workspaces: WorkspaceInfo[],
     options?: { preserveState?: boolean },
@@ -120,5 +120,5 @@ export function useWorkspaceRefreshOnFocus({
         clearInterval(pollTimer);
       }
     };
-  }, [backendMode, pollIntervalMs]);
+  }, []);
 }

@@ -95,7 +95,7 @@ export function WindowCaptionControls() {
   };
 
   return (
-    <div className="window-caption-controls" role="group" aria-label="Window controls">
+    <fieldset className="window-caption-controls" aria-label="Window controls">
       <button
         type="button"
         className="window-caption-control"
@@ -123,6 +123,6 @@ export function WindowCaptionControls() {
       >
         <X aria-hidden />
       </button>
-    </div>
+    </fieldset>
   );
 }

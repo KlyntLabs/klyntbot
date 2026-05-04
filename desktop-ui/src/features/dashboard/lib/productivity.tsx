@@ -3,7 +3,7 @@
  * score color thresholds, and activity-type color resolvers.
  */
 
-import { AppWindow } from "lucide-react";
+import AppWindow from "lucide-react/dist/esm/icons/app-window";
 import type { JSX } from "react";
 
 // ── App brand colors & icons ──────────────────────────────────────────

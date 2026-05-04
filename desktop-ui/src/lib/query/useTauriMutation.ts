@@ -32,10 +32,16 @@ export function useTauriMutation<TData = unknown, TVars = void>(
   const client = useQueryClient();
 
   const mutation = useMutation<TData, unknown, TVars, { rollback?: () => void }>({
-    mutationFn: (vars) =>
-      opts.mutationFn
-        ? opts.mutationFn(vars)
-        : ipc<TData>(opts.command!, vars as Record<string, unknown> | undefined),
+    mutationFn: (vars) => {
+      if (opts.mutationFn) {
+        return opts.mutationFn(vars);
+      }
+      const command = opts.command;
+      if (!command) {
+        throw new Error("useTauriMutation: command is required when mutationFn is not provided");
+      }
+      return ipc<TData>(command, vars as Record<string, unknown> | undefined);
+    },
 
     onMutate: async (vars) => {
       if (!opts.optimistic) return {};

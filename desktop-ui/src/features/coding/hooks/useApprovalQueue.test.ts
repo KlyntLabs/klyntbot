@@ -18,13 +18,13 @@ describe("useApprovalQueue", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("subscribes to approval events", async () => {
-    (listen as any).mockImplementation(() => Promise.resolve(() => {}));
+    vi.mocked(listen).mockImplementation(() => Promise.resolve(() => {}));
     renderHook(() => useApprovalQueue("session-1"));
     await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
   });
 
   it("respond invokes chat_respond_approval", async () => {
-    (listen as any).mockImplementation(() => Promise.resolve(() => {}));
+    vi.mocked(listen).mockImplementation(() => Promise.resolve(() => {}));
     const { result } = renderHook(() => useApprovalQueue("session-1"));
     await act(async () => {
       await result.current.respond("r1", { kind: "allow_once" });
@@ -38,12 +38,10 @@ describe("useApprovalQueue", () => {
 
   it("upserts approval on agent:approval_requested when requires_user_input is true", async () => {
     const listeners: Record<string, (event: { payload: unknown }) => void> = {};
-    (listen as any).mockImplementation(
-      (event: string, handler: (e: { payload: unknown }) => void) => {
-        listeners[event] = handler;
-        return Promise.resolve(() => {});
-      },
-    );
+    vi.mocked(listen).mockImplementation((event, handler) => {
+      listeners[event as string] = handler as (e: { payload: unknown }) => void;
+      return Promise.resolve(() => {});
+    });
     renderHook(() => useApprovalQueue("session-1"));
     await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
 
@@ -68,12 +66,10 @@ describe("useApprovalQueue", () => {
 
   it("resolves approval on agent:approval_resolved", async () => {
     const listeners: Record<string, (event: { payload: unknown }) => void> = {};
-    (listen as any).mockImplementation(
-      (event: string, handler: (e: { payload: unknown }) => void) => {
-        listeners[event] = handler;
-        return Promise.resolve(() => {});
-      },
-    );
+    vi.mocked(listen).mockImplementation((event, handler) => {
+      listeners[event as string] = handler as (e: { payload: unknown }) => void;
+      return Promise.resolve(() => {});
+    });
     renderHook(() => useApprovalQueue("session-1"));
     await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
 

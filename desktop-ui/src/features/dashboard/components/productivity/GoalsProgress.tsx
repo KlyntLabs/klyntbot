@@ -1,4 +1,5 @@
-import { Plus, Trash2 } from "lucide-react";
+import Plus from "lucide-react/dist/esm/icons/plus";
+import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import { useState } from "react";
 import {
   type GoalCreateParams,

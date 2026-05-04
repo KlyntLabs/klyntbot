@@ -38,6 +38,6 @@ describe("useCodingMode", () => {
     });
     const setCall = invokeCalls.find(([c]) => c === "chat_set_mode");
     expect(setCall).toBeTruthy();
-    expect((setCall![1] as any).mode).toBe("coding");
+    expect((setCall?.[1] as { mode: string }).mode).toBe("coding");
   });
 });

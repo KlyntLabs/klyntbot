@@ -29,7 +29,7 @@ type PersistThreadCodexParams = (patch: {
 type UseThreadSelectionHandlersOrchestrationParams = {
   appSettingsLoading: boolean;
   setAppSettings: SetState<AppSettings>;
-  queueSaveSettings: (next: AppSettings) => Promise<AppSettings | void>;
+  queueSaveSettings: (next: AppSettings) => Promise<AppSettings | undefined>;
   activeThreadIdRef: MutableRefObject<string | null>;
   setSelectedModelId: (id: string | null) => void;
   setSelectedEffort: (effort: string | null) => void;
@@ -118,7 +118,7 @@ export function useThreadCodexSyncOrchestration({
   activeWorkspaceId,
   activeThreadId,
   appSettings,
-  threadCodexParamsVersion,
+  threadCodexParamsVersion: _threadCodexParamsVersion,
   getThreadCodexParams,
   patchThreadCodexParams,
   setThreadCodexSelectionKey,
@@ -179,7 +179,6 @@ export function useThreadCodexSyncOrchestration({
     setPreferredModelId,
     setPreferredServiceTier,
     setThreadCodexSelectionKey,
-    threadCodexParamsVersion,
     setAccessMode,
     activeThreadIdRef,
     pendingNewThreadSeedRef,

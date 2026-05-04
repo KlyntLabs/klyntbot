@@ -27,7 +27,7 @@ export const MainHeaderActions = memo(function MainHeaderActions({
   return (
     <>
       {centerMode === "diff" && (
-        <div className="diff-view-toggle" role="group" aria-label="Diff view">
+        <fieldset className="diff-view-toggle" aria-label="Diff view">
           <button
             type="button"
             className={`diff-view-toggle-button${
@@ -56,7 +56,7 @@ export const MainHeaderActions = memo(function MainHeaderActions({
           >
             <AlignLeft size={14} aria-hidden />
           </button>
-        </div>
+        </fieldset>
       )}
       {!isCompact ? (
         rightPanelCollapsed ? (

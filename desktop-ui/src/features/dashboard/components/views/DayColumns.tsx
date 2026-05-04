@@ -125,6 +125,7 @@ export function DayColumns({
     queryKey: isToday
       ? qk.dashboard.productivityToday(date)
       : qk.productivity.summaryRange(date, date),
+    staleTime: 60_000,
     queryFn: async () => {
       if (isToday) return productivityTodayQuery();
       const arr = await productivitySummaryRangeQuery(date, date);
@@ -543,7 +544,6 @@ export function DayColumns({
             </div>
           </div>
         </div>
-
       </div>
       {sidebarOpen && (
         <SummaryPanel

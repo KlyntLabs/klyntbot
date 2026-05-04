@@ -67,7 +67,7 @@ export function useLocalUsage(enabled: boolean, workspacePath: string | null) {
     return () => {
       window.clearInterval(interval);
     };
-  }, [enabled, refresh, workspacePath]);
+  }, [enabled, refresh]);
 
   return { ...state, refresh };
 }

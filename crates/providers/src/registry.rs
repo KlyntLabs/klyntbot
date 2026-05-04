@@ -254,6 +254,24 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         strip_model_prefix: false,
         model_overrides: &[],
     },
+    // MiMo (Xiaomi): OpenAI-compatible, needs "mimo/" prefix
+    ProviderSpec {
+        name: "mimo",
+        keywords: &["mimo", "xiaomi"],
+        env_key: "MIMO_API_KEY",
+        display_name: "MiMo (Xiaomi)",
+        prefix: "mimo",
+        skip_prefixes: &["mimo/"],
+        env_extras: &[],
+        is_gateway: false,
+        is_local: false,
+        detect_by_key_prefix: "tp-",
+        detect_by_base_keyword: "xiaomimimo",
+        default_api_base: "https://token-plan-sgp.xiaomimimo.com/v1",
+        default_model: "mimo-v2.5-pro",
+        strip_model_prefix: false,
+        model_overrides: &[],
+    },
     // === Local deployment ===
 
     // vLLM / OpenAI-compatible local server

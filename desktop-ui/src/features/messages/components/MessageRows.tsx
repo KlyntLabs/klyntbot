@@ -116,13 +116,10 @@ const MessageImageGrid = memo(function MessageImageGrid({
   hasText: boolean;
 }) {
   return (
-    <div
-      className={`message-image-grid${hasText ? " message-image-grid--with-text" : ""}`}
-      role="list"
-    >
+    <ul className={`message-image-grid${hasText ? " message-image-grid--with-text" : ""}`}>
       {images.map((image, index) => (
         <button
-          key={`${image.src}-${index}`}
+          key={image.src}
           type="button"
           className="message-image-thumb"
           onClick={() => onOpen(index)}
@@ -131,7 +128,7 @@ const MessageImageGrid = memo(function MessageImageGrid({
           <img src={image.src} alt={image.label} loading="lazy" />
         </button>
       ))}
-    </div>
+    </ul>
   );
 });
 
@@ -171,8 +168,23 @@ const ImageLightbox = memo(function ImageLightbox({
   }
 
   return createPortal(
-    <div className="message-image-lightbox" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="message-image-lightbox-content" onClick={(event) => event.stopPropagation()}>
+    <div
+      className="message-image-lightbox"
+      role="dialog"
+      aria-modal="true"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+      }}
+    >
+      <div className="message-image-lightbox-content">
         <button
           type="button"
           className="message-image-lightbox-close"
@@ -221,7 +233,16 @@ const CommandOutput = memo(function CommandOutput({ output }: CommandOutputProps
       return;
     }
     node.scrollTop = node.scrollHeight;
-  }, [lineWindow, isPinned]);
+  }, [isPinned]);
+
+  const lineData = useMemo(
+    () =>
+      lineWindow.lines.map((line, index) => ({
+        content: line,
+        lineNumber: lineWindow.offset + index + 1,
+      })),
+    [lineWindow],
+  );
 
   if (lineWindow.lines.length === 0) {
     return null;
@@ -230,9 +251,9 @@ const CommandOutput = memo(function CommandOutput({ output }: CommandOutputProps
   return (
     <div className="tool-inline-terminal" role="log" aria-live="polite">
       <div className="tool-inline-terminal-lines" ref={containerRef} onScroll={handleScroll}>
-        {lineWindow.lines.map((line, index) => (
-          <div key={`${lineWindow.offset + index}-${line}`} className="tool-inline-terminal-line">
-            {line || " "}
+        {lineData.map(({ content, lineNumber }) => (
+          <div key={`line-${lineNumber}`} className="tool-inline-terminal-line">
+            {content || " "}
           </div>
         ))}
       </div>
@@ -633,13 +654,13 @@ export const UserInputRow = memo(function UserInputRow({
             {item.questions.map((question, index) => {
               const title = question.question || question.header || `Question ${index + 1}`;
               return (
-                <div key={`${question.id}-${index}`} className="user-input-inline-entry">
+                <div key={question.id} className="user-input-inline-entry">
                   <div className="user-input-inline-question">{title}</div>
                   {question.answers.length > 0 ? (
                     <div className="user-input-inline-answers">
-                      {question.answers.map((answer, answerIndex) => (
+                      {question.answers.map((answer, _answerIndex) => (
                         <div
-                          key={`${question.id}-answer-${answerIndex}`}
+                          key={`${question.id}-answer-${answer.slice(0, 32)}`}
                           className="user-input-inline-answer"
                         >
                           {answer}
@@ -796,8 +817,8 @@ export const ToolRow = memo(function ToolRow({
         )}
         {isExpanded && isFileChange && hasChanges && (
           <div className="tool-inline-change-list">
-            {item.changes?.map((change, index) => (
-              <div key={`${change.path}-${index}`} className="tool-inline-change">
+            {item.changes?.map((change) => (
+              <div key={`${change.path}-${change.kind ?? "change"}`} className="tool-inline-change">
                 <div className="tool-inline-change-header">
                   {change.kind && (
                     <span className="tool-inline-change-kind">{change.kind.toUpperCase()}</span>
@@ -875,8 +896,11 @@ export const ExploreRow = memo(function ExploreRow({ item }: ExploreRowProps) {
           <span className="explore-inline-title">{title}</span>
         </div>
         <div className="explore-inline-list">
-          {item.entries.map((entry, index) => (
-            <div key={`${entry.kind}-${entry.label}-${index}`} className="explore-inline-item">
+          {item.entries.map((entry) => (
+            <div
+              key={`${entry.kind}-${entry.label}-${entry.detail ?? ""}`}
+              className="explore-inline-item"
+            >
               <span className="explore-inline-kind">{exploreKindLabel(entry.kind)}</span>
               <span className="explore-inline-label">{entry.label}</span>
               {entry.detail && entry.detail !== entry.label && (

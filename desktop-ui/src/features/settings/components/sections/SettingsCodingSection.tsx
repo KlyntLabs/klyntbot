@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { GeneralSubsection } from "./coding/GeneralSubsection";
+import { HooksSubsection } from "./coding/HooksSubsection";
 import { PermissionsSubsection } from "./coding/PermissionsSubsection";
 import { SandboxSubsection } from "./coding/SandboxSubsection";
 import { SessionsSubsection } from "./coding/SessionsSubsection";
-import { HooksSubsection } from "./coding/HooksSubsection";
 import { SkillsSubsection } from "./coding/SkillsSubsection";
 import { ToolsSubsection } from "./coding/ToolsSubsection";
 
@@ -16,7 +16,12 @@ export function SettingsCodingSection() {
     <div className="settings-coding">
       <nav className="settings-coding__tabs">
         {TABS.map((t) => (
-          <button key={t} className={t === tab ? "active" : ""} onClick={() => setTab(t)}>
+          <button
+            type="button"
+            key={t}
+            className={t === tab ? "active" : ""}
+            onClick={() => setTab(t)}
+          >
             {t}
           </button>
         ))}

@@ -390,7 +390,9 @@ export function useThreadActions({
     (workspaceId: string) => {
       const threadIds = new Set<string>();
       const list = threadsByWorkspace[workspaceId] ?? [];
-      list.forEach((thread) => threadIds.add(thread.id));
+      for (const thread of list) {
+        threadIds.add(thread.id);
+      }
       const activeThread = activeThreadIdByWorkspace[workspaceId];
       if (activeThread) {
         threadIds.add(activeThread);

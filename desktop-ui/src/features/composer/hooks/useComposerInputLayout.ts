@@ -7,8 +7,8 @@ type UseComposerInputLayoutArgs = {
 };
 
 export function useComposerInputLayout({
-  isExpanded,
-  text,
+  isExpanded: _isExpanded,
+  text: _text,
   textareaRef,
 }: UseComposerInputLayoutArgs) {
   const [isPhoneLayout, setIsPhoneLayout] = useState(false);
@@ -47,8 +47,8 @@ export function useComposerInputLayout({
     if (!textarea) {
       return;
     }
-    const minTextareaHeight = isExpanded ? (isPhoneLayout ? 152 : 180) : isPhoneLayout ? 52 : 60;
-    const maxTextareaHeight = isExpanded ? (isPhoneLayout ? 280 : 320) : isPhoneLayout ? 168 : 120;
+    const minTextareaHeight = _isExpanded ? (isPhoneLayout ? 152 : 180) : isPhoneLayout ? 52 : 60;
+    const maxTextareaHeight = _isExpanded ? (isPhoneLayout ? 280 : 320) : isPhoneLayout ? 168 : 120;
     textarea.style.height = "auto";
     textarea.style.minHeight = `${minTextareaHeight}px`;
     textarea.style.maxHeight = `${maxTextareaHeight}px`;
@@ -72,7 +72,7 @@ export function useComposerInputLayout({
     const estimatedLineCount = contentHeight / lineHeight;
     const nextIsPhoneTallInput = estimatedLineCount > 2.25;
     setIsPhoneTallInput((prev) => (prev === nextIsPhoneTallInput ? prev : nextIsPhoneTallInput));
-  }, [isExpanded, isPhoneLayout, text, textareaRef]);
+  }, [_isExpanded, isPhoneLayout, textareaRef]);
 
   return { isPhoneLayout, isPhoneTallInput };
 }

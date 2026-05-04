@@ -2,7 +2,7 @@ import { productivityHourlyBreakdownQuery } from "@/api/endpoints/dashboard";
 import type { HourlyBreakdownResponse } from "@/bindings";
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
-import { todayISO, TZ_OFFSET_MINS } from "@/utils/dashboardDates";
+import { TZ_OFFSET_MINS, todayISO } from "@/utils/dashboardDates";
 
 interface Props {
   startDate: string;

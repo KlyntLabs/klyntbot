@@ -151,11 +151,11 @@ export function DesktopLayout({
   return (
     <>
       {sidebarNode}
-      <div
+      <hr
         className="sidebar-resizer"
-        role="separator"
         aria-orientation="vertical"
         aria-label="Resize sidebar"
+        tabIndex={0}
         onMouseDown={onSidebarResizeStart}
       />
 
@@ -183,11 +183,11 @@ export function DesktopLayout({
                   >
                     {chatPaneNode}
                   </div>
-                  <div
+                  <hr
                     className="content-split-resizer"
-                    role="separator"
                     aria-orientation="vertical"
                     aria-label="Resize chat/diff split"
+                    tabIndex={0}
                     onMouseDown={onChatDiffSplitPositionResizeStart}
                   />
                   <div
@@ -229,21 +229,21 @@ export function DesktopLayout({
               )}
             </div>
 
-            <div
+            <hr
               className="right-panel-resizer"
-              role="separator"
               aria-orientation="vertical"
               aria-label="Resize right panel"
+              tabIndex={0}
               onMouseDown={onRightPanelResizeStart}
             />
             <div className={`right-panel ${hasActivePlan ? "" : "plan-collapsed"}`}>
               <div className="right-panel-drag-strip" />
               <div className="right-panel-top">{gitDiffPanelNode}</div>
-              <div
+              <hr
                 className="right-panel-divider"
-                role="separator"
                 aria-orientation="horizontal"
                 aria-label="Resize plan panel"
+                tabIndex={0}
                 onMouseDown={onPlanPanelResizeStart}
               />
               <div className="right-panel-bottom">{planPanelNode}</div>

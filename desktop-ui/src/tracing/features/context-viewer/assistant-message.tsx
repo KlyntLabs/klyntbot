@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { useState } from "react";
-import type { ContextMessage, ContentPart, ToolCallItem } from "@/tracing/lib/api";
-import { normalizeContent } from "@/tracing/lib/api";
-import { Markdown } from "@/tracing/components/markdown";
-import { useRawMode, useNavigateToWire } from "./context-viewer";
 import {
+  ArrowRight,
   Bot,
   Brain,
   ChevronDown,
   ChevronRight,
-  Wrench,
   Image,
   Music,
   Video,
-  ArrowRight,
+  Wrench,
 } from "lucide-react";
+import { useState } from "react";
+import { Markdown } from "@/tracing/components/markdown";
+import type { ContentPart, ContextMessage, ToolCallItem } from "@/tracing/lib/api";
+import { normalizeContent } from "@/tracing/lib/api";
+import { useNavigateToWire, useRawMode } from "./context-viewer";
 
 interface AssistantMessageProps {
   message: ContextMessage;
@@ -32,6 +32,7 @@ function ThinkingBlock({ part }: { part: ContentPart }) {
   return (
     <div className="my-1 rounded-md border border-dashed bg-muted/30 px-3 py-2">
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
@@ -45,7 +46,8 @@ function ThinkingBlock({ part }: { part: ContentPart }) {
         </div>
       ) : (
         <div className="mt-1 truncate text-xs text-muted-foreground">
-          {text.slice(0, 100)}{text.length > 100 ? "..." : ""}
+          {text.slice(0, 100)}
+          {text.length > 100 ? "..." : ""}
         </div>
       )}
     </div>
@@ -67,6 +69,7 @@ function ToolCallBlock({ toolCall }: { toolCall: ToolCallItem }) {
     <div className="my-1 rounded-md border bg-purple-500/5 dark:bg-purple-500/10 px-3 py-2">
       <div className="flex items-center gap-1.5">
         <button
+          type="button"
           onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-1.5 text-xs"
         >
@@ -83,18 +86,14 @@ function ToolCallBlock({ toolCall }: { toolCall: ToolCallItem }) {
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </button>
         {navigateToWire && (
-          <span
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
             onClick={() => navigateToWire(toolCall.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") navigateToWire(toolCall.id);
-            }}
-            className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-0.5"
+            className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-0.5 bg-transparent border-none p-0"
           >
             <ArrowRight size={9} />
             Wire
-          </span>
+          </button>
         )}
       </div>
       {expanded && (
@@ -102,14 +101,14 @@ function ToolCallBlock({ toolCall }: { toolCall: ToolCallItem }) {
           <div className="rounded border bg-card p-2">
             <div className="text-[10px] font-medium text-muted-foreground mb-1">Arguments</div>
             <pre className="overflow-auto whitespace-pre-wrap text-[11px] font-mono text-card-foreground max-h-96">
-              {typeof parsedArgs === "string"
-                ? parsedArgs
-                : JSON.stringify(parsedArgs, null, 2)}
+              {typeof parsedArgs === "string" ? parsedArgs : JSON.stringify(parsedArgs, null, 2)}
             </pre>
           </div>
           {hasExtras && (
             <div className="rounded border bg-amber-500/5 p-2">
-              <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400 mb-1">Extras</div>
+              <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400 mb-1">
+                Extras
+              </div>
               <pre className="overflow-auto whitespace-pre-wrap text-[11px] font-mono text-card-foreground max-h-48">
                 {JSON.stringify(toolCall.extras, null, 2)}
               </pre>
@@ -130,11 +129,7 @@ function MediaBlock({ part, i }: { part: ContentPart; i: number }) {
           <span>Image</span>
           {part.image_url.id && <span className="font-mono">({part.image_url.id})</span>}
         </div>
-        <img
-          src={part.image_url.url}
-          alt="generated"
-          className="max-w-sm rounded-md border"
-        />
+        <img src={part.image_url.url} alt="generated" className="max-w-sm rounded-md border" />
       </div>
     );
   }
@@ -146,7 +141,9 @@ function MediaBlock({ part, i }: { part: ContentPart; i: number }) {
           <span>Audio</span>
           {part.audio_url.id && <span className="font-mono">({part.audio_url.id})</span>}
         </div>
-        <audio controls src={part.audio_url.url} className="max-w-sm" />
+        <audio controls src={part.audio_url.url} className="max-w-sm">
+          <track kind="captions" src="" label="No captions available" />
+        </audio>
       </div>
     );
   }
@@ -158,7 +155,9 @@ function MediaBlock({ part, i }: { part: ContentPart; i: number }) {
           <span>Video</span>
           {part.video_url.id && <span className="font-mono">({part.video_url.id})</span>}
         </div>
-        <video controls src={part.video_url.url} className="max-w-sm rounded-md border" />
+        <video controls src={part.video_url.url} className="max-w-sm rounded-md border">
+          <track kind="captions" src="" label="No captions available" />
+        </video>
       </div>
     );
   }
@@ -224,6 +223,7 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
             <span className="text-[10px] text-amber-600 dark:text-amber-400">streaming...</span>
           )}
           <button
+            type="button"
             onClick={() => setShowRaw(!showRaw)}
             className="text-[10px] text-muted-foreground hover:text-foreground"
           >

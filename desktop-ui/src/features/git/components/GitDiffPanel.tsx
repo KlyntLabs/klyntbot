@@ -278,7 +278,7 @@ export function GitDiffPanel({
   const githubBaseUrl = useMemo(() => getGitHubBaseUrl(gitRemoteUrl), [gitRemoteUrl]);
 
   const showLogMenu = useCallback(
-    async (event: ReactMouseEvent<HTMLDivElement>, entry: GitLogEntry) => {
+    async (event: ReactMouseEvent<HTMLButtonElement>, entry: GitLogEntry) => {
       event.preventDefault();
       event.stopPropagation();
 
@@ -309,7 +309,7 @@ export function GitDiffPanel({
   );
 
   const showPullRequestMenu = useCallback(
-    async (event: ReactMouseEvent<HTMLDivElement>, pullRequest: GitHubPullRequest) => {
+    async (event: ReactMouseEvent<HTMLButtonElement>, pullRequest: GitHubPullRequest) => {
       event.preventDefault();
       event.stopPropagation();
 
@@ -349,9 +349,7 @@ export function GitDiffPanel({
         return;
       }
 
-      for (const path of paths) {
-        await onRevertFile(path);
-      }
+      await Promise.all(paths.map((path) => onRevertFile(path)));
     },
     [onRevertFile],
   );
@@ -365,7 +363,7 @@ export function GitDiffPanel({
 
   const showFileMenu = useCallback(
     async (
-      event: ReactMouseEvent<HTMLDivElement>,
+      event: ReactMouseEvent<HTMLButtonElement>,
       path: string,
       _section: "staged" | "unstaged",
     ) => {
@@ -405,9 +403,7 @@ export function GitDiffPanel({
           await MenuItem.new({
             text: `Unstage file${stagedPaths.length > 1 ? `s (${stagedPaths.length})` : ""}`,
             action: async () => {
-              for (const stagedPath of stagedPaths) {
-                await onUnstageFile(stagedPath);
-              }
+              await Promise.all(stagedPaths.map((stagedPath) => onUnstageFile(stagedPath)));
             },
           }),
         );
@@ -418,9 +414,7 @@ export function GitDiffPanel({
           await MenuItem.new({
             text: `Stage file${unstagedPaths.length > 1 ? `s (${unstagedPaths.length})` : ""}`,
             action: async () => {
-              for (const unstagedPath of unstagedPaths) {
-                await onStageFile(unstagedPath);
-              }
+              await Promise.all(unstagedPaths.map((unstagedPath) => onStageFile(unstagedPath)));
             },
           }),
         );
@@ -537,7 +531,7 @@ export function GitDiffPanel({
     : logUpstream
       ? `${logSyncLabel} · ${fileStatus}`
       : fileStatus;
-  const hasGitRoot = Boolean(gitRoot && gitRoot.trim());
+  const hasGitRoot = Boolean(gitRoot?.trim());
   const showGitRootPanel =
     isMissingRepo(error) ||
     gitRootScanLoading ||
@@ -633,7 +627,7 @@ export function GitDiffPanel({
       onFilePanelModeChange={onFilePanelModeChange}
       headerClassName="git-panel-header"
       headerRight={
-        <div className="git-panel-actions" role="group" aria-label="Git panel">
+        <fieldset className="git-panel-actions" aria-label="Git panel">
           <div className="git-panel-select">
             <span className="git-panel-select-icon" aria-hidden>
               <ModeIcon />
@@ -651,7 +645,7 @@ export function GitDiffPanel({
               <option value="prs">PRs</option>
             </select>
           </div>
-        </div>
+        </fieldset>
       }
     >
       <div className="git-panel-overview">

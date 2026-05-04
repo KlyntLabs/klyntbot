@@ -330,7 +330,9 @@ const renderFeaturesSection = (
   cleanup();
   const onUpdateAppSettings = options.onUpdateAppSettings ?? vi.fn().mockResolvedValue(undefined);
   getExperimentalFeatureListMock.mockResolvedValue(
-    (options.experimentalFeaturesResponse as Record<string, unknown>) ?? {
+    (options.experimentalFeaturesResponse as Awaited<
+      ReturnType<typeof getExperimentalFeatureList>
+    >) ?? {
       features: [
         {
           name: "steer",
@@ -1045,8 +1047,7 @@ describe("SettingsView Environments", () => {
       if (originalDescriptor) {
         Object.defineProperty(navigator, "clipboard", originalDescriptor);
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (navigator as any).clipboard;
+        delete (navigator as unknown as Record<string, unknown>).clipboard;
       }
     }
   });

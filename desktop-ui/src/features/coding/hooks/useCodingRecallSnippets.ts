@@ -42,7 +42,9 @@ export function useCodingRecallSnippets(threadId: string | null) {
     })();
     return () => {
       active = false;
-      unlistens.forEach((fn) => fn?.());
+      for (const fn of unlistens) {
+        fn?.();
+      }
     };
   }, [threadId]);
 

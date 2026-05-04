@@ -44,26 +44,24 @@ export function useCollaborationModes({
   const workspaceId = activeWorkspace?.id ?? null;
   const isConnected = Boolean(activeWorkspace?.connected);
 
-  const extractModeList = useCallback((response: any): any[] => {
-    const candidates = [
-      response?.result?.data,
-      response?.result?.modes,
-      response?.result,
-      response?.data,
-      response?.modes,
-      response,
-    ];
+  const extractModeList = useCallback((response: unknown): unknown[] => {
+    const r = response as Record<string, unknown>;
+    const res = r?.result as Record<string, unknown> | undefined;
+    const candidates = [res?.data, res?.modes, res, r?.data, r?.modes, r];
     for (const candidate of candidates) {
       if (Array.isArray(candidate)) {
         return candidate;
       }
       if (candidate && typeof candidate === "object") {
-        const nested = (candidate as any).data ?? (candidate as any).modes;
+        const nested =
+          (candidate as Record<string, unknown>).data ??
+          (candidate as Record<string, unknown>).modes;
         if (Array.isArray(nested)) {
           return nested;
         }
         if (nested && typeof nested === "object") {
-          const deep = (nested as any).data ?? (nested as any).modes;
+          const deep =
+            (nested as Record<string, unknown>).data ?? (nested as Record<string, unknown>).modes;
           if (Array.isArray(deep)) {
             return deep;
           }
@@ -104,34 +102,36 @@ export function useCollaborationModes({
       });
       const rawData = extractModeList(response);
       const data: CollaborationModeOption[] = rawData
-        .map((item: any) => {
+        .map((item: unknown) => {
           if (!item || typeof item !== "object") {
             return null;
           }
-          const modeId = String(item.mode ?? item.name ?? "").trim();
+          const it = item as Record<string, unknown>;
+          const modeId = String(it.mode ?? it.name ?? "").trim();
           if (!modeId) {
             return null;
           }
 
           const settings =
-            item.settings && typeof item.settings === "object"
-              ? item.settings
+            it.settings && typeof it.settings === "object"
+              ? (it.settings as Record<string, unknown>)
               : {
-                  model: item.model ?? null,
-                  reasoning_effort: item.reasoning_effort ?? item.reasoningEffort ?? null,
+                  model: it.model ?? null,
+                  reasoning_effort: it.reasoning_effort ?? it.reasoningEffort ?? null,
                   developer_instructions:
-                    item.developer_instructions ?? item.developerInstructions ?? null,
+                    it.developer_instructions ?? it.developerInstructions ?? null,
                 };
 
-          const model = String(settings.model ?? "");
-          const reasoningEffort = settings.reasoning_effort ?? null;
-          const developerInstructions = settings.developer_instructions ?? null;
+          const model = String((settings as Record<string, unknown>).model ?? "");
+          const reasoningEffort = (settings as Record<string, unknown>).reasoning_effort ?? null;
+          const developerInstructions =
+            (settings as Record<string, unknown>).developer_instructions ?? null;
 
           const labelSource =
-            typeof item.label === "string" && item.label.trim()
-              ? item.label
-              : typeof item.name === "string" && item.name.trim()
-                ? item.name
+            typeof it.label === "string" && it.label.trim()
+              ? it.label
+              : typeof it.name === "string" && it.name.trim()
+                ? it.name
                 : modeId;
 
           const option: CollaborationModeOption = {
@@ -228,7 +228,7 @@ export function useCollaborationModes({
       return;
     }
     refreshModes();
-  }, [enabled, isConnected, modes.length, refreshModes, workspaceId]);
+  }, [enabled, isConnected, refreshModes, workspaceId]);
 
   return {
     collaborationModes: modes,

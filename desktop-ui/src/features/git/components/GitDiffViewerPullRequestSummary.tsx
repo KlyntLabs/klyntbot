@@ -49,7 +49,7 @@ export const PullRequestSummary = memo(function PullRequestSummary({
 
   useEffect(() => {
     setIsTimelineExpanded(false);
-  }, [pullRequest.number]);
+  }, []);
 
   return (
     <section className="diff-viewer-pr" aria-label="Pull request summary">

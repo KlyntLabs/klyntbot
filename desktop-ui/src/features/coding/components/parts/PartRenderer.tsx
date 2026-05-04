@@ -1,11 +1,11 @@
-import type { MessagePart } from "./types";
+import { CommandExecutionPart } from "./CommandExecutionPart";
+import { FileChangePart } from "./FileChangePart";
+import { FinishPart } from "./FinishPart";
+import { ReasoningPart } from "./ReasoningPart";
 import { TextPart } from "./TextPart";
 import { ToolCallPart } from "./ToolCallPart";
 import { ToolResultPart } from "./ToolResultPart";
-import { FileChangePart } from "./FileChangePart";
-import { CommandExecutionPart } from "./CommandExecutionPart";
-import { ReasoningPart } from "./ReasoningPart";
-import { FinishPart } from "./FinishPart";
+import type { MessagePart } from "./types";
 
 export function PartRenderer({ part }: { part: MessagePart }) {
   switch (part.kind) {
@@ -19,11 +19,7 @@ export function PartRenderer({ part }: { part: MessagePart }) {
       return <ReasoningPart text={part.text} redacted={part.redacted} />;
     case "file_change":
       return (
-        <FileChangePart
-          path={part.path}
-          diffUnified={part.diff_unified}
-          applied={part.applied}
-        />
+        <FileChangePart path={part.path} diffUnified={part.diff_unified} applied={part.applied} />
       );
     case "command_execution":
       return (

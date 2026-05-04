@@ -64,12 +64,12 @@ type GitDiffModeContentProps = {
   selectedPath: string | null;
   onSelectFile?: (path: string) => void;
   onFileClick: (
-    event: ReactMouseEvent<HTMLDivElement>,
+    event: ReactMouseEvent<HTMLButtonElement>,
     path: string,
     section: "staged" | "unstaged",
   ) => void;
   onShowFileMenu: (
-    event: ReactMouseEvent<HTMLDivElement>,
+    event: ReactMouseEvent<HTMLButtonElement>,
     path: string,
     section: "staged" | "unstaged",
   ) => void;
@@ -144,7 +144,17 @@ export function GitDiffModeContent({
     showApplyWorktree && unstagedFiles.length === 0 && stagedFiles.length > 0;
 
   return (
-    <div className="diff-list" onClick={onDiffListClick}>
+    <div
+      className="diff-list"
+      role="application"
+      onClick={onDiffListClick}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onDiffListClick(event as unknown as ReactMouseEvent<HTMLDivElement>);
+        }
+      }}
+    >
       {showGitRootPanel && (
         <div className="git-root-panel">
           <div className="git-root-title">{gitRootTitle}</div>

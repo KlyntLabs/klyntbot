@@ -99,7 +99,7 @@ export function MermaidDiagram({ source }: { source: string }) {
     return (
       <div className="markdown-mermaid markdown-mermaid-error" role="alert">
         <div className="markdown-mermaid-error-label">Mermaid render error: {state.message}</div>
-        <pre tabIndex={0}>
+        <pre>
           <code>{source}</code>
         </pre>
       </div>
@@ -111,7 +111,6 @@ export function MermaidDiagram({ source }: { source: string }) {
       className="markdown-mermaid"
       role="img"
       aria-label="Mermaid diagram"
-      tabIndex={0}
       // biome-ignore lint/security/noDangerouslySetInnerHtml: mermaid sanitizes via securityLevel: strict
       dangerouslySetInnerHTML={{ __html: state.svg }}
     />

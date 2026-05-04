@@ -3,8 +3,8 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useRemoteThreadLiveConnection } from "./useRemoteThreadLiveConnection";
 
-const appServerListeners = new Set<(event: any) => void>();
-const subscribeAppServerEventsMock = vi.fn((listener: (event: any) => void) => {
+const appServerListeners = new Set<(event: unknown) => void>();
+const subscribeAppServerEventsMock = vi.fn((listener: (event: unknown) => void) => {
   appServerListeners.add(listener);
   return () => {
     appServerListeners.delete(listener);
@@ -16,22 +16,22 @@ const threadLiveUnsubscribeMock = vi.fn().mockResolvedValue(undefined);
 const pushErrorToastMock = vi.fn();
 
 vi.mock("@services/events", () => ({
-  subscribeAppServerEvents: (listener: (event: any) => void) =>
+  subscribeAppServerEvents: (listener: (event: unknown) => void) =>
     subscribeAppServerEventsMock(listener),
 }));
 
 vi.mock("@services/tauri", () => ({
-  threadLiveSubscribe: (...args: any[]) => threadLiveSubscribeMock(...args),
-  threadLiveUnsubscribe: (...args: any[]) => threadLiveUnsubscribeMock(...args),
+  threadLiveSubscribe: (...args: unknown[]) => threadLiveSubscribeMock(...args),
+  threadLiveUnsubscribe: (...args: unknown[]) => threadLiveUnsubscribeMock(...args),
 }));
 
 vi.mock("@services/toasts", () => ({
-  pushErrorToast: (...args: any[]) => pushErrorToastMock(...args),
+  pushErrorToast: (...args: unknown[]) => pushErrorToastMock(...args),
 }));
 
 vi.mock("@utils/appServerEvents", () => ({
-  getAppServerRawMethod: (event: any) => event.method ?? null,
-  getAppServerParams: (event: any) => event.params ?? {},
+  getAppServerRawMethod: (event: unknown) => (event as Record<string, unknown>).method ?? null,
+  getAppServerParams: (event: unknown) => (event as Record<string, unknown>).params ?? {},
 }));
 
 vi.mock("@tauri-apps/api/window", () => ({

@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { commands } from "@/bindings";
 
 export function HooksSubsection() {
-  const [snapshot, setSnapshot] = useState<{ path: string; exists: boolean; content: string } | null>(null);
+  const [snapshot, setSnapshot] = useState<{
+    path: string;
+    exists: boolean;
+    content: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

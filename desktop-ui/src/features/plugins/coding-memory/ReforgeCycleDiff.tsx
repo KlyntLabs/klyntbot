@@ -32,7 +32,7 @@ export function ReforgeCycleDiff({ repoId }: Props) {
       beforeCycleId: selectedBefore,
       afterCycleId: selectedAfter,
     });
-    setDiff(result as any);
+    setDiff(result as { beforeBody: string; afterBody: string });
   };
 
   return (

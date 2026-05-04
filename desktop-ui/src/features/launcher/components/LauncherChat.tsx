@@ -34,11 +34,12 @@ export function LauncherChat({ initialQuery, sessionKey, onBack, onExpandToMain 
   return (
     <div className="lc-chat">
       <header className="lc-chat-header">
-        <button className="lc-icon-btn" onClick={onBack} aria-label="Back">
+        <button type="button" className="lc-icon-btn" onClick={onBack} aria-label="Back">
           ←
         </button>
         <span className="lc-chat-title">Ask</span>
         <button
+          type="button"
           className="lc-icon-btn"
           onClick={() => onExpandToMain(sessionKey)}
           aria-label="Expand"
@@ -68,7 +69,6 @@ export function LauncherChat({ initialQuery, sessionKey, onBack, onExpandToMain 
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Reply… (⌘↵ to expand)"
-          autoFocus
         />
       </form>
     </div>

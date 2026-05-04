@@ -191,7 +191,7 @@ export const REGISTRY: Record<string, SlashNode> = {
       },
     },
   },
-  "permissions": {
+  permissions: {
     kind: "branch",
     command: "permissions",
     description: "Permission and approval commands",
@@ -215,17 +215,15 @@ export const REGISTRY: Record<string, SlashNode> = {
     command: "dead-ends",
     description: "Surface this repo's known dead-ends from Mirror",
     category: "recall",
-    agentTransform: () =>
-      "[system: invoke check_dead_ends for the current repo and summarize]",
+    agentTransform: () => "[system: invoke check_dead_ends for the current repo and summarize]",
   },
-  "mirror": {
+  mirror: {
     kind: "leaf",
     path: "agent",
     command: "mirror",
     description: "Show recent Mirror alerts inline",
     category: "recall",
-    agentTransform: () =>
-      "[system: list the agent's recent Mirror alerts]",
+    agentTransform: () => "[system: list the agent's recent Mirror alerts]",
   },
   resume: {
     kind: "leaf",

@@ -14,6 +14,7 @@ export function useGitBranches(activeWorkspace: WorkspaceInfo | null) {
 
   const query = useTauriQuery<BranchInfo[]>({
     queryKey: qk.git.branches(workspaceId),
+    staleTime: 10_000,
     queryFn: async () => {
       if (!activeWorkspace) return [];
       return await listGitBranches(activeWorkspace.id);

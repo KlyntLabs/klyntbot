@@ -659,7 +659,6 @@
 
 .home-latest-card-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
   gap: 6px;
   margin-bottom: 10px;

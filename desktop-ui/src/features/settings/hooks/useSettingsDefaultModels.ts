@@ -86,8 +86,11 @@ export function useSettingsDefaultModels(projects: WorkspaceInfo[]) {
           continue;
         }
         try {
-          const list = parseModelListResponse(await getModelList(project.id));
-          const configModel = await getConfigModel(project.id);
+          const [listRaw, configModel] = await Promise.all([
+            getModelList(project.id),
+            getConfigModel(project.id),
+          ]);
+          const list = parseModelListResponse(listRaw);
           if (configModel) {
             all.push({
               id: configModel,

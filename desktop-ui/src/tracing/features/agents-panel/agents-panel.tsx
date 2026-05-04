@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { useEffect, useMemo, useState } from "react";
-import { type SubagentInfo, getSubagents } from "@/tracing/lib/api";
 import {
   Bot,
+  CheckCircle2,
   ChevronRight,
   Clock,
   Cpu,
   FileText,
-  Zap,
-  CheckCircle2,
-  XCircle,
   Loader2,
   Pause,
   Skull,
+  XCircle,
+  Zap,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { getSubagents, type SubagentInfo } from "@/tracing/lib/api";
 
 interface AgentsPanelProps {
   sessionId: string;
@@ -45,7 +45,10 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 function getTypeColor(type: string): string {
-  return TYPE_COLORS[type] ?? "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30";
+  return (
+    TYPE_COLORS[type] ??
+    "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30"
+  );
 }
 
 function formatSize(bytes: number): string {
@@ -82,12 +85,22 @@ export function AgentsPanel({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
     getSubagents(sessionId, refreshKey > 0)
-      .then(setAgents)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .then((res) => {
+        if (!cancelled) setAgents(res);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId, refreshKey]);
 
   const grouped = useMemo(() => {
@@ -111,9 +124,7 @@ export function AgentsPanel({
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center text-destructive">
-        Error: {error}
-      </div>
+      <div className="flex h-full items-center justify-center text-destructive">Error: {error}</div>
     );
   }
 
@@ -148,6 +159,7 @@ export function AgentsPanel({
       {/* Main agent selector */}
       <div className="px-3 pt-3 pb-1">
         <button
+          type="button"
           onClick={onSelectMain}
           className={`w-full flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all ${
             selectedAgentId === null
@@ -155,14 +167,21 @@ export function AgentsPanel({
               : "border-border hover:border-primary/40 hover:bg-muted/30"
           }`}
         >
-          <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-            selectedAgentId === null ? "bg-primary/15" : "bg-muted"
-          }`}>
-            <Cpu size={16} className={selectedAgentId === null ? "text-primary" : "text-muted-foreground"} />
+          <div
+            className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+              selectedAgentId === null ? "bg-primary/15" : "bg-muted"
+            }`}
+          >
+            <Cpu
+              size={16}
+              className={selectedAgentId === null ? "text-primary" : "text-muted-foreground"}
+            />
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium">Main Agent</div>
-            <div className="text-[11px] text-muted-foreground">Root conversation & orchestration</div>
+            <div className="text-[11px] text-muted-foreground">
+              Root conversation & orchestration
+            </div>
           </div>
           {selectedAgentId === null && (
             <span className="text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
@@ -177,7 +196,9 @@ export function AgentsPanel({
         {Array.from(grouped.entries()).map(([type, list]) => (
           <div key={type}>
             <div className="flex items-center gap-2 px-1 py-1.5">
-              <span className={`text-[10px] font-semibold uppercase tracking-wider ${getTypeColor(type).split(" ")[1]}`}>
+              <span
+                className={`text-[10px] font-semibold uppercase tracking-wider ${getTypeColor(type).split(" ")[1]}`}
+              >
                 {type}
               </span>
               <div className="h-px flex-1 bg-border/50" />
@@ -213,6 +234,7 @@ function AgentCard({
 
   return (
     <button
+      type="button"
       onClick={onSelect}
       className={`w-full group flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
         isSelected
@@ -221,16 +243,20 @@ function AgentCard({
       }`}
     >
       {/* Status icon */}
-      <div className={`mt-0.5 flex h-7 w-7 items-center justify-center rounded-md ${
-        isSelected ? "bg-indigo-500/15" : "bg-muted"
-      }`}>
+      <div
+        className={`mt-0.5 flex h-7 w-7 items-center justify-center rounded-md ${
+          isSelected ? "bg-indigo-500/15" : "bg-muted"
+        }`}
+      >
         <Bot size={14} className={isSelected ? "text-indigo-500" : "text-muted-foreground"} />
       </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium truncate">{agent.description || agent.agent_id.slice(0, 12)}</span>
+          <span className="text-xs font-medium truncate">
+            {agent.description || agent.agent_id.slice(0, 12)}
+          </span>
           <StatusIcon
             size={12}
             className={`shrink-0 ${statusCfg.color} ${agent.status.startsWith("running") ? "animate-spin" : ""}`}
@@ -238,14 +264,17 @@ function AgentCard({
         </div>
 
         <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <span className={`text-[9px] font-mono rounded border px-1 py-0 ${getTypeColor(agent.subagent_type)}`}>
+          <span
+            className={`text-[9px] font-mono rounded border px-1 py-0 ${getTypeColor(agent.subagent_type)}`}
+          >
             {agent.subagent_type}
           </span>
-          {typeof agent.launch_spec?.effective_model === "string" && agent.launch_spec.effective_model && (
-            <span className="text-[9px] font-mono rounded border px-1 py-0 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
-              {agent.launch_spec.effective_model}
-            </span>
-          )}
+          {typeof agent.launch_spec?.effective_model === "string" &&
+            agent.launch_spec.effective_model && (
+              <span className="text-[9px] font-mono rounded border px-1 py-0 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+                {agent.launch_spec.effective_model}
+              </span>
+            )}
           <span className="text-[9px] font-mono text-muted-foreground">
             {agent.agent_id.slice(0, 8)}
           </span>
@@ -276,7 +305,9 @@ function AgentCard({
       <ChevronRight
         size={14}
         className={`mt-1 shrink-0 transition-transform ${
-          isSelected ? "text-indigo-500" : "text-muted-foreground/50 group-hover:text-muted-foreground"
+          isSelected
+            ? "text-indigo-500"
+            : "text-muted-foreground/50 group-hover:text-muted-foreground"
         }`}
       />
     </button>

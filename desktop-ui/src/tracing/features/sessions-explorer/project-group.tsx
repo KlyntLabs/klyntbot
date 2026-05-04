@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { useState } from "react";
-import { type SessionInfo } from "@/tracing/lib/api";
-import { SessionCard } from "./session-card";
 import { ChevronDown, ChevronRight, FolderOpen } from "lucide-react";
+import { useState } from "react";
+import type { SessionInfo } from "@/tracing/lib/api";
+import { SessionCard } from "./session-card";
 
 function shortProjectName(workDir: string): string {
   if (!workDir) return "Unknown";
@@ -34,6 +34,7 @@ export function ProjectGroup({
   return (
     <div className="mb-4">
       <button
+        type="button"
         onClick={() => setCollapsed((v) => !v)}
         className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-muted transition-colors"
       >
@@ -43,12 +44,8 @@ export function ProjectGroup({
           <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
         )}
         <FolderOpen size={14} className="shrink-0 text-muted-foreground" />
-        <span className="text-sm font-medium truncate">
-          {shortProjectName(workDir)}
-        </span>
-        <span className="text-[11px] text-muted-foreground shrink-0">
-          ({sessions.length})
-        </span>
+        <span className="text-sm font-medium truncate">{shortProjectName(workDir)}</span>
+        <span className="text-[11px] text-muted-foreground shrink-0">({sessions.length})</span>
         <span className="text-[10px] font-mono text-muted-foreground ml-auto truncate max-w-[300px] hidden md:block">
           {workDir}
         </span>
@@ -57,9 +54,7 @@ export function ProjectGroup({
       {!collapsed && (
         <div
           className={
-            compact
-              ? "mt-1 ml-6"
-              : "mt-2 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 ml-6"
+            compact ? "mt-1 ml-6" : "mt-2 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 ml-6"
           }
         >
           {sessions.map((s) => (

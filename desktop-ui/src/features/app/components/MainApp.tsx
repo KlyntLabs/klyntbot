@@ -339,10 +339,10 @@ export default function MainApp() {
   );
   useEffect(() => {
     setSelectedCodexArgsOverride(normalizeCodexArgsInput(preferredCodexArgsOverride));
-  }, [preferredCodexArgsOverride, threadCodexSelectionKey]);
+  }, [preferredCodexArgsOverride]);
   useEffect(() => {
     setSelectedServiceTier(preferredServiceTier);
-  }, [preferredServiceTier, threadCodexSelectionKey]);
+  }, [preferredServiceTier]);
 
   const [appView, setAppView] = useState<"home" | "chat" | "plugins" | "calendar">("home");
   const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);

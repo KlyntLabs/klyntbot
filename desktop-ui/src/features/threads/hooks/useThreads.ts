@@ -101,7 +101,7 @@ export function useThreads({
   );
   useEffect(() => {
     dispatch({ type: "setMaxItemsPerThread", maxItemsPerThread });
-  }, [dispatch, maxItemsPerThread]);
+  }, [maxItemsPerThread]);
   const loadedThreadsRef = useRef<Record<string, boolean>>({});
   const replaceOnResumeRef = useRef<Record<string, boolean>>({});
   const pendingInterruptsRef = useRef<Set<string>>(new Set());
@@ -177,7 +177,7 @@ export function useThreads({
         dispatch({ type: "markUnread", threadId, hasUnread: true });
       }
     },
-    [activeThreadId, dispatch],
+    [activeThreadId],
   );
 
   const safeMessageActivity = useCallback(() => {
@@ -208,7 +208,7 @@ export function useThreads({
         });
       });
     },
-    [customNamesRef, dispatch, onDebug],
+    [customNamesRef, onDebug],
   );
 
   const onSubagentThreadDetected = useCallback((workspaceId: string, threadId: string) => {
@@ -374,7 +374,7 @@ export function useThreads({
         }),
       );
     },
-    [dispatch, getCustomName, onDebug, onSubagentThreadDetected, updateThreadParent],
+    [getCustomName, onDebug, onSubagentThreadDetected, updateThreadParent],
   );
 
   const { onUserMessageCreated } = useThreadTitleAutogeneration({
@@ -482,27 +482,29 @@ export function useThreads({
       });
 
       void (async () => {
-        for (const descendantId of descendants) {
-          const descendantKey = buildWorkspaceThreadKey(workspaceId, descendantId);
-          cascadeArchiveSkipRef.current[descendantKey] = Date.now();
-          try {
-            await archiveThreadService(workspaceId, descendantId);
-          } catch (error) {
-            delete cascadeArchiveSkipRef.current[descendantKey];
-            onDebug?.({
-              id: `${Date.now()}-client-thread-archive-cascade-error`,
-              timestamp: Date.now(),
-              source: "error",
-              label: "thread/archive cascade error",
-              payload: {
-                workspaceId,
-                rootThreadId: threadId,
-                threadId: descendantId,
-                error: error instanceof Error ? error.message : String(error),
-              },
-            });
-          }
-        }
+        await Promise.all(
+          descendants.map(async (descendantId) => {
+            const descendantKey = buildWorkspaceThreadKey(workspaceId, descendantId);
+            cascadeArchiveSkipRef.current[descendantKey] = Date.now();
+            try {
+              await archiveThreadService(workspaceId, descendantId);
+            } catch (error) {
+              delete cascadeArchiveSkipRef.current[descendantKey];
+              onDebug?.({
+                id: `${Date.now()}-client-thread-archive-cascade-error`,
+                timestamp: Date.now(),
+                source: "error",
+                label: "thread/archive cascade error",
+                payload: {
+                  workspaceId,
+                  rootThreadId: threadId,
+                  threadId: descendantId,
+                  error: error instanceof Error ? error.message : String(error),
+                },
+              });
+            }
+          }),
+        );
       })();
     },
     [isSubagentThread, onDebug, threadHandlers, unpinThread],
@@ -684,9 +686,7 @@ export function useThreads({
     },
     [
       activeWorkspaceId,
-      dispatch,
       ensureWorkspaceRuntimeCodexArgsBestEffort,
-      loadedThreadsRef,
       resumeThreadForWorkspace,
       startThreadForWorkspace,
       state.activeThreadIdByWorkspace,
@@ -762,18 +762,15 @@ export function useThreads({
     renameThread,
   });
 
-  const hasLocalThreadSnapshot = useCallback(
-    (threadId: string | null) => {
-      if (!threadId) {
-        return false;
-      }
-      return (
-        loadedThreadsRef.current[threadId] === true ||
-        (itemsByThreadRef.current[threadId]?.length ?? 0) > 0
-      );
-    },
-    [itemsByThreadRef, loadedThreadsRef],
-  );
+  const hasLocalThreadSnapshot = useCallback((threadId: string | null) => {
+    if (!threadId) {
+      return false;
+    }
+    return (
+      loadedThreadsRef.current[threadId] === true ||
+      (itemsByThreadRef.current[threadId]?.length ?? 0) > 0
+    );
+  }, []);
 
   const setActiveThreadId = useCallback(
     (threadId: string | null, workspaceId?: string) => {
@@ -812,7 +809,6 @@ export function useThreads({
       ensureWorkspaceRuntimeCodexArgsBestEffort,
       hasLocalThreadSnapshot,
       hasProcessingThreadInWorkspace,
-      loadedThreadsRef,
       resumeThreadForWorkspace,
       state.activeThreadIdByWorkspace,
     ],
@@ -827,79 +823,141 @@ export function useThreads({
     [archiveThread, unpinThread],
   );
 
-  return {
-    activeThreadId,
-    setActiveThreadId,
-    hasLocalThreadSnapshot,
-    activeItems,
-    approvals: state.approvals,
-    userInputRequests: state.userInputRequests,
-    threadsByWorkspace: state.threadsByWorkspace,
-    threadParentById: state.threadParentById,
-    isSubagentThread,
-    threadStatusById: state.threadStatusById,
-    threadResumeLoadingById: state.threadResumeLoadingById,
-    threadListLoadingByWorkspace: state.threadListLoadingByWorkspace,
-    threadListPagingByWorkspace: state.threadListPagingByWorkspace,
-    threadListCursorByWorkspace: state.threadListCursorByWorkspace,
-    activeTurnIdByThread: state.activeTurnIdByThread,
-    turnDiffByThread: state.turnDiffByThread,
-    tokenUsageByThread: state.tokenUsageByThread,
-    rateLimitsByWorkspace: state.rateLimitsByWorkspace,
-    accountByWorkspace: state.accountByWorkspace,
-    planByThread: state.planByThread,
-    lastAgentMessageByThread: state.lastAgentMessageByThread,
-    pinnedThreadsVersion,
-    refreshAccountRateLimits,
-    refreshAccountInfo,
-    interruptTurn,
-    removeThread,
-    pinThread,
-    unpinThread,
-    isThreadPinned,
-    getPinTimestamp,
-    renameThread,
-    startThread,
-    startThreadForWorkspace,
-    forkThreadForWorkspace,
-    listThreadsForWorkspaces,
-    listThreadsForWorkspace,
-    refreshThread,
-    resetWorkspaceThreads,
-    loadOlderThreadsForWorkspace,
-    sendUserMessage,
-    sendUserMessageToThread,
-    startFork,
-    startReview,
-    startUncommittedReview,
-    startResume,
-    startCompact,
-    startApps,
-    startMcp,
-    startFast,
-    startStatus,
-    reviewPrompt,
-    openReviewPrompt,
-    closeReviewPrompt,
-    showPresetStep,
-    choosePreset,
-    highlightedPresetIndex,
-    setHighlightedPresetIndex,
-    highlightedBranchIndex,
-    setHighlightedBranchIndex,
-    highlightedCommitIndex,
-    setHighlightedCommitIndex,
-    handleReviewPromptKeyDown,
-    confirmBranch,
-    selectBranch,
-    selectBranchAtIndex,
-    selectCommit,
-    selectCommitAtIndex,
-    confirmCommit,
-    updateCustomInstructions,
-    confirmCustom,
-    handleApprovalDecision,
-    handleApprovalRemember,
-    handleUserInputSubmit,
-  };
+  return useMemo(
+    () => ({
+      activeThreadId,
+      setActiveThreadId,
+      hasLocalThreadSnapshot,
+      activeItems,
+      approvals: state.approvals,
+      userInputRequests: state.userInputRequests,
+      threadsByWorkspace: state.threadsByWorkspace,
+      threadParentById: state.threadParentById,
+      isSubagentThread,
+      threadStatusById: state.threadStatusById,
+      threadResumeLoadingById: state.threadResumeLoadingById,
+      threadListLoadingByWorkspace: state.threadListLoadingByWorkspace,
+      threadListPagingByWorkspace: state.threadListPagingByWorkspace,
+      threadListCursorByWorkspace: state.threadListCursorByWorkspace,
+      activeTurnIdByThread: state.activeTurnIdByThread,
+      turnDiffByThread: state.turnDiffByThread,
+      tokenUsageByThread: state.tokenUsageByThread,
+      rateLimitsByWorkspace: state.rateLimitsByWorkspace,
+      accountByWorkspace: state.accountByWorkspace,
+      planByThread: state.planByThread,
+      lastAgentMessageByThread: state.lastAgentMessageByThread,
+      pinnedThreadsVersion,
+      refreshAccountRateLimits,
+      refreshAccountInfo,
+      interruptTurn,
+      removeThread,
+      pinThread,
+      unpinThread,
+      isThreadPinned,
+      getPinTimestamp,
+      renameThread,
+      startThread,
+      startThreadForWorkspace,
+      forkThreadForWorkspace,
+      listThreadsForWorkspaces,
+      listThreadsForWorkspace,
+      refreshThread,
+      resetWorkspaceThreads,
+      loadOlderThreadsForWorkspace,
+      sendUserMessage,
+      sendUserMessageToThread,
+      startFork,
+      startReview,
+      startUncommittedReview,
+      startResume,
+      startCompact,
+      startApps,
+      startMcp,
+      startFast,
+      startStatus,
+      reviewPrompt,
+      openReviewPrompt,
+      closeReviewPrompt,
+      showPresetStep,
+      choosePreset,
+      highlightedPresetIndex,
+      setHighlightedPresetIndex,
+      highlightedBranchIndex,
+      setHighlightedBranchIndex,
+      highlightedCommitIndex,
+      setHighlightedCommitIndex,
+      handleReviewPromptKeyDown,
+      confirmBranch,
+      selectBranch,
+      selectBranchAtIndex,
+      selectCommit,
+      selectCommitAtIndex,
+      confirmCommit,
+      updateCustomInstructions,
+      confirmCustom,
+      handleApprovalDecision,
+      handleApprovalRemember,
+      handleUserInputSubmit,
+    }),
+    [
+      activeThreadId,
+      setActiveThreadId,
+      hasLocalThreadSnapshot,
+      activeItems,
+      state,
+      isSubagentThread,
+      pinnedThreadsVersion,
+      refreshAccountRateLimits,
+      refreshAccountInfo,
+      interruptTurn,
+      removeThread,
+      pinThread,
+      unpinThread,
+      isThreadPinned,
+      getPinTimestamp,
+      renameThread,
+      startThread,
+      startThreadForWorkspace,
+      forkThreadForWorkspace,
+      listThreadsForWorkspaces,
+      listThreadsForWorkspace,
+      refreshThread,
+      resetWorkspaceThreads,
+      loadOlderThreadsForWorkspace,
+      sendUserMessage,
+      sendUserMessageToThread,
+      startFork,
+      startReview,
+      startUncommittedReview,
+      startResume,
+      startCompact,
+      startApps,
+      startMcp,
+      startFast,
+      startStatus,
+      reviewPrompt,
+      openReviewPrompt,
+      closeReviewPrompt,
+      showPresetStep,
+      choosePreset,
+      highlightedPresetIndex,
+      setHighlightedPresetIndex,
+      highlightedBranchIndex,
+      setHighlightedBranchIndex,
+      highlightedCommitIndex,
+      setHighlightedCommitIndex,
+      handleReviewPromptKeyDown,
+      confirmBranch,
+      selectBranch,
+      selectBranchAtIndex,
+      selectCommit,
+      selectCommitAtIndex,
+      confirmCommit,
+      updateCustomInstructions,
+      confirmCustom,
+      handleApprovalDecision,
+      handleApprovalRemember,
+      handleUserInputSubmit,
+    ],
+  );
 }

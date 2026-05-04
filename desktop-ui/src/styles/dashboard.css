@@ -857,11 +857,10 @@
   transition: background-color 0.15s ease;
   cursor: pointer;
   border: none;
-  padding: 0;
+  padding: 3px 4px;
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  padding: 3px 4px;
 }
 
 .dashboard__year-day-num {
@@ -1504,7 +1503,7 @@
   color: var(--ds-text-subtle);
 }
 .dashboard__goal-delete-btn:hover {
-  color: var(--destructive) !important;
+  color: var(--destructive);
 }
 .dashboard__goal-delete-btn svg {
   width: 12px;

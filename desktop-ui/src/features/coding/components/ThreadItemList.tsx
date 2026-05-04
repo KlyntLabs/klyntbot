@@ -1,16 +1,36 @@
-import { PartRenderer } from "./parts";
+import { useMemo } from "react";
 import type { MessageDto } from "../hooks/useThreadEvents";
+import { PartRenderer } from "./parts";
 
 type Props = {
   items: MessageDto[];
 };
 
+function partKey(itemId: string, part: unknown, index: number): string {
+  if (typeof part === "string") {
+    return `${itemId}-part-${part.slice(0, 32)}`;
+  }
+  if (part && typeof part === "object" && "type" in part) {
+    return `${itemId}-part-${(part as { type: string }).type}-${index}`;
+  }
+  return `${itemId}-part-${index}`;
+}
+
 /// Coding-thread item list — renders each MessageDto by dispatching its
 /// `parts` array through `PartRenderer`. Pure presentational.
 export function ThreadItemList({ items }: Props) {
+  const itemsWithKeys = useMemo(
+    () =>
+      items.map((item) => ({
+        ...item,
+        partKeys: item.parts.map((part, index) => partKey(item.id, part, index)),
+      })),
+    [items],
+  );
+
   return (
     <ol className="thread-item-list" aria-label="Coding thread items">
-      {items.map((item) => (
+      {itemsWithKeys.map((item) => (
         <li
           key={item.id}
           className={`thread-item thread-item--${item.role}`}
@@ -18,8 +38,8 @@ export function ThreadItemList({ items }: Props) {
         >
           <header className="thread-item__role">{item.role}</header>
           <div className="thread-item__parts">
-            {item.parts.map((part, idx) => (
-              <PartRenderer key={`${item.id}-${idx}`} part={part} />
+            {item.parts.map((part, index) => (
+              <PartRenderer key={item.partKeys[index]} part={part} />
             ))}
           </div>
         </li>
