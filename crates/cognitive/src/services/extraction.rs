@@ -18,6 +18,13 @@ pub struct ExtractedFact {
     /// Wave 2: who said this. NULL when the speaker IS the subject (i.e.
     /// first-person fact) or unknown.
     pub speaker: Option<String>,
+    /// Wave 5 / T1.2: temporal end-bound for the fact. Set when the
+    /// observation contains a clear duration or end-date (e.g. "left job
+    /// in March 2024"). NULL means open-ended (still valid). Format:
+    /// YYYY-MM-DD when day is known, YYYY-MM when only month, YYYY when
+    /// only year. Lets retrieval skip facts past their expiry without
+    /// losing them as historical truths.
+    pub valid_until: Option<String>,
 }
 
 /// Maps extracted facts back to their source observation in a batch.
@@ -182,7 +189,7 @@ pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) ->
         confidence: candidate.confidence,
         source: candidate.source.clone(),
         valid_from: observation.timestamp.strftime("%Y-%m-%d").to_string(),
-        valid_until: None,
+        valid_until: candidate.valid_until.clone(),
         recorded_at: now.strftime("%Y-%m-%dT%H:%M:%SZ").to_string(),
         superseded_at: None,
         superseded_by: None,

@@ -34,8 +34,9 @@ impl HeuristicExtractionHandler {
             object: observation.content.clone(),
             confidence,
             source: source.into(),
-        
-            speaker: None,};
+            speaker: None,
+            valid_until: None,
+        };
         let od = observation.domain.as_str();
 
         match observation.source_event.as_str() {
@@ -68,8 +69,9 @@ impl HeuristicExtractionHandler {
                         object,
                         confidence: 0.8,
                         source: "user_stated".into(),
-                    
-                        speaker: None,}]
+                        speaker: None,
+                        valid_until: None,
+                    }]
                 }
             }
             bus::DomainEvent::KIND_BUDGET_ALERT => {
@@ -401,6 +403,11 @@ struct ExtractedFactJson {
     /// the speaker IS the subject or the LLM omitted it.
     #[serde(default)]
     speaker: Option<String>,
+    /// Wave 5 / T1.2: temporal end-bound (YYYY-MM-DD / YYYY-MM / YYYY) when
+    /// the observation contains a clear end-date or duration. None for
+    /// open-ended facts.
+    #[serde(default)]
+    valid_until: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -456,8 +463,9 @@ fn bind_user_identity(extractions: &mut Vec<cognitive::BatchExtraction>) {
                     object: fact.object.clone(),
                     confidence: fact.confidence,
                     source: fact.source.clone(),
-                
-                    speaker: None,});
+                    speaker: None,
+                    valid_until: fact.valid_until.clone(),
+                });
             }
         }
         ext.facts.extend(additions);
@@ -504,7 +512,12 @@ impl ExtractionHandler for LlmExtractionHandler {
             .unwrap();
         }
         user_msg.push_str(
-            "Extract facts from ALL observations. Return JSON:\n\
+            "Extract facts from ALL observations. Return JSON. Each fact has \
+             {domain, subject, predicate, object, confidence, source, speaker?, valid_until?}.\n\
+             - valid_until: set ONLY when the observation contains a clear end-date or duration \
+               (e.g. 'left job in March 2024' → valid_until='2024-03', 'gym membership ends \
+               2025-06-30' → valid_until='2025-06-30'). Use YYYY, YYYY-MM, or YYYY-MM-DD. \
+               Otherwise OMIT the field. Don't guess.\n\
              {\"results\": [{\"observation_index\": 1, \"facts\": [{\"domain\": \"...\", \"subject\": \"...\", \"predicate\": \"...\", \"object\": \"...\", \"confidence\": 0.0, \"source\": \"...\"}]}]}",
         );
 
@@ -553,6 +566,7 @@ impl ExtractionHandler for LlmExtractionHandler {
                                             confidence: f.confidence,
                                             source: f.source,
                                             speaker: f.speaker,
+                                            valid_until: f.valid_until,
                                         })
                                         .collect(),
                                 }
