@@ -130,5 +130,11 @@ pub fn coding_memory_migrations() -> Vec<FeatureMigration> {
             description: "KCA Track 10: cross-CLI transfer log.".to_string(),
             sql: include_str!("../migrations/007_cross_cli_transfer_log.sql").to_string(),
         },
+        FeatureMigration {
+            feature_name: "coding_memory".to_string(),
+            version: 8,
+            description: "Fix coding_reviews FK referencing sessions(id) -> sessions(key).".to_string(),
+            sql: include_str!("../migrations/008_fix_coding_reviews_fk.sql").to_string(),
+        },
     ]
 }

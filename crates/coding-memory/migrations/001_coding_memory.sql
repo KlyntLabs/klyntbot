@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS coding_reviews (
     target        TEXT,
     delivery      TEXT,
     created_at    TEXT NOT NULL,
-    FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    FOREIGN KEY(session_id) REFERENCES sessions(key) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_coding_reviews_session
   ON coding_reviews(session_id, created_at DESC);

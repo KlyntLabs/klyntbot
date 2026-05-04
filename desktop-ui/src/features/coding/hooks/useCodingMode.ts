@@ -10,6 +10,12 @@ export function useCodingMode(threadId: string | null) {
 
   useEffect(() => {
     if (!threadId) return;
+    // Chat sessions are created lazily on first message; skip fetching mode
+    // for not-yet-persisted chat keys to avoid NOT_FOUND backend noise.
+    if (threadId.startsWith("chat:")) {
+      setModeState("general");
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {

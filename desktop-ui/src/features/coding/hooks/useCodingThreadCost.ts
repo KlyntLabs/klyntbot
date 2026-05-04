@@ -8,6 +8,13 @@ export function useCodingThreadCost(threadId: string | null) {
 
   useEffect(() => {
     if (!threadId) return;
+    // Chat sessions are not coding threads; skip fetching cost to avoid
+    // Storage not found backend noise.
+    if (threadId.startsWith("chat:")) {
+      setCost(0);
+      setTokens(0);
+      return;
+    }
     let active = true;
     let unlisten: (() => void) | undefined;
     (async () => {
