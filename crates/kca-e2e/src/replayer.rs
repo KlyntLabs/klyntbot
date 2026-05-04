@@ -274,6 +274,19 @@ impl ReplayContext {
         // Triples lose temporal/spatial detail; raw turns preserve dates,
         // names, and the speaker's own phrasing. Significant lift on
         // category-2 (multi-hop/temporal) questions.
+        // Diagnostic: count total episodic rows present at retrieval time
+        // so we can distinguish "episodes never stored" from "FTS missed".
+        if matches!(
+            std::env::var("KCA_BENCH_DIRECT_DIAG").ok().as_deref(),
+            Some("1")
+        ) {
+            let total: Option<(i64,)> = sqlx::query_as("SELECT COUNT(*) FROM episodic_memories")
+                .fetch_optional(self.pool.inner())
+                .await
+                .unwrap_or(None);
+            let n = total.map(|t| t.0).unwrap_or(-1);
+            eprintln!("[bench-direct-diag] episodic_memories total rows: {n}; question: {question:?}");
+        }
         match cognitive::search::bm25::search_episodic_memories(
             self.pool.inner(),
             question,
@@ -283,6 +296,16 @@ impl ReplayContext {
         .await
         {
             Ok(hits) if !hits.is_empty() => {
+                if matches!(
+                    std::env::var("KCA_BENCH_DIRECT_DIAG").ok().as_deref(),
+                    Some("1")
+                ) {
+                    eprintln!(
+                        "[bench-direct-diag] FTS episodic hits: {} (top-5 ids: {:?})",
+                        hits.len(),
+                        hits.iter().take(5).map(|h| &h.id).collect::<Vec<_>>()
+                    );
+                }
                 ctx.push_str("## Conversation episodes (verbatim)\n");
                 for h in hits.iter().take(10) {
                     let row: Option<(String, Option<String>, String)> = sqlx::query_as(
