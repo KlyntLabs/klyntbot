@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@/api/client";
 
-interface Snapshot { path: string; exists: boolean; content: string; }
+interface Snapshot {
+  path: string;
+  exists: boolean;
+  content: string;
+}
 
 export function HooksSection() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
@@ -10,12 +14,15 @@ export function HooksSection() {
   }, []);
 
   if (!snap) return <div>Loading...</div>;
-  if (!snap.exists) return (
-    <div>
-      <p>No <code>~/.klyntbot/hooks.toml</code> found.</p>
-      <p>Hooks are user-managed; create the file to enable.</p>
-    </div>
-  );
+  if (!snap.exists)
+    return (
+      <div>
+        <p>
+          No <code>~/.klyntbot/hooks.toml</code> found.
+        </p>
+        <p>Hooks are user-managed; create the file to enable.</p>
+      </div>
+    );
   return (
     <div className="hooks-section">
       <p>

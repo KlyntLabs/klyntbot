@@ -18,9 +18,17 @@ fn every_default_skill_filename_corresponds_to_registered_feature_skill() {
         "automation",
         "notebook",
         "learning",
+        "coding-orchestrator",
     ];
 
+    // Skills that are pure orchestrators without a corresponding AiFeature crate.
+    // These are valid DEFAULT_SKILLS entries that don't need feature registration.
+    let non_feature_skills: HashSet<&str> = ["coding-orchestrator"].into_iter().collect();
+
     for skill in &default_skill_names {
+        if non_feature_skills.contains(skill) {
+            continue;
+        }
         assert!(
             registered_skills.contains(skill),
             "DEFAULT_SKILLS entry {:?} has no corresponding AiFeature::SKILL in registry. \

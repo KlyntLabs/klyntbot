@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ProviderChips } from "./ProviderChips";
-import { SessionList } from "./SessionList";
-import { WireViewer } from "./WireViewer";
-import { ReforgeCycleDiff } from "./ReforgeCycleDiff";
-import { TracingApp } from "@/tracing";
 import { listCodingSessions } from "@/api/endpoints/codingMemory";
+import { TracingApp } from "@/tracing";
+import { ProviderChips } from "./ProviderChips";
+import { ReforgeCycleDiff } from "./ReforgeCycleDiff";
+import { SessionList } from "./SessionList";
 import type { ProviderId, SessionSummaryDto } from "./types";
+import { WireViewer } from "./WireViewer";
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -44,7 +44,9 @@ export function CodingMemoryPlugin() {
           initialLoadRef.current = false;
         }
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [provider]);
 
   // Background poll — silent refresh, preserves selection + scroll.
@@ -70,7 +72,10 @@ export function CodingMemoryPlugin() {
       }
     };
     const id = window.setInterval(tick, POLL_INTERVAL_MS);
-    return () => { cancelled = true; window.clearInterval(id); };
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
   }, [live, provider]);
 
   const counts = useMemo(() => {
@@ -79,9 +84,7 @@ export function CodingMemoryPlugin() {
     return c;
   }, [sessions]);
 
-  const lastSyncedLabel = lastSyncedAt
-    ? new Date(lastSyncedAt).toLocaleTimeString()
-    : "—";
+  const lastSyncedLabel = lastSyncedAt ? new Date(lastSyncedAt).toLocaleTimeString() : "—";
 
   return (
     <div className="cm-plugin">
@@ -100,21 +103,28 @@ export function CodingMemoryPlugin() {
       <div className="cm-plugin__secondary-tabs">
         <button
           type="button"
-          className={"cm-plugin__sec-tab" + (secondaryTab === "sessions" ? " cm-plugin__sec-tab--active" : "")}
+          className={
+            "cm-plugin__sec-tab" +
+            (secondaryTab === "sessions" ? " cm-plugin__sec-tab--active" : "")
+          }
           onClick={() => setSecondaryTab("sessions")}
         >
           Sessions
         </button>
         <button
           type="button"
-          className={"cm-plugin__sec-tab" + (secondaryTab === "reforge" ? " cm-plugin__sec-tab--active" : "")}
+          className={
+            "cm-plugin__sec-tab" + (secondaryTab === "reforge" ? " cm-plugin__sec-tab--active" : "")
+          }
           onClick={() => setSecondaryTab("reforge")}
         >
           Reforge
         </button>
         <button
           type="button"
-          className={"cm-plugin__sec-tab" + (secondaryTab === "tracing" ? " cm-plugin__sec-tab--active" : "")}
+          className={
+            "cm-plugin__sec-tab" + (secondaryTab === "tracing" ? " cm-plugin__sec-tab--active" : "")
+          }
           onClick={() => setSecondaryTab("tracing")}
         >
           Tracing
@@ -124,12 +134,19 @@ export function CodingMemoryPlugin() {
         {secondaryTab === "sessions" ? (
           <>
             <aside className="cm-plugin__sidebar">
-              <SessionList sessions={sessions} selectedId={selectedId} onSelect={setSelectedId} loading={loading} />
+              <SessionList
+                sessions={sessions}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                loading={loading}
+              />
             </aside>
             <main className="cm-plugin__main">
-              {selectedId
-                ? <WireViewer sessionId={selectedId} refreshKey={refreshKey} />
-                : <div className="cm-state cm-state--empty">Select a session to inspect.</div>}
+              {selectedId ? (
+                <WireViewer sessionId={selectedId} refreshKey={refreshKey} />
+              ) : (
+                <div className="cm-state cm-state--empty">Select a session to inspect.</div>
+              )}
             </main>
           </>
         ) : secondaryTab === "reforge" ? (

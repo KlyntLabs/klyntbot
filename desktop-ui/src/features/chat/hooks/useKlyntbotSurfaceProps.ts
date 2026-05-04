@@ -1,23 +1,19 @@
+import { invoke } from "@tauri-apps/api/core";
 import type { ComponentProps } from "react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Composer } from "@/features/composer/components/Composer";
 import type { Messages } from "@/features/messages/components/Messages";
-import type {
-  RequestUserInputRequest,
-  RequestUserInputResponse,
-  ConversationItem,
-} from "@/types";
-import { invoke } from "@tauri-apps/api/core";
+import type { ConversationItem, RequestUserInputRequest, RequestUserInputResponse } from "@/types";
 import { chatStreamStore } from "../store/chatStreamStore";
-import { useChatSession } from "./useChatSession";
 import type {
-  ChatMessage,
-  MessageSegment,
   ActiveInteraction,
-  FormResponse,
   Answer,
+  ChatMessage,
+  FormResponse,
+  MessageSegment,
   Question,
 } from "../types";
+import { useChatSession } from "./useChatSession";
 
 type MessagesProps = ComponentProps<typeof Messages>;
 type ComposerProps = ComponentProps<typeof Composer>;
@@ -147,42 +143,37 @@ function buildUserInputRequests(
   ];
 }
 
-function toFormResponse(
-  response: RequestUserInputResponse,
-  questions: Question[],
-): FormResponse {
-  const answers: Answer[] = Object.entries(response.answers).map(
-    ([questionId, ans]) => {
-      const question = questions.find((q) => q.id === questionId);
-      const answerType = question?.answer_type?.type ?? "free_text";
-      switch (answerType) {
-        case "single_select":
-          return {
-            question_id: questionId,
-            value: { type: "selected", value: ans.answers[0] ?? "" },
-          };
-        case "multi_select":
-          return {
-            question_id: questionId,
-            value: { type: "multi_selected", values: ans.answers },
-          };
-        case "yes_no":
-          return {
-            question_id: questionId,
-            value: {
-              type: "yes_no",
-              answer: ans.answers[0] === "true" || ans.answers[0] === "yes",
-            },
-          };
-        case "free_text":
-        default:
-          return {
-            question_id: questionId,
-            value: { type: "text", content: ans.answers.join(", ") },
-          };
-      }
-    },
-  );
+function toFormResponse(response: RequestUserInputResponse, questions: Question[]): FormResponse {
+  const answers: Answer[] = Object.entries(response.answers).map(([questionId, ans]) => {
+    const question = questions.find((q) => q.id === questionId);
+    const answerType = question?.answer_type?.type ?? "free_text";
+    switch (answerType) {
+      case "single_select":
+        return {
+          question_id: questionId,
+          value: { type: "selected", value: ans.answers[0] ?? "" },
+        };
+      case "multi_select":
+        return {
+          question_id: questionId,
+          value: { type: "multi_selected", values: ans.answers },
+        };
+      case "yes_no":
+        return {
+          question_id: questionId,
+          value: {
+            type: "yes_no",
+            answer: ans.answers[0] === "true" || ans.answers[0] === "yes",
+          },
+        };
+      case "free_text":
+      default:
+        return {
+          question_id: questionId,
+          value: { type: "text", content: ans.answers.join(", ") },
+        };
+    }
+  });
   return { Completed: answers };
 }
 
@@ -191,9 +182,7 @@ export function useKlyntbotSurfaceProps(
 ): KlyntbotSurfaceOverrides | null {
   const chat = useChatSession(sessionKey ?? "");
 
-  const processingStartedAtRef = useRef<number | null>(
-    chat.isStreaming ? Date.now() : null,
-  );
+  const processingStartedAtRef = useRef<number | null>(chat.isStreaming ? Date.now() : null);
   const prevIsStreamingRef = useRef(chat.isStreaming);
   if (!prevIsStreamingRef.current && chat.isStreaming) {
     processingStartedAtRef.current = Date.now();

@@ -1,4 +1,4 @@
-import { subscribeAppServerEvents } from "@services/events";
+import { subscribeAppServerEvents, subscribeApprovalRequest, subscribeCostUpdate } from "@services/events";
 import type { SupportedAppServerMethod } from "@utils/appServerEvents";
 import {
   getAppServerParams,
@@ -114,6 +114,8 @@ type AppServerEventHandlers = {
     workspaceId: string,
     payload: { loginId: string | null; success: boolean; error: string | null },
   ) => void;
+  onApprovalRequestTyped?: (payload: Record<string, unknown>) => void;
+  onCostUpdate?: (payload: Record<string, unknown>) => void;
 };
 
 export const METHODS_ROUTED_IN_USE_APP_SERVER_EVENTS = [
@@ -179,7 +181,7 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
   });
 
   useEffect(() => {
-    const unlisten = subscribeAppServerEvents((payload) => {
+    const unlistenAppServer = subscribeAppServerEvents((payload) => {
       const currentHandlers = handlersRef.current;
       currentHandlers.onAppServerEvent?.(payload);
 
@@ -565,8 +567,18 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
       }
     });
 
+    const unlistenApproval = subscribeApprovalRequest((payload) => {
+      handlersRef.current.onApprovalRequestTyped?.(payload);
+    });
+
+    const unlistenCost = subscribeCostUpdate((payload) => {
+      handlersRef.current.onCostUpdate?.(payload);
+    });
+
     return () => {
-      unlisten();
+      unlistenAppServer();
+      unlistenApproval();
+      unlistenCost();
     };
   }, []);
 }

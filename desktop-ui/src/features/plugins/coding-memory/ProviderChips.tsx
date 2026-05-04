@@ -28,7 +28,9 @@ export function ProviderChips({ active, onChange, counts }: Props) {
           onClick={() => onChange(p.id)}
         >
           {p.label}
-          {counts?.[p.id] != null && <span className="cm-provider-chip__count">{counts[p.id]}</span>}
+          {counts?.[p.id] != null && (
+            <span className="cm-provider-chip__count">{counts[p.id]}</span>
+          )}
         </button>
       ))}
     </div>

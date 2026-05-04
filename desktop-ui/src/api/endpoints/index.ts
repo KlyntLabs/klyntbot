@@ -16,3 +16,5 @@ export * from "./terminal";
 export * from "./thread";
 export * from "./workspace";
 export * from "./worktree";
+export * as providers from "./providers";
+export * as cost from "./cost";

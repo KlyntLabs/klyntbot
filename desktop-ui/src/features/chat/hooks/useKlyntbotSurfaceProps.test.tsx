@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useKlyntbotSurfaceProps } from "./useKlyntbotSurfaceProps";
 
 vi.mock("./useChatSession", () => ({
@@ -19,8 +20,8 @@ vi.mock("@tauri-apps/api/event", async () => {
   return mockTauriEvent();
 });
 
-import { useChatSession } from "./useChatSession";
 import { invoke } from "@tauri-apps/api/core";
+import { useChatSession } from "./useChatSession";
 
 const mockUseChatSession = vi.mocked(useChatSession);
 const mockInvoke = vi.mocked(invoke);
@@ -229,9 +230,7 @@ describe("useKlyntbotSurfaceProps", () => {
         requestId: "req-99",
         request: {
           title: "t",
-          questions: [
-            { id: "q1", title: "T", text: "?", answer_type: { type: "free_text" } },
-          ],
+          questions: [{ id: "q1", title: "T", text: "?", answer_type: { type: "free_text" } }],
         },
       },
     });
@@ -246,9 +245,7 @@ describe("useKlyntbotSurfaceProps", () => {
       sessionKey: "sk",
       requestId: "req-99",
       response: {
-        Completed: [
-          { question_id: "q1", value: { type: "text", content: "yes" } },
-        ],
+        Completed: [{ question_id: "q1", value: { type: "text", content: "yes" } }],
       },
     });
   });
@@ -260,9 +257,7 @@ describe("useKlyntbotSurfaceProps", () => {
         requestId: "req-y",
         request: {
           title: "t",
-          questions: [
-            { id: "q1", title: "Sure?", text: "?", answer_type: { type: "yes_no" } },
-          ],
+          questions: [{ id: "q1", title: "Sure?", text: "?", answer_type: { type: "yes_no" } }],
         },
       },
     });
@@ -277,9 +272,7 @@ describe("useKlyntbotSurfaceProps", () => {
       sessionKey: "sk",
       requestId: "req-y",
       response: {
-        Completed: [
-          { question_id: "q1", value: { type: "yes_no", answer: true } },
-        ],
+        Completed: [{ question_id: "q1", value: { type: "yes_no", answer: true } }],
       },
     });
   });
@@ -313,9 +306,7 @@ describe("useKlyntbotSurfaceProps", () => {
       sessionKey: "sk",
       requestId: "req-s",
       response: {
-        Completed: [
-          { question_id: "q1", value: { type: "selected", value: "a" } },
-        ],
+        Completed: [{ question_id: "q1", value: { type: "selected", value: "a" } }],
       },
     });
   });
@@ -332,7 +323,13 @@ describe("useKlyntbotSurfaceProps", () => {
               id: "q1",
               title: "Pick",
               text: "?",
-              answer_type: { type: "multi_select", options: [{ value: "a", label: "A" }, { value: "b", label: "B" }] },
+              answer_type: {
+                type: "multi_select",
+                options: [
+                  { value: "a", label: "A" },
+                  { value: "b", label: "B" },
+                ],
+              },
             },
           ],
         },
@@ -349,9 +346,7 @@ describe("useKlyntbotSurfaceProps", () => {
       sessionKey: "sk",
       requestId: "req-m",
       response: {
-        Completed: [
-          { question_id: "q1", value: { type: "multi_selected", values: ["a", "b"] } },
-        ],
+        Completed: [{ question_id: "q1", value: { type: "multi_selected", values: ["a", "b"] } }],
       },
     });
   });
@@ -359,9 +354,7 @@ describe("useKlyntbotSurfaceProps", () => {
   it("sets processingStartedAt on the false→true streaming edge", () => {
     const beforeStart = Date.now() - 1;
     mockUseChatSession.mockReturnValue({ ...baseSession, isStreaming: false });
-    const { result, rerender } = renderHook(() =>
-      useKlyntbotSurfaceProps("session-1"),
-    );
+    const { result, rerender } = renderHook(() => useKlyntbotSurfaceProps("session-1"));
     expect(result.current?.messagesProps.processingStartedAt).toBeNull();
 
     mockUseChatSession.mockReturnValue({ ...baseSession, isStreaming: true });
@@ -373,9 +366,7 @@ describe("useKlyntbotSurfaceProps", () => {
 
   it("clears processingStartedAt on streaming true→false edge", () => {
     mockUseChatSession.mockReturnValue({ ...baseSession, isStreaming: true });
-    const { result, rerender } = renderHook(() =>
-      useKlyntbotSurfaceProps("session-1"),
-    );
+    const { result, rerender } = renderHook(() => useKlyntbotSurfaceProps("session-1"));
     expect(typeof result.current?.messagesProps.processingStartedAt).toBe("number");
 
     mockUseChatSession.mockReturnValue({ ...baseSession, isStreaming: false });
@@ -401,9 +392,7 @@ describe("useKlyntbotSurfaceProps", () => {
 
   it("exposes chat.error and clears it on onDismissError", () => {
     mockUseChatSession.mockReturnValue({ ...baseSession, error: "oops" });
-    const { result, rerender } = renderHook(() =>
-      useKlyntbotSurfaceProps("session-1"),
-    );
+    const { result, rerender } = renderHook(() => useKlyntbotSurfaceProps("session-1"));
     expect(result.current?.error).toBe("oops");
 
     act(() => {
@@ -415,9 +404,7 @@ describe("useKlyntbotSurfaceProps", () => {
 
   it("re-shows error when a different error string arrives after dismissal", () => {
     mockUseChatSession.mockReturnValue({ ...baseSession, error: "first" });
-    const { result, rerender } = renderHook(() =>
-      useKlyntbotSurfaceProps("session-1"),
-    );
+    const { result, rerender } = renderHook(() => useKlyntbotSurfaceProps("session-1"));
     act(() => {
       result.current!.onDismissError();
     });

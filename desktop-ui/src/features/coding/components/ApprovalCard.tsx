@@ -29,13 +29,7 @@ export function ApprovalCard({ item, onRespond }: Props) {
     return (
       <div className="approval-card approval-card--decided">
         <span>
-          {item.status === "approved-once" || item.status === "approved-always"
-            ? "approved"
-            : item.status === "denied"
-              ? "denied"
-              : item.status === "timed-out"
-                ? "timed out"
-                : "cancelled"}
+          {statusLabel(item.status)}
           {" — "}
           {item.tool}: {summarizeArgs(item.args)}
         </span>
@@ -73,6 +67,21 @@ export function ApprovalCard({ item, onRespond }: Props) {
           </>
         )}
       </dl>
+      {item.layerDecisions && (
+        <details className="approval-card__why">
+          <summary>Why am I being asked?</summary>
+          <dl className="approval-card__layer-audit">
+            <dt>Privacy</dt>
+            <dd>{item.layerDecisions.privacy.reason}</dd>
+            <dt>Layer 1 (declarative)</dt>
+            <dd>{item.layerDecisions.layer1.reason}</dd>
+            <dt>Layer 2 (Starlark)</dt>
+            <dd>{item.layerDecisions.layer2.reason}</dd>
+            <dt>Layer 3 (Mirror)</dt>
+            <dd>{item.layerDecisions.layer3.reason}</dd>
+          </dl>
+        </details>
+      )}
       <div className="approval-card__buttons">
         <button type="button" onClick={() => onRespond(item.requestId, { kind: "allow_once" })}>
           Allow once (a)
@@ -99,6 +108,20 @@ export function ApprovalCard({ item, onRespond }: Props) {
       )}
     </div>
   );
+}
+
+function statusLabel(status: ApprovalItem["status"]): string {
+  switch (status) {
+    case "approved-once":
+    case "approved-always":
+      return "approved";
+    case "denied":
+      return "denied";
+    case "timed-out":
+      return "timed out";
+    default:
+      return "cancelled";
+  }
 }
 
 function summarizeArgs(a: Record<string, unknown>): string {

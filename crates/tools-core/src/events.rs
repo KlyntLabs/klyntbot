@@ -72,4 +72,11 @@ pub enum ToolEvent {
         persisted_rule: Option<String>,
         decided_by: String,
     },
+
+    /// Typed approval request for the coding surface.
+    /// Carries a serialized `desktop_shared::coding::ApprovalRequest` as JSON.
+    ApprovalRequest {
+        id: String,
+        payload: serde_json::Value,
+    },
 }

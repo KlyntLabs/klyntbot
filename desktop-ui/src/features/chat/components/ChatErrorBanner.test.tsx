@@ -1,16 +1,14 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { fireEvent } from "@testing-library/react";
+
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { ChatErrorBanner } from "./ChatErrorBanner";
 
 describe("ChatErrorBanner", () => {
   it("renders nothing when error is null", () => {
-    const { container } = render(
-      <ChatErrorBanner error={null} onDismiss={() => {}} />,
-    );
+    const { container } = render(<ChatErrorBanner error={null} onDismiss={() => {}} />);
     expect(container).toBeEmptyDOMElement();
   });
 

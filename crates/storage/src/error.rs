@@ -19,6 +19,16 @@ pub enum StorageError {
 
     #[error("Vector store error: {0}")]
     Vector(String),
+
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+}
+
+impl StorageError {
+    /// Create a serialization error from any serde error.
+    pub fn serialization(e: impl std::fmt::Display) -> Self {
+        StorageError::Serialization(e.to_string())
+    }
 }
 
 impl From<sqlx::migrate::MigrateError> for StorageError {

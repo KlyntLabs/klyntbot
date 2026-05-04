@@ -16,6 +16,7 @@ bus = { workspace = true }
 channels = { workspace = true }
 coding-memory = { workspace = true }
 coding-ingest = { path = "../coding-ingest" }
+coding-agents-md = { path = "../coding-agents-md" }
 cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }

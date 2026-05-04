@@ -1,6 +1,6 @@
 import { useTauriMutation } from "@/lib/query";
-import { showError } from "../lib/showError";
 import { formatRemaining } from "../lib/formatRemaining";
+import { showError } from "../lib/showError";
 
 interface Props {
   endsAt: string;

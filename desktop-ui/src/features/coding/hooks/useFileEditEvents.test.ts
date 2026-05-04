@@ -1,22 +1,30 @@
-import { describe, it, expect, vi } from "vitest";
-import { renderHook, waitFor, act } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
+
 import { listen } from "@tauri-apps/api/event";
-import { useFileEditEvents } from "./useFileEditEvents";
 import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
+import { useFileEditEvents } from "./useFileEditEvents";
 
 describe("useFileEditEvents", () => {
   it("upserts a kind: diff item on agent:file_edit_with_symbols", async () => {
     let handler: any;
     (listen as any).mockImplementation((_c: string, h: any) => {
-      handler = h; return Promise.resolve(() => {});
+      handler = h;
+      return Promise.resolve(() => {});
     });
     renderHook(() => useFileEditEvents("s1"));
     await waitFor(() => expect(listen).toHaveBeenCalled());
     act(() => {
-      handler({ payload: { path: "/repo/src/x.rs", op: "edit", bytes: 100,
-        diff: "--- /repo/src/x.rs\n+++ /repo/src/x.rs\n@@ -1 +1 @@\n-old\n+new\n" } });
+      handler({
+        payload: {
+          path: "/repo/src/x.rs",
+          op: "edit",
+          bytes: 100,
+          diff: "--- /repo/src/x.rs\n+++ /repo/src/x.rs\n@@ -1 +1 @@\n-old\n+new\n",
+        },
+      });
     });
     const items = chatStreamStore.getFileEdits("s1");
     expect(items).toHaveLength(1);

@@ -169,6 +169,8 @@ pub async fn run_for_test(
         mirror_min_approvals,
         mirror_cooldown_seconds,
         now_unix: jiff::Timestamp::now().as_second(),
+        thread_id: Some(session_id.clone()),
+        turn_id: message_id.clone(),
     };
     let decision = evaluate(guard_ctx, "apply_patch", &path_str).await;
     if !decision.allowed() {
@@ -210,6 +212,13 @@ pub async fn run_for_test(
         let before = tokio::fs::read_to_string(&resolved)
             .await
             .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("read: {e}"))))?;
+        // Reject obvious non-patches up front. `diffy::Patch::from_str` is too
+        // lenient — it accepts arbitrary text as a zero-hunk patch.
+        if !args.patch.contains("@@") && !args.patch.contains("---") {
+            return Err(KlyntbotError::Tool(ToolError::InvalidParams(
+                "malformed patch: missing unified-diff markers".into(),
+            )));
+        }
         let patch = diffy::Patch::from_str(&args.patch).map_err(|e| {
             KlyntbotError::Tool(ToolError::InvalidParams(format!("malformed patch: {e}")))
         })?;

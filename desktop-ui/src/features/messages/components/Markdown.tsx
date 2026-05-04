@@ -301,10 +301,7 @@ function applyAbbreviations(value: string) {
   if (definitions.size === 0) {
     return value;
   }
-  const pattern = new RegExp(
-    `\\b(${[...definitions.keys()].map(escapeRegex).join("|")})\\b`,
-    "g",
-  );
+  const pattern = new RegExp(`\\b(${[...definitions.keys()].map(escapeRegex).join("|")})\\b`, "g");
   let inFenceOut = false;
   return kept
     .map((line) => {

@@ -4,11 +4,21 @@
 
 import type { QueryKey } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ProductivitySummaryResponse, TimelineEntry, TimelineSummary } from "@/bindings";
+import { productivitySummaryRangeQuery, productivityTodayQuery } from "@/api/endpoints/dashboard";
+import type {
+  CalendarEvent,
+  ProductivitySummaryResponse,
+  TimelineEntry,
+  TimelineSummary,
+} from "@/bindings";
+import { useTauriQuery } from "@/lib/query";
+import { qk } from "@/lib/query/queryKeys";
 import { formatHumanDuration, minutesSinceMidnight } from "@/utils/dashboardDates";
 import { useTimelineDrag } from "../../hooks/useTimelineDrag";
-import { type LayerKey, useEnabledLayers } from "../../lib/layers";
+import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../../lib/layers";
 import { computeOverlapLayout } from "../../lib/timeline-utils";
+import { SummaryPanel } from "../SummaryPanel";
+import type { SessionBlock } from "./ActivityTrack";
 import { ActivityTrack } from "./ActivityTrack";
 import { CalendarTrack } from "./CalendarTrack";
 import { ContextRibbon } from "./ContextRibbon";
@@ -93,22 +103,35 @@ export interface DayColumnsProps {
   summary: TimelineSummary | null;
   isToday: boolean;
   loading: boolean;
-  productivitySummary?: ProductivitySummaryResponse | null;
   queryKey: QueryKey;
 }
 
 export function DayColumns({
   date,
   entries,
-  summary: _summary,
+  summary,
   isToday,
   loading,
-  productivitySummary: _productivitySummary,
   queryKey,
 }: DayColumnsProps) {
   const { enabled } = useEnabledLayers();
+  const { sidebarOpen } = useSidebarOpen();
   const [selectedEntry, setSelectedEntry] = useState<TimelineEntry | null>(null);
+  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
+  const [selectedSession, setSelectedSession] = useState<SessionBlock | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const { data: productivitySummary } = useTauriQuery<ProductivitySummaryResponse | null>({
+    queryKey: isToday
+      ? qk.dashboard.productivityToday(date)
+      : qk.productivity.summaryRange(date, date),
+    queryFn: async () => {
+      if (isToday) return productivityTodayQuery();
+      const arr = await productivitySummaryRangeQuery(date, date);
+      return arr[0] ?? null;
+    },
+    fallback: null,
+  });
 
   // Dynamic zoom state
   const [hourHeight, setHourHeight] = useState(DEFAULT_HOUR_HEIGHT);
@@ -393,7 +416,15 @@ export function DayColumns({
                 if (col.key === "activity") {
                   return (
                     <div key={col.key} className="dashboard__day-column">
-                      <ActivityTrack />
+                      <ActivityTrack
+                        date={date}
+                        hourHeight={hourHeight}
+                        isToday={isToday}
+                        onSelectSession={(s) => setSelectedSession(s)}
+                        onSelectEntry={(entry) => setSelectedEntry(entry)}
+                        selectedSession={selectedSession}
+                        selectedEntryId={selectedEntry?.id ?? null}
+                      />
                     </div>
                   );
                 }
@@ -401,8 +432,47 @@ export function DayColumns({
                 // Calendar column: fetches its own data
                 if (col.key === "calendar") {
                   return (
-                    <div key={col.key} className="dashboard__day-column">
-                      <CalendarTrack />
+                    <div
+                      key={col.key}
+                      className="dashboard__day-column"
+                      style={{ position: "relative" }}
+                    >
+                      <CalendarTrack
+                        date={date}
+                        hourHeight={hourHeight}
+                        selectedEventId={selectedCalendarEvent?.id ?? null}
+                        onSelectEvent={(event) => {
+                          setSelectedCalendarEvent(event);
+                          if (!event) return;
+                          // Convert calendar event to TimelineEntry-shape so SummaryPanel's EntryDetail can render it
+                          const startedAt = event.startedAt;
+                          const endedAt = event.endedAt;
+                          const durationSecs =
+                            startedAt && endedAt
+                              ? Math.max(
+                                  0,
+                                  Math.floor(
+                                    (new Date(endedAt).getTime() - new Date(startedAt).getTime()) /
+                                      1000,
+                                  ),
+                                )
+                              : null;
+                          setSelectedEntry({
+                            id: event.id,
+                            title: event.title,
+                            description: event.description ?? null,
+                            startedAt,
+                            endedAt,
+                            durationSecs,
+                            source: "calendar",
+                            entryType: "calendarEvent",
+                            color: event.color ?? "var(--timeline-focus)",
+                            metadata: null,
+                            entityId: event.id,
+                            entityRoute: null,
+                          });
+                        }}
+                      />
                     </div>
                   );
                 }
@@ -473,7 +543,22 @@ export function DayColumns({
             </div>
           </div>
         </div>
+
       </div>
+      {sidebarOpen && (
+        <SummaryPanel
+          summary={summary}
+          selectedEntry={selectedEntry}
+          selectedSession={selectedSession}
+          onClose={() => {
+            setSelectedEntry(null);
+            setSelectedSession(null);
+            setSelectedCalendarEvent(null);
+          }}
+          productivitySummary={productivitySummary}
+          date={date}
+        />
+      )}
     </div>
   );
 }

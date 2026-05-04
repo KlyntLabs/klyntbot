@@ -43,9 +43,7 @@ export function useLauncherSearch() {
       const off = await win.listen("window-shown", () => {
         // The store's results are cleared on hide via reset(); restore from the
         // React Query cache synchronously so frequents reappear immediately.
-        const cached = queryClient.getQueryData<LauncherItem[]>(
-          qk.launcher.search(""),
-        );
+        const cached = queryClient.getQueryData<LauncherItem[]>(qk.launcher.search(""));
         if (cached && cached.length > 0) setResults(cached);
         queryClient.invalidateQueries({ queryKey: qk.launcher.search("") });
       });

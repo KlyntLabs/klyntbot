@@ -9,6 +9,8 @@ import { useAppServerEvents } from "./useAppServerEvents";
 
 vi.mock("../../../services/events", () => ({
   subscribeAppServerEvents: vi.fn(),
+  subscribeApprovalRequest: vi.fn(() => vi.fn()),
+  subscribeCostUpdate: vi.fn(() => vi.fn()),
 }));
 
 type Handlers = Parameters<typeof useAppServerEvents>[0];

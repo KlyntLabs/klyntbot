@@ -15,11 +15,20 @@ export function PluginsView() {
   return (
     <section className="plugins-view" aria-labelledby="plugins-heading">
       <header className="plugins-view__header">
-        <h1 id="plugins-heading" className="plugins-view__title">Plugins</h1>
-        <p className="plugins-view__subtitle">Internal plugins for inspecting and tuning your Klynt platform.</p>
+        <h1 id="plugins-heading" className="plugins-view__title">
+          Plugins
+        </h1>
+        <p className="plugins-view__subtitle">
+          Internal plugins for inspecting and tuning your Klynt platform.
+        </p>
       </header>
       <div className="plugins-view__tabs-wrap">
-        <div className="panel-tabs" role="tablist" aria-label="Plugins" aria-orientation="horizontal">
+        <div
+          className="panel-tabs"
+          role="tablist"
+          aria-label="Plugins"
+          aria-orientation="horizontal"
+        >
           {PLUGIN_TABS.map((tab) => {
             const isActive = active === tab.id;
             return (

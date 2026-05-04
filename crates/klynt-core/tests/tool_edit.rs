@@ -14,7 +14,7 @@ async fn edits_unique_match() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("f.txt"), "alpha\nbeta\ngamma\n").unwrap();
     let perms = CodingPermissions {
-        allow: vec!["Edit(./**)".into()],
+        allow: vec!["Edit(**)".into()],
         ..Default::default()
     };
     let l1 = Arc::new(Layer1::compile(&perms).unwrap());
@@ -62,7 +62,7 @@ async fn rejects_multiple_matches() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("f.txt"), "x\nx\n").unwrap();
     let perms = CodingPermissions {
-        allow: vec!["Edit(./**)".into()],
+        allow: vec!["Edit(**)".into()],
         ..Default::default()
     };
     let l1 = Arc::new(Layer1::compile(&perms).unwrap());
@@ -110,7 +110,7 @@ async fn rejects_missing_old_text() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("f.txt"), "abc\n").unwrap();
     let perms = CodingPermissions {
-        allow: vec!["Edit(./**)".into()],
+        allow: vec!["Edit(**)".into()],
         ..Default::default()
     };
     let l1 = Arc::new(Layer1::compile(&perms).unwrap());

@@ -14,5 +14,7 @@ async fn returns_empty_array() {
         .unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert!(parsed.is_array());
-    assert_eq!(parsed.as_array().unwrap().len(), 0);
+    // tool_search is no longer a stub; "diff" returns curated hits (e.g., apply_patch).
+    // Keep this loose so future curated additions don't break the test.
+    assert!(!parsed.as_array().unwrap().is_empty());
 }

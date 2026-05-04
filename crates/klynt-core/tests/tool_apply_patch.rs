@@ -15,7 +15,7 @@ async fn applies_unified_diff() {
     std::fs::write(dir.path().join("f.txt"), "line1\nline2\nline3\n").unwrap();
     let patch = "--- f.txt\n+++ f.txt\n@@ -1,3 +1,3 @@\n line1\n-line2\n+LINE2\n line3\n";
     let perms = CodingPermissions {
-        allow: vec!["ApplyPatch(./**)".into()],
+        allow: vec!["ApplyPatch(**)".into()],
         ..Default::default()
     };
     let l1 = Arc::new(Layer1::compile(&perms).unwrap());
@@ -62,7 +62,7 @@ async fn rejects_malformed_patch() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("f.txt"), "abc\n").unwrap();
     let perms = CodingPermissions {
-        allow: vec!["ApplyPatch(./**)".into()],
+        allow: vec!["ApplyPatch(**)".into()],
         ..Default::default()
     };
     let l1 = Arc::new(Layer1::compile(&perms).unwrap());

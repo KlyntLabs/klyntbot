@@ -539,6 +539,57 @@ fn wire_event_channels(
         });
     }
 
+    spawn_broker_forwarder(
+        core.thread_events.subscribe(),
+        app_handle,
+        shutdown,
+        "agent:thread_event",
+    );
+    spawn_broker_forwarder(
+        core.cost_events.subscribe(),
+        app_handle,
+        shutdown,
+        "agent:cost_update",
+    );
+    // ToolEvent::ApprovalRequest rides on `DomainEvent::Generic { kind:
+    // "agent_event" }`. The dual-probe (`ApprovalRequest` key OR `type` field)
+    // accommodates both externally- and internally-tagged serde shapes.
+    {
+        let mut rx = channels.domain_event_bus.subscribe();
+        let handle = app_handle.clone();
+        let token = shutdown.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    msg = rx.recv() => match msg {
+                        Ok(bus::DomainEvent::Generic { kind, payload })
+                            if kind == "agent_event" =>
+                        {
+                            let is_approval = payload.get("ApprovalRequest").is_some()
+                                || payload.get("type").and_then(|v| v.as_str())
+                                    == Some("ApprovalRequest");
+                            if is_approval {
+                                let inner = payload.get("ApprovalRequest")
+                                    .and_then(|v| v.get("payload"))
+                                    .cloned()
+                                    .unwrap_or(payload);
+                                if let Err(e) = handle.emit("agent:approval_request", &inner) {
+                                    warn!("failed to emit agent:approval_request: {e}");
+                                }
+                            }
+                        }
+                        Ok(_) => {}
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            warn!("approval forwarder lagged by {n} events");
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+            }
+        });
+    }
+
     // Voice events → Tauri "voice:event" + global SSE broadcast
     if let Some(ref voice_service) = core.voice_service {
         if let Some(mut voice_rx) = voice_service.take_event_rx() {
@@ -605,6 +656,37 @@ fn center_on_cursor_monitor(
     }
 
     Ok(())
+}
+
+/// Forward every event from a `TypedBroker` subscriber onto a Tauri event channel.
+fn spawn_broker_forwarder<T>(
+    mut rx: tokio::sync::broadcast::Receiver<T>,
+    app_handle: &tauri::AppHandle,
+    shutdown_token: &CancellationToken,
+    event_name: &'static str,
+) where
+    T: Clone + serde::Serialize + Send + 'static,
+{
+    let handle = app_handle.clone();
+    let token = shutdown_token.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = token.cancelled() => break,
+                msg = rx.recv() => match msg {
+                    Ok(evt) => {
+                        if let Err(e) = handle.emit(event_name, &evt) {
+                            warn!("failed to emit {event_name}: {e}");
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        warn!("{event_name} forwarder lagged by {n} events");
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        }
+    });
 }
 
 /// Spawn a background task that receives from a channel and emits Tauri events.

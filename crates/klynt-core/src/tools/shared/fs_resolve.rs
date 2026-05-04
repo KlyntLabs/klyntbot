@@ -18,15 +18,39 @@ pub fn resolve_under_cwd(
     privacy: &PrivacyGuard,
 ) -> Result<PathBuf, FsResolveError> {
     let expanded = shellexpand::tilde(raw).into_owned();
+    // Canonicalize cwd up front so symlinked prefixes (macOS /tmp → /private/tmp)
+    // don't cause false `starts_with` mismatches against the resolved candidate.
+    let cwd_canonical = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
     let candidate = if Path::new(&expanded).is_absolute() {
         PathBuf::from(&expanded)
     } else {
-        cwd.join(&expanded)
+        cwd_canonical.join(&expanded)
     };
-    let resolved = candidate.canonicalize().unwrap_or(candidate);
+    // Try canonicalize; if the file (or any ancestor) doesn't exist, walk up
+    // until we find an ancestor that does, then re-append the trailing
+    // components so symlinked prefixes (macOS /tmp → /private/tmp) still match.
+    let resolved = candidate.canonicalize().unwrap_or_else(|_| {
+        let mut suffix: Vec<&std::ffi::OsStr> = Vec::new();
+        let mut cursor = candidate.as_path();
+        loop {
+            if let Ok(c) = cursor.canonicalize() {
+                let mut out = c;
+                for part in suffix.iter().rev() {
+                    out.push(part);
+                }
+                return out;
+            }
+            match (cursor.parent(), cursor.file_name()) {
+                (Some(p), Some(n)) if p != cursor => {
+                    suffix.push(n);
+                    cursor = p;
+                }
+                _ => return candidate.clone(),
+            }
+        }
+    });
 
     // cwd-restriction
-    let cwd_canonical = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
     if !resolved.starts_with(&cwd_canonical) {
         return Err(FsResolveError::OutsideCwd {
             path: resolved,

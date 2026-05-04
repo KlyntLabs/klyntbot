@@ -1,6 +1,7 @@
 :root {
   /* Typographic scale — anchor on --fs-sm (12.5px), step ~1.1x.
      Pick the role, not a number, so sizes stay harmonious. */
+  --fs-3xs: 9px; /* minuscule meta, heatmap labels */
   --fs-2xs: 10.5px; /* badges, tiny meta */
   --fs-xs: 11.5px; /* section labels, secondary text */
   --fs-sm: 12.5px; /* default UI body — nav items, buttons */
@@ -30,6 +31,15 @@
   --ds-text-strong: var(--text-strong);
   --ds-text-subtle: var(--text-subtle);
   --ds-text-faint: var(--text-faint);
+
+  /* Aliases consumed by the dashboard port (Phase 3). The dashboard CSS came
+     from a design system that named these tokens directly; map them to the
+     existing themed tokens so theme switching still works. */
+  --brand: var(--text-accent-cyan);
+  --success: var(--status-success);
+  --destructive: var(--status-error);
+  --surface-raised: var(--surface-control);
+  --text-muted-foreground: var(--text-muted);
 
   --ds-modal-backdrop: rgba(6, 8, 12, 0.55);
   --ds-modal-card-bg: var(--ds-surface-card);
@@ -78,49 +88,49 @@
   /* ── Coding Memory event chips ──
      One color family per logical group; bg/fg/border vars feed
      `cm-event-chip--<color>` variants in plugins.css. */
-  --cm-color-blue-bg:      color-mix(in srgb, #3b82f6 15%, transparent);
-  --cm-color-blue-fg:      #1d4ed8;
-  --cm-color-blue-border:  color-mix(in srgb, #3b82f6 30%, transparent);
+  --cm-color-blue-bg: color-mix(in srgb, #3b82f6 15%, transparent);
+  --cm-color-blue-fg: #1d4ed8;
+  --cm-color-blue-border: color-mix(in srgb, #3b82f6 30%, transparent);
 
-  --cm-color-purple-bg:    color-mix(in srgb, #a855f7 15%, transparent);
-  --cm-color-purple-fg:    #7e22ce;
-  --cm-color-purple-border:color-mix(in srgb, #a855f7 30%, transparent);
+  --cm-color-purple-bg: color-mix(in srgb, #a855f7 15%, transparent);
+  --cm-color-purple-fg: #7e22ce;
+  --cm-color-purple-border: color-mix(in srgb, #a855f7 30%, transparent);
 
-  --cm-color-green-bg:     color-mix(in srgb, #22c55e 15%, transparent);
-  --cm-color-green-fg:     #15803d;
+  --cm-color-green-bg: color-mix(in srgb, #22c55e 15%, transparent);
+  --cm-color-green-fg: #15803d;
   --cm-color-green-border: color-mix(in srgb, #22c55e 30%, transparent);
 
-  --cm-color-orange-bg:    color-mix(in srgb, #f97316 15%, transparent);
-  --cm-color-orange-fg:    #c2410c;
-  --cm-color-orange-border:color-mix(in srgb, #f97316 30%, transparent);
+  --cm-color-orange-bg: color-mix(in srgb, #f97316 15%, transparent);
+  --cm-color-orange-fg: #c2410c;
+  --cm-color-orange-border: color-mix(in srgb, #f97316 30%, transparent);
 
-  --cm-color-amber-bg:     color-mix(in srgb, #f59e0b 15%, transparent);
-  --cm-color-amber-fg:     #b45309;
+  --cm-color-amber-bg: color-mix(in srgb, #f59e0b 15%, transparent);
+  --cm-color-amber-fg: #b45309;
   --cm-color-amber-border: color-mix(in srgb, #f59e0b 30%, transparent);
 
-  --cm-color-cyan-bg:      color-mix(in srgb, #06b6d4 15%, transparent);
-  --cm-color-cyan-fg:      #0e7490;
-  --cm-color-cyan-border:  color-mix(in srgb, #06b6d4 30%, transparent);
+  --cm-color-cyan-bg: color-mix(in srgb, #06b6d4 15%, transparent);
+  --cm-color-cyan-fg: #0e7490;
+  --cm-color-cyan-border: color-mix(in srgb, #06b6d4 30%, transparent);
 
-  --cm-color-indigo-bg:    color-mix(in srgb, #6366f1 15%, transparent);
-  --cm-color-indigo-fg:    #4338ca;
-  --cm-color-indigo-border:color-mix(in srgb, #6366f1 30%, transparent);
+  --cm-color-indigo-bg: color-mix(in srgb, #6366f1 15%, transparent);
+  --cm-color-indigo-fg: #4338ca;
+  --cm-color-indigo-border: color-mix(in srgb, #6366f1 30%, transparent);
 
-  --cm-color-teal-bg:      color-mix(in srgb, #14b8a6 15%, transparent);
-  --cm-color-teal-fg:      #0f766e;
-  --cm-color-teal-border:  color-mix(in srgb, #14b8a6 30%, transparent);
+  --cm-color-teal-bg: color-mix(in srgb, #14b8a6 15%, transparent);
+  --cm-color-teal-fg: #0f766e;
+  --cm-color-teal-border: color-mix(in srgb, #14b8a6 30%, transparent);
 
-  --cm-color-pink-bg:      color-mix(in srgb, #ec4899 15%, transparent);
-  --cm-color-pink-fg:      #be185d;
-  --cm-color-pink-border:  color-mix(in srgb, #ec4899 30%, transparent);
+  --cm-color-pink-bg: color-mix(in srgb, #ec4899 15%, transparent);
+  --cm-color-pink-fg: #be185d;
+  --cm-color-pink-border: color-mix(in srgb, #ec4899 30%, transparent);
 
-  --cm-color-neutral-bg:   color-mix(in srgb, #6b7280 15%, transparent);
-  --cm-color-neutral-fg:   var(--ds-text-subtle);
+  --cm-color-neutral-bg: color-mix(in srgb, #6b7280 15%, transparent);
+  --cm-color-neutral-fg: var(--ds-text-subtle);
   --cm-color-neutral-border: var(--ds-border-subtle);
 
   /* Slow / error highlights for the timeline gutter */
-  --cm-color-warning-fg:   #b45309;
+  --cm-color-warning-fg: #b45309;
   --cm-color-warning-line: color-mix(in srgb, #f59e0b 35%, transparent);
-  --cm-color-danger-fg:    #b91c1c;
-  --cm-color-danger-line:  color-mix(in srgb, #ef4444 40%, transparent);
+  --cm-color-danger-fg: #b91c1c;
+  --cm-color-danger-line: color-mix(in srgb, #ef4444 40%, transparent);
 }

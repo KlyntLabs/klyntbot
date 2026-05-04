@@ -1,3 +1,4 @@
+pub mod coding;
 pub mod cognitive_commands;
 pub mod commands;
 pub mod entity_link_types;

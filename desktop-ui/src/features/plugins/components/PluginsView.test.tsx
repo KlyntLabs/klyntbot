@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // @vitest-environment jsdom
 import { render, screen, within } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { PluginsView } from "./PluginsView";
 
 describe("PluginsView", () => {
@@ -13,7 +13,10 @@ describe("PluginsView", () => {
 
   it("renders Coding Memory plugin by default", () => {
     render(<PluginsView />);
-    expect(screen.getByTestId("plugins-active-pane")).toHaveAttribute("data-plugin", "coding-memory");
+    expect(screen.getByTestId("plugins-active-pane")).toHaveAttribute(
+      "data-plugin",
+      "coding-memory",
+    );
   });
 
   it("does not render Klynt CLI as a primary plugin tab", () => {

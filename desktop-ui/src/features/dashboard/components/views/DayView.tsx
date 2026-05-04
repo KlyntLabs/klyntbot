@@ -41,7 +41,6 @@ export function DayView() {
       summary={data.summary}
       isToday={isToday}
       loading={isLoading}
-      productivitySummary={null}
       queryKey={timelineQueryKey}
     />
   );

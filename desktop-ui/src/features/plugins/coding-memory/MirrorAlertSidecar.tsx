@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchMirrorAlerts, actMirrorAlert } from "@/api/endpoints/codingMemory";
+import { actMirrorAlert, fetchMirrorAlerts } from "@/api/endpoints/codingMemory";
 import { EffectivenessTrendsChart } from "./EffectivenessTrendsChart";
 
 interface Alert {
@@ -12,7 +12,9 @@ interface Alert {
   dismissed: boolean;
 }
 
-interface Props { repo?: string; }
+interface Props {
+  repo?: string;
+}
 
 export function MirrorAlertSidecar({ repo }: Props) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -20,12 +22,16 @@ export function MirrorAlertSidecar({ repo }: Props) {
 
   const load = () => {
     setLoading(true);
-    fetchMirrorAlerts({ repo }).then((data) => {
-      if (Array.isArray(data)) setAlerts(data as Alert[]);
-    }).finally(() => setLoading(false));
+    fetchMirrorAlerts({ repo })
+      .then((data) => {
+        if (Array.isArray(data)) setAlerts(data as Alert[]);
+      })
+      .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [repo]);
+  useEffect(() => {
+    load();
+  }, [repo]);
 
   const handleAction = async (id: string, action: "approve" | "reject" | "snooze") => {
     await actMirrorAlert(id, action);
@@ -42,17 +48,35 @@ export function MirrorAlertSidecar({ repo }: Props) {
         {alerts.map((a) => (
           <li key={a.id} className="cm-mirror__row">
             <div className="cm-mirror__top">
-              <span className={`cm-event-chip cm-event-chip--${severityColor(a.severity)}`}>{a.severity}</span>
+              <span className={`cm-event-chip cm-event-chip--${severityColor(a.severity)}`}>
+                {a.severity}
+              </span>
               <span className="cm-mirror__headline">{a.headline}</span>
             </div>
             <div className="cm-mirror__actions">
-              <button type="button" className="cm-mirror__btn" onClick={() => handleAction(a.id, "approve")}>Approve</button>
-              <button type="button" className="cm-mirror__btn" onClick={() => handleAction(a.id, "reject")}>Reject</button>
-              <button type="button" className="cm-mirror__btn" onClick={() => handleAction(a.id, "snooze")}>Snooze</button>
+              <button
+                type="button"
+                className="cm-mirror__btn"
+                onClick={() => handleAction(a.id, "approve")}
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                className="cm-mirror__btn"
+                onClick={() => handleAction(a.id, "reject")}
+              >
+                Reject
+              </button>
+              <button
+                type="button"
+                className="cm-mirror__btn"
+                onClick={() => handleAction(a.id, "snooze")}
+              >
+                Snooze
+              </button>
             </div>
-            {a.kind === "patternEffectivenessDrop" && (
-              <EffectivenessTrendsChart patternId={a.id} />
-            )}
+            {a.kind === "patternEffectivenessDrop" && <EffectivenessTrendsChart patternId={a.id} />}
           </li>
         ))}
       </ul>
@@ -62,9 +86,13 @@ export function MirrorAlertSidecar({ repo }: Props) {
 
 function severityColor(severity: string): string {
   switch (severity) {
-    case "error": return "neutral";
-    case "warn": return "amber";
-    case "info": return "neutral";
-    default: return "neutral";
+    case "error":
+      return "neutral";
+    case "warn":
+      return "amber";
+    case "info":
+      return "neutral";
+    default:
+      return "neutral";
   }
 }

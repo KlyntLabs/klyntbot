@@ -8,7 +8,12 @@ import {
   useSidebarToggle,
 } from "../lib/layers";
 import { DashboardTopbar } from "./DashboardTopbar";
+import { AutoFocusToast } from "./productivity/AutoFocusToast";
+import { FocusStateIndicator } from "./productivity/FocusStateIndicator";
 import { DayView } from "./views/DayView";
+import { MonthView } from "./views/MonthView";
+import { WeekView } from "./views/WeekView";
+import { YearView } from "./views/YearView";
 
 export function Dashboard() {
   const state = useDashboardStateImpl();
@@ -22,13 +27,13 @@ export function Dashboard() {
       view = <DayView />;
       break;
     case "week":
+      view = <WeekView />;
+      break;
     case "month":
+      view = <MonthView />;
+      break;
     case "year":
-      view = (
-        <div className="dashboard__placeholder">
-          {state.mode.charAt(0).toUpperCase() + state.mode.slice(1)} view — coming in next phase
-        </div>
-      );
+      view = <YearView />;
       break;
   }
 
@@ -39,6 +44,8 @@ export function Dashboard() {
           <SidebarContext.Provider value={{ sidebarOpen, toggleSidebar }}>
             <div className="dashboard">
               <DashboardTopbar />
+              <FocusStateIndicator />
+              <AutoFocusToast />
               <div className="dashboard__content">{view}</div>
             </div>
           </SidebarContext.Provider>

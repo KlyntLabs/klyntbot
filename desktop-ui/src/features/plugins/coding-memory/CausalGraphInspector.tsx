@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { fetchRecallFacts } from "@/api/endpoints/codingMemory";
 
-interface Props { factIds: string[]; }
+interface Props {
+  factIds: string[];
+}
 
 export function CausalGraphInspector({ factIds }: Props) {
   const [facts, setFacts] = useState<Array<Record<string, unknown>>>([]);
@@ -13,7 +15,8 @@ export function CausalGraphInspector({ factIds }: Props) {
   }, [factIds]);
 
   if (factIds.length === 0) return null;
-  if (facts.length === 0) return <div className="cm-state cm-state--loading">Loading causal graph…</div>;
+  if (facts.length === 0)
+    return <div className="cm-state cm-state--loading">Loading causal graph…</div>;
 
   return (
     <section className="cm-causal" aria-label="Causal graph">

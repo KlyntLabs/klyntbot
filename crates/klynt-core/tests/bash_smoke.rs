@@ -42,7 +42,10 @@ async fn echo_hi_runs_and_emits_sandbox_event() {
 
     assert!(result.contains("hi"));
 
+    // ctx owns a clone of `tx` via `ctx.event_tx`; drop it before draining `rx`
+    // so the receive loop sees EOF.
     drop(tool);
+    drop(ctx);
     drop(tx);
     let mut saw_sandbox = false;
     while let Some(e) = rx.recv().await {

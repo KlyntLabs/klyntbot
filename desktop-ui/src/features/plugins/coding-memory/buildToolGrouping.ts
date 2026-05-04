@@ -17,7 +17,10 @@ export function buildToolGrouping(events: WireEventDto[]): Map<number, EventMeta
     if (e.kind === "toolCall") {
       const id = p.id as string | undefined;
       const name = (p.function?.name ?? p.tool_name) as string | undefined;
-      if (id) { active.push({ id, name: name ?? "" }); names.set(id, name ?? ""); }
+      if (id) {
+        active.push({ id, name: name ?? "" });
+        names.set(id, name ?? "");
+      }
       meta.set(i, { nestLevel: 0, linkedToolCallId: id, linkedToolName: name });
     } else if (e.kind === "toolCallPart") {
       const top = peek();

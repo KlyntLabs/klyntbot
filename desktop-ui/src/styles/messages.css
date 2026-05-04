@@ -1217,8 +1217,7 @@
 .message .markdown-codeblock {
   border: 1px solid var(--cm-border-soft);
   border-radius: 12px;
-  background:
-    linear-gradient(var(--cm-surface-panel-elevated), var(--cm-surface-panel-elevated))
+  background: linear-gradient(var(--cm-surface-panel-elevated), var(--cm-surface-panel-elevated))
     var(--cm-surface-composer);
   overflow: hidden;
   margin: 12px 0;
@@ -1303,8 +1302,7 @@
   padding: 10px 14px;
   border: 1px solid var(--cm-border-soft);
   border-radius: 12px;
-  background:
-    linear-gradient(var(--cm-surface-panel-elevated), var(--cm-surface-panel-elevated))
+  background: linear-gradient(var(--cm-surface-panel-elevated), var(--cm-surface-panel-elevated))
     var(--cm-surface-composer);
   white-space: pre;
   overflow-x: auto;
@@ -1347,8 +1345,7 @@
   overflow-x: auto;
   border: 1px solid var(--cm-border-soft);
   border-radius: 12px;
-  background:
-    linear-gradient(var(--cm-surface-panel-elevated), var(--cm-surface-panel-elevated))
+  background: linear-gradient(var(--cm-surface-panel-elevated), var(--cm-surface-panel-elevated))
     var(--cm-surface-composer);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }

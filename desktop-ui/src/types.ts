@@ -168,6 +168,10 @@ export type ConversationItem =
         | "default_mode";
       layerReason: string;
       mirrorHistory?: { approvalCount: number; denialCount: number };
+      // Mirrors `desktop_shared::coding::approval::LayerDecisions`. Each layer
+      // outcome is one of: allowed | denied | deferred | skipped — matching
+      // `desktop_shared::coding::approval::LayerOutcome`.
+      layerDecisions?: LayerDecisions;
       status:
         | "pending"
         | "approved-once"
@@ -748,4 +752,18 @@ export type DictationEvent =
 export type DictationTranscript = {
   id: string;
   text: string;
+};
+
+/// Mirrors `desktop_shared::coding::approval::LayerDecisions`.
+export type LayerDecisionEntry = {
+  outcome: "allowed" | "denied" | "deferred" | "skipped";
+  reason: string;
+  ruleMatched?: string | null;
+};
+
+export type LayerDecisions = {
+  privacy: LayerDecisionEntry;
+  layer1: LayerDecisionEntry;
+  layer2: LayerDecisionEntry;
+  layer3: LayerDecisionEntry;
 };

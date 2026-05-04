@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
+
+import { isTauri } from "@tauri-apps/api/core";
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { isTauri } from "@tauri-apps/api/core";
 import type { RateLimitSnapshot } from "@/types";
 import { buildTraySessionUsage, useTraySessionUsage } from "./useTraySessionUsage";
 

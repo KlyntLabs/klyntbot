@@ -11,6 +11,7 @@ pub mod sqlite_types;
 pub mod circuit_breaker;
 pub mod error;
 pub mod finance_storage;
+pub mod messages;
 pub mod pool;
 pub mod repos;
 pub mod rows;

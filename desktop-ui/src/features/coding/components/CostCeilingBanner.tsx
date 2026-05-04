@@ -1,39 +1,33 @@
 import { useEffect, useState } from "react";
-import { commands } from "@/bindings";
-import type { MirrorAlertRow } from "@/bindings";
+import { subscribeCostUpdates, type CostUpdate } from "@/api/endpoints/cost";
 
 export function CostCeilingBanner({ sessionKey }: { sessionKey: string }) {
-  const [alert, setAlert] = useState<MirrorAlertRow | null>(null);
+  const [breach, setBreach] = useState<CostUpdate | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    commands
-      .codingMemoryMirrorAlertsFeed({
-        kind: "costThresholdCrossed",
-        severity: null,
-        repo: null,
-        limit: 20,
-      })
-      .then((res) => {
-        if (!mounted || res.status !== "ok") return;
-        const hit = res.data?.[0];
-        if (hit) setAlert(hit);
-      });
+    const unlisten = subscribeCostUpdates((update) => {
+      if (!mounted) return;
+      if (update.ceilingBreached) {
+        setBreach(update);
+      }
+    });
     return () => {
       mounted = false;
+      void unlisten.then((fn) => fn());
     };
   }, [sessionKey]);
 
-  if (!alert) return null;
+  if (!breach) return null;
 
   return (
     <div className="cost-ceiling-banner" role="alert">
       <span className="cost-ceiling-banner__text">
-        Cost alert: {alert.kind} — {alert.severity}
+        Cost ceiling reached: ${breach.threadTotalUsd?.toFixed(2) ?? "??"} spent
       </span>
       <button
         className="cost-ceiling-banner__dismiss"
-        onClick={() => setAlert(null)}
+        onClick={() => setBreach(null)}
         aria-label="Dismiss cost alert"
       >
         ×

@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use desktop_shared::coding::LayerOutcome;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ApprovalLayer {
@@ -8,6 +10,16 @@ pub enum ApprovalLayer {
     Layer2Starlark,
     Layer3Mirror,
     DefaultMode,
+}
+
+/// Audit trace of each layer's outcome when an `Ask` decision is produced.
+/// Passed through to the frontend so the user can see *why* they're being asked.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LayerOutcomeAudit {
+    pub privacy_passed: bool,
+    pub layer1: LayerOutcome,
+    pub layer2: LayerOutcome,
+    pub layer3: LayerOutcome,
 }
 
 #[derive(Debug, Clone)]
@@ -21,6 +33,7 @@ pub enum ApprovalDecision {
     Ask {
         layer: ApprovalLayer,
         reason: String,
+        layer_audit: Option<LayerOutcomeAudit>,
     },
     PrivacyDenied {
         reason: String,
@@ -45,8 +58,23 @@ impl ApprovalDecision {
             rule_matched: None,
         }
     }
-    pub fn ask(layer: ApprovalLayer, reason: String) -> Self {
-        Self::Ask { layer, reason }
+    pub fn ask(layer: ApprovalLayer, reason: impl Into<String>) -> Self {
+        Self::Ask {
+            layer,
+            reason: reason.into(),
+            layer_audit: None,
+        }
+    }
+    pub fn ask_with_audit(
+        layer: ApprovalLayer,
+        reason: impl Into<String>,
+        audit: LayerOutcomeAudit,
+    ) -> Self {
+        Self::Ask {
+            layer,
+            reason: reason.into(),
+            layer_audit: Some(audit),
+        }
     }
     pub fn layer(&self) -> ApprovalLayer {
         match self {

@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
-import { WireEventCard } from "./WireEventCard";
-import { WireFilters } from "./WireFilters";
-import { TurnTree } from "./TurnTree";
-import { ToolCallDetail } from "./ToolCallDetail";
-import { RecallOverlay } from "./RecallOverlay";
-import { MirrorAlertSidecar } from "./MirrorAlertSidecar";
+import { fetchSessionWire } from "@/api/endpoints/codingMemory";
 import { buildToolGrouping } from "./buildToolGrouping";
 import { isErrorEvent } from "./eventHelpers";
-import { fetchSessionWire } from "@/api/endpoints/codingMemory";
+import { MirrorAlertSidecar } from "./MirrorAlertSidecar";
+import { RecallOverlay } from "./RecallOverlay";
+import { ToolCallDetail } from "./ToolCallDetail";
+import { TurnTree } from "./TurnTree";
 import type { WireEventDto } from "./types";
+import { WireEventCard } from "./WireEventCard";
+import { WireFilters } from "./WireFilters";
 
 interface WireViewerProps {
   sessionId: string;
@@ -64,7 +64,9 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
       .finally(() => {
         if (!cancelled && !isBackgroundRefresh) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId, refreshKey]);
 
   const allTypes = useMemo(() => {
@@ -92,7 +94,9 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
 
   const errorIndices = useMemo(() => {
     const indices: number[] = [];
-    events.forEach((e, i) => { if (isErrorEvent(e)) indices.push(i); });
+    events.forEach((e, i) => {
+      if (isErrorEvent(e)) indices.push(i);
+    });
     return indices;
   }, [events]);
 
@@ -146,12 +150,15 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
     setErrorsOnly(newErrorsOnly);
   }, []);
 
-  const scrollToEventIndex = useCallback((eventIndex: number) => {
-    const pos = filtered.findIndex(({ index }) => index === eventIndex);
-    if (pos >= 0 && virtuosoRef.current) {
-      virtuosoRef.current.scrollToIndex({ index: pos, align: "center", behavior: "smooth" });
-    }
-  }, [filtered]);
+  const scrollToEventIndex = useCallback(
+    (eventIndex: number) => {
+      const pos = filtered.findIndex(({ index }) => index === eventIndex);
+      if (pos >= 0 && virtuosoRef.current) {
+        virtuosoRef.current.scrollToIndex({ index: pos, align: "center", behavior: "smooth" });
+      }
+    },
+    [filtered],
+  );
 
   const handleEventSelect = useCallback((event: WireEventDto, _index: number) => {
     if (event.kind === "toolCall" || event.kind === "toolResult") {
@@ -160,24 +167,27 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
   }, []);
 
   const errorNavRef = useRef(0);
-  const navigateError = useCallback((direction: "next" | "prev") => {
-    if (errorIndices.length === 0) return;
-    if (direction === "next") {
-      errorNavRef.current = (errorNavRef.current + 1) % errorIndices.length;
-    } else {
-      errorNavRef.current = (errorNavRef.current - 1 + errorIndices.length) % errorIndices.length;
-    }
-    const targetIndex = errorIndices[errorNavRef.current];
-    const pos = filtered.findIndex(({ index }) => index === targetIndex);
-    if (pos >= 0 && virtuosoRef.current) {
-      virtuosoRef.current.scrollToIndex({ index: pos, align: "center", behavior: "smooth" });
-      setExpandedSet((prev) => {
-        const next = new Set(prev);
-        next.add(targetIndex);
-        return next;
-      });
-    }
-  }, [errorIndices, filtered]);
+  const navigateError = useCallback(
+    (direction: "next" | "prev") => {
+      if (errorIndices.length === 0) return;
+      if (direction === "next") {
+        errorNavRef.current = (errorNavRef.current + 1) % errorIndices.length;
+      } else {
+        errorNavRef.current = (errorNavRef.current - 1 + errorIndices.length) % errorIndices.length;
+      }
+      const targetIndex = errorIndices[errorNavRef.current];
+      const pos = filtered.findIndex(({ index }) => index === targetIndex);
+      if (pos >= 0 && virtuosoRef.current) {
+        virtuosoRef.current.scrollToIndex({ index: pos, align: "center", behavior: "smooth" });
+        setExpandedSet((prev) => {
+          const next = new Set(prev);
+          next.add(targetIndex);
+          return next;
+        });
+      }
+    },
+    [errorIndices, filtered],
+  );
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -246,14 +256,18 @@ export function WireViewer({ sessionId, refreshKey = 0 }: WireViewerProps) {
       <div className="cm-wire-viewer__toggles">
         <button
           type="button"
-          className={"cm-wire-viewer__toggle" + (showRecall ? " cm-wire-viewer__toggle--active" : "")}
+          className={
+            "cm-wire-viewer__toggle" + (showRecall ? " cm-wire-viewer__toggle--active" : "")
+          }
           onClick={() => setShowRecall((v) => !v)}
         >
           Recall
         </button>
         <button
           type="button"
-          className={"cm-wire-viewer__toggle" + (showMirror ? " cm-wire-viewer__toggle--active" : "")}
+          className={
+            "cm-wire-viewer__toggle" + (showMirror ? " cm-wire-viewer__toggle--active" : "")
+          }
           onClick={() => setShowMirror((v) => !v)}
         >
           Mirror

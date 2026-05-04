@@ -142,21 +142,32 @@ CREATE TABLE sessions (
     approval_mode          TEXT NOT NULL DEFAULT 'default',
     total_cost_usd         REAL NOT NULL DEFAULT 0,
     total_tokens           INTEGER NOT NULL DEFAULT 0,
-    parent_session_id      TEXT
+    parent_session_id      TEXT,
+    -- Phase 4 columns
+    workspace_id           TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
+    forked_from_id         TEXT REFERENCES sessions(key) ON DELETE SET NULL,
+    summary_message_id     TEXT,
+    ephemeral              INTEGER NOT NULL DEFAULT 0,
+    archived_at            INTEGER
 );
+
+CREATE INDEX IF NOT EXISTS idx_sessions_workspace_archived ON sessions(workspace_id, archived_at);
 
 -- ============================================================
 -- Session Messages
 -- ============================================================
 CREATE TABLE session_messages (
-    id          TEXT PRIMARY KEY,
-    session_key TEXT NOT NULL REFERENCES sessions(key) ON DELETE CASCADE,
-    role        TEXT NOT NULL,
-    content     TEXT NOT NULL,
-    timestamp   INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
-    request_id  TEXT,
-    tool_calls  TEXT,
-    metadata    TEXT
+    id            TEXT PRIMARY KEY,
+    session_key   TEXT NOT NULL REFERENCES sessions(key) ON DELETE CASCADE,
+    role          TEXT NOT NULL,
+    content       TEXT NOT NULL DEFAULT '',
+    parts         TEXT,                            -- Phase 4: JSON Vec<MessagePart>; NULL for legacy rows
+    turn_id       TEXT,                            -- Phase 4: UI turn grouping
+    finish_reason TEXT,                            -- Phase 4: typed FinishReason JSON
+    timestamp     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    request_id    TEXT,
+    tool_calls    TEXT,
+    metadata      TEXT
 );
 CREATE INDEX idx_session_messages_key_ts ON session_messages(session_key, timestamp);
 

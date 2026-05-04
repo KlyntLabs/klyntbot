@@ -6,6 +6,7 @@ import { type DashboardViewMode, useDashboardState } from "../hooks/useDashboard
 import { LAYERS, useEnabledLayers, useSidebarOpen } from "../lib/layers";
 import { CalendarSync } from "./CalendarSync";
 import { MiniCalendar } from "./MiniCalendar";
+import { FocusTrayIndicator } from "./productivity/FocusTrayIndicator";
 
 const VIEWS: { key: DashboardViewMode; label: string }[] = [
   { key: "day", label: "Day" },
@@ -15,7 +16,11 @@ const VIEWS: { key: DashboardViewMode; label: string }[] = [
 ];
 
 function formatDateDisplay(mode: DashboardViewMode, date: string): string {
-  if (mode === "year") return date;
+  if (mode === "year") {
+    return /^\d{4}$/.test(date) ? date : String(new Date().getFullYear());
+  }
+  // Day/Week/Month all expect YYYY-MM-DD.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return "—";
   if (mode === "day") return formatFullDate(date);
   if (mode === "month") return formatMonthLabel(date.slice(0, 7));
   // Week mode: "Apr 27 – May 3, 2026"
@@ -102,6 +107,7 @@ export function DashboardTopbar() {
   return (
     <div className="dashboard__topbar">
       <span className="dashboard__topbar-date">{formatDateDisplay(mode, date)}</span>
+      <FocusTrayIndicator />
 
       {/* View-pill switcher */}
       <div className="dashboard__view-switcher">

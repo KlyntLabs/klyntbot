@@ -6,7 +6,7 @@ pub mod layer3;
 pub mod matcher;
 pub mod round_trip;
 
-pub use decision::{ApprovalDecision, ApprovalLayer};
+pub use decision::{ApprovalDecision, ApprovalLayer, LayerOutcomeAudit};
 pub use guard::{evaluate, GuardCtx, APPROVAL_TIMEOUT};
 pub use host_cache::{HostApprovalCache, HostCheckResult, HostDecision, HostKey};
 pub use layer1::Layer1;

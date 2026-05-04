@@ -48,6 +48,8 @@ fn guard_ctx_with_history<'a>(
             .unwrap_or_default()
             .as_secs() as i64
             + now_offset_h * 3600,
+        thread_id: None,
+        turn_id: None,
     }
 }
 
@@ -86,6 +88,8 @@ async fn privacy_blocks_first() {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as i64,
+        thread_id: None,
+        turn_id: None,
     };
     let d = evaluate(ctx, "bash", "cat .env").await;
     assert!(matches!(d, ApprovalDecision::PrivacyDenied { .. }));
@@ -132,6 +136,8 @@ async fn auto_allow_emits_pair_no_user_input() {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as i64,
+        thread_id: None,
+        turn_id: None,
     };
     let d = evaluate(ctx, "bash", "echo hi").await;
     assert!(d.allowed());
@@ -201,6 +207,8 @@ async fn ask_path_awaits_user_decision() {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs() as i64,
+        thread_id: None,
+        turn_id: None,
     };
     let d = evaluate(ctx, "bash", "rm something").await;
     assert!(d.allowed());

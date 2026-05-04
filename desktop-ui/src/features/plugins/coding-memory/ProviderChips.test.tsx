@@ -23,7 +23,10 @@ describe("ProviderChips", () => {
 
   it("marks the active pill with aria-selected=true", () => {
     render(<ProviderChips active="klyntCli" onChange={() => {}} />);
-    expect(screen.getByRole("tab", { name: /klynt cli/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /klynt cli/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(screen.getByRole("tab", { name: /^all$/i })).toHaveAttribute("aria-selected", "false");
   });
 });
