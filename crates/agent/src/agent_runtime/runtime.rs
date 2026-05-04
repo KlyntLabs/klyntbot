@@ -562,11 +562,11 @@ impl AgentRuntime {
                 let nudge = if phase_4_tool_driven {
                     "Your previous answer signals a retrieval gap. Before answering, \
                      call the `memory` tool with action=`search_all`, widen=true, \
-                     and the named entities from the user's question (people, places, \
-                     dates) as the query. The widened search probes the cognitive \
-                     fact pool with broader thresholds. Use the search results to \
-                     answer. If the search returns nothing relevant, say so plainly — \
-                     do NOT fabricate details."
+                     and the named entities from the user's question (people, \
+                     places, dates) as the query. The widened search probes the \
+                     deeper fact pool. Use the search results to answer. If the \
+                     search returns nothing relevant, say so plainly — do NOT \
+                     fabricate details."
                 } else {
                     "Re-search the conversation history with broader effort. \
                      Focus on specific named entities, dates, places, and concrete \

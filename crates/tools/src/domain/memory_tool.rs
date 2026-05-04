@@ -297,30 +297,35 @@ impl MemoryTool {
             );
         }
 
-        // T2.2 — query semantic-fact pool (same pool as pre-injection
-        // retrieval) when handler is wired. Widened mode: doubles
-        // limit, lowers similarity floor.
+        // T2.2 — query semantic-fact pool ONLY when the caller
+        // requests widened search (typically the Tier 2 refusal-retry
+        // path). Default search_all calls stay on conversation+todo
+        // index to avoid drowning the model in widened-pool noise.
+        // The bench measured -26pp regression when this fired on
+        // every search_all call.
         let widen = args
             .get("widen")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
         let mut facts_block = String::new();
-        if let Some(fh) = &self.fact_search_handler {
-            let fact_limit = if widen { limit.max(20) * 2 } else { limit.max(15) };
-            match fh.search_facts(query, fact_limit, widen).await {
-                Ok(facts) if !facts.is_empty() => {
-                    facts_block.push_str("## Semantic Facts\n");
-                    for f in &facts {
-                        facts_block.push_str(&format!(
-                            "- [{:.2}] {}: {} = {} ({})\n",
-                            f.score, f.subject, f.predicate, f.object, f.domain
-                        ));
+        if widen {
+            if let Some(fh) = &self.fact_search_handler {
+                let fact_limit = limit.max(20);
+                match fh.search_facts(query, fact_limit, true).await {
+                    Ok(facts) if !facts.is_empty() => {
+                        facts_block.push_str("## Semantic Facts\n");
+                        for f in &facts {
+                            facts_block.push_str(&format!(
+                                "- [{:.2}] {}: {} = {} ({})\n",
+                                f.score, f.subject, f.predicate, f.object, f.domain
+                            ));
+                        }
+                        facts_block.push('\n');
                     }
-                    facts_block.push('\n');
-                }
-                Ok(_) => {}
-                Err(e) => {
-                    tracing::warn!(error = %e, "fact search failed in search_all");
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!(error = %e, "fact search failed in search_all");
+                    }
                 }
             }
         }
