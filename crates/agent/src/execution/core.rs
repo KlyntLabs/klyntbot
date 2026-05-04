@@ -371,12 +371,22 @@ async fn call_provider_streaming(
     // model emitted `reasoning_content` (Mimo, deepseek-r1, qwq, glm-zero),
     // promote the reasoning to be the answer. Without this, finish_reason=
     // length truncations mid-thought produce silent empty output across the
-    // whole agent. Mirrors the equivalent fallback in the non-streaming
-    // path at openai_compat.rs::parse_response.
+    // whole agent. We must ALSO fan out a synthetic ContentChunk event for
+    // any downstream consumer that scrapes the live event stream (the bench
+    // harness, streaming UIs) since no ContentChunk was ever emitted for
+    // reasoning chunks during the loop.
     let resolved_content = if content.trim().is_empty() {
         if reasoning.trim().is_empty() {
             None
         } else {
+            fan_out_event(
+                Some(event_tx),
+                domain_bus,
+                crate::events::AgentEvent::ContentChunk {
+                    data: reasoning.clone(),
+                },
+            )
+            .await;
             Some(reasoning.clone())
         }
     } else {
