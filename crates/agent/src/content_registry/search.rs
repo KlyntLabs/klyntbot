@@ -53,20 +53,33 @@ pub fn search_content(
 /// Score an entry against query terms.
 ///
 /// Weights: name match = 3.0, tag match = 2.0, description match = 1.0.
-fn score_entry(name: &str, description: &str, tags: &[String], terms: &[&str]) -> f64 {
-    let name_lower = name.to_lowercase();
-    let desc_lower = description.to_lowercase();
-    let tags_str = tags.join(" ").to_lowercase();
+/// Case-insensitive `contains` for ASCII needles.
+fn icontains(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    let mut chars = haystack.chars();
+    loop {
+        if chars.clone().zip(needle.chars()).all(|(a, b)| a.eq_ignore_ascii_case(&b)) {
+            return true;
+        }
+        if chars.next().is_none() {
+            break;
+        }
+    }
+    false
+}
 
+fn score_entry(name: &str, description: &str, tags: &[String], terms: &[&str]) -> f64 {
     let mut score = 0.0;
     for term in terms {
-        if name_lower.contains(term) {
+        if icontains(name, term) {
             score += 3.0;
         }
-        if desc_lower.contains(term) {
+        if icontains(description, term) {
             score += 1.0;
         }
-        if tags_str.contains(term) {
+        if tags.iter().any(|t| icontains(t, term)) {
             score += 2.0;
         }
     }

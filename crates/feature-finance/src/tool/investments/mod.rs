@@ -83,7 +83,7 @@ impl FinanceTool {
             "description": inserted.description,
             "currency": inserted.currency,
         });
-        Ok(serde_json::to_string_pretty(&resp).unwrap())
+        Ok(serde_json::to_string_pretty(&resp)?)
     }
 
     async fn portfolio_list(&self, _p: &ParamExtractor<'_>) -> Result<String> {
@@ -114,7 +114,7 @@ impl FinanceTool {
             }));
         }
 
-        Ok(serde_json::to_string_pretty(&result).unwrap())
+        Ok(serde_json::to_string_pretty(&result)?)
     }
 
     async fn portfolio_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
@@ -236,7 +236,7 @@ impl FinanceTool {
             "purchase_date": inserted.purchase_date.map(|d| d.to_string()),
             "notes": inserted.notes,
         });
-        Ok(serde_json::to_string_pretty(&json!({"investment": investment})).unwrap())
+        Ok(serde_json::to_string_pretty(&json!({"investment": investment}))?)
     }
 
     async fn investment_update(&self, p: &ParamExtractor<'_>) -> Result<String> {
@@ -278,7 +278,7 @@ impl FinanceTool {
             "purchase_date": updated.purchase_date.map(|d| d.to_string()),
             "notes": updated.notes,
         });
-        Ok(serde_json::to_string_pretty(&json!({"investment": investment})).unwrap())
+        Ok(serde_json::to_string_pretty(&json!({"investment": investment}))?)
     }
 
     async fn investment_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
@@ -436,7 +436,7 @@ impl FinanceTool {
         }
 
         let result = analytics::portfolio::PortfolioAnalyzer::allocation_drift(&holdings, &targets);
-        Ok(serde_json::to_string_pretty(&result).unwrap())
+        Ok(serde_json::to_string_pretty(&result)?)
     }
 
     async fn portfolio_rebalance(&self, p: &ParamExtractor<'_>) -> Result<String> {
@@ -470,7 +470,7 @@ impl FinanceTool {
             common::Decimal::new(contribution, 0),
             common::Decimal::new(min_trade, 0),
         );
-        Ok(serde_json::to_string_pretty(&result).unwrap())
+        Ok(serde_json::to_string_pretty(&result)?)
     }
 
     async fn portfolio_returns(&self, p: &ParamExtractor<'_>) -> Result<String> {
@@ -532,7 +532,7 @@ impl FinanceTool {
             start_date,
             end_date,
         );
-        Ok(serde_json::to_string_pretty(&result).unwrap())
+        Ok(serde_json::to_string_pretty(&result)?)
     }
 
     async fn portfolio_correlation(&self, p: &ParamExtractor<'_>) -> Result<String> {

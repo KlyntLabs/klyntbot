@@ -1066,7 +1066,7 @@ impl cognitive::pipeline::DeepConsolidationHandler for LlmDeepConsolidationHandl
                 sources.join(", ")
             ));
             for obs in &cluster.combined_observations {
-                let truncated = if obs.len() > 200 { &obs[..200] } else { obs };
+                let truncated = common::truncate_at_boundary(obs, 200);
                 user_msg.push_str(&format!("  - \"{truncated}\"\n"));
             }
             user_msg.push('\n');
@@ -1122,11 +1122,7 @@ impl cognitive::pipeline::DeepConsolidationHandler for LlmDeepConsolidationHandl
                 "episode" => {
                     let content = decision.content.unwrap_or(cluster.merged_subject.clone());
                     let summary = decision.summary.unwrap_or_else(|| {
-                        if content.len() > 120 {
-                            content[..120].to_string()
-                        } else {
-                            content.clone()
-                        }
+                        common::truncate_at_boundary(&content, 120).to_string()
                     });
                     ops.push(cognitive::pipeline::PromotionOp::CreateEpisode {
                         content,

@@ -39,10 +39,23 @@ impl SignalRouter {
                         let Ok(event) = event else { continue };
                         let Some(mut signal) = translator(&event) else { continue };
                         signal.raw_event = Some(event);
-                        for c in &consumers {
-                            if let Err(e) = c.consume(&signal).await {
-                                tracing::warn!(consumer = c.name(), error = %e,
-                                    "SignalConsumer failed");
+                        let signal = Arc::new(signal);
+                        let handles: Vec<_> = consumers
+                            .iter()
+                            .map(|c| {
+                                let c = Arc::clone(c);
+                                let signal = Arc::clone(&signal);
+                                tokio::spawn(async move {
+                                    if let Err(e) = c.consume(&signal).await {
+                                        tracing::warn!(consumer = c.name(), error = %e,
+                                            "SignalConsumer failed");
+                                    }
+                                })
+                            })
+                            .collect();
+                        for h in handles {
+                            if let Err(e) = h.await {
+                                tracing::warn!("SignalConsumer task panicked: {e}");
                             }
                         }
                     }

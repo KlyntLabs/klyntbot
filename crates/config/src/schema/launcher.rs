@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use super::core::default_true;
 
 fn default_scan_dirs() -> Vec<String> {
     vec!["~/Projects".to_string(), "~/Developer".to_string()]
@@ -30,9 +31,6 @@ fn default_120() -> u64 {
 }
 fn default_max_entries() -> usize {
     1_000_000
-}
-fn default_true() -> bool {
-    true
 }
 fn default_mdfind_threshold() -> usize {
     20

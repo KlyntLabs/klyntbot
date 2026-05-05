@@ -585,7 +585,11 @@ impl AgentLoop {
 
         // Track last active channel for notifications
         if let Some(last_active) = &self.last_active_channel {
-            *last_active.write().await = Some((msg.channel.clone(), msg.chat_id.clone()));
+            let new = Some((msg.channel.clone(), msg.chat_id.clone()));
+            let mut guard = last_active.write().await;
+            if *guard != new {
+                *guard = new;
+            }
         }
 
         let preview = preview_text(&msg.content, 80);
@@ -1313,22 +1317,50 @@ fn reaction_to_satisfaction(emoji: &str) -> Option<f32> {
     }
 }
 
+/// Case-insensitive `starts_with` for ASCII prefixes.
+fn istarts_with(s: &str, prefix: &str) -> bool {
+    let mut s_chars = s.chars();
+    for b in prefix.chars() {
+        match s_chars.next() {
+            Some(a) if a.eq_ignore_ascii_case(&b) => {}
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// Case-insensitive `contains` for ASCII needles.
+fn icontains(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    let mut chars = haystack.chars();
+    loop {
+        if chars.clone().zip(needle.chars()).all(|(a, b)| a.eq_ignore_ascii_case(&b)) {
+            return true;
+        }
+        if chars.next().is_none() {
+            break;
+        }
+    }
+    false
+}
+
 /// Detects if a user message starts with a correction phrase.
 /// Returns the correction strength (1.0 for strong, 0.8 for soft) or None.
 fn detect_correction_prefix(message: &str) -> Option<f64> {
-    let lower = message.to_lowercase();
-    let check = &lower[..lower.len().min(80)];
+    let check = &message[..message.len().min(80)];
 
     const STRONG: &[&str] = &["no,", "no ", "wrong", "that's not", "incorrect"];
     const SOFT: &[&str] = &["i meant", "try again", "redo", "not quite", "never mind"];
 
     for prefix in STRONG {
-        if check.starts_with(prefix) {
+        if istarts_with(check, prefix) {
             return Some(1.0);
         }
     }
     for prefix in SOFT {
-        if check.starts_with(prefix) {
+        if istarts_with(check, prefix) {
             return Some(0.8);
         }
     }
@@ -1338,8 +1370,7 @@ fn detect_correction_prefix(message: &str) -> Option<f64> {
 /// Detects if a user message indicates the AI forgot a previously mentioned fact.
 /// Returns true when the user signals a memory retrieval miss.
 fn detect_memory_miss(message: &str) -> bool {
-    let lower = message.to_lowercase();
-    let check = &lower[..lower.len().min(120)];
+    let check = &message[..message.len().min(120)];
 
     const PHRASES: &[&str] = &[
         "i already told you",
@@ -1356,7 +1387,7 @@ fn detect_memory_miss(message: &str) -> bool {
         "i already said",
     ];
 
-    PHRASES.iter().any(|phrase| check.contains(phrase))
+    PHRASES.iter().any(|phrase| icontains(check, phrase))
 }
 
 #[cfg(test)]

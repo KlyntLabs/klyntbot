@@ -74,30 +74,28 @@ impl AppCore {
 
             // Check for additional workspace-only references
             let ws_refs_dir = skills_dir.join(bi.name).join("references");
-            if tokio::fs::try_exists(&ws_refs_dir).await.unwrap_or(false) {
-                if let Ok(mut entries) = tokio::fs::read_dir(&ws_refs_dir).await {
-                    while let Ok(Some(entry)) = entries.next_entry().await {
-                        let path = entry.path();
-                        if path.extension().and_then(|e| e.to_str()) != Some("md") {
-                            continue;
-                        }
-                        let stem = path
-                            .file_stem()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("unknown");
-                        // Skip if already in built-in list
-                        if bi.skills.iter().any(|r| r.name == stem) {
-                            continue;
-                        }
-                        let content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
-                        files.push(AgentFileSummary {
-                            filename: format!("references/{}.md", stem),
-                            display_name: stem.to_string(),
-                            description: extract_description(&content),
-                            is_builtin: false,
-                            has_override: false,
-                        });
+            if let Ok(mut entries) = tokio::fs::read_dir(&ws_refs_dir).await {
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    let path = entry.path();
+                    if path.extension().and_then(|e| e.to_str()) != Some("md") {
+                        continue;
                     }
+                    let stem = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("unknown");
+                    // Skip if already in built-in list
+                    if bi.skills.iter().any(|r| r.name == stem) {
+                        continue;
+                    }
+                    let content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
+                    files.push(AgentFileSummary {
+                        filename: format!("references/{}.md", stem),
+                        display_name: stem.to_string(),
+                        description: extract_description(&content),
+                        is_builtin: false,
+                        has_override: false,
+                    });
                 }
             }
 
@@ -114,69 +112,62 @@ impl AppCore {
         }
 
         // Scan workspace for custom skills not in builtins
-        if skills_dir.exists() {
-            if let Ok(mut entries) = tokio::fs::read_dir(&skills_dir).await {
-                while let Ok(Some(entry)) = entries.next_entry().await {
-                    let path = entry.path();
-                    if !path.is_dir() {
-                        continue;
-                    }
-                    let name = path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("unknown")
-                        .to_string();
-                    // Skip if already listed as builtin
-                    if builtins.iter().any(|b| b.name == name) {
-                        continue;
-                    }
-                    let skill_md = path.join("SKILL.md");
-                    if !skill_md.exists() {
-                        continue;
-                    }
-
-                    let content = tokio::fs::read_to_string(&skill_md)
-                        .await
-                        .unwrap_or_default();
-
-                    let mut files = vec![AgentFileSummary {
-                        filename: "SKILL.md".to_string(),
-                        display_name: "SKILL.md".to_string(),
-                        description: "Skill profile and configuration".to_string(),
-                        is_builtin: false,
-                        has_override: false,
-                    }];
-
-                    let refs_dir = path.join("references");
-                    if refs_dir.exists() {
-                        if let Ok(mut ref_entries) = tokio::fs::read_dir(&refs_dir).await {
-                            while let Ok(Some(re)) = ref_entries.next_entry().await {
-                                let rp = re.path();
-                                if rp.extension().and_then(|e| e.to_str()) != Some("md") {
-                                    continue;
-                                }
-                                let stem =
-                                    rp.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown");
-                                let rc = tokio::fs::read_to_string(&rp).await.unwrap_or_default();
-                                files.push(AgentFileSummary {
-                                    filename: format!("references/{}.md", stem),
-                                    display_name: stem.to_string(),
-                                    description: extract_description(&rc),
-                                    is_builtin: false,
-                                    has_override: false,
-                                });
-                            }
-                        }
-                    }
-
-                    profiles.push(AgentProfileSummary {
-                        name,
-                        description: extract_description(&content),
-                        is_builtin: false,
-                        has_override: false,
-                        files,
-                    });
+        if let Ok(mut entries) = tokio::fs::read_dir(&skills_dir).await {
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                let path = entry.path();
+                if !path.is_dir() {
+                    continue;
                 }
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                // Skip if already listed as builtin
+                if builtins.iter().any(|b| b.name == name) {
+                    continue;
+                }
+                let skill_md = path.join("SKILL.md");
+                let content = match tokio::fs::read_to_string(&skill_md).await {
+                    Ok(c) => c,
+                    Err(_) => continue,
+                };
+
+                let mut files = vec![AgentFileSummary {
+                    filename: "SKILL.md".to_string(),
+                    display_name: "SKILL.md".to_string(),
+                    description: "Skill profile and configuration".to_string(),
+                    is_builtin: false,
+                    has_override: false,
+                }];
+
+                let refs_dir = path.join("references");
+                if let Ok(mut ref_entries) = tokio::fs::read_dir(&refs_dir).await {
+                    while let Ok(Some(re)) = ref_entries.next_entry().await {
+                        let rp = re.path();
+                        if rp.extension().and_then(|e| e.to_str()) != Some("md") {
+                            continue;
+                        }
+                        let stem =
+                            rp.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown");
+                        let rc = tokio::fs::read_to_string(&rp).await.unwrap_or_default();
+                        files.push(AgentFileSummary {
+                            filename: format!("references/{}.md", stem),
+                            display_name: stem.to_string(),
+                            description: extract_description(&rc),
+                            is_builtin: false,
+                            has_override: false,
+                        });
+                    }
+                }
+
+                profiles.push(AgentProfileSummary {
+                    name,
+                    description: extract_description(&content),
+                    is_builtin: false,
+                    has_override: false,
+                    files,
+                });
             }
         }
 
@@ -198,16 +189,17 @@ impl AppCore {
         let ws_path = workspace.join("skills").join(agent_name).join(filename);
 
         // Try workspace override first
-        if ws_path.exists() {
-            let content = tokio::fs::read_to_string(&ws_path)
-                .await
-                .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
-            return Ok(AgentFileContent {
-                agent_name: agent_name.to_string(),
-                filename: filename.to_string(),
-                content,
-                is_builtin: false,
-            });
+        match tokio::fs::read_to_string(&ws_path).await {
+            Ok(content) => {
+                return Ok(AgentFileContent {
+                    agent_name: agent_name.to_string(),
+                    filename: filename.to_string(),
+                    content,
+                    is_builtin: false,
+                });
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(ApiError::new("IO_ERROR", e.to_string())),
         }
 
         // Fall back to built-in
@@ -385,13 +377,11 @@ impl AppCore {
         let workspace = self.config.read().await.workspace_path();
         let ws_path = workspace.join("skills").join(agent_name).join(filename);
 
-        if !ws_path.exists() {
-            return Ok(false);
+        match tokio::fs::remove_file(&ws_path).await {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(e) => return Err(ApiError::new("IO_ERROR", e.to_string())),
         }
-
-        tokio::fs::remove_file(&ws_path)
-            .await
-            .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
 
         // Hot-reload
         if let Err(e) = self.agent.reload_agents().await {

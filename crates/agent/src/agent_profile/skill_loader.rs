@@ -23,11 +23,12 @@ impl SkillLoader {
     /// Load all `.md` skill files from the configured directory.
     /// Returns an empty vec if the directory doesn't exist.
     fn load_external_skills(&self) -> common::Result<Vec<AgentSkill>> {
-        if !self.skills_dir.exists() {
-            return Ok(Vec::new());
-        }
         let mut skills = Vec::new();
-        for entry in std::fs::read_dir(&self.skills_dir)? {
+        let entries = match std::fs::read_dir(&self.skills_dir) {
+            Ok(e) => e,
+            Err(_) => return Ok(skills),
+        };
+        for entry in entries {
             let entry = entry?;
             let path = entry.path();
             if path.extension().is_some_and(|e| e == "md") {

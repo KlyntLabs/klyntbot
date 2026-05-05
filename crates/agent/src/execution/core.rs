@@ -150,12 +150,47 @@ fn hash_value_into(value: &serde_json::Value, hasher: &mut impl Hasher) {
 /// looks like a tool result. This function uses heuristics to detect that pattern.
 ///
 /// Returns `true` if the text appears to be a fabricated tool execution.
+/// Case-insensitive `find` for ASCII needles. Returns byte offset if found.
+fn ifind(haystack: &str, needle: &str) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    let mut offset = 0;
+    let mut chars = haystack.chars();
+    loop {
+        if chars.clone().zip(needle.chars()).all(|(a, b)| a.eq_ignore_ascii_case(&b)) {
+            return Some(offset);
+        }
+        match chars.next() {
+            Some(c) => offset += c.len_utf8(),
+            None => break,
+        }
+    }
+    None
+}
+
+/// Case-insensitive `contains` for ASCII needles.
+fn icontains(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    let mut chars = haystack.chars();
+    loop {
+        if chars.clone().zip(needle.chars()).all(|(a, b)| a.eq_ignore_ascii_case(&b)) {
+            return true;
+        }
+        if chars.next().is_none() {
+            break;
+        }
+    }
+    false
+}
+
 fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
     if tool_names.is_empty() {
         return false;
     }
 
-    let lower = text.to_lowercase();
     let has_todo = tool_names.contains(&"todo");
     let has_search = tool_names.iter().any(|t| t.contains("search"));
 
@@ -163,8 +198,8 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
     let has_fake_id = {
         let mut found = false;
         for pattern in &["id:", "(id:"] {
-            if let Some(pos) = lower.find(pattern) {
-                let after = &lower[pos + pattern.len()..];
+            if let Some(pos) = ifind(text, pattern) {
+                let after = &text[pos + pattern.len()..];
                 let trimmed = after.trim_start();
                 let hex_chars = trimmed
                     .chars()
@@ -188,8 +223,8 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
         "here are the results",
         "i found these results",
     ];
-    let has_todo_result = has_todo && todo_indicators.iter().any(|p| lower.contains(p));
-    let has_search_result = has_search && search_indicators.iter().any(|p| lower.contains(p));
+    let has_todo_result = has_todo && todo_indicators.iter().any(|p| icontains(text, p));
+    let has_search_result = has_search && search_indicators.iter().any(|p| icontains(text, p));
     let has_structured_result = has_todo_result || has_search_result;
 
     // Pattern 3: Has multiple field-like patterns (Priority:, Due Date:, Description:, Tags:)
@@ -202,13 +237,13 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
     ];
     let field_count = field_patterns
         .iter()
-        .filter(|p| lower.contains(**p))
+        .filter(|p| icontains(text, **p))
         .count();
     let has_multiple_fields = field_count >= 2;
 
     // Pattern 4: Search with numbered list — requires fake ID for corroboration
     let has_search_with_list =
-        has_search_result && has_fake_id && lower.contains("\n1.") && lower.contains("\n2.");
+        has_search_result && has_fake_id && text.contains("\n1.") && text.contains("\n2.");
 
     // Decision: fabricated if structured result with (fake ID or multiple fields),
     // or search with numbered list and corroborating fake ID

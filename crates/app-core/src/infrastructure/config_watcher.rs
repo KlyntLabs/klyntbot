@@ -35,8 +35,8 @@ pub fn start_config_watcher(
                     break;
                 }
                 _ = interval.tick() => {
-                    let previous = hot_config.read().await.clone();
-                    if let Some((new_config, diff, new_hot)) = config::reload_if_changed(&previous, &mut last_mtime).await {
+                    let previous = hot_config.read().await;
+                    if let Some((new_config, diff, new_hot)) = config::reload_if_changed(&*previous, &mut last_mtime).await {
                         info!(
                             model_changed = diff.model_changed,
                             temp_changed = diff.temperature_changed,

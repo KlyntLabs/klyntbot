@@ -16,13 +16,7 @@ impl NoteSearcher {
     fn note_to_entry(note: feature_notes::models::NoteSearchResult, rank: usize) -> MemoryEntry {
         let body = note.body.as_deref().unwrap_or("");
         let body_preview = if body.len() > 500 {
-            let end = body
-                .char_indices()
-                .map(|(i, _)| i)
-                .take_while(|&i| i <= 500)
-                .last()
-                .unwrap_or(body.len());
-            format!("{}...", &body[..end])
+            format!("{}...", common::truncate_at_boundary(body, 500))
         } else {
             body.to_string()
         };

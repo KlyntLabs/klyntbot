@@ -24,12 +24,7 @@ impl NoteEmbeddingAdapter {
     /// Compose searchable text: "{title} {body_preview}".
     /// Truncate body to first 500 chars to keep embedding focused.
     fn compose_text(note: &NoteRow) -> String {
-        let body = &note.body;
-        let truncated = if body.len() > 500 {
-            &body[..500]
-        } else {
-            body.as_str()
-        };
+        let truncated = common::truncate_at_boundary(&note.body, 500);
         format!("{} {}", note.title, truncated)
     }
 }

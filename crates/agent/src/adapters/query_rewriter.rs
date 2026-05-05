@@ -24,10 +24,9 @@ enum Specificity {
 const PRONOUNS: &[&str] = &["that", "this", "it", "those", "these", "there", "them"];
 
 fn contains_pronouns(query: &str) -> bool {
-    let lower = query.to_lowercase();
-    lower.split_whitespace().any(|w| {
+    query.split_whitespace().any(|w| {
         let trimmed = w.trim_matches(|c: char| !c.is_alphanumeric());
-        PRONOUNS.contains(&trimmed)
+        PRONOUNS.iter().any(|p| trimmed.eq_ignore_ascii_case(p))
     })
 }
 
@@ -53,10 +52,12 @@ fn has_domain_keywords(query: &str) -> bool {
         "api",
     ];
 
-    let lower = query.to_lowercase();
-    let has_domain = lower
+    let has_domain = query
         .split_whitespace()
-        .any(|w| DOMAIN_TERMS.contains(&w.trim_matches(|c: char| !c.is_alphanumeric())));
+        .any(|w| {
+            let trimmed = w.trim_matches(|c: char| !c.is_alphanumeric());
+            DOMAIN_TERMS.iter().any(|t| trimmed.eq_ignore_ascii_case(t))
+        });
     if has_domain {
         return true;
     }
@@ -105,10 +106,12 @@ const ACTION_VERBS: &[&str] = &[
 ];
 
 fn has_action_verb(query: &str) -> bool {
-    let lower = query.to_lowercase();
-    lower
+    query
         .split_whitespace()
-        .any(|w| ACTION_VERBS.contains(&w.trim_matches(|c: char| !c.is_alphanumeric())))
+        .any(|w| {
+            let trimmed = w.trim_matches(|c: char| !c.is_alphanumeric());
+            ACTION_VERBS.iter().any(|v| trimmed.eq_ignore_ascii_case(v))
+        })
 }
 
 fn query_specificity(query: &str) -> Specificity {
@@ -163,12 +166,10 @@ pub fn extract_key_terms_from(text: &str) -> String {
     text.split_whitespace()
         .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
         .filter(|w| {
-            w.len() > 2 && {
-                let lower = w.to_lowercase();
-                !STOP_WORDS.contains(&lower.as_str())
-                    && !SEARCHER_STOP_WORDS.contains(&lower.as_str())
-                    && !PRONOUNS.contains(&lower.as_str())
-            }
+            w.len() > 2
+                && !STOP_WORDS.iter().any(|sw| w.eq_ignore_ascii_case(sw))
+                && !SEARCHER_STOP_WORDS.iter().any(|sw| w.eq_ignore_ascii_case(sw))
+                && !PRONOUNS.iter().any(|p| w.eq_ignore_ascii_case(p))
         })
         .take(5)
         .collect::<Vec<_>>()

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use super::core::default_true;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -96,9 +97,6 @@ impl Default for CodingPermissions {
 pub struct CodingSandbox {
     #[serde(default = "default_true")]
     pub enforce: bool,
-}
-fn default_true() -> bool {
-    true
 }
 impl Default for CodingSandbox {
     fn default() -> Self {

@@ -1,5 +1,7 @@
 //! Notification system configuration.
 
+use super::core::default_true;
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct NotificationsConfig {
@@ -52,9 +54,6 @@ impl Default for RetryConfig {
     }
 }
 
-fn default_true() -> bool {
-    true
-}
 fn default_channels() -> Vec<String> {
     vec!["os_native".into(), "tray".into()]
 }
