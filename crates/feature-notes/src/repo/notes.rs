@@ -393,10 +393,7 @@ impl NoteRepo {
     }
 
     /// Fetch notes by a list of IDs. Missing IDs are silently skipped.
-    pub async fn get_notes_by_ids(
-        &self,
-        ids: &[String],
-    ) -> Result<Vec<NoteRow>, StorageError> {
+    pub async fn get_notes_by_ids(&self, ids: &[String]) -> Result<Vec<NoteRow>, StorageError> {
         if ids.is_empty() {
             return Ok(Vec::new());
         }

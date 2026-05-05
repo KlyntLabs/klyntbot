@@ -176,7 +176,7 @@ fn make_cache_key(app: &str, url: Option<&str>) -> String {
 mod tests {
     use super::*;
     use crate::repos::{PrivacyRuleRepo, RuleEvolutionLogRepo, TrackingRuleRepo};
-    
+
     use jiff::Timestamp;
     use sqlx::SqlitePool;
 

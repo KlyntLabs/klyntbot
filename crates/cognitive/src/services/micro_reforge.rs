@@ -247,7 +247,6 @@ fn normalize(s: &str) -> String {
         .join(" ")
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

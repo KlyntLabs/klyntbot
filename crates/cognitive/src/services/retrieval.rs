@@ -419,8 +419,7 @@ pub async fn retrieve_relevant_facts(
                 .map(|s| (s.fact.id.as_str(), s.fact.subject.as_str()))
                 .collect();
             let boosts =
-                crate::services::graph_retrieval::compute_graph_boosts(er, query, &fact_refs)
-                    .await;
+                crate::services::graph_retrieval::compute_graph_boosts(er, query, &fact_refs).await;
             if !boosts.is_empty() {
                 for result in &mut scored {
                     if let Some(&b) = boosts.get(&result.fact.id) {

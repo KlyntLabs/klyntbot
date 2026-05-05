@@ -37,11 +37,10 @@ impl NoteSearcher {
         static ENGLISH_STOP_WORDS: std::sync::LazyLock<std::collections::HashSet<&str>> =
             std::sync::LazyLock::new(|| {
                 [
-                    "the", "a", "an", "is", "was", "were", "be", "been", "do", "does",
-                    "did", "will", "would", "could", "should", "can", "may", "to", "of",
-                    "in", "on", "at", "by", "from", "or", "but", "not", "my", "me",
-                    "i", "we", "you", "our", "your", "when", "where", "why", "who",
-                    "which",
+                    "the", "a", "an", "is", "was", "were", "be", "been", "do", "does", "did",
+                    "will", "would", "could", "should", "can", "may", "to", "of", "in", "on", "at",
+                    "by", "from", "or", "but", "not", "my", "me", "i", "we", "you", "our", "your",
+                    "when", "where", "why", "who", "which",
                 ]
                 .into_iter()
                 .collect()

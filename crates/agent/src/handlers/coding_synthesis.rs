@@ -49,7 +49,7 @@ impl CodingSynthesisHandler for CodingSynthesisHandlerImpl {
 
         let response = self
             .provider
-            .chat(&messages, None, &self.params)
+            .chat(&messages, None, &self.params, &[])
             .await
             .map_err(|e| crate::provider_err("Phase 2.5 chat", e))?;
 
@@ -100,7 +100,9 @@ mod tests {
 
     use crate::test_utils::MockProvider;
     use common::{KlyntbotError, ProviderError};
-    use providers::{LlmProvider, LlmResponse, ProviderCapabilities, ProviderHealth};
+    use providers::{
+        CacheBreakpoint, LlmProvider, LlmResponse, ProviderCapabilities, ProviderHealth,
+    };
     use serde_json::Value;
     use std::sync::Arc;
 
@@ -150,6 +152,7 @@ mod tests {
                 _messages: &[Message],
                 _tools: Option<&[Value]>,
                 _params: &ChatParams,
+                _cache_breakpoints: &[CacheBreakpoint],
             ) -> Result<LlmResponse> {
                 Err(KlyntbotError::Provider(ProviderError::Http("boom".into())))
             }

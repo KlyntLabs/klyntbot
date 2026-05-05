@@ -1151,17 +1151,14 @@ impl AgentLoop {
         // Authoritative session mode comes from the session row itself.
         // The legacy `mode: Option<String>` parameter is now an override hint
         // only used when the row does not yet exist (first turn).
-        let session_mode: common::SessionMode = match self
-            .session_manager
-            .get_session_row(&session_key)
-            .await
-        {
-            Ok(row) => row.session_mode(),
-            Err(_) => mode
-                .as_deref()
-                .and_then(common::SessionMode::parse)
-                .unwrap_or(common::SessionMode::Assistant),
-        };
+        let session_mode: common::SessionMode =
+            match self.session_manager.get_session_row(&session_key).await {
+                Ok(row) => row.session_mode(),
+                Err(_) => mode
+                    .as_deref()
+                    .and_then(common::SessionMode::parse)
+                    .unwrap_or(common::SessionMode::Assistant),
+            };
 
         let channel: common::ChannelName = match session_mode {
             common::SessionMode::Coding => common::CODING_CHANNEL.into(),
@@ -1336,7 +1333,11 @@ fn icontains(haystack: &str, needle: &str) -> bool {
     }
     let mut chars = haystack.chars();
     loop {
-        if chars.clone().zip(needle.chars()).all(|(a, b)| a.eq_ignore_ascii_case(&b)) {
+        if chars
+            .clone()
+            .zip(needle.chars())
+            .all(|(a, b)| a.eq_ignore_ascii_case(&b))
+        {
             return true;
         }
         if chars.next().is_none() {

@@ -11,9 +11,7 @@ use jiff::Timestamp;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use crate::mirror::{
-    MirrorAlert, MirrorRepo, RoutingSnapshot, SkillRouteStats,
-};
+use crate::mirror::{MirrorAlert, MirrorRepo, RoutingSnapshot, SkillRouteStats};
 
 const MAX_TRIGGER_PHRASES: usize = 100;
 

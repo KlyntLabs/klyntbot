@@ -1,7 +1,6 @@
 use desktop_macros::klynt_command;
 use desktop_shared::errors::ApiError;
 
-
 #[klynt_command]
 pub async fn workspace_meta_read(
     workspace_id: String,

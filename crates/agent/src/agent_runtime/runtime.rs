@@ -25,6 +25,7 @@ pub struct RuntimeConfig {
     pub provider_name: String,
     pub context_window: usize,
     pub max_response_tokens: usize,
+    pub cache_enabled: bool,
 }
 
 /// Result of processing a message through the agent runtime.
@@ -81,6 +82,8 @@ pub struct AgentRuntime {
     hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
     /// Domain event bus for emitting cross-cutting events (e.g. Mirror alerts).
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    /// Global kill switch for cache-breakpoint placement.
+    cache_enabled: bool,
 }
 
 impl AgentRuntime {
@@ -121,6 +124,7 @@ impl AgentRuntime {
             tool_kit: std::sync::Mutex::new(None),
             hook_engine: std::sync::Mutex::new(None),
             domain_event_bus: None,
+            cache_enabled: cfg.cache_enabled,
         }
     }
 
@@ -414,7 +418,12 @@ impl AgentRuntime {
         // tone/formatting rules that this prompt carries into every turn.
         let system_prompt = self
             .context_engine
-            .build_system_prompt(ctx.channel.as_str(), ctx.chat_id.as_str(), Some(message), ctx.session_mode)
+            .build_system_prompt(
+                ctx.channel.as_str(),
+                ctx.chat_id.as_str(),
+                Some(message),
+                ctx.session_mode,
+            )
             .await;
 
         let context_request = ContextRequest {
@@ -482,7 +491,8 @@ impl AgentRuntime {
         // Build execution params
         let mut params = ExecutionParams::new(&self.execution_model, self.context_window)
             .with_max_iterations(budget.max_turns())
-            .with_original_message(message.to_string());
+            .with_original_message(message.to_string())
+            .with_cache_enabled(self.cache_enabled);
 
         if let Some(token) = cancel_token {
             params = params.with_cancel_token(token);
@@ -1045,6 +1055,7 @@ mod tests {
                 provider_name: "mock".to_string(),
                 context_window: 128_000,
                 max_response_tokens: 8192,
+                cache_enabled: true,
             },
             hot_config,
         )

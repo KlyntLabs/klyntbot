@@ -62,7 +62,11 @@ impl ApprovalDecision {
     pub fn requires_user_input(&self) -> bool {
         matches!(self, Self::Ask { .. })
     }
-    pub fn auto_allow(layer: ApprovalLayer, reason: impl Into<String>, rule_matched: Option<String>) -> Self {
+    pub fn auto_allow(
+        layer: ApprovalLayer,
+        reason: impl Into<String>,
+        rule_matched: Option<String>,
+    ) -> Self {
         Self::Auto {
             allowed: true,
             layer,
@@ -70,7 +74,11 @@ impl ApprovalDecision {
             rule_matched,
         }
     }
-    pub fn auto_deny(layer: ApprovalLayer, reason: impl Into<String>, rule_matched: Option<String>) -> Self {
+    pub fn auto_deny(
+        layer: ApprovalLayer,
+        reason: impl Into<String>,
+        rule_matched: Option<String>,
+    ) -> Self {
         Self::Auto {
             allowed: false,
             layer,

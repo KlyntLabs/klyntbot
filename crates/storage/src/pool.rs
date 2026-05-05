@@ -33,13 +33,21 @@ impl StoragePool {
         let url = format!("sqlite:{}?mode=rwc", db_path.display());
         let pool = sqlx::pool::PoolOptions::<sqlx::Sqlite>::new()
             .max_connections(5)
-            .after_connect(|conn, _| Box::pin(async move {
-                sqlx::query("PRAGMA foreign_keys=ON;").execute(&mut *conn).await?;
-                sqlx::query("PRAGMA busy_timeout = 5000;").execute(&mut *conn).await?;
-                // ~2MB per connection instead of default ~8MB (single-user app).
-                sqlx::query("PRAGMA cache_size = -2000;").execute(&mut *conn).await?;
-                Ok(())
-            }))
+            .after_connect(|conn, _| {
+                Box::pin(async move {
+                    sqlx::query("PRAGMA foreign_keys=ON;")
+                        .execute(&mut *conn)
+                        .await?;
+                    sqlx::query("PRAGMA busy_timeout = 5000;")
+                        .execute(&mut *conn)
+                        .await?;
+                    // ~2MB per connection instead of default ~8MB (single-user app).
+                    sqlx::query("PRAGMA cache_size = -2000;")
+                        .execute(&mut *conn)
+                        .await?;
+                    Ok(())
+                })
+            })
             .connect(&url)
             .await?;
         // Database-level PRAGMAs — only need to run once.
@@ -65,11 +73,17 @@ impl StoragePool {
     pub async fn connect_in_memory() -> Result<Self, StorageError> {
         let pool = sqlx::pool::PoolOptions::<sqlx::Sqlite>::new()
             .max_connections(5)
-            .after_connect(|conn, _| Box::pin(async move {
-                sqlx::query("PRAGMA foreign_keys=ON;").execute(&mut *conn).await?;
-                sqlx::query("PRAGMA busy_timeout = 5000;").execute(&mut *conn).await?;
-                Ok(())
-            }))
+            .after_connect(|conn, _| {
+                Box::pin(async move {
+                    sqlx::query("PRAGMA foreign_keys=ON;")
+                        .execute(&mut *conn)
+                        .await?;
+                    sqlx::query("PRAGMA busy_timeout = 5000;")
+                        .execute(&mut *conn)
+                        .await?;
+                    Ok(())
+                })
+            })
             .connect("sqlite::memory:")
             .await?;
         sqlx::migrate!("./migrations").run(&pool).await?;

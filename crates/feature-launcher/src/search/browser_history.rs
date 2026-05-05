@@ -80,7 +80,8 @@ impl BrowserHistorySource {
             .filter(|(title, _, _)| !title.is_empty())
             .map(|(title, url, visit_time)| {
                 let ts_secs = (visit_time - 11_644_473_600_000_000) / 1_000_000;
-                let last_visit = jiff::Timestamp::from_second(ts_secs).unwrap_or(jiff::Timestamp::now());
+                let last_visit =
+                    jiff::Timestamp::from_second(ts_secs).unwrap_or(jiff::Timestamp::now());
                 HistoryEntry {
                     title,
                     url,

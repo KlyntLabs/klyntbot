@@ -110,7 +110,14 @@ impl AppCore {
         }
 
         // Batch fetch all linked entities concurrently
-        let (tasks_rows, notes_rows, conversations_rows, objectives_rows, key_results_rows, sources_rows) = tokio::join!(
+        let (
+            tasks_rows,
+            notes_rows,
+            conversations_rows,
+            objectives_rows,
+            key_results_rows,
+            sources_rows,
+        ) = tokio::join!(
             self.repos.tasks.get_by_ids(&task_ids),
             self.note_repo.get_notes_by_ids(&note_ids),
             self.repos.sessions.get_sessions_by_keys(&conversation_keys),
@@ -141,16 +148,18 @@ impl AppCore {
         }
 
         if let Ok(rows) = conversations_rows {
-            conversations.extend(rows.into_iter().map(|session| SessionSummaryResponse {
-                key: session.key,
-                title: session
-                    .metadata
-                    .as_object()
-                    .and_then(|m| m.get("title"))
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string()),
-                conversation_type: session.conversation_type,
-                updated_at: session.updated_at.to_string(),
+            conversations.extend(rows.into_iter().map(|session| {
+                SessionSummaryResponse {
+                    key: session.key,
+                    title: session
+                        .metadata
+                        .as_object()
+                        .and_then(|m| m.get("title"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                    conversation_type: session.conversation_type,
+                    updated_at: session.updated_at.to_string(),
+                }
             }));
         } else if let Err(e) = conversations_rows {
             warn!(error = %e, "Failed to batch fetch linked conversations");

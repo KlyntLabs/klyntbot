@@ -1,6 +1,4 @@
-use klynt_hooks::events::{
-    pre_compact::PreCompactInput, pre_file_edit::PreFileEditInput,
-};
+use klynt_hooks::events::{pre_compact::PreCompactInput, pre_file_edit::PreFileEditInput};
 
 #[test]
 fn extension_event_inputs_serialize_round_trip() {

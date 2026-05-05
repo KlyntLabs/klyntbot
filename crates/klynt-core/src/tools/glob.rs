@@ -125,8 +125,11 @@ impl ToolExecute for GlobTool {
                             }
                         }
                     }
-                    let mut out: Vec<(std::time::SystemTime, PathBuf)> =
-                        heap.into_sorted_vec().into_iter().map(|Reverse(v)| v).collect();
+                    let mut out: Vec<(std::time::SystemTime, PathBuf)> = heap
+                        .into_sorted_vec()
+                        .into_iter()
+                        .map(|Reverse(v)| v)
+                        .collect();
                     out.reverse();
                     out
                 })

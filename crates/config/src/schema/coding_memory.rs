@@ -1,7 +1,7 @@
 //! Configuration for the coding-memory subsystem.
 
-use serde::{Deserialize, Serialize};
 use super::core::default_true;
+use serde::{Deserialize, Serialize};
 
 /// Root config for coding memory.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

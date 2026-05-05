@@ -419,11 +419,7 @@ impl Policy {
         for entry in walkdir::WalkDir::new(path).follow_links(false) {
             let entry = match entry {
                 Ok(e) => e,
-                Err(e) => {
-                    return Err(std::io::Error::other(
-                        e.to_string(),
-                    ))
-                }
+                Err(e) => return Err(std::io::Error::other(e.to_string())),
             };
             if !entry.file_type().is_file() {
                 continue;

@@ -9,6 +9,7 @@ license.workspace = true
 common.workspace = true
 config.workspace = true
 async-trait.workspace = true
+dashmap.workspace = true
 jiff = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }

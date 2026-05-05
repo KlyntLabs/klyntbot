@@ -19,12 +19,13 @@ use super::core::ExecutionCore;
 use super::live_context_refresher::LiveContextRefresher;
 use super::loop_detector::{LoopDetector, LoopStatus};
 use super::mid_loop_compressor::MidLoopCompressor;
-use super::types::{CycleOutcome, ExecutionParams, accumulate_usage};
+use super::types::{accumulate_usage, CycleOutcome, ExecutionParams};
 use crate::events::AgentEvent;
 
 /// Returned to the caller when the synthesis pass produces no usable text.
 /// Never let an empty string escape `execute_loop` — users see this directly.
-const SYNTHESIS_FALLBACK: &str = "I was unable to produce a final response within the allowed budget. \
+const SYNTHESIS_FALLBACK: &str =
+    "I was unable to produce a final response within the allowed budget. \
      Please try again or rephrase your request.";
 
 /// Result of the unified execute loop.
@@ -174,6 +175,15 @@ pub async fn execute_loop(
         } else {
             tools
         };
+        let cache_bps: Vec<providers::CacheBreakpoint> = if params.cache_enabled {
+            crate::execution::cache_policy::compression_aware_default(
+                &messages,
+                Some(cycle_tools),
+                &compressor,
+            )
+        } else {
+            Vec::new()
+        };
         let (outcome, cycle_usage) = core
             .run_cycle(
                 &mut messages,
@@ -182,6 +192,7 @@ pub async fn execute_loop(
                 ctx,
                 event_tx.as_ref(),
                 Some(&mut seen_tool_calls),
+                &cache_bps,
             )
             .await?;
 
@@ -402,6 +413,8 @@ pub async fn execute_loop(
                 max_turns: budget.max_turns(),
                 cost_usd: budget.cost_usd(),
                 depth: budget.depth.to_string(),
+                cache_read_tokens: accumulated_usage.cache_read_tokens,
+                cache_write_tokens: accumulated_usage.cache_write_tokens,
             },
         )
         .await;

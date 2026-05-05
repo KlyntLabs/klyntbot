@@ -29,10 +29,7 @@ pub trait TokenBudgeter: Send + Sync {
             .map_or(s.len(), |(i, _)| i);
         // Verify; if still over budget, walk back one char at a time.
         while end > 0 && self.count(&s[..end]) > budget {
-            end = s[..end]
-                .char_indices()
-                .next_back()
-                .map_or(0, |(i, _)| i);
+            end = s[..end].char_indices().next_back().map_or(0, |(i, _)| i);
         }
         let mut out = s[..end].to_string();
         if end < s.len() && self.count(&out) < budget {

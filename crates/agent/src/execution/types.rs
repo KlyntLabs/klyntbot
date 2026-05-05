@@ -32,6 +32,8 @@ pub struct ExecutionParams {
     pub pause_context_updates: bool,
     /// Hook engine for firing PreCompact / PostCompact lifecycle hooks.
     pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    /// Global kill switch for cache-breakpoint placement.
+    pub cache_enabled: bool,
 }
 
 impl ExecutionParams {
@@ -54,6 +56,7 @@ impl ExecutionParams {
             context_update_queue: None,
             pause_context_updates: false,
             hook_engine: None,
+            cache_enabled: true,
         }
     }
 
@@ -112,6 +115,11 @@ impl ExecutionParams {
 
     pub fn with_hook_engine(mut self, engine: Arc<klynt_hooks::HookEngine>) -> Self {
         self.hook_engine = Some(engine);
+        self
+    }
+
+    pub fn with_cache_enabled(mut self, enabled: bool) -> Self {
+        self.cache_enabled = enabled;
         self
     }
 }

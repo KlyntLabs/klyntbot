@@ -7,8 +7,8 @@
 use std::collections::HashSet;
 
 use storage::{
-    KeyResultRow, ObjectiveRow, TaskAttachmentRow, TaskFilter, TaskPatch, TaskRepo,
-    TaskTimeEntryRow, TaskRow,
+    KeyResultRow, ObjectiveRow, TaskAttachmentRow, TaskFilter, TaskPatch, TaskRepo, TaskRow,
+    TaskTimeEntryRow,
 };
 
 // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -22,18 +22,12 @@ pub async fn list_tasks(
 }
 
 /// Get a single task by ID.
-pub async fn get_task(
-    repo: &TaskRepo,
-    id: &str,
-) -> Result<Option<TaskRow>, storage::StorageError> {
+pub async fn get_task(repo: &TaskRepo, id: &str) -> Result<Option<TaskRow>, storage::StorageError> {
     repo.get(id).await
 }
 
 /// Create a new task.
-pub async fn create_task(
-    repo: &TaskRepo,
-    row: &TaskRow,
-) -> Result<TaskRow, storage::StorageError> {
+pub async fn create_task(repo: &TaskRepo, row: &TaskRow) -> Result<TaskRow, storage::StorageError> {
     repo.add(row).await
 }
 
@@ -51,10 +45,7 @@ pub async fn delete_task(repo: &TaskRepo, id: &str) -> Result<bool, storage::Sto
 }
 
 /// Toggle a task's completion status.
-pub async fn toggle_complete(
-    repo: &TaskRepo,
-    id: &str,
-) -> Result<TaskRow, storage::StorageError> {
+pub async fn toggle_complete(repo: &TaskRepo, id: &str) -> Result<TaskRow, storage::StorageError> {
     let row = repo.get_or_err(id).await?;
     let new_status = if row.completed {
         "todo".to_string()
@@ -194,9 +185,7 @@ pub async fn today_tasks(repo: &TaskRepo) -> Result<Vec<TaskRow>, storage::Stora
 }
 
 /// Get the next upcoming task (earliest `due_date > now`, not completed).
-pub async fn next_upcoming_task(
-    repo: &TaskRepo,
-) -> Result<Option<TaskRow>, storage::StorageError> {
+pub async fn next_upcoming_task(repo: &TaskRepo) -> Result<Option<TaskRow>, storage::StorageError> {
     let filter = TaskFilter {
         due_after: Some(jiff::Timestamp::now()),
         limit: Some(1),
@@ -213,7 +202,9 @@ pub async fn objective_list(
     project_id: Option<&str>,
 ) -> Result<Vec<(ObjectiveRow, Vec<KeyResultRow>)>, storage::StorageError> {
     let objectives = objectives_repo.list(project_id, None).await?;
-    let kr_futures = objectives.iter().map(|o| key_results_repo.list(Some(&o.id)));
+    let kr_futures = objectives
+        .iter()
+        .map(|o| key_results_repo.list(Some(&o.id)));
     let all_krs = futures_util::future::try_join_all(kr_futures).await?;
     Ok(objectives.into_iter().zip(all_krs).collect())
 }

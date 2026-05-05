@@ -9,8 +9,8 @@ use std::sync::Arc;
 
 use bus::{DomainEvent, DomainEventBus};
 
-use storage::FinanceStorage;
 use storage::rows::finance::*;
+use storage::FinanceStorage;
 
 // ---------------------------------------------------------------------------
 // Accounts
@@ -103,7 +103,10 @@ pub async fn create_transaction(
         _ => 0,
     };
     if delta != 0 {
-        storage.accounts.adjust_balance(&row.account_id, delta).await?;
+        storage
+            .accounts
+            .adjust_balance(&row.account_id, delta)
+            .await?;
     }
 
     // Emit domain event for timeline tracking
@@ -155,7 +158,10 @@ pub async fn delete_transaction(
             _ => 0,
         };
         if delta != 0 {
-            storage.accounts.adjust_balance(&tx.account_id, delta).await?;
+            storage
+                .accounts
+                .adjust_balance(&tx.account_id, delta)
+                .await?;
         }
     }
 
@@ -431,8 +437,12 @@ pub async fn period_summary(
     default_currency: &str,
 ) -> Result<(i64, i64), storage::StorageError> {
     let (income, spending) = tokio::try_join!(
-        storage.transactions.sum_by_type_in_range("income", from, to, default_currency),
-        storage.transactions.sum_by_type_in_range("expense", from, to, default_currency),
+        storage
+            .transactions
+            .sum_by_type_in_range("income", from, to, default_currency),
+        storage
+            .transactions
+            .sum_by_type_in_range("expense", from, to, default_currency),
     )?;
     Ok((income, spending))
 }
@@ -455,8 +465,12 @@ pub async fn monthly_summary(
     let previous_month_label = prev_month.strftime("%Y-%m").to_string();
 
     let (income_rows, expense_rows) = tokio::try_join!(
-        storage.transactions.sum_by_period("income", 3, default_currency),
-        storage.transactions.sum_by_period("expense", 3, default_currency),
+        storage
+            .transactions
+            .sum_by_period("income", 3, default_currency),
+        storage
+            .transactions
+            .sum_by_period("expense", 3, default_currency),
     )?;
 
     let income_map: HashMap<String, i64> = income_rows.into_iter().collect();

@@ -385,7 +385,10 @@ impl MirrorRepo {
     }
 
     /// Convenience: build a snippet from an alert and insert it.
-    pub async fn insert_snippet_from_alert(&self, alert: &crate::mirror::types::MirrorAlert) -> Result<()> {
+    pub async fn insert_snippet_from_alert(
+        &self,
+        alert: &crate::mirror::types::MirrorAlert,
+    ) -> Result<()> {
         let snippet = crate::mirror::snippet_from_alert(alert);
         self.insert_snippet(&snippet).await
     }
@@ -536,8 +539,13 @@ impl MirrorRepo {
 
     /// Delete trend narratives older than `max_age_days`. Returns rows removed.
     pub async fn cleanup_old_trend_narratives(&self, max_age_days: u32) -> Result<u64> {
-        self.delete_older_than("mirror_trend_narratives", "generated_at", max_age_days, None)
-            .await
+        self.delete_older_than(
+            "mirror_trend_narratives",
+            "generated_at",
+            max_age_days,
+            None,
+        )
+        .await
     }
 
     /// Delete `Disabled` meta-rules older than `max_age_days`. Active/Pending

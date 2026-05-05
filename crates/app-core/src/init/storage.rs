@@ -110,28 +110,40 @@ pub(super) async fn init_storage(
     run_migration!("tasks", tasks_feature.migrations());
 
     // Run scheduling feature migrations (Phase 2: scheduled_fires table).
-    run_migration!("scheduling", [tools_core::FeatureMigration {
-        feature_name: "scheduling".to_string(),
-        version: 1,
-        description: "Create scheduled_fires table".to_string(),
-        sql: include_str!("../../../scheduling/migrations/001_scheduled_fires.sql").to_string(),
-    }]);
+    run_migration!(
+        "scheduling",
+        [tools_core::FeatureMigration {
+            feature_name: "scheduling".to_string(),
+            version: 1,
+            description: "Create scheduled_fires table".to_string(),
+            sql: include_str!("../../../scheduling/migrations/001_scheduled_fires.sql").to_string(),
+        }]
+    );
 
     // Run language-learning feature migrations.
-    run_migration!("language-learning", feature_language_learning::language_learning_migrations());
+    run_migration!(
+        "language-learning",
+        feature_language_learning::language_learning_migrations()
+    );
 
     // Run finance feature migrations.
     run_migration!("finance", feature_finance::finance_migrations());
 
     // Run focus feature migrations (DND sessions).
-    run_migration!("focus", <feature_focus::FocusFeature as tools_core::FeaturePackage>::migrations(
-        &feature_focus::FocusFeature,
-    ));
+    run_migration!(
+        "focus",
+        <feature_focus::FocusFeature as tools_core::FeaturePackage>::migrations(
+            &feature_focus::FocusFeature,
+        )
+    );
 
     // Run learning feature migrations (placeholder in v3; tables live in cognitive).
-    run_migration!("learning", <feature_learning::LearningFeature as tools_core::FeaturePackage>::migrations(
-        &feature_learning::LearningFeature::default(),
-    ));
+    run_migration!(
+        "learning",
+        <feature_learning::LearningFeature as tools_core::FeaturePackage>::migrations(
+            &feature_learning::LearningFeature::default(),
+        )
+    );
 
     // Run cognitive migrations up-front so downstream crates (coding-memory) can
     // ALTER their tables. Cognitive migrations are idempotent; the agent builder

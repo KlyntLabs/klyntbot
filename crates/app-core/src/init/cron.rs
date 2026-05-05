@@ -1761,7 +1761,7 @@ async fn generate_insights_via_llm(
     ];
 
     let response = provider
-        .chat(&messages, None, &params)
+        .chat(&messages, None, &params, &[])
         .await
         .map_err(|e| e.to_string())?;
 

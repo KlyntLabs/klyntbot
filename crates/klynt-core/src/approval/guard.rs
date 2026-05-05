@@ -149,7 +149,11 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
         let args_json = match ctx.args.as_ref() {
             Some(v) => {
                 let s = v.to_string();
-                if s.is_empty() { payload.to_string() } else { s }
+                if s.is_empty() {
+                    payload.to_string()
+                } else {
+                    s
+                }
             }
             None => payload.to_string(),
         };
@@ -164,7 +168,8 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
                     reason: format!("auto-allow: {reason}"),
                     rule_matched: None,
                 };
-                let decision = ApprovalDecision::auto_allow(ApprovalLayer::Layer3Mirror, reason, None);
+                let decision =
+                    ApprovalDecision::auto_allow(ApprovalLayer::Layer3Mirror, reason, None);
                 emit_pair(&ctx, tool, payload, &decision, false, Some(&summary)).await;
                 return decision;
             }
@@ -268,8 +273,6 @@ async fn emit_resolved<'a>(ctx: &GuardCtx<'a>, decision: &ApprovalDecision) {
     };
     fan_out_tool_event(ctx.event_tx, Some(ctx.domain_bus), res).await;
 }
-
-
 
 /// Map an `ApprovalDecision` into the frontend `LayerOutcome` type.
 fn layer_outcome_from_decision(d: &ApprovalDecision) -> desktop_shared::coding::LayerOutcome {

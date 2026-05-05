@@ -64,8 +64,6 @@ pub async fn compute_graph_boosts(
     boosts
 }
 
-
-
 /// Extract potential entity names from a query string.
 /// Capitalized words that aren't sentence starters.
 /// Wave 1: heuristic entity extractor with two layers.

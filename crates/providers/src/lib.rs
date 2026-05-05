@@ -38,10 +38,10 @@ pub use registry::{ProviderRegistry, ProviderSpec, PROVIDERS};
 
 // -- Types --
 pub use types::{
-    tool_calls_to_messages, ChatParams, ContentPart, DynProvider, FunctionCall, ImageUrl,
-    LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
-    ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage, ToolContent,
-    ToolContentPart, Usage, UserContent, DEFAULT_CONTEXT_WINDOW,
+    tool_calls_to_messages, CacheAnchor, CacheBreakpoint, CacheTtl, ChatParams, ContentPart,
+    DynProvider, FunctionCall, ImageUrl, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk,
+    Message, ProviderCapabilities, ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta,
+    ToolCallMessage, ToolContent, ToolContentPart, Usage, UserContent, DEFAULT_CONTEXT_WINDOW,
 };
 
 // -- Factory --

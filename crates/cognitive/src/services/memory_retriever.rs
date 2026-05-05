@@ -11,10 +11,10 @@ use crate::conversation_recall::ConversationRecallService;
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::{CoActivationRepo, EpisodicMemoryRepo, SemanticFactRepo, USER_MODEL_DOMAINS};
 use crate::retrieval::{retrieve_relevant_facts, rrf_merge, RetrievalParams, ScoredFact};
-use crate::types::freshness_label;
 use crate::search::bm25::search_episodic_memories;
 use crate::services::scoring::{CommunityCache, KnowledgeDepthCache};
 use crate::situation::UserSituation;
+use crate::types::freshness_label;
 
 /// RRF constant — same as used in retrieval.rs BM25 merge.
 const RRF_K: f64 = 60.0;

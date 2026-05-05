@@ -11,8 +11,8 @@ use tokio::task::JoinHandle;
 use uuid::Uuid;
 
 use crate::mirror::{
-    EarlyTrialEvaluator, MirrorAlert, MirrorRepo, PreviewRecommendation,
-    TrialEarlySignals, TrialPreview,
+    EarlyTrialEvaluator, MirrorAlert, MirrorRepo, PreviewRecommendation, TrialEarlySignals,
+    TrialPreview,
 };
 
 const PREVIEW_DELAY_SECS: u64 = 4 * 60 * 60;

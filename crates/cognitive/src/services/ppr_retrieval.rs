@@ -167,7 +167,11 @@ pub async fn build_graph_from_entities(
     Ok((g, name_by_idx))
 }
 
-type PprCacheEntry = (DiGraph<String, f32, u32>, HashMap<String, NodeIndex>, Instant);
+type PprCacheEntry = (
+    DiGraph<String, f32, u32>,
+    HashMap<String, NodeIndex>,
+    Instant,
+);
 
 pub struct CachedPprGraph {
     repo: crate::repos::EntityRepo,

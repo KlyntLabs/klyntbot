@@ -158,7 +158,11 @@ fn ifind(haystack: &str, needle: &str) -> Option<usize> {
     let mut offset = 0;
     let mut chars = haystack.chars();
     loop {
-        if chars.clone().zip(needle.chars()).all(|(a, b)| a.eq_ignore_ascii_case(&b)) {
+        if chars
+            .clone()
+            .zip(needle.chars())
+            .all(|(a, b)| a.eq_ignore_ascii_case(&b))
+        {
             return Some(offset);
         }
         match chars.next() {
@@ -176,7 +180,11 @@ fn icontains(haystack: &str, needle: &str) -> bool {
     }
     let mut chars = haystack.chars();
     loop {
-        if chars.clone().zip(needle.chars()).all(|(a, b)| a.eq_ignore_ascii_case(&b)) {
+        if chars
+            .clone()
+            .zip(needle.chars())
+            .all(|(a, b)| a.eq_ignore_ascii_case(&b))
+        {
             return true;
         }
         if chars.next().is_none() {
@@ -271,8 +279,11 @@ async fn call_provider_streaming(
     params: &providers::ChatParams,
     event_tx: &tokio::sync::mpsc::Sender<crate::events::AgentEvent>,
     domain_bus: Option<&Arc<bus::DomainEventBus>>,
+    cache_breakpoints: &[providers::CacheBreakpoint],
 ) -> Result<providers::LlmResponse> {
-    let mut stream = provider.chat_stream(messages, Some(tools), params).await?;
+    let mut stream = provider
+        .chat_stream(messages, Some(tools), params, cache_breakpoints)
+        .await?;
 
     let mut content = String::new();
     let mut partials: Vec<PartialToolCall> = Vec::with_capacity(4);
@@ -517,6 +528,7 @@ impl ExecutionCore {
         routing_ctx: &RoutingContext,
         event_tx: Option<&tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
         seen_tool_calls: Option<&mut HashSet<String>>,
+        cache_breakpoints: &[providers::CacheBreakpoint],
     ) -> Result<(CycleOutcome, Usage)> {
         // When an event channel is available, stream tokens so the UI updates
         // in real-time. Non-streaming providers already have a default
@@ -530,15 +542,33 @@ impl ExecutionCore {
                 &params.chat_params,
                 tx,
                 self.domain_event_bus.as_ref(),
+                cache_breakpoints,
             )
             .await?
         } else {
             self.provider
-                .chat(messages, Some(tools), &params.chat_params)
+                .chat(
+                    messages,
+                    Some(tools),
+                    &params.chat_params,
+                    cache_breakpoints,
+                )
                 .await?
         };
 
         let usage = response.usage.clone();
+
+        if usage.prompt_tokens > 0 {
+            let hit_rate = usage.cache_read_tokens as f64 / usage.prompt_tokens as f64;
+            tracing::info!(
+                target: "klynt::execution::cache",
+                cache_read = usage.cache_read_tokens,
+                cache_write = usage.cache_write_tokens,
+                prompt = usage.prompt_tokens,
+                hit_rate,
+                "cache hit ratio for this call"
+            );
+        }
 
         if !response.tool_calls.is_empty() {
             debug!(
@@ -929,7 +959,15 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 
@@ -955,7 +993,15 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 
@@ -987,7 +1033,15 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 
@@ -1104,7 +1158,15 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 
@@ -1140,7 +1202,15 @@ mod tests {
         })];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 
@@ -1167,7 +1237,15 @@ mod tests {
         })];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 
@@ -1226,7 +1304,15 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 

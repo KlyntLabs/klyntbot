@@ -116,9 +116,7 @@ impl GitInvalidationHandler for GitInvalidationHandlerImpl {
         }
 
         // Single scan: OR-joined LIKE patterns, one bind per changed file.
-        let mut sql = String::from(
-            "SELECT id, metadata FROM semantic_facts WHERE ",
-        );
+        let mut sql = String::from("SELECT id, metadata FROM semantic_facts WHERE ");
         let placeholders: Vec<String> = (1..=diffs.len())
             .map(|i| format!("metadata LIKE ?{i}"))
             .collect();

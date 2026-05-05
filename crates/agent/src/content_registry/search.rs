@@ -60,7 +60,11 @@ fn icontains(haystack: &str, needle: &str) -> bool {
     }
     let mut chars = haystack.chars();
     loop {
-        if chars.clone().zip(needle.chars()).all(|(a, b)| a.eq_ignore_ascii_case(&b)) {
+        if chars
+            .clone()
+            .zip(needle.chars())
+            .all(|(a, b)| a.eq_ignore_ascii_case(&b))
+        {
             return true;
         }
         if chars.next().is_none() {

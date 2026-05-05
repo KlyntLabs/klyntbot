@@ -1,7 +1,7 @@
+use crate::approval::guard::fan_out_tool_event;
 use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
-use crate::approval::guard::fan_out_tool_event;
 use async_trait::async_trait;
 use bus::DomainEventBus;
 use klynt_execpolicy::Policy;
@@ -87,10 +87,7 @@ impl ToolExecute for BashTool {
             pending: &self.pending,
             event_tx: ctx.event_tx.as_ref(),
             domain_bus: &self.bus,
-            cancel: ctx
-                .cancel_token
-                .clone()
-                .unwrap_or_default(),
+            cancel: ctx.cancel_token.clone().unwrap_or_default(),
             request_id,
             args: Some(serde_json::to_value(&args).unwrap_or(serde_json::Value::Null)),
             cwd: args.cwd.clone(),

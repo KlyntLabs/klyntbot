@@ -75,7 +75,8 @@ impl ExtractionCriticLogRepo {
         for id in ids {
             q = q.bind(id);
         }
-        q.execute(self.pool.inner()).await
+        q.execute(self.pool.inner())
+            .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
     }

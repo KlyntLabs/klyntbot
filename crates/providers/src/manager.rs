@@ -232,9 +232,13 @@ impl ProviderManager {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmResponse> {
-        self.retry_with_backoff(|| self.primary.chat(messages, tools, params))
-            .await
+        self.retry_with_backoff(|| {
+            self.primary
+                .chat(messages, tools, params, cache_breakpoints)
+        })
+        .await
     }
 
     async fn try_primary_stream_with_retry(
@@ -242,9 +246,13 @@ impl ProviderManager {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmStream> {
-        self.retry_with_backoff(|| self.primary.chat_stream(messages, tools, params))
-            .await
+        self.retry_with_backoff(|| {
+            self.primary
+                .chat_stream(messages, tools, params, cache_breakpoints)
+        })
+        .await
     }
 
     /// Check health of primary and fallback providers.
@@ -276,6 +284,7 @@ impl ProviderManager {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
         primary_err: KlyntbotError,
     ) -> Result<LlmResponse> {
         let delays = [
@@ -285,7 +294,9 @@ impl ProviderManager {
         match &self.fallback {
             Some(fb) => {
                 let result = self
-                    .retry_with_backoff_inner(&delays, false, || fb.chat(messages, tools, params))
+                    .retry_with_backoff_inner(&delays, false, || {
+                        fb.chat(messages, tools, params, cache_breakpoints)
+                    })
                     .await;
                 if result.is_err() {
                     if let Some(ref cb) = *self.on_provider_degraded.read().await {
@@ -315,10 +326,11 @@ impl ProviderManager {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmResponse> {
         let mut params = params.clone();
         params.role = Some(role);
-        self.chat(messages, tools, &params).await
+        self.chat(messages, tools, &params, cache_breakpoints).await
     }
 }
 
@@ -329,17 +341,24 @@ impl LlmProvider for ProviderManager {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmResponse> {
         // Circuit open → skip primary entirely
         if self.is_circuit_open().await {
             if let Some(fb) = &self.fallback {
-                return fb.chat(messages, tools, params).await;
+                return fb.chat(messages, tools, params, cache_breakpoints).await;
             }
         }
 
-        match self.try_primary_with_retry(messages, tools, params).await {
+        match self
+            .try_primary_with_retry(messages, tools, params, cache_breakpoints)
+            .await
+        {
             Ok(r) => Ok(r),
-            Err(e) => self.try_fallback(messages, tools, params, e).await,
+            Err(e) => {
+                self.try_fallback(messages, tools, params, cache_breakpoints, e)
+                    .await
+            }
         }
     }
 
@@ -348,22 +367,27 @@ impl LlmProvider for ProviderManager {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmStream> {
         // Circuit open → skip primary entirely
         if self.is_circuit_open().await {
             if let Some(fb) = &self.fallback {
-                return fb.chat_stream(messages, tools, params).await;
+                return fb
+                    .chat_stream(messages, tools, params, cache_breakpoints)
+                    .await;
             }
         }
 
         match self
-            .try_primary_stream_with_retry(messages, tools, params)
+            .try_primary_stream_with_retry(messages, tools, params, cache_breakpoints)
             .await
         {
             Ok(s) => Ok(s),
             Err(e) => match &self.fallback {
                 Some(fb) => {
-                    let result = fb.chat_stream(messages, tools, params).await;
+                    let result = fb
+                        .chat_stream(messages, tools, params, cache_breakpoints)
+                        .await;
                     if result.is_err() {
                         if let Some(ref cb) = *self.on_provider_degraded.read().await {
                             cb(DegradationLevel::Offline);
@@ -518,6 +542,7 @@ mod tests {
             _messages: &[Message],
             _tools: Option<&[Value]>,
             _params: &ChatParams,
+            _cache_breakpoints: &[CacheBreakpoint],
         ) -> Result<LlmResponse> {
             self.call_count.fetch_add(1, AtomicOrdering::SeqCst);
             match self.fail_with {
@@ -531,6 +556,7 @@ mod tests {
             _messages: &[Message],
             _tools: Option<&[Value]>,
             _params: &ChatParams,
+            _cache_breakpoints: &[CacheBreakpoint],
         ) -> Result<LlmStream> {
             self.stream_call_count.fetch_add(1, AtomicOrdering::SeqCst);
             match self.fail_with {
@@ -565,7 +591,7 @@ mod tests {
         );
 
         let result = manager
-            .chat(&[], None, &ChatParams::new("test-model"))
+            .chat(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(result.is_ok());
         assert_eq!(primary_count.load(AtomicOrdering::SeqCst), 1);
@@ -594,7 +620,7 @@ mod tests {
         );
 
         let result = manager
-            .chat(&[], None, &ChatParams::new("test-model"))
+            .chat(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(result.is_ok());
         // Primary should have been tried 3 times (retry with backoff)
@@ -625,7 +651,7 @@ mod tests {
         );
 
         let result = manager
-            .chat(&[], None, &ChatParams::new("test-model"))
+            .chat(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         // Should fail — fallback exhausted its retries
         assert!(result.is_err());
@@ -655,6 +681,7 @@ mod tests {
                 _messages: &[Message],
                 _tools: Option<&[Value]>,
                 _params: &ChatParams,
+                _cache_breakpoints: &[CacheBreakpoint],
             ) -> Result<LlmResponse> {
                 let n = self.call_count.fetch_add(1, AtomicOrdering::SeqCst);
                 if n == 0 {
@@ -687,7 +714,7 @@ mod tests {
         );
 
         let result = manager
-            .chat(&[], None, &ChatParams::new("test-model"))
+            .chat(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(result.is_ok());
         assert_eq!(primary_count.load(AtomicOrdering::SeqCst), 1);
@@ -723,7 +750,7 @@ mod tests {
         // Each call: primary fails (records 1 failure), fallback rate-limited (no circuit effect)
         for _ in 0..2 {
             let _ = manager
-                .chat(&[], None, &ChatParams::new("test-model"))
+                .chat(&[], None, &ChatParams::new("test-model"), &[])
                 .await;
         }
 
@@ -755,7 +782,7 @@ mod tests {
         );
 
         let result = manager
-            .chat(&[], None, &ChatParams::new("test-model"))
+            .chat(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(result.is_ok());
         // Non-retryable: primary tried once, then fallback
@@ -778,7 +805,7 @@ mod tests {
         );
 
         let result = manager
-            .chat(&[], None, &ChatParams::new("test-model"))
+            .chat(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(result.is_err());
         assert_eq!(primary_count.load(AtomicOrdering::SeqCst), 1);
@@ -811,7 +838,7 @@ mod tests {
         // Make 5 calls. After 3 failures, circuit opens → subsequent calls skip primary.
         for _ in 0..5 {
             let _ = manager
-                .chat(&[], None, &ChatParams::new("test-model"))
+                .chat(&[], None, &ChatParams::new("test-model"), &[])
                 .await;
         }
 
@@ -851,14 +878,14 @@ mod tests {
         // Trip the circuit (2 failures)
         for _ in 0..2 {
             let _ = manager
-                .chat(&[], None, &ChatParams::new("test-model"))
+                .chat(&[], None, &ChatParams::new("test-model"), &[])
                 .await;
         }
         assert_eq!(primary_count.load(AtomicOrdering::SeqCst), 2);
 
         // Call while circuit is open → goes to fallback without touching primary
         let _ = manager
-            .chat(&[], None, &ChatParams::new("test-model"))
+            .chat(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert_eq!(primary_count.load(AtomicOrdering::SeqCst), 2); // unchanged
 
@@ -867,7 +894,7 @@ mod tests {
 
         // Circuit should be closed now → primary gets tried again
         let _ = manager
-            .chat(&[], None, &ChatParams::new("test-model"))
+            .chat(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert_eq!(primary_count.load(AtomicOrdering::SeqCst), 3);
     }
@@ -891,6 +918,7 @@ mod tests {
                 _messages: &[Message],
                 _tools: Option<&[Value]>,
                 _params: &ChatParams,
+                _cache_breakpoints: &[CacheBreakpoint],
             ) -> Result<LlmResponse> {
                 let n = self.call_count.fetch_add(1, AtomicOrdering::SeqCst);
                 if n == 0 {
@@ -919,7 +947,7 @@ mod tests {
         );
 
         let result = manager
-            .chat(&[], None, &ChatParams::new("test-model"))
+            .chat(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(result.is_ok());
         assert_eq!(call_count.load(AtomicOrdering::SeqCst), 2);
@@ -941,6 +969,7 @@ mod tests {
                 _messages: &[Message],
                 _tools: Option<&[Value]>,
                 _params: &ChatParams,
+                _cache_breakpoints: &[CacheBreakpoint],
             ) -> Result<LlmResponse> {
                 let n = self.call_count.fetch_add(1, AtomicOrdering::SeqCst);
                 if n % 3 == 2 {
@@ -974,15 +1003,15 @@ mod tests {
 
         // Call 1: fail (failures=1)
         let _ = manager
-            .chat(&[], None, &ChatParams::new("test-model"))
+            .chat(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         // Call 2: fail (failures=2)
         let _ = manager
-            .chat(&[], None, &ChatParams::new("test-model"))
+            .chat(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         // Call 3: succeed → resets counter
         let r = manager
-            .chat(&[], None, &ChatParams::new("test-model"))
+            .chat(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(r.is_ok());
 
@@ -1001,6 +1030,7 @@ mod tests {
                 _: &[Message],
                 _: Option<&[Value]>,
                 _: &ChatParams,
+                _: &[CacheBreakpoint],
             ) -> Result<LlmResponse> {
                 Ok(dummy_response())
             }
@@ -1040,7 +1070,7 @@ mod tests {
         );
 
         let result = manager
-            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .chat_stream(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(result.is_ok());
         assert_eq!(primary_stream.load(AtomicOrdering::SeqCst), 1);
@@ -1069,7 +1099,7 @@ mod tests {
         );
 
         let result = manager
-            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .chat_stream(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(result.is_ok());
         // Primary retried 3 times with backoff
@@ -1098,7 +1128,7 @@ mod tests {
         );
 
         let result = manager
-            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .chat_stream(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(result.is_ok());
         // Non-retryable: primary tried once, then fallback
@@ -1121,7 +1151,7 @@ mod tests {
         );
 
         let result = manager
-            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .chat_stream(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(result.is_err());
         assert_eq!(primary_stream.load(AtomicOrdering::SeqCst), 1);
@@ -1145,6 +1175,7 @@ mod tests {
                 _: &[Message],
                 _: Option<&[Value]>,
                 _: &ChatParams,
+                _: &[CacheBreakpoint],
             ) -> Result<LlmResponse> {
                 Ok(dummy_response())
             }
@@ -1153,6 +1184,7 @@ mod tests {
                 _: &[Message],
                 _: Option<&[Value]>,
                 _: &ChatParams,
+                _: &[CacheBreakpoint],
             ) -> Result<LlmStream> {
                 let n = self.stream_count.fetch_add(1, AtomicOrdering::SeqCst);
                 if n == 0 {
@@ -1181,7 +1213,7 @@ mod tests {
         );
 
         let result = manager
-            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .chat_stream(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(result.is_ok());
         assert_eq!(stream_count.load(AtomicOrdering::SeqCst), 2);
@@ -1214,16 +1246,16 @@ mod tests {
 
         // Trip the circuit with streaming calls (2 non-retryable failures)
         let _ = manager
-            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .chat_stream(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         let _ = manager
-            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .chat_stream(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert_eq!(primary_stream.load(AtomicOrdering::SeqCst), 2);
 
         // Circuit is now open → primary skipped
         let result = manager
-            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .chat_stream(&[], None, &ChatParams::new("test-model"), &[])
             .await;
         assert!(result.is_ok());
         assert_eq!(primary_stream.load(AtomicOrdering::SeqCst), 2); // unchanged
@@ -1244,6 +1276,7 @@ mod tests {
             _: &[Message],
             _: Option<&[Value]>,
             _: &ChatParams,
+            _: &[CacheBreakpoint],
         ) -> Result<LlmResponse> {
             Ok(dummy_response())
         }

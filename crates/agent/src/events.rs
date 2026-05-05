@@ -326,6 +326,10 @@ pub enum AgentEvent {
         max_turns: u32,
         cost_usd: f64,
         depth: String,
+        #[serde(default)]
+        cache_read_tokens: u32,
+        #[serde(default)]
+        cache_write_tokens: u32,
     },
 
     /// User extended the budget mid-conversation.

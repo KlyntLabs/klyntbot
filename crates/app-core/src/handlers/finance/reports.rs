@@ -37,13 +37,15 @@ impl AppCore {
 
         let totals_by_currency: Vec<CurrencyNetWorth> = totals
             .into_iter()
-            .map(|(currency, accounts, investments, liabilities)| CurrencyNetWorth {
-                currency,
-                accounts,
-                investments,
-                liabilities,
-                net: accounts + investments - liabilities,
-            })
+            .map(
+                |(currency, accounts, investments, liabilities)| CurrencyNetWorth {
+                    currency,
+                    accounts,
+                    investments,
+                    liabilities,
+                    net: accounts + investments - liabilities,
+                },
+            )
             .collect();
 
         Ok(FinanceNetWorthResponse { totals_by_currency })
@@ -371,9 +373,12 @@ impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub async fn finance_monthly_summary(&self) -> Result<FinanceMonthlySummaryResponse, ApiError> {
         let ((_, current_income, current_spending), (_, previous_income, previous_spending)) =
-            feature_finance::api::monthly_summary(&self.repos.finance, &self.default_currency().await)
-                .await
-                .map_err(map_storage_err)?;
+            feature_finance::api::monthly_summary(
+                &self.repos.finance,
+                &self.default_currency().await,
+            )
+            .await
+            .map_err(map_storage_err)?;
 
         Ok(FinanceMonthlySummaryResponse {
             current_income,

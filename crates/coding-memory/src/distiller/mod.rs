@@ -601,8 +601,7 @@ impl Distiller {
                         let Some(outcome) = obs.outcome else { continue };
                         if !matches!(
                             outcome,
-                            crate::facts::FixOutcome::Failure
-                                | crate::facts::FixOutcome::Abandoned
+                            crate::facts::FixOutcome::Failure | crate::facts::FixOutcome::Abandoned
                         ) {
                             continue;
                         }

@@ -100,6 +100,44 @@ pub enum ResponseFormat {
     JsonSchema { name: String, schema: Value },
 }
 
+/// Cache lifetime hint for a [`CacheBreakpoint`]. Picked by the policy
+/// that emits the breakpoint; honored by providers whose `ProviderCapabilities`
+/// have `explicit_cache_markers = true`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CacheTtl {
+    /// ~5 minutes. Anthropic default. Right for transient prefixes
+    /// (e.g. the message-frontier marker that survives one compression
+    /// burst but probably won't be reused tomorrow).
+    #[default]
+    Ephemeral,
+    /// ~1 hour. Anthropic via `extended-cache-ttl-2025-04-11` beta.
+    /// Right for system prompts and tool definitions that are stable
+    /// for the whole session.
+    Persistent,
+}
+
+/// Where to place a cache-control marker.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CacheAnchor {
+    /// On the last `Message::System` block in the messages vec.
+    /// No-op if there are no System messages.
+    LastSystem,
+    /// On the last entry in the tools array.
+    /// No-op if `tools` is None or empty.
+    LastTool,
+    /// On the message at this index in the messages vec.
+    /// Logged + skipped if out-of-range.
+    MessageIndex(usize),
+}
+
+/// One cache-breakpoint instruction for a single LLM call.
+#[derive(Clone, Debug)]
+pub struct CacheBreakpoint {
+    pub anchor: CacheAnchor,
+    pub ttl: CacheTtl,
+}
+
 /// Parameters for chat completion requests
 #[derive(Debug, Clone)]
 pub struct ChatParams {
@@ -109,6 +147,10 @@ pub struct ChatParams {
     pub response_format: Option<ResponseFormat>,
     /// Optional provider role for role-based routing (e.g. Distiller, ReforgeRules).
     pub role: Option<crate::ProviderRole>,
+    /// Opaque session identifier. Used by the OpenAI-compat debug assertion
+    /// to dedupe prefix-stability hashes across calls. Production builds
+    /// don't read it.
+    pub session_key: Option<String>,
 }
 
 impl ChatParams {
@@ -119,6 +161,7 @@ impl ChatParams {
             max_tokens: None,
             response_format: None,
             role: None,
+            session_key: None,
         }
     }
 
@@ -139,6 +182,11 @@ impl ChatParams {
 
     pub fn with_role(mut self, role: crate::ProviderRole) -> Self {
         self.role = Some(role);
+        self
+    }
+
+    pub fn with_session_key(mut self, key: impl Into<String>) -> Self {
+        self.session_key = Some(key.into());
         self
     }
 }
@@ -165,6 +213,7 @@ pub trait LlmProvider: Send + Sync {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmResponse>;
 
     /// Send a streaming chat completion request
@@ -174,9 +223,12 @@ pub trait LlmProvider: Send + Sync {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmStream> {
         // Default: call chat() and wrap the response as stream chunks.
-        let response = self.chat(messages, tools, params).await?;
+        let response = self
+            .chat(messages, tools, params, cache_breakpoints)
+            .await?;
 
         let mut chunks: Vec<std::result::Result<LlmStreamChunk, common::KlyntbotError>> =
             Vec::with_capacity(response.tool_calls.len() + 1);
@@ -314,6 +366,9 @@ pub struct ProviderCapabilities {
     pub extended_thinking: bool,
     pub structured_outputs: bool,
     pub prompt_caching: bool,
+    /// True if this provider honors explicit `CacheBreakpoint` markers.
+    /// Anthropic: true. OpenAI/Gemini/etc. (auto-prefix-cache only): false.
+    pub explicit_cache_markers: bool,
     pub native_token_counting: bool,
     pub vision: bool,
     pub streaming: bool,
@@ -327,6 +382,7 @@ impl Default for ProviderCapabilities {
             extended_thinking: false,
             structured_outputs: false,
             prompt_caching: false,
+            explicit_cache_markers: false,
             native_token_counting: false,
             vision: true,
             streaming: true,
@@ -686,5 +742,46 @@ mod tests {
         } else {
             panic!("wrong variant");
         }
+    }
+
+    #[test]
+    fn cache_ttl_serde_roundtrip() {
+        let json = serde_json::to_string(&CacheTtl::Ephemeral).unwrap();
+        assert_eq!(json, "\"ephemeral\"");
+        let json = serde_json::to_string(&CacheTtl::Persistent).unwrap();
+        assert_eq!(json, "\"persistent\"");
+        let parsed: CacheTtl = serde_json::from_str("\"ephemeral\"").unwrap();
+        assert_eq!(parsed, CacheTtl::Ephemeral);
+    }
+
+    #[test]
+    fn cache_ttl_default_is_ephemeral() {
+        assert_eq!(CacheTtl::default(), CacheTtl::Ephemeral);
+    }
+
+    #[test]
+    fn cache_anchor_equality() {
+        assert_eq!(CacheAnchor::LastSystem, CacheAnchor::LastSystem);
+        assert_ne!(CacheAnchor::LastSystem, CacheAnchor::LastTool);
+        assert_eq!(CacheAnchor::MessageIndex(5), CacheAnchor::MessageIndex(5));
+        assert_ne!(CacheAnchor::MessageIndex(5), CacheAnchor::MessageIndex(6));
+    }
+
+    #[test]
+    fn cache_breakpoint_construction() {
+        let bp = CacheBreakpoint {
+            anchor: CacheAnchor::LastSystem,
+            ttl: CacheTtl::Persistent,
+        };
+        assert_eq!(bp.anchor, CacheAnchor::LastSystem);
+        assert_eq!(bp.ttl, CacheTtl::Persistent);
+    }
+
+    #[test]
+    fn provider_capabilities_default_excludes_explicit_markers() {
+        let caps = ProviderCapabilities::default();
+        assert!(!caps.explicit_cache_markers);
+        assert!(caps.streaming);
+        assert!(!caps.prompt_caching);
     }
 }

@@ -197,7 +197,10 @@ impl AppIndex {
             }
         }
         let (icon_count, bundle_count) = apps.iter().fold((0, 0), |(ic, bc), a| {
-            (ic + a.icon_path.is_some() as usize, bc + a.bundle_id.is_some() as usize)
+            (
+                ic + a.icon_path.is_some() as usize,
+                bc + a.bundle_id.is_some() as usize,
+            )
         });
         tracing::info!(
             "Indexed {} applications ({} with icons, {} with bundle ids)",

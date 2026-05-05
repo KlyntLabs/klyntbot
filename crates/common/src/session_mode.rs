@@ -5,7 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, specta::Type)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, specta::Type,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionMode {
     #[default]
@@ -29,7 +31,6 @@ impl SessionMode {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

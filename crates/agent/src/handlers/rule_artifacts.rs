@@ -46,7 +46,7 @@ impl RuleArtifactsHandler for RuleArtifactsHandlerImpl {
 
         let response = self
             .provider
-            .chat(&messages, None, &self.params)
+            .chat(&messages, None, &self.params, &[])
             .await
             .map_err(|e| crate::provider_err("Phase 3.5 chat", e))?;
 
@@ -131,7 +131,7 @@ fn recover_artifact(raw: &str, artifact: &RuleArtifact) -> RuleArtifactOutput {
 mod tests {
     use super::*;
     use crate::test_utils::MockProvider;
-    
+
     use coding_memory::reforge::types::RepoArtifactPlan;
     use std::sync::Arc;
 

@@ -30,7 +30,7 @@ impl ProductivityHandler for ProductivityHandlerImpl {
         let messages = vec![Message::user(prompt)];
         let params = ChatParams::new(&self.model).with_max_tokens(256);
 
-        let response = self.provider.chat(&messages, None, &params).await?;
+        let response = self.provider.chat(&messages, None, &params, &[]).await?;
         response.content.ok_or_else(|| {
             common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
                 "Empty LLM response for productivity summary".to_string(),
@@ -47,7 +47,7 @@ impl ProductivityHandler for ProductivityHandlerImpl {
         let messages = vec![Message::user(prompt)];
         let params = ChatParams::new(&self.model).with_max_tokens(512);
 
-        let response = self.provider.chat(&messages, None, &params).await?;
+        let response = self.provider.chat(&messages, None, &params, &[]).await?;
         response.content.ok_or_else(|| {
             common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
                 "Empty LLM response for narrative".to_string(),
@@ -69,7 +69,7 @@ impl ProductivityHandler for ProductivityHandlerImpl {
         let messages = vec![Message::user(prompt)];
         let params = ChatParams::new(&self.model).with_max_tokens(32);
 
-        let response = self.provider.chat(&messages, None, &params).await?;
+        let response = self.provider.chat(&messages, None, &params, &[]).await?;
         response.content.ok_or_else(|| {
             common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
                 "Empty LLM response for activity classification".to_string(),

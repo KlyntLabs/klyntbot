@@ -40,13 +40,15 @@ fn arb_review_issue() -> impl Strategy<Value = ReviewIssue> {
         "[A-Za-z0-9 .,!?]{0,80}",
         proptest::option::of("[A-Za-z0-9 .,!?]{0,80}"),
     )
-        .prop_map(|(severity, file, line, description, suggestion)| ReviewIssue {
-            severity,
-            file,
-            line,
-            description,
-            suggestion,
-        })
+        .prop_map(
+            |(severity, file, line, description, suggestion)| ReviewIssue {
+                severity,
+                file,
+                line,
+                description,
+                suggestion,
+            },
+        )
 }
 
 fn arb_review_result() -> impl Strategy<Value = ReviewResult> {
@@ -84,16 +86,17 @@ proptest! {
 
 // ── Part 2: registry-construction test ───────────────────────────────
 
-const MUTATING_TOOL_NAMES: &[&str] = &[
-    "bash",
-    "write",
-    "edit",
-    "apply_patch",
-    "notebook_edit",
-];
+const MUTATING_TOOL_NAMES: &[&str] = &["bash", "write", "edit", "apply_patch", "notebook_edit"];
 
-const EXPECTED_READ_ONLY_TOOL_NAMES: &[&str] =
-    &["read", "list_dir", "glob", "grep", "tool_search", "ask_user", "web_fetch"];
+const EXPECTED_READ_ONLY_TOOL_NAMES: &[&str] = &[
+    "read",
+    "list_dir",
+    "glob",
+    "grep",
+    "tool_search",
+    "ask_user",
+    "web_fetch",
+];
 
 fn build_test_kit() -> klynt_core::ToolKitBuilder {
     let layer1 = Arc::new(
@@ -106,7 +109,9 @@ fn build_test_kit() -> klynt_core::ToolKitBuilder {
     let bus = Arc::new(bus::DomainEventBus::new(16));
     let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let pool = rt.block_on(storage::StoragePool::connect_in_memory()).unwrap();
+    let pool = rt
+        .block_on(storage::StoragePool::connect_in_memory())
+        .unwrap();
     let repos = storage::Repos::from_pool(&pool);
 
     klynt_core::ToolKitBuilder {

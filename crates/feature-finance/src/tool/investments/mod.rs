@@ -236,7 +236,9 @@ impl FinanceTool {
             "purchase_date": inserted.purchase_date.map(|d| d.to_string()),
             "notes": inserted.notes,
         });
-        Ok(serde_json::to_string_pretty(&json!({"investment": investment}))?)
+        Ok(serde_json::to_string_pretty(
+            &json!({"investment": investment}),
+        )?)
     }
 
     async fn investment_update(&self, p: &ParamExtractor<'_>) -> Result<String> {
@@ -278,7 +280,9 @@ impl FinanceTool {
             "purchase_date": updated.purchase_date.map(|d| d.to_string()),
             "notes": updated.notes,
         });
-        Ok(serde_json::to_string_pretty(&json!({"investment": investment}))?)
+        Ok(serde_json::to_string_pretty(
+            &json!({"investment": investment}),
+        )?)
     }
 
     async fn investment_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {

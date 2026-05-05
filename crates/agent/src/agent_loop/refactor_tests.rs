@@ -10,9 +10,8 @@
 mod tests {
     use std::sync::Arc;
 
-    
     use bus::MessageBus;
-    
+
     use tempfile::TempDir;
 
     use crate::agent_loop::AgentLoop;

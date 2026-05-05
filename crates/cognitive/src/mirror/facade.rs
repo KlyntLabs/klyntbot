@@ -439,7 +439,8 @@ impl MirrorFacade {
         for snippet in &snippets {
             let snippet_text = format!("{} {}", snippet.headline, snippet.body);
             if let Ok(snippet_embedding) = embedder.embed(&snippet_text).await {
-                let score = common::helpers::cosine_similarity(&query_embedding, &snippet_embedding);
+                let score =
+                    common::helpers::cosine_similarity(&query_embedding, &snippet_embedding);
                 if score > best_score {
                     best_score = score;
                     best_text = Some(snippet.headline.clone());

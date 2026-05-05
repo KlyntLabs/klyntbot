@@ -15,7 +15,10 @@ impl AppCore {
             .await
             .map_err(map_storage_err)?;
 
-        Ok(rows.iter().map(|row| action_to_today_task(row, now)).collect())
+        Ok(rows
+            .iter()
+            .map(|row| action_to_today_task(row, now))
+            .collect())
     }
 
     /// Get the next upcoming task (earliest `due_date > now`, not completed).

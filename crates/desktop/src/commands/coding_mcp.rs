@@ -1,7 +1,6 @@
 use desktop_macros::klynt_command;
 use desktop_shared::errors::ApiError;
 
-
 #[klynt_command]
 pub async fn coding_mcp_status(workspace_id: Option<String>) -> serde_json::Value {
     state
@@ -17,7 +16,6 @@ pub(crate) async fn dispatch_dev(
     core: &::app_core::state::AppCore,
     body: &serde_json::Value,
 ) -> Option<desktop_shared::CommandResult<serde_json::Value>> {
-    
     Some(match cmd {
         "coding_mcp_status" => {
             let workspace_id = body

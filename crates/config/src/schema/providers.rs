@@ -47,6 +47,9 @@ pub struct ProvidersConfig {
 
     #[serde(default)]
     pub mimo: ProviderConfig,
+
+    #[serde(default)]
+    pub cache: CacheConfig,
 }
 
 /// Individual provider configuration
@@ -109,6 +112,25 @@ pub struct ProviderManagerConfig {
     /// Model name for the complexity classifier
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classifier_model: Option<String>,
+}
+
+/// Cache-placement configuration. Single global kill switch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheConfig {
+    /// When false, the executor passes empty cache_breakpoints to the provider.
+    #[serde(default = "default_cache_enabled")]
+    pub enabled: bool,
+}
+
+fn default_cache_enabled() -> bool {
+    true
+}
+
+impl Default for CacheConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 #[cfg(test)]

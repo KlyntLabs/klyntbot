@@ -103,9 +103,7 @@ impl ToolExecute for WebFetchTool {
             self.pending.clone(),
             ctx.event_tx.clone(),
             self.bus.clone(),
-            ctx.cancel_token
-                .clone()
-                .unwrap_or_default(),
+            ctx.cancel_token.clone().unwrap_or_default(),
             self.client.clone(),
             common::tool_channel::Channel::from_name(ctx.channel.as_str()),
             self.non_ui_policy,

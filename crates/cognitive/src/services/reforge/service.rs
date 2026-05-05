@@ -660,7 +660,9 @@ pub async fn run_reforge(
                 }
                 Err(e) => {
                     warn!("Reforge Phase 6.7 failed to list communities: {e}");
-                    result.phase_errors.push(format!("community_summaries: {e}"));
+                    result
+                        .phase_errors
+                        .push(format!("community_summaries: {e}"));
                 }
             }
         }
@@ -730,7 +732,9 @@ pub async fn run_reforge(
                         continue;
                     }
                     group.sort_by(|a, b| {
-                        b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal)
+                        b.confidence
+                            .partial_cmp(&a.confidence)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     });
                     let winner_id = group[0].id.clone();
                     for loser in &group[1..] {

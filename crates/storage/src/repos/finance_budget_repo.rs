@@ -174,13 +174,16 @@ impl FinanceBudgetRepo {
         &self,
         budget_id: &str,
     ) -> Result<BudgetUsageRow, crate::error::StorageError> {
-        let row = sqlx::query_as::<_, BudgetUsageRow>(
-            &format!("{} WHERE b.id = ? GROUP BY b.id", Self::BUDGET_USAGE_SQL),
-        )
+        let row = sqlx::query_as::<_, BudgetUsageRow>(&format!(
+            "{} WHERE b.id = ? GROUP BY b.id",
+            Self::BUDGET_USAGE_SQL
+        ))
         .bind(budget_id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_budget {budget_id}")))?;
+        .ok_or_else(|| {
+            crate::error::StorageError::NotFound(format!("finance_budget {budget_id}"))
+        })?;
 
         Ok(row)
     }
@@ -190,9 +193,10 @@ impl FinanceBudgetRepo {
     pub async fn all_budget_usage(
         &self,
     ) -> Result<Vec<BudgetUsageRow>, crate::error::StorageError> {
-        let rows = sqlx::query_as::<_, BudgetUsageRow>(
-            &format!("{} WHERE b.is_active = TRUE GROUP BY b.id ORDER BY b.created_at", Self::BUDGET_USAGE_SQL),
-        )
+        let rows = sqlx::query_as::<_, BudgetUsageRow>(&format!(
+            "{} WHERE b.is_active = TRUE GROUP BY b.id ORDER BY b.created_at",
+            Self::BUDGET_USAGE_SQL
+        ))
         .fetch_all(&self.pool)
         .await?;
 

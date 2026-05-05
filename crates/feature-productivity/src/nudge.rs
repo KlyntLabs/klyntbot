@@ -230,7 +230,6 @@ fn is_quiet_hours(config: &NudgeConfig) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     async fn setup_pool() -> sqlx::SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();

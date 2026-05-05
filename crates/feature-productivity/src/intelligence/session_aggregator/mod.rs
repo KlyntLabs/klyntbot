@@ -649,7 +649,7 @@ impl SessionAggregator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use jiff::SignedDuration;
     use sqlx::SqlitePool;
 

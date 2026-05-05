@@ -355,12 +355,7 @@ impl AppCore {
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
 
-        let global_path = self
-            .config
-            .read()
-            .await
-            .data_dir_path()
-            .join("AGENTS.md");
+        let global_path = self.config.read().await.data_dir_path().join("AGENTS.md");
 
         let source =
             WorkspaceAgentsSource::new(PathBuf::from(&workspace.path)).with_global(global_path);

@@ -34,7 +34,11 @@ pub async fn migrate_app_ids_to_bundle_ids(
     // Batch updates via a CTE mapping table to avoid N+1 queries.
     let mut total: u64 = 0;
     for chunk in mappings.chunks(400) {
-        let values_sql = chunk.iter().map(|_| "(?, ?)").collect::<Vec<_>>().join(", ");
+        let values_sql = chunk
+            .iter()
+            .map(|_| "(?, ?)")
+            .collect::<Vec<_>>()
+            .join(", ");
 
         let pins_sql = format!(
             "WITH mappings(old_id, new_id) AS (VALUES {})

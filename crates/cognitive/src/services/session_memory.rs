@@ -199,7 +199,7 @@ async fn generate_summary(
         .with_temperature(0.2)
         .with_max_tokens(800);
 
-    let response = provider.chat(&llm_messages, None, &params).await?;
+    let response = provider.chat(&llm_messages, None, &params, &[]).await?;
     Ok(response.content.unwrap_or_default())
 }
 
@@ -207,12 +207,17 @@ async fn generate_summary(
 fn heuristic_summary(messages: &[storage::SessionMessageRow]) -> String {
     let lines: Vec<String> = messages
         .iter()
-        .map(|m| format!("- **{}**: {}", m.role, common::helpers::truncate_at_boundary(&m.content, 120)))
+        .map(|m| {
+            format!(
+                "- **{}**: {}",
+                m.role,
+                common::helpers::truncate_at_boundary(&m.content, 120)
+            )
+        })
         .collect();
 
     format!("## Recent Messages\n\n{}", lines.join("\n"))
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -234,5 +239,4 @@ mod tests {
         // Turn 9 — update
         assert!(should_update(9));
     }
-
 }

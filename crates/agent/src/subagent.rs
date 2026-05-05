@@ -310,7 +310,8 @@ impl SubagentManager {
             };
             if let klynt_hooks::HookOutcome::Block { reason } = engine
                 .fire(klynt_hooks::engine::HookFireInput::SubagentSpawn(input))
-                .await {
+                .await
+            {
                 return format!(
                     "Subagent spawn blocked by hook: {} (ID: {})",
                     reason, short_id
@@ -477,8 +478,6 @@ impl SubagentManager {
             info!("Subagent {} completed", subagent_id_clone);
         });
 
-
-
         format!(
             "Subagent spawned (ID: {}). Working on '{}' in the background...",
             short_id, label_text
@@ -621,9 +620,8 @@ async fn run_subagent_task(
         t
     } else {
         let kit = tool_kit.ok_or_else(|| {
-            Box::new(std::io::Error::other(
-                "subagent tool kit not initialized",
-            )) as Box<dyn std::error::Error + Send + Sync>
+            Box::new(std::io::Error::other("subagent tool kit not initialized"))
+                as Box<dyn std::error::Error + Send + Sync>
         })?;
         let kit = (*kit).clone().with_cwd(workspace.to_path_buf());
 
@@ -699,20 +697,16 @@ async fn run_subagent_task(
                             .unwrap_or(None);
                         progress.insert(agent_id.clone(), (iter_u32, last_tool.clone()));
                         if let Some(ref tx) = lifecycle_tx {
-                            let _ = tx.send(
-                                crate::subagent_events::SubagentLifecycleEvent::Progress {
+                            let _ =
+                                tx.send(crate::subagent_events::SubagentLifecycleEvent::Progress {
                                     agent_id: agent_id.clone(),
                                     iteration: iter_u32,
                                     last_tool,
-                                },
-                            );
+                                });
                         }
                     }
                     crate::events::AgentEvent::ToolStart { name, .. } => {
-                        let iteration = progress
-                            .get(&agent_id)
-                            .map(|e| e.value().0)
-                            .unwrap_or(0);
+                        let iteration = progress.get(&agent_id).map(|e| e.value().0).unwrap_or(0);
                         progress.insert(agent_id.clone(), (iteration, Some(name)));
                     }
                     _ => {}

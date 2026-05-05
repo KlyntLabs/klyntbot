@@ -213,7 +213,8 @@ impl InvertedFileIndex {
 
         let token_index = TokenIndex::build(tokens);
 
-        let mut path_to_idx = FxHashMap::with_capacity_and_hasher(entries.len(), Default::default());
+        let mut path_to_idx =
+            FxHashMap::with_capacity_and_hasher(entries.len(), Default::default());
         for (i, e) in entries.iter().enumerate() {
             path_to_idx.insert(e.path.clone(), i as u32);
         }

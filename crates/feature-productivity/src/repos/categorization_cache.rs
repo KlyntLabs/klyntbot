@@ -62,7 +62,6 @@ impl CategorizationCacheRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     async fn setup_pool() -> SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();

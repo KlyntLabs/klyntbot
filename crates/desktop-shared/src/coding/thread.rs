@@ -54,7 +54,6 @@ pub enum ApprovalPolicy {
     YoloMode,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum SandboxKind {

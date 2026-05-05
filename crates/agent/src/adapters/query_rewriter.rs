@@ -52,12 +52,10 @@ fn has_domain_keywords(query: &str) -> bool {
         "api",
     ];
 
-    let has_domain = query
-        .split_whitespace()
-        .any(|w| {
-            let trimmed = w.trim_matches(|c: char| !c.is_alphanumeric());
-            DOMAIN_TERMS.iter().any(|t| trimmed.eq_ignore_ascii_case(t))
-        });
+    let has_domain = query.split_whitespace().any(|w| {
+        let trimmed = w.trim_matches(|c: char| !c.is_alphanumeric());
+        DOMAIN_TERMS.iter().any(|t| trimmed.eq_ignore_ascii_case(t))
+    });
     if has_domain {
         return true;
     }
@@ -106,12 +104,10 @@ const ACTION_VERBS: &[&str] = &[
 ];
 
 fn has_action_verb(query: &str) -> bool {
-    query
-        .split_whitespace()
-        .any(|w| {
-            let trimmed = w.trim_matches(|c: char| !c.is_alphanumeric());
-            ACTION_VERBS.iter().any(|v| trimmed.eq_ignore_ascii_case(v))
-        })
+    query.split_whitespace().any(|w| {
+        let trimmed = w.trim_matches(|c: char| !c.is_alphanumeric());
+        ACTION_VERBS.iter().any(|v| trimmed.eq_ignore_ascii_case(v))
+    })
 }
 
 fn query_specificity(query: &str) -> Specificity {
@@ -144,18 +140,118 @@ fn query_specificity(query: &str) -> Specificity {
 // ---------------------------------------------------------------------------
 
 const STOP_WORDS: &[&str] = &[
-    "a", "an", "as", "at", "be", "but", "by", "do", "done", "down",
-    "each", "few", "from", "having", "he", "her", "here", "hers", "herself", "him",
-    "himself", "his", "if", "in", "into", "is", "its", "itself", "just", "let",
-    "ll", "may", "me", "more", "most", "much", "must", "my", "myself", "no",
-    "nor", "not", "now", "of", "off", "on", "once", "only", "or", "other",
-    "our", "ours", "ourselves", "out", "over", "own", "re", "really", "same", "shall",
-    "she", "so", "some", "still", "such", "than", "their", "theirs", "them", "themselves",
-    "then", "there", "they", "thing", "things", "to", "too", "up", "us", "use",
-    "used", "using", "ve", "very", "we", "when", "where", "which", "while", "who",
-    "whom", "why", "won", "yes", "yet", "you", "your", "yours", "yourself", "yourselves",
-    "after", "again", "all", "also", "am", "because", "before", "between", "both", "currently",
-    "everything", "i"
+    "a",
+    "an",
+    "as",
+    "at",
+    "be",
+    "but",
+    "by",
+    "do",
+    "done",
+    "down",
+    "each",
+    "few",
+    "from",
+    "having",
+    "he",
+    "her",
+    "here",
+    "hers",
+    "herself",
+    "him",
+    "himself",
+    "his",
+    "if",
+    "in",
+    "into",
+    "is",
+    "its",
+    "itself",
+    "just",
+    "let",
+    "ll",
+    "may",
+    "me",
+    "more",
+    "most",
+    "much",
+    "must",
+    "my",
+    "myself",
+    "no",
+    "nor",
+    "not",
+    "now",
+    "of",
+    "off",
+    "on",
+    "once",
+    "only",
+    "or",
+    "other",
+    "our",
+    "ours",
+    "ourselves",
+    "out",
+    "over",
+    "own",
+    "re",
+    "really",
+    "same",
+    "shall",
+    "she",
+    "so",
+    "some",
+    "still",
+    "such",
+    "than",
+    "their",
+    "theirs",
+    "them",
+    "themselves",
+    "then",
+    "there",
+    "they",
+    "thing",
+    "things",
+    "to",
+    "too",
+    "up",
+    "us",
+    "use",
+    "used",
+    "using",
+    "ve",
+    "very",
+    "we",
+    "when",
+    "where",
+    "which",
+    "while",
+    "who",
+    "whom",
+    "why",
+    "won",
+    "yes",
+    "yet",
+    "you",
+    "your",
+    "yours",
+    "yourself",
+    "yourselves",
+    "after",
+    "again",
+    "all",
+    "also",
+    "am",
+    "because",
+    "before",
+    "between",
+    "both",
+    "currently",
+    "everything",
+    "i",
 ];
 
 /// Extract key terms from text by filtering stop words and short tokens.
@@ -168,7 +264,9 @@ pub fn extract_key_terms_from(text: &str) -> String {
         .filter(|w| {
             w.len() > 2
                 && !STOP_WORDS.iter().any(|sw| w.eq_ignore_ascii_case(sw))
-                && !SEARCHER_STOP_WORDS.iter().any(|sw| w.eq_ignore_ascii_case(sw))
+                && !SEARCHER_STOP_WORDS
+                    .iter()
+                    .any(|sw| w.eq_ignore_ascii_case(sw))
                 && !PRONOUNS.iter().any(|p| w.eq_ignore_ascii_case(p))
         })
         .take(5)
@@ -437,7 +535,7 @@ impl ContextualQueryRewriter {
 
         let timeout_dur = std::time::Duration::from_millis(self.timeout_ms);
         let result =
-            tokio::time::timeout(timeout_dur, provider.chat(&messages, None, &params)).await;
+            tokio::time::timeout(timeout_dur, provider.chat(&messages, None, &params, &[])).await;
 
         match result {
             Ok(Ok(response)) => {

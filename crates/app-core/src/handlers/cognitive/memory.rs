@@ -447,7 +447,11 @@ impl AppCore {
             }
             "rule" => {
                 let rule_repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
-                match rule_repo.find_by_id(ref_id).await.map_err(map_cognitive_err)? {
+                match rule_repo
+                    .find_by_id(ref_id)
+                    .await
+                    .map_err(map_cognitive_err)?
+                {
                     Some(r) => {
                         let mut details = HashMap::new();
                         details.insert("Domain".to_string(), r.domain.clone());

@@ -105,7 +105,11 @@ impl LlmSummaryProvider {
         };
         let params = ChatParams::new(&self.model).with_max_tokens(max_tokens);
 
-        match self.provider.chat(&request_messages, None, &params).await {
+        match self
+            .provider
+            .chat(&request_messages, None, &params, &[])
+            .await
+        {
             Ok(response) => {
                 if let Some(content) = response.content {
                     if let Some(summaries) = Self::extract_json(&content) {

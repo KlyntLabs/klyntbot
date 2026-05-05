@@ -148,8 +148,7 @@ impl AppCore {
                         if rp.extension().and_then(|e| e.to_str()) != Some("md") {
                             continue;
                         }
-                        let stem =
-                            rp.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown");
+                        let stem = rp.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown");
                         let rc = tokio::fs::read_to_string(&rp).await.unwrap_or_default();
                         files.push(AgentFileSummary {
                             filename: format!("references/{}.md", stem),

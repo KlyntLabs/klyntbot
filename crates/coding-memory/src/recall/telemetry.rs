@@ -166,8 +166,7 @@ impl RecallInvocationRepo {
         .fetch_all(self.pool.inner())
         .await
         .map_err(|e| common::KlyntbotError::Storage(format!("top facts recall: {e}")))?;
-        rows
-            .into_iter()
+        rows.into_iter()
             .map(|r| r.into_row())
             .collect::<Result<Vec<_>, _>>()
     }

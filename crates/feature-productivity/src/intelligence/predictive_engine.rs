@@ -175,7 +175,7 @@ fn parse_time_frac(time_str: &str) -> f64 {
 mod tests {
     use super::*;
     use crate::repos::IntelligenceSessionRepo;
-    
+
     use sqlx::SqlitePool;
 
     async fn setup_pool() -> SqlitePool {

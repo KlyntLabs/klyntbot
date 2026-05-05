@@ -404,16 +404,12 @@ impl AutoTunerOrchestrator {
 
                     // Log per-trial evaluation results for observability.
                     for (trial_id, trial_result) in &result.evaluated_trials {
-                        let verdict = if result
-                            .promotion
-                            .as_ref()
-                            .map(|(pid, _, _)| pid)
-                            == Some(trial_id)
-                        {
-                            "PASS"
-                        } else {
-                            "FAIL"
-                        };
+                        let verdict =
+                            if result.promotion.as_ref().map(|(pid, _, _)| pid) == Some(trial_id) {
+                                "PASS"
+                            } else {
+                                "FAIL"
+                            };
                         info!(
                             trial_id = %trial_id,
                             correction_rate = %format!("{:.3}", trial_result.correction_rate),
@@ -433,15 +429,14 @@ impl AutoTunerOrchestrator {
                         );
 
                         // Compute event fields before moving values into new_champion.
-                        let improvement_pct =
-                            if champion.baseline_metrics.correction_rate > 0.0 {
-                                (champion.baseline_metrics.correction_rate
-                                    - trial_result.correction_rate)
-                                    / champion.baseline_metrics.correction_rate
-                                    * 100.0
-                            } else {
-                                0.0
-                            };
+                        let improvement_pct = if champion.baseline_metrics.correction_rate > 0.0 {
+                            (champion.baseline_metrics.correction_rate
+                                - trial_result.correction_rate)
+                                / champion.baseline_metrics.correction_rate
+                                * 100.0
+                        } else {
+                            0.0
+                        };
                         let affected_params =
                             autotuner::affected_param_names(&champion.params, &params);
 
@@ -456,7 +451,9 @@ impl AutoTunerOrchestrator {
                             impact_summary: format!(
                                 "Evaluated {} trials, {} passed constraints",
                                 result.completed_count,
-                                result.completed_count.saturating_sub(result.failed_constraints.len()),
+                                result
+                                    .completed_count
+                                    .saturating_sub(result.failed_constraints.len()),
                             ),
                             consecutive_regression_days: 0,
                         };
@@ -466,9 +463,7 @@ impl AutoTunerOrchestrator {
                         if let Some(ref bus) = domain_event_bus {
                             bus.publish(bus::DomainEvent::AutotunerDecision {
                                 trial_id: trial_id.to_string(),
-                                verdict: autotuner::TrialStatus::Promoted
-                                    .as_str()
-                                    .to_string(),
+                                verdict: autotuner::TrialStatus::Promoted.as_str().to_string(),
                                 improvement_pct,
                                 affected_params,
                             });
@@ -773,7 +768,7 @@ async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<Vec<
         .with_temperature(0.7)
         .with_response_format(providers::ResponseFormat::JsonObject);
 
-    let response = orch.provider.chat(&messages, None, &params).await?;
+    let response = orch.provider.chat(&messages, None, &params, &[]).await?;
     let content = response.content.ok_or_else(|| {
         common::KlyntbotError::Cron("autotuner: LLM returned empty response".into())
     })?;

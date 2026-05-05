@@ -9,7 +9,8 @@ use serde_json::Value;
 use common::{ProviderError, Result};
 
 use crate::types::{
-    ChatParams, LlmProvider, LlmResponse, Message, ProviderCapabilities, ProviderHealth,
+    CacheBreakpoint, ChatParams, LlmProvider, LlmResponse, Message, ProviderCapabilities,
+    ProviderHealth,
 };
 
 /// A stub provider that rejects all LLM calls with a configuration error.
@@ -22,6 +23,7 @@ impl LlmProvider for NoopProvider {
         _messages: &[Message],
         _tools: Option<&[Value]>,
         _params: &ChatParams,
+        _cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmResponse> {
         Err(ProviderError::Http(
             "No LLM provider configured. Please complete setup in Settings → Personalization."

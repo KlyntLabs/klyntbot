@@ -130,8 +130,7 @@ pub fn score_turn(content: &str, known_entities: Option<&[String]>) -> DensitySc
     let word_count = words.len() as f64;
 
     // Entity signal: capitalized words that aren't sentence starters
-    let entity_count =
-        crate::services::graph_retrieval::extract_query_entities(content).len();
+    let entity_count = crate::services::graph_retrieval::extract_query_entities(content).len();
     let entity_signal = (entity_count as f64 / word_count * 4.0).min(1.0);
 
     // Action signal: count of action verbs

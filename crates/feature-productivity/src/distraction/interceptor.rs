@@ -158,7 +158,6 @@ impl DistractionInterceptor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     async fn setup_with_config(config: FocusConfig) -> DistractionInterceptor {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();

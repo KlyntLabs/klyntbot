@@ -3,8 +3,8 @@
 use std::sync::Mutex;
 
 use providers::{
-    ChatParams, LlmProvider, LlmResponse, Message, ProviderCapabilities, ProviderHealth, ToolCall,
-    Usage,
+    CacheBreakpoint, ChatParams, LlmProvider, LlmResponse, Message, ProviderCapabilities,
+    ProviderHealth, ToolCall, Usage,
 };
 use serde_json::Value;
 
@@ -103,6 +103,7 @@ impl LlmProvider for MockProvider {
         _messages: &[Message],
         _tools: Option<&[Value]>,
         _params: &ChatParams,
+        _cache_breakpoints: &[CacheBreakpoint],
     ) -> common::Result<LlmResponse> {
         let mut responses = self.responses.lock().unwrap();
         if responses.is_empty() {

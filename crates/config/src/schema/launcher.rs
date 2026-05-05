@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use super::core::default_true;
+use serde::{Deserialize, Serialize};
 
 fn default_scan_dirs() -> Vec<String> {
     vec!["~/Projects".to_string(), "~/Developer".to_string()]

@@ -381,7 +381,6 @@ mod tests {
     use super::*;
     use crate::repos::ProductivityRepos;
     use crate::types::DailySummary;
-    
 
     async fn setup_pool() -> sqlx::SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();

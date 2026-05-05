@@ -1,6 +1,5 @@
 //! Focus / DND Tauri commands — thin adapters to `DndManager` + the macOS bridge helpers.
 
-
 use desktop_macros::{klynt_command, klynt_raw_command};
 use desktop_shared::{errors::ApiError, CommandResult};
 use feature_focus::repo::FocusSession;

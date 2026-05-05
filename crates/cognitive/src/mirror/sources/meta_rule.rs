@@ -10,8 +10,7 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::mirror::{
-    MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlert,
-    MirrorRepo,
+    MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlert, MirrorRepo,
 };
 
 const LOW_CONFIDENCE_THRESHOLD: f64 = 0.4;

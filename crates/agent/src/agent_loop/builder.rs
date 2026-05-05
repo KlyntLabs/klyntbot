@@ -57,7 +57,7 @@ impl context_engine::DecomposerLlm for DecomposerLlmAdapter {
         }];
         let response = self
             .provider
-            .chat(&messages, None, &self.params)
+            .chat(&messages, None, &self.params, &[])
             .await
             .map_err(|e| e.to_string())?;
         response.content.ok_or_else(|| "empty response".to_string())
@@ -1819,6 +1819,7 @@ impl AgentLoopBuilder {
                 provider_name: provider.name().to_string(),
                 context_window: provider.context_window(),
                 max_response_tokens: config.agents.defaults.max_tokens as usize,
+                cache_enabled: config.providers.cache.enabled,
             },
             Arc::clone(&hot_config),
         )

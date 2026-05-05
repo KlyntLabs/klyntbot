@@ -279,7 +279,11 @@ impl ContextEngine {
                     hasher.update(b"user");
                     hasher.update(format!("{content:?}").as_bytes());
                 }
-                providers::Message::Assistant { content, tool_calls, .. } => {
+                providers::Message::Assistant {
+                    content,
+                    tool_calls,
+                    ..
+                } => {
                     hasher.update(b"assistant");
                     if let Some(c) = content {
                         hasher.update(c.as_bytes());
@@ -290,7 +294,11 @@ impl ContextEngine {
                         }
                     }
                 }
-                providers::Message::Tool { tool_call_id, name, content } => {
+                providers::Message::Tool {
+                    tool_call_id,
+                    name,
+                    content,
+                } => {
                     hasher.update(b"tool");
                     hasher.update(tool_call_id.as_bytes());
                     hasher.update(name.as_bytes());

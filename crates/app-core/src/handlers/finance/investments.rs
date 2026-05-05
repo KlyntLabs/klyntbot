@@ -20,9 +20,10 @@ impl AppCore {
             .map_err(map_storage_err)?;
 
         let default_currency = self.default_currency().await;
-        let summaries = feature_finance::api::portfolio_summaries(&self.repos.finance, &default_currency)
-            .await
-            .map_err(map_storage_err)?;
+        let summaries =
+            feature_finance::api::portfolio_summaries(&self.repos.finance, &default_currency)
+                .await
+                .map_err(map_storage_err)?;
 
         Ok(portfolios
             .into_iter()

@@ -33,7 +33,6 @@ impl RetrievalIndexer {
         self.min_importance = threshold.clamp(0.0, 1.0);
         self
     }
-
 }
 
 #[async_trait]

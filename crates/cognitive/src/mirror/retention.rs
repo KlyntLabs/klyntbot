@@ -61,16 +61,7 @@ impl MirrorRetentionService {
     }
 
     pub async fn sweep_once(repo: &MirrorRepo, config: &MirrorRetentionConfig) {
-        let (
-            r1,
-            r2,
-            r3,
-            r4,
-            r5,
-            r6,
-            r7,
-            r8,
-        ) = tokio::join!(
+        let (r1, r2, r3, r4, r5, r6, r7, r8) = tokio::join!(
             repo.cleanup_old_snapshots(config.routing_snapshot_days),
             repo.cleanup_old_snippets(config.snippet_days),
             repo.cleanup_old_trend_narratives(config.narrative_days),

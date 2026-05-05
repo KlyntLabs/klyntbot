@@ -1939,10 +1939,9 @@ impl AppCore {
             // `desktop_shared::coding::SubagentEvent`; they are structurally identical
             // except for the `Cancelled` reason type (String vs enum).
             {
-                let (tx, mut rx) =
-                    tokio::sync::broadcast::channel::<::agent::subagent_events::SubagentLifecycleEvent>(
-                        256,
-                    );
+                let (tx, mut rx) = tokio::sync::broadcast::channel::<
+                    ::agent::subagent_events::SubagentLifecycleEvent,
+                >(256);
                 core.agent.set_subagent_event_sender(tx);
                 let broker = core.subagent_events.clone();
                 tokio::spawn(async move {

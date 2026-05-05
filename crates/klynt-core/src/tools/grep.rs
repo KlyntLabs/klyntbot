@@ -111,7 +111,10 @@ impl ToolExecute for GrepTool {
                     // Stream file line-by-line with a small buffer for context.
                     let mut buf: Vec<(usize, String)> = Vec::with_capacity(ctx_lines + 1);
                     let mut pending: Option<usize> = None; // index in buf of the match line
-                    for (i, line) in std::io::BufRead::lines(reader).map_while(|l| l.ok()).enumerate() {
+                    for (i, line) in std::io::BufRead::lines(reader)
+                        .map_while(|l| l.ok())
+                        .enumerate()
+                    {
                         buf.push((i, line));
 
                         if let Some(mid) = pending {

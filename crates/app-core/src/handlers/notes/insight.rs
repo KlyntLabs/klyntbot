@@ -200,7 +200,7 @@ impl AppCore {
                             },
                         ];
                         if let Ok(response) = changes_provider
-                            .chat(&messages, None, &changes_params)
+                            .chat(&messages, None, &changes_params, &[])
                             .await
                         {
                             if let Some(summary) = response.content {
@@ -362,7 +362,7 @@ impl AppCore {
         ];
 
         let response = provider
-            .chat(&messages, None, &params)
+            .chat(&messages, None, &params, &[])
             .await
             .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
 
@@ -572,7 +572,7 @@ impl AppCore {
         ];
 
         let response = provider
-            .chat(&messages, None, &params)
+            .chat(&messages, None, &params, &[])
             .await
             .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
 
@@ -677,7 +677,7 @@ impl AppCore {
             ];
 
             let response = provider
-                .chat(&messages, None, &params)
+                .chat(&messages, None, &params, &[])
                 .await
                 .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
 
@@ -1194,7 +1194,7 @@ async fn stream_synthesis(
         },
     ];
 
-    match provider.chat_stream(&messages, None, params).await {
+    match provider.chat_stream(&messages, None, params, &[]).await {
         Ok(mut stream) => {
             let mut full_content = String::new();
             while let Some(chunk_result) = StreamExt::next(&mut stream).await {
@@ -1240,8 +1240,6 @@ fn resolve_response_lang(config: &config::Config) -> Option<String> {
         .or_else(|| config.language.native_lang.clone())
 }
 
-
-
 async fn generate_tab(
     provider: &providers::DynProvider,
     emitter: &Arc<dyn AppEventEmitter>,
@@ -1258,7 +1256,7 @@ async fn generate_tab(
         },
     ];
 
-    match provider.chat(&messages, None, params).await {
+    match provider.chat(&messages, None, params, &[]).await {
         Ok(response) => {
             let raw = response.content.unwrap_or_default();
             // Strip markdown fences for JSON-producing tabs

@@ -176,6 +176,7 @@ pub async fn invoke_llm(inv: LlmInvocation<'_>) -> Result<Vec<Observation>, Dist
         &messages,
         tools.as_deref(),
         &params,
+        &[],
     );
     let resp = tokio::time::timeout(inv.timeout, fut)
         .await

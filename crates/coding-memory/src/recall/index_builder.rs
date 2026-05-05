@@ -78,7 +78,11 @@ impl IndexBuilder {
         IndexEntry {
             id: ep.id.parse().unwrap_or_else(|_| uuid::Uuid::nil()),
             kind: ep.kind.clone().unwrap_or_else(|| "episode".to_string()),
-            title: common::helpers::truncate_chars(&ep.summary.clone().unwrap_or_default(), 120, "…"),
+            title: common::helpers::truncate_chars(
+                &ep.summary.clone().unwrap_or_default(),
+                120,
+                "…",
+            ),
             when,
             scope,
             confidence: ep.importance as f32,
@@ -92,4 +96,3 @@ impl Default for IndexBuilder {
         Self::new()
     }
 }
-

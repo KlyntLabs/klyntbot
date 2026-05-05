@@ -4,12 +4,10 @@ use std::sync::LazyLock;
 static WHAT_PCT_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^what\s+%?\s*(?:percent\s+)?is\s+([\d.]+)\s+of\s+([\d.]+)$").unwrap()
 });
-static PCT_OF_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^([\d.]+)\s*%\s*of\s+([\d.]+)$").unwrap()
-});
-static ADD_SUB_PCT_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^([\d.]+)\s*([+-])\s*([\d.]+)\s*%$").unwrap()
-});
+static PCT_OF_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^([\d.]+)\s*%\s*of\s+([\d.]+)$").unwrap());
+static ADD_SUB_PCT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^([\d.]+)\s*([+-])\s*([\d.]+)\s*%$").unwrap());
 static UNIT_CONV_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^([\d.]+)\s*°?\s*([a-z]+)\s+(?:to|in)\s+°?\s*([a-z]+)$").unwrap()
 });

@@ -5,7 +5,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 impl AppCore {
-    fn tracing_provider(&self, id: &str) -> Result<Arc<dyn crate::tracing::provider::TracingProvider>, ApiError> {
+    fn tracing_provider(
+        &self,
+        id: &str,
+    ) -> Result<Arc<dyn crate::tracing::provider::TracingProvider>, ApiError> {
         self.tracing_registry.get(id).map_err(ApiError::from)
     }
 

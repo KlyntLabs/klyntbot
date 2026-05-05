@@ -73,7 +73,8 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
                 .unwrap_or("")
                 .trim();
             if !org.is_empty() && org.len() < 40 {
-                let case_corrected = original_case(content, &lc, org).unwrap_or_else(|| org.to_string());
+                let case_corrected =
+                    original_case(content, &lc, org).unwrap_or_else(|| org.to_string());
                 out.push(mk("work", "works_at", &case_corrected));
                 break;
             }

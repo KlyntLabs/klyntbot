@@ -2,7 +2,6 @@ use desktop_macros::klynt_command;
 use desktop_shared::coding::ApprovalDecisionDto;
 use desktop_shared::errors::ApiError;
 
-
 #[klynt_command]
 pub async fn approval_respond(approval_id: String, decision: ApprovalDecisionDto) -> () {
     let internal = map_decision(decision);

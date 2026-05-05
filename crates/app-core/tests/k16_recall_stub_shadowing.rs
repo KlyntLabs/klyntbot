@@ -78,9 +78,11 @@ fn shadow_property(stub_first: bool) -> bool {
     for &n in RECALL_NAMES {
         register(&mut reg, n, second);
     }
-    RECALL_NAMES
-        .iter()
-        .all(|n| reg.get(n).map(|t| t.description() == second).unwrap_or(false))
+    RECALL_NAMES.iter().all(|n| {
+        reg.get(n)
+            .map(|t| t.description() == second)
+            .unwrap_or(false)
+    })
 }
 
 proptest! {

@@ -162,15 +162,13 @@ impl CommunityRepo {
     /// Update only the `summary` text for a community (Wave 8 / Phase 6.7).
     pub async fn update_summary(&self, community_id: &str, summary: &str) -> Result<()> {
         let now = jiff::Timestamp::now().to_string();
-        sqlx::query(
-            "UPDATE communities SET summary = ?1, updated_at = ?2 WHERE id = ?3",
-        )
-        .bind(summary)
-        .bind(now)
-        .bind(community_id)
-        .execute(&self.pool)
-        .await
-        .map_err(map_sqlx)?;
+        sqlx::query("UPDATE communities SET summary = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(summary)
+            .bind(now)
+            .bind(community_id)
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx)?;
         Ok(())
     }
 

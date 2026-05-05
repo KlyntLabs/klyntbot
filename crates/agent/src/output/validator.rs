@@ -92,7 +92,11 @@ fn icontains(haystack: &str, needle: &str) -> bool {
     }
     let mut chars = haystack.chars();
     loop {
-        if chars.clone().zip(needle.chars()).all(|(a, b)| a.eq_ignore_ascii_case(&b)) {
+        if chars
+            .clone()
+            .zip(needle.chars())
+            .all(|(a, b)| a.eq_ignore_ascii_case(&b))
+        {
             return true;
         }
         if chars.next().is_none() {
@@ -125,7 +129,11 @@ fn detect_instruction_density(text: &str) -> bool {
     let instruction_markers = ["must", "always", "never", "shall", "ensure", "maintain"];
     let count = words
         .iter()
-        .filter(|w| instruction_markers.iter().any(|m| w.eq_ignore_ascii_case(m)))
+        .filter(|w| {
+            instruction_markers
+                .iter()
+                .any(|m| w.eq_ignore_ascii_case(m))
+        })
         .count();
     (count as f32 / words.len() as f32) > 0.05
 }
