@@ -8,10 +8,7 @@ use crate::state::{AppCore, HandlerResult};
 impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub async fn finance_accounts(&self) -> Result<Vec<FinanceAccountRow>, ApiError> {
-        self.repos
-            .finance
-            .accounts
-            .list(false)
+        feature_finance::api::list_accounts(&self.repos.finance)
             .await
             .map_err(map_storage_err)
     }
@@ -44,10 +41,7 @@ impl AppCore {
             exchange_rate: 1.0,
         };
 
-        self.repos
-            .finance
-            .accounts
-            .add(&row)
+        let row = feature_finance::api::create_account(&self.repos.finance, &row)
             .await
             .map_err(map_storage_err)?;
         Ok((row, Self::finance_updates(id)))
@@ -69,11 +63,7 @@ impl AppCore {
             base_currency: None,
             exchange_rate: None,
         };
-        let row = self
-            .repos
-            .finance
-            .accounts
-            .update(&patch)
+        let row = feature_finance::api::update_account(&self.repos.finance, &patch)
             .await
             .map_err(map_storage_err)?;
         Ok((row, Self::finance_updates(params.id)))
@@ -81,10 +71,7 @@ impl AppCore {
 
     #[tracing::instrument(skip(self))]
     pub async fn finance_account_delete(&self, id: String) -> HandlerResult<bool> {
-        self.repos
-            .finance
-            .accounts
-            .delete(&id)
+        feature_finance::api::delete_account(&self.repos.finance, &id)
             .await
             .map_err(map_storage_err)?;
         Ok((true, Self::finance_updates(id)))

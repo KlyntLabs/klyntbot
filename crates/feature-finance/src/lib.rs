@@ -8,6 +8,7 @@
 //! - Config: `FinanceConfig` (inlined — no dep on config crate)
 //! - Services: `PriceService` (live market data), `FinanceHandler` (proactive analysis)
 
+pub mod api;
 pub mod config;
 pub mod currency;
 pub mod events;

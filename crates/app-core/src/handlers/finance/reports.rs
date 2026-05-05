@@ -17,59 +17,32 @@ use crate::state::{AppCore, HandlerResult};
 impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub async fn finance_goals(&self) -> Result<Vec<FinanceGoalRow>, ApiError> {
-        self.repos
-            .finance
-            .goals
-            .list_all()
+        feature_finance::api::list_goals(&self.repos.finance)
             .await
             .map_err(map_storage_err)
     }
 
     #[tracing::instrument(skip(self), err)]
     pub async fn finance_liabilities(&self) -> Result<Vec<FinanceLiabilityRow>, ApiError> {
-        self.repos
-            .finance
-            .liabilities
-            .list_all()
+        feature_finance::api::list_liabilities(&self.repos.finance)
             .await
             .map_err(map_storage_err)
     }
 
     #[tracing::instrument(skip(self), err)]
     pub async fn finance_net_worth(&self) -> Result<FinanceNetWorthResponse, ApiError> {
-        let (account_totals, investment_totals, liability_totals) = tokio::try_join!(
-            self.repos.finance.accounts.total_balance_by_currency(),
-            self.repos.finance.investments.total_value_by_currency(),
-            self.repos.finance.liabilities.total_remaining_by_currency(),
-        )
-        .map_err(map_storage_err)?;
+        let totals = feature_finance::api::net_worth(&self.repos.finance)
+            .await
+            .map_err(map_storage_err)?;
 
-        let mut by_currency: HashMap<&str, CurrencyNetWorth> = HashMap::new();
-
-        for (currency, total) in &account_totals {
-            by_currency
-                .entry(currency)
-                .or_insert_with(|| CurrencyNetWorth::zero(currency.clone()))
-                .accounts = *total;
-        }
-        for (currency, total) in &investment_totals {
-            by_currency
-                .entry(currency)
-                .or_insert_with(|| CurrencyNetWorth::zero(currency.clone()))
-                .investments = *total;
-        }
-        for (currency, total) in &liability_totals {
-            by_currency
-                .entry(currency)
-                .or_insert_with(|| CurrencyNetWorth::zero(currency.clone()))
-                .liabilities = *total;
-        }
-
-        let totals_by_currency: Vec<CurrencyNetWorth> = by_currency
-            .into_values()
-            .map(|mut c| {
-                c.net = c.accounts + c.investments - c.liabilities;
-                c
+        let totals_by_currency: Vec<CurrencyNetWorth> = totals
+            .into_iter()
+            .map(|(currency, accounts, investments, liabilities)| CurrencyNetWorth {
+                currency,
+                accounts,
+                investments,
+                liabilities,
+                net: accounts + investments - liabilities,
             })
             .collect();
 
@@ -119,10 +92,7 @@ impl AppCore {
             exchange_rate: 1.0,
         };
 
-        self.repos
-            .finance
-            .goals
-            .add(&row)
+        let row = feature_finance::api::create_goal(&self.repos.finance, &row)
             .await
             .map_err(map_storage_err)?;
         Ok((row, Self::finance_updates(id)))
@@ -145,53 +115,20 @@ impl AppCore {
             status: params.status,
             ..Default::default()
         };
-        // Capture old current_amount before the update (for delta).
-        let old_current = if params.current_amount.is_some() {
-            self.repos
-                .finance
-                .goals
-                .get(&params.id)
-                .await
-                .ok()
-                .flatten()
-                .map(|g| g.current_amount)
-        } else {
-            None
-        };
 
-        let row = self
-            .repos
-            .finance
-            .goals
-            .update(&patch)
-            .await
-            .map_err(map_storage_err)?;
-
-        // Emit FinanceGoalProgress when current_amount changed.
-        if let Some(prev) = old_current {
-            let delta = row.current_amount - prev;
-            if delta != 0 {
-                if let Ok(bus) = self.domain_event_bus() {
-                    bus.publish(bus::DomainEvent::FinanceGoalProgress {
-                        goal_id: row.id.clone(),
-                        name: row.name.clone(),
-                        current_amount: row.current_amount,
-                        target_amount: row.target_amount,
-                        delta,
-                    });
-                }
-            }
-        }
-
+        let row = feature_finance::api::update_goal(
+            &self.repos.finance,
+            &patch,
+            self.domain_event_bus.as_ref(),
+        )
+        .await
+        .map_err(map_storage_err)?;
         Ok((row, Self::finance_updates(params.id)))
     }
 
     #[tracing::instrument(skip(self))]
     pub async fn finance_goal_delete(&self, id: String) -> HandlerResult<bool> {
-        self.repos
-            .finance
-            .goals
-            .delete(&id)
+        feature_finance::api::delete_goal(&self.repos.finance, &id)
             .await
             .map_err(map_storage_err)?;
         Ok((true, Self::finance_updates(id)))
@@ -232,10 +169,7 @@ impl AppCore {
             exchange_rate: 1.0,
         };
 
-        self.repos
-            .finance
-            .liabilities
-            .add(&row)
+        let row = feature_finance::api::create_liability(&self.repos.finance, &row)
             .await
             .map_err(map_storage_err)?;
         Ok((row, Self::finance_updates(id)))
@@ -257,11 +191,7 @@ impl AppCore {
             base_currency: None,
             exchange_rate: None,
         };
-        let row = self
-            .repos
-            .finance
-            .liabilities
-            .update(&patch)
+        let row = feature_finance::api::update_liability(&self.repos.finance, &patch)
             .await
             .map_err(map_storage_err)?;
         Ok((row, Self::finance_updates(params.id)))
@@ -269,10 +199,7 @@ impl AppCore {
 
     #[tracing::instrument(skip(self))]
     pub async fn finance_liability_delete(&self, id: String) -> HandlerResult<bool> {
-        self.repos
-            .finance
-            .liabilities
-            .delete(&id)
+        feature_finance::api::delete_liability(&self.repos.finance, &id)
             .await
             .map_err(map_storage_err)?;
         Ok((true, Self::finance_updates(id)))
@@ -310,13 +237,15 @@ impl AppCore {
             .unwrap_or_else(|| now.with().day(1).build().unwrap_or(now));
         let to = date_to.and_then(|d| parse_naive_date(&d)).unwrap_or(now);
 
-        let rows = self
-            .repos
-            .finance
-            .transactions
-            .sum_by_category(from, to, tx_type, &self.default_currency().await)
-            .await
-            .map_err(map_storage_err)?;
+        let rows = feature_finance::api::category_report(
+            &self.repos.finance,
+            from,
+            to,
+            tx_type,
+            &self.default_currency().await,
+        )
+        .await
+        .map_err(map_storage_err)?;
 
         let total: i64 = rows.iter().map(|(_, amt)| amt).sum();
         let breakdown = rows
@@ -346,13 +275,14 @@ impl AppCore {
             "income" => "income",
             _ => "expense",
         };
-        let rows = self
-            .repos
-            .finance
-            .transactions
-            .sum_by_period(tx_type, n as i32, &self.default_currency().await)
-            .await
-            .map_err(map_storage_err)?;
+        let rows = feature_finance::api::trend_report(
+            &self.repos.finance,
+            tx_type,
+            n as i32,
+            &self.default_currency().await,
+        )
+        .await
+        .map_err(map_storage_err)?;
 
         let points: Vec<FinanceTrendPoint> = rows
             .iter()
@@ -392,13 +322,14 @@ impl AppCore {
             ApiError::new("INVALID_PARAMS", format!("invalid date_to: {date_to}"))
         })?;
 
-        let rows = self
-            .repos
-            .finance
-            .transactions
-            .daily_spending(from, to, &self.default_currency().await)
-            .await
-            .map_err(map_storage_err)?;
+        let rows = feature_finance::api::daily_spending(
+            &self.repos.finance,
+            from,
+            to,
+            &self.default_currency().await,
+        )
+        .await
+        .map_err(map_storage_err)?;
 
         let days = rows
             .into_iter()
@@ -425,20 +356,13 @@ impl AppCore {
             ApiError::new("INVALID_PARAMS", format!("invalid date_to: {date_to}"))
         })?;
 
-        let currency = self.default_currency().await;
-
-        let from_jiff = from;
-        let to_jiff = to;
-        let (income, spending) = tokio::try_join!(
-            self.repos
-                .finance
-                .transactions
-                .sum_by_type_in_range("income", from_jiff, to_jiff, &currency),
-            self.repos
-                .finance
-                .transactions
-                .sum_by_type_in_range("expense", from_jiff, to_jiff, &currency),
+        let (income, spending) = feature_finance::api::period_summary(
+            &self.repos.finance,
+            from,
+            to,
+            &self.default_currency().await,
         )
+        .await
         .map_err(map_storage_err)?;
 
         Ok(FinancePeriodSummaryResponse { income, spending })
@@ -446,39 +370,16 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn finance_monthly_summary(&self) -> Result<FinanceMonthlySummaryResponse, ApiError> {
-        let currency = self.default_currency().await;
-        let now = jiff::Zoned::now();
-        let current_month_label = now.strftime("%Y-%m").to_string();
-        let previous_month = now
-            .date()
-            .with()
-            .day(1)
-            .build()
-            .unwrap_or_else(|_| now.date())
-            .checked_sub(jiff::Span::new().months(1))
-            .unwrap_or_else(|_| now.date());
-        let previous_month_label = previous_month.strftime("%Y-%m").to_string();
-
-        let (income_rows, expense_rows) = tokio::try_join!(
-            self.repos
-                .finance
-                .transactions
-                .sum_by_period("income", 3, &currency),
-            self.repos
-                .finance
-                .transactions
-                .sum_by_period("expense", 3, &currency),
-        )
-        .map_err(map_storage_err)?;
-
-        let income_map: HashMap<String, i64> = income_rows.into_iter().collect();
-        let expense_map: HashMap<String, i64> = expense_rows.into_iter().collect();
+        let ((_, current_income, current_spending), (_, previous_income, previous_spending)) =
+            feature_finance::api::monthly_summary(&self.repos.finance, &self.default_currency().await)
+                .await
+                .map_err(map_storage_err)?;
 
         Ok(FinanceMonthlySummaryResponse {
-            current_income: *income_map.get(&current_month_label).unwrap_or(&0),
-            current_spending: *expense_map.get(&current_month_label).unwrap_or(&0),
-            previous_income: *income_map.get(&previous_month_label).unwrap_or(&0),
-            previous_spending: *expense_map.get(&previous_month_label).unwrap_or(&0),
+            current_income,
+            current_spending,
+            previous_income,
+            previous_spending,
         })
     }
 }
