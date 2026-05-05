@@ -925,7 +925,7 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("hi")];
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         let tools = vec![];
 
         let (outcome, _usage) = core
@@ -951,7 +951,7 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("use echo")];
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         let tools = vec![];
 
         let (outcome, _usage) = core
@@ -983,7 +983,7 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("run slow")];
-        let params = ExecutionParams::new("mock").with_timeout(Duration::from_millis(100));
+        let params = ExecutionParams::new("mock", 128_000).with_timeout(Duration::from_millis(100));
         let tools = vec![];
 
         let (outcome, _usage) = core
@@ -1100,7 +1100,7 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("empty")];
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         let tools = vec![];
 
         let (outcome, _usage) = core
@@ -1129,7 +1129,7 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("create task: buy")];
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         let tools = vec![serde_json::json!({
             "type": "function",
             "function": {
@@ -1156,7 +1156,7 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("create task: buy")];
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         let tools = vec![serde_json::json!({
             "type": "function",
             "function": {
@@ -1222,7 +1222,7 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("search")];
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         let tools = vec![];
 
         let (outcome, _usage) = core

@@ -72,7 +72,7 @@ pub struct InsightForge {
 /// `k = 60`. Items appearing in multiple lists accumulate scores.
 /// The result is sorted by score descending, deduplicated by ID, and
 /// re-normalised so the top score is 1.0.
-pub(super) fn rrf_merge(ranked_lists: &[Vec<MemoryEntry>], limit: usize) -> Vec<MemoryEntry> {
+pub fn rrf_merge(ranked_lists: &[Vec<MemoryEntry>], limit: usize) -> Vec<MemoryEntry> {
     const K: f64 = 60.0;
 
     // Accumulate scores per ID.

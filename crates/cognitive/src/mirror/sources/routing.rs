@@ -319,10 +319,10 @@ mod tests {
         let repo = crate::mirror::test_mirror_repo().await;
         let source = RoutingSignalSource::new(repo);
         for _ in 0..8 {
-            source.accumulate_signal("general", 0.4, vec![]);
+            source.accumulate_signal("general", 0.4, &[]);
         }
         for _ in 0..2 {
-            source.accumulate_signal("general", 0.9, vec![]);
+            source.accumulate_signal("general", 0.9, &[]);
         }
 
         let snapshot = source.build_snapshot();
@@ -334,9 +334,9 @@ mod tests {
             RoutingSignalSource::new(repo)
         };
         for _ in 0..9 {
-            source2.accumulate_signal("general", 0.4, vec![]);
+            source2.accumulate_signal("general", 0.4, &[]);
         }
-        source2.accumulate_signal("general", 0.9, vec![]);
+        source2.accumulate_signal("general", 0.9, &[]);
         let current = source2.build_snapshot();
 
         let alert = source2.detect_drift(&current, &history);

@@ -169,9 +169,10 @@ impl AppCore {
         let mut registry = ToolRegistry::new();
         kit.register_read_only(&mut registry);
         let tool_defs: Vec<serde_json::Value> = (*registry.get_definitions()).clone();
+        let context_window = provider.context_window();
         let core = ExecutionCore::new(provider, Arc::new(RwLock::new(registry)));
 
-        let params = ExecutionParams::new(model)
+        let params = ExecutionParams::new(model, context_window)
             .with_timeout(tool_timeout)
             .with_max_iterations(REVIEW_MAX_ITER);
         let mut budget = ExecutionBudget::with_limits(DepthMode::Normal, 120_000, REVIEW_MAX_ITER);

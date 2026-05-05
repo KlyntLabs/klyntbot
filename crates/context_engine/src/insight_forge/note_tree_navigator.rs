@@ -797,7 +797,7 @@ mod tests {
             },
         ];
 
-        let merged = super::rrf_merge(&[list1, list2], 10);
+        let merged = crate::insight_forge::rrf_merge(&[list1, list2], 10);
 
         // "x" appears in both lists → should rank first.
         assert_eq!(merged[0].id, "x");

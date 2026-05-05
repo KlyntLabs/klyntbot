@@ -55,6 +55,7 @@ fn dummy_fact() -> SemanticFact {
         scope_id: None,
         scope_repo_id: None,
         metadata: None,
+        speaker: None,
     }
 }
 
@@ -75,6 +76,7 @@ fn dummy_episode() -> EpisodicMemory {
         scope_id: None,
         scope_repo_id: None,
         metadata: None,
+
         kind: None,
         actor_id: None,
         tier: "raw".into(),

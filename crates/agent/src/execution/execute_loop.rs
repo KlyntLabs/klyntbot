@@ -17,9 +17,15 @@ use tools::RoutingContext;
 use super::budget::ExecutionBudget;
 use super::core::ExecutionCore;
 use super::live_context_refresher::LiveContextRefresher;
+use super::loop_detector::{LoopDetector, LoopStatus};
 use super::mid_loop_compressor::MidLoopCompressor;
-use super::types::{accumulate_usage, CycleOutcome, ExecutionParams};
+use super::types::{CycleOutcome, ExecutionParams, accumulate_usage};
 use crate::events::AgentEvent;
+
+/// Returned to the caller when the synthesis pass produces no usable text.
+/// Never let an empty string escape `execute_loop` — users see this directly.
+const SYNTHESIS_FALLBACK: &str = "I was unable to produce a final response within the allowed budget. \
+     Please try again or rephrase your request.";
 
 /// Result of the unified execute loop.
 pub struct ExecuteLoopResult {
@@ -59,6 +65,7 @@ pub async fn execute_loop(
     let mut last_content = String::new();
     let mut wrap_up_injected = false;
     let mut synthesis_attempted = false;
+    let mut loop_detector = LoopDetector::new();
     let compressor = MidLoopCompressor::new(core.token_counter().clone(), params.context_window);
     let refresher = params
         .context_update_queue
@@ -85,11 +92,20 @@ pub async fn execute_loop(
                 });
             }
             // Already tried synthesis once — stop to avoid infinite loop
-            // (e.g. if the model keeps returning tool calls instead of text)
+            // (e.g. if the model keeps returning tool calls instead of text).
+            // Return a hardcoded fallback so callers never see an empty string.
             if synthesis_attempted {
-                warn!("Budget exhausted and synthesis did not produce text — stopping");
+                warn!("Budget exhausted and synthesis did not produce text — returning fallback");
+                crate::execution::core::fan_out_event(
+                    event_tx.as_ref(),
+                    core.domain_event_bus.as_ref(),
+                    AgentEvent::SynthesisFailed {
+                        iteration: budget.turns_used() as usize,
+                    },
+                )
+                .await;
                 return Ok(ExecuteLoopResult {
-                    content: String::new(),
+                    content: SYNTHESIS_FALLBACK.to_string(),
                     usage: accumulated_usage,
                     turns: budget.turns_used(),
                     budget_exhausted: true,
@@ -102,11 +118,15 @@ pub async fn execute_loop(
             // The next iteration's run_cycle will be invoked with tools=&[]
             // (see synthesis-pass branch below) so reasoning models that
             // would otherwise emit yet another tool_call are forced to
-            // commit text into `content`.
+            // commit text into `content`. The prompt explicitly forbids
+            // empty responses and structured output to deter reasoning
+            // models from emitting JSON or tool invocations.
             messages.push(providers::types::Message::system(
-                "Your budget is exhausted. Do NOT call any more tools. \
-                 Write a concise final answer in plain text using whatever \
-                 information you already have.",
+                "Your budget is exhausted. You MUST respond with a non-empty \
+                 plain-text answer — even if incomplete. Do NOT call any tools. \
+                 Do NOT output JSON or tool invocations. Summarise what you have \
+                 found so far, or state that you could not complete the task. \
+                 An empty response is not acceptable.",
             ));
         }
 
@@ -198,6 +218,74 @@ pub async fn execute_loop(
                 for r in &results {
                     all_tool_calls.push(r.tool_name.clone());
                 }
+
+                // ── Loop detection ───────────────────────────
+                // Hash this iteration's (name, args) pairs and check for
+                // oscillation. Warning surfaces a hint to the user via
+                // event; HardStop aborts to prevent silent budget burn.
+                let iteration_calls: Vec<(String, serde_json::Value)> = results
+                    .iter()
+                    .map(|r| (r.tool_name.clone(), r.arguments.clone()))
+                    .collect();
+                match loop_detector.record_iteration(budget.turns_used() as usize, &iteration_calls)
+                {
+                    LoopStatus::Warning {
+                        count,
+                        tools_summary,
+                        ..
+                    } => {
+                        warn!(
+                            iteration = budget.turns_used(),
+                            count,
+                            tools = %tools_summary,
+                            "LoopDetector: repeating tool-call pattern detected"
+                        );
+                        let suggestion = format!(
+                            "Iteration {} repeats the same tool calls {} times. \
+                             Consider trying a different approach.",
+                            budget.turns_used(),
+                            count
+                        );
+                        crate::execution::core::fan_out_event(
+                            event_tx.as_ref(),
+                            core.domain_event_bus.as_ref(),
+                            AgentEvent::LoopDetected {
+                                iteration: budget.turns_used() as usize,
+                                tools_summary,
+                                suggestion,
+                            },
+                        )
+                        .await;
+                    }
+                    LoopStatus::HardStop {
+                        count,
+                        tools_summary,
+                    } => {
+                        warn!(
+                            iteration = budget.turns_used(),
+                            count,
+                            tools = %tools_summary,
+                            "LoopDetector: hard-stop threshold reached — aborting execution"
+                        );
+                        crate::execution::core::fan_out_event(
+                            event_tx.as_ref(),
+                            core.domain_event_bus.as_ref(),
+                            AgentEvent::LoopHardStop {
+                                iteration: budget.turns_used() as usize,
+                                tools_summary: tools_summary.clone(),
+                            },
+                        )
+                        .await;
+                        return Err(common::KlyntbotError::Tool(
+                            common::ToolError::ExecutionFailed(format!(
+                                "Agent entered an infinite loop (tool pattern '{}' repeated {} times)",
+                                tools_summary, count
+                            )),
+                        ));
+                    }
+                    LoopStatus::NoLoop => {}
+                }
+
                 last_content = String::new(); // Reset — we'll get new content next turn
             }
 
@@ -220,9 +308,19 @@ pub async fn execute_loop(
                     warn!("Execute loop: empty response from LLM, retrying");
                     continue;
                 }
-                warn!("Execute loop: empty response from LLM, no budget for retry");
+                warn!(
+                    "Execute loop: empty response from LLM, no budget for retry — returning fallback"
+                );
+                crate::execution::core::fan_out_event(
+                    event_tx.as_ref(),
+                    core.domain_event_bus.as_ref(),
+                    AgentEvent::SynthesisFailed {
+                        iteration: budget.turns_used() as usize,
+                    },
+                )
+                .await;
                 return Ok(ExecuteLoopResult {
-                    content: String::new(),
+                    content: SYNTHESIS_FALLBACK.to_string(),
                     usage: accumulated_usage,
                     turns: budget.turns_used(),
                     budget_exhausted: true,

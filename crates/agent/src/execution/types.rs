@@ -35,7 +35,12 @@ pub struct ExecutionParams {
 }
 
 impl ExecutionParams {
-    pub fn new(model: impl Into<String>) -> Self {
+    /// Construct execution params with a required `context_window` (in tokens).
+    ///
+    /// `context_window` MUST come from the provider's `context_window()` method
+    /// (e.g. `provider.context_window()`). The mid-loop compressor uses this to
+    /// derive its threshold; passing the wrong value silently shrinks context.
+    pub fn new(model: impl Into<String>, context_window: usize) -> Self {
         Self {
             tool_timeout: Duration::from_secs(30),
             chat_params: ChatParams::new(model),
@@ -45,7 +50,7 @@ impl ExecutionParams {
             original_message: String::new(),
             planning_prompt: None,
             pipeline_timeout: None,
-            context_window: 128_000,
+            context_window,
             context_update_queue: None,
             pause_context_updates: false,
             hook_engine: None,
@@ -150,7 +155,7 @@ mod tests {
 
     #[test]
     fn execution_params_has_per_request_fields() {
-        let params = ExecutionParams::new("mock")
+        let params = ExecutionParams::new("mock", 128_000)
             .with_max_iterations(5)
             .with_max_fabrication_retries(3)
             .with_original_message("hello".to_string());
@@ -163,13 +168,13 @@ mod tests {
     #[test]
     fn execution_params_with_cancel_token() {
         let token = tokio_util::sync::CancellationToken::new();
-        let params = ExecutionParams::new("mock").with_cancel_token(token.clone());
+        let params = ExecutionParams::new("mock", 128_000).with_cancel_token(token.clone());
         assert!(params.cancel_token.is_some());
     }
 
     #[test]
     fn execution_params_defaults() {
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         assert_eq!(params.max_iterations, 10);
         assert_eq!(params.max_fabrication_retries, 2);
         assert!(params.original_message.is_empty());
@@ -178,13 +183,21 @@ mod tests {
 
     #[test]
     fn execution_params_with_context_window() {
-        let params = ExecutionParams::new("mock").with_context_window(200_000);
+        let params = ExecutionParams::new("mock", 128_000).with_context_window(200_000);
+        assert_eq!(params.context_window, 200_000);
+    }
+
+    #[test]
+    fn execution_params_stores_provider_context_window() {
+        // Regression guard: Anthropic's 200K window must propagate through
+        // construction, not be silently overridden by a default.
+        let params = ExecutionParams::new("claude-3-5-sonnet", 200_000);
         assert_eq!(params.context_window, 200_000);
     }
 
     #[test]
     fn execution_params_with_planning_prompt() {
-        let params = ExecutionParams::new("mock")
+        let params = ExecutionParams::new("mock", 128_000)
             .with_planning_prompt("Create a step-by-step plan.".to_string());
         assert_eq!(
             params.planning_prompt.as_deref(),
@@ -194,26 +207,26 @@ mod tests {
 
     #[test]
     fn execution_params_default_no_planning() {
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         assert!(params.planning_prompt.is_none());
     }
 
     #[test]
     fn execution_params_pipeline_timeout_builder() {
-        let params =
-            ExecutionParams::new("test-model").with_pipeline_timeout(Duration::from_secs(120));
+        let params = ExecutionParams::new("test-model", 128_000)
+            .with_pipeline_timeout(Duration::from_secs(120));
         assert_eq!(params.pipeline_timeout, Some(Duration::from_secs(120)));
     }
 
     #[test]
     fn execution_params_default_no_pipeline_timeout() {
-        let params = ExecutionParams::new("test-model");
+        let params = ExecutionParams::new("test-model", 128_000);
         assert!(params.pipeline_timeout.is_none());
     }
 
     #[test]
     fn execution_params_default_no_context_queue() {
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         assert!(params.context_update_queue.is_none());
         assert!(!params.pause_context_updates);
     }
@@ -221,7 +234,7 @@ mod tests {
     #[test]
     fn execution_params_with_context_queue() {
         let queue = std::sync::Arc::new(bus::ContextUpdateQueue::new());
-        let params = ExecutionParams::new("mock").with_context_update_queue(queue);
+        let params = ExecutionParams::new("mock", 128_000).with_context_update_queue(queue);
         assert!(params.context_update_queue.is_some());
     }
 }

@@ -666,7 +666,7 @@ async fn run_subagent_task(
         Message::user(task.to_string()),
     ];
 
-    let params = ExecutionParams::new(model)
+    let params = ExecutionParams::new(model, provider.context_window())
         .with_timeout(std::time::Duration::from_secs(config.task_timeout));
     let mut routing_ctx = RoutingContext::new("subagent".into(), "background".into());
     routing_ctx.hook_engine = hook_engine;

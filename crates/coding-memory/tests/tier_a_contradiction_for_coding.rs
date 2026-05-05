@@ -36,6 +36,7 @@ async fn contradiction_fires_when_repo_context_conflicts() {
             scope_id: None,
             scope_repo_id: Some("myrepo".into()),
             metadata: None,
+    speaker: None,
         })
         .await
         .unwrap();
@@ -64,6 +65,7 @@ async fn contradiction_fires_when_repo_context_conflicts() {
             scope_id: None,
             scope_repo_id: Some("myrepo".into()),
             metadata: None,
+    speaker: None,
         })
         .await
         .unwrap();

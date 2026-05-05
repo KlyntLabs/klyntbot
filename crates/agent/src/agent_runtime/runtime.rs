@@ -480,10 +480,9 @@ impl AgentRuntime {
         let mut budget = ExecutionBudget::new(depth);
 
         // Build execution params
-        let mut params = ExecutionParams::new(&self.execution_model)
+        let mut params = ExecutionParams::new(&self.execution_model, self.context_window)
             .with_max_iterations(budget.max_turns())
-            .with_original_message(message.to_string())
-            .with_context_window(self.context_window);
+            .with_original_message(message.to_string());
 
         if let Some(token) = cancel_token {
             params = params.with_cancel_token(token);

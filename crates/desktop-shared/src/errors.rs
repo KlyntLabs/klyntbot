@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// Standardized API error response for Tauri commands.
 /// Sent to the frontend with structured error information.
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiError {
     /// Machine-readable error code (e.g., "NOT_FOUND", "INVALID_PARAMS")

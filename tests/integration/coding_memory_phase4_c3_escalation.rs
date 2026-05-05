@@ -31,7 +31,7 @@ impl RetrievalSkill for LiftSkill {
 async fn escalation_lifts_coverage_and_bumps_ema() {
     let bus = Arc::new(bus::DomainEventBus::new(64));
     let reg = RetrievalSkillRegistry::new(vec![Arc::new(LiftSkill)], bus);
-    let before = reg.effectiveness_of("lift").await;
+    let before = reg.effectiveness_of("lift");
     assert!(
         (before - 0.5).abs() < f32::EPSILON,
         "initial EMA should be 0.5, got {before}"
@@ -47,7 +47,7 @@ async fn escalation_lifts_coverage_and_bumps_ema() {
     assert!(out.final_outcome.succeeded);
     assert!(out.final_outcome.coverage_after > 0.5);
 
-    let after = reg.effectiveness_of("lift").await;
+    let after = reg.effectiveness_of("lift");
     assert!(
         after > before,
         "EMA should bump after success, got before={before} after={after}"

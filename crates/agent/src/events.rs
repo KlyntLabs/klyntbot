@@ -312,6 +312,11 @@ pub enum AgentEvent {
         tools_summary: String,
     },
 
+    /// The synthesis pass (final budget-exhausted LLM call) returned no
+    /// usable text. The caller is given a hardcoded fallback message
+    /// instead of an empty response.
+    SynthesisFailed { iteration: usize },
+
     // ── Budget HUD (Deep/Ultra mode) ─────────────────────────
     /// Emitted after each turn with current budget state.
     /// UI renders the live budget HUD from this.
@@ -538,7 +543,6 @@ pub enum AgentEvent {
 #[cfg(test)]
 mod recall_skill_variant_tests {
     use super::*;
-    
 
     #[test]
     fn recall_injected_serializes_with_camel_case_tag() {
@@ -602,7 +606,6 @@ mod recall_skill_variant_tests {
 #[cfg(test)]
 mod approval_sandbox_variant_tests {
     use super::*;
-    
 
     #[test]
     fn approval_requested_carries_requires_user_input_field() {

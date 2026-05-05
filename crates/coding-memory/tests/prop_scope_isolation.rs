@@ -50,6 +50,7 @@ proptest! {
                         scope_id: None,
                         scope_repo_id: Some(format!("repo_{r}")),
                         metadata: None,
+                        speaker: None,
                     }).await.unwrap();
                 }
             }
@@ -77,6 +78,7 @@ proptest! {
                 scope_id: None,
                 scope_repo_id: None,
                 metadata: None,
+                speaker: None,
             }).await.unwrap();
 
             let telem = coding_memory::RecallInvocationRepo::new(pool.clone());
