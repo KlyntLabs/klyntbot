@@ -247,6 +247,8 @@ mod tests {
                         source: "observed".into(),
 
                         speaker: None,
+                        valid_from: None,
+                        valid_until: None,
                     }],
                 },
                 BatchExtraction {
@@ -320,6 +322,8 @@ mod tests {
             source: "observed".into(),
 
             speaker: None,
+            valid_from: None,
+            valid_until: None,
         };
         let obs = test_observation();
         let fact = to_semantic_fact(&candidate, &obs);

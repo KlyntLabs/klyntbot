@@ -391,6 +391,42 @@ pub async fn retrieve_relevant_facts(
                 // Use the stronger signal: direct co-activation or transitive community
                 let effective = co_score.max(community_score);
                 result.score += effective * weights.community;
+                if std::env::var("KCA_TRACE_FSRS").ok().as_deref() == Some("1") {
+                    tracing::debug!(
+                        fact_id = %result.fact.id,
+                        co_score,
+                        community_score,
+                        effective,
+                        community_weight = weights.community,
+                        stability = result.fact.stability,
+                        "W9 trace: hebbian + community"
+                    );
+                }
+            }
+        }
+    }
+
+    // T0.2: Graph-aware boost. When EntityRepo is wired and graph_path_boost
+    // weight > 0, boost facts whose subjects sit close to query-entity
+    // neighborhoods. Mirrors the post-hoc wiring in `UnifiedMemoryService::retrieve`
+    // (memory_retriever.rs) so the static fact-injection path benefits from the
+    // same signal as the dynamic path. recall_support is intentionally NOT wired
+    // here: this path has no recall corpus to compute "support" against.
+    if let Some(er) = entity_repo {
+        if weights.graph_path_boost > 0.0 && !scored.is_empty() {
+            let fact_refs: Vec<(&str, &str)> = scored
+                .iter()
+                .map(|s| (s.fact.id.as_str(), s.fact.subject.as_str()))
+                .collect();
+            let boosts =
+                crate::services::graph_retrieval::compute_graph_boosts(er, query, &fact_refs)
+                    .await;
+            if !boosts.is_empty() {
+                for result in &mut scored {
+                    if let Some(&b) = boosts.get(&result.fact.id) {
+                        result.score += b * weights.graph_path_boost;
+                    }
+                }
             }
         }
     }

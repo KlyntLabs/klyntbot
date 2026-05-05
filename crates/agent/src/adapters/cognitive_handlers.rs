@@ -258,13 +258,25 @@ impl cognitive::services::extraction::ConflictResolver for LlmConflictResolver {
                 return cognitive::services::extraction::ConflictDecision::Add;
             }
         };
-        let line = response
-            .content
-            .unwrap_or_default()
+        // Mimo and other reasoning models emit chain-of-thought prose and bury
+        // the verdict deep in the response (or in reasoning_content). Scan all
+        // lines from the end and pick the last one whose first token is a
+        // recognized verdict — this tolerates reasoning preambles like
+        // "First, the task is to..." while still parsing single-token replies.
+        let raw = response.content.unwrap_or_default();
+        let line = raw
             .lines()
-            .next()
-            .unwrap_or("")
-            .trim()
+            .rev()
+            .map(|l| l.trim().trim_matches(|c: char| c == '`' || c == '"' || c == '*'))
+            .find(|l| {
+                let head = l
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_uppercase();
+                matches!(head.as_str(), "ADD" | "UPDATE" | "DELETE" | "NOOP")
+            })
+            .unwrap_or_else(|| raw.lines().next().unwrap_or("").trim())
             .to_string();
         let upper = line.to_uppercase();
         if upper == "NOOP" {
