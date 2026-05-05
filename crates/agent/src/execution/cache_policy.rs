@@ -28,10 +28,12 @@ pub fn compression_aware_default(
     let mut bps = Vec::with_capacity(3);
 
     // 1. System prompt — durable, worth Persistent
-    bps.push(CacheBreakpoint {
-        anchor: CacheAnchor::LastSystem,
-        ttl: CacheTtl::Persistent,
-    });
+    if messages.iter().any(|m| m.is_system()) {
+        bps.push(CacheBreakpoint {
+            anchor: CacheAnchor::LastSystem,
+            ttl: CacheTtl::Persistent,
+        });
+    }
 
     // 2. Tool definitions — durable when present
     if matches!(tools, Some(t) if !t.is_empty()) {
@@ -139,5 +141,15 @@ mod tests {
         assert!(!bps
             .iter()
             .any(|b| matches!(b.anchor, CacheAnchor::LastTool)));
+    }
+
+    #[test]
+    fn no_system_messages_means_no_last_system_breakpoint() {
+        let compressor = make_compressor();
+        let messages = vec![user("hi")];
+        let bps = compression_aware_default(&messages, None, &compressor);
+        assert!(!bps
+            .iter()
+            .any(|b| matches!(b.anchor, CacheAnchor::LastSystem)));
     }
 }

@@ -53,14 +53,15 @@ impl MidLoopCompressor {
     ///
     /// Returns `system_count` for short conversations (len < MIN_RECENT_MESSAGES).
     pub fn frontier_index(&self, messages: &[Message]) -> usize {
-        let system_count = messages
-            .iter()
-            .take_while(|m| matches!(m, Message::System { .. }))
-            .count();
+        let system_count = Self::count_system_messages(messages);
         messages
             .len()
             .saturating_sub(MIN_RECENT_MESSAGES)
             .max(system_count)
+    }
+
+    fn count_system_messages(messages: &[Message]) -> usize {
+        messages.iter().take_while(|m| m.is_system()).count()
     }
 
     /// Compress older tool results if total tokens exceed the threshold.
@@ -88,10 +89,7 @@ impl MidLoopCompressor {
         );
 
         let recent_start = self.frontier_index(messages);
-        let system_count = messages
-            .iter()
-            .take_while(|m| matches!(m, Message::System { .. }))
-            .count();
+        let system_count = Self::count_system_messages(messages);
 
         // Accumulate savings inline to avoid a second full scan
         let mut saved_tokens: usize = 0;

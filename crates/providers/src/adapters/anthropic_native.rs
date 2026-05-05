@@ -58,7 +58,7 @@ fn resolve_breakpoints(
                     .iter()
                     .enumerate()
                     .rev()
-                    .find_map(|(i, m)| matches!(m, Message::System { .. }).then_some(i));
+                    .find_map(|(i, m)| m.is_system().then_some(i));
                 if let Some(i) = last {
                     out.push(ResolvedMarker {
                         section: SECTION_SYSTEM,
@@ -85,7 +85,7 @@ fn resolve_breakpoints(
                     // the wire messages array).
                     let system_offset = messages[..=*n]
                         .iter()
-                        .filter(|m| matches!(m, Message::System { .. }))
+                        .filter(|m| m.is_system())
                         .count();
                     let wire_idx = n.saturating_sub(system_offset);
                     out.push(ResolvedMarker {
@@ -190,6 +190,35 @@ impl AnthropicNativeProvider {
     pub fn with_extended_thinking(mut self, config: Option<ExtendedThinkingConfig>) -> Self {
         self.extended_thinking = config;
         self
+    }
+
+    /// Resolve breakpoints, synthesizing a legacy fallback if the caller passed
+    /// no explicit breakpoints and the legacy `cache_system_prompt` flag is on.
+    /// Returns the resolved markers and whether any marker needs the extended
+    /// cache TTL header.
+    fn prepare_cache_markers(
+        &self,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+        cache_breakpoints: &[CacheBreakpoint],
+    ) -> (Vec<ResolvedMarker>, bool) {
+        let bps_owned: Vec<CacheBreakpoint>;
+        let bps: &[CacheBreakpoint] = if cache_breakpoints.is_empty() && self.cache_system_prompt {
+            debug!(
+                target: "klynt::providers::anthropic",
+                "no explicit cache_breakpoints; synthesizing legacy LastSystem/Ephemeral fallback"
+            );
+            bps_owned = vec![CacheBreakpoint {
+                anchor: CacheAnchor::LastSystem,
+                ttl: CacheTtl::Ephemeral,
+            }];
+            &bps_owned
+        } else {
+            cache_breakpoints
+        };
+        let resolved = resolve_breakpoints(messages, tools, bps);
+        let needs_header = needs_extended_cache_ttl_header(&resolved);
+        (resolved, needs_header)
     }
 
     /// Extract all system prompts from messages, preserving order.
@@ -564,24 +593,7 @@ impl AnthropicNativeProvider {
             body["stream"] = json!(true);
         }
 
-        // Resolve breakpoints — synthesize a legacy fallback if caller passed
-        // no explicit breakpoints AND the legacy flag is on.
-        let bps_owned: Vec<CacheBreakpoint>;
-        let bps: &[CacheBreakpoint] = if cache_breakpoints.is_empty() && self.cache_system_prompt {
-            debug!(
-                target: "klynt::providers::anthropic",
-                "no explicit cache_breakpoints; synthesizing legacy LastSystem/Ephemeral fallback"
-            );
-            bps_owned = vec![CacheBreakpoint {
-                anchor: CacheAnchor::LastSystem,
-                ttl: CacheTtl::Ephemeral,
-            }];
-            &bps_owned
-        } else {
-            cache_breakpoints
-        };
-
-        let resolved = resolve_breakpoints(messages, tools, bps);
+        let (resolved, _) = self.prepare_cache_markers(messages, tools, cache_breakpoints);
 
         // Build a quick-lookup: section -> set of (index, ttl)
         fn marker_for(resolved: &[ResolvedMarker], section: u8, index: usize) -> Option<CacheTtl> {
@@ -600,10 +612,7 @@ impl AnthropicNativeProvider {
                 .map(|(i, text)| {
                     let mut block = json!({"type": "text", "text": text});
                     if let Some(ttl) = marker_for(&resolved, SECTION_SYSTEM, i) {
-                        block["cache_control"] = match ttl {
-                            CacheTtl::Ephemeral => json!({"type": "ephemeral"}),
-                            CacheTtl::Persistent => json!({"type": "ephemeral", "ttl": "1h"}),
-                        };
+                        block["cache_control"] = ttl.to_cache_control();
                     }
                     block
                 })
@@ -640,10 +649,7 @@ impl AnthropicNativeProvider {
         if let Some(tools_arr) = body.get_mut("tools").and_then(|t| t.as_array_mut()) {
             for (i, tool) in tools_arr.iter_mut().enumerate() {
                 if let Some(ttl) = marker_for(&resolved, SECTION_TOOLS, i) {
-                    tool["cache_control"] = match ttl {
-                        CacheTtl::Ephemeral => json!({"type": "ephemeral"}),
-                        CacheTtl::Persistent => json!({"type": "ephemeral", "ttl": "1h"}),
-                    };
+                    tool["cache_control"] = ttl.to_cache_control();
                 }
             }
         }
@@ -659,8 +665,7 @@ impl AnthropicNativeProvider {
         if let Some(msgs_arr) = converted {
             for (i, msg) in msgs_arr.iter_mut().enumerate() {
                 if let Some(ttl) = marker_for(&resolved, SECTION_MESSAGES, i) {
-                    let content = msg.get_mut("content").cloned();
-                    if let Some(content) = content {
+                    if let Some(content) = msg.as_object_mut().and_then(|o| o.remove("content")) {
                         let mut blocks: Vec<Value> = match content {
                             Value::String(s) => vec![json!({"type": "text", "text": s})],
                             Value::Array(a) => a,
@@ -668,13 +673,7 @@ impl AnthropicNativeProvider {
                         };
                         if let Some(last) = blocks.last_mut() {
                             if let Some(obj) = last.as_object_mut() {
-                                let cc = match ttl {
-                                    CacheTtl::Ephemeral => json!({"type": "ephemeral"}),
-                                    CacheTtl::Persistent => {
-                                        json!({"type": "ephemeral", "ttl": "1h"})
-                                    }
-                                };
-                                obj.insert("cache_control".to_string(), cc);
+                                obj.insert("cache_control".to_string(), ttl.to_cache_control());
                             }
                         }
                         msg["content"] = json!(blocks);
@@ -781,18 +780,7 @@ impl LlmProvider for AnthropicNativeProvider {
             self.extended_thinking.as_ref().is_some_and(|et| et.enabled),
         );
 
-        // Resolve breakpoints to check if we need the extended-cache-ttl header.
-        let bps_owned: Vec<CacheBreakpoint>;
-        let bps: &[CacheBreakpoint] = if cache_breakpoints.is_empty() && self.cache_system_prompt {
-            bps_owned = vec![CacheBreakpoint {
-                anchor: CacheAnchor::LastSystem,
-                ttl: CacheTtl::Ephemeral,
-            }];
-            &bps_owned
-        } else {
-            cache_breakpoints
-        };
-        let resolved = resolve_breakpoints(messages, tools, bps);
+        let (_, needs_header) = self.prepare_cache_markers(messages, tools, cache_breakpoints);
 
         let mut request = self
             .client
@@ -801,7 +789,7 @@ impl LlmProvider for AnthropicNativeProvider {
             .header("anthropic-version", &self.api_version)
             .header("content-type", "application/json");
 
-        if needs_extended_cache_ttl_header(&resolved) {
+        if needs_header {
             request = request.header("anthropic-beta", "extended-cache-ttl-2025-04-11");
         }
 
@@ -849,18 +837,7 @@ impl LlmProvider for AnthropicNativeProvider {
             self.extended_thinking.as_ref().is_some_and(|et| et.enabled),
         );
 
-        // Resolve breakpoints to check if we need the extended-cache-ttl header.
-        let bps_owned: Vec<CacheBreakpoint>;
-        let bps: &[CacheBreakpoint] = if cache_breakpoints.is_empty() && self.cache_system_prompt {
-            bps_owned = vec![CacheBreakpoint {
-                anchor: CacheAnchor::LastSystem,
-                ttl: CacheTtl::Ephemeral,
-            }];
-            &bps_owned
-        } else {
-            cache_breakpoints
-        };
-        let resolved = resolve_breakpoints(messages, tools, bps);
+        let (_, needs_header) = self.prepare_cache_markers(messages, tools, cache_breakpoints);
 
         let mut request = self
             .client
@@ -869,7 +846,7 @@ impl LlmProvider for AnthropicNativeProvider {
             .header("anthropic-version", &self.api_version)
             .header("content-type", "application/json");
 
-        if needs_extended_cache_ttl_header(&resolved) {
+        if needs_header {
             request = request.header("anthropic-beta", "extended-cache-ttl-2025-04-11");
         }
 

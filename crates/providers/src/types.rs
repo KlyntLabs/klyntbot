@@ -540,12 +540,27 @@ impl ToolContent {
 
 pub const DEFAULT_CONTEXT_WINDOW: usize = 128_000;
 
+impl CacheTtl {
+    /// Return the Anthropic `cache_control` JSON object for this TTL variant.
+    pub fn to_cache_control(self) -> serde_json::Value {
+        match self {
+            CacheTtl::Ephemeral => serde_json::json!({"type": "ephemeral"}),
+            CacheTtl::Persistent => serde_json::json!({"type": "ephemeral", "ttl": "1h"}),
+        }
+    }
+}
+
 impl Message {
     /// Create a system message
     pub fn system(content: impl Into<String>) -> Self {
         Self::System {
             content: content.into(),
         }
+    }
+
+    /// True if this message is a system message.
+    pub fn is_system(&self) -> bool {
+        matches!(self, Message::System { .. })
     }
 
     /// Create a user message with text
