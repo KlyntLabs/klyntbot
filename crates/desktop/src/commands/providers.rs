@@ -1,7 +1,6 @@
 use desktop_macros::klynt_command;
 use desktop_shared::errors::ApiError;
 
-use crate::commands::dev_helpers as dev;
 
 #[klynt_command]
 pub async fn providers_list() -> serde_json::Value {

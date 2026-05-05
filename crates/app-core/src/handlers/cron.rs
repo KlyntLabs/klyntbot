@@ -10,6 +10,15 @@ use uuid::Uuid;
 
 use crate::state::{AppCore, HandlerResult};
 
+fn map_cron_err(e: storage::error::StorageError) -> ApiError {
+    match e {
+        storage::error::StorageError::NotFound(_) => {
+            ApiError::new("NOT_FOUND", e.to_string())
+        }
+        other => ApiError::new("CRON_ERROR", other.to_string()),
+    }
+}
+
 /// Generate a short 8-character cron job ID from a new UUIDv4.
 pub(crate) fn new_cron_id() -> String {
     Uuid::new_v4().to_string()[..8].to_string()
@@ -64,7 +73,7 @@ impl AppCore {
             .cron_repo
             .list()
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+            .map_err(map_cron_err)?;
 
         if !include_disabled {
             rows.retain(|r| r.enabled);
@@ -82,7 +91,7 @@ impl AppCore {
             .cron_repo
             .list()
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+            .map_err(map_cron_err)?;
 
         let jobs = rows.len();
         let next_wake_at_ms = rows
@@ -122,7 +131,7 @@ impl AppCore {
             .cron_repo
             .get(&id)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+            .map_err(map_cron_err)?;
 
         Ok((to_response(&row), vec![]))
     }
@@ -135,7 +144,7 @@ impl AppCore {
             .cron_repo
             .get_opt(&id)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?
+            .map_err(map_cron_err)?
             .ok_or_else(|| ApiError::new("NOT_FOUND", format!("cron job '{id}'")))?;
 
         let now_ms = Timestamp::now().as_millisecond();
@@ -145,7 +154,7 @@ impl AppCore {
         self.cron_repo
             .upsert(&row)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+            .map_err(map_cron_err)?;
 
         self.cron_bridge
             .reconcile_all()
@@ -167,7 +176,7 @@ impl AppCore {
             .cron_repo
             .get_opt(&id)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?
+            .map_err(map_cron_err)?
         {
             if row.origin == "system" {
                 return Err(ApiError::new("FORBIDDEN", "Cannot delete system cron jobs"));
@@ -178,7 +187,7 @@ impl AppCore {
             .cron_repo
             .delete(&id)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+            .map_err(map_cron_err)?;
 
         if deleted {
             self.cron_bridge
@@ -227,7 +236,7 @@ impl AppCore {
             .cron_repo
             .upsert(&row)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+            .map_err(map_cron_err)?;
 
         self.cron_bridge
             .reconcile_all()
@@ -247,7 +256,7 @@ impl AppCore {
             .cron_repo
             .get_opt(&params.id)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?
+            .map_err(map_cron_err)?
             .ok_or_else(|| ApiError::new("NOT_FOUND", format!("cron job '{}'", params.id)))?;
 
         if existing.origin == "system" {
@@ -320,12 +329,12 @@ impl AppCore {
             .cron_repo
             .upsert(&new_row)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+            .map_err(map_cron_err)?;
 
         self.cron_repo
             .delete(&params.id)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+            .map_err(map_cron_err)?;
 
         self.cron_bridge
             .reconcile_all()

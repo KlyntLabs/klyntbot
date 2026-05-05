@@ -1,9 +1,7 @@
-use coding_agents_md::AgentsMdSource;
 use desktop_macros::klynt_command;
 use desktop_shared::coding::{ApprovalPolicy, Thread, ThreadSummary};
 use desktop_shared::errors::ApiError;
 
-use crate::commands::dev_helpers as dev;
 
 #[klynt_command]
 pub async fn coding_thread_start(

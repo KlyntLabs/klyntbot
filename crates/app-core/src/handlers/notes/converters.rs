@@ -126,7 +126,7 @@ pub(crate) async fn extract_links_and_mentions(
     row: &NoteRow,
 ) -> Result<(), ApiError> {
     // 1. Extract link targets from HTML (data-note-id attributes)
-    let mut target_ids: Vec<String> = Vec::new();
+    let mut target_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
     if let Some(html) = &row.body_html {
         target_ids.extend(link_parser::extract_wiki_link_ids(html));
     }
@@ -140,14 +140,12 @@ pub(crate) async fn extract_links_and_mentions(
             .await
             .map_err(map_storage_err)?;
         for (_title, id) in resolved {
-            if !target_ids.contains(&id) {
-                target_ids.push(id);
-            }
+            target_ids.insert(id);
         }
     }
 
-    // Filter out self-links
-    target_ids.retain(|id| id != note_id);
+    // Filter out self-links and convert to Vec
+    let target_ids: Vec<String> = target_ids.into_iter().filter(|id| id != note_id).collect();
 
     // 3. Extract entity mentions (@task:id, @project:id)
     let mentions = link_parser::extract_entity_mentions(&row.body);

@@ -96,19 +96,12 @@ impl JourneyTracker {
     /// Used as a guard for the `HelloPulse` milestone (requires >= 3 items).
     pub async fn total_item_count(&self) -> i64 {
         let db = self.pool.inner();
-        let tasks: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM tasks")
-            .fetch_one(db)
-            .await
-            .unwrap_or((0,));
-        let notes: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM notes")
-            .fetch_one(db)
-            .await
-            .unwrap_or((0,));
-        let finance: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM finance_transactions")
-            .fetch_one(db)
-            .await
-            .unwrap_or((0,));
-        tasks.0 + notes.0 + finance.0
+        let (tasks, notes, finance) = tokio::join!(
+            sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM tasks").fetch_one(db),
+            sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM notes").fetch_one(db),
+            sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM finance_transactions").fetch_one(db),
+        );
+        tasks.map_or(0, |x| x.0) + notes.map_or(0, |x| x.0) + finance.map_or(0, |x| x.0)
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────

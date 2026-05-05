@@ -9,7 +9,6 @@ pub use submission::{Submission, SubmissionResult};
 pub use trace::CodingTraceEvent;
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// Stable session identifier — re-export from common::types.
 pub use common::types::SessionKey;

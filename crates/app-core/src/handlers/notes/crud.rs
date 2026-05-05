@@ -44,7 +44,8 @@ impl AppCore {
             .await
             .map_err(map_storage_err)?
             .ok_or_else(|| ApiError::new("NOT_FOUND", format!("note '{id}' not found")))?;
-        note_with_tags(self, &row).await
+        let tags = self.note_repo.get_tags(&id).await.map_err(map_storage_err)?;
+        Ok(note_row_to_response(&row, tags))
     }
 
     #[tracing::instrument(skip(self), err)]

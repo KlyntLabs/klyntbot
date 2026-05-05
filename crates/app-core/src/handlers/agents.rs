@@ -42,7 +42,9 @@ impl AppCore {
         let mut profiles: Vec<AgentProfileSummary> = Vec::new();
 
         for bi in &builtins {
-            let has_override = skills_dir.join(bi.name).join("SKILL.md").exists();
+            let has_override = tokio::fs::try_exists(skills_dir.join(bi.name).join("SKILL.md"))
+                .await
+                .unwrap_or(false);
 
             let mut files = vec![AgentFileSummary {
                 filename: "SKILL.md".to_string(),
@@ -53,11 +55,14 @@ impl AppCore {
             }];
 
             for skill in &bi.skills {
-                let ref_override = skills_dir
-                    .join(bi.name)
-                    .join("references")
-                    .join(format!("{}.md", skill.name))
-                    .exists();
+                let ref_override = tokio::fs::try_exists(
+                    skills_dir
+                        .join(bi.name)
+                        .join("references")
+                        .join(format!("{}.md", skill.name)),
+                )
+                .await
+                .unwrap_or(false);
                 files.push(AgentFileSummary {
                     filename: format!("references/{}.md", skill.name),
                     display_name: skill.name.to_string(),
@@ -69,7 +74,7 @@ impl AppCore {
 
             // Check for additional workspace-only references
             let ws_refs_dir = skills_dir.join(bi.name).join("references");
-            if ws_refs_dir.exists() {
+            if tokio::fs::try_exists(&ws_refs_dir).await.unwrap_or(false) {
                 if let Ok(mut entries) = tokio::fs::read_dir(&ws_refs_dir).await {
                     while let Ok(Some(entry)) = entries.next_entry().await {
                         let path = entry.path();

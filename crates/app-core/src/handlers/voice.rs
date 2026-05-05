@@ -253,7 +253,7 @@ impl AppCore {
         let model = parse_model(&model_name)?;
         let svc = self.voice_service()?;
         let dir = svc.model_manager().models_dir().join(model.dir_name());
-        if dir.exists() {
+        if tokio::fs::try_exists(&dir).await.unwrap_or(false) {
             tokio::fs::remove_dir_all(&dir)
                 .await
                 .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;

@@ -8,22 +8,7 @@ use desktop_shared::commands::{
 };
 use desktop_shared::errors::ApiError;
 
-/// Cosine similarity between two vectors: dot(a,b) / (||a|| * ||b||).
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    let (mut dot, mut norm_a, mut norm_b) = (0.0_f64, 0.0_f64, 0.0_f64);
-    for (x, y) in a.iter().zip(b.iter()) {
-        let (xf, yf) = (*x as f64, *y as f64);
-        dot += xf * yf;
-        norm_a += xf * xf;
-        norm_b += yf * yf;
-    }
-    let denom = norm_a.sqrt() * norm_b.sqrt();
-    if denom == 0.0 {
-        0.0
-    } else {
-        dot / denom
-    }
-}
+use common::helpers::cosine_similarity;
 
 fn parse_json_col(s: Option<&str>) -> Option<serde_json::Value> {
     s.and_then(|v| serde_json::from_str(v).ok())

@@ -2,7 +2,6 @@ use desktop_macros::klynt_command;
 use desktop_shared::coding::ApprovalDecisionDto;
 use desktop_shared::errors::ApiError;
 
-use crate::commands::dev_helpers as dev;
 
 #[klynt_command]
 pub async fn approval_respond(approval_id: String, decision: ApprovalDecisionDto) -> () {

@@ -57,7 +57,7 @@ impl AppCore {
             }
 
             // Canonicalize — broken symlinks get skipped (not abort)
-            let canonical = match std::fs::canonicalize(&path) {
+            let canonical = match tokio::fs::canonicalize(&path).await {
                 Ok(p) => p,
                 Err(e) => {
                     skipped.push(SkippedFile {

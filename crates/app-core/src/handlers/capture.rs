@@ -119,7 +119,8 @@ impl AppCore {
         let shell = crate::infrastructure::shell_hook::detect_shell();
         let rc_file = crate::infrastructure::shell_hook::rc_file_for_shell(&shell)
             .map_err(|e| ApiError::new("INTERNAL", format!("{e}")))?;
-        let installed = std::fs::read_to_string(&rc_file)
+        let installed = tokio::fs::read_to_string(&rc_file)
+            .await
             .map(|c| c.contains(crate::infrastructure::shell_hook::MARKER_START))
             .unwrap_or(false);
 
