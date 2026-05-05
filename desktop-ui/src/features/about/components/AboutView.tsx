@@ -1,6 +1,7 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
+import "@/styles/about.css";
 
 const GITHUB_URL = "https://github.com/Dimillian/Klynt";
 const TWITTER_URL = "https://x.com/dimillian";

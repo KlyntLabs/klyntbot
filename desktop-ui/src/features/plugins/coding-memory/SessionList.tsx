@@ -12,7 +12,7 @@ export function SessionList({ sessions, selectedId, onSelect, loading }: Props) 
   if (sessions.length === 0)
     return <div className="cm-state cm-state--empty">No sessions in the last 14 days.</div>;
   return (
-    <ul className="cm-session-list" role="listbox" aria-label="Coding memory sessions">
+    <ul className="cm-session-list" aria-label="Coding memory sessions">
       {sessions.map((s) => (
         <li key={s.sessionId}>
           <button

@@ -603,6 +603,10 @@ impl Tool for ProductivityTool {
         "productivity"
     }
 
+    fn allowed_channels(&self) -> common::ChannelMask {
+        common::ChannelMask::NON_CODING
+    }
+
     fn description(&self) -> &str {
         "Track daily productivity and focus. Start/end focus sessions (Pomodoro), log time, set productivity goals, and view activity summaries. NOT for financial goals or task management."
     }

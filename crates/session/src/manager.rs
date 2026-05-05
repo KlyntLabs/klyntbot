@@ -273,6 +273,11 @@ impl SessionManager {
         }
     }
 
+    /// Get the raw session row from SQL without loading messages or caching.
+    pub async fn get_session_row(&self, key: &str) -> Result<storage::SessionRow> {
+        self.sql_repo.get_session(key).await.map_err(Into::into)
+    }
+
     /// Get an existing session or create a new one.
     ///
     /// Returns an `Arc<TokioMutex<Session>>` — the caller locks it per-session.

@@ -635,8 +635,8 @@ describe("useThreadActions", () => {
       resolveSecond = resolve;
     });
     vi.mocked(resumeThread)
-      .mockReturnValueOnce(firstPromise as Promise<any>)
-      .mockReturnValueOnce(secondPromise as Promise<any>);
+      .mockReturnValueOnce(firstPromise as unknown as Promise<Record<string, unknown>>)
+      .mockReturnValueOnce(secondPromise as unknown as Promise<Record<string, unknown>>);
     vi.mocked(buildItemsFromThread).mockReturnValue([]);
     vi.mocked(isReviewingFromThread).mockReturnValue(false);
     vi.mocked(getThreadTimestamp).mockReturnValue(0);

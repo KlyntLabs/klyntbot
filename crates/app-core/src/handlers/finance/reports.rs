@@ -350,7 +350,7 @@ impl AppCore {
             .repos
             .finance
             .transactions
-            .sum_by_period(tx_type, n as i32, "monthly", &self.default_currency().await)
+            .sum_by_period(tx_type, n as i32, &self.default_currency().await)
             .await
             .map_err(map_storage_err)?;
 
@@ -463,11 +463,11 @@ impl AppCore {
             self.repos
                 .finance
                 .transactions
-                .sum_by_period("income", 3, "monthly", &currency),
+                .sum_by_period("income", 3, &currency),
             self.repos
                 .finance
                 .transactions
-                .sum_by_period("expense", 3, "monthly", &currency),
+                .sum_by_period("expense", 3, &currency),
         )
         .map_err(map_storage_err)?;
 

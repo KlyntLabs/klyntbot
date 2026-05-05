@@ -121,18 +121,24 @@ pub(super) async fn build_situation_inputs(
 
     // Query productivity data if available.
     if let Some(pr) = prod_repos {
-        // Hours active today
-        if let Ok(active_secs) = pr.events.total_active_secs(&today_start, &now).await {
+        // Fire independent queries concurrently.
+        let (active_secs, switches, aggregates) = tokio::join!(
+            pr.events.total_active_secs(&today_start, &now),
+            pr.events.count_context_switches(&thirty_min_ago, &now),
+            pr.events.aggregate_by_type(&today_start, &now),
+        );
+
+        if let Ok(active_secs) = active_secs {
             inputs.hours_active_today = active_secs as f64 / 3600.0;
         }
-
-        // Context switches in last 30 min
-        if let Ok(switches) = pr
-            .events
-            .count_context_switches(&thirty_min_ago, &now)
-            .await
-        {
+        if let Ok(switches) = switches {
             inputs.context_switches_last_30min = switches as i32;
+        }
+        if let Ok((productive, neutral, distracting)) = aggregates {
+            let total_work = productive + neutral + distracting;
+            if total_work > 0 {
+                inputs.productive_ratio_today = productive as f64 / total_work as f64;
+            }
         }
 
         // Historical average context switches (from last 7 days of daily summaries)
@@ -147,16 +153,6 @@ pub(super) async fn build_situation_inputs(
                 let total_switches: i64 = summaries.iter().map(|s| s.context_switches).sum();
                 inputs.historical_avg_context_switches =
                     total_switches as f64 / summaries.len() as f64;
-            }
-        }
-
-        // Productive ratio today (productive_secs / total_active_secs)
-        if let Ok((productive, neutral, distracting)) =
-            pr.events.aggregate_by_type(&today_start, &now).await
-        {
-            let total_work = productive + neutral + distracting;
-            if total_work > 0 {
-                inputs.productive_ratio_today = productive as f64 / total_work as f64;
             }
         }
 

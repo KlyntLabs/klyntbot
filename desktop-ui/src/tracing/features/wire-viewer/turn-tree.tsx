@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { useMemo, useState } from "react";
-import { type WireEvent } from "@/tracing/lib/api";
-import { isErrorEvent } from "./wire-event-card";
 import {
+  AlertCircle,
+  Bot,
   ChevronDown,
   ChevronRight,
-  AlertCircle,
-  RefreshCw,
-  PanelLeftClose,
   PanelLeft,
-  Bot,
+  PanelLeftClose,
+  RefreshCw,
 } from "lucide-react";
+import { useMemo, useState } from "react";
+import type { WireEvent } from "@/tracing/lib/api";
+import { isErrorEvent } from "./wire-event-card";
 
 interface ToolCallNode {
   eventIndex: number;
@@ -102,14 +102,14 @@ function buildTree(events: WireEvent[]): TurnNode[] {
         if (tc) tc.hasError = true;
       }
     } else if (event.type === "SubagentEvent" && currentStep) {
-      const taskId = event.payload.parent_tool_call_id as string ?? "";
+      const taskId = (event.payload.parent_tool_call_id as string) ?? "";
       const inner = event.payload.event as Record<string, unknown> | undefined;
       const innerType = (inner?.type as string) ?? "";
       const innerPayload = (inner?.payload as Record<string, unknown>) ?? {};
       let summary = innerType;
       if (innerType === "ToolCall") {
         const fn = innerPayload.function as Record<string, unknown> | undefined;
-        summary = fn?.name as string ?? "tool";
+        summary = (fn?.name as string) ?? "tool";
       } else if (innerType === "TurnBegin") {
         summary = "TurnBegin";
       }
@@ -160,6 +160,7 @@ export function TurnTree({
     return (
       <div className="flex flex-col items-center border-r py-2 px-1">
         <button
+          type="button"
           onClick={onToggleCollapse}
           className="rounded p-1 hover:bg-muted text-muted-foreground"
           title="Show navigation"
@@ -173,10 +174,9 @@ export function TurnTree({
   return (
     <div className="flex flex-col border-r w-56 shrink-0 overflow-hidden">
       <div className="flex items-center justify-between px-2 py-1.5 border-b">
-        <span className="text-[11px] font-medium text-muted-foreground">
-          Navigation
-        </span>
+        <span className="text-[11px] font-medium text-muted-foreground">Navigation</span>
         <button
+          type="button"
           onClick={onToggleCollapse}
           className="rounded p-0.5 hover:bg-muted text-muted-foreground"
           title="Hide navigation"
@@ -210,13 +210,12 @@ function TurnNodeItem({
   const [expanded, setExpanded] = useState(true);
 
   const isActive =
-    visibleRange &&
-    turn.eventIndex >= visibleRange[0] &&
-    turn.eventIndex <= visibleRange[1];
+    visibleRange && turn.eventIndex >= visibleRange[0] && turn.eventIndex <= visibleRange[1];
 
   return (
     <div className="text-[11px]">
       <button
+        type="button"
         onClick={() => setExpanded((v) => !v)}
         className={`flex items-center gap-1 w-full px-2 py-1 text-left hover:bg-muted/50 transition-colors ${
           isActive ? "bg-muted/40 text-foreground" : "text-muted-foreground"
@@ -229,20 +228,19 @@ function TurnNodeItem({
         )}
         <span className="font-medium shrink-0">Turn {turn.turnNumber}</span>
         {turn.hasError && <AlertCircle size={10} className="shrink-0 text-red-500" />}
-        {turn.hasCompaction && (
-          <RefreshCw size={9} className="shrink-0 text-orange-500" />
-        )}
+        {turn.hasCompaction && <RefreshCw size={9} className="shrink-0 text-orange-500" />}
       </button>
       {expanded && (
         <>
           {turn.userInput && (
-            <div
-              className="pl-6 pr-2 py-0.5 text-[10px] text-muted-foreground truncate cursor-pointer hover:bg-muted/30"
+            <button
+              type="button"
+              className="pl-6 pr-2 py-0.5 text-[10px] text-muted-foreground truncate cursor-pointer hover:bg-muted/30 w-full text-left bg-transparent border-none"
               onClick={() => onScrollToIndex(turn.eventIndex)}
               title={turn.userInput}
             >
               &quot;{turn.userInput}&quot;
-            </div>
+            </button>
           )}
           {turn.steps.map((step) => (
             <StepNodeItem
@@ -271,13 +269,12 @@ function StepNodeItem({
   const hasChildren = step.toolCalls.length > 0 || step.subagents.length > 0;
 
   const isActive =
-    visibleRange &&
-    step.eventIndex >= visibleRange[0] &&
-    step.eventIndex <= visibleRange[1];
+    visibleRange && step.eventIndex >= visibleRange[0] && step.eventIndex <= visibleRange[1];
 
   return (
     <div>
       <button
+        type="button"
         onClick={() => {
           if (hasChildren) {
             setExpanded((v) => !v);
@@ -310,6 +307,7 @@ function StepNodeItem({
         <>
           {step.toolCalls.map((tc) => (
             <button
+              type="button"
               key={tc.eventIndex}
               onClick={() => onScrollToIndex(tc.eventIndex)}
               className={`flex items-center gap-1 w-full pl-10 pr-2 py-0.5 text-left hover:bg-muted/50 transition-colors text-[10px] text-muted-foreground ${
@@ -343,6 +341,7 @@ function SubagentNodeItem({
   return (
     <div>
       <button
+        type="button"
         onClick={() => {
           if (toolCalls.length > 0) {
             setExpanded((v) => !v);
@@ -353,7 +352,11 @@ function SubagentNodeItem({
         className="flex items-center gap-1 w-full pl-10 pr-2 py-0.5 text-left hover:bg-muted/50 transition-colors text-[10px] text-indigo-600 dark:text-indigo-400"
       >
         {toolCalls.length > 0 ? (
-          expanded ? <ChevronDown size={8} className="shrink-0 opacity-60" /> : <ChevronRight size={8} className="shrink-0 opacity-60" />
+          expanded ? (
+            <ChevronDown size={8} className="shrink-0 opacity-60" />
+          ) : (
+            <ChevronRight size={8} className="shrink-0 opacity-60" />
+          )
         ) : (
           <span className="shrink-0 w-[8px]" />
         )}
@@ -362,18 +365,21 @@ function SubagentNodeItem({
           {node.agentType ? `[${node.agentType}]` : `task:${node.taskToolCallId.slice(0, 8)}`}
         </span>
         <span className="opacity-60 shrink-0">
-          {turns > 0 && `${turns}T `}{toolCalls.length > 0 && `${toolCalls.length}TC`}
+          {turns > 0 && `${turns}T `}
+          {toolCalls.length > 0 && `${toolCalls.length}TC`}
         </span>
       </button>
-      {expanded && toolCalls.map((tc, i) => (
-        <button
-          key={i}
-          onClick={() => onScrollToIndex(node.eventIndex)}
-          className="flex items-center gap-1 w-full pl-14 pr-2 py-0.5 text-left hover:bg-muted/50 transition-colors text-[9px] text-muted-foreground truncate"
-        >
-          {tc.summary}
-        </button>
-      ))}
+      {expanded &&
+        toolCalls.map((tc) => (
+          <button
+            type="button"
+            key={tc.summary}
+            onClick={() => onScrollToIndex(node.eventIndex)}
+            className="flex items-center gap-1 w-full pl-14 pr-2 py-0.5 text-left hover:bg-muted/50 transition-colors text-[9px] text-muted-foreground truncate"
+          >
+            {tc.summary}
+          </button>
+        ))}
     </div>
   );
 }

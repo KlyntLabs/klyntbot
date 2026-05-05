@@ -22,7 +22,7 @@ describe("ChatErrorBanner", () => {
     const { container } = render(<ChatErrorBanner error="boom" onDismiss={onDismiss} />);
     const btn = container.querySelector(".chat-error-banner__dismiss");
     expect(btn).not.toBeNull();
-    fireEvent.click(btn!);
+    fireEvent.click(btn as HTMLElement);
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });

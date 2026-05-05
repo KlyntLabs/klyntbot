@@ -1,3 +1,16 @@
+/* Visually hidden element for screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 /* ── Root + layout ───────────────────────────────────────────── */
 .dashboard {
   display: flex;
@@ -20,6 +33,16 @@
   flex: 1;
   overflow: hidden;
   position: relative;
+}
+
+.dashboard__content > * {
+  animation: fade-in 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard__content > * {
+    animation: none;
+  }
 }
 
 /* ── Topbar ──────────────────────────────────────────────────── */
@@ -564,6 +587,7 @@
   transition: background-color var(--ds-dur-fast) var(--ds-ease-out);
   text-align: left;
   border: none;
+  min-height: 18px;
 }
 
 .dashboard__calendar-event:hover {
@@ -857,11 +881,10 @@
   transition: background-color 0.15s ease;
   cursor: pointer;
   border: none;
-  padding: 0;
+  padding: 3px 4px;
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  padding: 3px 4px;
 }
 
 .dashboard__year-day-num {
@@ -921,6 +944,51 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard__focus-state-pill-dot--pulsing,
+  .lc-spin,
+  .dashboard__activity-feed-row--new,
+  .dashboard__auto-focus-toast {
+    animation: none;
+  }
+  .dashboard__score-ring-svg circle,
+  .dashboard__goal-bar-fill,
+  .dashboard__hourly-bar-fill,
+  .dashboard__view-pill,
+  .dashboard__icon-button,
+  .dashboard__popover-item,
+  .dashboard__popover-reset,
+  .dashboard__mini-day,
+  .dashboard__mini-shortcut,
+  .dashboard__calendar-sync,
+  .dashboard__week-header-cell,
+  .dashboard__month-day,
+  .dashboard__year-day,
+  .dashboard__task-block,
+  .dashboard__due-today-chip,
+  .dashboard__entry-block,
+  .dashboard__entry-dot,
+  .dashboard__activity-block,
+  .dashboard__calendar-event,
+  .dashboard__week-session,
+  .dashboard__strip-toggle,
+  .dashboard__goals-add-btn,
+  .dashboard__goal-delete-btn,
+  .dashboard__goal-dialog-period-btn,
+  .dashboard__goal-dialog-metric-btn,
+  .dashboard__summary-close,
+  .dashboard__summary-entry-link,
+  .dashboard__auto-focus-toast-confirm,
+  .dashboard__auto-focus-toast-dismiss,
+  .dashboard__goal-dialog-footer button {
+    transition: none;
+  }
+  .dashboard__auto-focus-toast {
+    transform: none;
+    opacity: 1;
   }
 }
 /* ── SummaryPanel ──────────────────────────────────────────────────── */
@@ -1504,7 +1572,7 @@
   color: var(--ds-text-subtle);
 }
 .dashboard__goal-delete-btn:hover {
-  color: var(--destructive) !important;
+  color: var(--destructive);
 }
 .dashboard__goal-delete-btn svg {
   width: 12px;
@@ -1786,12 +1854,27 @@
   padding: 2px 4px;
   text-align: left;
   transition: opacity 0.2s ease;
+  min-height: 16px;
 }
 .dashboard__activity-block--selected {
   outline: 1px solid var(--border-accent);
 }
 .dashboard__activity-block--shadow {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Focus-visible for keyboard navigation */
+.dashboard__activity-block:focus-visible,
+.dashboard__calendar-event:focus-visible,
+.dashboard__week-session:focus-visible,
+.dashboard__month-day:focus-visible,
+.dashboard__year-day:focus-visible,
+.dashboard__task-block:focus-visible,
+.dashboard__entry-block:focus-visible,
+.dashboard__entry-dot:focus-visible {
+  outline: 2px solid var(--border-accent);
+  outline-offset: 1px;
+  z-index: 5;
 }
 .dashboard__activity-block-quality-badge {
   position: absolute;

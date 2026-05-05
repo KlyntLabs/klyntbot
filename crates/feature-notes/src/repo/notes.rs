@@ -392,6 +392,24 @@ impl NoteRepo {
         Ok(rows)
     }
 
+    /// Fetch notes by a list of IDs. Missing IDs are silently skipped.
+    pub async fn get_notes_by_ids(
+        &self,
+        ids: &[String],
+    ) -> Result<Vec<NoteRow>, StorageError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM notes WHERE id IN (");
+        let mut sep = qb.separated(", ");
+        for id in ids {
+            sep.push_bind(id);
+        }
+        qb.push(")");
+        let rows = qb.build_query_as::<NoteRow>().fetch_all(&self.pool).await?;
+        Ok(rows)
+    }
+
     /// Full-text search using FTS5 with BM25 ranking.
     /// Title matches are weighted 5x, body matches 1x.
     /// Returns results sorted by relevance (highest first).

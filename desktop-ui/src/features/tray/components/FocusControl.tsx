@@ -1,14 +1,12 @@
-import {
-  ChevronRight,
-  Coffee,
-  Eye,
-  Pause,
-  Play,
-  Settings,
-  Sparkles,
-  Square,
-  X,
-} from "lucide-react";
+import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
+import Coffee from "lucide-react/dist/esm/icons/coffee";
+import Eye from "lucide-react/dist/esm/icons/eye";
+import Pause from "lucide-react/dist/esm/icons/pause";
+import Play from "lucide-react/dist/esm/icons/play";
+import Settings from "lucide-react/dist/esm/icons/settings";
+import Sparkles from "lucide-react/dist/esm/icons/sparkles";
+import Square from "lucide-react/dist/esm/icons/square";
+import X from "lucide-react/dist/esm/icons/x";
 import { useEffect, useRef, useState } from "react";
 import { qk, useTauriQuery } from "@/lib/query";
 import { emit, getCurrentWindow, getWindowByLabel, isTauri } from "@/utils/tauri-bridge";
@@ -294,8 +292,8 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
           )}
 
           <div className="tc-dots">
-            {Array.from({ length: dotsCount }, (_, i) => (
-              <div key={`dot-${i}`} className={`tc-dot${i < filledDots ? " is-filled" : ""}`} />
+            {Array.from({ length: dotsCount }, (_, i) => `dot-${i}`).map((key, i) => (
+              <div key={key} className={`tc-dot${i < filledDots ? " is-filled" : ""}`} />
             ))}
           </div>
 
@@ -345,13 +343,16 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
       )}
 
       {!isBreak && !isBreakPending && !showWarning && (
-        <label className="tc-dnd-row">
+        <div className="tc-dnd-row">
           <Checkbox
+            id="tc-dnd"
             checked={settings.dndEnabled}
             onCheckedChange={(v) => timer.updateSettings({ dndEnabled: v })}
           />
-          <span className="tc-dnd-label">Do Not Disturb</span>
-        </label>
+          <label htmlFor="tc-dnd" className="tc-dnd-label">
+            Do Not Disturb
+          </label>
+        </div>
       )}
 
       {dndHint && (

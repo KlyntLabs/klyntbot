@@ -148,6 +148,12 @@
   border: none;
 }
 
+.open-app-toggle {
+  padding: 7px 8px;
+  border-radius: 0;
+  border-left: 1px solid var(--border-subtle);
+}
+
 .open-app-button .open-app-action,
 .open-app-button .open-app-toggle {
   display: flex;
@@ -176,12 +182,6 @@
   height: 14px;
   border-radius: 3px;
   flex-shrink: 0;
-}
-
-.open-app-toggle {
-  padding: 7px 8px;
-  border-radius: 0;
-  border-left: 1px solid var(--border-subtle);
 }
 
 .open-app-dropdown {
@@ -772,10 +772,6 @@
   align-items: center;
 }
 
-.branch-search .branch-input {
-  flex: 1;
-}
-
 .branch-action {
   display: inline-flex;
   align-items: center;
@@ -823,6 +819,10 @@
 
 .branch-input:focus {
   outline: 1px solid var(--border-strong);
+}
+
+.branch-search .branch-input {
+  flex: 1;
 }
 
 .branch-create-button {

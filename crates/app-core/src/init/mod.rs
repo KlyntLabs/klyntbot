@@ -16,8 +16,8 @@ mod temporal_scheduler;
 
 use std::sync::Arc;
 
-use ::agent::cognitive_handlers::{LlmConflictResolver, LlmExtractionHandler};
 use ::agent::cognitive_handlers::{HeuristicCoachingReasonerHandler, LlmCoachingReasonerHandler};
+use ::agent::cognitive_handlers::{LlmConflictResolver, LlmExtractionHandler};
 use ::agent::AgentLoop;
 use ::channels::ChannelManager;
 use ::cognitive::pipeline::{
@@ -523,7 +523,7 @@ impl AppCore {
 
         // ── Phase 8: Mirror self-reflection layer (before SignalRouter so consumers can be wired in)
         let coding_approval_history_repo =
-            ::storage::repos::CodingApprovalHistoryRepo::new(storage_pool.clone());
+            ::storage::repos::CodingApprovalHistoryRepo::new(storage_pool.inner().clone());
         let (mirror_facade, mirror_consumers, mirror_flush_handles, mirror_shutdown) = {
             let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
             let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
@@ -1268,6 +1268,7 @@ impl AppCore {
             ))),
             thread_events: bus::TypedBroker::new(1024),
             cost_events: bus::TypedBroker::new(1024),
+            subagent_events: bus::TypedBroker::new(256),
             thread_subscriptions: Arc::new(dashmap::DashMap::new()),
             steer_queue: Arc::new(crate::coding::steer_queue::SteerQueue::new()),
         };
@@ -1856,7 +1857,26 @@ impl AppCore {
                 .clone()
                 .unwrap_or_else(|| Arc::new(bus::DomainEventBus::new(64)));
 
-            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            // Toolkit cwd: walk up from the running binary's cwd to find the
+            // outermost workspace root (`.git` marker). Fixes the case where
+            // `cargo tauri dev` cd's into `crates/desktop`, leaving tools
+            // sandboxed to that subdir instead of the actual repo.
+            let cwd = {
+                let start =
+                    std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+                let mut cur = start.clone();
+                let mut found = None;
+                loop {
+                    if cur.join(".git").exists() {
+                        found = Some(cur.clone());
+                    }
+                    match cur.parent() {
+                        Some(p) if p != cur => cur = p.to_path_buf(),
+                        _ => break,
+                    }
+                }
+                found.unwrap_or(start)
+            };
             let non_ui_policy = config_guard.tools.approval_policy.non_ui_channels;
             let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
 
@@ -1908,6 +1928,75 @@ impl AppCore {
             if let Some(ref engine) = hook_engine {
                 core.agent.runtime().set_hook_engine(Arc::clone(engine));
                 core.agent.set_subagent_hook_engine(Arc::clone(engine));
+            }
+            // Bridge subagent lifecycle events from agent crate to app-core broker.
+            // The agent uses `SubagentLifecycleEvent` while the UI broker uses
+            // `desktop_shared::coding::SubagentEvent`; they are structurally identical
+            // except for the `Cancelled` reason type (String vs enum).
+            {
+                let (tx, mut rx) =
+                    tokio::sync::broadcast::channel::<::agent::subagent_events::SubagentLifecycleEvent>(
+                        256,
+                    );
+                core.agent.set_subagent_event_sender(tx);
+                let broker = core.subagent_events.clone();
+                tokio::spawn(async move {
+                    loop {
+                        match rx.recv().await {
+                            Ok(ev) => {
+                                let mapped = match ev {
+                                    ::agent::subagent_events::SubagentLifecycleEvent::Spawned {
+                                        agent_id,
+                                        label,
+                                        profile,
+                                        parent_session_id,
+                                        spawned_at,
+                                    } => desktop_shared::coding::SubagentEvent::Spawned {
+                                        agent_id,
+                                        label,
+                                        profile,
+                                        parent_session_id,
+                                        spawned_at,
+                                    },
+                                    ::agent::subagent_events::SubagentLifecycleEvent::Progress {
+                                        agent_id,
+                                        iteration,
+                                        last_tool,
+                                    } => desktop_shared::coding::SubagentEvent::Progress {
+                                        agent_id,
+                                        iteration,
+                                        last_tool,
+                                    },
+                                    ::agent::subagent_events::SubagentLifecycleEvent::Completed {
+                                        agent_id,
+                                        success,
+                                        summary,
+                                        tokens_used,
+                                        duration_ms,
+                                    } => desktop_shared::coding::SubagentEvent::Completed {
+                                        agent_id,
+                                        success,
+                                        summary,
+                                        tokens_used,
+                                        duration_ms,
+                                    },
+                                    ::agent::subagent_events::SubagentLifecycleEvent::Cancelled {
+                                        agent_id,
+                                        reason: _,
+                                        cancelled_at,
+                                    } => desktop_shared::coding::SubagentEvent::Cancelled {
+                                        agent_id,
+                                        reason: desktop_shared::coding::SubagentCancelReason::UserRequested,
+                                        cancelled_at,
+                                    },
+                                };
+                                broker.publish(mapped);
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                        }
+                    }
+                });
             }
         }
 

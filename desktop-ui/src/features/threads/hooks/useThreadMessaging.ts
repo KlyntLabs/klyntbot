@@ -763,16 +763,8 @@ export function useThreadMessaging({
       }
 
       try {
-        const response = (await getAppsListService(
-          activeWorkspace.id,
-          null,
-          100,
-          threadId,
-        )) as Record<string, unknown> | null;
-        const result = (response?.result ?? response) as Record<string, unknown> | null;
-        const data = Array.isArray(result?.data)
-          ? (result?.data as Array<Record<string, unknown>>)
-          : [];
+        const response = await getAppsListService(activeWorkspace.id, null, 100, threadId);
+        const data = Array.isArray(response) ? response : [];
         const lines = buildAppsLines(data);
 
         const timestamp = Date.now();

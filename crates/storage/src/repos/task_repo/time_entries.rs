@@ -117,8 +117,8 @@ impl TaskRepo {
         end_date: &str,
     ) -> Result<Vec<super::TimeEntryWithTask>, StorageError> {
         // Convert date strings to epoch ms bounds.
-        let start_ms = date_str_to_ms(start_date, false);
-        let end_ms = date_str_to_ms(end_date, true); // next-day exclusive
+        let start_ms = date_str_to_ms(start_date, false)?;
+        let end_ms = date_str_to_ms(end_date, true)?; // next-day exclusive
         let rows = sqlx::query_as::<_, super::TimeEntryWithTask>(
             r#"
             SELECT te.id, te.task_id, t.title AS task_title,
@@ -144,8 +144,8 @@ impl TaskRepo {
         start_date: &str,
         end_date: &str,
     ) -> Result<Vec<crate::rows::task::TaskRow>, StorageError> {
-        let start_ms = date_str_to_ms(start_date, false);
-        let end_ms = date_str_to_ms(end_date, true);
+        let start_ms = date_str_to_ms(start_date, false)?;
+        let end_ms = date_str_to_ms(end_date, true)?;
         let rows = sqlx::query_as::<_, crate::rows::task::TaskRow>(
             r#"
             SELECT * FROM tasks
@@ -168,20 +168,19 @@ impl TaskRepo {
 
 /// Convert a `YYYY-MM-DD` date string to epoch milliseconds.
 /// If `next_day` is true, returns the start of the following day (exclusive upper bound).
-fn date_str_to_ms(date: &str, next_day: bool) -> i64 {
-    let d: jiff::civil::Date = date.parse().unwrap_or_else(|_| {
-        jiff::Timestamp::now()
-            .to_zoned(jiff::tz::TimeZone::UTC)
-            .date()
-    });
+fn date_str_to_ms(date: &str, next_day: bool) -> Result<i64, StorageError> {
+    let d: jiff::civil::Date = date
+        .parse()
+        .map_err(|e| StorageError::Serialization(format!("invalid date '{date}': {e}")))?;
     let d = if next_day {
-        d.checked_add(jiff::Span::new().days(1)).unwrap_or(d)
+        d.checked_add(jiff::Span::new().days(1))
+            .map_err(|e| StorageError::Serialization(format!("date overflow for '{date}': {e}")))?
     } else {
         d
     };
-    d.at(0, 0, 0, 0)
+    Ok(d.at(0, 0, 0, 0)
         .to_zoned(jiff::tz::TimeZone::UTC)
         .expect("UTC never fails for civil datetime")
         .timestamp()
-        .as_millisecond()
+        .as_millisecond())
 }

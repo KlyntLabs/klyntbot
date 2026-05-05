@@ -1,5 +1,5 @@
 import type { ThreadStatusById } from "@utils/threadStatus";
-import { type MouseEvent, useMemo, useState } from "react";
+import { type MouseEvent, memo, useMemo, useState } from "react";
 import type { ThreadSummary } from "@/types";
 import { ThreadRow } from "./ThreadRow";
 import { buildThreadRowVisibility } from "./threadRowVisibility";
@@ -29,7 +29,7 @@ type PinnedThreadListProps = {
   ) => void;
 };
 
-export function PinnedThreadList({
+export const PinnedThreadList = memo(function PinnedThreadList({
   rows,
   activeWorkspaceId,
   activeThreadId,
@@ -95,4 +95,4 @@ export function PinnedThreadList({
       })}
     </div>
   );
-}
+});

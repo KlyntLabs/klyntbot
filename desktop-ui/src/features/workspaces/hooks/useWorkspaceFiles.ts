@@ -97,7 +97,7 @@ export function useWorkspaceFiles({
     setFiles([]);
     lastFetchedWorkspaceId.current = null;
     inFlight.current = null;
-  }, [isConnected, workspaceId]);
+  }, []);
 
   useEffect(() => {
     setIsLoading(Boolean(workspaceId && isConnected && isEnabled));

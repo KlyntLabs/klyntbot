@@ -1,4 +1,10 @@
-import { Check, Lightbulb, LogOut, Monitor, Settings, X, XCircle } from "lucide-react";
+import Check from "lucide-react/dist/esm/icons/check";
+import Lightbulb from "lucide-react/dist/esm/icons/lightbulb";
+import LogOut from "lucide-react/dist/esm/icons/log-out";
+import Monitor from "lucide-react/dist/esm/icons/monitor";
+import Settings from "lucide-react/dist/esm/icons/settings";
+import X from "lucide-react/dist/esm/icons/x";
+import XCircle from "lucide-react/dist/esm/icons/x-circle";
 import { useCallback, useMemo, useRef } from "react";
 import { useTransparentBackground } from "@/hooks/window/useTransparentBackground";
 import { useWindowAutoResize } from "@/hooks/window/useWindowAutoResize";

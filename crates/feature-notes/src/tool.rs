@@ -43,6 +43,10 @@ impl Tool for NotesTool {
         "notes"
     }
 
+    fn allowed_channels(&self) -> common::ChannelMask {
+        common::ChannelMask::NON_CODING
+    }
+
     fn description(&self) -> &str {
         "Manage the user's personal notes and notebooks. Actions: create_note, get_note, update_note, delete_note, list_notes, search_notes, tag_note, link_notes, get_backlinks, create_notebook, list_notebooks, update_notebook, delete_notebook, archive_note, unarchive_note, list_archived, capture_inbox, list_inbox, delete_inbox_item. NOT for system annotations — use 'annotate' for those."
     }

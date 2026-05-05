@@ -287,7 +287,9 @@ export function buildToolGroups(items: ConversationItem[]): MessageListEntry[] {
       (item) => item.kind !== "tool" && item.kind !== "explore",
     ).length;
     if (toolCount === 0 || normalizedBuffer.length === 1) {
-      normalizedBuffer.forEach((item) => entries.push({ kind: "item", item }));
+      normalizedBuffer.forEach((item) => {
+        entries.push({ kind: "item", item });
+      });
     } else {
       entries.push({
         kind: "toolGroup",

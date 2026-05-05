@@ -63,7 +63,7 @@ export function useFocusTimer() {
     fallback: { active: false, sync: null, session: null },
   });
   const initialStatus = initialStatusQuery.data;
-  const refetch = () => initialStatusQuery.refetch();
+  const refetch = useCallback(() => initialStatusQuery.refetch(), [initialStatusQuery]);
 
   const startMut = useTauriMutation<FocusSession, Record<string, unknown>>({
     command: "focus_session_start",
@@ -104,10 +104,10 @@ export function useFocusTimer() {
     fallback: [],
   });
   const todaySessions = todaySessionsQuery.data;
-  const refetchToday = () => todaySessionsQuery.refetch();
+  const refetchToday = useCallback(() => todaySessionsQuery.refetch(), [todaySessionsQuery]);
 
   const [serverState, setServerState] = useState<FocusSyncPayload | null>(null);
-  const [receivedAt, setReceivedAt] = useState<number>(0);
+  const [_receivedAt, setReceivedAt] = useState<number>(0);
   const [settings, setSettings] = useState(loadSettings);
   const [selectedTask, setSelectedTask] = useState<{
     id: string;
@@ -127,7 +127,7 @@ export function useFocusTimer() {
 
   useEffect(() => {
     setLocalTick(0);
-  }, [receivedAt]);
+  }, []);
 
   useEvent<FocusSyncPayload>("focus:sync", (payload) => {
     if (payload) {

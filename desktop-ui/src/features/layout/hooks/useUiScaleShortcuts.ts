@@ -26,9 +26,6 @@ export function useUiScaleShortcuts({
   const uiScale = clampUiScale(settings.uiScale);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
     getCurrentWebview()
       .setZoom(uiScale)
       .catch(() => undefined);

@@ -41,8 +41,8 @@ export function PlanPanel({ plan, isProcessing }: PlanPanelProps) {
         <div className="plan-empty">{emptyLabel}</div>
       ) : (
         <ol className="plan-list">
-          {steps.map((step, index) => (
-            <li key={`${step.step}-${index}`} className={`plan-step ${step.status}`}>
+          {steps.map((step, _index) => (
+            <li key={step.step} className={`plan-step ${step.status}`}>
               <span className="plan-step-status" aria-hidden>
                 {statusLabel(step.status)}
               </span>

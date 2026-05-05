@@ -250,8 +250,7 @@ pub async fn retrieve_relevant_facts(
                         for row in rows {
                             if let Ok(aliases) = er.list_aliases(&row.id).await {
                                 for alias in aliases {
-                                    terms_set
-                                        .insert(format!("\"{}\"", alias.replace('"', "")));
+                                    terms_set.insert(format!("\"{}\"", alias.replace('"', "")));
                                 }
                             }
                         }

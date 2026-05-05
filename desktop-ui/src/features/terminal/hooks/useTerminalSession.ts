@@ -129,7 +129,7 @@ export function useTerminalSession({
   const [message, setMessage] = useState("Open a terminal to start a session.");
   const [hasSession, setHasSession] = useState(false);
   const [readyKey, setReadyKey] = useState<string | null>(null);
-  const [sessionResetCounter, setSessionResetCounter] = useState(0);
+  const [_sessionResetCounter, setSessionResetCounter] = useState(0);
   const cleanupTerminalSession = useCallback(
     (workspaceId: string, terminalId: string) => {
       const key = `${workspaceId}:${terminalId}`;
@@ -352,15 +352,7 @@ export function useTerminalSession({
       setMessage("Failed to start terminal session.");
       onDebug?.(buildErrorDebugEntry("terminal open error", error));
     });
-  }, [
-    activeTerminalId,
-    activeWorkspace,
-    isVisible,
-    onDebug,
-    refreshTerminal,
-    syncActiveBuffer,
-    sessionResetCounter,
-  ]);
+  }, [activeTerminalId, activeWorkspace, isVisible, onDebug, refreshTerminal, syncActiveBuffer]);
 
   useEffect(() => {
     if (!isVisible || focusRequestVersion === 0) {

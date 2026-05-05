@@ -1,4 +1,5 @@
 import type { SidebarProps } from "@app/components/Sidebar";
+import { useAppMode } from "@app/hooks/useAppMode";
 import type { useMainAppComposerWorkspaceState } from "@app/hooks/useMainAppComposerWorkspaceState";
 import type { useMainAppDisplayNodes } from "@app/hooks/useMainAppDisplayNodes";
 import type { useMainAppGitState } from "@app/hooks/useMainAppGitState";
@@ -11,6 +12,7 @@ import type { RefObject } from "react";
 import type { LayoutNodesOptions } from "@/features/layout/hooks/layoutNodes/types";
 import type { ThreadState } from "@/features/threads/hooks/useThreadsReducer";
 import type { AppSettings, ComposerEditorSettings, WorkspaceInfo } from "@/types";
+import { useCodingSessions } from "@/features/coding/hooks/useCodingSessions";
 
 type ComposerProps = NonNullable<LayoutNodesOptions["primary"]["composerProps"]>;
 type MainHeaderProps = NonNullable<LayoutNodesOptions["primary"]["mainHeaderProps"]>;
@@ -1002,6 +1004,22 @@ export function useMainAppLayoutSurfaces({
   handleDebugClick,
   chatView,
 }: UseMainAppLayoutSurfacesArgs): LayoutNodesOptions {
+  const { mode } = useAppMode();
+  const codingSessions = useCodingSessions({ enabled: mode === "code" });
+
+  const sidebarThreads = mode === "code" ? codingSessions.threads : chatView.chatThreads;
+  const onSelectThread = (sessionKey: string) => {
+    if (mode === "code") {
+      const workspaceId = codingSessions.workspaceIdBySessionKey.get(sessionKey);
+      if (workspaceId) {
+        threadNavigation.selectWorkspace(workspaceId);
+        threadNavigation.setActiveThreadId(sessionKey, workspaceId);
+      }
+      return;
+    }
+    chatView.onSelectThread(sessionKey);
+  };
+
   const context: MainAppLayoutSurfacesContext = {
     appSettings,
     workspaces,
@@ -1159,7 +1177,11 @@ export function useMainAppLayoutSurfaces({
     dismissErrorToast,
     showDebugButton,
     handleDebugClick,
-    chatView,
+    chatView: {
+      ...chatView,
+      chatThreads: sidebarThreads,
+      onSelectThread,
+    },
   };
 
   return {

@@ -272,8 +272,7 @@ export const Composer = memo(function Composer({
       : "Queue"
     : sendLabel;
   const ctxWindow = contextUsage?.modelContextWindow ?? 0;
-  const ctxUsed =
-    contextUsage?.last.totalTokens || contextUsage?.total.totalTokens || 0;
+  const ctxUsed = contextUsage?.last.totalTokens || contextUsage?.total.totalTokens || 0;
   const contextFreePercent =
     ctxWindow > 0 && ctxUsed > 0
       ? Math.max(0, 100 - Math.min(100, (ctxUsed / ctxWindow) * 100))
@@ -655,88 +654,88 @@ export const Composer = memo(function Composer({
         </div>
       ) : null}
       <div className="composer-shell">
-      <ComposerInput
-        text={text}
-        disabled={disabled}
-        sendLabel={effectiveSendLabel}
-        canStop={canStop}
-        canSend={canSend}
-        isProcessing={isProcessing}
-        onStop={onStop}
-        onSend={() => handleSend(defaultSubmitIntent)}
-        dictationEnabled={dictationEnabled}
-        dictationState={dictationState}
-        dictationLevel={dictationLevel}
-        onToggleDictation={onToggleDictation}
-        onCancelDictation={onCancelDictation}
-        onOpenDictationSettings={onOpenDictationSettings}
-        dictationError={dictationError}
-        onDismissDictationError={onDismissDictationError}
-        dictationHint={dictationHint}
-        onDismissDictationHint={onDismissDictationHint}
-        attachments={attachedImages}
-        onAddAttachment={onPickImages}
-        onAttachImages={onAttachImages}
-        onRemoveAttachment={onRemoveImage}
-        onTextChange={handleTextChangeWithHistory}
-        onSelectionChange={handleSelectionChange}
-        onTextPaste={handleTextPaste}
-        isExpanded={editorExpanded}
-        onToggleExpand={onToggleEditorExpanded}
-        onKeyDown={handleKeyDown}
-        textareaRef={textareaRef}
-        suggestionsOpen={suggestionsOpen}
-        suggestions={suggestions}
-        highlightIndex={highlightIndex}
-        onHighlightIndex={setHighlightIndex}
-        onSelectSuggestion={applyAutocomplete}
-        suggestionsStyle={suggestionsStyle}
-        reviewPrompt={reviewPrompt}
-        onReviewPromptClose={onReviewPromptClose}
-        onReviewPromptShowPreset={onReviewPromptShowPreset}
-        onReviewPromptChoosePreset={onReviewPromptChoosePreset}
-        highlightedPresetIndex={highlightedPresetIndex}
-        onReviewPromptHighlightPreset={onReviewPromptHighlightPreset}
-        highlightedBranchIndex={highlightedBranchIndex}
-        onReviewPromptHighlightBranch={onReviewPromptHighlightBranch}
-        highlightedCommitIndex={highlightedCommitIndex}
-        onReviewPromptHighlightCommit={onReviewPromptHighlightCommit}
-        onReviewPromptSelectBranch={onReviewPromptSelectBranch}
-        onReviewPromptSelectBranchAtIndex={onReviewPromptSelectBranchAtIndex}
-        onReviewPromptConfirmBranch={onReviewPromptConfirmBranch}
-        onReviewPromptSelectCommit={onReviewPromptSelectCommit}
-        onReviewPromptSelectCommitAtIndex={onReviewPromptSelectCommitAtIndex}
-        onReviewPromptConfirmCommit={onReviewPromptConfirmCommit}
-        onReviewPromptUpdateCustomInstructions={onReviewPromptUpdateCustomInstructions}
-        onReviewPromptConfirmCustom={onReviewPromptConfirmCustom}
-        contextFreePercent={contextFreePercent}
-        contextFreeLabel={contextFreeLabel}
-      />
-      <ComposerMetaBar
-        disabled={disabled}
-        collaborationModes={collaborationModes}
-        selectedCollaborationModeId={selectedCollaborationModeId}
-        onSelectCollaborationMode={onSelectCollaborationMode}
-        providers={providers}
-        selectedProviderId={selectedProviderId}
-        onSelectProvider={onSelectProvider}
-        models={models}
-        selectedModelId={selectedModelId}
-        onSelectModel={onSelectModel}
-        reasoningOptions={reasoningOptions}
-        selectedEffort={selectedEffort}
-        onSelectEffort={onSelectEffort}
-        selectedServiceTier={selectedServiceTier}
-        reasoningSupported={reasoningSupported}
-        codexArgsOptions={codexArgsOptions}
-        selectedCodexArgsOverride={selectedCodexArgsOverride}
-        onSelectCodexArgsOverride={onSelectCodexArgsOverride}
-        accessMode={accessMode}
-        onSelectAccessMode={onSelectAccessMode}
-      >
-        <CodingModePill threadId={historyKey} />
-        <CostPill threadId={historyKey} />
-      </ComposerMetaBar>
+        <ComposerInput
+          text={text}
+          disabled={disabled}
+          sendLabel={effectiveSendLabel}
+          canStop={canStop}
+          canSend={canSend}
+          isProcessing={isProcessing}
+          onStop={onStop}
+          onSend={() => handleSend(defaultSubmitIntent)}
+          dictationEnabled={dictationEnabled}
+          dictationState={dictationState}
+          dictationLevel={dictationLevel}
+          onToggleDictation={onToggleDictation}
+          onCancelDictation={onCancelDictation}
+          onOpenDictationSettings={onOpenDictationSettings}
+          dictationError={dictationError}
+          onDismissDictationError={onDismissDictationError}
+          dictationHint={dictationHint}
+          onDismissDictationHint={onDismissDictationHint}
+          attachments={attachedImages}
+          onAddAttachment={onPickImages}
+          onAttachImages={onAttachImages}
+          onRemoveAttachment={onRemoveImage}
+          onTextChange={handleTextChangeWithHistory}
+          onSelectionChange={handleSelectionChange}
+          onTextPaste={handleTextPaste}
+          isExpanded={editorExpanded}
+          onToggleExpand={onToggleEditorExpanded}
+          onKeyDown={handleKeyDown}
+          textareaRef={textareaRef}
+          suggestionsOpen={suggestionsOpen}
+          suggestions={suggestions}
+          highlightIndex={highlightIndex}
+          onHighlightIndex={setHighlightIndex}
+          onSelectSuggestion={applyAutocomplete}
+          suggestionsStyle={suggestionsStyle}
+          reviewPrompt={reviewPrompt}
+          onReviewPromptClose={onReviewPromptClose}
+          onReviewPromptShowPreset={onReviewPromptShowPreset}
+          onReviewPromptChoosePreset={onReviewPromptChoosePreset}
+          highlightedPresetIndex={highlightedPresetIndex}
+          onReviewPromptHighlightPreset={onReviewPromptHighlightPreset}
+          highlightedBranchIndex={highlightedBranchIndex}
+          onReviewPromptHighlightBranch={onReviewPromptHighlightBranch}
+          highlightedCommitIndex={highlightedCommitIndex}
+          onReviewPromptHighlightCommit={onReviewPromptHighlightCommit}
+          onReviewPromptSelectBranch={onReviewPromptSelectBranch}
+          onReviewPromptSelectBranchAtIndex={onReviewPromptSelectBranchAtIndex}
+          onReviewPromptConfirmBranch={onReviewPromptConfirmBranch}
+          onReviewPromptSelectCommit={onReviewPromptSelectCommit}
+          onReviewPromptSelectCommitAtIndex={onReviewPromptSelectCommitAtIndex}
+          onReviewPromptConfirmCommit={onReviewPromptConfirmCommit}
+          onReviewPromptUpdateCustomInstructions={onReviewPromptUpdateCustomInstructions}
+          onReviewPromptConfirmCustom={onReviewPromptConfirmCustom}
+          contextFreePercent={contextFreePercent}
+          contextFreeLabel={contextFreeLabel}
+        />
+        <ComposerMetaBar
+          disabled={disabled}
+          collaborationModes={collaborationModes}
+          selectedCollaborationModeId={selectedCollaborationModeId}
+          onSelectCollaborationMode={onSelectCollaborationMode}
+          providers={providers}
+          selectedProviderId={selectedProviderId}
+          onSelectProvider={onSelectProvider}
+          models={models}
+          selectedModelId={selectedModelId}
+          onSelectModel={onSelectModel}
+          reasoningOptions={reasoningOptions}
+          selectedEffort={selectedEffort}
+          onSelectEffort={onSelectEffort}
+          selectedServiceTier={selectedServiceTier}
+          reasoningSupported={reasoningSupported}
+          codexArgsOptions={codexArgsOptions}
+          selectedCodexArgsOverride={selectedCodexArgsOverride}
+          onSelectCodexArgsOverride={onSelectCodexArgsOverride}
+          accessMode={accessMode}
+          onSelectAccessMode={onSelectAccessMode}
+        >
+          <CodingModePill threadId={historyKey} />
+          <CostPill threadId={historyKey} />
+        </ComposerMetaBar>
       </div>
     </footer>
   );

@@ -92,7 +92,7 @@ export function useTrayRecentThreads({
     [isSubagentThread, threadsByWorkspace, workspaces],
   );
   const serializedEntries = useMemo(() => JSON.stringify(entries), [entries]);
-  const syncEntries = useMemo(() => entries, [serializedEntries]);
+  const syncEntries = useMemo(() => entries, [entries]);
   const lastSyncedEntriesRef = useRef<string | null>(null);
 
   useEffect(() => {

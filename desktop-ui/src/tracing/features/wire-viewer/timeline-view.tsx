@@ -1,16 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { useCallback, useMemo, useRef, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import {
-  Layers,
-  ArrowDownNarrowWide,
-  ZoomIn,
-  ZoomOut,
-  Activity,
-  Timer,
-} from "lucide-react";
+import { Activity, ArrowDownNarrowWide, Layers, Timer, ZoomIn, ZoomOut } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { WireEvent } from "@/tracing/lib/api";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -45,7 +38,13 @@ type TooltipPayload =
       action: string;
       response: string;
     }
-  | { kind: "subagent"; taskToolCallId: string; eventCount: number; subagentType?: string; agentId?: string };
+  | {
+      kind: "subagent";
+      taskToolCallId: string;
+      eventCount: number;
+      subagentType?: string;
+      agentId?: string;
+    };
 
 interface TimelineBar {
   label: string;
@@ -140,7 +139,17 @@ function buildTimeline(events: WireEvent[]): BuildTimelineResult {
   let genIsThinking = false;
 
   // ── Track sub-agents ──
-  const subagentData = new Map<string, { startTime: number; endTime: number; eventIndex: number; eventCount: number; subagentType?: string; agentId?: string }>();
+  const subagentData = new Map<
+    string,
+    {
+      startTime: number;
+      endTime: number;
+      eventIndex: number;
+      eventCount: number;
+      subagentType?: string;
+      agentId?: string;
+    }
+  >();
 
   const closeGeneration = (t: number) => {
     if (genStart !== null) {
@@ -225,12 +234,8 @@ function buildTimeline(events: WireEvent[]): BuildTimelineResult {
       if (typeof input === "string") {
         turnUserInput = input.slice(0, 120);
       } else if (Array.isArray(input)) {
-        const textPart = input.find(
-          (p: Record<string, unknown>) => p.type === "text",
-        );
-        turnUserInput = textPart
-          ? String(textPart.text ?? "").slice(0, 120)
-          : "(multipart)";
+        const textPart = input.find((p: Record<string, unknown>) => p.type === "text");
+        turnUserInput = textPart ? String(textPart.text ?? "").slice(0, 120) : "(multipart)";
       } else {
         turnUserInput = "";
       }
@@ -273,7 +278,8 @@ function buildTimeline(events: WireEvent[]): BuildTimelineResult {
       closeGeneration(t);
       const tcId = e.payload.tool_call_id as string | undefined;
       if (tcId && openToolCalls.has(tcId)) {
-        const call = openToolCalls.get(tcId)!;
+        const call = openToolCalls.get(tcId);
+        if (!call) continue;
         const rv = e.payload.return_value as Record<string, unknown> | undefined;
         const hasError = rv?.is_error === true;
         bars.push({
@@ -308,7 +314,8 @@ function buildTimeline(events: WireEvent[]): BuildTimelineResult {
     } else if (e.type === "ApprovalResponse") {
       const reqId = e.payload.request_id as string | undefined;
       if (reqId && openApprovals.has(reqId)) {
-        const req = openApprovals.get(reqId)!;
+        const req = openApprovals.get(reqId);
+        if (!req) continue;
         const response = (e.payload.response as string) ?? "";
         bars.push({
           label: `Approval: ${req.action || req.sender || "wait"}`,
@@ -343,13 +350,13 @@ function buildTimeline(events: WireEvent[]): BuildTimelineResult {
       }
     } else if (e.type === "StatusUpdate") {
       const cu = e.payload.context_usage as number | undefined;
-      const tu = e.payload.token_usage as
-        | Record<string, number>
-        | undefined;
+      const tu = e.payload.token_usage as Record<string, number> | undefined;
       if (cu !== undefined || tu) {
         tokenData.push({
           timeSec: t,
-          inputTokens: tu ? (tu.input_other ?? 0) + (tu.input_cache_read ?? 0) + (tu.input_cache_creation ?? 0) : 0,
+          inputTokens: tu
+            ? (tu.input_other ?? 0) + (tu.input_cache_read ?? 0) + (tu.input_cache_creation ?? 0)
+            : 0,
           outputTokens: tu?.output ?? 0,
           contextUsage: cu ?? 0,
           eventIndex: e.index,
@@ -372,12 +379,16 @@ function buildTimeline(events: WireEvent[]): BuildTimelineResult {
       if (taskId) {
         if (!subagentData.has(taskId)) {
           subagentData.set(taskId, {
-            startTime: t, endTime: t, eventIndex: e.index, eventCount: 0,
+            startTime: t,
+            endTime: t,
+            eventIndex: e.index,
+            eventCount: 0,
             subagentType: (e.payload.subagent_type as string) ?? undefined,
             agentId: (e.payload.agent_id as string) ?? undefined,
           });
         }
-        const sa = subagentData.get(taskId)!;
+        const sa = subagentData.get(taskId);
+        if (!sa) continue;
         sa.endTime = Math.max(sa.endTime, t);
         sa.startTime = Math.min(sa.startTime, t);
         sa.eventCount++;
@@ -450,16 +461,12 @@ function buildTimeline(events: WireEvent[]): BuildTimelineResult {
   }
 
   const totalSec =
-    events.length >= 2
-      ? events[events.length - 1].timestamp - events[0].timestamp
-      : 0;
+    events.length >= 2 ? events[events.length - 1].timestamp - events[0].timestamp : 0;
 
   // ── Compute gaps ──
   const gaps: GapIndicator[] = [];
   if (totalSec > 0) {
-    const toolBars = bars
-      .filter((b) => b.depth === 2)
-      .sort((a, b) => a.startSec - b.startSec);
+    const toolBars = bars.filter((b) => b.depth === 2).sort((a, b) => a.startSec - b.startSec);
     for (let i = 1; i < toolBars.length; i++) {
       const prev = toolBars[i - 1];
       const curr = toolBars[i];
@@ -490,10 +497,7 @@ function formatDuration(sec: number): string {
   return `${(sec / 60).toFixed(1)}min`;
 }
 
-function computeTicks(
-  rangeStart: number,
-  rangeEnd: number,
-): { sec: number; label: string }[] {
+function computeTicks(rangeStart: number, rangeEnd: number): { sec: number; label: string }[] {
   const duration = rangeEnd - rangeStart;
   if (duration <= 0) return [];
 
@@ -570,8 +574,8 @@ function BarTooltipContent({ bar }: { bar: TimelineBar }) {
       {d.kind === "turn" && (
         <>
           <div className="text-muted-foreground">
-            {d.stepCount} step{d.stepCount !== 1 ? "s" : ""}, {d.toolCallCount}{" "}
-            tool call{d.toolCallCount !== 1 ? "s" : ""}
+            {d.stepCount} step{d.stepCount !== 1 ? "s" : ""}, {d.toolCallCount} tool call
+            {d.toolCallCount !== 1 ? "s" : ""}
           </div>
           {d.userInput && (
             <div className="text-muted-foreground/80 italic truncate max-w-[240px]">
@@ -616,9 +620,7 @@ function BarTooltipContent({ bar }: { bar: TimelineBar }) {
           </div>
           <div
             className={
-              d.response === "reject"
-                ? "text-red-500 font-medium"
-                : "text-green-500 font-medium"
+              d.response === "reject" ? "text-red-500 font-medium" : "text-green-500 font-medium"
             }
           >
             {d.response === "approve"
@@ -636,7 +638,8 @@ function BarTooltipContent({ bar }: { bar: TimelineBar }) {
         <>
           {d.subagentType && (
             <div className="font-medium text-indigo-600 dark:text-indigo-400">
-              {d.subagentType}{d.agentId ? ` (${d.agentId})` : ""}
+              {d.subagentType}
+              {d.agentId ? ` (${d.agentId})` : ""}
             </div>
           )}
           <div className="font-mono text-[10px] text-muted-foreground/70">
@@ -668,34 +671,26 @@ function TokenSparkline({
   const H = 24;
   const PAD_Y = 2;
 
-  const maxTokens = Math.max(
-    ...tokenData.map((d) => d.inputTokens + d.outputTokens),
-    1,
-  );
+  const maxTokens = Math.max(...tokenData.map((d) => d.inputTokens + d.outputTokens), 1);
 
   const points = tokenData
     .filter((d) => d.timeSec >= rangeStart && d.timeSec <= rangeStart + rangeDuration)
     .map((d) => {
       const x = ((d.timeSec - rangeStart) / rangeDuration) * W;
-      const y =
-        H - PAD_Y - ((d.inputTokens + d.outputTokens) / maxTokens) * (H - PAD_Y * 2);
+      const y = H - PAD_Y - ((d.inputTokens + d.outputTokens) / maxTokens) * (H - PAD_Y * 2);
       return { x, y };
     });
 
   if (points.length < 2) return null;
 
-  const linePath = points
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`)
-    .join(" ");
+  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
   const areaPath = `${linePath} L${points[points.length - 1].x},${H} L${points[0].x},${H} Z`;
 
   // Context usage line
   const ctxPoints = tokenData
     .filter(
       (d) =>
-        d.timeSec >= rangeStart &&
-        d.timeSec <= rangeStart + rangeDuration &&
-        d.contextUsage > 0,
+        d.timeSec >= rangeStart && d.timeSec <= rangeStart + rangeDuration && d.contextUsage > 0,
     )
     .map((d) => {
       const x = ((d.timeSec - rangeStart) / rangeDuration) * W;
@@ -712,17 +707,10 @@ function TokenSparkline({
     <div className="flex items-center gap-2 h-6 mb-1">
       <div className="shrink-0 w-32" />
       <div className="flex-1 relative">
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          className="w-full h-6"
-          preserveAspectRatio="none"
-        >
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-6" preserveAspectRatio="none">
+          <title>Token usage sparkline</title>
           <path d={areaPath} className="fill-primary/8" />
-          <path
-            d={linePath}
-            className="stroke-primary/40 fill-none"
-            strokeWidth={1.5}
-          />
+          <path d={linePath} className="stroke-primary/40 fill-none" strokeWidth={1.5} />
           {ctxPath && (
             <path
               d={ctxPath}
@@ -772,15 +760,10 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
 
   const visibleBars = useMemo(() => {
     if (!isZoomed) return sortedBars;
-    return sortedBars.filter(
-      (bar) => bar.endSec > rangeStart && bar.startSec < rangeEnd,
-    );
+    return sortedBars.filter((bar) => bar.endSec > rangeStart && bar.startSec < rangeEnd);
   }, [sortedBars, isZoomed, rangeStart, rangeEnd]);
 
-  const ticks = useMemo(
-    () => computeTicks(rangeStart, rangeEnd),
-    [rangeStart, rangeEnd],
-  );
+  const ticks = useMemo(() => computeTicks(rangeStart, rangeEnd), [rangeStart, rangeEnd]);
 
   // ── Zoom handlers ──
   const getTimeFromMouseEvent = useCallback(
@@ -880,6 +863,7 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
           {/* Sort mode toggle */}
           <div className="flex items-center border rounded-md overflow-hidden ml-3">
             <button
+              type="button"
               onClick={() => setSortMode("hierarchy")}
               className={`px-2 py-1 text-xs flex items-center gap-1 transition-colors ${
                 sortMode === "hierarchy"
@@ -892,6 +876,7 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
               Hierarchy
             </button>
             <button
+              type="button"
               onClick={() => setSortMode("chronological")}
               className={`px-2 py-1 text-xs flex items-center gap-1 transition-colors ${
                 sortMode === "chronological"
@@ -908,6 +893,7 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
           {/* Gap toggle */}
           {gaps.length > 0 && (
             <button
+              type="button"
               onClick={() => setShowGaps((v) => !v)}
               className={`px-2 py-1 text-xs rounded-md border flex items-center gap-1 transition-colors ${
                 showGaps
@@ -924,6 +910,7 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
           {/* Token sparkline toggle */}
           {tokenData.length >= 2 && (
             <button
+              type="button"
               onClick={() => setShowTokens((v) => !v)}
               className={`px-2 py-1 text-xs rounded-md border flex items-center gap-1 transition-colors ${
                 showTokens
@@ -940,6 +927,7 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
           {/* Zoom controls */}
           <div className="flex items-center border rounded-md overflow-hidden ml-1">
             <button
+              type="button"
               onClick={() => zoomBy(0.5)}
               className="px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
               title="Zoom in"
@@ -947,6 +935,7 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
               <ZoomIn className="w-3 h-3" />
             </button>
             <button
+              type="button"
               onClick={() => zoomBy(2)}
               className="px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors border-l"
               title="Zoom out"
@@ -955,6 +944,7 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
             </button>
             {isZoomed && (
               <button
+                type="button"
                 onClick={resetZoom}
                 className="px-2 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors border-l"
                 title="Reset zoom"
@@ -1013,6 +1003,8 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
         {/* ── Bar Area ── */}
         <div
           ref={trackContainerRef}
+          role="application"
+          aria-label="Timeline selection area"
           className="relative select-none"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -1024,15 +1016,13 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
           {/* Compaction marker overlays */}
           {compactionMarkers.map((c) => {
             const leftPct = ((c.startSec - rangeStart) / rangeDuration) * 100;
-            const widthPct = Math.max(
-              ((c.endSec - c.startSec) / rangeDuration) * 100,
-              0.3,
-            );
+            const widthPct = Math.max(((c.endSec - c.startSec) / rangeDuration) * 100, 0.3);
             if (leftPct > 100 || leftPct + widthPct < 0) return null;
             return (
               <Tooltip.Root key={`c-${c.eventIndex}`}>
                 <Tooltip.Trigger asChild>
-                  <div
+                  <button
+                    type="button"
                     className="absolute top-0 bottom-0 bg-orange-500/8 border-l border-dashed border-orange-500/40 z-10 cursor-pointer hover:bg-orange-500/15 transition-colors"
                     style={{
                       left: `calc(${LABEL_W}px + (100% - ${LABEL_W}px - 72px) * ${leftPct / 100})`,
@@ -1088,25 +1078,19 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
 
           {/* Bars */}
           <div className="space-y-0.5">
-            {visibleBars.map((bar, i) => {
-              const leftPct = Math.max(
-                0,
-                ((bar.startSec - rangeStart) / rangeDuration) * 100,
-              );
+            {visibleBars.map((bar, _i) => {
+              const leftPct = Math.max(0, ((bar.startSec - rangeStart) / rangeDuration) * 100);
               const rightClamp = Math.min(bar.endSec, rangeEnd);
               const leftClamp = Math.max(bar.startSec, rangeStart);
-              const widthPct = Math.max(
-                ((rightClamp - leftClamp) / rangeDuration) * 100,
-                0.5,
-              );
+              const widthPct = Math.max(((rightClamp - leftClamp) / rangeDuration) * 100, 0.5);
               const colors = COLOR_MAP[bar.color] ?? COLOR_MAP.blue;
-              const indent =
-                sortMode === "hierarchy" ? bar.depth * 16 : bar.depth * 8;
+              const indent = sortMode === "hierarchy" ? bar.depth * 16 : bar.depth * 8;
 
               return (
-                <Tooltip.Root key={`${bar.eventIndex}-${i}`}>
+                <Tooltip.Root key={`bar-${bar.eventIndex}`}>
                   <Tooltip.Trigger asChild>
-                    <div
+                    <button
+                      type="button"
                       className="flex items-center gap-2 h-6 group cursor-pointer"
                       style={{ paddingLeft: `${indent}px` }}
                       onClick={() => onScrollToIndex(bar.eventIndex)}
@@ -1126,9 +1110,7 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
                       >
                         <div
                           className={`absolute top-0 h-full rounded-sm border ${colors.bg} ${colors.border} ${
-                            bar.hasError
-                              ? "bg-red-500/20 border-red-500/30"
-                              : ""
+                            bar.hasError ? "bg-red-500/20 border-red-500/30" : ""
                           } ${bar.dashed ? "border-dashed" : ""} group-hover:brightness-125 transition-all`}
                           style={{
                             left: `${leftPct}%`,
@@ -1148,7 +1130,7 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
                       <span className="text-[10px] font-mono text-muted-foreground w-16 shrink-0 text-right">
                         {formatDuration(bar.durationSec)}
                       </span>
-                    </div>
+                    </button>
                   </Tooltip.Trigger>
                   <Tooltip.Portal>
                     <Tooltip.Content
@@ -1165,28 +1147,18 @@ export function TimelineView({ events, onScrollToIndex }: TimelineViewProps) {
 
           {/* Gap indicators */}
           {showGaps &&
-            gaps.map((gap, i) => {
-              const leftPct = Math.max(
-                0,
-                ((gap.startSec - rangeStart) / rangeDuration) * 100,
-              );
-              const widthPct = Math.max(
-                (gap.durationSec / rangeDuration) * 100,
-                0.5,
-              );
+            gaps.map((gap, _i) => {
+              const leftPct = Math.max(0, ((gap.startSec - rangeStart) / rangeDuration) * 100);
+              const widthPct = Math.max((gap.durationSec / rangeDuration) * 100, 0.5);
               if (leftPct > 100) return null;
-              const indent =
-                sortMode === "hierarchy" ? gap.depth * 16 : gap.depth * 8;
+              const indent = sortMode === "hierarchy" ? gap.depth * 16 : gap.depth * 8;
               return (
                 <div
-                  key={`gap-${i}`}
+                  key={`gap-${gap.startSec}-${gap.depth}`}
                   className="flex items-center gap-2 h-5"
                   style={{ paddingLeft: `${indent}px` }}
                 >
-                  <div
-                    className="shrink-0"
-                    style={{ width: `${LABEL_W - indent}px` }}
-                  />
+                  <div className="shrink-0" style={{ width: `${LABEL_W - indent}px` }} />
                   <div className="flex-1 relative h-3">
                     <div
                       className="absolute top-0 h-full rounded-sm border border-dashed border-red-400/30 bg-red-500/5 flex items-center justify-center"
@@ -1224,9 +1196,7 @@ function Legend({ color, label }: { color: string; label: string }) {
   const colors = COLOR_MAP[color] ?? COLOR_MAP.blue;
   return (
     <div className="flex items-center gap-1">
-      <div
-        className={`w-3 h-2 rounded-sm ${colors.bg} border ${colors.border}`}
-      />
+      <div className={`w-3 h-2 rounded-sm ${colors.bg} border ${colors.border}`} />
       <span className="text-[10px] text-muted-foreground">{label}</span>
     </div>
   );

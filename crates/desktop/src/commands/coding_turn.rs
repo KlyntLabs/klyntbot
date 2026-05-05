@@ -1,7 +1,6 @@
 use desktop_macros::klynt_command;
 use desktop_shared::errors::ApiError;
 
-use crate::commands::dev_helpers as dev;
 
 #[klynt_command]
 pub async fn coding_message_send(
@@ -25,11 +24,7 @@ pub async fn coding_turn_interrupt(thread_id: String, turn_id: String) -> () {
 }
 
 #[klynt_command]
-pub async fn coding_turn_steer(
-    thread_id: String,
-    turn_id: String,
-    text: String,
-) -> () {
+pub async fn coding_turn_steer(thread_id: String, turn_id: String, text: String) -> () {
     state
         .coding_turn_steer(&thread_id, &turn_id, &text)
         .await

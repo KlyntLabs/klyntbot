@@ -1447,8 +1447,7 @@ impl AgentLoopBuilder {
                 if fact_handler_on {
                     if let Some(pool) = &self.pool {
                         let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
-                        let entity_repo =
-                            Some(cognitive::repos::EntityRepo::new(pool.clone()));
+                        let entity_repo = Some(cognitive::repos::EntityRepo::new(pool.clone()));
                         let fact_search_handler = Arc::new(
                             crate::adapters::semantic_fact_search::SemanticFactSearchHandlerImpl::new(
                                 fact_repo,

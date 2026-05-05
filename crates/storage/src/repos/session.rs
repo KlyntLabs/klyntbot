@@ -12,7 +12,9 @@ fn parse_json_column<T: serde::de::DeserializeOwned>(
     col: &Option<String>,
 ) -> Result<Option<T>, StorageError> {
     match col.as_deref() {
-        Some(s) if !s.is_empty() => serde_json::from_str(s).map_err(StorageError::serialization).map(Some),
+        Some(s) if !s.is_empty() => serde_json::from_str(s)
+            .map_err(StorageError::serialization)
+            .map(Some),
         _ => Ok(None),
     }
 }
@@ -28,6 +30,33 @@ impl SessionRepo {
         Self { pool }
     }
 
+    /// Insert or refresh a session with a known mode.
+    /// On conflict the `mode` column is NOT overwritten — mode is set at
+    /// creation time and is immutable for the life of the session.
+    pub async fn upsert_session_with_mode(
+        &self,
+        key: &str,
+        mode: common::SessionMode,
+        metadata: &serde_json::Value,
+    ) -> Result<SessionRow, StorageError> {
+        let now = jiff::Timestamp::now().as_millisecond();
+        let row = sqlx::query_as::<_, SessionRow>(
+            "INSERT INTO sessions (key, mode, metadata, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?4)
+             ON CONFLICT (key) DO UPDATE SET
+               metadata   = excluded.metadata,
+               updated_at = excluded.updated_at
+             RETURNING *",
+        )
+        .bind(key)
+        .bind(mode.as_str())
+        .bind(metadata)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
     /// Upsert a session — inserts on first call, updates `updated_at` on conflict.
     ///
     pub async fn upsert_session(
@@ -37,15 +66,14 @@ impl SessionRepo {
     ) -> Result<SessionRow, StorageError> {
         let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         let row = sqlx::query_as::<_, SessionRow>(
-            "INSERT INTO sessions (key, metadata, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4)
+            "INSERT INTO sessions (key, mode, metadata, created_at, updated_at)
+             VALUES (?1, 'assistant', ?2, ?3, ?3)
              ON CONFLICT (key) DO UPDATE SET
-               updated_at = ?4
+               updated_at = ?3
              RETURNING *",
         )
         .bind(key)
         .bind(metadata)
-        .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
@@ -87,6 +115,45 @@ impl SessionRepo {
             .ok_or_not_found(&format!("session '{}'", key))
     }
 
+    /// Fetch sessions by a list of keys. Missing keys are silently skipped.
+    pub async fn get_sessions_by_keys(
+        &self,
+        keys: &[String],
+    ) -> Result<Vec<SessionRow>, StorageError> {
+        if keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM sessions WHERE key IN (");
+        let mut sep = qb.separated(", ");
+        for key in keys {
+            sep.push_bind(key);
+        }
+        qb.push(")");
+        let rows = qb.build_query_as::<SessionRow>().fetch_all(&self.pool).await?;
+        Ok(rows)
+    }
+
+    /// List recent sessions with message counts, ordered by updated_at descending.
+    pub async fn list_recent(&self, limit: i64) -> Result<Vec<SessionListRow>, StorageError> {
+        let rows = sqlx::query_as::<_, SessionListRow>(
+            "SELECT s.key, s.metadata, s.created_at, s.updated_at,
+                    COALESCE(counts.cnt, 0) AS message_count,
+                    s.project_id, s.conversation_type, s.pinned
+             FROM sessions s
+             LEFT JOIN (
+                 SELECT session_key, COUNT(*) AS cnt
+                 FROM session_messages
+                 GROUP BY session_key
+             ) counts ON counts.session_key = s.key
+             ORDER BY s.updated_at DESC
+             LIMIT ?1",
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// List all sessions with message counts, ordered by updated_at descending.
     pub async fn list_sessions(&self) -> Result<Vec<SessionListRow>, StorageError> {
         let rows = sqlx::query_as::<_, SessionListRow>(
@@ -101,6 +168,30 @@ impl SessionRepo {
              ) counts ON counts.session_key = s.key
              ORDER BY s.updated_at DESC",
         )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// List sessions filtered by mode (with message count).
+    pub async fn list_sessions_by_mode(
+        &self,
+        mode: common::SessionMode,
+    ) -> Result<Vec<SessionListRow>, StorageError> {
+        let rows = sqlx::query_as::<_, SessionListRow>(
+            "SELECT s.key, s.metadata, s.created_at, s.updated_at,
+                    COALESCE(counts.cnt, 0) AS message_count,
+                    s.project_id, s.conversation_type, s.pinned
+             FROM sessions s
+             LEFT JOIN (
+                 SELECT session_key, COUNT(*) AS cnt
+                 FROM session_messages
+                 GROUP BY session_key
+             ) counts ON counts.session_key = s.key
+             WHERE s.mode = ?1
+             ORDER BY s.updated_at DESC",
+        )
+        .bind(mode.as_str())
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
@@ -253,6 +344,29 @@ impl SessionRepo {
                 .fetch_one(&self.pool)
                 .await?;
         Ok(row.0)
+    }
+
+    /// Update the synthetic AGENTS.md message for a session.
+    pub async fn update_synthetic_agents_md(
+        &self,
+        session_id: &str,
+        new_body: &str,
+    ) -> Result<bool, StorageError> {
+        let result = sqlx::query(
+            "UPDATE session_messages
+             SET content = ?1,
+                 parts = ?2
+             WHERE session_key = ?3 AND role = 'user'
+               AND content LIKE '%AGENTS.md instructions for%'
+             ORDER BY timestamp ASC
+             LIMIT 1",
+        )
+        .bind(new_body)
+        .bind(serde_json::json!([{"type":"text","text":new_body}]).to_string())
+        .bind(session_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
     }
 
     /// Compact a session by keeping only the most recent `keep_count` messages.
@@ -827,4 +941,65 @@ pub struct SessionMessageWithParts {
     pub finish_reason: Option<FinishReason>,
     pub timestamp: jiff::Timestamp,
     pub metadata: Option<serde_json::Value>,
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn upsert_session_with_mode_persists_coding() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repos = crate::Repos::from_pool(&pool);
+        let row = repos
+            .sessions
+            .upsert_session_with_mode(
+                "coding:abc",
+                common::SessionMode::Coding,
+                &serde_json::json!({}),
+            )
+            .await
+            .unwrap();
+        assert_eq!(row.mode, "coding");
+        assert_eq!(row.session_mode(), common::SessionMode::Coding);
+    }
+
+    #[tokio::test]
+    async fn upsert_session_defaults_to_assistant() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repos = crate::Repos::from_pool(&pool);
+        let row = repos
+            .sessions
+            .upsert_session("chat:xyz", &serde_json::json!({}))
+            .await
+            .unwrap();
+        assert_eq!(row.mode, "assistant");
+    }
+
+    #[tokio::test]
+    async fn mode_is_immutable_on_conflict() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repos = crate::Repos::from_pool(&pool);
+        repos
+            .sessions
+            .upsert_session_with_mode(
+                "coding:k",
+                common::SessionMode::Coding,
+                &serde_json::json!({"v": 1}),
+            )
+            .await
+            .unwrap();
+        // Re-upsert with assistant mode — mode column must stay "coding".
+        let row = repos
+            .sessions
+            .upsert_session_with_mode(
+                "coding:k",
+                common::SessionMode::Assistant,
+                &serde_json::json!({"v": 2}),
+            )
+            .await
+            .unwrap();
+        assert_eq!(row.mode, "coding");
+    }
 }

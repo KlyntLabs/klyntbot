@@ -1,6 +1,5 @@
-use crate::StoragePool;
-use common::Result;
-use sqlx::Row;
+use crate::error::StorageError;
+use sqlx::{Row, SqlitePool};
 
 #[derive(Debug, Clone)]
 pub struct HistoryEntry {
@@ -27,16 +26,16 @@ impl ApprovalHistorySummary {
 
 #[derive(Debug, Clone)]
 pub struct CodingApprovalHistoryRepo {
-    pool: StoragePool,
+    pool: SqlitePool,
 }
 
 impl CodingApprovalHistoryRepo {
-    pub fn new(pool: StoragePool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
     #[tracing::instrument(skip(self), err)]
-    pub async fn record(&self, entry: HistoryEntry) -> Result<()> {
+    pub async fn record(&self, entry: HistoryEntry) -> Result<(), StorageError> {
         sqlx::query(
             "INSERT INTO coding_approval_history \
              (tool, args_hash, repo_id, decision, decided_by, layer) \
@@ -48,9 +47,8 @@ impl CodingApprovalHistoryRepo {
         .bind(&entry.decision)
         .bind(&entry.decided_by)
         .bind(&entry.layer)
-        .execute(self.pool.inner())
-        .await
-        .map_err(common::KlyntbotError::from)?;
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 
@@ -60,51 +58,43 @@ impl CodingApprovalHistoryRepo {
         tool: &str,
         args_hash: &str,
         repo_id: &str,
-    ) -> Result<ApprovalHistorySummary> {
+    ) -> Result<ApprovalHistorySummary, StorageError> {
         let row = sqlx::query(
             "SELECT \
-                SUM(CASE WHEN decision = 'allow' THEN 1 ELSE 0 END) AS allow_count, \
-                SUM(CASE WHEN decision = 'deny'  THEN 1 ELSE 0 END) AS deny_count, \
+                COALESCE(SUM(CASE WHEN decision = 'allow' THEN 1 ELSE 0 END), 0) AS allow_count, \
+                COALESCE(SUM(CASE WHEN decision = 'deny'  THEN 1 ELSE 0 END), 0) AS deny_count, \
                 MAX(created_at) AS last_at \
              FROM coding_approval_history WHERE tool = ? AND args_hash = ? AND repo_id = ?",
         )
         .bind(tool)
         .bind(args_hash)
         .bind(repo_id)
-        .fetch_one(self.pool.inner())
-        .await
-        .map_err(common::KlyntbotError::from)?;
+        .fetch_one(&self.pool)
+        .await?;
         Ok(ApprovalHistorySummary {
-            approval_count: row
-                .try_get::<Option<i64>, _>("allow_count")
-                .unwrap_or(None)
-                .unwrap_or(0) as u32,
-            denial_count: row
-                .try_get::<Option<i64>, _>("deny_count")
-                .unwrap_or(None)
-                .unwrap_or(0) as u32,
+            approval_count: row.try_get::<i64, _>("allow_count").unwrap_or(0) as u32,
+            denial_count: row.try_get::<i64, _>("deny_count").unwrap_or(0) as u32,
             last_decided_at: row.try_get::<Option<i64>, _>("last_at").unwrap_or(None),
         })
     }
 
     #[tracing::instrument(skip(self), err)]
-    pub async fn clear_for_tool(&self, tool: &str, repo_id: Option<&str>) -> Result<u64> {
+    pub async fn clear_for_tool(&self, tool: &str, repo_id: Option<&str>) -> Result<u64, StorageError> {
         let res = match repo_id {
             Some(rid) => {
                 sqlx::query("DELETE FROM coding_approval_history WHERE tool = ? AND repo_id = ?")
                     .bind(tool)
                     .bind(rid)
-                    .execute(self.pool.inner())
+                    .execute(&self.pool)
                     .await
             }
             None => {
                 sqlx::query("DELETE FROM coding_approval_history WHERE tool = ?")
                     .bind(tool)
-                    .execute(self.pool.inner())
+                    .execute(&self.pool)
                     .await
             }
-        }
-        .map_err(common::KlyntbotError::from)?;
+        }?;
         Ok(res.rows_affected())
     }
 }
@@ -117,7 +107,7 @@ mod tests {
     #[tokio::test]
     async fn record_and_summary_round_trip() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        let repo = CodingApprovalHistoryRepo::new(pool.clone());
+        let repo = CodingApprovalHistoryRepo::new(pool.inner().clone());
         repo.record(HistoryEntry {
             tool: "bash".into(),
             args_hash: "abc".into(),
@@ -146,7 +136,7 @@ mod tests {
     #[tokio::test]
     async fn single_denial_marks_history_poisoned() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        let repo = CodingApprovalHistoryRepo::new(pool.clone());
+        let repo = CodingApprovalHistoryRepo::new(pool.inner().clone());
         for _ in 0..10 {
             repo.record(HistoryEntry {
                 tool: "bash".into(),
@@ -177,7 +167,7 @@ mod tests {
     #[tokio::test]
     async fn clear_for_tool_empties_summary() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        let repo = CodingApprovalHistoryRepo::new(pool.clone());
+        let repo = CodingApprovalHistoryRepo::new(pool.inner().clone());
         repo.record(HistoryEntry {
             tool: "bash".into(),
             args_hash: "z".into(),

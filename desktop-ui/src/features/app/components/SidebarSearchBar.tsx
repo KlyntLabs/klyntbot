@@ -23,7 +23,6 @@ export function SidebarSearchBar({
           placeholder="Search conversations"
           aria-label="Search conversations"
           data-tauri-drag-region="false"
-          autoFocus
         />
       )}
       {isSearchOpen && searchQuery.length > 0 && (

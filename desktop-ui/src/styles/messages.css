@@ -193,6 +193,12 @@
   box-shadow: none;
 }
 
+.markdown .markdown-table-wrap {
+  --markdown-table-wide-col: max(18rem, 33%);
+  margin: 8px 0 8px;
+  width: 100%;
+}
+
 .message.assistant .message-bubble.message-bubble-table-only .markdown-table-wrap {
   margin: 0;
 }
@@ -337,8 +343,8 @@
   aspect-ratio: 1 / 1;
   cursor: zoom-in;
   display: block;
-  box-shadow: none !important;
-  transform: none !important;
+  box-shadow: none;
+  transform: none;
 }
 
 .message-image-thumb img {
@@ -349,8 +355,8 @@
 }
 
 .message-image-thumb:hover {
-  transform: none !important;
-  box-shadow: none !important;
+  transform: none;
+  box-shadow: none;
   outline: 1px solid var(--border-accent);
   outline-offset: 0;
 }
@@ -1329,6 +1335,15 @@
   word-break: break-all;
 }
 
+.markdown a {
+  color: var(--message-link-color);
+  text-underline-offset: 2px;
+}
+
+.markdown a:hover {
+  color: var(--text-stronger);
+}
+
 .message .markdown-linkblock a {
   color: var(--message-link-color);
   text-decoration: underline;
@@ -1419,6 +1434,10 @@
   text-transform: capitalize;
 }
 
+.markdown li p {
+  margin: 0;
+}
+
 .message .markdown .markdown-table td p {
   margin: 0;
 }
@@ -1449,10 +1468,6 @@
   margin-top: 6px;
   margin-left: 8px;
   padding-left: 14px;
-}
-
-.markdown li p {
-  margin: 0;
 }
 
 .message.assistant .markdown :where(p, ul, ol, blockquote) {

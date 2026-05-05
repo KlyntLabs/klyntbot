@@ -1,5 +1,8 @@
 import { useAppBootstrapOrchestration } from "@app/bootstrap/useAppBootstrapOrchestration";
 import { MainAppShell } from "@app/components/MainAppShell";
+import { AppView } from "@app/constants/appViews";
+import { useAppMode } from "@app/hooks/useAppMode";
+import { useResetAppViewOnModeChange } from "@app/hooks/useResetAppViewOnModeChange";
 import { useAccountSwitching } from "@app/hooks/useAccountSwitching";
 import { useArchiveShortcut } from "@app/hooks/useArchiveShortcut";
 import { useHomeAccount } from "@app/hooks/useHomeAccount";
@@ -128,17 +131,20 @@ export default function MainApp() {
     setThreadListOrganizeMode,
   } = useThreadListSortKey();
   const activeTab = "codex";
-  const setActiveTab = (
-    _tab:
-      | "home"
-      | "projects"
-      | "codex"
-      | "git"
-      | "log"
-      | ((
-          prev: "home" | "projects" | "codex" | "git" | "log",
-        ) => "home" | "projects" | "codex" | "git" | "log"),
-  ) => {};
+  const setActiveTab = useCallback(
+    (
+      _tab:
+        | "home"
+        | "projects"
+        | "codex"
+        | "git"
+        | "log"
+        | ((
+            prev: "home" | "projects" | "codex" | "git" | "log",
+          ) => "home" | "projects" | "codex" | "git" | "log"),
+    ) => {},
+    [],
+  );
   const tabletTab = "codex";
   const {
     workspaces,
@@ -256,15 +262,26 @@ export default function MainApp() {
     toggleDebugPanelShortcut: appSettings.toggleDebugPanelShortcut,
     toggleTerminalShortcut: appSettings.toggleTerminalShortcut,
   });
-  const sidebarToggleProps = {
-    isCompact,
-    sidebarCollapsed,
-    rightPanelCollapsed,
-    onCollapseSidebar: collapseSidebar,
-    onExpandSidebar: expandSidebar,
-    onCollapseRightPanel: collapseRightPanel,
-    onExpandRightPanel: expandRightPanel,
-  };
+  const sidebarToggleProps = useMemo(
+    () => ({
+      isCompact,
+      sidebarCollapsed,
+      rightPanelCollapsed,
+      onCollapseSidebar: collapseSidebar,
+      onExpandSidebar: expandSidebar,
+      onCollapseRightPanel: collapseRightPanel,
+      onExpandRightPanel: expandRightPanel,
+    }),
+    [
+      isCompact,
+      sidebarCollapsed,
+      rightPanelCollapsed,
+      collapseSidebar,
+      expandSidebar,
+      collapseRightPanel,
+      expandRightPanel,
+    ],
+  );
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const workspaceHomeTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -339,19 +356,28 @@ export default function MainApp() {
   );
   useEffect(() => {
     setSelectedCodexArgsOverride(normalizeCodexArgsInput(preferredCodexArgsOverride));
-  }, [preferredCodexArgsOverride, threadCodexSelectionKey]);
+  }, [preferredCodexArgsOverride]);
   useEffect(() => {
     setSelectedServiceTier(preferredServiceTier);
-  }, [preferredServiceTier, threadCodexSelectionKey]);
+  }, [preferredServiceTier]);
 
-  const [appView, setAppView] = useState<"home" | "chat" | "plugins" | "calendar">("home");
+  const [appView, setAppView] = useState<AppView>(AppView.Home);
   const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);
+  useResetAppViewOnModeChange(setAppView);
   const { threads: chatThreads, refetch: refetchChatThreads } = useChatThreads();
 
+  const { mode } = useAppMode();
+
   const onNewChat = useCallback(() => {
+    if (mode === "code") {
+      setSelectedSessionKey(null);
+      setAppView(AppView.Home);
+      setActiveWorkspaceId(null);
+      return;
+    }
     setSelectedSessionKey(`chat:${crypto.randomUUID()}`);
-    setAppView("chat");
-  }, []);
+    setAppView(AppView.Chat);
+  }, [mode, setActiveWorkspaceId]);
 
   const onSelectPlugins = useCallback(() => {
     setAppView("plugins");
@@ -391,27 +417,49 @@ export default function MainApp() {
     [filteredModels, appSettings.commitMessageModelId],
   );
 
-  const composerShortcuts = {
-    modelShortcut: appSettings.composerModelShortcut,
-    accessShortcut: appSettings.composerAccessShortcut,
-    reasoningShortcut: appSettings.composerReasoningShortcut,
-    collaborationShortcut: appSettings.collaborationModesEnabled
-      ? appSettings.composerCollaborationShortcut
-      : null,
-    models: filteredModels,
-    collaborationModes,
-    selectedModelId,
-    onSelectModel: handleSelectModel,
-    selectedCollaborationModeId,
-    onSelectCollaborationMode: handleSelectCollaborationMode,
-    accessMode,
-    onSelectAccessMode: handleSelectAccessMode,
-    reasoningOptions,
-    selectedEffort,
-    onSelectEffort: handleSelectEffort,
-    selectedServiceTier: selectedServiceTier ?? null,
-    reasoningSupported,
-  };
+  const composerShortcuts = useMemo(
+    () => ({
+      modelShortcut: appSettings.composerModelShortcut,
+      accessShortcut: appSettings.composerAccessShortcut,
+      reasoningShortcut: appSettings.composerReasoningShortcut,
+      collaborationShortcut: appSettings.collaborationModesEnabled
+        ? appSettings.composerCollaborationShortcut
+        : null,
+      models: filteredModels,
+      collaborationModes,
+      selectedModelId,
+      onSelectModel: handleSelectModel,
+      selectedCollaborationModeId,
+      onSelectCollaborationMode: handleSelectCollaborationMode,
+      accessMode,
+      onSelectAccessMode: handleSelectAccessMode,
+      reasoningOptions,
+      selectedEffort,
+      onSelectEffort: handleSelectEffort,
+      selectedServiceTier: selectedServiceTier ?? null,
+      reasoningSupported,
+    }),
+    [
+      appSettings.composerModelShortcut,
+      appSettings.composerAccessShortcut,
+      appSettings.composerReasoningShortcut,
+      appSettings.collaborationModesEnabled,
+      appSettings.composerCollaborationShortcut,
+      filteredModels,
+      collaborationModes,
+      selectedModelId,
+      handleSelectModel,
+      selectedCollaborationModeId,
+      handleSelectCollaborationMode,
+      accessMode,
+      handleSelectAccessMode,
+      reasoningOptions,
+      selectedEffort,
+      handleSelectEffort,
+      selectedServiceTier,
+      reasoningSupported,
+    ],
+  );
 
   useComposerShortcuts({
     textareaRef: composerInputRef,
@@ -604,12 +652,20 @@ export default function MainApp() {
     isCompact,
     isTablet,
     setActiveTab,
-    appSettings: {
-      preloadGitDiffs: appSettings.preloadGitDiffs,
-      gitDiffIgnoreWhitespaceChanges: appSettings.gitDiffIgnoreWhitespaceChanges,
-      splitChatDiffView: appSettings.splitChatDiffView,
-      reviewDeliveryMode: appSettings.reviewDeliveryMode,
-    },
+    appSettings: useMemo(
+      () => ({
+        preloadGitDiffs: appSettings.preloadGitDiffs,
+        gitDiffIgnoreWhitespaceChanges: appSettings.gitDiffIgnoreWhitespaceChanges,
+        splitChatDiffView: appSettings.splitChatDiffView,
+        reviewDeliveryMode: appSettings.reviewDeliveryMode,
+      }),
+      [
+        appSettings.preloadGitDiffs,
+        appSettings.gitDiffIgnoreWhitespaceChanges,
+        appSettings.splitChatDiffView,
+        appSettings.reviewDeliveryMode,
+      ],
+    ),
     addDebugEntry,
     updateWorkspaceSettings,
     commitMessageModelId,
@@ -693,11 +749,18 @@ export default function MainApp() {
   useThreadCodexSyncOrchestration({
     activeWorkspaceId,
     activeThreadId,
-    appSettings: {
-      defaultAccessMode: appSettings.defaultAccessMode,
-      lastComposerModelId: appSettings.lastComposerModelId,
-      lastComposerReasoningEffort: appSettings.lastComposerReasoningEffort,
-    },
+    appSettings: useMemo(
+      () => ({
+        defaultAccessMode: appSettings.defaultAccessMode,
+        lastComposerModelId: appSettings.lastComposerModelId,
+        lastComposerReasoningEffort: appSettings.lastComposerReasoningEffort,
+      }),
+      [
+        appSettings.defaultAccessMode,
+        appSettings.lastComposerModelId,
+        appSettings.lastComposerReasoningEffort,
+      ],
+    ),
     threadCodexParamsVersion,
     getThreadCodexParams,
     patchThreadCodexParams,
@@ -1554,19 +1617,34 @@ export default function MainApp() {
   });
   const { workspaceHomeNode } = displayNodes;
   const layoutSurfaces = useMainAppLayoutSurfaces({
-    appSettings: {
-      usageShowRemaining: appSettings.usageShowRemaining,
-      composerCodeBlockCopyUseModifier: appSettings.composerCodeBlockCopyUseModifier,
-      showMessageFilePath: appSettings.showMessageFilePath,
-      openAppTargets: appSettings.openAppTargets,
-      selectedOpenAppId: appSettings.selectedOpenAppId,
-      experimentalAppsEnabled: appSettings.experimentalAppsEnabled,
-      followUpMessageBehavior: appSettings.followUpMessageBehavior,
-      composerFollowUpHintEnabled: appSettings.composerFollowUpHintEnabled,
-      dictationEnabled: appSettings.dictationEnabled,
-      splitChatDiffView: appSettings.splitChatDiffView,
-      gitDiffIgnoreWhitespaceChanges: appSettings.gitDiffIgnoreWhitespaceChanges,
-    },
+    appSettings: useMemo(
+      () => ({
+        usageShowRemaining: appSettings.usageShowRemaining,
+        composerCodeBlockCopyUseModifier: appSettings.composerCodeBlockCopyUseModifier,
+        showMessageFilePath: appSettings.showMessageFilePath,
+        openAppTargets: appSettings.openAppTargets,
+        selectedOpenAppId: appSettings.selectedOpenAppId,
+        experimentalAppsEnabled: appSettings.experimentalAppsEnabled,
+        followUpMessageBehavior: appSettings.followUpMessageBehavior,
+        composerFollowUpHintEnabled: appSettings.composerFollowUpHintEnabled,
+        dictationEnabled: appSettings.dictationEnabled,
+        splitChatDiffView: appSettings.splitChatDiffView,
+        gitDiffIgnoreWhitespaceChanges: appSettings.gitDiffIgnoreWhitespaceChanges,
+      }),
+      [
+        appSettings.usageShowRemaining,
+        appSettings.composerCodeBlockCopyUseModifier,
+        appSettings.showMessageFilePath,
+        appSettings.openAppTargets,
+        appSettings.selectedOpenAppId,
+        appSettings.experimentalAppsEnabled,
+        appSettings.followUpMessageBehavior,
+        appSettings.composerFollowUpHintEnabled,
+        appSettings.dictationEnabled,
+        appSettings.splitChatDiffView,
+        appSettings.gitDiffIgnoreWhitespaceChanges,
+      ],
+    ),
     workspaces,
     groupedWorkspaces,
     workspaceGroupsCount: workspaceGroups.length,
@@ -1837,14 +1915,18 @@ export default function MainApp() {
     },
     appLayout: {
       showHome: showHome && appView !== "chat" && appView !== "plugins" && appView !== "calendar",
-      centerMode:
-        appView === "chat"
-          ? "chat"
-          : appView === "plugins"
-            ? "plugins"
-            : appView === "calendar"
-              ? "calendar"
-              : centerMode,
+      centerMode: (() => {
+        switch (appView) {
+          case "chat":
+            return "chat";
+          case "plugins":
+            return "plugins";
+          case "calendar":
+            return "calendar";
+          default:
+            return centerMode;
+        }
+      })(),
       preloadGitDiffs: appSettings.preloadGitDiffs,
       splitChatDiffView: appSettings.splitChatDiffView,
       hasActivePlan: hasActivePlan,

@@ -1,7 +1,13 @@
-import { Calendar, Clock, FolderPlus, LayoutGrid, Search, Settings, SquarePen } from "lucide-react";
+import Calendar from "lucide-react/dist/esm/icons/calendar";
+import Clock from "lucide-react/dist/esm/icons/clock";
+import FolderPlus from "lucide-react/dist/esm/icons/folder-plus";
+import LayoutGrid from "lucide-react/dist/esm/icons/layout-grid";
+import Search from "lucide-react/dist/esm/icons/search";
+import Settings from "lucide-react/dist/esm/icons/settings";
+import SquarePen from "lucide-react/dist/esm/icons/square-pen";
 import { memo } from "react";
 import type { ChatThread } from "@/features/chat/types";
-import { useAppMode } from "../hooks/useAppMode";
+import { useAppMode, type AppMode } from "../hooks/useAppMode";
 import { AppModeSwitch } from "./AppModeSwitch";
 
 type SidebarChatLayoutProps = {
@@ -20,6 +26,7 @@ type NavItem = {
   label: string;
   icon: React.ReactNode;
   onClick?: () => void;
+  modes: readonly AppMode[];
 };
 
 export const SidebarChatLayout = memo(function SidebarChatLayout({
@@ -34,19 +41,21 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
 }: SidebarChatLayoutProps) {
   const { mode, setMode } = useAppMode();
   const handleSelectCalendar = onSelectCalendar ?? (() => {});
-  const navItems: NavItem[] = [
-    { id: "new-chat", label: "New chat", icon: <SquarePen aria-hidden />, onClick: onNewChat },
-    { id: "search", label: "Search", icon: <Search aria-hidden /> },
+  const allNavItems: NavItem[] = [
+    { id: "new-chat", label: "New chat", icon: <SquarePen aria-hidden />, onClick: onNewChat, modes: ["assistant", "code"] },
+    { id: "search", label: "Search", icon: <Search aria-hidden />, modes: ["assistant", "code"] },
     {
       id: "calendar",
       label: "Calendar",
       icon: <Calendar aria-hidden />,
       onClick: handleSelectCalendar,
+      modes: ["assistant"],
     },
-    { id: "plugins", label: "Plugins", icon: <LayoutGrid aria-hidden />, onClick: onSelectPlugins },
-    { id: "automations", label: "Automations", icon: <Clock aria-hidden /> },
-    { id: "project", label: "Project", icon: <FolderPlus aria-hidden /> },
+    { id: "plugins", label: "Plugins", icon: <LayoutGrid aria-hidden />, onClick: onSelectPlugins, modes: ["assistant", "code"] },
+    { id: "automations", label: "Automations", icon: <Clock aria-hidden />, modes: ["assistant"] },
+    { id: "project", label: "Project", icon: <FolderPlus aria-hidden />, modes: ["assistant", "code"] },
   ];
+  const navItems = allNavItems.filter((it) => it.modes.includes(mode));
 
   return (
     <aside className="sidebar-chat">

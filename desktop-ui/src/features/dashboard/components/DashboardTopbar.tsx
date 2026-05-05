@@ -1,4 +1,8 @@
-import { Calendar, ChevronLeft, ChevronRight, Layers, PanelRight } from "lucide-react";
+import Calendar from "lucide-react/dist/esm/icons/calendar";
+import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
+import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
+import Layers from "lucide-react/dist/esm/icons/layers";
+import PanelRight from "lucide-react/dist/esm/icons/panel-right";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatFullDate, formatMonthLabel } from "@/utils/dashboardDates";

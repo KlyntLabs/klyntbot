@@ -106,11 +106,7 @@ export function RequestUserInputMessage({
 
   return (
     <div className="message request-user-input-message">
-      <div
-        className="bubble request-user-input-card"
-        role="group"
-        aria-label="User input requested"
-      >
+      <fieldset className="bubble request-user-input-card" aria-label="User input requested">
         <div className="request-user-input-header">
           <div className="request-user-input-title">Input requested</div>
           {totalRequests > 1 ? (
@@ -138,7 +134,7 @@ export function RequestUserInputMessage({
                     <div className="request-user-input-options">
                       {options.map((option, optionIndex) => (
                         <button
-                          key={`${questionId}-${optionIndex}`}
+                          key={`${questionId}-${option.label}-${option.description ?? ""}`}
                           type="button"
                           className={`request-user-input-option${
                             selectedIndex === optionIndex ? " is-selected" : ""
@@ -170,11 +166,11 @@ export function RequestUserInputMessage({
           )}
         </div>
         <div className="request-user-input-actions">
-          <button className="primary" onClick={handleSubmit}>
+          <button type="button" className="primary" onClick={handleSubmit}>
             Submit
           </button>
         </div>
-      </div>
+      </fieldset>
     </div>
   );
 }

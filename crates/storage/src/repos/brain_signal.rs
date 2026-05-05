@@ -43,24 +43,35 @@ impl BrainSignalFeedbackRepo {
         Ok(())
     }
 
-    /// Returns `true` if this `entity_pair` was surfaced within the last `hours` hours.
-    pub async fn was_surfaced_recently(
+    /// Returns `true` if this `entity_pair` had `action` within the last `hours` hours.
+    async fn was_action_recently(
         &self,
         entity_pair: &str,
+        action: &str,
         hours: i64,
     ) -> Result<bool, StorageError> {
         let cutoff = jiff::Timestamp::now().as_millisecond() - hours * 3_600_000;
         let count: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM brain_signal_feedback
              WHERE entity_pair = ?1
-               AND action = 'surfaced'
-               AND timestamp > ?2",
+               AND action = ?2
+               AND timestamp > ?3",
         )
         .bind(entity_pair)
+        .bind(action)
         .bind(cutoff)
         .fetch_one(&self.pool)
         .await?;
         Ok(count.0 > 0)
+    }
+
+    /// Returns `true` if this `entity_pair` was surfaced within the last `hours` hours.
+    pub async fn was_surfaced_recently(
+        &self,
+        entity_pair: &str,
+        hours: i64,
+    ) -> Result<bool, StorageError> {
+        self.was_action_recently(entity_pair, "surfaced", hours).await
     }
 
     /// Returns `true` if this `entity_pair` was dismissed within the last `days` days.
@@ -69,18 +80,7 @@ impl BrainSignalFeedbackRepo {
         entity_pair: &str,
         days: i64,
     ) -> Result<bool, StorageError> {
-        let cutoff = jiff::Timestamp::now().as_millisecond() - days * 86_400_000;
-        let count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM brain_signal_feedback
-             WHERE entity_pair = ?1
-               AND action = 'dismissed'
-               AND timestamp > ?2",
-        )
-        .bind(entity_pair)
-        .bind(cutoff)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(count.0 > 0)
+        self.was_action_recently(entity_pair, "dismissed", days * 24).await
     }
 
     /// Count the number of dismissals recorded in the last `hours` hours (across all entity pairs).

@@ -8,9 +8,6 @@ type UseSidebarTogglesOptions = {
 };
 
 function readStoredBool(key: string) {
-  if (typeof window === "undefined") {
-    return false;
-  }
   return window.localStorage.getItem(key) === "true";
 }
 

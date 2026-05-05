@@ -274,17 +274,22 @@ export const DiffCard = memo(function DiffCard({
         </div>
       ) : entry.diff.trim().length > 0 && parsedLines.length > 0 ? (
         <div className="diff-viewer-output diff-viewer-output-flat diff-viewer-output-raw">
-          {parsedLines.map((line, index) => {
+          {parsedLines.map((line) => {
             const highlighted = highlightLine(
               line.text,
               isFallbackRawDiffLineHighlightable(line.type) ? fallbackLanguage : null,
             );
 
             return (
-              <div key={index} className={`diff-viewer-raw-line diff-viewer-raw-line-${line.type}`}>
+              <div
+                key={`${line.type}-${line.text.slice(0, 20)}`}
+                className={`diff-viewer-raw-line diff-viewer-raw-line-${line.type}`}
+              >
                 <span
+                  ref={(el) => {
+                    if (el) el.innerHTML = highlighted;
+                  }}
                   className="diff-line-content"
-                  dangerouslySetInnerHTML={{ __html: highlighted }}
                 />
               </div>
             );

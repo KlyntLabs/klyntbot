@@ -37,6 +37,9 @@ pub use types::{
     MCP_CHANNEL, MIRROR_ALERT_COST_THRESHOLD_CROSSED, SYSTEM_CHANNEL, TELEGRAM_RESET_SENDER,
 };
 
+pub mod session_mode;
+pub use session_mode::SessionMode;
+
 // ── Re-exports: commonly used utilities ─────────────────────────────────
 
 pub use rust_decimal::Decimal;

@@ -148,6 +148,7 @@ pub async fn load_with_env_overrides() -> Result<Config> {
         "KLYNTBOT_PROVIDERS__AIHUBMIX__API_KEY",
         config.providers.aihubmix.api_key
     );
+    env_secret!("MIMO_API_KEY", config.providers.mimo.api_key);
 
     // Data directory (explicit override takes precedence over KLYNTBOT_HOME)
     if let Ok(val) = std::env::var("KLYNTBOT_DATA_DIR") {

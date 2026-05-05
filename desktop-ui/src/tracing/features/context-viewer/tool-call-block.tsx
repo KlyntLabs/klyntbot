@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
+import { ArrowRight, ChevronDown, ChevronRight, Terminal } from "lucide-react";
 import { useState } from "react";
 import type { ContextMessage } from "@/tracing/lib/api";
 import { normalizeContent } from "@/tracing/lib/api";
 import { useNavigateToWire } from "./context-viewer";
-import { ChevronDown, ChevronRight, Terminal, ArrowRight } from "lucide-react";
 
 interface ToolMessageProps {
   message: ContextMessage;
@@ -27,9 +27,12 @@ export function ToolMessage({ message }: ToolMessageProps) {
     ? textContent.slice(0, 80) + (textContent.length > 80 ? "..." : "")
     : null;
 
+  const tcId = message.tool_call_id;
+
   return (
     <div className="my-1 ml-10 rounded-md border bg-muted/20 px-3 py-2">
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 text-xs"
       >
@@ -40,10 +43,8 @@ export function ToolMessage({ message }: ToolMessageProps) {
             {message.name}
           </span>
         )}
-        {message.tool_call_id && (
-          <span className="font-mono text-[10px] text-muted-foreground">
-            {message.tool_call_id.slice(0, 12)}
-          </span>
+        {tcId && (
+          <span className="font-mono text-[10px] text-muted-foreground">{tcId.slice(0, 12)}</span>
         )}
         {expanded ? (
           <ChevronDown size={12} className="text-muted-foreground" />
@@ -52,26 +53,20 @@ export function ToolMessage({ message }: ToolMessageProps) {
         )}
       </button>
       {/* Cross-reference: navigate to Wire Events */}
-      {navigateToWire && message.tool_call_id && (
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={() => navigateToWire(message.tool_call_id!)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") navigateToWire(message.tool_call_id!);
-          }}
-          className="inline-flex items-center gap-0.5 ml-6 mt-0.5 text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+      {navigateToWire && tcId && (
+        <button
+          type="button"
+          onClick={() => navigateToWire(tcId)}
+          className="inline-flex items-center gap-0.5 ml-6 mt-0.5 text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer bg-transparent border-none p-0"
         >
           <ArrowRight size={9} />
           Wire
-        </span>
+        </button>
       )}
 
       {/* Collapsed preview */}
       {!expanded && preview && (
-        <div className="mt-1 truncate text-[11px] font-mono text-muted-foreground">
-          {preview}
-        </div>
+        <div className="mt-1 truncate text-[11px] font-mono text-muted-foreground">{preview}</div>
       )}
 
       {expanded && (

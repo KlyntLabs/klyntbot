@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
+import { ChevronDown, ChevronRight, Image, Music, User, Video } from "lucide-react";
 import { useState } from "react";
+import { Markdown } from "@/tracing/components/markdown";
 import type { ContextMessage } from "@/tracing/lib/api";
 import { normalizeContent } from "@/tracing/lib/api";
-import { Markdown } from "@/tracing/components/markdown";
 import { useRawMode } from "./context-viewer";
-import { ChevronDown, ChevronRight, User, Image, Music, Video } from "lucide-react";
 
 interface UserMessageProps {
   message: ContextMessage;
@@ -42,6 +42,7 @@ export function UserMessage({ message }: UserMessageProps) {
             </span>
           )}
           <button
+            type="button"
             onClick={() => setShowRaw(!showRaw)}
             className="text-[10px] text-muted-foreground hover:text-foreground"
           >
@@ -58,42 +59,42 @@ export function UserMessage({ message }: UserMessageProps) {
         <TextContent text={textContent} />
 
         {/* Images */}
-        {images.map((img, i) => (
-          <div key={i} className="mt-2">
+        {images.map((img) => (
+          <div key={img.image_url?.url ?? `image-${img.image_url?.id ?? ""}`} className="mt-2">
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1">
               <Image size={10} />
               <span>Image</span>
               {img.image_url?.id && <span className="font-mono">({img.image_url.id})</span>}
             </div>
-            <img
-              src={img.image_url?.url}
-              alt="attachment"
-              className="max-w-sm rounded-md border"
-            />
+            <img src={img.image_url?.url} alt="attachment" className="max-w-sm rounded-md border" />
           </div>
         ))}
 
         {/* Audio */}
-        {audios.map((aud, i) => (
-          <div key={`audio-${i}`} className="mt-2">
+        {audios.map((aud) => (
+          <div key={aud.audio_url?.url ?? `audio-${aud.audio_url?.id ?? ""}`} className="mt-2">
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1">
               <Music size={10} />
               <span>Audio</span>
               {aud.audio_url?.id && <span className="font-mono">({aud.audio_url.id})</span>}
             </div>
-            <audio controls src={aud.audio_url?.url} className="max-w-sm" />
+            <audio controls src={aud.audio_url?.url} className="max-w-sm">
+              <track kind="captions" src="" label="No captions available" />
+            </audio>
           </div>
         ))}
 
         {/* Video */}
-        {videos.map((vid, i) => (
-          <div key={`video-${i}`} className="mt-2">
+        {videos.map((vid) => (
+          <div key={vid.video_url?.url ?? `video-${vid.video_url?.id ?? ""}`} className="mt-2">
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1">
               <Video size={10} />
               <span>Video</span>
               {vid.video_url?.id && <span className="font-mono">({vid.video_url.id})</span>}
             </div>
-            <video controls src={vid.video_url?.url} className="max-w-sm rounded-md border" />
+            <video controls src={vid.video_url?.url} className="max-w-sm rounded-md border">
+              <track kind="captions" src="" label="No captions available" />
+            </video>
           </div>
         ))}
 

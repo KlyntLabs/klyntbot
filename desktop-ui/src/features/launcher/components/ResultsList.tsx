@@ -22,11 +22,10 @@ export function ResultsList({ onExecute }: ResultsListProps) {
   const mouseMovedRef = useRef(false);
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
 
-  const resultsKey = results.length > 0 ? results[0].id : "";
   useEffect(() => {
     mouseMovedRef.current = false;
     lastMousePosRef.current = null;
-  }, [resultsKey]);
+  }, []);
 
   useEffect(() => {
     const list = listRef.current;
@@ -132,7 +131,7 @@ function ResultRow({
       <div className="lc-row-text">
         <div className="lc-row-title">
           {item.pinned && (
-            <span className="lc-pin-glyph" aria-label="Pinned">
+            <span className="lc-pin-glyph" role="img" aria-label="Pinned">
               📌
             </span>
           )}

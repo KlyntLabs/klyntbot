@@ -6,6 +6,7 @@ pub mod brain_signal;
 pub mod coaching_intervention_log;
 pub mod coaching_strategy;
 pub mod coding_approval_history;
+pub mod coding_reviews;
 pub mod cron;
 pub mod custom_column;
 pub mod decision_log;
@@ -60,6 +61,7 @@ pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoa
 pub use coding_approval_history::{
     ApprovalHistorySummary, CodingApprovalHistoryRepo, HistoryEntry,
 };
+pub use coding_reviews::{CodingReviewRow, CodingReviewsRepo};
 pub use cron::CronRepo;
 pub use custom_column::CustomColumnRepo;
 pub use decision_log::DecisionLogRepo;
@@ -169,6 +171,7 @@ pub struct Repos {
     pub notification_log: NotificationLogRepo,
     pub held_notifications: HeldNotificationsRepo,
     pub coding_approval_history: CodingApprovalHistoryRepo,
+    pub coding_reviews: CodingReviewsRepo,
     pub workspaces: WorkspaceRepo,
 }
 
@@ -208,7 +211,8 @@ impl Repos {
             skill_version: SkillVersionRepo::new(db.clone()),
             notification_log: NotificationLogRepo::new(db.clone()),
             held_notifications: HeldNotificationsRepo::new(db.clone()),
-            coding_approval_history: CodingApprovalHistoryRepo::new(pool.clone()),
+            coding_approval_history: CodingApprovalHistoryRepo::new(db.clone()),
+            coding_reviews: CodingReviewsRepo::new(db.clone()),
             workspaces: WorkspaceRepo::new(db.clone()),
             pool: db,
         }

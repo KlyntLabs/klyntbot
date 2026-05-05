@@ -137,6 +137,7 @@ mod tests {
                 "SessionRow",
                 serde_json::to_value(&SessionRow {
                     key: "s".to_string(),
+                    mode: "assistant".to_string(),
                     metadata: serde_json::json!({}),
                     created_at: now,
                     updated_at: now,

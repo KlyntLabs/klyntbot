@@ -165,6 +165,7 @@ class ChatStreamStore {
   private approvalsBySession = new Map<string, ApprovalItem[]>();
   private fileEditsBySession = new Map<string, DiffItem[]>();
   private listenersInitialized = false;
+  private tauriUnlisteners: Array<() => void> = [];
 
   constructor() {
     this.initEventListeners();
@@ -316,14 +317,25 @@ class ChatStreamStore {
 
   // ── Internal helpers ────────────────────────────────────────────────
 
+  private notifyPending = false;
+
   private notify(): void {
     for (const l of this.listeners) l();
+  }
+
+  private scheduleNotify(): void {
+    if (this.notifyPending) return;
+    this.notifyPending = true;
+    queueMicrotask(() => {
+      this.notifyPending = false;
+      this.notify();
+    });
   }
 
   private updateState(sessionKey: string, updater: (s: StreamSnapshot) => StreamSnapshot): void {
     const current = this.states.get(sessionKey) ?? DEFAULT_SNAPSHOT;
     this.states.set(sessionKey, updater(current));
-    this.notify();
+    this.scheduleNotify();
   }
 
   private cancelRaf(sessionKey: string): void {
@@ -468,8 +480,12 @@ class ChatStreamStore {
   private initTauriListeners(): void {
     import("@tauri-apps/api/event").then(({ listen }) => {
       const register = <T>(event: string, handler: (payload: T) => void) => {
-        // Singleton listeners — intentionally never unlistened
-        listen<T>(event, (e) => handler(e.payload));
+        const result = listen?.<T>(event, (e) => handler(e.payload));
+        if (result && typeof result.then === "function") {
+          result.then((off) => {
+            if (off) this.tauriUnlisteners.push(off);
+          });
+        }
       };
 
       register<ContentChunkPayload>("agent:content_chunk", (p) => this.onContentChunk(p));
@@ -671,6 +687,36 @@ class ChatStreamStore {
     this.textBuffers.delete(key);
     this.rafIds.delete(key);
     this.onDoneCallbacks.delete(key);
+    this.approvalsBySession.delete(key);
+    this.fileEditsBySession.delete(key);
+    const es = this.eventSources.get(key);
+    if (es) {
+      es.close();
+      this.eventSources.delete(key);
+    }
+  }
+
+  /** Dispose all resources — useful for HMR teardown. */
+  dispose(): void {
+    for (const off of this.tauriUnlisteners) {
+      off();
+    }
+    this.tauriUnlisteners = [];
+    for (const es of this.eventSources.values()) {
+      es.close();
+    }
+    this.eventSources.clear();
+    this.listeners.clear();
+    this.states.clear();
+    this.textBuffers.clear();
+    this.approvalsBySession.clear();
+    this.fileEditsBySession.clear();
+    this.onDoneCallbacks.clear();
+    for (const id of this.rafIds.values()) {
+      cancelAnimationFrame(id);
+    }
+    this.rafIds.clear();
+    this.listenersInitialized = false;
   }
 
   private onError(payload: AgentErrorPayload): void {

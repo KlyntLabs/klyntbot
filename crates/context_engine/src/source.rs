@@ -21,6 +21,8 @@ pub struct SourceContext {
     pub intent_summary: Option<String>,
     /// Project ID for project-scoped context sources.
     pub project_id: Option<String>,
+    /// Session mode discriminator (assistant vs coding).
+    pub session_mode: common::SessionMode,
 }
 
 /// A pluggable provider of context sections for the system prompt.

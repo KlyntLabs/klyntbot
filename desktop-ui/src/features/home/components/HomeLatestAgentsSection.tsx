@@ -39,17 +39,35 @@ export function HomeLatestAgentsSection({
           ))}
         </div>
       ) : isLoadingLatestAgents ? (
-        <div className="home-latest-grid home-latest-grid-loading" aria-label="Loading agents">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div className="home-latest-card home-latest-card-skeleton" key={index}>
-              <div className="home-latest-card-header">
-                <span className="home-latest-skeleton home-latest-skeleton-title" />
-                <span className="home-latest-skeleton home-latest-skeleton-time" />
-              </div>
-              <span className="home-latest-skeleton home-latest-skeleton-line" />
-              <span className="home-latest-skeleton home-latest-skeleton-line short" />
+        <div
+          className="home-latest-grid home-latest-grid-loading"
+          role="status"
+          aria-label="Loading agents"
+        >
+          <div className="home-latest-card home-latest-card-skeleton" key="skeleton-1">
+            <div className="home-latest-card-header">
+              <span className="home-latest-skeleton home-latest-skeleton-title" />
+              <span className="home-latest-skeleton home-latest-skeleton-time" />
             </div>
-          ))}
+            <span className="home-latest-skeleton home-latest-skeleton-line" />
+            <span className="home-latest-skeleton home-latest-skeleton-line short" />
+          </div>
+          <div className="home-latest-card home-latest-card-skeleton" key="skeleton-2">
+            <div className="home-latest-card-header">
+              <span className="home-latest-skeleton home-latest-skeleton-title" />
+              <span className="home-latest-skeleton home-latest-skeleton-time" />
+            </div>
+            <span className="home-latest-skeleton home-latest-skeleton-line" />
+            <span className="home-latest-skeleton home-latest-skeleton-line short" />
+          </div>
+          <div className="home-latest-card home-latest-card-skeleton" key="skeleton-3">
+            <div className="home-latest-card-header">
+              <span className="home-latest-skeleton home-latest-skeleton-title" />
+              <span className="home-latest-skeleton home-latest-skeleton-time" />
+            </div>
+            <span className="home-latest-skeleton home-latest-skeleton-line" />
+            <span className="home-latest-skeleton home-latest-skeleton-line short" />
+          </div>
         </div>
       ) : (
         <div className="home-latest-empty">

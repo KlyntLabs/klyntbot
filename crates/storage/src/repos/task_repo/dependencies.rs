@@ -12,8 +12,11 @@ impl TaskRepo {
         blocker_id: &str,
         dep_type: &str,
     ) -> Result<(), StorageError> {
-        let would_cycle = self.would_create_cycle(task_id, blocker_id).await?;
+        let mut tx = self.pool.begin().await?;
+
+        let would_cycle = self.would_create_cycle(&mut *tx, task_id, blocker_id).await?;
         if would_cycle {
+            tx.rollback().await?;
             return Err(StorageError::Conflict(format!(
                 "Adding dependency {task_id} -> {blocker_id} would create a cycle"
             )));
@@ -25,7 +28,7 @@ impl TaskRepo {
         .bind(task_id)
         .bind(blocker_id)
         .bind(dep_type)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| {
             if let sqlx::Error::Database(ref db_err) = e {
@@ -38,6 +41,7 @@ impl TaskRepo {
             StorageError::Sqlx(e)
         })?;
 
+        tx.commit().await?;
         Ok(())
     }
 
@@ -103,6 +107,7 @@ impl TaskRepo {
 
     async fn would_create_cycle(
         &self,
+        conn: &mut sqlx::SqliteConnection,
         task_id: &str,
         blocker_id: &str,
     ) -> Result<bool, StorageError> {
@@ -119,7 +124,7 @@ impl TaskRepo {
         )
         .bind(task_id)
         .bind(blocker_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(conn)
         .await?;
 
         Ok(row.map(|r| r.0).unwrap_or(false))

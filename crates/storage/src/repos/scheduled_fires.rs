@@ -101,12 +101,7 @@ impl ScheduledFiresRepo {
     /// Delete all pending fires whose dedup_prefix matches the given literal prefix.
     /// Returns count deleted.
     pub async fn cancel_by_prefix(&self, prefix: &str) -> Result<u64, StorageError> {
-        // Escape LIKE wildcards in the literal prefix. Order matters: escape the
-        // escape char first, then the wildcards.
-        let escaped = prefix
-            .replace('\\', "\\\\")
-            .replace('%', "\\%")
-            .replace('_', "\\_");
+        let escaped = crate::macros::escape_like(prefix);
         let like = format!("{escaped}%");
         let result = sqlx::query(
             "DELETE FROM scheduled_fires WHERE fired = 0 AND dedup_prefix LIKE ?1 ESCAPE '\\'",

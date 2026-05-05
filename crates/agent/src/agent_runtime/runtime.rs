@@ -414,7 +414,7 @@ impl AgentRuntime {
         // tone/formatting rules that this prompt carries into every turn.
         let system_prompt = self
             .context_engine
-            .build_system_prompt(ctx.channel.as_str(), ctx.chat_id.as_str(), Some(message))
+            .build_system_prompt(ctx.channel.as_str(), ctx.chat_id.as_str(), Some(message), ctx.session_mode)
             .await;
 
         let context_request = ContextRequest {
@@ -552,9 +552,7 @@ impl AgentRuntime {
         // with broader effort — mirrors Letta's filesystem-tool agentic
         // retrieval pattern. Single retry per QA, capped to bound cost.
         if let Some(retry_messages_base) = messages_for_retry {
-            if crate::output::validator::detect_memory_refusal(&loop_result.content)
-                .is_some()
-            {
+            if crate::output::validator::detect_memory_refusal(&loop_result.content).is_some() {
                 let mut retry_messages = retry_messages_base;
                 retry_messages.push(providers::types::Message::assistant(
                     loop_result.content.clone(),
@@ -593,9 +591,7 @@ impl AgentRuntime {
                     // Take retry only if it produced a non-refusal answer.
                     // A retry that ALSO refuses just doubles latency without
                     // signal; keep the original in that case.
-                    if crate::output::validator::detect_memory_refusal(&retried.content)
-                        .is_none()
-                    {
+                    if crate::output::validator::detect_memory_refusal(&retried.content).is_none() {
                         loop_result = retried;
                     }
                 }

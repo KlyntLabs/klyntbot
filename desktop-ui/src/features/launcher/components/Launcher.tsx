@@ -136,8 +136,10 @@ function LauncherShell() {
   return (
     <div className="lc-root">
       <div ref={contentRef} className="lc-shell">
-        <div
+        <button
+          type="button"
           className="lc-drag-handle"
+          aria-label="Drag to move window"
           onMouseDown={async () => {
             if (!isTauri()) return;
             try {
@@ -148,7 +150,7 @@ function LauncherShell() {
           }}
         >
           <div className="lc-drag-grip" />
-        </div>
+        </button>
         {mode === "recording" ? (
           <VoiceRecorder
             onTranscriptReady={(t) => {

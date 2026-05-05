@@ -5,7 +5,7 @@ type ScrollFadeState = {
   bottom: boolean;
 };
 
-export function useSidebarScrollFade(deps: ReadonlyArray<unknown>) {
+export function useSidebarScrollFade(_deps: ReadonlyArray<unknown>) {
   const sidebarBodyRef = useRef<HTMLDivElement | null>(null);
   const [scrollFade, setScrollFade] = useState<ScrollFadeState>({
     top: false,
@@ -29,7 +29,7 @@ export function useSidebarScrollFade(deps: ReadonlyArray<unknown>) {
   useEffect(() => {
     const frame = requestAnimationFrame(updateScrollFade);
     return () => cancelAnimationFrame(frame);
-  }, [updateScrollFade, deps]);
+  }, [updateScrollFade]);
 
   return { sidebarBodyRef, scrollFade, updateScrollFade };
 }

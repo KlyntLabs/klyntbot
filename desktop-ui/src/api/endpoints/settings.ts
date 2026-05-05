@@ -1,6 +1,7 @@
 import type {
   AppSettings,
   CodexDoctorResult,
+  CodexFeature,
   CodexUpdateResult,
   TailscaleDaemonCommandPreview,
   TailscaleStatus,
@@ -89,6 +90,9 @@ export async function getExperimentalFeatureList(
   workspaceId: string,
   cursor?: string | null,
   limit?: number | null,
-) {
-  return invoke<any>("experimental_feature_list", { workspaceId, cursor, limit });
+): Promise<{ features: CodexFeature[]; nextCursor: string | null }> {
+  return invoke<{ features: CodexFeature[]; nextCursor: string | null }>(
+    "experimental_feature_list",
+    { workspaceId, cursor, limit },
+  );
 }

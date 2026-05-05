@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { type WireEvent } from "@/tracing/lib/api";
-import { ShieldCheck, ShieldAlert } from "lucide-react";
+import { ShieldAlert, ShieldCheck } from "lucide-react";
+import type { WireEvent } from "@/tracing/lib/api";
 
 // ---------- Data structures ----------
 
@@ -86,7 +86,10 @@ export function computeIntegrity(events: WireEvent[]): IntegrityResult {
       if (callId && toolCallMap.has(callId)) {
         toolCallMap.delete(callId);
       } else {
-        orphans.push({ event: ev, reason: `ToolResult references unknown tool_call_id: ${callId ?? "(none)"}` });
+        orphans.push({
+          event: ev,
+          reason: `ToolResult references unknown tool_call_id: ${callId ?? "(none)"}`,
+        });
       }
     }
   }
@@ -109,7 +112,10 @@ export function computeIntegrity(events: WireEvent[]): IntegrityResult {
       if (id && approvalMap.has(id)) {
         approvalMap.delete(id);
       } else {
-        orphans.push({ event: ev, reason: `ApprovalResponse references unknown request id: ${id ?? "(none)"}` });
+        orphans.push({
+          event: ev,
+          reason: `ApprovalResponse references unknown request id: ${id ?? "(none)"}`,
+        });
       }
     }
   }
@@ -118,9 +124,7 @@ export function computeIntegrity(events: WireEvent[]): IntegrityResult {
   }
 
   // --- Score ---
-  const score = Math.round(
-    (1 - orphans.length / Math.max(totalPairable, 1)) * 100,
-  );
+  const score = Math.round((1 - orphans.length / Math.max(totalPairable, 1)) * 100);
 
   return { score, totalPairable, orphans };
 }
@@ -163,20 +167,20 @@ export function IntegrityPanel({ result, onScrollToIndex }: IntegrityPanelProps)
       {/* Header */}
       <div className="flex items-center gap-2">
         <ScoreIcon size={16} className={scoreColor} />
-        <span className={`text-sm font-semibold ${scoreColor}`}>
-          {score}%
-        </span>
+        <span className={`text-sm font-semibold ${scoreColor}`}>{score}%</span>
         <span className="text-xs text-muted-foreground">
-          integrity &middot; {totalPairable} pairable events &middot; {orphans.length} orphan{orphans.length !== 1 ? "s" : ""}
+          integrity &middot; {totalPairable} pairable events &middot; {orphans.length} orphan
+          {orphans.length !== 1 ? "s" : ""}
         </span>
       </div>
 
       {/* Orphan list */}
       {orphans.length > 0 && (
         <div className="space-y-1 max-h-48 overflow-y-auto">
-          {orphans.map((o, i) => (
+          {orphans.map((o) => (
             <button
-              key={i}
+              type="button"
+              key={o.event.index}
               onClick={() => onScrollToIndex(o.event.index)}
               className="flex items-center gap-2 w-full text-left rounded px-2 py-1 hover:bg-muted/60 transition-colors group"
             >

@@ -45,7 +45,7 @@ type UseMainAppGitStateOptions = {
       effort?: string | null;
       collaborationMode?: Record<string, unknown> | null;
     },
-  ) => Promise<void | SendMessageResult>;
+  ) => Promise<undefined | SendMessageResult>;
 };
 
 type GitStatusSummary = {
@@ -161,7 +161,7 @@ function useMainAppPullRequestReviewState({
     threadId: string,
     text: string,
     images?: string[],
-  ) => Promise<void | SendMessageResult>;
+  ) => Promise<undefined | SendMessageResult>;
 }) {
   return usePullRequestReviewActions({
     activeWorkspace,
@@ -219,7 +219,7 @@ export function useMainAppGitState({
 
   useEffect(() => {
     resetGitHubPanelState();
-  }, [activeWorkspaceId, resetGitHubPanelState]);
+  }, [resetGitHubPanelState]);
 
   const { remote: gitRemoteUrl, refresh: refreshGitRemote } = useGitRemote(activeWorkspace);
   const {

@@ -38,6 +38,7 @@ export function useGitActions(activeWorkspace: WorkspaceInfo | null) {
       return stageGitFileService(workspaceId, path);
     },
     invalidates: invalidatesGit,
+    onError: (e) => console.error("Failed to stage file:", e),
   });
 
   const stageAllMut = useTauriMutation({
@@ -46,6 +47,7 @@ export function useGitActions(activeWorkspace: WorkspaceInfo | null) {
       return stageGitAllService(workspaceId);
     },
     invalidates: invalidatesGit,
+    onError: (e) => console.error("Failed to stage all:", e),
   });
 
   const unstageFileMut = useTauriMutation({
@@ -54,6 +56,7 @@ export function useGitActions(activeWorkspace: WorkspaceInfo | null) {
       return unstageGitFileService(workspaceId, path);
     },
     invalidates: invalidatesGit,
+    onError: (e) => console.error("Failed to unstage file:", e),
   });
 
   const revertFileMut = useTauriMutation({
@@ -62,6 +65,7 @@ export function useGitActions(activeWorkspace: WorkspaceInfo | null) {
       return revertGitFileService(workspaceId, path);
     },
     invalidates: invalidatesGit,
+    onError: (e) => console.error("Failed to revert file:", e),
   });
 
   const revertAllMut = useTauriMutation({
@@ -70,6 +74,7 @@ export function useGitActions(activeWorkspace: WorkspaceInfo | null) {
       return revertGitAll(workspaceId);
     },
     invalidates: invalidatesGit,
+    onError: (e) => console.error("Failed to revert all:", e),
   });
 
   const applyWorktreeMut = useTauriMutation({
@@ -137,7 +142,11 @@ export function useGitActions(activeWorkspace: WorkspaceInfo | null) {
     if (!confirmed) {
       return;
     }
-    await revertAllMut.mutate();
+    try {
+      await revertAllMut.mutate();
+    } catch {
+      // Error is handled by onError on the mutation.
+    }
   }, [revertAllMut, workspaceId]);
 
   const applyWorktreeChanges = useCallback(async () => {

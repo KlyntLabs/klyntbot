@@ -34,7 +34,12 @@ async function normalizeImagesForRpc(images?: string[]): Promise<string[] | null
 }
 
 export async function startThread(workspaceId: string) {
-  return invoke<Record<string, unknown>>("coding_thread_start", { workspaceId, model: null, approvalPolicy: null, ephemeral: false });
+  return invoke<Record<string, unknown>>("coding_thread_start", {
+    workspaceId,
+    model: null,
+    approvalPolicy: null,
+    ephemeral: false,
+  });
 }
 
 export async function forkThread(workspaceId: string, threadId: string) {
@@ -144,7 +149,12 @@ export async function listThreads(
   limit?: number | null,
   sortKey?: "created_at" | "updated_at" | null,
 ) {
-  return invoke<Record<string, unknown>>("coding_thread_list", { workspaceId, cursor, limit, sortKey });
+  return invoke<Record<string, unknown>>("coding_thread_list", {
+    workspaceId,
+    cursor,
+    limit,
+    sortKey,
+  });
 }
 
 export async function listMcpServerStatus(
@@ -162,7 +172,11 @@ export async function resumeThread(workspaceId: string, threadId: string) {
 
 export async function readThread(workspaceId: string, threadId: string) {
   void workspaceId;
-  return invoke<Record<string, unknown>>("coding_thread_read", { threadId, cursor: null, limit: null });
+  return invoke<Record<string, unknown>>("coding_thread_read", {
+    threadId,
+    cursor: null,
+    limit: null,
+  });
 }
 
 export async function threadLiveSubscribe(workspaceId: string, threadId: string) {

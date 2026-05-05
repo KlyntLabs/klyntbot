@@ -7,6 +7,7 @@ export function HomeActions({ onAddWorkspace, onAddWorkspaceFromUrl }: HomeActio
   return (
     <div className="home-actions">
       <button
+        type="button"
         className="home-button primary home-add-workspaces-button"
         onClick={onAddWorkspace}
         data-tauri-drag-region="false"
@@ -17,6 +18,7 @@ export function HomeActions({ onAddWorkspace, onAddWorkspaceFromUrl }: HomeActio
         Add Workspaces
       </button>
       <button
+        type="button"
         className="home-button secondary home-add-workspace-from-url-button"
         onClick={onAddWorkspaceFromUrl}
         data-tauri-drag-region="false"

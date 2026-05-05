@@ -142,6 +142,8 @@ if (typeof window !== "undefined" && !window.__TAURI_INTERNALS__) {
     metadata: { currentWindow: { label: "main" } },
   };
 
+  (window as unknown as { __TAURI_BROWSER_SHIM__?: boolean }).__TAURI_BROWSER_SHIM__ = true;
+
   // Event plugin uses its own internals global. `_unlisten` in
   // @tauri-apps/api/event reads `window.__TAURI_EVENT_PLUGIN_INTERNALS__`.
   type EventPluginInternals = {
@@ -161,7 +163,7 @@ if (typeof window !== "undefined" && !window.__TAURI_INTERNALS__) {
   };
 
   // eslint-disable-next-line no-console
-  console.info("[browser-shim] installed __TAURI_INTERNALS__ → " + DEV_BASE);
+  console.info(`[browser-shim] installed __TAURI_INTERNALS__ → ${DEV_BASE}`);
 }
 
 export {};

@@ -39,7 +39,7 @@ fn configure_mimalloc() {
 #[cfg(debug_assertions)]
 use desktop::dev_server;
 use desktop::{
-    app_core, claude_code_integration, commands, focus_timer, lazy_window, oauth, shortcuts,
+    app_core, claude_code_integration, commands, focus_timer, lazy_window, shortcuts,
     specta_builder, tray_countdown,
 };
 

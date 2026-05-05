@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import X from "lucide-react/dist/esm/icons/x";
 import { useState } from "react";
 
 interface AddGoalDialogProps {
@@ -27,7 +27,10 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
   if (!open) return null;
 
   const selectedMetric = METRICS.find((m) => m.value === metric) ?? METRICS[0];
-  const canSubmit = targetValue.trim() !== "" && Number(targetValue) > 0;
+  const numericValue = Number(targetValue);
+  const isEmpty = targetValue.trim() === "";
+  const isInvalid = !isEmpty && (Number.isNaN(numericValue) || numericValue <= 0);
+  const canSubmit = !isEmpty && !isInvalid;
 
   const handleSubmit = () => {
     onAdd({ goalType, metric, targetValue: Number(targetValue) });
@@ -39,7 +42,7 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
     <div className="dashboard__goal-dialog-backdrop">
       <div className="dashboard__goal-dialog">
         <div className="dashboard__goal-dialog-header">
-          <h3>Add Goal</h3>
+          <h2>Add Goal</h2>
           <button type="button" onClick={onClose} aria-label="Close dialog">
             <X aria-hidden />
           </button>
@@ -99,7 +102,22 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
               min={0}
               step={metric === "productive_hours" ? 0.5 : 1}
               className="dashboard__goal-dialog-input"
+              aria-invalid={isInvalid}
+              aria-describedby={isInvalid ? "goal-target-error" : undefined}
             />
+            {isInvalid && (
+              <span
+                id="goal-target-error"
+                style={{
+                  fontSize: "var(--fs-2xs)",
+                  color: "var(--destructive)",
+                  marginTop: 4,
+                }}
+                role="alert"
+              >
+                Please enter a positive number
+              </span>
+            )}
           </div>
         </div>
 

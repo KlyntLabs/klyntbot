@@ -34,6 +34,7 @@ export function SettingsComposerSection({
         <div className="settings-field-label">Follow-up behavior</div>
         <div
           className={`settings-segmented${appSettings.followUpMessageBehavior === "steer" ? " is-second-active" : ""}`}
+          role="radiogroup"
           aria-label="Follow-up behavior"
         >
           <label

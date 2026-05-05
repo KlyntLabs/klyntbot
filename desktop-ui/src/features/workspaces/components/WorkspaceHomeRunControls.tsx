@@ -228,6 +228,7 @@ export function WorkspaceHomeRunControls({
           <div className="open-app-button">
             <span className="composer-icon" aria-hidden>
               <svg viewBox="0 0 24 24" fill="none">
+                <title>Collaboration mode</title>
                 <path
                   d="M7 7h10M7 12h6M7 17h8"
                   stroke="currentColor"
@@ -256,6 +257,7 @@ export function WorkspaceHomeRunControls({
         <div className="open-app-button">
           <span className="composer-icon" aria-hidden>
             <svg viewBox="0 0 24 24" fill="none">
+              <title>Thinking mode</title>
               <path
                 d="M8.5 4.5a3.5 3.5 0 0 0-3.46 4.03A4 4 0 0 0 6 16.5h2"
                 stroke="currentColor"

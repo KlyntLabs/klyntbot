@@ -123,25 +123,6 @@ pub async fn chat_respond_approval(
 }
 
 #[klynt_command]
-pub async fn chat_set_mode(
-    app: tauri::AppHandle,
-    session_key: String,
-    mode: app_core::coding::mode_handler::ChatMode,
-) -> storage::SessionRow {
-    let core = app.state::<std::sync::Arc<app_core::AppCore>>();
-    let row = app_core::coding::mode_handler::set_mode(&core.repos, &session_key, mode)
-        .await
-        .map_err(|e| {
-            let code = match &e {
-                app_core::coding::mode_handler::ModeError::NotFound(_) => "NOT_FOUND",
-                app_core::coding::mode_handler::ModeError::Storage(_) => "STORAGE_ERROR",
-            };
-            desktop_shared::errors::ApiError::new(code, e.to_string())
-        })?;
-    Ok(row)
-}
-
-#[klynt_command]
 pub async fn chat_save_starlark_rule(
     app: tauri::AppHandle,
     request_id: String,
@@ -238,21 +219,7 @@ pub(crate) async fn dispatch_dev(
             );
             dev::val(result)
         }
-        "chat_set_mode" => {
-            let session_key = try_field!(dev::get_str(body, "sessionKey"));
-            let mode: app_core::coding::mode_handler::ChatMode =
-                try_field!(dev::require(body, "mode"));
-            let result = app_core::coding::mode_handler::set_mode(&core.repos, &session_key, mode)
-                .await
-                .map_err(|e| {
-                    let code = match &e {
-                        app_core::coding::mode_handler::ModeError::NotFound(_) => "NOT_FOUND",
-                        app_core::coding::mode_handler::ModeError::Storage(_) => "STORAGE_ERROR",
-                    };
-                    desktop_shared::errors::ApiError::new(code, e.to_string())
-                });
-            dev::val(result)
-        }
+
         "chat_save_starlark_rule" => {
             let request_id = try_field!(dev::get_str(body, "requestId"));
             let rule_source = try_field!(dev::get_str(body, "ruleSource"));

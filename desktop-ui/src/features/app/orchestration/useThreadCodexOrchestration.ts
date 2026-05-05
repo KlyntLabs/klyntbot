@@ -117,7 +117,6 @@ export function useThreadCodexOrchestration({
       preferredServiceTier,
       threadCodexSelectionKey,
       threadCodexParamsVersion,
-      setPreferredCodexArgsOverride,
       getThreadCodexParams,
       patchThreadCodexParams,
       persistThreadCodexParams,

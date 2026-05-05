@@ -40,7 +40,7 @@ export function resolveMountedWorkspacePath(path: string, workspacePath?: string
     if (segments.length === 0) {
       return trimTrailingSeparators(trimmedWorkspace);
     }
-    const workspaceIndex = segments.findIndex((segment) => segment === workspaceName);
+    const workspaceIndex = segments.indexOf(workspaceName);
     if (workspaceIndex >= 0) {
       const relativePath = segments.slice(workspaceIndex + 1).join("/");
       return relativePath

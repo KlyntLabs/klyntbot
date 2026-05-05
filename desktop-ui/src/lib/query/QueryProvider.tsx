@@ -21,11 +21,16 @@ export function QueryProvider({ children, client }: QueryProviderProps) {
     let stopApp: (() => void) | null = null;
     let cancelled = false;
 
-    startTauriEventBridge(clientRef.current!).then((s) => {
+    const currentClient = clientRef.current;
+    if (!currentClient) {
+      return;
+    }
+
+    startTauriEventBridge(currentClient).then((s) => {
       if (cancelled) s();
       else stopTauri = s;
     });
-    stopApp = startAppServerEventBridge(clientRef.current!);
+    stopApp = startAppServerEventBridge(currentClient);
 
     return () => {
       cancelled = true;

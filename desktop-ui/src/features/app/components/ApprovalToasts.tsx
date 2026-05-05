@@ -135,11 +135,16 @@ export function ApprovalToasts({
               )}
             </div>
             <ToastActions className="approval-toast-actions">
-              <button className="secondary" onClick={() => onDecision(request, "decline")}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => onDecision(request, "decline")}
+              >
                 Decline
               </button>
               {commandInfo && onRemember ? (
                 <button
+                  type="button"
                   className="ghost approval-toast-remember"
                   onClick={() => onRemember(request, commandInfo.tokens)}
                   title={`Allow commands that start with ${commandInfo.preview}`}
@@ -147,7 +152,11 @@ export function ApprovalToasts({
                   Always allow
                 </button>
               ) : null}
-              <button className="primary" onClick={() => onDecision(request, "accept")}>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => onDecision(request, "accept")}
+              >
                 Approve (Enter)
               </button>
             </ToastActions>

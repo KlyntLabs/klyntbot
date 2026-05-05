@@ -83,6 +83,14 @@ impl AppCore {
         let mut key_results = vec![];
         let mut sources = vec![];
 
+        // Collect IDs by entity kind for batch fetching
+        let mut task_ids: Vec<String> = Vec::new();
+        let mut note_ids: Vec<String> = Vec::new();
+        let mut conversation_keys: Vec<String> = Vec::new();
+        let mut objective_ids: Vec<String> = Vec::new();
+        let mut key_result_ids: Vec<String> = Vec::new();
+        let mut source_ids: Vec<String> = Vec::new();
+
         for link in &links {
             let (other_kind, other_id) = if link.source_kind == kind && link.source_id == id {
                 (&link.target_kind, &link.target_id)
@@ -91,91 +99,88 @@ impl AppCore {
             };
 
             match EntityKind::parse(other_kind) {
-                Some(EntityKind::Task) => match self.repos.tasks.get(other_id).await {
-                    Ok(Some(task)) => {
-                        tasks.push(ActionSummaryResponse {
-                            id: task.id,
-                            title: task.title,
-                            status: task.status,
-                            priority: priority_label(task.priority),
-                        });
-                    }
-                    Err(e) => {
-                        warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked task")
-                    }
-                    _ => {}
-                },
-                Some(EntityKind::Note) => match self.note_repo.get_note(other_id).await {
-                    Ok(Some(note)) => {
-                        notes.push(NoteSummaryResponse {
-                            id: note.id,
-                            title: note.title,
-                            updated_at: note.updated_at,
-                        });
-                    }
-                    Err(e) => {
-                        warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked note")
-                    }
-                    _ => {}
-                },
-                Some(EntityKind::Conversation) => {
-                    match self.repos.sessions.get_session(other_id).await {
-                        Ok(session) => {
-                            conversations.push(SessionSummaryResponse {
-                                key: session.key,
-                                title: session
-                                    .metadata
-                                    .as_object()
-                                    .and_then(|m| m.get("title"))
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string()),
-                                conversation_type: session.conversation_type,
-                                updated_at: session.updated_at.to_string(),
-                            });
-                        }
-                        Err(e) => {
-                            warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked conversation")
-                        }
-                    }
-                }
-                Some(EntityKind::Objective) => match self.repos.objectives.get(other_id).await {
-                    Ok(Some(obj)) => {
-                        objectives.push(ObjectiveSummaryResponse {
-                            id: obj.id,
-                            title: obj.title,
-                            progress: obj.progress,
-                            status: obj.status,
-                        });
-                    }
-                    Err(e) => {
-                        warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked objective")
-                    }
-                    _ => {}
-                },
-                Some(EntityKind::KeyResult) => match self.repos.key_results.get(other_id).await {
-                    Ok(Some(kr)) => {
-                        key_results.push(KeyResultSummaryResponse {
-                            id: kr.id,
-                            title: kr.title,
-                            progress: kr.progress,
-                        });
-                    }
-                    Err(e) => {
-                        warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked key result")
-                    }
-                    _ => {}
-                },
-                Some(EntityKind::Source) => match self.repos.project_sources.get(other_id).await {
-                    Ok(Some(src)) => {
-                        sources.push(source_row_to_response(&src));
-                    }
-                    Err(e) => {
-                        warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked source")
-                    }
-                    _ => {}
-                },
+                Some(EntityKind::Task) => task_ids.push(other_id.clone()),
+                Some(EntityKind::Note) => note_ids.push(other_id.clone()),
+                Some(EntityKind::Conversation) => conversation_keys.push(other_id.clone()),
+                Some(EntityKind::Objective) => objective_ids.push(other_id.clone()),
+                Some(EntityKind::KeyResult) => key_result_ids.push(other_id.clone()),
+                Some(EntityKind::Source) => source_ids.push(other_id.clone()),
                 _ => {}
             }
+        }
+
+        // Batch fetch all linked entities concurrently
+        let (tasks_rows, notes_rows, conversations_rows, objectives_rows, key_results_rows, sources_rows) = tokio::join!(
+            self.repos.tasks.get_by_ids(&task_ids),
+            self.note_repo.get_notes_by_ids(&note_ids),
+            self.repos.sessions.get_sessions_by_keys(&conversation_keys),
+            self.repos.objectives.get_by_ids(&objective_ids),
+            self.repos.key_results.get_by_ids(&key_result_ids),
+            self.repos.project_sources.get_by_ids(&source_ids),
+        );
+
+        if let Ok(rows) = tasks_rows {
+            tasks.extend(rows.into_iter().map(|task| ActionSummaryResponse {
+                id: task.id,
+                title: task.title,
+                status: task.status,
+                priority: priority_label(task.priority),
+            }));
+        } else if let Err(e) = tasks_rows {
+            warn!(error = %e, "Failed to batch fetch linked tasks");
+        }
+
+        if let Ok(rows) = notes_rows {
+            notes.extend(rows.into_iter().map(|note| NoteSummaryResponse {
+                id: note.id,
+                title: note.title,
+                updated_at: note.updated_at,
+            }));
+        } else if let Err(e) = notes_rows {
+            warn!(error = %e, "Failed to batch fetch linked notes");
+        }
+
+        if let Ok(rows) = conversations_rows {
+            conversations.extend(rows.into_iter().map(|session| SessionSummaryResponse {
+                key: session.key,
+                title: session
+                    .metadata
+                    .as_object()
+                    .and_then(|m| m.get("title"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+                conversation_type: session.conversation_type,
+                updated_at: session.updated_at.to_string(),
+            }));
+        } else if let Err(e) = conversations_rows {
+            warn!(error = %e, "Failed to batch fetch linked conversations");
+        }
+
+        if let Ok(rows) = objectives_rows {
+            objectives.extend(rows.into_iter().map(|obj| ObjectiveSummaryResponse {
+                id: obj.id,
+                title: obj.title,
+                progress: obj.progress,
+                status: obj.status,
+            }));
+        } else if let Err(e) = objectives_rows {
+            warn!(error = %e, "Failed to batch fetch linked objectives");
+        }
+
+        if let Ok(rows) = key_results_rows {
+            key_results.extend(rows.into_iter().map(|kr| KeyResultSummaryResponse {
+                id: kr.id,
+                title: kr.title,
+                progress: kr.progress,
+            }));
+        } else if let Err(e) = key_results_rows {
+            warn!(error = %e, "Failed to batch fetch linked key results");
+        }
+
+        if let Ok(rows) = sources_rows {
+            sources.extend(rows.into_iter().map(|src| source_row_to_response(&src)));
+        } else if let Err(e) = sources_rows {
+            warn!(error = %e, "Failed to batch fetch linked sources");
         }
 
         Ok(LinkedEntitiesResponse {

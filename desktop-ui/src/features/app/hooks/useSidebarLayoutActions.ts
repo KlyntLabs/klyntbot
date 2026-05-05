@@ -20,16 +20,16 @@ type UseSidebarLayoutActionsOptions = {
   updateWorkspaceSettings: (
     workspaceId: string,
     patch: Partial<WorkspaceSettings>,
-  ) => void | Promise<unknown>;
+  ) => undefined | Promise<unknown>;
   removeThread: (workspaceId: string, threadId: string) => void;
   clearDraftForThread: (threadId: string) => void;
   removeImagesForThread: (threadId: string) => void;
-  refreshThread: (workspaceId: string, threadId: string) => void | Promise<unknown>;
+  refreshThread: (workspaceId: string, threadId: string) => undefined | Promise<unknown>;
   handleRenameThread: (workspaceId: string, threadId: string) => void;
-  removeWorkspace: (workspaceId: string) => void | Promise<unknown>;
-  removeWorktree: (workspaceId: string) => void | Promise<unknown>;
-  loadOlderThreadsForWorkspace: (workspace: WorkspaceInfo) => void | Promise<unknown>;
-  listThreadsForWorkspace: (workspace: WorkspaceInfo) => void | Promise<unknown>;
+  removeWorkspace: (workspaceId: string) => undefined | Promise<unknown>;
+  removeWorktree: (workspaceId: string) => undefined | Promise<unknown>;
+  loadOlderThreadsForWorkspace: (workspace: WorkspaceInfo) => undefined | Promise<unknown>;
+  listThreadsForWorkspace: (workspace: WorkspaceInfo) => undefined | Promise<unknown>;
 };
 
 export function useSidebarLayoutActions({

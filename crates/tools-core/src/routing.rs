@@ -60,6 +60,11 @@ pub trait InteractionChannel: Send + Sync {
 #[derive(Clone)]
 pub struct RoutingContext {
     pub channel: ChannelName,
+    /// Authoritative session mode discriminator. Drives:
+    /// - which `SoulContextSource` variant to inject
+    /// - which tools the LLM sees (via `ChannelMask` interpreted in mode-aware mode)
+    /// - which `ContextSource`s gate themselves on (e.g. CodingRecall)
+    pub session_mode: common::SessionMode,
     pub chat_id: ChatId,
     /// Channel for ask_user tool to send interaction bundles.
     /// Only available when running in CLI chat mode (TTY).
@@ -97,10 +102,16 @@ pub struct RoutingContext {
 }
 
 impl RoutingContext {
+    pub fn with_session_mode(mut self, mode: common::SessionMode) -> Self {
+        self.session_mode = mode;
+        self
+    }
+
     /// Non-interactive mode (bus-driven channels, non-TTY).
     pub fn new(channel: ChannelName, chat_id: ChatId) -> Self {
         Self {
             channel,
+            session_mode: common::SessionMode::Assistant,
             chat_id,
             interaction_tx: None,
             is_direct_mode: false,
@@ -125,6 +136,7 @@ impl RoutingContext {
     ) -> Self {
         Self {
             channel,
+            session_mode: common::SessionMode::Assistant,
             chat_id,
             interaction_tx: Some(interaction_tx),
             is_direct_mode: true,

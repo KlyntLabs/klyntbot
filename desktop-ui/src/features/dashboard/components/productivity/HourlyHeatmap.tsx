@@ -2,7 +2,7 @@ import { productivityHourlyBreakdownQuery } from "@/api/endpoints/dashboard";
 import type { HourlyBreakdownResponse } from "@/bindings";
 import { useTauriQuery } from "@/lib/query";
 import { qk } from "@/lib/query/queryKeys";
-import { todayISO, TZ_OFFSET_MINS } from "@/utils/dashboardDates";
+import { TZ_OFFSET_MINS, todayISO } from "@/utils/dashboardDates";
 
 interface Props {
   startDate: string;
@@ -89,7 +89,7 @@ export function HourlyHeatmap({ startDate, endDate }: Props) {
     : null;
 
   return (
-    <div className="dashboard__hourly">
+    <div className="dashboard__hourly" role="img" aria-label="Hourly productivity breakdown">
       <div className="dashboard__hourly-title">
         Hourly Productivity
         {peakHour && <span className="dashboard__hourly-peak"> Peak: {peakHour.hour}:00</span>}

@@ -84,6 +84,11 @@ impl TrialRepo {
         Self { pool }
     }
 
+    /// Format a `jiff::Timestamp` as `YYYY-MM-DD HH:MM:SS` for SQLite datetime comparison.
+    fn fmt_sqlite_datetime(ts: jiff::Timestamp) -> String {
+        ts.to_string().get(..19).unwrap_or("").replace('T', " ")
+    }
+
     /// Run the autotuner DDL migrations against the underlying pool.
     pub async fn migrate(&self) -> Result<(), StorageError> {
         sqlx::query(MIGRATION_SQL).execute(&self.pool).await?;
@@ -348,7 +353,7 @@ impl TrialRepo {
         since: jiff::Timestamp,
     ) -> Result<f64, StorageError> {
         // Format as YYYY-MM-DD HH:MM:SS to match SQLite's datetime() output.
-        let since_str = since.to_string().get(..19).unwrap_or("").replace('T', " ");
+        let since_str = Self::fmt_sqlite_datetime(since);
         let (total, agreed): (i64, i64) = if let Some(tid) = trial_id {
             sqlx::query_as::<_, (i64, i64)>(
                 "SELECT COUNT(*) AS total,
@@ -387,7 +392,7 @@ impl TrialRepo {
         trial_id: &str,
         since: jiff::Timestamp,
     ) -> Result<(i64, i64), StorageError> {
-        let since_str = since.to_string().get(..19).unwrap_or("").replace('T', " ");
+        let since_str = Self::fmt_sqlite_datetime(since);
         sqlx::query_as::<_, (i64, i64)>(
             "SELECT COUNT(*) AS total,
                     COALESCE(SUM(CASE WHEN user_corrected = 1 THEN 1 ELSE 0 END), 0) AS corrected
@@ -406,7 +411,7 @@ impl TrialRepo {
     /// Count trials that reached a terminal status (completed, promoted, or
     /// reverted) since the given timestamp.
     pub async fn count_trials_since(&self, since: jiff::Timestamp) -> Result<i64, StorageError> {
-        let since_str = since.to_string().get(..19).unwrap_or("").replace('T', " ");
+        let since_str = Self::fmt_sqlite_datetime(since);
         Ok(sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM autotuner_trials
              WHERE status IN ('completed', 'promoted', 'reverted')
@@ -458,7 +463,7 @@ impl TrialRepo {
         trial_id: &str,
         since: jiff::Timestamp,
     ) -> Result<f64, StorageError> {
-        let since_str = since.to_string().get(..19).unwrap_or("").replace('T', " ");
+        let since_str = Self::fmt_sqlite_datetime(since);
         let result = sqlx::query_as::<_, (f64,)>(
             "SELECT COALESCE(AVG(CASE WHEN variant_retrieved_count > 0
                 THEN CAST(overlap_count AS REAL) / variant_retrieved_count
@@ -479,7 +484,7 @@ impl TrialRepo {
         trial_id: &str,
         since: jiff::Timestamp,
     ) -> Result<f64, StorageError> {
-        let since_str = since.to_string().get(..19).unwrap_or("").replace('T', " ");
+        let since_str = Self::fmt_sqlite_datetime(since);
         let result = sqlx::query_as::<_, (f64,)>(
             "SELECT COALESCE(AVG(variant_avg_age_days), 0.0)
              FROM autotuner_shadow_retrieval_log
@@ -494,7 +499,7 @@ impl TrialRepo {
 
     /// Count trials that were promoted since the given timestamp.
     pub async fn count_promoted_since(&self, since: jiff::Timestamp) -> Result<i64, StorageError> {
-        let since_str = since.to_string().get(..19).unwrap_or("").replace('T', " ");
+        let since_str = Self::fmt_sqlite_datetime(since);
         Ok(sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM autotuner_trials
              WHERE status = 'promoted' AND completed_at >= ?1",

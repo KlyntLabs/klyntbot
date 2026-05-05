@@ -1,7 +1,14 @@
 import { AppLayout } from "@app/components/AppLayout";
 import type { AppModalsProps } from "@app/components/AppModals";
 import { AppModals } from "@app/components/AppModals";
-import { type ComponentProps, type CSSProperties, lazy, type RefObject, Suspense } from "react";
+import {
+  type ComponentProps,
+  type CSSProperties,
+  lazy,
+  memo,
+  type RefObject,
+  Suspense,
+} from "react";
 import { TitlebarExpandControls } from "@/features/layout/components/SidebarToggleControls";
 import { WindowCaptionControls } from "@/features/layout/components/WindowCaptionControls";
 import { MobileServerSetupWizard } from "@/features/mobile/components/MobileServerSetupWizard";
@@ -32,7 +39,7 @@ type MainAppShellProps = {
   mobileSetupWizardProps: ComponentProps<typeof MobileServerSetupWizard>;
 };
 
-export function MainAppShell({
+export const MainAppShell = memo(function MainAppShell({
   appClassName,
   isResizing,
   appStyle,
@@ -64,4 +71,4 @@ export function MainAppShell({
       {showMobileSetupWizard ? <MobileServerSetupWizard {...mobileSetupWizardProps} /> : null}
     </div>
   );
-}
+});

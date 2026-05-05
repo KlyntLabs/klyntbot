@@ -6,6 +6,16 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
+/// Handle returned by `start_data_version_watcher`. Cancels the background
+/// task when dropped.
+pub struct DataVersionWatcherHandle(CancellationToken);
+
+impl Drop for DataVersionWatcherHandle {
+    fn drop(&mut self) {
+        self.0.cancel();
+    }
+}
+
 /// Newtype wrapper around `sqlx::SqlitePool` with auto-migration on connect.
 #[derive(Clone)]
 pub struct StoragePool(sqlx::SqlitePool);
@@ -23,19 +33,17 @@ impl StoragePool {
         let url = format!("sqlite:{}?mode=rwc", db_path.display());
         let pool = sqlx::pool::PoolOptions::<sqlx::Sqlite>::new()
             .max_connections(5)
+            .after_connect(|conn, _| Box::pin(async move {
+                sqlx::query("PRAGMA foreign_keys=ON;").execute(&mut *conn).await?;
+                sqlx::query("PRAGMA busy_timeout = 5000;").execute(&mut *conn).await?;
+                // ~2MB per connection instead of default ~8MB (single-user app).
+                sqlx::query("PRAGMA cache_size = -2000;").execute(&mut *conn).await?;
+                Ok(())
+            }))
             .connect(&url)
             .await?;
+        // Database-level PRAGMAs — only need to run once.
         sqlx::query("PRAGMA journal_mode=WAL;")
-            .execute(&pool)
-            .await?;
-        sqlx::query("PRAGMA foreign_keys=ON;")
-            .execute(&pool)
-            .await?;
-        sqlx::query("PRAGMA busy_timeout = 5000;")
-            .execute(&pool)
-            .await?;
-        // ~2MB per connection instead of default ~8MB (single-user app).
-        sqlx::query("PRAGMA cache_size = -2000;")
             .execute(&pool)
             .await?;
         // Prevent unbounded WAL file growth (default is 1000 pages ≈ 4MB).
@@ -55,12 +63,14 @@ impl StoragePool {
     ///
     /// Useful for tests and as a fallback when no `data_dir` is configured.
     pub async fn connect_in_memory() -> Result<Self, StorageError> {
-        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await?;
-        sqlx::query("PRAGMA foreign_keys=ON;")
-            .execute(&pool)
-            .await?;
-        sqlx::query("PRAGMA busy_timeout = 5000;")
-            .execute(&pool)
+        let pool = sqlx::pool::PoolOptions::<sqlx::Sqlite>::new()
+            .max_connections(5)
+            .after_connect(|conn, _| Box::pin(async move {
+                sqlx::query("PRAGMA foreign_keys=ON;").execute(&mut *conn).await?;
+                sqlx::query("PRAGMA busy_timeout = 5000;").execute(&mut *conn).await?;
+                Ok(())
+            }))
+            .connect("sqlite::memory:")
             .await?;
         sqlx::migrate!("./migrations").run(&pool).await?;
         Ok(Self(pool))
@@ -96,32 +106,29 @@ impl StoragePool {
                     m.feature_name, m.version
                 );
             }
-            let exists: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM _feature_migrations WHERE feature_name = ?1 AND version = ?2)",
+            let mut tx = pool.begin().await?;
+            let inserted = sqlx::query(
+                "INSERT OR IGNORE INTO _feature_migrations (feature_name, version, description) VALUES (?1, ?2, ?3)",
             )
             .bind(&m.feature_name)
             .bind(m.version)
-            .fetch_one(pool)
-            .await?;
+            .bind(&m.description)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected()
+                > 0;
 
-            if !exists {
+            if inserted {
                 tracing::info!(
                     feature = %m.feature_name,
                     version = m.version,
                     description = %m.description,
                     "Running feature migration"
                 );
-                let mut tx = pool.begin().await?;
                 sqlx::query(&m.sql).execute(&mut *tx).await?;
-                sqlx::query(
-                    "INSERT INTO _feature_migrations (feature_name, version, description) VALUES (?1, ?2, ?3)",
-                )
-                .bind(&m.feature_name)
-                .bind(m.version)
-                .bind(&m.description)
-                .execute(&mut *tx)
-                .await?;
                 tx.commit().await?;
+            } else {
+                tx.rollback().await?;
             }
         }
         Ok(())
@@ -146,11 +153,11 @@ impl StoragePool {
     /// connections commit. Holding a long-lived borrow on a single connection
     /// would mask all updates — that's why we use `fetch_one(&self.0)`
     /// (a sqlx pool) on every tick, which checks out a fresh connection.
-    pub async fn start_data_version_watcher(
+    pub fn start_data_version_watcher(
         &self,
         bus: Arc<bus::DomainEventBus>,
         interval: Duration,
-    ) -> CancellationToken {
+    ) -> DataVersionWatcherHandle {
         let token = CancellationToken::new();
         let token_child = token.clone();
         let pool = self.clone();
@@ -189,7 +196,7 @@ impl StoragePool {
                 }
             }
         });
-        token
+        DataVersionWatcherHandle(token)
     }
 }
 

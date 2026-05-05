@@ -277,6 +277,7 @@ klynt-core.workspace = true
 klynt-execpolicy.workspace = true
 proptest.workspace = true
 tokio-test.workspace = true
+walkdir.workspace = true
 
 [profile.dev]
 opt-level = 0

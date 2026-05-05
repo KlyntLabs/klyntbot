@@ -24,7 +24,10 @@ export function BrainEventBridge() {
     const eventNames = [
       "agent:approval_requested",
       "agent:approval_resolved",
+      "agent:approval_request",
       "agent:sandbox_policy_applied",
+      "agent:thread_event",
+      "agent:cost_update",
       "brain:ambient",
       "provider:degraded",
       "entity:updated",

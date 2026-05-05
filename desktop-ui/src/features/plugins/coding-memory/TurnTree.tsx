@@ -1,4 +1,6 @@
-import { AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
+import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
+import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
 import { useMemo, useState } from "react";
 import { isErrorEvent } from "./eventHelpers";
 import type { WireEventDto } from "./types";
@@ -24,7 +26,7 @@ function buildTree(events: WireEventDto[]): TurnNode[] {
 
   events.forEach((event, idx) => {
     if (event.kind === "turnBegin") {
-      const p = event.payloadDecoded as any;
+      const p = event.payloadDecoded as Record<string, unknown> | undefined;
       let input = "";
       if (typeof p?.user_input === "string") {
         input = p.user_input.slice(0, 60);
@@ -75,7 +77,7 @@ export function TurnTree({ events, onScrollToIndex }: TurnTreeProps) {
           <div key={turn.eventIndex} className="cm-turn-tree__node">
             <button
               type="button"
-              className={"cm-turn-tree__turn" + (turn.hasError ? " cm-turn-tree__turn--error" : "")}
+              className={`cm-turn-tree__turn${turn.hasError ? " cm-turn-tree__turn--error" : ""}`}
               onClick={() => {
                 setCollapsedTurns((prev) => {
                   const next = new Set(prev);
@@ -95,9 +97,7 @@ export function TurnTree({ events, onScrollToIndex }: TurnTreeProps) {
                   <button
                     key={step.eventIndex}
                     type="button"
-                    className={
-                      "cm-turn-tree__step" + (step.hasError ? " cm-turn-tree__step--error" : "")
-                    }
+                    className={`cm-turn-tree__step${step.hasError ? " cm-turn-tree__step--error" : ""}`}
                     onClick={() => onScrollToIndex(step.eventIndex)}
                   >
                     Step {step.stepNumber}

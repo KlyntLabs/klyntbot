@@ -90,24 +90,37 @@ impl FinanceExchangeRateRepo {
         base: &str,
         rates: &[(&str, f64)],
     ) -> Result<(), StorageError> {
+        let mut tx = self.pool.begin().await?;
         let now = crate::sqlite_types::SqlTs(jiff::Timestamp::now());
         for (target, rate) in rates {
-            sqlx::query(
-                r#"
-                INSERT INTO finance_exchange_rates (from_currency, to_currency, rate, fetched_at)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (from_currency, to_currency) DO UPDATE SET
-                    rate = excluded.rate,
-                    fetched_at = excluded.fetched_at
-                "#,
-            )
-            .bind(base)
-            .bind(target)
-            .bind(rate)
-            .bind(now)
-            .execute(&self.pool)
-            .await?;
+            Self::do_upsert(&mut tx, base, target, *rate, now).await?;
         }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn do_upsert(
+        conn: &mut sqlx::SqliteConnection,
+        from: &str,
+        to: &str,
+        rate: f64,
+        now: crate::sqlite_types::SqlTs,
+    ) -> Result<(), StorageError> {
+        sqlx::query(
+            r#"
+            INSERT INTO finance_exchange_rates (from_currency, to_currency, rate, fetched_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (from_currency, to_currency) DO UPDATE SET
+                rate = excluded.rate,
+                fetched_at = excluded.fetched_at
+            "#,
+        )
+        .bind(from)
+        .bind(to)
+        .bind(rate)
+        .bind(now)
+        .execute(conn)
+        .await?;
         Ok(())
     }
 

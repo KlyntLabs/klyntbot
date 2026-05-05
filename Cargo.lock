@@ -2705,6 +2705,7 @@ dependencies = [
  "rust_decimal",
  "serde",
  "serde_json",
+ "specta",
  "sqlx",
  "thiserror 2.0.18",
  "tokio",
@@ -4484,10 +4485,12 @@ dependencies = [
  "axum",
  "bus",
  "clap 4.6.1",
+ "coding-agents-md",
  "coding-ingest",
  "cognitive",
  "common",
  "config",
+ "criterion",
  "dashmap",
  "desktop-macros",
  "desktop-shared",
@@ -8219,6 +8222,7 @@ dependencies = [
  "tools",
  "tools-core",
  "uuid",
+ "walkdir",
 ]
 
 [[package]]

@@ -34,7 +34,7 @@ type UseQueuedSendOptions = {
     threadId: string,
     text: string,
     images?: string[],
-  ) => Promise<void | SendMessageResult>;
+  ) => Promise<undefined | SendMessageResult>;
   startFork: (text: string) => Promise<void>;
   startReview: (text: string) => Promise<void>;
   startResume: (text: string) => Promise<void>;

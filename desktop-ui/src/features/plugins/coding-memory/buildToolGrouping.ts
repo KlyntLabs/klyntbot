@@ -13,7 +13,12 @@ export function buildToolGrouping(events: WireEventDto[]): Map<number, EventMeta
   const peek = () => (active.length ? active[active.length - 1] : undefined);
 
   events.forEach((e, i) => {
-    const p = (e.payloadDecoded ?? {}) as any;
+    const p = (e.payloadDecoded ?? {}) as Record<string, unknown> & {
+      id?: unknown;
+      function?: { name?: unknown };
+      tool_name?: unknown;
+      tool_call_id?: unknown;
+    };
     if (e.kind === "toolCall") {
       const id = p.id as string | undefined;
       const name = (p.function?.name ?? p.tool_name) as string | undefined;

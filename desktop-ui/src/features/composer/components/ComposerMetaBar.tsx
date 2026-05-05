@@ -1,8 +1,11 @@
 import type { CodexArgsOption } from "@threads/utils/codexArgsProfiles";
-import { BrainCog, Server, SlidersHorizontal, Zap } from "lucide-react";
+import BrainCog from "lucide-react/dist/esm/icons/brain-cog";
+import Server from "lucide-react/dist/esm/icons/server";
+import SlidersHorizontal from "lucide-react/dist/esm/icons/sliders-horizontal";
+import Zap from "lucide-react/dist/esm/icons/zap";
 import type { CSSProperties, ReactNode } from "react";
-import type { AccessMode, ServiceTier } from "@/types";
 import type { ProviderInfo } from "@/features/models/hooks/useProviders";
+import type { AccessMode, ServiceTier } from "@/types";
 
 type ComposerMetaBarProps = {
   disabled: boolean;
@@ -84,6 +87,7 @@ export function ComposerMetaBar({
                 />
                 <span className="composer-plan-toggle-icon" aria-hidden>
                   <svg viewBox="0 0 24 24" fill="none">
+                    <title>Plan mode</title>
                     <path
                       d="m6.5 7.5 1 1 2-2M6.5 12.5l1 1 2-2M6.5 17.5l1 1 2-2M11 7.5h7M11 12.5h7M11 17.5h7"
                       stroke="currentColor"
@@ -100,6 +104,7 @@ export function ComposerMetaBar({
             <div className="composer-select-wrap">
               <span className="composer-icon" aria-hidden>
                 <svg viewBox="0 0 24 24" fill="none">
+                  <title>Collaboration mode</title>
                   <path
                     d="m6.5 7.5 1 1 2-2M6.5 12.5l1 1 2-2M6.5 17.5l1 1 2-2M11 7.5h7M11 12.5h7M11 17.5h7"
                     stroke="currentColor"
@@ -148,6 +153,7 @@ export function ComposerMetaBar({
         <div className="composer-select-wrap composer-select-wrap--model">
           <span className="composer-icon composer-icon--model" aria-hidden>
             <svg viewBox="0 0 24 24" fill="none">
+              <title>Model</title>
               <path d="M12 4v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
               <path
                 d="M8 7.5h8a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-2.5 2.5H8A2.5 2.5 0 0 1 5.5 15v-5A2.5 2.5 0 0 1 8 7.5Z"
@@ -242,6 +248,7 @@ export function ComposerMetaBar({
         <div className="composer-select-wrap">
           <span className="composer-icon" aria-hidden>
             <svg viewBox="0 0 24 24" fill="none">
+              <title>Access mode</title>
               <path
                 d="M12 4l7 3v5c0 4.5-3 7.5-7 8-4-0.5-7-3.5-7-8V7l7-3z"
                 stroke="currentColor"

@@ -1,4 +1,5 @@
-import { Plus, Trash2 } from "lucide-react";
+import Plus from "lucide-react/dist/esm/icons/plus";
+import Trash2 from "lucide-react/dist/esm/icons/trash-2";
 import { useState } from "react";
 import {
   type GoalCreateParams,
@@ -57,6 +58,12 @@ export function GoalsProgress() {
     void createGoal(params);
   };
 
+  const handleDelete = (id: number) => {
+    if (window.confirm("Are you sure you want to delete this goal?")) {
+      void deleteGoal(id);
+    }
+  };
+
   return (
     <>
       <div className="dashboard__goals">
@@ -104,7 +111,7 @@ export function GoalsProgress() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => void deleteGoal(g.id)}
+                      onClick={() => handleDelete(g.id)}
                       className="dashboard__goal-delete-btn"
                       aria-label="Delete goal"
                     >

@@ -102,8 +102,8 @@ export function WorkspaceHomeHistory({
                   {run.error && <div className="workspace-home-run-error">{run.error}</div>}
                   {run.instanceErrors.length > 0 && (
                     <div className="workspace-home-run-error-list">
-                      {run.instanceErrors.slice(0, 2).map((entry, index) => (
-                        <div className="workspace-home-run-error-item" key={index}>
+                      {run.instanceErrors.slice(0, 2).map((entry) => (
+                        <div className="workspace-home-run-error-item" key={entry.message}>
                           {entry.message}
                         </div>
                       ))}

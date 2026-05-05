@@ -149,7 +149,6 @@ export async function productivityIntelligenceSessionsQuery(
   return r.data;
 }
 
-
 export async function productivityGoalsQuery(): Promise<GoalProgressResponse[]> {
   const r = await commands.productivityGoals();
   if (r.status !== "ok") throw new Error(r.error.message ?? "productivity goals failed");

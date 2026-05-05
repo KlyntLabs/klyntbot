@@ -21,7 +21,8 @@ fn ask_decision_carries_layer_audit() {
     );
     match d {
         ApprovalDecision::Ask {
-            layer_audit: Some(a), ..
+            layer_audit: Some(a),
+            ..
         } => {
             assert!(a.privacy_passed);
             match &a.layer3 {

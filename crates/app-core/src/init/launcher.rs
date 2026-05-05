@@ -37,7 +37,7 @@ pub(super) async fn init_launcher(
     let launcher_config = &config.launcher;
     let frequency_repo = FrequencyRepo::new(pool.clone());
     let clipboard_repo = ClipboardRepo::new(pool.clone());
-    let pins_repo = feature_launcher::PinsRepo::new(&storage_pool);
+    let pins_repo = feature_launcher::PinsRepo::new(storage_pool);
     let entity_attention_repo = Arc::new(EntityAttentionRepo::new(pool.clone()));
 
     let mut sources: Vec<Arc<dyn feature_launcher::SearchSource>> = Vec::new();

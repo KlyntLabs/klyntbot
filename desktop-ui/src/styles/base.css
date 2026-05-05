@@ -133,7 +133,7 @@ body {
 .app.is-windows [data-tauri-drag-region],
 .app.is-windows .titlebar,
 .app.is-windows .main-topbar {
-  -webkit-app-region: no-drag !important;
+  -webkit-app-region: no-drag;
 }
 
 .titlebar-controls {
@@ -305,10 +305,10 @@ button.window-caption-control:focus-visible,
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
   }
 
   /* Restore functional spinners — these communicate loading state */
@@ -323,7 +323,7 @@ button.window-caption-control:focus-visible,
   .composer-action-spinner,
   .compact-codex-refresh-icon.spinning,
   .home-usage-refresh-icon.spinning {
-    animation-duration: var(--ds-spinner-dur) !important;
-    animation-iteration-count: infinite !important;
+    animation-duration: var(--ds-spinner-dur);
+    animation-iteration-count: infinite;
   }
 }

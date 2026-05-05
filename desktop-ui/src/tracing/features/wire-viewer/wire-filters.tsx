@@ -2,20 +2,20 @@
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
 import {
-  ChevronsDownUp,
-  ChevronsUpDown,
-  Search,
-  ChevronUp,
-  ChevronDown,
-  X,
   AlertCircle,
   BarChart3,
-  List,
-  GanttChart,
   Brain,
-  Zap,
-  ShieldCheck,
+  ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  ChevronUp,
+  GanttChart,
+  List,
+  Search,
   ShieldAlert,
+  ShieldCheck,
+  X,
+  Zap,
 } from "lucide-react";
 
 interface FilterPreset {
@@ -27,9 +27,17 @@ interface FilterPreset {
 const FILTER_PRESETS: FilterPreset[] = [
   { label: "All Events", types: new Set(), errorsOnly: false },
   { label: "Errors Only", types: new Set(), errorsOnly: true },
-  { label: "Tool Calls", types: new Set(["ToolCall", "ToolResult", "ToolCallPart"]), errorsOnly: false },
+  {
+    label: "Tool Calls",
+    types: new Set(["ToolCall", "ToolResult", "ToolCallPart"]),
+    errorsOnly: false,
+  },
   { label: "Thinking", types: new Set(["ThinkPart", "TextPart"]), errorsOnly: false },
-  { label: "Approvals", types: new Set(["ApprovalRequest", "ApprovalResponse"]), errorsOnly: false },
+  {
+    label: "Approvals",
+    types: new Set(["ApprovalRequest", "ApprovalResponse"]),
+    errorsOnly: false,
+  },
   { label: "Sub-agents", types: new Set(["SubagentEvent"]), errorsOnly: false },
 ];
 
@@ -135,6 +143,7 @@ export function WireFilters({
           <Zap size={12} className="text-muted-foreground mr-0.5" />
           {FILTER_PRESETS.map((preset, i) => (
             <button
+              type="button"
               key={preset.label}
               onClick={() => onApplyPreset(preset.types, preset.errorsOnly)}
               className={`rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
@@ -153,7 +162,10 @@ export function WireFilters({
       <div className="flex items-center gap-2">
         {/* Search box */}
         <div className="relative flex-1 max-w-xs">
-          <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search
+            size={13}
+            className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           <input
             type="text"
             value={searchQuery}
@@ -164,6 +176,7 @@ export function WireFilters({
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => onSearchChange("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
@@ -181,6 +194,7 @@ export function WireFilters({
 
         {/* Error navigation */}
         <button
+          type="button"
           onClick={onToggleErrorsOnly}
           className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] transition-colors ${
             errorsOnly
@@ -195,6 +209,7 @@ export function WireFilters({
         {errorCount > 0 && (
           <>
             <button
+              type="button"
               onClick={onPrevError}
               className="rounded border p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted"
               title="Previous error"
@@ -202,6 +217,7 @@ export function WireFilters({
               <ChevronUp size={14} />
             </button>
             <button
+              type="button"
               onClick={onNextError}
               className="rounded border p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted"
               title="Next error"
@@ -220,6 +236,7 @@ export function WireFilters({
             : `${total}`}
         </span>
         <button
+          type="button"
           onClick={allExpanded ? onCollapseAll : onExpandAll}
           className="flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           title={allExpanded ? "Collapse all" : "Expand all"}
@@ -232,6 +249,7 @@ export function WireFilters({
           <>
             <div className="h-4 w-px bg-border" />
             <button
+              type="button"
               onClick={onToggleUsageChart}
               className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] transition-colors ${
                 showUsageChart
@@ -251,6 +269,7 @@ export function WireFilters({
             <div className="h-4 w-px bg-border" />
             <div className="flex items-center rounded border overflow-hidden">
               <button
+                type="button"
                 onClick={() => onViewModeChange("events")}
                 className={`flex items-center gap-1 px-1.5 py-0.5 text-[11px] transition-colors ${
                   viewMode === "events"
@@ -264,6 +283,7 @@ export function WireFilters({
               </button>
               <div className="w-px h-4 bg-border" />
               <button
+                type="button"
                 onClick={() => onViewModeChange("timeline")}
                 className={`flex items-center gap-1 px-1.5 py-0.5 text-[11px] transition-colors ${
                   viewMode === "timeline"
@@ -277,6 +297,7 @@ export function WireFilters({
               </button>
               <div className="w-px h-4 bg-border" />
               <button
+                type="button"
                 onClick={() => onViewModeChange("decisions")}
                 className={`flex items-center gap-1 px-1.5 py-0.5 text-[11px] transition-colors ${
                   viewMode === "decisions"
@@ -296,6 +317,7 @@ export function WireFilters({
           <>
             <div className="h-4 w-px bg-border" />
             <button
+              type="button"
               onClick={onToggleIntegrity}
               className={`flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
                 integrityScore === 100
@@ -306,11 +328,7 @@ export function WireFilters({
               }`}
               title="Toggle integrity panel"
             >
-              {integrityScore === 100 ? (
-                <ShieldCheck size={11} />
-              ) : (
-                <ShieldAlert size={11} />
-              )}
+              {integrityScore === 100 ? <ShieldCheck size={11} /> : <ShieldAlert size={11} />}
               {integrityScore === 100 ? "✓ 100%" : `${integrityScore}%`}
             </button>
           </>
@@ -321,15 +339,15 @@ export function WireFilters({
       <div className="flex items-center gap-1.5 flex-wrap">
         {allTypes.map((type) => {
           const active = selectedTypes.has(type);
-          const colorClass = TYPE_COLORS[type] ?? "bg-secondary border-border text-secondary-foreground";
+          const colorClass =
+            TYPE_COLORS[type] ?? "bg-secondary border-border text-secondary-foreground";
           return (
             <button
+              type="button"
               key={type}
               onClick={() => onToggle(type)}
               className={`rounded-full border px-2 py-0.5 text-[11px] font-medium transition-opacity ${colorClass} ${
-                active || selectedTypes.size === 0
-                  ? "opacity-100"
-                  : "opacity-40"
+                active || selectedTypes.size === 0 ? "opacity-100" : "opacity-40"
               }`}
             >
               {type}

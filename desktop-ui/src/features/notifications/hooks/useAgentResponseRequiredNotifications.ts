@@ -11,7 +11,7 @@ function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) {
     return text;
   }
-  return text.slice(0, maxLength - 1) + "…";
+  return `${text.slice(0, maxLength - 1)}…`;
 }
 
 function buildApprovalKey(workspaceId: string, requestId: string | number) {
@@ -72,8 +72,8 @@ export function useAgentResponseRequiredNotifications({
   const notifiedPlanItemsRef = useRef(new Set<string>());
   const pendingPlanNotificationsRef = useRef(new Map<string, PendingPlanNotification>());
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [retrySignal, setRetrySignal] = useState(0);
-  const [pendingPlansSignal, setPendingPlansSignal] = useState(0);
+  const [_retrySignal, setRetrySignal] = useState(0);
+  const [_pendingPlansSignal, setPendingPlansSignal] = useState(0);
 
   const canNotifyNow = useCallback(() => {
     if (!enabled) {
@@ -224,14 +224,7 @@ export function useAgentResponseRequiredNotifications({
       requestId: latestUnnotifiedApproval.request_id,
     });
     scheduleRetry();
-  }, [
-    canNotifyNow,
-    getWorkspaceName,
-    latestUnnotifiedApproval,
-    notify,
-    retrySignal,
-    scheduleRetry,
-  ]);
+  }, [canNotifyNow, getWorkspaceName, latestUnnotifiedApproval, notify, scheduleRetry]);
 
   const latestUnnotifiedQuestion = (() => {
     for (let index = userInputRequests.length - 1; index >= 0; index -= 1) {
@@ -282,14 +275,7 @@ export function useAgentResponseRequiredNotifications({
       itemId: latestUnnotifiedQuestion.params.item_id,
     });
     scheduleRetry();
-  }, [
-    canNotifyNow,
-    getWorkspaceName,
-    latestUnnotifiedQuestion,
-    notify,
-    retrySignal,
-    scheduleRetry,
-  ]);
+  }, [canNotifyNow, getWorkspaceName, latestUnnotifiedQuestion, notify, scheduleRetry]);
 
   useEffect(() => {
     if (!pendingPlanNotificationsRef.current.size) {
@@ -313,7 +299,7 @@ export function useAgentResponseRequiredNotifications({
     if (pendingPlanNotificationsRef.current.size) {
       scheduleRetry();
     }
-  }, [canNotifyNow, notify, pendingPlansSignal, retrySignal, scheduleRetry]);
+  }, [canNotifyNow, notify, scheduleRetry]);
 
   const onItemCompleted = useCallback(
     (workspaceId: string, threadId: string, item: Record<string, unknown>) => {

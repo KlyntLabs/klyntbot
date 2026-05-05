@@ -27,7 +27,9 @@ export function HooksSection() {
     <div className="hooks-section">
       <p>
         Hook configuration: <code>{snap.path}</code>{" "}
-        <button onClick={() => invoke("open_path", { path: snap.path })}>Open in editor</button>
+        <button type="button" onClick={() => invoke("open_path", { path: snap.path })}>
+          Open in editor
+        </button>
       </p>
       <pre className="hooks-section__content">{snap.content}</pre>
     </div>

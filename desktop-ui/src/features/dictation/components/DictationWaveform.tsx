@@ -41,9 +41,19 @@ export function DictationWaveform({ active, processing, level }: DictationWavefo
   return (
     <div className={`composer-waveform${processing ? " is-processing" : ""}`} aria-hidden>
       {processing && <span className="composer-waveform-label">Processing...</span>}
-      {barHeights.map((height, index) => (
-        <span key={index} className="composer-waveform-bar" style={{ height }} />
-      ))}
+      {(() => {
+        const bars: React.ReactElement[] = [];
+        for (let i = 0; i < barHeights.length; i++) {
+          bars.push(
+            <span
+              key={`wave-${i}`}
+              className="composer-waveform-bar"
+              style={{ height: barHeights[i] }}
+            />,
+          );
+        }
+        return bars;
+      })()}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import type { ThreadStatusById } from "@utils/threadStatus";
 import { formatRelativeTimeShort } from "@utils/time";
-import { FolderOpen } from "lucide-react";
+import FolderOpen from "lucide-react/dist/esm/icons/folder-open";
 import type { MouseEvent, RefObject } from "react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";

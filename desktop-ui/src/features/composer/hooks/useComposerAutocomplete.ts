@@ -196,7 +196,7 @@ export function useComposerAutocomplete({
   useEffect(() => {
     setHighlightIndex(0);
     setDismissed(false);
-  }, [state.active, state.query, state.trigger, state.range?.start, state.range?.end]);
+  }, []);
 
   const moveHighlight = (delta: number) => {
     if (matches.length === 0) {

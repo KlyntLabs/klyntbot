@@ -85,6 +85,7 @@ export function CommitButton({
             strokeLinejoin="round"
             aria-hidden
           >
+            <title>Commit</title>
             <path d="M20 6 9 17l-5-5" />
           </svg>
         )}
@@ -138,9 +139,9 @@ type DiffFileRowProps = {
   isSelected: boolean;
   isActive: boolean;
   section: "staged" | "unstaged";
-  onClick: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onClick: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   onKeySelect: () => void;
-  onContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onContextMenu: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   onStageFile?: (path: string) => Promise<void> | void;
   onUnstageFile?: (path: string) => Promise<void> | void;
   onDiscardFile?: (path: string) => Promise<void> | void;
@@ -167,10 +168,9 @@ function DiffFileRow({
   const showDiscard = section === "unstaged" && Boolean(onDiscardFile);
 
   return (
-    <div
+    <button
+      type="button"
       className={`diff-row ${isActive ? "active" : ""} ${isSelected ? "selected" : ""}`}
-      role="button"
-      tabIndex={0}
       onClick={onClick}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -193,12 +193,16 @@ function DiffFileRow({
         {dir && <div className="diff-dir">{dir}</div>}
       </div>
       <div className="diff-row-meta">
-        <span className="diff-counts-inline" aria-label={`+${file.additions} -${file.deletions}`}>
+        <span
+          className="diff-counts-inline"
+          role="img"
+          aria-label={`+${file.additions} -${file.deletions}`}
+        >
           <span className="diff-add">+{file.additions}</span>
           <span className="diff-sep">/</span>
           <span className="diff-del">-{file.deletions}</span>
         </span>
-        <div className="diff-row-actions" role="group" aria-label="File actions">
+        <fieldset className="diff-row-actions" aria-label="File actions">
           {showStage && (
             <button
               type="button"
@@ -244,9 +248,9 @@ function DiffFileRow({
               <RotateCcw size={12} aria-hidden />
             </button>
           )}
-        </div>
+        </fieldset>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -269,12 +273,12 @@ type DiffSectionProps = {
   worktreeApplySuccess?: boolean;
   onApplyWorktreeChanges?: () => Promise<void> | void;
   onFileClick: (
-    event: ReactMouseEvent<HTMLDivElement>,
+    event: ReactMouseEvent<HTMLButtonElement>,
     path: string,
     section: "staged" | "unstaged",
   ) => void;
   onShowFileMenu: (
-    event: ReactMouseEvent<HTMLDivElement>,
+    event: ReactMouseEvent<HTMLButtonElement>,
     path: string,
     section: "staged" | "unstaged",
   ) => void;
@@ -323,7 +327,7 @@ export function DiffSection({
           <span className="diff-section-count">{files.length}</span>
         </div>
         {showSectionActions && (
-          <div className="diff-section-actions" role="group" aria-label={`${title} actions`}>
+          <fieldset className="diff-section-actions" aria-label={`${title} actions`}>
             {canApplyWorktree && (
               <button
                 type="button"
@@ -362,11 +366,7 @@ export function DiffSection({
                     void onStageAllChanges();
                     return;
                   }
-                  void (async () => {
-                    for (const path of filePaths) {
-                      await onStageFile?.(path);
-                    }
-                  })();
+                  void Promise.all(filePaths.map((path) => onStageFile?.(path)));
                 }}
                 data-tooltip="Stage All Changes"
                 data-tooltip-align="end"
@@ -380,11 +380,7 @@ export function DiffSection({
                 type="button"
                 className="diff-row-action diff-row-action--unstage ds-tooltip-trigger"
                 onClick={() => {
-                  void (async () => {
-                    for (const path of filePaths) {
-                      await onUnstageFile?.(path);
-                    }
-                  })();
+                  void Promise.all(filePaths.map((path) => onUnstageFile?.(path)));
                 }}
                 data-tooltip="Unstage All Changes"
                 data-tooltip-align="end"
@@ -407,7 +403,7 @@ export function DiffSection({
                 <RotateCcw size={12} aria-hidden />
               </button>
             )}
-          </div>
+          </fieldset>
         )}
       </div>
       <div className="diff-section-list">
@@ -440,7 +436,7 @@ type GitLogEntryRowProps = {
   isSelected: boolean;
   compact?: boolean;
   onSelect?: (entry: GitLogEntry) => void;
-  onContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onContextMenu: (event: ReactMouseEvent<HTMLButtonElement>) => void;
 };
 
 export function GitLogEntryRow({
@@ -451,12 +447,11 @@ export function GitLogEntryRow({
   onContextMenu,
 }: GitLogEntryRowProps) {
   return (
-    <div
+    <button
+      type="button"
       className={`git-log-entry ${compact ? "git-log-entry-compact" : ""} ${isSelected ? "active" : ""}`}
       onClick={() => onSelect?.(entry)}
       onContextMenu={onContextMenu}
-      role="button"
-      tabIndex={0}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
@@ -472,7 +467,7 @@ export function GitLogEntryRow({
         <span className="git-log-sep">·</span>
         <span className="git-log-date">{formatRelativeTime(entry.timestamp * 1000)}</span>
       </div>
-    </div>
+    </button>
   );
 }
 

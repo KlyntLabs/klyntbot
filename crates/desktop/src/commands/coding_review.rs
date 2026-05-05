@@ -1,7 +1,6 @@
 use desktop_macros::klynt_command;
 use desktop_shared::errors::ApiError;
 
-use crate::commands::dev_helpers as dev;
 
 #[klynt_command]
 pub async fn coding_review_start(
@@ -10,11 +9,7 @@ pub async fn coding_review_start(
     delivery: Option<String>,
 ) -> serde_json::Value {
     state
-        .coding_review_start(
-            &thread_id,
-            target.as_deref(),
-            delivery.as_deref(),
-        )
+        .coding_review_start(&thread_id, target.as_deref(), delivery.as_deref())
         .await
         .map(|r| serde_json::to_value(r).unwrap_or_default())
         .map_err(|e| ApiError::new("REVIEW_ERROR", e.to_string()))
@@ -30,14 +25,16 @@ pub(crate) async fn dispatch_dev(
     Some(match cmd {
         "coding_review_start" => {
             let thread_id = try_field!(dev::get_str(body, "threadId"));
-            let target = body.get("target").and_then(|v| v.as_str()).map(String::from);
-            let delivery = body.get("delivery").and_then(|v| v.as_str()).map(String::from);
+            let target = body
+                .get("target")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let delivery = body
+                .get("delivery")
+                .and_then(|v| v.as_str())
+                .map(String::from);
             match core
-                .coding_review_start(
-                    &thread_id,
-                    target.as_deref(),
-                    delivery.as_deref(),
-                )
+                .coding_review_start(&thread_id, target.as_deref(), delivery.as_deref())
                 .await
             {
                 Ok(r) => Ok(serde_json::to_value(r).unwrap_or_default()),

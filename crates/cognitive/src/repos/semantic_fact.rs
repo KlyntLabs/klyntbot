@@ -555,11 +555,7 @@ impl SemanticFactRepo {
     /// DELETE path: the candidate fact contradicts the existing one,
     /// so we tomb the old row (it stays queryable as historical fact)
     /// and the caller separately upserts the new one.
-    pub async fn supersede_fact(
-        &self,
-        existing_id: &str,
-        new_id: &str,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn supersede_fact(&self, existing_id: &str, new_id: &str) -> Result<(), sqlx::Error> {
         let now = jiff::Timestamp::now().to_string();
         sqlx::query(
             r#"

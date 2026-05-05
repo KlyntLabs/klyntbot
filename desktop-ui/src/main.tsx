@@ -29,8 +29,10 @@ if (!sentryWithMetrics.metrics) {
   sentryWithMetrics.metrics = { count: () => {} };
 }
 
+let mobileInitDone = false;
+
 function disableMobileZoomGestures() {
-  if (!isMobilePlatform() || typeof document === "undefined") {
+  if (!isMobilePlatform()) {
     return;
   }
   const preventGesture = (event: Event) => event.preventDefault();
@@ -49,7 +51,7 @@ function disableMobileZoomGestures() {
 }
 
 function syncMobileViewportHeight() {
-  if (!isMobilePlatform() || typeof window === "undefined" || typeof document === "undefined") {
+  if (!isMobilePlatform()) {
     return;
   }
 
@@ -101,8 +103,11 @@ function syncMobileViewportHeight() {
   });
 }
 
-disableMobileZoomGestures();
-syncMobileViewportHeight();
+if (!mobileInitDone) {
+  mobileInitDone = true;
+  disableMobileZoomGestures();
+  syncMobileViewportHeight();
+}
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

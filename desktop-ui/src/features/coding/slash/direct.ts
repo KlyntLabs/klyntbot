@@ -4,7 +4,7 @@ import type { DispatchResult } from "./types";
 
 export async function dispatchDirect(input: string, sessionKey: string): Promise<DispatchResult> {
   const leaf = resolveLeaf(input);
-  if (!leaf || !leaf.tauriCommand) {
+  if (!leaf?.tauriCommand) {
     return { kind: "error", message: `unknown direct command: ${input}` };
   }
   const args = input.slice(1).trim().split(/\s+/).slice(leaf.command.split(" ").length);

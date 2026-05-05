@@ -296,6 +296,7 @@ async fn test_full_pipeline_event_to_retrieval() {
         None,
         None,
         None,
+        None,
     )
     .await
     .unwrap();
@@ -391,6 +392,7 @@ async fn test_full_pipeline_update_replaces_old_fact() {
             situational_boost: 0.5,
             ..RetrievalParams::new(0)
         },
+        None,
         None,
         None,
         None,
@@ -521,6 +523,7 @@ async fn test_cognitive_context_source_with_facts() {
         message: None,
         intent_summary: None,
         project_id: None,
+        session_mode: common::SessionMode::Assistant,
     };
 
     let result = source.provide(&ctx).await;
@@ -544,6 +547,7 @@ async fn test_cognitive_context_source_empty_returns_none() {
         message: None,
         intent_summary: None,
         project_id: None,
+        session_mode: common::SessionMode::Assistant,
     };
     assert!(source.provide(&ctx).await.is_none());
 }

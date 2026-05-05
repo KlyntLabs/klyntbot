@@ -43,6 +43,7 @@ export function Dashboard() {
         <LayerContext.Provider value={{ enabled, enabledSources, toggle, reset }}>
           <SidebarContext.Provider value={{ sidebarOpen, toggleSidebar }}>
             <div className="dashboard">
+              <h1 className="sr-only">Dashboard</h1>
               <DashboardTopbar />
               <FocusStateIndicator />
               <AutoFocusToast />

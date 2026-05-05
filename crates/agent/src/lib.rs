@@ -29,6 +29,7 @@ pub mod learning;
 mod notes_integration_tests;
 pub mod output;
 pub mod subagent;
+pub mod subagent_events;
 #[cfg(test)]
 pub mod test_utils;
 

@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { MessageDto, ThreadEvent } from "./useThreadEvents";
 import { applyThreadEvent } from "./useThreadEvents";
-import type { ThreadEvent, MessageDto } from "./useThreadEvents";
 
 const baseItem = (id: string): MessageDto => ({
   id,

@@ -218,7 +218,7 @@ async fn ask_path_awaits_user_decision() {
 async fn layer3_auto_allows_after_5_prior_approvals_when_enabled() {
     use storage::repos::{CodingApprovalHistoryRepo, HistoryEntry};
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-    let history = CodingApprovalHistoryRepo::new(pool.clone());
+    let history = CodingApprovalHistoryRepo::new(pool.inner().clone());
     for _ in 0..5 {
         history
             .record(HistoryEntry {

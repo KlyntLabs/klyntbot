@@ -83,8 +83,11 @@ impl TaskRepo {
         new_parent_id: Option<&str>,
         new_project_id: Option<&str>,
     ) -> Result<TaskRow, StorageError> {
+        let mut tx = self.pool.begin().await?;
+
         if let Some(parent_id) = new_parent_id {
-            if self.would_create_parent_cycle(id, parent_id).await? {
+            if self.would_create_parent_cycle(&mut *tx, id, parent_id).await? {
+                tx.rollback().await?;
                 return Err(StorageError::Conflict(format!(
                     "Setting parent {parent_id} for task {id} would create a cycle"
                 )));
@@ -102,15 +105,17 @@ impl TaskRepo {
         .bind(id)
         .bind(new_parent_id)
         .bind(new_project_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?
         .ok_or_not_found(&format!("task {id}"))?;
 
+        tx.commit().await?;
         Ok(row)
     }
 
     async fn would_create_parent_cycle(
         &self,
+        conn: &mut sqlx::SqliteConnection,
         child_id: &str,
         new_parent_id: &str,
     ) -> Result<bool, StorageError> {
@@ -132,7 +137,7 @@ impl TaskRepo {
         )
         .bind(child_id)
         .bind(new_parent_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(conn)
         .await?;
 
         Ok(row.map(|r| r.0).unwrap_or(false))

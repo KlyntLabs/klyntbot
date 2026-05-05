@@ -37,25 +37,40 @@ impl AppCore {
 
         // hooks.toml
         let hooks_path: PathBuf = home.join("hooks.toml");
-        items.push(if !hooks_path.exists() {
+        let hooks_exists = tokio::fs::try_exists(&hooks_path).await.unwrap_or(false);
+        items.push(if !hooks_exists {
             diag("hooks.toml", "green", "absent (default)")
         } else {
-            match klynt_hooks::HookEngine::load_from_path(&hooks_path) {
-                Ok(_) => diag("hooks.toml", "green", "parsed"),
-                Err(e) => diag("hooks.toml", "red", &e.to_string()),
+            match tokio::task::spawn_blocking({
+                let hooks_path = hooks_path.clone();
+                move || klynt_hooks::HookEngine::load_from_path(&hooks_path)
+            })
+            .await
+            {
+                Ok(Ok(_)) => diag("hooks.toml", "green", "parsed"),
+                Ok(Err(e)) => diag("hooks.toml", "red", &e.to_string()),
+                Err(_) => diag("hooks.toml", "red", "load panicked"),
             }
         });
 
         // starlark rules
         let rules_dir = home.join("rules");
-        items.push(match klynt_execpolicy::Policy::load_from_dir(&rules_dir) {
-            Ok(_) => diag(
-                "starlark rules",
-                "green",
-                &format!("dir: {}", rules_dir.display()),
-            ),
-            Err(e) => diag("starlark rules", "red", &e.to_string()),
-        });
+        items.push(
+            match tokio::task::spawn_blocking({
+                let rules_dir = rules_dir.clone();
+                move || klynt_execpolicy::Policy::load_from_dir(&rules_dir)
+            })
+            .await
+            {
+                Ok(Ok(_)) => diag(
+                    "starlark rules",
+                    "green",
+                    &format!("dir: {}", rules_dir.display()),
+                ),
+                Ok(Err(e)) => diag("starlark rules", "red", &e.to_string()),
+                Err(_) => diag("starlark rules", "red", "load panicked"),
+            },
+        );
 
         // sandbox
         items.push(match self.coding_test_sandbox().await {

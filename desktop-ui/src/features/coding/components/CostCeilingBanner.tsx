@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { subscribeCostUpdates, type CostUpdate } from "@/api/endpoints/cost";
+import { type CostUpdate, subscribeCostUpdates } from "@/api/endpoints/cost";
 
-export function CostCeilingBanner({ sessionKey }: { sessionKey: string }) {
+export function CostCeilingBanner({ sessionKey: _sessionKey }: { sessionKey: string }) {
   const [breach, setBreach] = useState<CostUpdate | null>(null);
 
   useEffect(() => {
@@ -16,7 +16,7 @@ export function CostCeilingBanner({ sessionKey }: { sessionKey: string }) {
       mounted = false;
       void unlisten.then((fn) => fn());
     };
-  }, [sessionKey]);
+  }, []);
 
   if (!breach) return null;
 
@@ -26,6 +26,7 @@ export function CostCeilingBanner({ sessionKey }: { sessionKey: string }) {
         Cost ceiling reached: ${breach.threadTotalUsd?.toFixed(2) ?? "??"} spent
       </span>
       <button
+        type="button"
         className="cost-ceiling-banner__dismiss"
         onClick={() => setBreach(null)}
         aria-label="Dismiss cost alert"

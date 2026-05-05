@@ -140,6 +140,7 @@ impl FinanceGoalRepo {
     // -----------------------------------------------------------------------
 
     /// Set `current_amount` directly on a goal. Returns the updated row.
+    /// Also recalculates `base_current_amount` using the stored exchange_rate.
     pub async fn update_progress(
         &self,
         id: &str,
@@ -148,11 +149,14 @@ impl FinanceGoalRepo {
         let row = sqlx::query_as::<_, FinanceGoalRow>(
             r#"
             UPDATE finance_goals
-            SET current_amount = ?, updated_at = (unixepoch('now') * 1000)
+            SET current_amount = ?,
+                base_current_amount = CAST(ROUND(? * exchange_rate) AS INTEGER),
+                updated_at = (unixepoch('now') * 1000)
             WHERE id = ?
             RETURNING *
             "#,
         )
+        .bind(current_amount)
         .bind(current_amount)
         .bind(id)
         .fetch_optional(&self.pool)

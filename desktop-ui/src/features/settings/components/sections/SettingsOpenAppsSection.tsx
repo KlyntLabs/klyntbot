@@ -159,6 +159,7 @@ export function SettingsOpenAppsSection({
                 {!isComplete && (
                   <span
                     className="settings-open-app-status"
+                    role="status"
                     title={incompleteHint}
                     aria-label={incompleteHint}
                   >

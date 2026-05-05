@@ -15,7 +15,7 @@ export type ApprovalDecisionDto =
 
 export async function approvalRespond(
   approvalId: string,
-  decision: ApprovalDecisionDto
+  decision: ApprovalDecisionDto,
 ): Promise<void> {
   return invoke<void>("approval_respond", { approvalId, decision });
 }

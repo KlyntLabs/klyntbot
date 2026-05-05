@@ -926,12 +926,12 @@
   .lc-voice-orb,
   .lc-loading-icon,
   .lc-loading-line {
-    animation: none !important;
-    transition: none !important;
+    animation: none;
+    transition: none;
   }
   .lc-row,
   .lc-empty,
   .lc-action-menu {
-    animation: none !important;
+    animation: none;
   }
 }

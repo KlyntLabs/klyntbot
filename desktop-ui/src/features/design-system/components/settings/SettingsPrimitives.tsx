@@ -1,5 +1,5 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import { joinClassNames } from "../classNames";
+import { cn } from "@/utils/cn";
 
 type SettingsSectionProps = {
   title: ReactNode;
@@ -10,7 +10,7 @@ type SettingsSectionProps = {
 
 export function SettingsSection({ title, subtitle, className, children }: SettingsSectionProps) {
   return (
-    <section className={joinClassNames("settings-section", className)}>
+    <section className={cn("settings-section", className)}>
       <div className="settings-section-title">{title}</div>
       {subtitle ? <div className="settings-section-subtitle">{subtitle}</div> : null}
       {children}
@@ -47,7 +47,7 @@ export function SettingsToggleRow({
   children,
 }: SettingsToggleRowProps) {
   return (
-    <div className={joinClassNames("settings-toggle-row", className)}>
+    <div className={cn("settings-toggle-row", className)}>
       <div>
         <div className="settings-toggle-title">{title}</div>
         {subtitle ? <div className="settings-toggle-subtitle">{subtitle}</div> : null}
@@ -69,7 +69,7 @@ export function SettingsToggleSwitch({ pressed, className, ...props }: SettingsT
   return (
     <button
       type="button"
-      className={joinClassNames("settings-toggle", pressed && "on", className)}
+      className={cn("settings-toggle", pressed && "on", className)}
       aria-pressed={pressed}
       {...props}
     >

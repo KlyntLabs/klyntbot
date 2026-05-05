@@ -13,13 +13,7 @@ use cognitive::SemanticFactEmbedder;
 use tools::semantic_fact_search::{FactSearchResult, SemanticFactSearchHandler};
 
 const ALL_DOMAINS: &[&str] = &[
-    "personal",
-    "work",
-    "health",
-    "finance",
-    "learning",
-    "general",
-    "coding",
+    "personal", "work", "health", "finance", "learning", "general", "coding",
 ];
 
 pub struct SemanticFactSearchHandlerImpl {
@@ -51,12 +45,11 @@ impl SemanticFactSearchHandler for SemanticFactSearchHandlerImpl {
         widen: bool,
     ) -> common::Result<Vec<FactSearchResult>> {
         // T2.2 v3: widen *recall* (more candidates) but keep *quality bar* high
-        // (similarity floor). The earlier widen mode dropped the floor to 0.2 —
+        // (similarity floor). Earlier widen mode dropped min_similarity to 0.2 —
         // at 384-dim BGE that's essentially random, and the resulting 20-fact
         // dump confused the model into empty output. Now: more candidates (top_k
         // doubles) but min_similarity stays at the default. A post-hoc score
-        // filter caps the response at MAX_WIDEN_RESULTS so synthesis isn't
-        // drowned.
+        // filter caps the response at MAX_WIDEN_RESULTS so synthesis isn't drowned.
         const MAX_WIDEN_RESULTS: usize = 6;
         const MIN_WIDEN_SCORE: f64 = 0.30;
 
@@ -77,9 +70,7 @@ impl SemanticFactSearchHandler for SemanticFactSearchHandlerImpl {
             self.entity_repo.as_ref(),
         )
         .await
-        .map_err(|e| {
-            common::KlyntbotError::Storage(format!("fact search failed: {e}"))
-        })?;
+        .map_err(|e| common::KlyntbotError::Storage(format!("fact search failed: {e}")))?;
 
         let filtered: Vec<_> = if widen {
             scored

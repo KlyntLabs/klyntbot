@@ -125,6 +125,8 @@ CREATE INDEX idx_task_groups_project_id ON task_groups(project_id);
 -- ============================================================
 CREATE TABLE sessions (
     key        TEXT PRIMARY KEY,
+    mode       TEXT NOT NULL DEFAULT 'assistant'
+                 CHECK (mode IN ('assistant', 'coding')),
     metadata   TEXT NOT NULL DEFAULT '{}',
     created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
@@ -152,6 +154,7 @@ CREATE TABLE sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_workspace_archived ON sessions(workspace_id, archived_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_mode ON sessions(mode);
 
 -- ============================================================
 -- Session Messages

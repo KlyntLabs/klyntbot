@@ -145,6 +145,8 @@ impl ObjectiveRepo {
 
         Ok(row.0)
     }
+
+    get_by_ids_impl!("objectives", ObjectiveRow);
 }
 
 #[cfg(test)]

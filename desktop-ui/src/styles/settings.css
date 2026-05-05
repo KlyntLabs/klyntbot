@@ -40,6 +40,12 @@
   display: flex;
 }
 
+.settings-sidebar {
+  padding: 16px 12px 16px 16px;
+  background: transparent;
+  border-right: none;
+}
+
 .settings-master .settings-sidebar {
   flex: 1;
 }
@@ -347,6 +353,11 @@
   color: #ffb1b1;
 }
 
+.settings-input {
+  flex: 1;
+  min-width: 0;
+}
+
 .settings-add-remote-card .settings-input {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.2);
@@ -549,6 +560,11 @@
   font-size: var(--fs-xs);
   color: var(--text-muted);
   opacity: 0.8;
+}
+
+.settings-select {
+  padding: 10px 12px;
+  border-radius: 10px;
 }
 
 .settings-agents-model-field--model .settings-select {

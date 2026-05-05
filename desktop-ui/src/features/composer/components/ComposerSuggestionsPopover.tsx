@@ -9,7 +9,7 @@ import PlusCircle from "lucide-react/dist/esm/icons/plus-circle";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
 import ScrollText from "lucide-react/dist/esm/icons/scroll-text";
 import Wrench from "lucide-react/dist/esm/icons/wrench";
-import { type CSSProperties, type RefObject, useEffect } from "react";
+import { type CSSProperties, memo, type RefObject, useEffect } from "react";
 import { PopoverSurface } from "@/features/design-system/components/popover/PopoverPrimitives";
 import type { AutocompleteItem } from "../hooks/useComposerAutocomplete";
 import { ReviewInlinePrompt } from "./ReviewInlinePrompt";
@@ -87,7 +87,7 @@ const fileTitle = (path: string) => {
   return parts.length ? parts[parts.length - 1] : path;
 };
 
-export function ComposerSuggestionsPopover({
+export const ComposerSuggestionsPopover = memo(function ComposerSuggestionsPopover({
   highlightIndex,
   highlightedBranchIndex,
   highlightedCommitIndex,
@@ -261,4 +261,4 @@ export function ComposerSuggestionsPopover({
       )}
     </PopoverSurface>
   );
-}
+});

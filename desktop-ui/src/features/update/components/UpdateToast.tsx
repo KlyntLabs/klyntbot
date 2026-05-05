@@ -1,5 +1,6 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import {
   ToastActions,
@@ -62,6 +63,7 @@ export function UpdateToast({
               <div className="update-toast-notes" role="document">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeSanitize]}
                   components={{
                     a: ({ href, children }) => {
                       if (!href) {
@@ -96,6 +98,7 @@ export function UpdateToast({
           <ToastActions className="update-toast-actions">
             {postUpdateNotice.stage !== "loading" ? (
               <button
+                type="button"
                 className="primary"
                 onClick={() => {
                   void openUrl(postUpdateNotice.htmlUrl);
@@ -104,7 +107,11 @@ export function UpdateToast({
                 View on GitHub
               </button>
             ) : null}
-            <button className="secondary" onClick={onDismissPostUpdateNotice ?? onDismiss}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={onDismissPostUpdateNotice ?? onDismiss}
+            >
               Dismiss
             </button>
           </ToastActions>
@@ -136,10 +143,10 @@ export function UpdateToast({
           <>
             <ToastBody className="update-toast-body">A new version is available.</ToastBody>
             <ToastActions className="update-toast-actions">
-              <button className="secondary" onClick={onDismiss}>
+              <button type="button" className="secondary" onClick={onDismiss}>
                 Later
               </button>
-              <button className="primary" onClick={onUpdate}>
+              <button type="button" className="primary" onClick={onUpdate}>
                 Update
               </button>
             </ToastActions>
@@ -150,7 +157,7 @@ export function UpdateToast({
             <ToastBody className="update-toast-body update-toast-body-inline">
               You’re up to date.
             </ToastBody>
-            <button className="secondary" onClick={onDismiss}>
+            <button type="button" className="secondary" onClick={onDismiss}>
               Dismiss
             </button>
           </div>
@@ -186,10 +193,10 @@ export function UpdateToast({
               <ToastError className="update-toast-error">{state.error}</ToastError>
             ) : null}
             <ToastActions className="update-toast-actions">
-              <button className="secondary" onClick={onDismiss}>
+              <button type="button" className="secondary" onClick={onDismiss}>
                 Dismiss
               </button>
-              <button className="primary" onClick={onUpdate}>
+              <button type="button" className="primary" onClick={onUpdate}>
                 Retry
               </button>
             </ToastActions>

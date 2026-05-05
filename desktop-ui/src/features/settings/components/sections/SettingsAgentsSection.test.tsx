@@ -160,7 +160,7 @@ describe("SettingsAgentsSection", () => {
     render(
       <SettingsAgentsSection
         {...props}
-        settings={{ ...props.settings!, maxDepth: 4 }}
+        settings={{ ...(props.settings as NonNullable<typeof props.settings>), maxDepth: 4 }}
         onSetMaxDepth={onSetMaxDepth}
       />,
     );

@@ -241,8 +241,8 @@
 }
 
 .workspace-home-model-dropdown {
-  min-width: 190px !important;
-  width: max-content !important;
+  min-width: 190px;
+  width: max-content;
 }
 
 .workspace-home-model-option {
@@ -507,7 +507,7 @@
 
 @media (max-width: 560px) {
   .workspace-home-model-dropdown {
-    max-width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px);
   }
 
   .workspace-home-model-option .workspace-home-model-toggle .ds-popover-item-label {

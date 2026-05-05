@@ -199,6 +199,8 @@ pub struct AppCore {
     pub thread_events: bus::TypedBroker<desktop_shared::coding::ThreadEvent>,
     /// Typed broker for CostUpdate — publish after each provider call.
     pub cost_events: bus::TypedBroker<desktop_shared::coding::CostUpdate>,
+    /// Typed broker for SubagentEvent — publish from subagent manager, subscribe from Tauri.
+    pub subagent_events: bus::TypedBroker<desktop_shared::coding::SubagentEvent>,
     /// Active thread subscriptions keyed by subscription_id.
     pub thread_subscriptions: Arc<dashmap::DashMap<String, ThreadSubscription>>,
     /// Per-turn steer queue — accepts mid-turn user corrections injected via
@@ -546,7 +548,9 @@ impl AppCore {
         .map_err(|e| common::KlyntbotError::NotImplemented(format!("invalid Starlark: {e}")))?;
 
         let rules_dir = self.config.read().await.data_dir_path().join("rules");
-        std::fs::create_dir_all(&rules_dir).map_err(common::KlyntbotError::Io)?;
+        tokio::fs::create_dir_all(&rules_dir)
+            .await
+            .map_err(common::KlyntbotError::Io)?;
 
         let filename = suggested_filename.unwrap_or_else(|| {
             let now = std::time::SystemTime::now()
@@ -556,7 +560,9 @@ impl AppCore {
             format!("rule-{now}.rules")
         });
         let path = rules_dir.join(filename);
-        std::fs::write(&path, &rule_source).map_err(common::KlyntbotError::Io)?;
+        tokio::fs::write(&path, &rule_source)
+            .await
+            .map_err(common::KlyntbotError::Io)?;
 
         Ok(path.to_string_lossy().into_owned())
     }
@@ -564,12 +570,8 @@ impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub async fn coding_hooks_list(&self) -> common::Result<HooksTomlSnapshot> {
         let path = self.config.read().await.data_dir_path().join("hooks.toml");
-        let exists = path.exists();
-        let content = if exists {
-            std::fs::read_to_string(&path).unwrap_or_default()
-        } else {
-            String::new()
-        };
+        let content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
+        let exists = !content.is_empty();
         Ok(HooksTomlSnapshot {
             path: path.to_string_lossy().into_owned(),
             exists,
@@ -586,7 +588,7 @@ impl AppCore {
         let repo = self.coding_approval_history_repo.clone().ok_or_else(|| {
             common::KlyntbotError::Storage("approval history repo not initialized".into())
         })?;
-        repo.clear_for_tool(&tool, repo_id.as_deref()).await
+        repo.clear_for_tool(&tool, repo_id.as_deref()).await.map_err(Into::into)
     }
 
     #[tracing::instrument(skip(self), err)]
@@ -784,14 +786,11 @@ impl AppCore {
         let cfg_guard = self.config.read().await;
         let params = providers::cognitive_chat_params(&cfg_guard, 1024);
         drop(cfg_guard);
-        let handler: Arc<dyn cognitive::services::graph_linker::GraphLinkHandler> =
-            Arc::new(agent::cognitive_handlers::LlmGraphLinkHandler::new(
-                provider, params,
-            ));
-        let fact_repo =
-            cognitive::repos::SemanticFactRepo::new(self.storage_pool.inner().clone());
-        let entity_repo =
-            cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
+        let handler: Arc<dyn cognitive::services::graph_linker::GraphLinkHandler> = Arc::new(
+            agent::cognitive_handlers::LlmGraphLinkHandler::new(provider, params),
+        );
+        let fact_repo = cognitive::repos::SemanticFactRepo::new(self.storage_pool.inner().clone());
+        let entity_repo = cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
         let count = cognitive::services::background::run_graph_consolidation(
             &fact_repo,
             &entity_repo,

@@ -134,6 +134,7 @@ export function SidebarHeader({
             <FolderPlus aria-hidden />
           </button>
           <button
+            type="button"
             className="subtitle subtitle-button sidebar-title-button"
             onClick={onSelectHome}
             data-tauri-drag-region="false"

@@ -116,6 +116,11 @@ impl AgentLoop {
         Arc::clone(&self.runtime)
     }
 
+    /// Public accessor for the subagent manager.
+    pub fn subagent_manager(&self) -> Option<Arc<crate::SubagentManager>> {
+        self.subagent_manager.clone()
+    }
+
     /// Public accessor for the skill store.
     /// Used by `klyntbot-server` to expose active skills via MCP resources.
     pub fn skill_store(&self) -> Arc<RwLock<skill_system::SkillStore>> {
@@ -138,6 +143,16 @@ impl AgentLoop {
     pub fn set_subagent_hook_engine(&self, engine: Arc<klynt_hooks::HookEngine>) {
         if let Some(ref mgr) = self.subagent_manager {
             mgr.set_hook_engine(engine);
+        }
+    }
+
+    /// Inject the event sender into the subagent manager (called by app-core init).
+    pub fn set_subagent_event_sender(
+        &self,
+        tx: tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>,
+    ) {
+        if let Some(ref mgr) = self.subagent_manager {
+            mgr.set_event_sender(tx);
         }
     }
 
@@ -1129,20 +1144,30 @@ impl AgentLoop {
         let (event_tx, event_rx) = mpsc::channel(64);
         let (interaction_tx, interaction_rx) = mpsc::channel(4);
 
-        let channel: common::ChannelName = mode
-            .as_deref()
-            .map(|m| {
-                if m == "coding" {
-                    common::CODING_CHANNEL.into()
-                } else {
-                    "desktop".into()
-                }
-            })
-            .unwrap_or_else(|| "desktop".into());
+        // Authoritative session mode comes from the session row itself.
+        // The legacy `mode: Option<String>` parameter is now an override hint
+        // only used when the row does not yet exist (first turn).
+        let session_mode: common::SessionMode = match self
+            .session_manager
+            .get_session_row(&session_key)
+            .await
+        {
+            Ok(row) => row.session_mode(),
+            Err(_) => mode
+                .as_deref()
+                .and_then(common::SessionMode::parse)
+                .unwrap_or(common::SessionMode::Assistant),
+        };
+
+        let channel: common::ChannelName = match session_mode {
+            common::SessionMode::Coding => common::CODING_CHANNEL.into(),
+            common::SessionMode::Assistant => "desktop".into(),
+        };
 
         // Routing context with interaction channel for ask_user tool
         let mut routing_ctx =
             RoutingContext::with_interaction(channel, session_key.clone().into(), interaction_tx);
+        routing_ctx.session_mode = session_mode;
         routing_ctx.session_key = Some(session_key.clone().into());
         routing_ctx.message_id = user_msg_id;
 

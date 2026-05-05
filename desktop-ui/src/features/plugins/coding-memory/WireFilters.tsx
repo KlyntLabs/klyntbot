@@ -1,12 +1,10 @@
-import {
-  AlertCircle,
-  ChevronDown,
-  ChevronsDownUp,
-  ChevronsUpDown,
-  ChevronUp,
-  Search,
-  X,
-} from "lucide-react";
+import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
+import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
+import ChevronsDownUp from "lucide-react/dist/esm/icons/chevrons-down-up";
+import ChevronsUpDown from "lucide-react/dist/esm/icons/chevrons-up-down";
+import Search from "lucide-react/dist/esm/icons/search";
+import X from "lucide-react/dist/esm/icons/x";
 import { eventChipColor } from "./eventHelpers";
 
 interface FilterPreset {
@@ -95,7 +93,7 @@ export function WireFilters({
               key={preset.label}
               type="button"
               onClick={() => onApplyPreset(preset.types, preset.errorsOnly)}
-              className={"cm-preset" + (activePresetIndex === i ? " cm-preset--active" : "")}
+              className={`cm-preset${activePresetIndex === i ? " cm-preset--active" : ""}`}
             >
               {preset.label}
             </button>
@@ -128,7 +126,7 @@ export function WireFilters({
         <button
           type="button"
           onClick={onToggleErrorsOnly}
-          className={"cm-filters__errors" + (errorsOnly ? " cm-filters__errors--active" : "")}
+          className={`cm-filters__errors${errorsOnly ? " cm-filters__errors--active" : ""}`}
           title="Show errors only"
         >
           <AlertCircle size={12} />

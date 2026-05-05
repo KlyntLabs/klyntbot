@@ -1,11 +1,11 @@
 import type { MouseEventHandler, ReactNode } from "react";
-import { joinClassNames } from "../classNames";
+import { cn } from "@/utils/cn";
 
 type ModalShellProps = {
   children: ReactNode;
   className?: string;
   cardClassName?: string;
-  onBackdropClick?: MouseEventHandler<HTMLDivElement>;
+  onBackdropClick?: MouseEventHandler<HTMLButtonElement>;
   ariaLabel?: string;
   ariaLabelledBy?: string;
   ariaDescribedBy?: string;
@@ -22,15 +22,20 @@ export function ModalShell({
 }: ModalShellProps) {
   return (
     <div
-      className={joinClassNames("ds-modal", className)}
+      className={cn("ds-modal", className)}
       role="dialog"
       aria-modal="true"
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
       aria-describedby={ariaDescribedBy}
     >
-      <div className="ds-modal-backdrop" onClick={onBackdropClick} />
-      <div className={joinClassNames("ds-modal-card", cardClassName)}>{children}</div>
+      <button
+        type="button"
+        className="ds-modal-backdrop"
+        aria-label="Close dialog"
+        onClick={onBackdropClick}
+      />
+      <div className={cn("ds-modal-card", cardClassName)}>{children}</div>
     </div>
   );
 }

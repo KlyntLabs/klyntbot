@@ -1,4 +1,6 @@
-import { Calendar, Loader2, RefreshCw } from "lucide-react";
+import Calendar from "lucide-react/dist/esm/icons/calendar";
+import Loader2 from "lucide-react/dist/esm/icons/loader-2";
+import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import { useState } from "react";
 import { calendarSyncEvents } from "@/api/endpoints/dashboard";
 import { useTauriMutation } from "@/lib/query";

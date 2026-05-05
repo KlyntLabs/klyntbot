@@ -58,13 +58,21 @@ export function DraggableTaskBlock({
     .filter(Boolean)
     .join(" ");
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick();
+    }
+    // Note: ArrowUp/ArrowDown keyboard nudge for drag-and-drop would require
+    // parent callback support (onKeyboardMove). Enter/Space opens the detail panel.
+  };
+
   return (
     <>
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: drag handle — keyboard not applicable */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: drag handle for timeline scheduling */}
-      <div
+      <button
+        type="button"
         className={blockClass}
-        style={{ ...posStyle, height }}
+        style={{ ...posStyle, height, textAlign: "left" }}
         title={entry.title}
         onMouseDown={(e) => {
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -77,18 +85,20 @@ export function DraggableTaskBlock({
             onClick();
           }
         }}
+        onKeyDown={handleKeyDown}
       >
         <span className="dashboard__task-block-title">{entry.title}</span>
         {status && height > 28 && <span className="dashboard__task-block-status">{status}</span>}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: resize handle */}
         <div
           className="dashboard__task-block-resize-handle"
           onMouseDown={(e) => {
             e.stopPropagation();
             onMouseDownResize(e);
           }}
+          role="separator"
+          aria-label="Resize task"
         />
-      </div>
+      </button>
 
       {isDragging && ghostTopMin != null && ghostEndMin != null && (
         <div

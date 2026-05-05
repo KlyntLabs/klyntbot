@@ -1,3 +1,4 @@
+use crate::error::StorageError;
 use sqlx::SqlitePool;
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -26,7 +27,7 @@ impl ResponseWarningRepo {
         warning_type: &str,
         detail: Option<&str>,
         chat_id: Option<&str>,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<(), StorageError> {
         sqlx::query(
             "INSERT INTO response_warnings (request_id, warning_type, detail, chat_id)
              VALUES (?1, ?2, ?3, ?4)",
@@ -43,8 +44,8 @@ impl ResponseWarningRepo {
     pub async fn count_by_type_since(
         &self,
         since: &str,
-    ) -> Result<Vec<(String, i64)>, sqlx::Error> {
-        sqlx::query_as(
+    ) -> Result<Vec<(String, i64)>, StorageError> {
+        Ok(sqlx::query_as(
             "SELECT warning_type, COUNT(*) FROM response_warnings
              WHERE created_at > ?1
              GROUP BY warning_type
@@ -52,10 +53,10 @@ impl ResponseWarningRepo {
         )
         .bind(since)
         .fetch_all(&self.pool)
-        .await
+        .await?)
     }
 
-    pub async fn prune(&self, max_age_days: u32) -> Result<u64, sqlx::Error> {
+    pub async fn prune(&self, max_age_days: u32) -> Result<u64, StorageError> {
         let result =
             sqlx::query("DELETE FROM response_warnings WHERE created_at < datetime('now', ?1)")
                 .bind(format!("-{max_age_days} days"))

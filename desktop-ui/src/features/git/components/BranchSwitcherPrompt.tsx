@@ -59,7 +59,7 @@ export function BranchSwitcherPrompt({
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [filteredBranches.length]);
+  }, []);
 
   useEffect(() => {
     const itemEl = listRef.current?.children[selectedIndex] as HTMLElement | undefined;

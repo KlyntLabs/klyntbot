@@ -77,6 +77,10 @@ impl Tool for LearningTool {
         "learning"
     }
 
+    fn allowed_channels(&self) -> common::ChannelMask {
+        common::ChannelMask::NON_CODING
+    }
+
     fn description(&self) -> &str {
         "Query learning system insights: current confidence threshold, per-tool success rates, \
          outcome statistics, and adaptive threshold history. \

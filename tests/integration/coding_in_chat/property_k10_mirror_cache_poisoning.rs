@@ -13,7 +13,7 @@ proptest! {
     ) {
         tokio::runtime::Runtime::new().unwrap().block_on(async move {
             let pool = StoragePool::connect_in_memory().await.unwrap();
-            let repo = CodingApprovalHistoryRepo::new(pool.clone());
+            let repo = CodingApprovalHistoryRepo::new(pool.inner().clone());
             for _ in 0..approvals_before {
                 repo.record(HistoryEntry {
                     tool: "bash".into(), args_hash: "h".into(), repo_id: "r".into(),

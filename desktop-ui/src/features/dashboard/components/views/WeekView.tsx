@@ -282,6 +282,7 @@ export function WeekView() {
                           key={`activity-${s.startMin}`}
                           type="button"
                           className="dashboard__week-session"
+                          aria-label={`${s.label}, ${formatHumanDuration(s.totalSecs)}`}
                           style={{
                             top,
                             height,

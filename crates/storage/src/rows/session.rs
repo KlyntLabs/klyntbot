@@ -9,6 +9,7 @@ use sqlx::FromRow;
 #[serde(rename_all = "camelCase")]
 pub struct SessionRow {
     pub key: String,
+    pub mode: String,  // "assistant" | "coding"  (mirrors common::SessionMode)
     pub metadata: serde_json::Value,
     pub created_at: SqlTs,
     pub updated_at: SqlTs,
@@ -29,6 +30,12 @@ pub struct SessionRow {
     pub summary_message_id: Option<String>,
     pub ephemeral: i64,
     pub archived_at: Option<i64>,
+}
+
+impl SessionRow {
+    pub fn session_mode(&self) -> common::SessionMode {
+        common::SessionMode::parse(&self.mode).unwrap_or_default()
+    }
 }
 
 /// Row struct for the `session_messages` table.

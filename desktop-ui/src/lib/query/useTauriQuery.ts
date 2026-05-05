@@ -27,7 +27,15 @@ export function useTauriQuery<TData>(
 
   const result = useQuery<TData>({
     queryKey: opts.queryKey,
-    queryFn: opts.queryFn ?? (() => ipc<TData>(opts.command!, opts.args)),
+    queryFn:
+      opts.queryFn ??
+      (() => {
+        const command = opts.command;
+        if (!command) {
+          throw new Error("useTauriQuery: command is required when queryFn is not provided");
+        }
+        return ipc<TData>(command, opts.args);
+      }),
     enabled: opts.enabled,
     staleTime: opts.staleTime,
     placeholderData: opts.fallback as never,

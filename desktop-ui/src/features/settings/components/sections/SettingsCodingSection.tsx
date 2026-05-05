@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { GeneralSubsection } from "./coding/GeneralSubsection";
+import { HooksSubsection } from "./coding/HooksSubsection";
 import { PermissionsSubsection } from "./coding/PermissionsSubsection";
 import { SandboxSubsection } from "./coding/SandboxSubsection";
 import { SessionsSubsection } from "./coding/SessionsSubsection";
-import { HooksSubsection } from "./coding/HooksSubsection";
 import { SkillsSubsection } from "./coding/SkillsSubsection";
 import { ToolsSubsection } from "./coding/ToolsSubsection";
+import { CodingRecallStats } from "../CodingRecallStats";
 
-const TABS = ["General", "Tools", "Permissions", "Sandbox", "Skills", "Sessions", "Hooks"] as const;
+const TABS = ["General", "Tools", "Permissions", "Sandbox", "Skills", "Sessions", "Hooks", "Recall"] as const;
 type Tab = (typeof TABS)[number];
 
 export function SettingsCodingSection() {
@@ -16,7 +17,12 @@ export function SettingsCodingSection() {
     <div className="settings-coding">
       <nav className="settings-coding__tabs">
         {TABS.map((t) => (
-          <button key={t} className={t === tab ? "active" : ""} onClick={() => setTab(t)}>
+          <button
+            type="button"
+            key={t}
+            className={t === tab ? "active" : ""}
+            onClick={() => setTab(t)}
+          >
             {t}
           </button>
         ))}
@@ -29,6 +35,7 @@ export function SettingsCodingSection() {
         {tab === "Skills" && <SkillsSubsection />}
         {tab === "Sessions" && <SessionsSubsection />}
         {tab === "Hooks" && <HooksSubsection />}
+        {tab === "Recall" && <CodingRecallStats workspaceId="default" />}
       </div>
     </div>
   );

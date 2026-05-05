@@ -20,10 +20,8 @@ pub async fn emit_file_edit(
 ) {
     let (anchored_symbols, lsp_diagnostics_delta) = if let Some(client) = lsp {
         let path = Path::new(e.path);
-        let (symbols, diags) = tokio::join!(
-            client.document_symbols(path),
-            client.diagnostics_for(path),
-        );
+        let (symbols, diags) =
+            tokio::join!(client.document_symbols(path), client.diagnostics_for(path),);
         let sym_values: Vec<serde_json::Value> = symbols
             .unwrap_or_default()
             .into_iter()

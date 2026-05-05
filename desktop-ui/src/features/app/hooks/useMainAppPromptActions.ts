@@ -30,7 +30,7 @@ type UseMainAppPromptActionsArgs = {
     threadId: string,
     text: string,
     images?: string[],
-  ) => Promise<void | SendMessageResult>;
+  ) => Promise<undefined | SendMessageResult>;
   createPrompt: (data: PromptPayload) => Promise<void>;
   updatePrompt: (data: PromptUpdatePayload) => Promise<void>;
   deletePrompt: (path: string) => Promise<void>;

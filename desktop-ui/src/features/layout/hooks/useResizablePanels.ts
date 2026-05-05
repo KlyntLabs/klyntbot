@@ -59,9 +59,6 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function readStoredWidth(key: string, fallback: number, min: number, max: number) {
-  if (typeof window === "undefined") {
-    return fallback;
-  }
   const raw = window.localStorage.getItem(key);
   if (!raw) {
     return fallback;

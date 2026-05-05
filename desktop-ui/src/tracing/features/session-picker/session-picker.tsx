@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { type SessionInfo, listSessions } from "@/tracing/lib/api";
 import { Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { listSessions, type SessionInfo } from "@/tracing/lib/api";
 
 interface SessionPickerProps {
   value: string | null;
@@ -44,7 +44,7 @@ export function SessionPicker({ value, onChange }: SessionPickerProps) {
       (s) =>
         s.session_id.toLowerCase().includes(q) ||
         s.title.toLowerCase().includes(q) ||
-        (s.work_dir && s.work_dir.toLowerCase().includes(q)),
+        s.work_dir?.toLowerCase().includes(q),
     );
   }, [sessions, search]);
 
@@ -68,11 +68,15 @@ export function SessionPicker({ value, onChange }: SessionPickerProps) {
   return (
     <div className="relative">
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+        <label
+          htmlFor="session-input"
+          className="text-sm font-medium text-muted-foreground whitespace-nowrap"
+        >
           Session:
         </label>
         <div className="relative flex-1">
           <input
+            id="session-input"
             type="text"
             value={inputValue}
             onChange={(e) => {
@@ -101,20 +105,22 @@ export function SessionPicker({ value, onChange }: SessionPickerProps) {
 
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-transparent"
+            aria-label="Close"
+            onClick={() => setOpen(false)}
+          />
           <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-80 overflow-auto rounded-md border bg-popover shadow-lg">
             {loading && (
-              <div className="p-3 text-sm text-muted-foreground">
-                Loading sessions...
-              </div>
+              <div className="p-3 text-sm text-muted-foreground">Loading sessions...</div>
             )}
             {!loading && filtered.length === 0 && (
-              <div className="p-3 text-sm text-muted-foreground">
-                No sessions found
-              </div>
+              <div className="p-3 text-sm text-muted-foreground">No sessions found</div>
             )}
             {filtered.map((session) => (
               <button
+                type="button"
                 key={session.session_id}
                 onClick={() => handleSelect(session.session_id)}
                 className={`w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors ${
@@ -125,9 +131,7 @@ export function SessionPicker({ value, onChange }: SessionPickerProps) {
                   <span className="font-mono text-xs text-muted-foreground">
                     {shortId(session.session_id)}
                   </span>
-                  <span className="truncate flex-1">
-                    {session.title || "Untitled Session"}
-                  </span>
+                  <span className="truncate flex-1">{session.title || "Untitled Session"}</span>
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {formatTime(session.last_updated)}
                   </span>

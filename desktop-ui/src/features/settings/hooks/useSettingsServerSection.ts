@@ -211,20 +211,20 @@ export const useSettingsServerSection = ({
     setRemoteHostError(null);
   }, [activeRemoteBackend]);
 
-  const normalizeRemoteBackendEntry = (
-    entry: RemoteBackendTarget,
-    index: number,
-  ): RemoteBackendTarget => ({
-    id: entry.id?.trim() || `remote-${index + 1}`,
-    name: entry.name?.trim() || `Remote ${index + 1}`,
-    provider: "tcp",
-    host: entry.host?.trim() || DEFAULT_REMOTE_HOST,
-    token: entry.token?.trim() ? entry.token.trim() : null,
-    lastConnectedAtMs:
-      typeof entry.lastConnectedAtMs === "number" && Number.isFinite(entry.lastConnectedAtMs)
-        ? entry.lastConnectedAtMs
-        : null,
-  });
+  const normalizeRemoteBackendEntry = useCallback(
+    (entry: RemoteBackendTarget, index: number): RemoteBackendTarget => ({
+      id: entry.id?.trim() || `remote-${index + 1}`,
+      name: entry.name?.trim() || `Remote ${index + 1}`,
+      provider: "tcp",
+      host: entry.host?.trim() || DEFAULT_REMOTE_HOST,
+      token: entry.token?.trim() ? entry.token.trim() : null,
+      lastConnectedAtMs:
+        typeof entry.lastConnectedAtMs === "number" && Number.isFinite(entry.lastConnectedAtMs)
+          ? entry.lastConnectedAtMs
+          : null,
+    }),
+    [],
+  );
 
   const buildSettingsFromRemoteBackends = useCallback(
     (
@@ -253,7 +253,7 @@ export const useSettingsServerSection = ({
           : {}),
       };
     },
-    [mobilePlatform],
+    [mobilePlatform, normalizeRemoteBackendEntry],
   );
 
   const persistRemoteBackends = useCallback(
@@ -558,7 +558,7 @@ export const useSettingsServerSection = ({
     }
     setMobileConnectStatusText(null);
     setMobileConnectStatusError(false);
-  }, [mobilePlatform, remoteHostDraft, remoteTokenDraft]);
+  }, [mobilePlatform]);
 
   const handleRefreshTailscaleStatus = () => {
     void tailscaleStatusQuery.refetch();

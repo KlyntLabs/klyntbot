@@ -12,7 +12,7 @@ use tokio_util::sync::CancellationToken;
 #[tokio::test]
 async fn scenario_mirror_layer3_auto_approves_after_5_prior_allows() {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-    let history = CodingApprovalHistoryRepo::new(pool.clone());
+    let history = CodingApprovalHistoryRepo::new(pool.inner().clone());
     let hash = klynt_core::approval::layer3::args_hash_for_relevance(
         "bash",
         r#"{"command":"git status"}"#,
@@ -63,6 +63,8 @@ async fn scenario_mirror_layer3_auto_approves_after_5_prior_allows() {
         mirror_min_approvals: 5,
         mirror_cooldown_seconds: 86400,
         now_unix: jiff::Timestamp::now().as_second() + 25 * 3600,
+        thread_id: None,
+        turn_id: None,
     };
 
     let decision = evaluate(ctx, "bash", r#"{"command":"git status"}"#).await;

@@ -134,15 +134,15 @@ pub async fn rows_to_tasks(
         .map_err(map_storage_err)?;
 
     // Batch-load all unique status labels to avoid N+1
-    let label_ids: Vec<&str> = rows
+    let label_ids: Vec<String> = rows
         .iter()
-        .filter_map(|r| r.status_label_id.as_deref())
-        .collect::<std::collections::HashSet<&str>>()
+        .filter_map(|r| r.status_label_id.clone())
+        .collect::<std::collections::HashSet<String>>()
         .into_iter()
         .collect();
     let labels = repos
         .status_workflows
-        .get_labels_by_ids(&label_ids)
+        .get_by_ids(&label_ids)
         .await
         .map_err(map_storage_err)?;
     let label_map: std::collections::HashMap<&str, _> =

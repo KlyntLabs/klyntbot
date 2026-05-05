@@ -1,6 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import Image from "lucide-react/dist/esm/icons/image";
 import X from "lucide-react/dist/esm/icons/x";
+import { memo, useCallback } from "react";
 
 type ComposerAttachmentsProps = {
   attachments: string[];
@@ -34,7 +35,55 @@ function attachmentPreviewSrc(path: string) {
   }
 }
 
-export function ComposerAttachments({
+type AttachmentItemProps = {
+  path: string;
+  disabled: boolean;
+  onRemoveAttachment?: (path: string) => void;
+};
+
+const AttachmentItem = memo(function AttachmentItem({
+  path,
+  disabled,
+  onRemoveAttachment,
+}: AttachmentItemProps) {
+  const title = fileTitle(path);
+  const titleAttr = path.startsWith("data:") ? "Pasted image" : path;
+  const previewSrc = attachmentPreviewSrc(path);
+  const handleRemove = useCallback(() => {
+    onRemoveAttachment?.(path);
+  }, [onRemoveAttachment, path]);
+
+  return (
+    <div className="composer-attachment" title={titleAttr}>
+      {previewSrc && (
+        <span className="composer-attachment-preview" aria-hidden>
+          <img src={previewSrc} alt="" />
+        </span>
+      )}
+      {previewSrc ? (
+        <span className="composer-attachment-thumb" aria-hidden>
+          <img src={previewSrc} alt="" />
+        </span>
+      ) : (
+        <span className="composer-icon" aria-hidden>
+          <Image size={14} />
+        </span>
+      )}
+      <span className="composer-attachment-name">{title}</span>
+      <button
+        type="button"
+        className="composer-attachment-remove"
+        onClick={handleRemove}
+        aria-label={`Remove ${title}`}
+        disabled={disabled}
+      >
+        <X size={12} aria-hidden />
+      </button>
+    </div>
+  );
+});
+
+export const ComposerAttachments = memo(function ComposerAttachments({
   attachments,
   disabled,
   onRemoveAttachment,
@@ -45,39 +94,14 @@ export function ComposerAttachments({
 
   return (
     <div className="composer-attachments">
-      {attachments.map((path) => {
-        const title = fileTitle(path);
-        const titleAttr = path.startsWith("data:") ? "Pasted image" : path;
-        const previewSrc = attachmentPreviewSrc(path);
-        return (
-          <div key={path} className="composer-attachment" title={titleAttr}>
-            {previewSrc && (
-              <span className="composer-attachment-preview" aria-hidden>
-                <img src={previewSrc} alt="" />
-              </span>
-            )}
-            {previewSrc ? (
-              <span className="composer-attachment-thumb" aria-hidden>
-                <img src={previewSrc} alt="" />
-              </span>
-            ) : (
-              <span className="composer-icon" aria-hidden>
-                <Image size={14} />
-              </span>
-            )}
-            <span className="composer-attachment-name">{title}</span>
-            <button
-              type="button"
-              className="composer-attachment-remove"
-              onClick={() => onRemoveAttachment?.(path)}
-              aria-label={`Remove ${title}`}
-              disabled={disabled}
-            >
-              <X size={12} aria-hidden />
-            </button>
-          </div>
-        );
-      })}
+      {attachments.map((path) => (
+        <AttachmentItem
+          key={path}
+          path={path}
+          disabled={disabled}
+          onRemoveAttachment={onRemoveAttachment}
+        />
+      ))}
     </div>
   );
-}
+});

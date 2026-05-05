@@ -278,16 +278,18 @@ impl VectorStore {
         Ok(out)
     }
 
-    /// Delete an embedding by ID.
+    /// Delete an embedding by ID. Returns Ok(()) if the table does not exist.
     pub async fn delete(&self, table: &str, id: &str) -> Result<(), StorageError> {
-        let tbl = match self.get_table(table).await {
+        let tbl = match self.db.open_table(table).execute().await {
             Ok(t) => t,
-            Err(_) => return Ok(()), // table may not exist yet
+            Err(lancedb::Error::TableNotFound { .. }) => return Ok(()),
+            Err(e) => return Err(StorageError::Vector(format!("open table {table}: {e}"))),
         };
         let safe_id = sanitize_predicate_value(id)?;
         tbl.delete(&format!("id = '{safe_id}'"))
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB delete from {table}: {e}")))?;
+        self.table_cache.remove(table);
         Ok(())
     }
 
@@ -296,15 +298,18 @@ impl VectorStore {
     /// The predicate is validated for dangerous patterns (semicolons, comment
     /// markers, line breaks) before being passed to LanceDB. Individual values
     /// within the predicate should already be escaped via [`sanitize_predicate_value`].
+    /// Returns Ok(()) if the table does not exist.
     pub async fn delete_where(&self, table: &str, predicate: &str) -> Result<(), StorageError> {
         validate_predicate(predicate)?;
-        let tbl = match self.get_table(table).await {
+        let tbl = match self.db.open_table(table).execute().await {
             Ok(t) => t,
-            Err(_) => return Ok(()), // table may not exist yet
+            Err(lancedb::Error::TableNotFound { .. }) => return Ok(()),
+            Err(e) => return Err(StorageError::Vector(format!("open table {table}: {e}"))),
         };
         tbl.delete(predicate)
             .await
             .map_err(|e| StorageError::Vector(format!("delete_where in {table}: {e}")))?;
+        self.table_cache.remove(table);
         Ok(())
     }
 

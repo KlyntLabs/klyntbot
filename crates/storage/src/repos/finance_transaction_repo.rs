@@ -252,7 +252,6 @@ impl FinanceTransactionRepo {
         &self,
         tx_type: &str,
         n_periods: i32,
-        _period_type: &str,
         base_currency: &str,
     ) -> Result<Vec<(String, i64)>, crate::error::StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(

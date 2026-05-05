@@ -25,8 +25,8 @@ export function StarlarkRuleEditor({ requestId, initialDraft, onCommit, onCancel
         suggestedFilename: null,
       });
       onCommit(path);
-    } catch (e: any) {
-      setError(String(e?.message ?? e));
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
     } finally {
       setSaving(false);
     }
@@ -35,19 +35,18 @@ export function StarlarkRuleEditor({ requestId, initialDraft, onCommit, onCancel
   return (
     <div className="starlark-rule-editor">
       <h4>Add Starlark rule</h4>
-      <textarea
-        value={src}
-        onChange={(e) => setSrc(e.target.value)}
-        rows={8}
-        spellCheck={false}
-        autoFocus
-      />
+      <textarea value={src} onChange={(e) => setSrc(e.target.value)} rows={8} spellCheck={false} />
       {error && <div className="starlark-rule-editor__error">{error}</div>}
       <div className="starlark-rule-editor__actions">
-        <button onClick={onCancel} disabled={saving}>
+        <button type="button" onClick={onCancel} disabled={saving}>
           Cancel
         </button>
-        <button onClick={onSave} disabled={saving} className="starlark-rule-editor__primary">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className="starlark-rule-editor__primary"
+        >
           {saving ? "Saving..." : "Save rule"}
         </button>
       </div>

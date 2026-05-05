@@ -386,6 +386,7 @@ mod tests {
             message: None,
             intent_summary: None,
             project_id: None,
+            session_mode: common::SessionMode::Assistant,
         };
         let result = source.provide(&ctx).await;
         assert!(result.is_none());
@@ -413,6 +414,7 @@ mod tests {
             message: None,
             intent_summary: None,
             project_id: None,
+            session_mode: common::SessionMode::Assistant,
         };
 
         let result = source.provide(&ctx).await.unwrap();
@@ -443,6 +445,7 @@ mod tests {
             message: None,
             intent_summary: None,
             project_id: None,
+            session_mode: common::SessionMode::Assistant,
         };
 
         let result = source.provide(&ctx).await.unwrap();
@@ -478,6 +481,7 @@ mod tests {
             message: None,
             intent_summary: None,
             project_id: None,
+            session_mode: common::SessionMode::Assistant,
         };
 
         let result = source.provide(&ctx).await.unwrap();
@@ -562,6 +566,7 @@ mod tests {
             message: None,
             intent_summary: None,
             project_id: None,
+            session_mode: common::SessionMode::Assistant,
         };
 
         let result = source.provide(&ctx).await.unwrap();

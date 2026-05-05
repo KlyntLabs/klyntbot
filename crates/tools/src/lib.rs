@@ -29,9 +29,9 @@ pub use embedding::{embedding_engine, embedding_store};
 
 // ── Shared modules (root-level) ─────────────────────────────────────────────
 pub mod conversation_recall;
-pub mod semantic_fact_search;
 pub mod progress_handler;
 pub mod search_utils;
+pub mod semantic_fact_search;
 pub mod todo_types;
 
 // ── Tool framework ──────────────────────────────────────────────────────────

@@ -395,7 +395,7 @@ export function SettingsAgentsSection({
           </>
         }
       >
-        <div className="settings-agents-stepper" role="group" aria-label="Maximum agent threads">
+        <fieldset className="settings-agents-stepper" aria-label="Maximum agent threads">
           <button
             type="button"
             className="ghost settings-agents-stepper-button"
@@ -421,7 +421,7 @@ export function SettingsAgentsSection({
           >
             ▲
           </button>
-        </div>
+        </fieldset>
       </SettingsToggleRow>
 
       <SettingsToggleRow
@@ -432,7 +432,7 @@ export function SettingsAgentsSection({
           </>
         }
       >
-        <div className="settings-agents-stepper" role="group" aria-label="Maximum agent depth">
+        <fieldset className="settings-agents-stepper" aria-label="Maximum agent depth">
           <button
             type="button"
             className="ghost settings-agents-stepper-button"
@@ -458,7 +458,7 @@ export function SettingsAgentsSection({
           >
             ▲
           </button>
-        </div>
+        </fieldset>
       </SettingsToggleRow>
 
       <SettingsSubsection

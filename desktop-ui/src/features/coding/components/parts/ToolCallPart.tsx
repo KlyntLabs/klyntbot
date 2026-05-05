@@ -1,11 +1,19 @@
-import { ChevronRight } from "lucide-react";
+import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
 import { useMemo, useState } from "react";
 
-export function ToolCallPart({ callId, name, args }: { callId: string; name: string; args: unknown }) {
+export function ToolCallPart({
+  callId,
+  name,
+  args,
+}: {
+  callId: string;
+  name: string;
+  args: unknown;
+}) {
   const [expanded, setExpanded] = useState(false);
   const argsStr = useMemo(
     () => (typeof args === "string" ? args : JSON.stringify(args, null, 2)),
-    [args]
+    [args],
   );
 
   return (
@@ -23,9 +31,7 @@ export function ToolCallPart({ callId, name, args }: { callId: string; name: str
         <span className="part-tool-call__name">{name}</span>
         <span className="part-tool-call__id">{callId.slice(0, 8)}</span>
       </button>
-      {expanded && (
-        <pre className="part-tool-call__args">{argsStr}</pre>
-      )}
+      {expanded && <pre className="part-tool-call__args">{argsStr}</pre>}
     </div>
   );
 }

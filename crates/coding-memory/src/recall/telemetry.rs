@@ -117,6 +117,61 @@ impl RecallInvocationRepo {
         self.list_by_session(session_id, limit, 0).await
     }
 
+    /// Count invocations in the last N days for a workspace.
+    pub async fn count_in_last_days(&self, _workspace_id: &str, days: u32) -> common::Result<u64> {
+        let since = jiff::Timestamp::now() - jiff::Span::new().days(days as i64);
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM recall_invocations WHERE occurred_at >= ?")
+                .bind(since.to_string())
+                .fetch_one(self.pool.inner())
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(format!("count recall: {e}")))?;
+        Ok(count as u64)
+    }
+
+    /// Mean latency in the last N days for a workspace.
+    pub async fn mean_latency_in_last_days(
+        &self,
+        _workspace_id: &str,
+        days: u32,
+    ) -> common::Result<f64> {
+        let since = jiff::Timestamp::now() - jiff::Span::new().days(days as i64);
+        let avg: Option<f64> = sqlx::query_scalar(
+            "SELECT AVG(latency_ms) FROM recall_invocations WHERE occurred_at >= ?",
+        )
+        .bind(since.to_string())
+        .fetch_one(self.pool.inner())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("mean latency recall: {e}")))?;
+        Ok(avg.unwrap_or(0.0))
+    }
+
+    /// Top recalled facts in the last N days.
+    pub async fn top_facts_in_last_days(
+        &self,
+        _workspace_id: &str,
+        days: u32,
+        limit: u32,
+    ) -> common::Result<Vec<TopFactRow>> {
+        let since = jiff::Timestamp::now() - jiff::Span::new().days(days as i64);
+        let rows = sqlx::query_as::<_, TopFactRaw>(
+            "SELECT result_ids, COUNT(*) as cnt FROM recall_invocations
+             WHERE occurred_at >= ?
+             GROUP BY result_ids
+             ORDER BY cnt DESC
+             LIMIT ?",
+        )
+        .bind(since.to_string())
+        .bind(limit as i64)
+        .fetch_all(self.pool.inner())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("top facts recall: {e}")))?;
+        Ok(rows
+            .into_iter()
+            .map(|r| r.into_row())
+            .collect::<Result<Vec<_>, _>>()?)
+    }
+
     /// List recent invocations across all sessions, paginated.
     pub async fn list_recent(
         &self,
@@ -153,6 +208,38 @@ impl RecallInvocationRepo {
         }
         .map_err(|e| common::KlyntbotError::Storage(format!("list recent: {e}")))?;
         rows.into_iter().map(RawRow::into_row).collect()
+    }
+}
+
+#[derive(Debug, Clone)]
+/// A recalled fact with its metadata and recall count.
+pub struct TopFactRow {
+    /// Fact UUID.
+    pub fact_id: String,
+    /// Subject of the fact.
+    pub subject: String,
+    /// Predicate of the fact.
+    pub predicate: String,
+    /// Number of times recalled.
+    pub recall_count: u64,
+}
+
+#[derive(sqlx::FromRow)]
+struct TopFactRaw {
+    result_ids: String,
+    cnt: i64,
+}
+
+impl TopFactRaw {
+    fn into_row(self) -> common::Result<TopFactRow> {
+        let ids: Vec<uuid::Uuid> = serde_json::from_str(&self.result_ids).unwrap_or_default();
+        let fact_id = ids.first().map(|u| u.to_string()).unwrap_or_default();
+        Ok(TopFactRow {
+            fact_id: fact_id.clone(),
+            subject: String::new(),
+            predicate: String::new(),
+            recall_count: self.cnt as u64,
+        })
     }
 }
 

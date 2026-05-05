@@ -24,7 +24,7 @@ export function ProviderChips({ active, onChange, counts }: Props) {
           type="button"
           role="tab"
           aria-selected={active === p.id}
-          className={"cm-provider-chip" + (active === p.id ? " cm-provider-chip--active" : "")}
+          className={`cm-provider-chip${active === p.id ? " cm-provider-chip--active" : ""}`}
           onClick={() => onChange(p.id)}
         >
           {p.label}

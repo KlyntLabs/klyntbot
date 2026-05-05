@@ -172,9 +172,7 @@ export function ContextSpaceMap({ messages, onScrollToIndex }: ContextSpaceMapPr
     <div className="border-b px-4 py-3 shrink-0 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-medium text-muted-foreground">
-          Context Space Map
-        </span>
+        <span className="text-[10px] font-medium text-muted-foreground">Context Space Map</span>
         <span className="text-[10px] text-muted-foreground">
           (~{formatTokens(totalTokens)} est. tokens)
         </span>
@@ -252,11 +250,12 @@ export function ContextSpaceMap({ messages, onScrollToIndex }: ContextSpaceMapPr
             Top {largeItems.length} Largest Items (&gt;5% of total)
           </div>
           <div className="flex flex-col gap-0.5">
-            {largeItems.map((item, i) => {
+            {largeItems.map((item, _i) => {
               const cfg = CATEGORY_CONFIG[item.category];
               return (
                 <button
-                  key={`${item.messageIndex}-${i}`}
+                  type="button"
+                  key={`${item.messageIndex}-${item.category}`}
                   onClick={() => onScrollToIndex(item.messageIndex)}
                   className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 text-left transition-colors group"
                 >

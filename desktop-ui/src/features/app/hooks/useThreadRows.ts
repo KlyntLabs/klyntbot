@@ -101,14 +101,20 @@ export function useThreadRows(threadParentById: Record<string, string>) {
       const appendThread = (thread: ThreadSummary, depth: number, rows: ThreadRow[]) => {
         rows.push({ thread, depth });
         const children = childrenByParent.get(thread.id) ?? [];
-        children.forEach((child) => appendThread(child, depth + 1, rows));
+        for (const child of children) {
+          appendThread(child, depth + 1, rows);
+        }
       };
 
       const pinnedRows: ThreadRow[] = [];
-      pinnedRoots.forEach((thread) => appendThread(thread, 0, pinnedRows));
+      for (const thread of pinnedRoots) {
+        appendThread(thread, 0, pinnedRows);
+      }
 
       const unpinnedRows: ThreadRow[] = [];
-      visibleRoots.forEach((thread) => appendThread(thread, 0, unpinnedRows));
+      for (const thread of visibleRoots) {
+        appendThread(thread, 0, unpinnedRows);
+      }
 
       const result = {
         pinnedRows,

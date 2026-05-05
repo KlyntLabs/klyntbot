@@ -43,10 +43,11 @@ impl CoachingStrategyRepo {
 
     /// Upsert by matching on (strategy_type, domain) instead of id.
     pub async fn upsert(&self, input: &UpsertCoachingStrategy<'_>) -> Result<(), StorageError> {
+        let id = uuid::Uuid::new_v4().to_string();
         sqlx::query(
             "INSERT INTO coaching_strategies (id, strategy_type, domain, times_used, times_accepted,
                 times_led_to_improvement, avg_improvement_magnitude, confidence, last_used)
-             VALUES (lower(hex(randomblob(16))), ?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'))
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now'))
              ON CONFLICT(strategy_type, domain) DO UPDATE SET
                 times_used = excluded.times_used,
                 times_accepted = excluded.times_accepted,
@@ -55,6 +56,7 @@ impl CoachingStrategyRepo {
                 confidence = excluded.confidence,
                 last_used = excluded.last_used",
         )
+        .bind(&id)
         .bind(input.strategy_type)
         .bind(input.domain)
         .bind(input.times_used)

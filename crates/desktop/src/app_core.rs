@@ -24,7 +24,7 @@ static BRIDGE_SERVER: OnceLock<mcp_bridge::BridgeServer> = OnceLock::new();
 /// Process-wide token for the PRAGMA data_version polling fallback.
 /// The watcher task exits when this token is cancelled (on graceful
 /// shutdown) or when the runtime drops (on process exit).
-static DATA_VERSION_WATCHER: OnceLock<tokio_util::sync::CancellationToken> = OnceLock::new();
+static DATA_VERSION_WATCHER: OnceLock<storage::DataVersionWatcherHandle> = OnceLock::new();
 
 /// Latest distraction intervention awaiting display. Populated each time a
 /// `DistractionAlert` is forwarded; cleared when the overlay's React layer
@@ -129,8 +129,7 @@ pub async fn init(
         .start_data_version_watcher(
             channels.domain_event_bus.clone(),
             std::time::Duration::from_secs(5),
-        )
-        .await;
+        );
     if DATA_VERSION_WATCHER.set(dv_token).is_err() {
         tracing::warn!("data_version_watcher: already initialized");
     }
@@ -544,13 +543,52 @@ fn wire_event_channels(
         app_handle,
         shutdown,
         "agent:thread_event",
+        Some(global_event_tx.clone()),
     );
     spawn_broker_forwarder(
         core.cost_events.subscribe(),
         app_handle,
         shutdown,
         "agent:cost_update",
+        Some(global_event_tx.clone()),
     );
+    // Subagent lifecycle events — route Spawned by parent_session_id, others on global channel.
+    {
+        let mut rx = core.subagent_events.subscribe();
+        let handle = app_handle.clone();
+        let token = shutdown.clone();
+        let global_tx = Some(global_event_tx.clone());
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    msg = rx.recv() => match msg {
+                        Ok(evt) => {
+                            let channel = match &evt {
+                                desktop_shared::coding::SubagentEvent::Spawned { parent_session_id, .. } => {
+                                    format!("agent:subagent_event#{parent_session_id}")
+                                }
+                                _ => "agent:subagent_event".to_string(),
+                            };
+                            // Serialize once to Value; emit clones the value tree instead of
+                            // re-serializing from scratch.
+                            let payload = serde_json::to_value(&evt).unwrap_or_default();
+                            if let Err(e) = handle.emit(&channel, &payload) {
+                                warn!("failed to emit {channel}: {e}");
+                            }
+                            if let Some(ref tx) = global_tx {
+                                let _ = tx.send((channel, payload));
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            warn!("subagent event forwarder lagged by {n} events");
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+            }
+        });
+    }
     // ToolEvent::ApprovalRequest rides on `DomainEvent::Generic { kind:
     // "agent_event" }`. The dual-probe (`ApprovalRequest` key OR `type` field)
     // accommodates both externally- and internally-tagged serde shapes.
@@ -558,6 +596,7 @@ fn wire_event_channels(
         let mut rx = channels.domain_event_bus.subscribe();
         let handle = app_handle.clone();
         let token = shutdown.clone();
+        let global_tx = global_event_tx.clone();
         tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -566,17 +605,26 @@ fn wire_event_channels(
                         Ok(bus::DomainEvent::Generic { kind, payload })
                             if kind == "agent_event" =>
                         {
+                            // ToolEvent uses #[serde(tag="type", rename_all="camelCase")]
+                            // so ApprovalRequest variants serialize with "type":"approvalRequest"
+                            // (internally tagged; no outer "ApprovalRequest" key). The dual-probe
+                            // is kept for defensive forward-compat with externally-tagged variants.
                             let is_approval = payload.get("ApprovalRequest").is_some()
-                                || payload.get("type").and_then(|v| v.as_str())
-                                    == Some("ApprovalRequest");
+                                || matches!(
+                                    payload.get("type").and_then(|v| v.as_str()),
+                                    Some("approvalRequest" | "ApprovalRequest")
+                                );
                             if is_approval {
                                 let inner = payload.get("ApprovalRequest")
                                     .and_then(|v| v.get("payload"))
                                     .cloned()
+                                    .or_else(|| payload.get("payload").cloned())
                                     .unwrap_or(payload);
                                 if let Err(e) = handle.emit("agent:approval_request", &inner) {
                                     warn!("failed to emit agent:approval_request: {e}");
                                 }
+                                let _ = global_tx
+                                    .send(("agent:approval_request".to_string(), inner));
                             }
                         }
                         Ok(_) => {}
@@ -664,6 +712,7 @@ fn spawn_broker_forwarder<T>(
     app_handle: &tauri::AppHandle,
     shutdown_token: &CancellationToken,
     event_name: &'static str,
+    global_event_tx: Option<broadcast::Sender<(String, Value)>>,
 ) where
     T: Clone + serde::Serialize + Send + 'static,
 {
@@ -677,6 +726,12 @@ fn spawn_broker_forwarder<T>(
                     Ok(evt) => {
                         if let Err(e) = handle.emit(event_name, &evt) {
                             warn!("failed to emit {event_name}: {e}");
+                        }
+                        // Mirror to dev_server SSE so browser-only dev mode also receives.
+                        if let Some(ref tx) = global_event_tx {
+                            if let Ok(payload) = serde_json::to_value(&evt) {
+                                let _ = tx.send((event_name.to_string(), payload));
+                            }
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {

@@ -9,8 +9,8 @@
 html[data-launcher],
 html[data-launcher] body,
 html[data-launcher] #root {
-  background: transparent !important;
-  background-color: transparent !important;
+  background: transparent;
+  background-color: transparent;
   border-radius: 14px;
   overflow: hidden;
 }

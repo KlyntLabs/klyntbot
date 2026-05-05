@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { useState } from "react";
-import { type WireEvent } from "@/tracing/lib/api";
 import {
-  ChevronRight,
-  ChevronDown,
-  Link,
-  Copy,
-  Check,
-  WrapText,
   AlertCircle,
   Bot,
-  Terminal,
-  FileEdit,
-  ListTodo,
+  Check,
+  ChevronDown,
+  ChevronRight,
   Clock,
+  Copy,
+  FileEdit,
+  Link,
+  ListTodo,
+  Terminal,
+  WrapText,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { WireEvent } from "@/tracing/lib/api";
 
 interface WireEventCardProps {
   event: WireEvent;
@@ -51,61 +51,35 @@ export function isErrorEvent(event: WireEvent): boolean {
 }
 
 export const TYPE_COLORS: Record<string, string> = {
-  TurnBegin:
-    "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
+  TurnBegin: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
   TurnEnd: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
-  SteerInput:
-    "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
-  StepBegin:
-    "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/30",
-  StepInterrupted:
-    "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/30",
-  CompactionBegin:
-    "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30",
-  CompactionEnd:
-    "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30",
-  MCPLoadingBegin:
-    "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30",
-  MCPLoadingEnd:
-    "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30",
-  StatusUpdate:
-    "bg-gray-500/15 text-gray-700 dark:text-gray-300 border-gray-500/30",
-  Notification:
-    "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/30",
+  SteerInput: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
+  StepBegin: "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/30",
+  StepInterrupted: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/30",
+  CompactionBegin: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30",
+  CompactionEnd: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30",
+  MCPLoadingBegin: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30",
+  MCPLoadingEnd: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30",
+  StatusUpdate: "bg-gray-500/15 text-gray-700 dark:text-gray-300 border-gray-500/30",
+  Notification: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/30",
   TextPart: "bg-gray-500/15 text-gray-700 dark:text-gray-300 border-gray-500/30",
-  ThinkPart:
-    "bg-gray-500/15 text-gray-700 dark:text-gray-300 border-gray-500/30",
-  PlanDisplay:
-    "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30",
-  ToolCall:
-    "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
-  ToolResult:
-    "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
-  ToolCallPart:
-    "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
-  ToolCallRequest:
-    "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
-  QuestionRequest:
-    "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
-  ApprovalRequest:
-    "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
-  ApprovalResponse:
-    "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
-  SubagentEvent:
-    "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30",
-  ImageURLPart:
-    "bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/30",
-  VideoURLPart:
-    "bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/30",
-  AudioURLPart:
-    "bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/30",
+  ThinkPart: "bg-gray-500/15 text-gray-700 dark:text-gray-300 border-gray-500/30",
+  PlanDisplay: "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30",
+  ToolCall: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
+  ToolResult: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
+  ToolCallPart: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
+  ToolCallRequest: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
+  QuestionRequest: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+  ApprovalRequest: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+  ApprovalResponse: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+  SubagentEvent: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30",
+  ImageURLPart: "bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/30",
+  VideoURLPart: "bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/30",
+  AudioURLPart: "bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/30",
 };
 
 function getTypeColor(type: string): string {
-  return (
-    TYPE_COLORS[type] ??
-    "bg-secondary text-secondary-foreground border-border"
-  );
+  return TYPE_COLORS[type] ?? "bg-secondary text-secondary-foreground border-border";
 }
 
 export function formatTimestamp(ts: number): string {
@@ -141,7 +115,7 @@ function timeDeltaLineColor(deltaSec: number): string {
 }
 
 function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max) + "…" : s;
+  return s.length > max ? `${s.slice(0, max)}…` : s;
 }
 
 function summarizeUserInput(input: unknown): string {
@@ -175,7 +149,8 @@ function getSummary(event: WireEvent): string {
         const args = JSON.parse(fn.arguments as string) as Record<string, unknown>;
         if (name === "ReadFile" || name === "ReadMediaFile" || name === "PlanModeReadFile") {
           detail = ` ${args.path}`;
-          if (args.line_offset || args.n_lines) detail += ` [${args.line_offset ?? 1}:${(args.n_lines as number) ?? ""}]`;
+          if (args.line_offset || args.n_lines)
+            detail += ` [${args.line_offset ?? 1}:${(args.n_lines as number) ?? ""}]`;
         } else if (name === "WriteFile") {
           detail = ` ${args.path}`;
         } else if (name === "StrReplaceFile") {
@@ -302,7 +277,9 @@ function getSummary(event: WireEvent): string {
       } else if (innerType) {
         detail = ` ${innerType}`;
       }
-      const prefix = agentType ? `[${agentType}]` : `task:${String(p.parent_tool_call_id ?? "").slice(0, 8)}`;
+      const prefix = agentType
+        ? `[${agentType}]`
+        : `task:${String(p.parent_tool_call_id ?? "").slice(0, 8)}`;
       const idSuffix = agentId ? ` (${agentId.slice(0, 6)})` : "";
       return `${prefix}${idSuffix}${detail}`;
     }
@@ -324,11 +301,8 @@ export function WireEventCard({
   searchMatch,
 }: WireEventCardProps) {
   const summary = getSummary(event);
-  const timeDelta = prevEvent
-    ? formatTimeDelta(event.timestamp, prevEvent.timestamp)
-    : "";
-  const isTurnBoundary =
-    event.type === "TurnBegin" || event.type === "TurnEnd";
+  const timeDelta = prevEvent ? formatTimeDelta(event.timestamp, prevEvent.timestamp) : "";
+  const isTurnBoundary = event.type === "TurnBegin" || event.type === "TurnEnd";
 
   const isNested = nestLevel > 0;
   const isError = isErrorEvent(event);
@@ -342,16 +316,19 @@ export function WireEventCard({
       {/* Time gap indicator — color-coded for slow operations */}
       {timeDelta && prevEvent && event.timestamp - prevEvent.timestamp > 1 && (
         <div className="flex items-center gap-2 py-1 mb-1">
-          <div className={`h-px flex-1 ${timeDeltaLineColor(event.timestamp - prevEvent.timestamp)}`} />
-          <span className={`text-[10px] ${timeDeltaColor(event.timestamp - prevEvent.timestamp)}`}>{timeDelta}</span>
-          <div className={`h-px flex-1 ${timeDeltaLineColor(event.timestamp - prevEvent.timestamp)}`} />
+          <div
+            className={`h-px flex-1 ${timeDeltaLineColor(event.timestamp - prevEvent.timestamp)}`}
+          />
+          <span className={`text-[10px] ${timeDeltaColor(event.timestamp - prevEvent.timestamp)}`}>
+            {timeDelta}
+          </span>
+          <div
+            className={`h-px flex-1 ${timeDeltaLineColor(event.timestamp - prevEvent.timestamp)}`}
+          />
         </div>
       )}
 
-      <button
-        onClick={onToggle}
-        className="flex w-full items-start gap-2 text-left"
-      >
+      <button type="button" onClick={onToggle} className="flex w-full items-start gap-2 text-left">
         {/* Expand icon */}
         <span className="mt-0.5 text-muted-foreground">
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -363,9 +340,7 @@ export function WireEventCard({
         </span>
 
         {/* Error icon */}
-        {isError && (
-          <AlertCircle size={13} className="mt-0.5 shrink-0 text-red-500" />
-        )}
+        {isError && <AlertCircle size={13} className="mt-0.5 shrink-0 text-red-500" />}
 
         {/* Type badge */}
         <span
@@ -393,33 +368,29 @@ export function WireEventCard({
 
         {/* Summary */}
         {summary && (
-          <span className="mt-0.5 truncate text-xs text-muted-foreground">
-            {summary}
-          </span>
+          <span className="mt-0.5 truncate text-xs text-muted-foreground">{summary}</span>
         )}
 
         {/* Detail button for ToolCall/ToolResult */}
         {isToolEvent && onSelect && (
-          <span
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onSelect();
             }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.stopPropagation(); onSelect(); }
-            }}
-            className="mt-0.5 shrink-0 text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+            className="mt-0.5 shrink-0 text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer bg-transparent border-none p-0"
             title="Show tool call details"
           >
             detail
-          </span>
+          </button>
         )}
 
         {/* Time delta — highlight slow operations */}
         {timeDelta && event.timestamp - (prevEvent?.timestamp ?? 0) <= 1 && (
-          <span className={`mt-0.5 ml-auto shrink-0 text-[10px] ${timeDeltaColor(event.timestamp - (prevEvent?.timestamp ?? 0))}`}>
+          <span
+            className={`mt-0.5 ml-auto shrink-0 text-[10px] ${timeDeltaColor(event.timestamp - (prevEvent?.timestamp ?? 0))}`}
+          >
             {timeDelta}
           </span>
         )}
@@ -443,17 +414,30 @@ function ExpandedPayload({ payload }: { payload: Record<string, unknown> }) {
   const [copied, setCopied] = useState(false);
   const [wrap, setWrap] = useState(true);
   const text = JSON.stringify(payload, null, 2);
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copiedTimeoutRef.current) {
+      clearTimeout(copiedTimeoutRef.current);
+    }
+    copiedTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   return (
     <div className="mt-2 ml-6 mb-2 rounded-md border bg-card relative group/payload">
       <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover/payload:opacity-100 transition-opacity z-10">
         <button
+          type="button"
           onClick={() => setWrap(!wrap)}
           className={`rounded p-1 hover:bg-muted ${wrap ? "text-foreground bg-muted/60" : "text-muted-foreground"}`}
           title={wrap ? "No wrap" : "Wrap lines"}
@@ -461,6 +445,7 @@ function ExpandedPayload({ payload }: { payload: Record<string, unknown> }) {
           <WrapText size={14} />
         </button>
         <button
+          type="button"
           onClick={handleCopy}
           className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-foreground"
           title="Copy JSON"
@@ -468,7 +453,9 @@ function ExpandedPayload({ payload }: { payload: Record<string, unknown> }) {
           {copied ? <Check size={14} /> : <Copy size={14} />}
         </button>
       </div>
-      <pre className={`overflow-auto text-xs font-mono leading-relaxed text-card-foreground max-h-[500px] p-3 ${wrap ? "whitespace-pre-wrap break-all" : "whitespace-pre"}`}>
+      <pre
+        className={`overflow-auto text-xs font-mono leading-relaxed text-card-foreground max-h-[500px] p-3 ${wrap ? "whitespace-pre-wrap break-all" : "whitespace-pre"}`}
+      >
         {text}
       </pre>
     </div>
@@ -503,11 +490,15 @@ function SubagentContent({ payload, depth }: { payload: Record<string, unknown>;
   }
 
   // Build a summary for the inner event
-  const innerSummary = innerType ? getSummary({ index: 0, timestamp: 0, type: innerType, payload: innerPayload }) : "";
+  const innerSummary = innerType
+    ? getSummary({ index: 0, timestamp: 0, type: innerType, payload: innerPayload })
+    : "";
 
   // Check if the inner event is itself a SubagentEvent (recursive)
   const isNestedSubagent = innerType === "SubagentEvent";
-  const innerIsError = innerType ? isErrorEvent({ index: 0, timestamp: 0, type: innerType, payload: innerPayload }) : false;
+  const innerIsError = innerType
+    ? isErrorEvent({ index: 0, timestamp: 0, type: innerType, payload: innerPayload })
+    : false;
 
   return (
     <div className="mt-2 ml-4 mb-2 border-l-2 border-l-indigo-400/50 dark:border-l-indigo-500/40 pl-3">
@@ -523,6 +514,7 @@ function SubagentContent({ payload, depth }: { payload: Record<string, unknown>;
           {agentId ? agentId.slice(0, 8) : `task:${taskId}`}
         </span>
         <button
+          type="button"
           onClick={() => setShowRaw((v) => !v)}
           className="text-[10px] text-muted-foreground hover:text-foreground"
         >
@@ -534,10 +526,14 @@ function SubagentContent({ payload, depth }: { payload: Record<string, unknown>;
 
       {/* Render the inner event as a mini card */}
       {innerType && (
-        <div className={`rounded border px-3 py-1.5 ${innerIsError ? "bg-red-500/5 border-red-500/20" : "bg-indigo-500/5 border-indigo-500/15"}`}>
+        <div
+          className={`rounded border px-3 py-1.5 ${innerIsError ? "bg-red-500/5 border-red-500/20" : "bg-indigo-500/5 border-indigo-500/15"}`}
+        >
           <div className="flex items-center gap-2">
             {innerIsError && <AlertCircle size={11} className="shrink-0 text-red-500" />}
-            <span className={`shrink-0 rounded border px-1.5 py-0 text-[10px] font-medium ${innerIsError ? "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30" : getTypeColor(innerType)}`}>
+            <span
+              className={`shrink-0 rounded border px-1.5 py-0 text-[10px] font-medium ${innerIsError ? "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30" : getTypeColor(innerType)}`}
+            >
               {innerType}
             </span>
             {innerSummary && (
@@ -574,17 +570,26 @@ function InnerEventContent({ type, payload }: { type: string; payload: Record<st
     const fn = payload.function as Record<string, unknown> | undefined;
     return (
       <div className="mt-1">
-        <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400">{fn?.name as string}()</span>
+        <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400">
+          {fn?.name as string}()
+        </span>
         {expanded && (
           <pre className="mt-1 overflow-auto whitespace-pre-wrap text-[10px] font-mono text-muted-foreground max-h-32">
             {(() => {
               if (!fn?.arguments) return "{}";
-              try { return JSON.stringify(JSON.parse(fn.arguments as string), null, 2); }
-              catch { return String(fn.arguments); }
+              try {
+                return JSON.stringify(JSON.parse(fn.arguments as string), null, 2);
+              } catch {
+                return String(fn.arguments);
+              }
             })()}
           </pre>
         )}
-        <button onClick={() => setExpanded((v) => !v)} className="text-[9px] text-muted-foreground hover:text-foreground ml-1">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="text-[9px] text-muted-foreground hover:text-foreground ml-1"
+        >
           {expanded ? "hide args" : "show args"}
         </button>
       </div>
@@ -602,7 +607,11 @@ function InnerEventContent({ type, payload }: { type: string; payload: Record<st
           {typeof output === "string" ? output.slice(0, 200) : JSON.stringify(output).slice(0, 200)}
         </span>
         {expanded && <ExpandedPayload payload={payload} />}
-        <button onClick={() => setExpanded((v) => !v)} className="text-[9px] text-muted-foreground hover:text-foreground ml-1">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="text-[9px] text-muted-foreground hover:text-foreground ml-1"
+        >
           {expanded ? "hide" : "more"}
         </button>
       </div>
@@ -612,7 +621,11 @@ function InnerEventContent({ type, payload }: { type: string; payload: Record<st
   // Default: collapsible JSON
   return (
     <div className="mt-1">
-      <button onClick={() => setExpanded((v) => !v)} className="text-[9px] text-muted-foreground hover:text-foreground">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="text-[9px] text-muted-foreground hover:text-foreground"
+      >
         {expanded ? "hide payload" : "show payload"}
       </button>
       {expanded && <ExpandedPayload payload={payload} />}
@@ -630,16 +643,26 @@ function ApprovalRequestContent({ payload }: { payload: Record<string, unknown> 
       {/* Request info */}
       <div className="rounded border bg-amber-500/5 border-amber-500/15 px-3 py-2">
         <div className="flex items-center gap-2 text-[11px]">
-          <span className="font-medium text-amber-700 dark:text-amber-300">{String(payload.sender ?? "")}</span>
+          <span className="font-medium text-amber-700 dark:text-amber-300">
+            {String(payload.sender ?? "")}
+          </span>
           <span className="text-muted-foreground">wants to</span>
-          <span className="font-mono font-medium text-foreground">{String(payload.action ?? "")}</span>
+          <span className="font-mono font-medium text-foreground">
+            {String(payload.action ?? "")}
+          </span>
         </div>
         {payload.description != null && (
           <div className="mt-1 text-xs text-muted-foreground">{String(payload.description)}</div>
         )}
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-[9px] font-mono text-muted-foreground">id: {String(payload.id ?? "").slice(0, 12)}</span>
-          <button onClick={() => setShowRaw((v) => !v)} className="text-[9px] text-muted-foreground hover:text-foreground">
+          <span className="text-[9px] font-mono text-muted-foreground">
+            id: {String(payload.id ?? "").slice(0, 12)}
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowRaw((v) => !v)}
+            className="text-[9px] text-muted-foreground hover:text-foreground"
+          >
             {showRaw ? "hide raw" : "raw"}
           </button>
         </div>
@@ -648,8 +671,8 @@ function ApprovalRequestContent({ payload }: { payload: Record<string, unknown> 
       {showRaw && <ExpandedPayload payload={payload} />}
 
       {/* Display blocks */}
-      {display.map((block, i) => (
-        <DisplayBlockRenderer key={i} block={block} />
+      {display.map((block) => (
+        <DisplayBlockRenderer key={String(block.type ?? "block")} block={block} />
       ))}
     </div>
   );
@@ -700,6 +723,7 @@ function DiffBlock({ block }: { block: Record<string, unknown> }) {
   return (
     <div className="rounded border bg-card overflow-hidden">
       <button
+        type="button"
         onClick={() => setExpanded((v) => !v)}
         className="flex items-center gap-1.5 w-full px-3 py-1.5 text-left hover:bg-muted/50 text-[11px]"
       >
@@ -711,18 +735,26 @@ function DiffBlock({ block }: { block: Record<string, unknown> }) {
         <div className="border-t max-h-64 overflow-auto">
           {oldLines.length > 0 && oldText && (
             <div>
-              {oldLines.map((line, i) => (
-                <div key={`old-${i}`} className="px-3 py-0 bg-red-500/10 text-red-700 dark:text-red-300 font-mono text-[10px] leading-5">
-                  <span className="select-none text-red-500/60 mr-2">-</span>{line}
+              {oldLines.map((line) => (
+                <div
+                  key={`old-${line}`}
+                  className="px-3 py-0 bg-red-500/10 text-red-700 dark:text-red-300 font-mono text-[10px] leading-5"
+                >
+                  <span className="select-none text-red-500/60 mr-2">-</span>
+                  {line}
                 </div>
               ))}
             </div>
           )}
           {newLines.length > 0 && newText && (
             <div>
-              {newLines.map((line, i) => (
-                <div key={`new-${i}`} className="px-3 py-0 bg-green-500/10 text-green-700 dark:text-green-300 font-mono text-[10px] leading-5">
-                  <span className="select-none text-green-500/60 mr-2">+</span>{line}
+              {newLines.map((line) => (
+                <div
+                  key={`new-${line}`}
+                  className="px-3 py-0 bg-green-500/10 text-green-700 dark:text-green-300 font-mono text-[10px] leading-5"
+                >
+                  <span className="select-none text-green-500/60 mr-2">+</span>
+                  {line}
                 </div>
               ))}
             </div>
@@ -762,12 +794,20 @@ function TodoBlock({ block }: { block: Record<string, unknown> }) {
         <span className="text-[10px] font-medium text-muted-foreground">Todo</span>
       </div>
       <div className="space-y-0.5">
-        {items.map((item, i) => {
+        {items.map((item) => {
           const status = item.status as string;
           const icon = status === "done" ? "✓" : status === "in_progress" ? "▶" : "○";
-          const color = status === "done" ? "text-green-600" : status === "in_progress" ? "text-blue-600" : "text-muted-foreground";
+          const color =
+            status === "done"
+              ? "text-green-600"
+              : status === "in_progress"
+                ? "text-blue-600"
+                : "text-muted-foreground";
           return (
-            <div key={i} className={`flex items-center gap-1.5 text-[11px] ${color}`}>
+            <div
+              key={String(item.title ?? "")}
+              className={`flex items-center gap-1.5 text-[11px] ${color}`}
+            >
               <span className="shrink-0 w-3 text-center">{icon}</span>
               <span>{String(item.title ?? "")}</span>
             </div>
@@ -795,10 +835,13 @@ function BackgroundTaskBlock({ block }: { block: Record<string, unknown> }) {
   const kind = String(block.kind ?? "");
 
   const statusColor =
-    status === "running" ? "text-blue-600 dark:text-blue-400" :
-    status === "completed" ? "text-green-600 dark:text-green-400" :
-    status === "failed" ? "text-red-500" :
-    "text-muted-foreground";
+    status === "running"
+      ? "text-blue-600 dark:text-blue-400"
+      : status === "completed"
+        ? "text-green-600 dark:text-green-400"
+        : status === "failed"
+          ? "text-red-500"
+          : "text-muted-foreground";
 
   return (
     <div className="rounded border bg-card px-3 py-2">
@@ -809,9 +852,7 @@ function BackgroundTaskBlock({ block }: { block: Record<string, unknown> }) {
         <span className={`text-[10px] font-medium ${statusColor}`}>{status}</span>
         <span className="text-[9px] font-mono text-muted-foreground ml-auto">{taskId}</span>
       </div>
-      {description && (
-        <div className="mt-1 text-xs text-muted-foreground">{description}</div>
-      )}
+      {description && <div className="mt-1 text-xs text-muted-foreground">{description}</div>}
     </div>
   );
 }

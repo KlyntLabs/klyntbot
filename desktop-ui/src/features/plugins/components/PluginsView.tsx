@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CodingMemoryPlugin } from "@/features/plugins/coding-memory/CodingMemoryPlugin";
 
 type PluginId = "coding-memory" | "skills" | "mcp";
@@ -10,6 +10,10 @@ const PLUGIN_TABS: ReadonlyArray<{ id: PluginId; label: string; available: boole
 ];
 
 export function PluginsView() {
+  useEffect(() => {
+    import("@/styles/plugins.css");
+  }, []);
+
   const [active, setActive] = useState<PluginId>("coding-memory");
 
   return (

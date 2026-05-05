@@ -42,20 +42,17 @@ impl AppCore {
 
 fn generate_title(prompt: &str) -> String {
     let stop_words: &[&str] = &[
-        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-        "have", "has", "had", "do", "does", "did", "will", "would", "could",
-        "should", "may", "might", "can", "shall", "to", "of", "in", "for",
-        "on", "with", "at", "by", "from", "as", "into", "about", "like",
-        "through", "after", "over", "between", "out", "against", "during",
-        "without", "before", "under", "around", "among", "and", "but", "or",
-        "nor", "not", "so", "yet", "both", "either", "neither", "each",
-        "every", "all", "any", "few", "more", "most", "other", "some",
-        "such", "no", "only", "own", "same", "than", "too", "very",
-        "just", "because", "if", "when", "where", "how", "what", "which",
-        "who", "whom", "this", "that", "these", "those", "i", "me", "my",
-        "we", "our", "you", "your", "he", "him", "his", "she", "her", "it",
-        "its", "they", "them", "their", "please", "help", "want", "need",
-        "make", "create", "add", "fix", "update", "write",
+        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+        "do", "does", "did", "will", "would", "could", "should", "may", "might", "can", "shall",
+        "to", "of", "in", "for", "on", "with", "at", "by", "from", "as", "into", "about", "like",
+        "through", "after", "over", "between", "out", "against", "during", "without", "before",
+        "under", "around", "among", "and", "but", "or", "nor", "not", "so", "yet", "both",
+        "either", "neither", "each", "every", "all", "any", "few", "more", "most", "other", "some",
+        "such", "no", "only", "own", "same", "than", "too", "very", "just", "because", "if",
+        "when", "where", "how", "what", "which", "who", "whom", "this", "that", "these", "those",
+        "i", "me", "my", "we", "our", "you", "your", "he", "him", "his", "she", "her", "it", "its",
+        "they", "them", "their", "please", "help", "want", "need", "make", "create", "add", "fix",
+        "update", "write",
     ];
 
     let words: Vec<&str> = prompt

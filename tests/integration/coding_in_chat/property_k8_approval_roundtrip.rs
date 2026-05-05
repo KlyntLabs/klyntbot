@@ -46,6 +46,8 @@ proptest! {
                     mirror_min_approvals: 5,
                     mirror_cooldown_seconds: 86400,
                     now_unix: jiff::Timestamp::now().as_second(),
+                    thread_id: None,
+                    turn_id: None,
                 };
                 let _ = evaluate(ctx, "bash", "echo k8").await;
             }

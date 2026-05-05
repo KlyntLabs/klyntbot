@@ -18,7 +18,7 @@ fn row_to_insight_response(row: feature_insights::InsightReviewRow) -> InsightRe
         content.self_assessment.as_deref().and_then(|s| {
             // Try parsing as-is first, then try stripping markdown fences
             serde_json::from_str(s)
-                .or_else(|_| serde_json::from_str(&strip_markdown_fences(s)))
+                .or_else(|_| serde_json::from_str(common::helpers::strip_llm_fences(s)))
                 .ok()
         });
 
@@ -133,12 +133,11 @@ impl AppCore {
         let (context_text, note_title, parent_insight_id) =
             if let Some(ref service) = self.insight_service {
                 // Fetch related notes for the resolved scope
-                let mut related_notes = Vec::new();
-                for id in &scope_note_ids {
-                    if let Ok(Some(n)) = self.note_repo.get_note(id).await {
-                        related_notes.push(n);
-                    }
-                }
+                let related_notes = self
+                    .note_repo
+                    .get_notes_by_ids(&scope_note_ids)
+                    .await
+                    .unwrap_or_default();
 
                 match service
                     .prepare_context(
@@ -536,12 +535,11 @@ impl AppCore {
                 .unwrap_or_default();
 
             let scope_ids = service.resolve_scope(note_id, &scope).await;
-            let mut related_notes = Vec::new();
-            for id in &scope_ids {
-                if let Ok(Some(n)) = self.note_repo.get_note(id).await {
-                    related_notes.push(n);
-                }
-            }
+            let related_notes = self
+                .note_repo
+                .get_notes_by_ids(&scope_ids)
+                .await
+                .unwrap_or_default();
 
             match service
                 .prepare_context(&note, &related_notes, &scope_ids, &scope, &note_domains)
@@ -580,9 +578,9 @@ impl AppCore {
             .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
 
         let content = response.content.unwrap_or_default();
-        let cleaned = strip_markdown_fences(&content);
+        let cleaned = common::helpers::strip_llm_fences(&content);
 
-        serde_json::from_str::<ScenarioChallengeResponse>(&cleaned).map_err(|e| {
+        serde_json::from_str::<ScenarioChallengeResponse>(cleaned).map_err(|e| {
             ApiError::new(
                 "PARSE_ERROR",
                 format!("Failed to parse scenario response: {e}"),
@@ -628,12 +626,11 @@ impl AppCore {
                 .unwrap_or_default();
 
             let scope_ids = service.resolve_scope(note_id, &scope).await;
-            let mut related_notes = Vec::new();
-            for id in &scope_ids {
-                if let Ok(Some(n)) = self.note_repo.get_note(id).await {
-                    related_notes.push(n);
-                }
-            }
+            let related_notes = self
+                .note_repo
+                .get_notes_by_ids(&scope_ids)
+                .await
+                .unwrap_or_default();
 
             match service
                 .prepare_context(&note, &related_notes, &scope_ids, &scope, &note_domains)
@@ -688,7 +685,7 @@ impl AppCore {
             let raw_content = response.content.unwrap_or_default();
             // Only strip fences for JSON-producing tabs (matching generate_tab pipeline behavior)
             if tab == "assessment" || tab == "gaps" {
-                strip_markdown_fences(&raw_content)
+                common::helpers::strip_llm_fences(&raw_content).to_string()
             } else {
                 raw_content
             }
@@ -864,24 +861,28 @@ impl AppCore {
             self.get_related_note_ids(&params.note_id).await
         };
 
+        let mut all_ids = note_ids.clone();
+        all_ids.push(params.note_id.clone());
+        let note_rows = self
+            .note_repo
+            .get_notes_by_ids(&all_ids)
+            .await
+            .unwrap_or_default();
         let mut notes = Vec::new();
         let mut total_words: u32 = 0;
-        for id in &note_ids {
-            if let Ok(Some(note)) = self.note_repo.get_note(id).await {
-                let wc = note.body.split_whitespace().count() as u32;
-                total_words += wc;
-                notes.push(ScopePreviewNote {
-                    id: note.id,
-                    title: note.title,
-                    notebook_id: note.notebook_id,
-                    word_count: wc,
-                });
+        for note in &note_rows {
+            if note.id == params.note_id {
+                total_words += note.body.split_whitespace().count() as u32;
+                continue;
             }
-        }
-
-        // Add current note's word count
-        if let Ok(Some(current)) = self.note_repo.get_note(&params.note_id).await {
-            total_words += current.body.split_whitespace().count() as u32;
+            let wc = note.body.split_whitespace().count() as u32;
+            total_words += wc;
+            notes.push(ScopePreviewNote {
+                id: note.id.clone(),
+                title: note.title.clone(),
+                notebook_id: note.notebook_id.clone(),
+                word_count: wc,
+            });
         }
 
         // Fetch links between all nodes in scope (current note + scope notes)
@@ -987,13 +988,11 @@ impl AppCore {
             .get_backlinks_with_context(note_id)
             .await
             .unwrap_or_default();
-        let mut notes = Vec::new();
-        for (backlink_note, _ctx) in &backlinks {
-            if let Ok(Some(full_note)) = self.note_repo.get_note(&backlink_note.id).await {
-                notes.push(full_note);
-            }
-        }
-        notes
+        let backlink_ids: Vec<String> = backlinks.iter().map(|(n, _)| n.id.clone()).collect();
+        self.note_repo
+            .get_notes_by_ids(&backlink_ids)
+            .await
+            .unwrap_or_default()
     }
 }
 
@@ -1242,23 +1241,7 @@ fn resolve_response_lang(config: &config::Config) -> Option<String> {
         .or_else(|| config.language.native_lang.clone())
 }
 
-/// Strip markdown code fences (```json...``` or ```...```) from LLM output.
-/// LLMs frequently wrap JSON responses in fences despite being told not to.
-fn strip_markdown_fences(content: &str) -> String {
-    let trimmed = content.trim();
-    if let Some(rest) = trimmed.strip_prefix("```") {
-        // Remove optional language tag (e.g. "json", "mermaid") on the first line
-        let rest = rest
-            .strip_prefix("json")
-            .or_else(|| rest.strip_prefix("mermaid"))
-            .unwrap_or(rest);
-        let rest = rest.trim_start_matches('\n');
-        if let Some(body) = rest.strip_suffix("```") {
-            return body.trim().to_string();
-        }
-    }
-    trimmed.to_string()
-}
+
 
 async fn generate_tab(
     provider: &providers::DynProvider,
@@ -1281,7 +1264,7 @@ async fn generate_tab(
             let raw = response.content.unwrap_or_default();
             // Strip markdown fences for JSON-producing tabs
             let content = if tab_name == "assessment" || tab_name == "gaps" {
-                strip_markdown_fences(&raw)
+                common::helpers::strip_llm_fences(&raw).to_string()
             } else {
                 raw
             };

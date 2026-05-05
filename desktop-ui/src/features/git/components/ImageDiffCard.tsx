@@ -135,7 +135,7 @@ export const ImageDiffCard = memo(function ImageDiffCard({
           <div className="image-diff-single">
             <div className="image-diff-pane image-diff-pane-new">
               {newDataUri ? (
-                <img src={newDataUri} alt="New image" className="image-diff-preview" />
+                <img src={newDataUri} alt="New" className="image-diff-preview" />
               ) : (
                 renderPlaceholder()
               )}
@@ -147,7 +147,7 @@ export const ImageDiffCard = memo(function ImageDiffCard({
           <div className="image-diff-single">
             <div className="image-diff-pane image-diff-pane-old">
               {oldDataUri ? (
-                <img src={oldDataUri} alt="Deleted image" className="image-diff-preview" />
+                <img src={oldDataUri} alt="Deleted" className="image-diff-preview" />
               ) : (
                 renderPlaceholder()
               )}

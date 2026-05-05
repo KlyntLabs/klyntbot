@@ -22,7 +22,7 @@ pub mod test_util;
 
 // ── Core infrastructure ─────────────────────────────────────────────
 pub use error::{OptionExt, StorageError};
-pub use pool::StoragePool;
+pub use pool::{DataVersionWatcherHandle, StoragePool};
 pub use repos::Repos;
 pub use sqlite_types::{SqlDate, SqlTs};
 pub use vector_store::{sanitize_predicate_value, CognitiveFactParams, VectorStore};

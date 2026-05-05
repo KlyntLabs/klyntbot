@@ -63,7 +63,6 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
       <div
         className="dashboard__score-ring-track"
         style={{ width: size, height: size }}
-        tabIndex={0}
         role="img"
         aria-label={`Productivity score ${Math.round(score)} out of 100`}
         onMouseEnter={() => setHovered(true)}

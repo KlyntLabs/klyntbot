@@ -400,6 +400,7 @@ export function useThreadTurnEvents({
       pushThreadErrorMessage,
       safeMessageActivity,
       setActiveTurnId,
+      pendingInterruptsRef,
     ],
   );
 

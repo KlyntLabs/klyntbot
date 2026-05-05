@@ -1,28 +1,33 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { type ContextMessage, getContextMessages, getSubagentContextMessages, normalizeContent } from "@/tracing/lib/api";
-import { UserMessage } from "./user-message";
-import { AssistantMessage } from "./assistant-message";
-import { ToolMessage } from "./tool-call-block";
-import { Markdown } from "@/tracing/components/markdown";
-import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import {
+  Activity,
+  BarChart3,
+  Bookmark,
   ChevronDown,
   ChevronRight,
   ChevronUp,
-  Activity,
-  Bookmark,
+  Code,
   Eye,
   EyeOff,
-  Code,
   FileText,
-  BarChart3,
   Search,
   X,
 } from "lucide-react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
+import { Markdown } from "@/tracing/components/markdown";
+import {
+  type ContextMessage,
+  getContextMessages,
+  getSubagentContextMessages,
+  normalizeContent,
+} from "@/tracing/lib/api";
+import { AssistantMessage } from "./assistant-message";
 import { ContextSpaceMap } from "./context-space-map";
+import { ToolMessage } from "./tool-call-block";
+import { UserMessage } from "./user-message";
 
 interface ContextViewerProps {
   sessionId: string;
@@ -49,12 +54,18 @@ export const useRawMode = () => useContext(RawModeContext);
 /** Inline metadata row for _usage / _checkpoint / other internal records */
 function MetadataRow({ message }: { message: ContextMessage }) {
   const [expanded, setExpanded] = useState(false);
-  const label = message.role === "_usage" ? "Usage" : message.role === "_checkpoint" ? "Checkpoint" : message.role;
+  const label =
+    message.role === "_usage"
+      ? "Usage"
+      : message.role === "_checkpoint"
+        ? "Checkpoint"
+        : message.role;
   const Icon = message.role === "_usage" ? Activity : Bookmark;
 
   return (
     <div className="my-0.5 ml-10 px-2 py-1 rounded border border-dashed bg-muted/10">
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground"
       >
@@ -80,13 +91,17 @@ function MetadataRow({ message }: { message: ContextMessage }) {
 /** Dedicated viewer for _system_prompt — the most important context for debugging */
 function SystemPromptRow({ message }: { message: ContextMessage }) {
   const [expanded, setExpanded] = useState(false);
-  const content = typeof message.content === "string" ? message.content : String((message as Record<string, unknown>).content ?? "");
+  const content =
+    typeof message.content === "string"
+      ? message.content
+      : String((message as Record<string, unknown>).content ?? "");
   const charCount = content.length;
   const estimatedTokens = Math.round(charCount / 4);
 
   return (
     <div className="my-2 rounded-md border border-blue-500/30 bg-blue-500/5 px-3 py-2">
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-2 w-full text-left text-xs"
       >
@@ -95,7 +110,11 @@ function SystemPromptRow({ message }: { message: ContextMessage }) {
         <span className="text-[10px] text-muted-foreground font-mono">
           ~{estimatedTokens.toLocaleString()} tokens · {charCount.toLocaleString()} chars
         </span>
-        {expanded ? <ChevronDown size={11} className="ml-auto shrink-0" /> : <ChevronRight size={11} className="ml-auto shrink-0" />}
+        {expanded ? (
+          <ChevronDown size={11} className="ml-auto shrink-0" />
+        ) : (
+          <ChevronRight size={11} className="ml-auto shrink-0" />
+        )}
       </button>
       {expanded && (
         <div className="mt-2 max-h-[600px] overflow-auto text-xs text-muted-foreground">
@@ -104,14 +123,22 @@ function SystemPromptRow({ message }: { message: ContextMessage }) {
       )}
       {!expanded && content && (
         <div className="mt-1 truncate text-[11px] text-muted-foreground font-mono">
-          {content.slice(0, 120)}{content.length > 120 ? "…" : ""}
+          {content.slice(0, 120)}
+          {content.length > 120 ? "…" : ""}
         </div>
       )}
     </div>
   );
 }
 
-export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scrollToToolCallId, onScrollTargetConsumed, agentScope }: ContextViewerProps) {
+export function ContextViewer({
+  sessionId,
+  refreshKey = 0,
+  onNavigateToWire,
+  scrollToToolCallId,
+  onScrollTargetConsumed,
+  agentScope,
+}: ContextViewerProps) {
   const [allMessages, setAllMessages] = useState<ContextMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -138,7 +165,7 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
   }, [sessionId, refreshKey, agentScope]);
 
   const visibleMessages = useMemo(
-    () => showInternal ? allMessages : allMessages.filter((m) => !m.role.startsWith("_")),
+    () => (showInternal ? allMessages : allMessages.filter((m) => !m.role.startsWith("_"))),
     [allMessages, showInternal],
   );
 
@@ -169,20 +196,36 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
     visibleMessages.forEach((msg, idx) => {
       const parts = normalizeContent(msg.content);
       for (const p of parts) {
-        if (p.text && p.text.toLowerCase().includes(q)) { matches.push(idx); return; }
-        if (p.think && p.think.toLowerCase().includes(q)) { matches.push(idx); return; }
-        if (p.thinking && p.thinking.toLowerCase().includes(q)) { matches.push(idx); return; }
+        if (p.text?.toLowerCase().includes(q)) {
+          matches.push(idx);
+          return;
+        }
+        if (p.think?.toLowerCase().includes(q)) {
+          matches.push(idx);
+          return;
+        }
+        if (p.thinking?.toLowerCase().includes(q)) {
+          matches.push(idx);
+          return;
+        }
       }
       if (msg.tool_calls) {
         for (const tc of msg.tool_calls) {
-          if (tc.function.name.toLowerCase().includes(q) || tc.function.arguments.toLowerCase().includes(q)) {
-            matches.push(idx); return;
+          if (
+            tc.function.name.toLowerCase().includes(q) ||
+            tc.function.arguments.toLowerCase().includes(q)
+          ) {
+            matches.push(idx);
+            return;
           }
         }
       }
       if (msg.role === "tool") {
         const raw = JSON.stringify(msg.content).toLowerCase();
-        if (raw.includes(q)) { matches.push(idx); return; }
+        if (raw.includes(q)) {
+          matches.push(idx);
+          return;
+        }
       }
     });
     return matches;
@@ -192,19 +235,28 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
   useEffect(() => {
     setSearchNavIndex(0);
     if (searchMatchIndices.length > 0 && virtuosoRef.current) {
-      virtuosoRef.current.scrollToIndex({ index: searchMatchIndices[0], align: "center", behavior: "smooth" });
+      virtuosoRef.current.scrollToIndex({
+        index: searchMatchIndices[0],
+        align: "center",
+        behavior: "smooth",
+      });
     }
-  }, [searchQuery, searchMatchIndices]);
+  }, [searchMatchIndices]);
 
   const searchMatchSet = useMemo(() => new Set(searchMatchIndices), [searchMatchIndices]);
 
   const navigateSearch = (direction: "next" | "prev") => {
     if (searchMatchIndices.length === 0) return;
-    const next = direction === "next"
-      ? (searchNavIndex + 1) % searchMatchIndices.length
-      : (searchNavIndex - 1 + searchMatchIndices.length) % searchMatchIndices.length;
+    const next =
+      direction === "next"
+        ? (searchNavIndex + 1) % searchMatchIndices.length
+        : (searchNavIndex - 1 + searchMatchIndices.length) % searchMatchIndices.length;
     setSearchNavIndex(next);
-    virtuosoRef.current?.scrollToIndex({ index: searchMatchIndices[next], align: "center", behavior: "smooth" });
+    virtuosoRef.current?.scrollToIndex({
+      index: searchMatchIndices[next],
+      align: "center",
+      behavior: "smooth",
+    });
   };
 
   // Keyboard: / to focus search
@@ -214,7 +266,9 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (e.key === "/") {
         e.preventDefault();
-        const input = document.querySelector('input[placeholder="Search messages..."]') as HTMLInputElement | null;
+        const input = document.querySelector(
+          'input[placeholder="Search messages..."]',
+        ) as HTMLInputElement | null;
         input?.focus();
       }
     };
@@ -251,9 +305,7 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center text-destructive">
-        Error: {error}
-      </div>
+      <div className="flex h-full items-center justify-center text-destructive">Error: {error}</div>
     );
   }
 
@@ -273,7 +325,9 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
           {agentScope && (
             <div className="flex items-center gap-2 px-4 py-1 border-b bg-indigo-500/5 text-[11px] text-indigo-600 dark:text-indigo-400 shrink-0">
               <span className="font-medium">Sub-agent context</span>
-              <span className="font-mono text-[10px] text-muted-foreground">{agentScope.slice(0, 8)}</span>
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {agentScope.slice(0, 8)}
+              </span>
             </div>
           )}
           {/* Stats bar */}
@@ -281,6 +335,7 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
             <span className="shrink-0">{allMessages.length} messages</span>
             {internalCount > 0 && (
               <button
+                type="button"
                 onClick={() => setShowInternal(!showInternal)}
                 className="flex items-center gap-1 hover:text-foreground shrink-0"
               >
@@ -293,7 +348,10 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
 
             {/* Search */}
             <div className="relative flex-1 max-w-xs">
-              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Search
+                size={12}
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -312,6 +370,7 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
               />
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery("")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
@@ -326,10 +385,20 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
                     ? `${searchNavIndex + 1}/${searchMatchIndices.length}`
                     : "0 results"}
                 </span>
-                <button onClick={() => navigateSearch("prev")} className="p-0.5 hover:bg-muted rounded" title="Previous (Shift+Enter)">
+                <button
+                  type="button"
+                  onClick={() => navigateSearch("prev")}
+                  className="p-0.5 hover:bg-muted rounded"
+                  title="Previous (Shift+Enter)"
+                >
                   <ChevronUp size={12} />
                 </button>
-                <button onClick={() => navigateSearch("next")} className="p-0.5 hover:bg-muted rounded" title="Next (Enter)">
+                <button
+                  type="button"
+                  onClick={() => navigateSearch("next")}
+                  className="p-0.5 hover:bg-muted rounded"
+                  title="Next (Enter)"
+                >
                   <ChevronDown size={12} />
                 </button>
               </div>
@@ -337,22 +406,20 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
 
             <div className="ml-auto" />
             <button
+              type="button"
               onClick={() => setShowSpaceMap(!showSpaceMap)}
               className={`flex items-center gap-1 px-2 py-0.5 rounded transition-colors shrink-0 ${
-                showSpaceMap
-                  ? "bg-primary/10 text-foreground"
-                  : "hover:text-foreground"
+                showSpaceMap ? "bg-primary/10 text-foreground" : "hover:text-foreground"
               }`}
             >
               <BarChart3 size={11} />
               Space
             </button>
             <button
+              type="button"
               onClick={() => setRawMode(!rawMode)}
               className={`flex items-center gap-1 px-2 py-0.5 rounded transition-colors shrink-0 ${
-                rawMode
-                  ? "bg-primary/10 text-foreground"
-                  : "hover:text-foreground"
+                rawMode ? "bg-primary/10 text-foreground" : "hover:text-foreground"
               }`}
             >
               {rawMode ? <Code size={11} /> : <FileText size={11} />}
@@ -361,9 +428,16 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
           </div>
 
           {showSpaceMap && (
-            <ContextSpaceMap messages={allMessages} onScrollToIndex={(idx) => {
-              virtuosoRef.current?.scrollToIndex({ index: idx, align: "center", behavior: "smooth" });
-            }} />
+            <ContextSpaceMap
+              messages={allMessages}
+              onScrollToIndex={(idx) => {
+                virtuosoRef.current?.scrollToIndex({
+                  index: idx,
+                  align: "center",
+                  behavior: "smooth",
+                });
+              }}
+            />
           )}
 
           <Virtuoso
@@ -383,23 +457,15 @@ export function ContextViewer({ sessionId, refreshKey = 0, onNavigateToWire, scr
                   className={`px-4 py-1 ${isHighlighted ? "bg-blue-500/10 ring-1 ring-blue-500/30 rounded transition-all" : ""} ${isSearchMatch ? "bg-yellow-500/10" : ""}`}
                 >
                   {message.role === "user" && <UserMessage message={message} />}
-                  {message.role === "assistant" && (
-                    <AssistantMessage message={message} />
-                  )}
+                  {message.role === "assistant" && <AssistantMessage message={message} />}
                   {message.role === "tool" && <ToolMessage message={message} />}
-                  {message.role === "system" && (
-                    <SystemMessage message={message} />
-                  )}
-                  {message.role === "_system_prompt" && (
-                    <SystemPromptRow message={message} />
-                  )}
+                  {message.role === "system" && <SystemMessage message={message} />}
+                  {message.role === "_system_prompt" && <SystemPromptRow message={message} />}
                   {message.role.startsWith("_") && message.role !== "_system_prompt" && (
                     <MetadataRow message={message} />
                   )}
                   {!["user", "assistant", "tool", "system"].includes(message.role) &&
-                    !message.role.startsWith("_") && (
-                      <UnknownMessage message={message} />
-                    )}
+                    !message.role.startsWith("_") && <UnknownMessage message={message} />}
                 </div>
               );
             }}
@@ -419,6 +485,7 @@ function SystemMessage({ message }: { message: ContextMessage }) {
   return (
     <div className="my-2 rounded-md border border-dashed bg-muted/30 px-3 py-2">
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
@@ -444,7 +511,8 @@ function SystemMessage({ message }: { message: ContextMessage }) {
         </div>
       ) : (
         <div className="mt-1 truncate text-xs text-muted-foreground">
-          {preview}{text.length > 150 ? "..." : ""}
+          {preview}
+          {text.length > 150 ? "..." : ""}
         </div>
       )}
     </div>
@@ -457,6 +525,7 @@ function UnknownMessage({ message }: { message: ContextMessage }) {
   return (
     <div className="my-1 rounded-md border bg-muted/10 px-3 py-2">
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >

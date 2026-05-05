@@ -1,5 +1,5 @@
-import { matchesShortcut } from "@utils/shortcuts";
-import { useEffect } from "react";
+import { useCallback } from "react";
+import { useGlobalShortcut } from "@/hooks/useGlobalShortcut";
 
 type UsePanelShortcutsOptions = {
   toggleDebugPanelShortcut: string | null;
@@ -14,30 +14,26 @@ export function usePanelShortcuts({
   onToggleDebug,
   onToggleTerminal,
 }: UsePanelShortcutsOptions) {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat || event.defaultPrevented) {
-        return;
-      }
-      const target = event.target;
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable ||
-          target.closest("input, textarea, select, [contenteditable='true']"))
-      ) {
-        return;
-      }
-      if (matchesShortcut(event, toggleDebugPanelShortcut)) {
-        event.preventDefault();
-        onToggleDebug();
-        return;
-      }
-      if (matchesShortcut(event, toggleTerminalShortcut)) {
-        event.preventDefault();
-        onToggleTerminal();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onToggleDebug, onToggleTerminal, toggleDebugPanelShortcut, toggleTerminalShortcut]);
+  const handleDebug = useCallback(
+    (event: KeyboardEvent) => {
+      event.preventDefault();
+      onToggleDebug();
+    },
+    [onToggleDebug],
+  );
+
+  const handleTerminal = useCallback(
+    (event: KeyboardEvent) => {
+      event.preventDefault();
+      onToggleTerminal();
+    },
+    [onToggleTerminal],
+  );
+
+  useGlobalShortcut({
+    shortcuts: [
+      { shortcut: toggleDebugPanelShortcut, handler: handleDebug },
+      { shortcut: toggleTerminalShortcut, handler: handleTerminal },
+    ],
+  });
 }

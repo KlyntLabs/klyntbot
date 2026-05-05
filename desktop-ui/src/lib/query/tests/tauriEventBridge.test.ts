@@ -19,7 +19,10 @@ describe("tauriEventBridge", () => {
     const spy = vi.spyOn(client, "invalidateQueries");
     const { listen, fire } = fakeListenFactory();
 
-    const stop = await startTauriEventBridge(client, listen as any);
+    const stop = await startTauriEventBridge(
+      client,
+      listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+    );
     fire("entity:updated", { entityKind: "task", id: "t1" });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: qk.tasks.all() });
@@ -31,7 +34,10 @@ describe("tauriEventBridge", () => {
     const spy = vi.spyOn(client, "invalidateQueries");
     const { listen, fire } = fakeListenFactory();
 
-    const stop = await startTauriEventBridge(client, listen as any);
+    const stop = await startTauriEventBridge(
+      client,
+      listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+    );
     fire("focus:phase_changed", { phase: "break" });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: qk.focus.status() });
@@ -43,7 +49,10 @@ describe("tauriEventBridge", () => {
     const spy = vi.spyOn(client, "invalidateQueries");
     const { listen, fire } = fakeListenFactory();
 
-    const stop = await startTauriEventBridge(client, listen as any);
+    const stop = await startTauriEventBridge(
+      client,
+      listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+    );
     fire("entity:updated", { entityKind: "unknownKind", id: "x" });
 
     expect(spy).not.toHaveBeenCalled();
@@ -55,7 +64,10 @@ describe("tauriEventBridge", () => {
     const { listen, subs, fire } = fakeListenFactory();
     const spy = vi.spyOn(client, "invalidateQueries");
 
-    const stop = await startTauriEventBridge(client, listen as any);
+    const stop = await startTauriEventBridge(
+      client,
+      listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+    );
     expect(subs.size).toBeGreaterThan(0);
     stop();
     expect(subs.size).toBe(0);
@@ -69,7 +81,10 @@ it("chat:thread_created invalidates threads.list", async () => {
   const client = new QueryClient();
   const spy = vi.spyOn(client, "invalidateQueries");
   const { listen, fire } = fakeListenFactory();
-  const stop = await startTauriEventBridge(client, listen as any);
+  const stop = await startTauriEventBridge(
+    client,
+    listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+  );
   fire("chat:thread_created", { id: "t1" });
   expect(spy).toHaveBeenCalledWith({ queryKey: qk.threads.list() });
   stop();
@@ -79,7 +94,10 @@ it("chat:thread_updated invalidates threads.list", async () => {
   const client = new QueryClient();
   const spy = vi.spyOn(client, "invalidateQueries");
   const { listen, fire } = fakeListenFactory();
-  const stop = await startTauriEventBridge(client, listen as any);
+  const stop = await startTauriEventBridge(
+    client,
+    listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+  );
   fire("chat:thread_updated", { id: "t1" });
   expect(spy).toHaveBeenCalledWith({ queryKey: qk.threads.list() });
   stop();
@@ -89,7 +107,10 @@ it("chat:thread_deleted invalidates threads.all (covers list + byId)", async () 
   const client = new QueryClient();
   const spy = vi.spyOn(client, "invalidateQueries");
   const { listen, fire } = fakeListenFactory();
-  const stop = await startTauriEventBridge(client, listen as any);
+  const stop = await startTauriEventBridge(
+    client,
+    listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+  );
   fire("chat:thread_deleted", { id: "t1" });
   expect(spy).toHaveBeenCalledWith({ queryKey: qk.threads.all() });
   stop();
@@ -99,7 +120,10 @@ it("chat:message_added invalidates threads.list", async () => {
   const client = new QueryClient();
   const spy = vi.spyOn(client, "invalidateQueries");
   const { listen, fire } = fakeListenFactory();
-  const stop = await startTauriEventBridge(client, listen as any);
+  const stop = await startTauriEventBridge(
+    client,
+    listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+  );
   fire("chat:message_added", { sessionKey: "s1" });
   expect(spy).toHaveBeenCalledWith({ queryKey: qk.threads.list() });
   stop();
@@ -109,7 +133,10 @@ it("mcp:server_status invalidates system.mcpServers", async () => {
   const client = new QueryClient();
   const spy = vi.spyOn(client, "invalidateQueries");
   const { listen, fire } = fakeListenFactory();
-  const stop = await startTauriEventBridge(client, listen as any);
+  const stop = await startTauriEventBridge(
+    client,
+    listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+  );
   fire("mcp:server_status", { serverName: "x", status: "ready" });
   expect(spy).toHaveBeenCalledWith({ queryKey: qk.system.mcpServers() });
   stop();
@@ -119,7 +146,10 @@ it("mcp:startup_complete invalidates system.mcpServers", async () => {
   const client = new QueryClient();
   const spy = vi.spyOn(client, "invalidateQueries");
   const { listen, fire } = fakeListenFactory();
-  const stop = await startTauriEventBridge(client, listen as any);
+  const stop = await startTauriEventBridge(
+    client,
+    listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+  );
   fire("mcp:startup_complete", {});
   expect(spy).toHaveBeenCalledWith({ queryKey: qk.system.mcpServers() });
   stop();
@@ -129,7 +159,10 @@ it("score:updated invalidates launcher.dashboard", async () => {
   const client = new QueryClient();
   const spy = vi.spyOn(client, "invalidateQueries");
   const { listen, fire } = fakeListenFactory();
-  const stop = await startTauriEventBridge(client, listen as any);
+  const stop = await startTauriEventBridge(
+    client,
+    listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+  );
   fire("score:updated", { score: 0.8 });
   expect(spy).toHaveBeenCalledWith({ queryKey: qk.launcher.dashboard() });
   stop();
@@ -139,7 +172,10 @@ it("bucket:completed invalidates launcher.dashboard", async () => {
   const client = new QueryClient();
   const spy = vi.spyOn(client, "invalidateQueries");
   const { listen, fire } = fakeListenFactory();
-  const stop = await startTauriEventBridge(client, listen as any);
+  const stop = await startTauriEventBridge(
+    client,
+    listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+  );
   fire("bucket:completed", { bucket: "x" });
   expect(spy).toHaveBeenCalledWith({ queryKey: qk.launcher.dashboard() });
   stop();
@@ -149,7 +185,10 @@ it("focus:state_changed invalidates dndActive too", async () => {
   const client = new QueryClient();
   const spy = vi.spyOn(client, "invalidateQueries");
   const { listen, fire } = fakeListenFactory();
-  const stop = await startTauriEventBridge(client, listen as any);
+  const stop = await startTauriEventBridge(
+    client,
+    listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+  );
   fire("focus:state_changed", { state: "active" });
   expect(spy).toHaveBeenCalledWith({ queryKey: qk.launcher.dndActive() });
   stop();
@@ -161,7 +200,10 @@ describe("coding memory + data_version", () => {
     const spy = vi.spyOn(client, "invalidateQueries");
     const { listen, fire } = fakeListenFactory();
 
-    const stop = await startTauriEventBridge(client, listen as any);
+    const stop = await startTauriEventBridge(
+      client,
+      listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+    );
     fire("entity:updated", { entityKind: "codingFact", id: "fact-1" });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: qk.codingMemory.all() });
@@ -173,26 +215,38 @@ describe("coding memory + data_version", () => {
     const spy = vi.spyOn(client, "invalidateQueries");
     const { listen, fire } = fakeListenFactory();
 
-    const stop = await startTauriEventBridge(client, listen as any);
+    const stop = await startTauriEventBridge(
+      client,
+      listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+    );
     fire("entity:updated", { entityKind: "codingEpisode", id: "ep-1" });
 
     expect(spy).toHaveBeenCalledWith({ queryKey: qk.codingMemory.all() });
     stop();
   });
 
-  it("data:version_bumped triggers a broad invalidate (no key prefix)", async () => {
+  it("data:version_bumped invalidates core domain keys", async () => {
     const client = new QueryClient();
-    // Seed two unrelated queries so we can prove BOTH refetch.
-    client.setQueryData(qk.tasks.today(), [{ id: "t1" }]);
-    client.setQueryData(qk.codingMemory.facts(), [{ id: "f1" }]);
     const spy = vi.spyOn(client, "invalidateQueries");
     const { listen, fire } = fakeListenFactory();
 
-    const stop = await startTauriEventBridge(client, listen as any);
+    const stop = await startTauriEventBridge(
+      client,
+      listen as unknown as Parameters<typeof startTauriEventBridge>[1],
+    );
     fire("data:version_bumped", { previous: 41, current: 42 });
 
-    // Broad invalidate: called with no queryKey filter.
-    expect(spy).toHaveBeenCalledWith();
+    // Should invalidate the main domain keys rather than the entire cache.
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.threads.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.settings.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.tasks.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.focus.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.system.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.agents.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.models.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.git.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.dashboard.all() });
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.codingMemory.all() });
     stop();
   });
 });

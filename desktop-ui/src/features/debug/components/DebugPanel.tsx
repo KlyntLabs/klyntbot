@@ -89,21 +89,21 @@ export function DebugPanel({
   return (
     <section className={`debug-panel ${variant === "full" ? "full" : isOpen ? "open" : ""}`}>
       {variant !== "full" && isOpen && onResizeStart ? (
-        <div
+        <hr
           className="debug-panel-resizer"
-          role="separator"
           aria-orientation="horizontal"
           aria-label="Resize debug panel"
+          tabIndex={0}
           onMouseDown={onResizeStart}
         />
       ) : null}
       <div className="debug-header">
         <div className="debug-title">Debug</div>
         <div className="debug-actions">
-          <button className="ghost" onClick={onCopy}>
+          <button type="button" className="ghost" onClick={onCopy}>
             Copy
           </button>
-          <button className="ghost" onClick={onClear}>
+          <button type="button" className="ghost" onClick={onClear}>
             Clear
           </button>
         </div>

@@ -1,4 +1,5 @@
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import { useEffect } from "react";
 import type { TerminalTab } from "../hooks/useTerminalTabs";
 
 type TerminalDockProps = {
@@ -22,6 +23,9 @@ export function TerminalDock({
   onResizeStart,
   terminalNode,
 }: TerminalDockProps) {
+  useEffect(() => {
+    import("@/styles/terminal.css");
+  }, []);
   if (!isOpen) {
     return null;
   }
@@ -29,10 +33,9 @@ export function TerminalDock({
   return (
     <section className="terminal-panel">
       {onResizeStart && (
-        <div
+        <button
+          type="button"
           className="terminal-panel-resizer"
-          role="separator"
-          aria-orientation="horizontal"
           aria-label="Resize terminal panel"
           onMouseDown={onResizeStart}
         />
@@ -40,18 +43,24 @@ export function TerminalDock({
       <div className="terminal-header">
         <div className="terminal-tabs" role="tablist" aria-label="Terminal tabs">
           {terminals.map((tab) => (
-            <button
+            <div
               key={tab.id}
               className={`terminal-tab${tab.id === activeTerminalId ? " active" : ""}`}
-              type="button"
               role="tab"
+              tabIndex={0}
               aria-selected={tab.id === activeTerminalId}
               onClick={() => onSelectTerminal(tab.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectTerminal(tab.id);
+                }
+              }}
             >
               <span className="terminal-tab-label">{tab.title}</span>
-              <span
+              <button
+                type="button"
                 className="terminal-tab-close"
-                role="button"
                 aria-label={`Close ${tab.title}`}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -59,8 +68,8 @@ export function TerminalDock({
                 }}
               >
                 ×
-              </span>
-            </button>
+              </button>
+            </div>
           ))}
           <button
             className="terminal-tab-add"

@@ -10,7 +10,7 @@ export function CausalGraphInspector({ factIds }: Props) {
   useEffect(() => {
     if (factIds.length === 0) return;
     fetchRecallFacts(factIds).then((data) => {
-      if (Array.isArray(data)) setFacts(data as any[]);
+      if (Array.isArray(data)) setFacts(data as Array<Record<string, unknown>>);
     });
   }, [factIds]);
 
@@ -22,8 +22,8 @@ export function CausalGraphInspector({ factIds }: Props) {
     <section className="cm-causal" aria-label="Causal graph">
       <h4 className="cm-causal__title">Causal Graph ({facts.length} facts)</h4>
       <ul className="cm-causal__list">
-        {facts.map((f, i) => (
-          <li key={i} className="cm-causal__row">
+        {facts.map((f) => (
+          <li key={JSON.stringify(f)} className="cm-causal__row">
             <span className="cm-causal__subject">{String(f.subject ?? "?")}</span>
             <span className="cm-causal__arrow">→</span>
             <span className="cm-causal__predicate">{String(f.predicate ?? "?")}</span>

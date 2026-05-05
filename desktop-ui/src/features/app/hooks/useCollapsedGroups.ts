@@ -2,9 +2,6 @@ import { useCallback, useState } from "react";
 
 export function useCollapsedGroups(storageKey: string) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") {
-      return new Set();
-    }
     const raw = window.localStorage.getItem(storageKey);
     if (!raw) {
       return new Set();
@@ -22,9 +19,6 @@ export function useCollapsedGroups(storageKey: string) {
 
   const persistCollapsedGroups = useCallback(
     (next: Set<string>) => {
-      if (typeof window === "undefined") {
-        return;
-      }
       window.localStorage.setItem(storageKey, JSON.stringify(Array.from(next)));
     },
     [storageKey],

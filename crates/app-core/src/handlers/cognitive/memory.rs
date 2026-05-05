@@ -447,11 +447,7 @@ impl AppCore {
             }
             "rule" => {
                 let rule_repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
-                let all_rules = rule_repo
-                    .list_all_active()
-                    .await
-                    .map_err(map_cognitive_err)?;
-                match all_rules.iter().find(|r| r.id == ref_id) {
+                match rule_repo.find_by_id(ref_id).await.map_err(map_cognitive_err)? {
                     Some(r) => {
                         let mut details = HashMap::new();
                         details.insert("Domain".to_string(), r.domain.clone());
@@ -509,11 +505,13 @@ impl AppCore {
                 Ok(Some(note)) => {
                     let tags = self.note_repo.get_tags(ref_id).await.unwrap_or_default();
                     let notebook_name = if let Some(ref nb_id) = note.notebook_id {
-                        self.note_repo.list_notebooks().await.ok().and_then(|nbs| {
-                            nbs.into_iter()
-                                .find(|nb| &nb.id == nb_id)
-                                .map(|nb| nb.title)
-                        })
+                        sqlx::query_as::<_, (String,)>("SELECT title FROM notebooks WHERE id = ?1")
+                            .bind(nb_id)
+                            .fetch_optional(self.note_repo.pool())
+                            .await
+                            .ok()
+                            .flatten()
+                            .map(|r| r.0)
                     } else {
                         None
                     };

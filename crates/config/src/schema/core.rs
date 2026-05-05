@@ -319,6 +319,7 @@ impl Config {
             ("moonshot", &self.providers.moonshot),
             ("minimax", &self.providers.minimax),
             ("aihubmix", &self.providers.aihubmix),
+            ("mimo", &self.providers.mimo),
         ]
     }
 
@@ -368,6 +369,7 @@ impl Config {
             "moonshot" => self.providers.moonshot.api_key = secret,
             "minimax" => self.providers.minimax.api_key = secret,
             "aihubmix" => self.providers.aihubmix.api_key = secret,
+            "mimo" => self.providers.mimo.api_key = secret,
             _ => {
                 tracing::warn!(
                     provider = provider_name,

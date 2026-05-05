@@ -57,6 +57,7 @@ export function buildPrimaryNodes(options: PrimaryLayoutNodesOptions): PrimaryLa
     <>
       {options.desktopTopbarProps.showBackToChat && (
         <button
+          type="button"
           className="icon-button back-button"
           onClick={options.desktopTopbarProps.onExitDiff}
           aria-label="Back to chat"

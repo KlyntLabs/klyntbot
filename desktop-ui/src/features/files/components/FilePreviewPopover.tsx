@@ -2,9 +2,19 @@ import { OpenAppMenu } from "@app/components/OpenAppMenu";
 import { highlightLine, languageFromPath } from "@utils/syntax";
 import X from "lucide-react/dist/esm/icons/x";
 import type { CSSProperties, MouseEvent } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { PopoverSurface } from "@/features/design-system/components/popover/PopoverPrimitives";
 import type { OpenAppTarget } from "@/types";
+
+function SafeHtmlSpan({ html, className }: { html: string; className?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.innerHTML = html;
+    }
+  }, [html]);
+  return <span ref={ref} className={className} />;
+}
 
 type FilePreviewPopoverProps = {
   path: string;
@@ -128,7 +138,7 @@ export function FilePreviewPopover({
             <div className="file-preview-selection-group">
               <span className="file-preview-selection">{selectionLabel}</span>
               {selectionHints.length > 0 ? (
-                <div className="file-preview-hints" aria-label="Selection hints">
+                <div className="file-preview-hints">
                   {selectionHints.map((hint) => (
                     <span key={hint} className="file-preview-hint">
                       {hint}
@@ -163,33 +173,34 @@ export function FilePreviewPopover({
               </button>
             </div>
           </div>
-          <div className="file-preview-lines" role="list">
-            {lines.map((_, index) => {
-              const html = highlightedLines[index] ?? "&nbsp;";
-              const isSelected = selection && index >= selection.start && index <= selection.end;
-              const isStart = isSelected && selection?.start === index;
-              const isEnd = isSelected && selection?.end === index;
-              return (
-                <button
-                  key={`line-${index}`}
-                  type="button"
-                  className={`file-preview-line${
-                    isSelected ? " is-selected" : ""
-                  }${isStart ? " is-start" : ""}${isEnd ? " is-end" : ""}`}
-                  onClick={(event) => onSelectLine(index, event)}
-                  onMouseDown={(event) => onLineMouseDown?.(index, event)}
-                  onMouseEnter={(event) => onLineMouseEnter?.(index, event)}
-                  onMouseUp={(event) => onLineMouseUp?.(index, event)}
-                >
-                  <span className="file-preview-line-number">{index + 1}</span>
-                  <span
-                    className="file-preview-line-text"
-                    dangerouslySetInnerHTML={{ __html: html || "&nbsp;" }}
-                  />
-                </button>
-              );
-            })}
-          </div>
+          <ol className="file-preview-lines">
+            {(() => {
+              const lineButtons: React.ReactElement[] = [];
+              for (let index = 0; index < lines.length; index++) {
+                const html = highlightedLines[index] ?? "&nbsp;";
+                const isSelected = selection && index >= selection.start && index <= selection.end;
+                const isStart = isSelected && selection?.start === index;
+                const isEnd = isSelected && selection?.end === index;
+                lineButtons.push(
+                  <button
+                    key={`line-${index + 1}`}
+                    type="button"
+                    className={`file-preview-line${
+                      isSelected ? " is-selected" : ""
+                    }${isStart ? " is-start" : ""}${isEnd ? " is-end" : ""}`}
+                    onClick={(event) => onSelectLine(index, event)}
+                    onMouseDown={(event) => onLineMouseDown?.(index, event)}
+                    onMouseEnter={(event) => onLineMouseEnter?.(index, event)}
+                    onMouseUp={(event) => onLineMouseUp?.(index, event)}
+                  >
+                    <span className="file-preview-line-number">{index + 1}</span>
+                    <SafeHtmlSpan className="file-preview-line-text" html={html || "&nbsp;"} />
+                  </button>,
+                );
+              }
+              return lineButtons;
+            })()}
+          </ol>
         </div>
       )}
     </PopoverSurface>

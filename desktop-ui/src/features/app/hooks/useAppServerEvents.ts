@@ -1,4 +1,8 @@
-import { subscribeAppServerEvents, subscribeApprovalRequest, subscribeCostUpdate } from "@services/events";
+import {
+  subscribeApprovalRequest,
+  subscribeAppServerEvents,
+  subscribeCostUpdate,
+} from "@services/events";
 import type { SupportedAppServerMethod } from "@utils/appServerEvents";
 import {
   getAppServerParams,

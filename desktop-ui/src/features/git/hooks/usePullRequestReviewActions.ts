@@ -36,7 +36,7 @@ type UsePullRequestReviewActionsOptions = {
     threadId: string,
     text: string,
     images?: string[],
-  ) => Promise<void | SendMessageResult>;
+  ) => Promise<undefined | SendMessageResult>;
 };
 
 type RunPullRequestReviewOptions = {

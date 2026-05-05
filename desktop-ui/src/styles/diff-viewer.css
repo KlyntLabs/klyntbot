@@ -558,6 +558,19 @@
   background: var(--border-accent);
 }
 
+.diff-gutter {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  color: var(--text-fainter);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-line-hunk .diff-gutter {
+  color: var(--text-dim);
+}
+
 .diff-line.is-selected .diff-gutter {
   color: var(--text-strong);
 }
@@ -576,15 +589,6 @@
 
 .diff-line.is-selectable:focus-visible {
   outline: none;
-}
-
-.diff-gutter {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  color: var(--text-fainter);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
 }
 
 .diff-line-number {
@@ -707,10 +711,6 @@
 .diff-line-hunk {
   background: var(--surface-card-muted);
   color: var(--text-subtle);
-}
-
-.diff-line-hunk .diff-gutter {
-  color: var(--text-dim);
 }
 
 .diff-line-add {
@@ -879,6 +879,12 @@
   gap: 16px;
 }
 
+.image-diff-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .image-diff-single {
   display: flex;
   justify-content: center;
@@ -886,12 +892,6 @@
 
 .image-diff-single .image-diff-pane {
   max-width: 50%;
-}
-
-.image-diff-pane {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
 
 .image-diff-preview {

@@ -40,32 +40,32 @@ describe("useSlashCommands", () => {
 
   test("dispatch direct invokes Tauri command", async () => {
     const { result } = renderHook(() => useSlashCommands());
-    let res: any;
+    let res: { kind: string; itemKind?: string; text?: string } | undefined;
     await act(async () => {
       res = await result.current.dispatch("/skills list", "session-1");
     });
-    expect(res.kind).toBe("render");
-    expect(res.itemKind).toBe("system");
+    expect(res?.kind).toBe("render");
+    expect(res?.itemKind).toBe("system");
   });
 
   test("dispatch agent-routed returns passthrough", async () => {
     const { result } = renderHook(() => useSlashCommands());
-    let res: any;
+    let res: { kind: string; itemKind?: string; text?: string } | undefined;
     await act(async () => {
       res = await result.current.dispatch("/plan refactor", "session-1");
     });
-    expect(res.kind).toBe("passthrough");
-    expect(res.text).toContain("[system: enter plan mode]");
+    expect(res?.kind).toBe("passthrough");
+    expect(res?.text).toContain("[system: enter plan mode]");
   });
 
   test("dispatch unknown returns passthrough with original text", async () => {
     const { result } = renderHook(() => useSlashCommands());
-    let res: any;
+    let res: { kind: string; itemKind?: string; text?: string } | undefined;
     await act(async () => {
       res = await result.current.dispatch("/foobar abc", "session-1");
     });
-    expect(res.kind).toBe("passthrough");
-    expect(res.text).toBe("/foobar abc");
+    expect(res?.kind).toBe("passthrough");
+    expect(res?.text).toBe("/foobar abc");
   });
 
   test("catalog returns flatCatalog", () => {

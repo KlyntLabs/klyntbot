@@ -8,8 +8,9 @@ interface Props {
 export function EffectivenessTrendsChart({ patternId }: Props) {
   const [buckets, setBuckets] = useState<Array<{ at: string; score: number }>>([]);
   useEffect(() => {
-    fetchEffectivenessTrends(patternId).then((data: any) => {
-      if (data?.buckets) setBuckets(data.buckets);
+    fetchEffectivenessTrends(patternId).then((data: unknown) => {
+      const trends = data as { buckets?: Array<{ at: string; score: number }> } | undefined;
+      if (trends?.buckets) setBuckets(trends.buckets);
     });
   }, [patternId]);
 
@@ -30,8 +31,9 @@ export function EffectivenessTrendsChart({ patternId }: Props) {
     .join(" ");
 
   return (
-    <div className="cm-sparkline" aria-label="Effectiveness trend">
-      <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h}>
+    <div className="cm-sparkline">
+      <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} aria-label="Effectiveness trend">
+        <title>Effectiveness trend</title>
         <polyline
           fill="none"
           stroke="var(--ds-border-accent-soft)"

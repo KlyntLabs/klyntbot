@@ -175,6 +175,7 @@ impl ContextEngine {
         channel: &str,
         chat_id: &str,
         message: Option<&str>,
+        session_mode: common::SessionMode,
     ) -> String {
         if self.sources.is_empty() {
             return String::new();
@@ -186,6 +187,7 @@ impl ContextEngine {
             message: message.map(|s| s.to_string()),
             intent_summary: None,
             project_id: None,
+            session_mode,
         };
 
         let futures: Vec<_> = self.sources.iter().map(|s| s.provide(&ctx)).collect();
@@ -1243,6 +1245,7 @@ mod tests {
             message: None,
             intent_summary: None,
             project_id: None,
+            session_mode: common::SessionMode::Assistant,
         }
     }
 

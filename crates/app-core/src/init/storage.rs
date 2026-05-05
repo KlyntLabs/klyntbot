@@ -92,84 +92,56 @@ pub(super) async fn init_storage(
     }
     info!("storage connected");
 
+    macro_rules! run_migration {
+        ($name:expr, $migrations:expr) => {
+            StoragePool::run_feature_migrations(storage_pool.inner(), &$migrations)
+                .await
+                .map_err(|e| format!(concat!($name, " migration failed: {}"), e))?
+        };
+    }
+
     // Run notes feature migrations and create repo.
     let notes_pool = storage_pool.inner().clone();
-    StoragePool::run_feature_migrations(&notes_pool, &feature_notes::notes_migrations())
-        .await
-        .map_err(|e| format!("notes migration failed: {e}"))?;
+    run_migration!("notes", feature_notes::notes_migrations());
     let note_repo = NoteRepo::new(notes_pool);
 
     // Run tasks feature migrations.
     let tasks_feature = feature_tasks::TasksFeature::new();
-    StoragePool::run_feature_migrations(storage_pool.inner(), &tasks_feature.migrations())
-        .await
-        .map_err(|e| format!("tasks migration failed: {e}"))?;
+    run_migration!("tasks", tasks_feature.migrations());
 
     // Run scheduling feature migrations (Phase 2: scheduled_fires table).
-    StoragePool::run_feature_migrations(
-        storage_pool.inner(),
-        &[tools_core::FeatureMigration {
-            feature_name: "scheduling".to_string(),
-            version: 1,
-            description: "Create scheduled_fires table".to_string(),
-            sql: include_str!("../../../scheduling/migrations/001_scheduled_fires.sql").to_string(),
-        }],
-    )
-    .await
-    .map_err(|e| format!("scheduling migration failed: {e}"))?;
+    run_migration!("scheduling", [tools_core::FeatureMigration {
+        feature_name: "scheduling".to_string(),
+        version: 1,
+        description: "Create scheduled_fires table".to_string(),
+        sql: include_str!("../../../scheduling/migrations/001_scheduled_fires.sql").to_string(),
+    }]);
 
     // Run language-learning feature migrations.
-    StoragePool::run_feature_migrations(
-        storage_pool.inner(),
-        &feature_language_learning::language_learning_migrations(),
-    )
-    .await
-    .map_err(|e| format!("language-learning migration failed: {e}"))?;
+    run_migration!("language-learning", feature_language_learning::language_learning_migrations());
 
     // Run finance feature migrations.
-    StoragePool::run_feature_migrations(
-        storage_pool.inner(),
-        &feature_finance::finance_migrations(),
-    )
-    .await
-    .map_err(|e| format!("finance migration failed: {e}"))?;
+    run_migration!("finance", feature_finance::finance_migrations());
 
     // Run focus feature migrations (DND sessions).
-    StoragePool::run_feature_migrations(
-        storage_pool.inner(),
-        &<feature_focus::FocusFeature as tools_core::FeaturePackage>::migrations(
-            &feature_focus::FocusFeature,
-        ),
-    )
-    .await
-    .map_err(|e| format!("focus migration failed: {e}"))?;
+    run_migration!("focus", <feature_focus::FocusFeature as tools_core::FeaturePackage>::migrations(
+        &feature_focus::FocusFeature,
+    ));
 
     // Run learning feature migrations (placeholder in v3; tables live in cognitive).
-    StoragePool::run_feature_migrations(
-        storage_pool.inner(),
-        &<feature_learning::LearningFeature as tools_core::FeaturePackage>::migrations(
-            &feature_learning::LearningFeature::default(),
-        ),
-    )
-    .await
-    .map_err(|e| format!("learning migration failed: {e}"))?;
+    run_migration!("learning", <feature_learning::LearningFeature as tools_core::FeaturePackage>::migrations(
+        &feature_learning::LearningFeature::default(),
+    ));
 
     // Run cognitive migrations up-front so downstream crates (coding-memory) can
     // ALTER their tables. Cognitive migrations are idempotent; the agent builder
     // also invokes them later without conflict.
-    StoragePool::run_feature_migrations(storage_pool.inner(), &cognitive::cognitive_migrations())
-        .await
-        .map_err(|e| format!("cognitive migration failed: {e}"))?;
+    run_migration!("cognitive", cognitive::cognitive_migrations());
 
     // Run coding-memory migrations (scope/provenance columns on semantic_facts,
     // episodic_memories, skill_versions; causal-edge / ingest-log / klynt_sessions
     // tables). Must run AFTER cognitive migrations create the base tables.
-    StoragePool::run_feature_migrations(
-        storage_pool.inner(),
-        &coding_memory::coding_memory_migrations(),
-    )
-    .await
-    .map_err(|e| format!("coding-memory migration failed: {e}"))?;
+    run_migration!("coding-memory", coding_memory::coding_memory_migrations());
 
     // 3. Create LLM provider (graceful — falls back to noop for setup wizard).
     // Use the "full" variant to get the inner ProviderManager (when a fallback is configured)

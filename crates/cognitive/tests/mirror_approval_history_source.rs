@@ -6,7 +6,7 @@ use tools_core::events::ToolEvent;
 #[tokio::test]
 async fn records_resolved_approval_into_history_repo() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    let repo = CodingApprovalHistoryRepo::new(pool.clone());
+    let repo = CodingApprovalHistoryRepo::new(pool.inner().clone());
     let source = ApprovalHistorySource::new(repo.clone());
 
     // Synthesize a paired ApprovalRequested + ApprovalResolved as a fake stream

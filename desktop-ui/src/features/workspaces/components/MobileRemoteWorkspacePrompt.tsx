@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
 
 type MobileRemoteWorkspacePromptProps = {
@@ -21,7 +21,7 @@ export function MobileRemoteWorkspacePrompt({
   onConfirm,
 }: MobileRemoteWorkspacePromptProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const focusTextareaAtEnd = () => {
+  const focusTextareaAtEnd = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) {
       return;
@@ -29,11 +29,11 @@ export function MobileRemoteWorkspacePrompt({
     textarea.focus();
     const end = textarea.value.length;
     textarea.setSelectionRange(end, end);
-  };
+  }, []);
 
   useEffect(() => {
     focusTextareaAtEnd();
-  }, []);
+  }, [focusTextareaAtEnd]);
 
   return (
     <ModalShell

@@ -104,8 +104,8 @@ describe("useCollaborationModes", () => {
 
   it("accepts alternate response shapes from the backend", async () => {
     vi.mocked(getCollaborationModes)
-      .mockResolvedValueOnce(makeModesResponseArrayResult() as any)
-      .mockResolvedValueOnce(makeModesResponseTopLevelArray() as any);
+      .mockResolvedValueOnce(makeModesResponseArrayResult())
+      .mockResolvedValueOnce(makeModesResponseTopLevelArray());
 
     const { result, rerender } = renderHook(
       ({ workspace }: { workspace: WorkspaceInfo | null }) =>

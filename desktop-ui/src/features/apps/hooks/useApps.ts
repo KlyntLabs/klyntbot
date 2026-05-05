@@ -13,10 +13,11 @@ export function useApps({ activeWorkspace, activeThreadId }: UseAppsArgs) {
 
   const query = useTauriQuery<AppOption[]>({
     queryKey: qk.apps.list(workspaceId, activeThreadId),
+    staleTime: 60_000,
     queryFn: async () => {
       if (!activeWorkspace) return [];
       const list = await getAppsList(activeWorkspace.id, null, 100, activeThreadId);
-      return list.filter((a: any) => Boolean(a.id) && Boolean(a.name));
+      return list.filter((a) => Boolean(a.id) && Boolean(a.name));
     },
     fallback: [],
     enabled: activeWorkspace !== null,

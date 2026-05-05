@@ -238,13 +238,6 @@
   position: relative;
 }
 
-.composer-attachment:hover .composer-attachment-preview,
-.composer-attachment:focus-within .composer-attachment-preview {
-  opacity: 1;
-  transform: translate(-50%, -6px) scale(1);
-  pointer-events: auto;
-}
-
 .composer-attachment-preview {
   position: absolute;
   left: 50%;
@@ -265,14 +258,21 @@
   z-index: 20;
 }
 
-.workspace-home .composer-attachment:hover .composer-attachment-preview,
-.workspace-home .composer-attachment:focus-within .composer-attachment-preview {
-  transform: translate(-50%, 6px) scale(1);
-}
-
 .workspace-home .composer-attachment-preview {
   top: calc(100% + 8px);
   bottom: auto;
+}
+
+.composer-attachment:hover .composer-attachment-preview,
+.composer-attachment:focus-within .composer-attachment-preview {
+  opacity: 1;
+  transform: translate(-50%, -6px) scale(1);
+  pointer-events: auto;
+}
+
+.workspace-home .composer-attachment:hover .composer-attachment-preview,
+.workspace-home .composer-attachment:focus-within .composer-attachment-preview {
+  transform: translate(-50%, 6px) scale(1);
 }
 
 .composer-attachment-preview img {
@@ -391,16 +391,23 @@
   color: var(--text-strong);
 }
 
-:root[data-theme="light"] .composer-action:hover {
-  color: var(--text-strong);
-}
-
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) .composer-action {
     border-color: var(--border-strong);
     color: var(--text-strong);
   }
+}
 
+.composer-action:hover {
+  background: var(--cm-surface-panel-solid);
+  color: var(--text-strong);
+}
+
+:root[data-theme="light"] .composer-action:hover {
+  color: var(--text-strong);
+}
+
+@media (prefers-color-scheme: light) {
   :root:not([data-theme]) .composer-action:hover {
     color: var(--text-strong);
   }

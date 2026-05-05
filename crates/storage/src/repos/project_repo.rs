@@ -271,25 +271,14 @@ impl ProjectRepo {
             None => return Ok(None),
         };
 
-        let mut stats = ProjectWithStats {
+        let summary = super::compute_summary(&counts);
+        Ok(Some(ProjectWithStats {
             project,
-            task_count_todo: 0,
-            task_count_doing: 0,
-            task_count_done: 0,
-            task_count_total: 0,
-        };
-
-        for (status, count) in &counts {
-            match status.as_str() {
-                "todo" => stats.task_count_todo = *count,
-                "doing" => stats.task_count_doing = *count,
-                "done" => stats.task_count_done = *count,
-                _ => {}
-            }
-            stats.task_count_total += count;
-        }
-
-        Ok(Some(stats))
+            task_count_todo: summary.todo,
+            task_count_doing: summary.doing,
+            task_count_done: summary.done,
+            task_count_total: summary.total,
+        }))
     }
 }
 

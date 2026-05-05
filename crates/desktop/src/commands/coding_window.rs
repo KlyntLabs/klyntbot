@@ -1,8 +1,7 @@
 //! Tauri command for opening per-repo coding windows.
 
-use crate::lazy_window::{get_or_create_window, parse_coding_label};
+use crate::lazy_window::get_or_create_window;
 use desktop_macros::klynt_raw_command;
-use tauri::Manager;
 
 /// Open a coding window for a specific repo.
 ///

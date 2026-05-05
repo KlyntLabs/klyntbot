@@ -98,7 +98,7 @@ pub async fn run_compaction(
 
     // 7. Clean old session memory entries
     if let Some(sm) = session_mem_repo {
-        match sm.delete_older_than(SESSION_MEMORY_MAX_DAYS).await {
+        match sm.delete_older_than(SESSION_MEMORY_MAX_DAYS, jiff::Timestamp::now()).await {
             Ok(deleted) => {
                 result.session_memory_deleted = deleted;
                 if deleted > 0 {
