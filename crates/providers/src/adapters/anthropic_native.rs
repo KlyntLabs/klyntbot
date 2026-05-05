@@ -83,10 +83,7 @@ fn resolve_breakpoints(
                     // Convert original index to wire index by counting system
                     // messages at or before this position (they're stripped from
                     // the wire messages array).
-                    let system_offset = messages[..=*n]
-                        .iter()
-                        .filter(|m| m.is_system())
-                        .count();
+                    let system_offset = messages[..=*n].iter().filter(|m| m.is_system()).count();
                     let wire_idx = n.saturating_sub(system_offset);
                     out.push(ResolvedMarker {
                         section: SECTION_MESSAGES,

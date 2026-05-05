@@ -31,6 +31,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut cost: Option<String> = None;
     let mut concurrency_safe: Option<bool> = None;
     let mut allowed_channels: Option<String> = None;
+    let mut custom_timeout_secs: Option<u64> = None;
 
     for attr in &input.attrs {
         if attr.path().is_ident("tool") {
@@ -96,6 +97,14 @@ pub fn derive(input: TokenStream) -> TokenStream {
                                     allowed_channels = Some(s.value());
                                 }
                             }
+                        } else if nv.path.is_ident("custom_timeout_secs") {
+                            if let syn::Expr::Lit(lit) = &nv.value {
+                                if let Lit::Str(s) = &lit.lit {
+                                    custom_timeout_secs = Some(s.value().parse().unwrap_or_else(|_| {
+                                        panic!("#[tool(custom_timeout_secs = \"...\")] must be a valid integer")
+                                    }));
+                                }
+                            }
                         }
                     }
                 }
@@ -159,6 +168,16 @@ pub fn derive(input: TokenStream) -> TokenStream {
         quote! {}
     };
 
+    let custom_timeout_impl = if let Some(secs) = custom_timeout_secs {
+        quote! {
+            fn custom_timeout(&self) -> Option<::std::time::Duration> {
+                Some(::std::time::Duration::from_secs(#secs))
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let expanded = quote! {
         #[::async_trait::async_trait]
         impl ::tools_core::Tool for #name {
@@ -187,6 +206,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
             #metadata_impl
             #concurrency_impl
             #allowed_channels_impl
+            #custom_timeout_impl
         }
     };
 

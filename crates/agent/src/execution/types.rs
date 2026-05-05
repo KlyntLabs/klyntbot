@@ -157,6 +157,42 @@ pub fn accumulate_usage(total: &mut Usage, cycle: &Usage) {
     total.cache_write_tokens += cycle.cache_write_tokens;
 }
 
+/// Why an `execute_loop` invocation terminated.
+///
+/// `Completed` is the success path — the model returned a final response with no tool calls.
+/// `Cancelled` indicates user-initiated abort via `CancellationToken`.
+/// `SafetyTurnLimit` / `TokenLimit` are silent backstops; hitting one is logged at `error!` for
+/// user-facing agents and at `warn!` for subagents (where caps are intentional capability tiers).
+/// `LoopDetected` comes from `LoopDetector::HardStop` — repeated identical tool signatures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LoopFinishReason {
+    Completed,
+    Cancelled,
+    SafetyTurnLimit,
+    TokenLimit,
+    LoopDetected,
+}
+
+impl LoopFinishReason {
+    /// Stable wire string. Kept stable for telemetry consumers (analytics, mirror).
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::Completed => "completed",
+            Self::Cancelled => "cancelled",
+            Self::SafetyTurnLimit => "safety_turn_limit_reached",
+            Self::TokenLimit => "token_limit_reached",
+            Self::LoopDetected => "loop_detected",
+        }
+    }
+}
+
+impl std::fmt::Display for LoopFinishReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_wire_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,5 +280,26 @@ mod tests {
         let queue = std::sync::Arc::new(bus::ContextUpdateQueue::new());
         let params = ExecutionParams::new("mock", 128_000).with_context_update_queue(queue);
         assert!(params.context_update_queue.is_some());
+    }
+
+    #[test]
+    fn finish_reason_wire_strings_are_stable() {
+        assert_eq!(LoopFinishReason::Completed.as_wire_str(), "completed");
+        assert_eq!(LoopFinishReason::Cancelled.as_wire_str(), "cancelled");
+        assert_eq!(
+            LoopFinishReason::SafetyTurnLimit.as_wire_str(),
+            "safety_turn_limit_reached"
+        );
+        assert_eq!(
+            LoopFinishReason::TokenLimit.as_wire_str(),
+            "token_limit_reached"
+        );
+        assert_eq!(LoopFinishReason::LoopDetected.as_wire_str(), "loop_detected");
+    }
+
+    #[test]
+    fn finish_reason_serializes_snake_case() {
+        let json = serde_json::to_string(&LoopFinishReason::SafetyTurnLimit).unwrap();
+        assert_eq!(json, "\"safety_turn_limit\"");
     }
 }

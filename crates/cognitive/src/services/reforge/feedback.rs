@@ -166,7 +166,7 @@ pub async fn load_runtime_signals(
 ) -> super::types::RuntimeSignalSummary {
     let row: Option<(i64, f64, i64, f64)> = sqlx::query_as(
         "SELECT
-            COALESCE(SUM(CASE WHEN budget_exhausted = 1 THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN safety_cap_hit = 1 THEN 1 ELSE 0 END), 0),
             COALESCE(AVG(turns_used), 0),
             COALESCE(SUM(CASE WHEN loop_detected = 1 THEN 1 ELSE 0 END), 0),
             COALESCE(AVG(context_fill_pct), 0)

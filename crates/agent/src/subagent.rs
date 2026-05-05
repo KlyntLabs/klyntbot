@@ -600,7 +600,7 @@ async fn run_subagent_task(
         tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>,
     >,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
-    use crate::execution::budget::{DepthMode, ExecutionBudget};
+    use crate::execution::budget::{DepthMode, SafetyCap};
     use crate::execution::core::ExecutionCore;
     use crate::execution::execute_loop::execute_loop;
     use crate::execution::types::ExecutionParams;
@@ -670,8 +670,8 @@ async fn run_subagent_task(
     routing_ctx.hook_engine = hook_engine;
     routing_ctx.session_key = Some(session_key.into());
 
-    // Execute via unified execute loop with a fixed budget
-    let mut budget = ExecutionBudget::with_limits(
+    // Execute via unified execute loop with a fixed safety cap
+    let mut budget = SafetyCap::with_limits(
         DepthMode::Normal,
         120_000, // generous token budget for subagents
         profile.max_iterations(),

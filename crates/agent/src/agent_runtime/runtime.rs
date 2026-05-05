@@ -15,7 +15,7 @@ use tracing::warn;
 
 use crate::autotuner::hooks::AutoTunerHook;
 use crate::events::AgentEvent;
-use crate::execution::{execute_loop, DepthMode, ExecutionBudget, ExecutionParams};
+use crate::execution::{execute_loop, DepthMode, ExecutionParams, SafetyCap};
 use crate::output::cost_tracker::CostTracker;
 use crate::output::validator::{ResponseValidator, ValidationResult};
 
@@ -36,7 +36,7 @@ pub struct RuntimeResult {
     pub validation: ValidationResult,
     pub agent_name: String,
     pub turns: u32,
-    pub budget_exhausted: bool,
+    pub safety_cap_hit: bool,
     pub tool_calls: Vec<String>,
 }
 
@@ -485,8 +485,8 @@ impl AgentRuntime {
             self.emit_learning_summary(tx).await;
         }
 
-        // Create budget
-        let mut budget = ExecutionBudget::new(depth);
+        // Create safety cap
+        let mut budget = SafetyCap::new(depth);
 
         // Build execution params
         let mut params = ExecutionParams::new(&self.execution_model, self.context_window)
@@ -582,7 +582,7 @@ impl AgentRuntime {
                      concrete answer with specific names and details where possible."
                 };
                 retry_messages.push(providers::types::Message::user(nudge.to_string()));
-                let mut retry_budget = ExecutionBudget::new(depth);
+                let mut retry_budget = SafetyCap::new(depth);
                 let retry_result = tokio::time::timeout(
                     safety_timeout,
                     execute_loop(
@@ -667,7 +667,7 @@ impl AgentRuntime {
             let strategy_repo = strategy_repo.clone();
             let warning_repo = self.warning_repo.clone();
             let chat_id = ctx.chat_id.to_string();
-            let budget_exhausted = loop_result.budget_exhausted;
+            let safety_cap_hit = loop_result.safety_cap_hit;
             let turns = loop_result.turns;
             let tool_calls = loop_result.tool_calls.clone();
             let mode = mode_name.clone();
@@ -686,7 +686,7 @@ impl AgentRuntime {
                     escalation_count: 0,
                     iterations_used: turns as i32,
                     max_iterations: 0,
-                    success: !budget_exhausted,
+                    success: !safety_cap_hit,
                     user_satisfaction: None,
                     response_time_ms: pipeline_elapsed_ms as i64,
                     chat_id: Some(chat_id.clone()),
@@ -696,7 +696,7 @@ impl AgentRuntime {
                     complexity_signals: serde_json::json!({}),
                     execution_mode: Some(mode),
                     retrieved_memory_count: None,
-                    budget_exhausted,
+                    safety_cap_hit: safety_cap_hit,
                     turns_used: turns as i32,
                     loop_detected: false,
                     loop_tools: None,
@@ -791,7 +791,7 @@ impl AgentRuntime {
             validation,
             agent_name: "klyntbot".to_string(),
             turns: loop_result.turns,
-            budget_exhausted: loop_result.budget_exhausted,
+            safety_cap_hit: loop_result.safety_cap_hit,
             tool_calls: loop_result.tool_calls,
         })
     }

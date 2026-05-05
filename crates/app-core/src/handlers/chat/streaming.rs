@@ -1079,7 +1079,6 @@ pub async fn relay_chat_stream(
                     }
                     // Budget-bounded execution events — logged for now, UI integration later.
                     AgentEvent::BudgetUpdate { .. }
-                    | AgentEvent::BudgetExtended { .. }
                     | AgentEvent::DepthSuggestion { .. }
                     | AgentEvent::EnrichmentStarted { .. }
                     | AgentEvent::EnrichmentComplete { .. }

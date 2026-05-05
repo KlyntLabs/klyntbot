@@ -33,7 +33,8 @@ pub struct BashArgs {
                    Approval and sandbox rules apply. Output is captured and \
                    truncated to 50KB.",
     params = "BashArgs",
-    allowed_channels = "coding_only"
+    allowed_channels = "coding_only",
+    custom_timeout_secs = "600"
 )]
 pub struct BashTool {
     layer1: Arc<Layer1>,

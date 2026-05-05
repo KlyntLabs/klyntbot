@@ -222,7 +222,7 @@ CREATE TABLE strategy_records (
     complexity_signals TEXT NOT NULL DEFAULT '{}',
     execution_mode     TEXT,
     retrieved_memory_count INTEGER,
-    budget_exhausted   INTEGER DEFAULT 0,
+    safety_cap_hit     INTEGER DEFAULT 0,
     turns_used         INTEGER DEFAULT 0,
     loop_detected      INTEGER DEFAULT 0,
     loop_tools         TEXT,

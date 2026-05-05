@@ -47,8 +47,11 @@ pub async fn fan_out_event(
     }
 }
 
-/// Extended timeout for interactive tools that wait on user input.
-const INTERACTIVE_TOOL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
+/// Extended timeout for interactive tools (ask_user) and long-running tools
+/// (shell / build / test) whose wall-time can legitimately exceed
+/// `params.tool_timeout` (default 30 s). Tools opt in by returning
+/// `Some(LONG_RUNNING_TOOL_TIMEOUT)` from `Tool::custom_timeout()`.
+pub const LONG_RUNNING_TOOL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
 
 /// Maximum number of tool calls that can execute concurrently within a single cycle.
 const MAX_CONCURRENT_TOOLS: usize = 10;
@@ -697,7 +700,7 @@ impl ExecutionCore {
                     ctx.cancel_token = params.cancel_token.clone();
                     let id = tc.id.clone();
                     let timeout_dur = if name == ASK_USER_TOOL_NAME {
-                        INTERACTIVE_TOOL_TIMEOUT
+                        LONG_RUNNING_TOOL_TIMEOUT
                     } else {
                         custom_timeouts[i].unwrap_or(params.tool_timeout)
                     };

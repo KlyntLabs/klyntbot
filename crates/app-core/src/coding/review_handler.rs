@@ -137,7 +137,7 @@ impl AppCore {
         workspace_path: std::path::PathBuf,
     ) -> Result<String> {
         use ::agent::execution::{
-            execute_loop, DepthMode, ExecutionBudget, ExecutionCore, ExecutionParams,
+            execute_loop, DepthMode, ExecutionCore, ExecutionParams, SafetyCap,
         };
         use tools::{registry::ToolRegistry, RoutingContext};
 
@@ -175,7 +175,7 @@ impl AppCore {
         let params = ExecutionParams::new(model, context_window)
             .with_timeout(tool_timeout)
             .with_max_iterations(REVIEW_MAX_ITER);
-        let mut budget = ExecutionBudget::with_limits(DepthMode::Normal, 120_000, REVIEW_MAX_ITER);
+        let mut budget = SafetyCap::with_limits(DepthMode::Normal, 120_000, REVIEW_MAX_ITER);
         let routing_ctx = RoutingContext::new("review".into(), session_key.into());
 
         let result = execute_loop(

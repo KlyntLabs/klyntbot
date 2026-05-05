@@ -10,7 +10,7 @@ pub mod mid_loop_compressor;
 pub mod scratchpad;
 pub mod types;
 
-pub use budget::{DepthMode, ExecutionBudget, SkillBudget};
+pub use budget::{DepthMode, SafetyCap, SkillBudget};
 pub use cache_policy::compression_aware_default;
 pub use core::ExecutionCore;
 pub use execute_loop::{execute_loop, ExecuteLoopResult};

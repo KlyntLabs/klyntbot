@@ -312,11 +312,6 @@ pub enum AgentEvent {
         tools_summary: String,
     },
 
-    /// The synthesis pass (final budget-exhausted LLM call) returned no
-    /// usable text. The caller is given a hardcoded fallback message
-    /// instead of an empty response.
-    SynthesisFailed { iteration: usize },
-
     // ── Budget HUD (Deep/Ultra mode) ─────────────────────────
     /// Emitted after each turn with current budget state.
     /// UI renders the live budget HUD from this.
@@ -330,12 +325,6 @@ pub enum AgentEvent {
         cache_read_tokens: u32,
         #[serde(default)]
         cache_write_tokens: u32,
-    },
-
-    /// User extended the budget mid-conversation.
-    BudgetExtended {
-        additional_turns: u32,
-        new_max_turns: u32,
     },
 
     // ── Depth suggestion (adaptive layer) ────────────────────
