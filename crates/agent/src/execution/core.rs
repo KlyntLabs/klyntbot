@@ -548,9 +548,10 @@ impl ExecutionCore {
 
                 // Append assistant message so the conversation stays coherent
                 let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
-                messages.push(Message::assistant_with_content_and_tools(
+                messages.push(Message::assistant_with_content_tools_and_reasoning(
                     response.content.clone(),
                     tool_call_msgs,
+                    response.reasoning_content.clone(),
                 ));
 
                 // Append synthetic "already called" tool results
@@ -589,10 +590,12 @@ impl ExecutionCore {
             }
 
             // Append assistant message with tool calls (preserving any text content)
+            // and reasoning_content — required by providers like Kimi For Coding.
             let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
-            messages.push(Message::assistant_with_content_and_tools(
+            messages.push(Message::assistant_with_content_tools_and_reasoning(
                 response.content.clone(),
                 tool_call_msgs,
+                response.reasoning_content.clone(),
             ));
 
             // Execute all tools in parallel, each with a timeout.

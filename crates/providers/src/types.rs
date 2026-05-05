@@ -527,6 +527,21 @@ impl Message {
         }
     }
 
+    /// Create an assistant message preserving reasoning content. Required by
+    /// providers that gate tool-call replay on the presence of
+    /// `reasoning_content` (e.g. Kimi For Coding).
+    pub fn assistant_with_content_tools_and_reasoning(
+        content: Option<String>,
+        tool_calls: Vec<ToolCallMessage>,
+        reasoning_content: Option<String>,
+    ) -> Self {
+        Self::Assistant {
+            content,
+            tool_calls: Some(tool_calls),
+            reasoning_content,
+        }
+    }
+
     /// Create a tool result message
     pub fn tool(
         tool_call_id: impl Into<String>,

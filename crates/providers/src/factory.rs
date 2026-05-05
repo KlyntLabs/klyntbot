@@ -284,7 +284,16 @@ fn try_create_from_spec(spec: &ProviderSpec, config: &Config, model: &str) -> Op
         }
 
         match OpenAiCompatProvider::new(api_base, pc.api_key.expose(), model) {
-            Ok(provider) => {
+            Ok(mut provider) => {
+                if let Some(headers) = pc.extra_headers.as_ref() {
+                    let pairs: Vec<(String, String)> = headers
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect();
+                    if !pairs.is_empty() {
+                        provider = provider.with_extra_headers(pairs);
+                    }
+                }
                 info!("Using {} provider with {}", spec.name, model);
                 Some(Arc::new(provider))
             }
