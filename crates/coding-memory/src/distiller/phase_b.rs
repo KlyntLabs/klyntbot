@@ -201,11 +201,30 @@ pub async fn invoke_llm(inv: LlmInvocation<'_>) -> Result<Vec<Observation>, Dist
             detail: e.to_string(),
         })?;
 
-    let args: Vec<serde_json::Value> = resp
+    let mut args: Vec<serde_json::Value> = resp
         .tool_calls
         .into_iter()
         .filter(|tc| tc.name == super::record_observation::RECORD_OBSERVATION_TOOL_NAME)
         .map(|tc| tc.arguments)
         .collect();
+    // Reasoning models (Mimo, DeepSeek-R1) often skip the function-call
+    // protocol entirely and emit observation JSON inline in `content`.
+    // When tool_calls is empty but content carries a JSON array of
+    // observation-shaped objects, accept it as a fallback. This restores
+    // Phase B coverage that would otherwise be lost as "transient failure".
+    if args.is_empty() {
+        if let Some(content) = resp.content.as_deref() {
+            let stripped = common::helpers::strip_llm_fences(content);
+            if let Some(slice) = common::helpers::extract_last_json_array(stripped) {
+                if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(slice) {
+                    args = arr;
+                }
+            } else if let Some(slice) = common::helpers::extract_json_object(stripped) {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(slice) {
+                    args = vec![v];
+                }
+            }
+        }
+    }
     decode_observations(&args)
 }
