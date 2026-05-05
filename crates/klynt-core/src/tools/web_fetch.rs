@@ -151,7 +151,11 @@ pub async fn run_for_test(
             rx.changed().await.map_err(|_| {
                 KlyntbotError::Tool(ToolError::ExecutionFailed("host approval cancelled".into()))
             })?;
-            rx.borrow().expect("decision set on resolution")
+            rx.borrow().ok_or_else(|| {
+                KlyntbotError::Tool(ToolError::ExecutionFailed(
+                    "host approval channel closed without decision".into(),
+                ))
+            })?
         }
         HostCheckResult::NewlyRegistered { tx } => {
             let request_id = Uuid::new_v4().to_string();
@@ -210,7 +214,7 @@ pub async fn run_for_test(
     let start = std::time::Instant::now();
     let result: Result<String> = (async {
         let max_bytes = args.max_bytes.unwrap_or(200_000) as usize;
-        let resp =
+        let mut resp =
             client.get(&args.url).send().await.map_err(|e| {
                 KlyntbotError::Tool(ToolError::ExecutionFailed(format!("http: {e}")))
             })?;
@@ -221,17 +225,22 @@ pub async fn run_for_test(
                 args.url
             ))));
         }
-        let body = resp
-            .bytes()
-            .await
-            .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(e.to_string())))?;
-        let truncated = &body[..body.len().min(max_bytes)];
         let format = args.format.as_deref().unwrap_or("text");
+        let mut body = Vec::with_capacity(max_bytes.min(8192));
+        while let Some(chunk) = resp.chunk().await.map_err(|e| {
+            KlyntbotError::Tool(ToolError::ExecutionFailed(format!("download: {e}")))
+        })? {
+            body.extend_from_slice(&chunk);
+            if body.len() >= max_bytes {
+                body.truncate(max_bytes);
+                break;
+            }
+        }
         let out = if format == "text" {
-            html2text::from_read(truncated, 80)
-                .unwrap_or_else(|_| String::from_utf8_lossy(truncated).into_owned())
+            html2text::from_read(&body[..], 80)
+                .unwrap_or_else(|_| String::from_utf8_lossy(&body).into_owned())
         } else {
-            String::from_utf8_lossy(truncated).into_owned()
+            String::from_utf8_lossy(&body).into_owned()
         };
         Ok(out)
     })

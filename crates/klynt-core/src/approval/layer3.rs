@@ -57,17 +57,39 @@ pub fn args_hash_for_relevance(tool: &str, args_json: &str) -> String {
 }
 
 fn normalize_bash(args_json: &str) -> String {
-    let v: serde_json::Value = serde_json::from_str(args_json).unwrap_or(serde_json::Value::Null);
-    let cmd = v.get("command").and_then(|c| c.as_str()).unwrap_or("");
-    cmd.split_whitespace().next().unwrap_or("").to_string()
+    extract_json_str_field(args_json, "command")
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .to_string()
 }
 
 fn normalize_path(args_json: &str) -> String {
-    let v: serde_json::Value = serde_json::from_str(args_json).unwrap_or(serde_json::Value::Null);
-    v.get("path")
-        .and_then(|p| p.as_str())
-        .unwrap_or("")
-        .to_string()
+    extract_json_str_field(args_json, "path")
+}
+
+/// Lightweight field extractor: scans for `"key":"value"` without full JSON parse.
+fn extract_json_str_field(json: &str, key: &str) -> String {
+    let key_quoted = format!("\"{key}\"");
+    let Some(start) = json.find(&key_quoted) else {
+        return String::new();
+    };
+    let rest = &json[start + key_quoted.len()..];
+    let Some(colon) = rest.find(':') else {
+        return String::new();
+    };
+    let rest = rest[colon + 1..].trim_start();
+    if rest.starts_with('"') {
+        let rest = &rest[1..];
+        if let Some(end) = rest.find('"') {
+            return rest[..end].to_string();
+        }
+    }
+    // Unquoted value — read until next comma or brace
+    let end = rest
+        .find(|c: char| c == ',' || c == '}' || c.is_whitespace())
+        .unwrap_or(rest.len());
+    rest[..end].to_string()
 }
 
 #[cfg(test)]

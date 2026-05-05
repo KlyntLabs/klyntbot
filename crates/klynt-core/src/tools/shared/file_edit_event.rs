@@ -1,3 +1,4 @@
+use crate::approval::guard::fan_out_tool_event;
 use bus::DomainEventBus;
 use std::path::Path;
 use std::sync::Arc;
@@ -45,15 +46,7 @@ pub async fn emit_file_edit(
         anchored_symbols,
         lsp_diagnostics_delta,
     };
-    if let Some(tx) = event_tx {
-        let _ = tx.send(evt.clone()).await;
-    }
-    let payload =
-        serde_json::to_value(&evt).unwrap_or_else(|_| serde_json::json!({"type": "unknown"}));
-    bus.publish(bus::DomainEvent::Generic {
-        kind: "agent_event".into(),
-        payload,
-    });
+    fan_out_tool_event(event_tx.as_ref(), Some(bus), evt).await;
 }
 
 /// Compute a unified diff of `before` → `after`. Empty `before` = pure write.

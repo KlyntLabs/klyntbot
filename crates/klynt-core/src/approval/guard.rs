@@ -64,8 +64,9 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
             .privacy
             .raw_patterns()
             .first()
-            .cloned()
-            .unwrap_or_default();
+            .map(|s| s.as_str())
+            .unwrap_or("")
+            .to_string();
         let d = ApprovalDecision::PrivacyDenied {
             reason: "privacy guard: excludePaths match".into(),
             pattern: pat,
@@ -145,12 +146,13 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
         // the raw `payload` we're evaluating so call-sites that don't populate
         // `ctx.args` (e.g. unit tests, simple bash gates) still hash the same
         // shape that record() uses.
-        let args_json = ctx
-            .args
-            .as_ref()
-            .map(|v| v.to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| payload.to_string());
+        let args_json = match ctx.args.as_ref() {
+            Some(v) => {
+                let s = v.to_string();
+                if s.is_empty() { payload.to_string() } else { s }
+            }
+            None => payload.to_string(),
+        };
         let hash = crate::approval::layer3::args_hash_for_relevance(tool, &args_json);
         let summary = repo
             .summary(tool, &hash, &ctx.repo_id)
@@ -162,7 +164,7 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
                     reason: format!("auto-allow: {reason}"),
                     rule_matched: None,
                 };
-                let decision = ApprovalDecision::auto_allow(ApprovalLayer::Layer3Mirror, reason);
+                let decision = ApprovalDecision::auto_allow(ApprovalLayer::Layer3Mirror, reason, None);
                 emit_pair(&ctx, tool, payload, &decision, false, Some(&summary)).await;
                 return decision;
             }
@@ -201,14 +203,9 @@ pub async fn evaluate<'a>(ctx: GuardCtx<'a>, tool: &str, payload: &str) -> Appro
             emit_pair(&ctx, tool, payload, &merged, false, None).await;
             merged
         }
-        ApprovalDecision::Ask { .. } => {
+        ApprovalDecision::Ask { layer, reason, .. } => {
             emit_approval_request(&ctx, tool, &audit).await;
-            let decision_with_audit = match merged {
-                ApprovalDecision::Ask { layer, reason, .. } => {
-                    ApprovalDecision::ask_with_audit(layer, reason, audit)
-                }
-                other => other,
-            };
+            let decision_with_audit = ApprovalDecision::ask_with_audit(layer, reason, audit);
             emit_pair(&ctx, tool, payload, &decision_with_audit, true, None).await;
             let user = await_decision(
                 ctx.pending,
@@ -245,14 +242,14 @@ async fn emit_pair<'a>(
         request_id: ctx.request_id.clone(),
         tool: tool.into(),
         args_hash,
-        layer: format!("{:?}", layer_of(decision)),
-        rule_matched: rule_of(decision),
+        layer: decision.layer().to_string(),
+        rule_matched: decision.rule_matched(),
         mirror_history: mirror_history_json,
         sandbox_summary: String::new(),
         requires_user_input,
         args: ctx.args.clone(),
         cwd: ctx.cwd.clone(),
-        layer_reason: Some(reason_of(decision)),
+        layer_reason: Some(decision.reason()),
     };
     fan_out_tool_event(ctx.event_tx, Some(ctx.domain_bus), req).await;
     if !requires_user_input {
@@ -264,70 +261,37 @@ async fn emit_resolved<'a>(ctx: &GuardCtx<'a>, decision: &ApprovalDecision) {
     let res = ToolEvent::ApprovalResolved {
         request_id: ctx.request_id.clone(),
         decision: format!("{:?}", decision),
-        decision_reason: reason_of(decision),
+        decision_reason: decision.reason(),
         latency_ms: 0,
         persisted_rule: None,
-        decided_by: decided_by(decision).into(),
+        decided_by: decision.decided_by().into(),
     };
     fan_out_tool_event(ctx.event_tx, Some(ctx.domain_bus), res).await;
 }
 
-fn layer_of(d: &ApprovalDecision) -> ApprovalLayer {
-    match d {
-        ApprovalDecision::Auto { layer, .. } | ApprovalDecision::Ask { layer, .. } => layer.clone(),
-        ApprovalDecision::PrivacyDenied { .. } => ApprovalLayer::Privacy,
-        _ => ApprovalLayer::DefaultMode,
-    }
-}
-fn rule_of(d: &ApprovalDecision) -> Option<String> {
-    if let ApprovalDecision::Auto { rule_matched, .. } = d {
-        rule_matched.clone()
-    } else {
-        None
-    }
-}
-fn reason_of(d: &ApprovalDecision) -> String {
-    match d {
-        ApprovalDecision::Auto { reason, .. } | ApprovalDecision::Ask { reason, .. } => {
-            reason.clone()
-        }
-        ApprovalDecision::PrivacyDenied { reason, .. } => reason.clone(),
-        ApprovalDecision::Cancelled => "cancelled".into(),
-        ApprovalDecision::TimedOut => "timeout".into(),
-    }
-}
-fn decided_by(d: &ApprovalDecision) -> &'static str {
-    match d {
-        ApprovalDecision::Auto { allowed: true, .. } => "auto_allow",
-        ApprovalDecision::Auto { allowed: false, .. } => "auto_deny",
-        ApprovalDecision::Ask { .. } => "user",
-        ApprovalDecision::PrivacyDenied { .. } => "auto_deny",
-        ApprovalDecision::Cancelled => "cancelled",
-        ApprovalDecision::TimedOut => "timeout",
-    }
-}
+
 
 /// Map an `ApprovalDecision` into the frontend `LayerOutcome` type.
 fn layer_outcome_from_decision(d: &ApprovalDecision) -> desktop_shared::coding::LayerOutcome {
     match d {
         ApprovalDecision::Auto {
-            allowed: true,
-            reason: _,
+            allowed,
             rule_matched,
             ..
-        } => desktop_shared::coding::LayerOutcome::Allowed {
-            reason: format!("allowed: {}", rule_matched.as_deref().unwrap_or("?")),
-            rule_matched: rule_matched.clone(),
-        },
-        ApprovalDecision::Auto {
-            allowed: false,
-            reason: _,
-            rule_matched,
-            ..
-        } => desktop_shared::coding::LayerOutcome::Denied {
-            reason: format!("denied: {}", rule_matched.as_deref().unwrap_or("?")),
-            rule_matched: rule_matched.clone(),
-        },
+        } => {
+            let reason = format!("{}", rule_matched.as_deref().unwrap_or("?"));
+            if *allowed {
+                desktop_shared::coding::LayerOutcome::Allowed {
+                    reason: format!("allowed: {reason}"),
+                    rule_matched: rule_matched.clone(),
+                }
+            } else {
+                desktop_shared::coding::LayerOutcome::Denied {
+                    reason: format!("denied: {reason}"),
+                    rule_matched: rule_matched.clone(),
+                }
+            }
+        }
         ApprovalDecision::Ask { reason, .. } => desktop_shared::coding::LayerOutcome::Deferred {
             reason: format!("ask: {reason}"),
         },
@@ -395,16 +359,16 @@ pub async fn emit_approval_request(ctx: &GuardCtx<'_>, tool: &str, audit: &Layer
 
     let request = match tool {
         "bash" => desktop_shared::coding::ApprovalRequest::CommandExecution {
-            approval_id,
-            thread_id,
-            turn_id,
+            approval_id: approval_id.clone(),
+            thread_id: thread_id.clone(),
+            turn_id: turn_id.clone(),
             command: get_arg_str(&ctx.args, "command")
                 .map(|s| s.split_whitespace().map(String::from).collect())
                 .unwrap_or_default(),
             cwd: ctx.cwd.clone().unwrap_or_default(),
             reason: "user approval required".into(),
             proposed_execpolicy_amendment: None,
-            layer_decisions,
+            layer_decisions: layer_decisions.clone(),
         },
         _ => desktop_shared::coding::ApprovalRequest::FileChange {
             approval_id,
@@ -417,7 +381,10 @@ pub async fn emit_approval_request(ctx: &GuardCtx<'_>, tool: &str, audit: &Layer
         },
     };
 
-    let payload = serde_json::to_value(&request).unwrap_or_default();
+    let payload = serde_json::to_value(&request).unwrap_or_else(|e| {
+        tracing::error!("failed to serialize ApprovalRequest: {e}");
+        serde_json::Value::Null
+    });
     let evt = ToolEvent::ApprovalRequest {
         id: ctx.request_id.clone(),
         payload,
@@ -434,8 +401,10 @@ pub(crate) async fn fan_out_tool_event(
         let _ = tx.send(evt.clone()).await;
     }
     if let Some(bus) = domain_bus {
-        let payload =
-            serde_json::to_value(&evt).unwrap_or_else(|_| serde_json::json!({"type": "unknown"}));
+        let payload = serde_json::to_value(&evt).unwrap_or_else(|e| {
+            tracing::error!("failed to serialize ToolEvent: {e}");
+            serde_json::json!({"type": "unknown"})
+        });
         bus.publish(bus::DomainEvent::Generic {
             kind: "agent_event".into(),
             payload,

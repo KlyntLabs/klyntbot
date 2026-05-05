@@ -1,6 +1,7 @@
 use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
+use crate::approval::guard::fan_out_tool_event;
 use async_trait::async_trait;
 use bus::DomainEventBus;
 use klynt_execpolicy::Policy;
@@ -146,33 +147,19 @@ impl ToolExecute for BashTool {
                     .map(PathBuf::from)
                     .unwrap_or_else(|| std::env::current_dir().unwrap());
                 let sandbox_policy = klynt_sandbox::SandboxPolicy::cwd_writes_only(cwd.clone());
-                if let Some(ref tx) = ctx.event_tx {
-                    let _ = tx
-                        .send(ToolEvent::SandboxPolicyApplied {
-                            tool: "bash".into(),
-                            policy_summary: sandbox_policy.summary(),
-                            policy_hash: sandbox_policy.policy_hash(),
-                            fallback_unsandboxed: false,
-                            fs_constraints: vec![format!("{:?}", sandbox_policy.fs)],
-                            network_constraints: vec![format!("{:?}", sandbox_policy.network)],
-                        })
-                        .await;
-                }
-                if let Some(bus) = Some(&self.bus) {
-                    let payload = serde_json::json!({
-                        "type": "sandboxPolicyApplied",
-                        "tool": "bash",
-                        "policySummary": sandbox_policy.summary(),
-                        "policyHash": sandbox_policy.policy_hash(),
-                        "fallbackUnsandboxed": false,
-                        "fsConstraints": vec![format!("{:?}", sandbox_policy.fs)],
-                        "networkConstraints": vec![format!("{:?}", sandbox_policy.network)],
-                    });
-                    bus.publish(bus::DomainEvent::Generic {
-                        kind: "agent_event".into(),
-                        payload,
-                    });
-                }
+                fan_out_tool_event(
+                    ctx.event_tx.as_ref(),
+                    Some(&self.bus),
+                    ToolEvent::SandboxPolicyApplied {
+                        tool: "bash".into(),
+                        policy_summary: sandbox_policy.summary(),
+                        policy_hash: sandbox_policy.policy_hash(),
+                        fallback_unsandboxed: false,
+                        fs_constraints: vec![format!("{:?}", sandbox_policy.fs)],
+                        network_constraints: vec![format!("{:?}", sandbox_policy.network)],
+                    },
+                )
+                .await;
                 let runner = klynt_sandbox::MacOsSeatbeltRunner::new();
                 let timeout = Duration::from_millis(args.timeout_ms.unwrap_or(60_000));
                 let out = runner

@@ -35,7 +35,8 @@ impl CompiledRules {
         Ok(Self { sets })
     }
     pub fn find_match(&self, tool: &str, payload: &str) -> Option<String> {
-        let (set, raws) = self.sets.get(&normalize_tool(tool))?;
+        let key = self.sets.keys().find(|k| tool_name_eq(k, tool))?;
+        let (set, raws) = self.sets.get(key)?;
         let m: Vec<usize> = set.matches(payload);
         m.first().map(|&i| raws[i].clone())
     }
@@ -48,6 +49,22 @@ fn normalize_tool(s: &str) -> String {
         .filter(|c| !matches!(c, '_' | '-'))
         .flat_map(|c| c.to_lowercase())
         .collect()
+}
+
+fn tool_name_eq(a: &str, b: &str) -> bool {
+    let mut a = a.chars().filter(|c| !matches!(c, '_' | '-'));
+    let mut b = b.chars().filter(|c| !matches!(c, '_' | '-'));
+    loop {
+        match (a.next(), b.next()) {
+            (Some(ca), Some(cb)) => {
+                if !ca.eq_ignore_ascii_case(&cb) {
+                    return false;
+                }
+            }
+            (None, None) => return true,
+            _ => return false,
+        }
+    }
 }
 
 fn parse_rule(rule: &str) -> Result<(String, String), MatcherError> {

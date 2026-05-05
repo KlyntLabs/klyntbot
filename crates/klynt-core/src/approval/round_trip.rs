@@ -35,9 +35,9 @@ impl PendingApprovalsMap {
         self.inner.is_empty()
     }
     pub fn cancel_all(&self) {
-        let keys: Vec<String> = self.inner.iter().map(|e| e.key().clone()).collect();
-        for k in keys {
-            self.resolve(&k, ApprovalDecision::Cancelled);
+        let keys: Vec<RequestId> = self.inner.iter().map(|e| e.key().clone()).collect();
+        for key in keys {
+            self.resolve(&key, ApprovalDecision::Cancelled);
         }
     }
 }

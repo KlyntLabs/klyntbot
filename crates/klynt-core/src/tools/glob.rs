@@ -94,7 +94,11 @@ impl ToolExecute for GlobTool {
             let privacy = self.privacy.clone();
             let matches =
                 tokio::task::spawn_blocking(move || -> Vec<(std::time::SystemTime, PathBuf)> {
-                    let mut out: Vec<(std::time::SystemTime, PathBuf)> = Vec::new();
+                    use std::cmp::Reverse;
+                    use std::collections::BinaryHeap;
+
+                    let mut heap: BinaryHeap<Reverse<(std::time::SystemTime, PathBuf)>> =
+                        BinaryHeap::with_capacity(max);
                     for entry in WalkDir::new(&root).follow_links(false) {
                         let Ok(entry) = entry else { continue };
                         if !entry.file_type().is_file() {
@@ -112,10 +116,18 @@ impl ToolExecute for GlobTool {
                             .ok()
                             .and_then(|m| m.modified().ok())
                             .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                        out.push((mtime, entry.path().to_path_buf()));
+                        if heap.len() < max {
+                            heap.push(Reverse((mtime, entry.path().to_path_buf())));
+                        } else if let Some(&Reverse((oldest, _))) = heap.peek() {
+                            if mtime > oldest {
+                                heap.pop();
+                                heap.push(Reverse((mtime, entry.path().to_path_buf())));
+                            }
+                        }
                     }
-                    out.sort_by(|a, b| b.0.cmp(&a.0));
-                    out.truncate(max);
+                    let mut out: Vec<(std::time::SystemTime, PathBuf)> =
+                        heap.into_sorted_vec().into_iter().map(|Reverse(v)| v).collect();
+                    out.reverse();
                     out
                 })
                 .await

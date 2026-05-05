@@ -107,32 +107,92 @@ impl ToolExecute for GrepTool {
                         Err(_) => continue,
                     };
                     let reader = std::io::BufReader::new(file);
-                    let file_lines: Vec<String> = std::io::BufRead::lines(reader)
-                        .map_while(|l| l.ok())
-                        .collect();
                     let mut last_hi = 0usize;
-                    for (i, line) in file_lines.iter().enumerate() {
-                        if re.is_match(line) {
-                            let lo = i.saturating_sub(ctx_lines);
-                            let hi = (i + ctx_lines + 1).min(file_lines.len());
-                            if lo > last_hi && !out.is_empty() {
-                                out.push("--".into());
+                    // Stream file line-by-line with a small buffer for context.
+                    let mut buf: Vec<(usize, String)> = Vec::with_capacity(ctx_lines + 1);
+                    let mut pending: Option<usize> = None; // index in buf of the match line
+                    for (i, line) in std::io::BufRead::lines(reader).map_while(|l| l.ok()).enumerate() {
+                        buf.push((i, line));
+
+                        if let Some(mid) = pending {
+                            // Collecting suffix lines after a match
+                            if buf.len() >= mid + ctx_lines + 1 {
+                                let start = mid.saturating_sub(ctx_lines);
+                                let end = (mid + ctx_lines + 1).min(buf.len());
+                                let lo = buf[start].0;
+                                let hi = buf[end - 1].0 + 1;
+                                if lo > last_hi && !out.is_empty() {
+                                    out.push("--".into());
+                                }
+                                for (j, line_text) in &buf[start..end] {
+                                    let marker = if *j == buf[mid].0 { ":" } else { "-" };
+                                    out.push(format!(
+                                        "{}{}{}{}{}",
+                                        rel.display(),
+                                        marker,
+                                        j + 1,
+                                        marker,
+                                        line_text
+                                    ));
+                                }
+                                last_hi = hi;
+                                buf.drain(..end);
+                                pending = None;
+                                if out.len() >= max {
+                                    break 'outer;
+                                }
                             }
-                            for (j, line_text) in file_lines.iter().enumerate().skip(lo).take(hi - lo) {
-                                let marker = if j == i { ":" } else { "-" };
+                            continue;
+                        }
+
+                        let check_idx = buf.len() - 1;
+                        if re.is_match(&buf[check_idx].1) {
+                            if ctx_lines == 0 {
+                                let (j, line_text) = &buf[check_idx];
+                                if *j > last_hi && !out.is_empty() {
+                                    out.push("--".into());
+                                }
                                 out.push(format!(
                                     "{}{}{}{}{}",
                                     rel.display(),
-                                    marker,
+                                    ":",
                                     j + 1,
-                                    marker,
+                                    ":",
                                     line_text
                                 ));
+                                last_hi = j + 1;
+                                buf.clear();
+                                if out.len() >= max {
+                                    break 'outer;
+                                }
+                            } else {
+                                pending = Some(check_idx);
                             }
-                            last_hi = hi;
-                            if out.len() >= max {
-                                break 'outer;
-                            }
+                        } else if buf.len() > ctx_lines {
+                            buf.remove(0);
+                        }
+                    }
+                    // Flush any pending match at EOF
+                    if let Some(mid) = pending {
+                        let start = mid.saturating_sub(ctx_lines);
+                        let end = buf.len();
+                        let lo = buf[start].0;
+                        if lo > last_hi && !out.is_empty() {
+                            out.push("--".into());
+                        }
+                        for (j, line_text) in &buf[start..end] {
+                            let marker = if *j == buf[mid].0 { ":" } else { "-" };
+                            out.push(format!(
+                                "{}{}{}{}{}",
+                                rel.display(),
+                                marker,
+                                j + 1,
+                                marker,
+                                line_text
+                            ));
+                        }
+                        if out.len() >= max {
+                            break 'outer;
                         }
                     }
                 }

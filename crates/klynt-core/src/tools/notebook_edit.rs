@@ -250,7 +250,7 @@ pub async fn run_for_test(
             bytes_after,
         )
         .await;
-        let mut final_content = after;
+        let mut final_content = after.clone();
         match pre_file_result {
             Ok(None) => {}
             Ok(Some(modified)) => {
@@ -274,7 +274,11 @@ pub async fn run_for_test(
         .await;
         write_result
             .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("write: {e}"))))?;
-        let diff = unified_diff(&path_str, &before, &final_content);
+        let diff_full = if final_content == after {
+            diff_preview
+        } else {
+            unified_diff(&path_str, &before, &final_content)
+        };
         emit_file_edit(
             &event_tx,
             &bus,
@@ -282,7 +286,7 @@ pub async fn run_for_test(
                 op: "notebook_edit",
                 path: &path_str,
                 bytes: final_content.len() as u64,
-                diff_full: diff,
+                diff_full,
             },
             None,
         )

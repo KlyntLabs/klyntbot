@@ -25,7 +25,11 @@ impl HostKey {
         let host = u.host_str().ok_or_else(|| {
             common::KlyntbotError::Tool(common::ToolError::InvalidParams("URL has no host".into()))
         })?;
-        let port = u.port_or_known_default().unwrap_or(0);
+        let port = u.port_or_known_default().ok_or_else(|| {
+            common::KlyntbotError::Tool(common::ToolError::InvalidParams(
+                "URL scheme has no known default port".into(),
+            ))
+        })?;
         Ok(Self {
             scheme: u.scheme().to_ascii_lowercase(),
             host: host.to_ascii_lowercase(),

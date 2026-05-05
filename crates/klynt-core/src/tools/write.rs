@@ -231,7 +231,8 @@ pub async fn run_for_test(
             bytes_after,
         )
         .await;
-        let mut final_content = args.content;
+        let original_content = args.content;
+        let mut final_content = original_content.clone();
         match pre_file_result {
             Ok(None) => {}
             Ok(Some(modified)) => {
@@ -257,7 +258,11 @@ pub async fn run_for_test(
             .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("write: {e}"))))?;
 
         let bytes = final_content.len() as u64;
-        let diff = unified_diff(&path_str, &before, &final_content);
+        let diff_full = if final_content == original_content {
+            diff_preview
+        } else {
+            unified_diff(&path_str, &before, &final_content)
+        };
         emit_file_edit(
             &event_tx,
             &bus,
@@ -265,7 +270,7 @@ pub async fn run_for_test(
                 op: "write",
                 path: &path_str,
                 bytes,
-                diff_full: diff,
+                diff_full,
             },
             None,
         )

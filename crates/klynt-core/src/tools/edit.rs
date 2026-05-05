@@ -214,18 +214,19 @@ pub async fn run_for_test(
         let before = tokio::fs::read_to_string(&resolved)
             .await
             .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("read: {e}"))))?;
-        let count = before.matches(&args.old_text).count();
-        if count == 0 {
-            return Err(KlyntbotError::Tool(ToolError::ExecutionFailed(
+        let mut occurrences = before.match_indices(&args.old_text);
+        let (first_pos, _) = occurrences.next().ok_or_else(|| {
+            KlyntbotError::Tool(ToolError::ExecutionFailed(
                 "old_text not found in file. Make sure it matches exactly.".into(),
+            ))
+        })?;
+        if occurrences.next().is_some() {
+            return Err(KlyntbotError::Tool(ToolError::ExecutionFailed(
+                "old_text appears multiple times. Provide more context to make it unique.".into(),
             )));
         }
-        if count > 1 {
-            return Err(KlyntbotError::Tool(ToolError::ExecutionFailed(format!(
-                "old_text appears {count} times. Provide more context to make it unique."
-            ))));
-        }
-        let after = before.replacen(&args.old_text, &args.new_text, 1);
+        let mut after = before.clone();
+        after.replace_range(first_pos..first_pos + args.old_text.len(), &args.new_text);
         let bytes_before = before.len() as u64;
         let bytes_after = after.len() as u64;
         let diff_preview = unified_diff(&path_str, &before, &after);
@@ -240,7 +241,7 @@ pub async fn run_for_test(
             bytes_after,
         )
         .await;
-        let mut final_content = after;
+        let mut final_content = after.clone();
         match pre_file_result {
             Ok(None) => {}
             Ok(Some(modified)) => {
@@ -265,7 +266,11 @@ pub async fn run_for_test(
         write_result
             .map_err(|e| KlyntbotError::Tool(ToolError::ExecutionFailed(format!("write: {e}"))))?;
 
-        let diff = unified_diff(&path_str, &before, &final_content);
+        let diff_full = if final_content == after {
+            diff_preview
+        } else {
+            unified_diff(&path_str, &before, &final_content)
+        };
         emit_file_edit(
             &event_tx,
             &bus,
@@ -273,7 +278,7 @@ pub async fn run_for_test(
                 op: "edit",
                 path: &path_str,
                 bytes: final_content.len() as u64,
-                diff_full: diff,
+                diff_full,
             },
             None,
         )
