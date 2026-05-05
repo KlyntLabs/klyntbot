@@ -181,6 +181,8 @@ impl KeyResultRepo {
 
         Ok((row.0, row.1))
     }
+
+    get_by_ids_impl!("key_results", KeyResultRow);
 }
 
 #[cfg(test)]

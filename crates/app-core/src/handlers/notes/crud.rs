@@ -419,19 +419,17 @@ impl AppCore {
                         Ok(results) => {
                             let keyword_ids: std::collections::HashSet<&str> =
                                 keyword_notes.iter().map(|n| n.id.as_str()).collect();
-                            let mut notes = Vec::new();
-                            for (note_id, _score) in results {
-                                // Skip notes already in keyword results
-                                if keyword_ids.contains(note_id.as_str()) {
-                                    continue;
-                                }
-                                if let Ok(Some(row)) = self.note_repo.get_note(&note_id).await {
-                                    let tags =
-                                        self.note_repo.get_tags(&note_id).await.unwrap_or_default();
-                                    notes.push(note_row_to_response(&row, tags));
-                                }
-                            }
-                            notes
+                            let note_ids: Vec<String> = results
+                                .into_iter()
+                                .filter(|(id, _)| !keyword_ids.contains(id.as_str()))
+                                .map(|(id, _)| id)
+                                .collect();
+                            let note_rows = self
+                                .note_repo
+                                .get_notes_by_ids(&note_ids)
+                                .await
+                                .map_err(map_storage_err)?;
+                            notes_with_tags_batch(self, &note_rows).await?
                         }
                         Err(_) => Vec::new(),
                     }
@@ -469,13 +467,24 @@ impl AppCore {
             .await
             .map_err(|e| ApiError::new("SEARCH_ERROR", e.to_string()))?;
 
-        let mut notes = Vec::new();
-        for (note_id, _score) in results {
-            if let Ok(Some(row)) = self.note_repo.get_note(&note_id).await {
-                let tags = self.note_repo.get_tags(&note_id).await.unwrap_or_default();
-                notes.push(note_row_to_list_item(&row, tags));
-            }
-        }
+        let note_ids: Vec<String> = results.into_iter().map(|(id, _)| id).collect();
+        let note_rows = self
+            .note_repo
+            .get_notes_by_ids(&note_ids)
+            .await
+            .map_err(map_storage_err)?;
+        let mut tag_map = self
+            .note_repo
+            .get_tags_batch(&note_ids)
+            .await
+            .map_err(map_storage_err)?;
+        let notes = note_rows
+            .into_iter()
+            .map(|row| {
+                let tags = tag_map.remove(&row.id).unwrap_or_default();
+                note_row_to_list_item(&row, tags)
+            })
+            .collect();
         Ok(notes)
     }
 
@@ -546,14 +555,22 @@ impl AppCore {
             .await
             .map_err(map_storage_err)?;
 
-        let mut results = Vec::with_capacity(rows.len());
-        for (row, context) in &rows {
-            let note = note_with_tags(self, row).await?;
-            results.push(BacklinkResponse {
-                note,
-                context: context.clone(),
-            });
-        }
+        let note_ids: Vec<String> = rows.iter().map(|(r, _)| r.id.clone()).collect();
+        let mut tag_map = self
+            .note_repo
+            .get_tags_batch(&note_ids)
+            .await
+            .map_err(map_storage_err)?;
+        let results: Vec<BacklinkResponse> = rows
+            .into_iter()
+            .map(|(row, context)| {
+                let tags = tag_map.remove(&row.id).unwrap_or_default();
+                BacklinkResponse {
+                    note: note_row_to_response(&row, tags),
+                    context,
+                }
+            })
+            .collect();
         Ok(results)
     }
 

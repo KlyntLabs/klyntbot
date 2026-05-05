@@ -88,6 +88,8 @@ impl ProjectSourceRepo {
         .await?;
         Ok(result.rows_affected() > 0)
     }
+
+    get_by_ids_impl!("project_sources", ProjectSourceRow);
 }
 
 #[cfg(test)]

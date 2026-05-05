@@ -11,18 +11,12 @@ impl AppCore {
         &self,
         limit: usize,
     ) -> Result<Vec<RecentLearningSession>, ApiError> {
-        // NOTE: list_sessions loads all sessions; acceptable for v1 since session counts
-        // are small. A dedicated `list_recent(limit)` query can optimize later if needed.
-        let mut sessions = self
+        let sessions = self
             .repos
             .sessions
-            .list_sessions()
+            .list_recent(limit as i64)
             .await
             .map_err(map_storage_err)?;
-
-        // Sort by updated_at descending, take first `limit`
-        sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
-        sessions.truncate(limit);
 
         // Fetch messages concurrently (limit is typically 3)
         let message_futures: Vec<_> = sessions

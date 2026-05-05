@@ -133,12 +133,11 @@ impl AppCore {
         let (context_text, note_title, parent_insight_id) =
             if let Some(ref service) = self.insight_service {
                 // Fetch related notes for the resolved scope
-                let mut related_notes = Vec::new();
-                for id in &scope_note_ids {
-                    if let Ok(Some(n)) = self.note_repo.get_note(id).await {
-                        related_notes.push(n);
-                    }
-                }
+                let related_notes = self
+                    .note_repo
+                    .get_notes_by_ids(&scope_note_ids)
+                    .await
+                    .unwrap_or_default();
 
                 match service
                     .prepare_context(
@@ -536,12 +535,11 @@ impl AppCore {
                 .unwrap_or_default();
 
             let scope_ids = service.resolve_scope(note_id, &scope).await;
-            let mut related_notes = Vec::new();
-            for id in &scope_ids {
-                if let Ok(Some(n)) = self.note_repo.get_note(id).await {
-                    related_notes.push(n);
-                }
-            }
+            let related_notes = self
+                .note_repo
+                .get_notes_by_ids(&scope_ids)
+                .await
+                .unwrap_or_default();
 
             match service
                 .prepare_context(&note, &related_notes, &scope_ids, &scope, &note_domains)
@@ -628,12 +626,11 @@ impl AppCore {
                 .unwrap_or_default();
 
             let scope_ids = service.resolve_scope(note_id, &scope).await;
-            let mut related_notes = Vec::new();
-            for id in &scope_ids {
-                if let Ok(Some(n)) = self.note_repo.get_note(id).await {
-                    related_notes.push(n);
-                }
-            }
+            let related_notes = self
+                .note_repo
+                .get_notes_by_ids(&scope_ids)
+                .await
+                .unwrap_or_default();
 
             match service
                 .prepare_context(&note, &related_notes, &scope_ids, &scope, &note_domains)
@@ -864,24 +861,28 @@ impl AppCore {
             self.get_related_note_ids(&params.note_id).await
         };
 
+        let mut all_ids = note_ids.clone();
+        all_ids.push(params.note_id.clone());
+        let note_rows = self
+            .note_repo
+            .get_notes_by_ids(&all_ids)
+            .await
+            .unwrap_or_default();
         let mut notes = Vec::new();
         let mut total_words: u32 = 0;
-        for id in &note_ids {
-            if let Ok(Some(note)) = self.note_repo.get_note(id).await {
-                let wc = note.body.split_whitespace().count() as u32;
-                total_words += wc;
-                notes.push(ScopePreviewNote {
-                    id: note.id,
-                    title: note.title,
-                    notebook_id: note.notebook_id,
-                    word_count: wc,
-                });
+        for note in &note_rows {
+            if note.id == params.note_id {
+                total_words += note.body.split_whitespace().count() as u32;
+                continue;
             }
-        }
-
-        // Add current note's word count
-        if let Ok(Some(current)) = self.note_repo.get_note(&params.note_id).await {
-            total_words += current.body.split_whitespace().count() as u32;
+            let wc = note.body.split_whitespace().count() as u32;
+            total_words += wc;
+            notes.push(ScopePreviewNote {
+                id: note.id.clone(),
+                title: note.title.clone(),
+                notebook_id: note.notebook_id.clone(),
+                word_count: wc,
+            });
         }
 
         // Fetch links between all nodes in scope (current note + scope notes)
@@ -987,13 +988,11 @@ impl AppCore {
             .get_backlinks_with_context(note_id)
             .await
             .unwrap_or_default();
-        let mut notes = Vec::new();
-        for (backlink_note, _ctx) in &backlinks {
-            if let Ok(Some(full_note)) = self.note_repo.get_note(&backlink_note.id).await {
-                notes.push(full_note);
-            }
-        }
-        notes
+        let backlink_ids: Vec<String> = backlinks.iter().map(|(n, _)| n.id.clone()).collect();
+        self.note_repo
+            .get_notes_by_ids(&backlink_ids)
+            .await
+            .unwrap_or_default()
     }
 }
 

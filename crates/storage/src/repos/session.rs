@@ -115,6 +115,45 @@ impl SessionRepo {
             .ok_or_not_found(&format!("session '{}'", key))
     }
 
+    /// Fetch sessions by a list of keys. Missing keys are silently skipped.
+    pub async fn get_sessions_by_keys(
+        &self,
+        keys: &[String],
+    ) -> Result<Vec<SessionRow>, StorageError> {
+        if keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM sessions WHERE key IN (");
+        let mut sep = qb.separated(", ");
+        for key in keys {
+            sep.push_bind(key);
+        }
+        qb.push(")");
+        let rows = qb.build_query_as::<SessionRow>().fetch_all(&self.pool).await?;
+        Ok(rows)
+    }
+
+    /// List recent sessions with message counts, ordered by updated_at descending.
+    pub async fn list_recent(&self, limit: i64) -> Result<Vec<SessionListRow>, StorageError> {
+        let rows = sqlx::query_as::<_, SessionListRow>(
+            "SELECT s.key, s.metadata, s.created_at, s.updated_at,
+                    COALESCE(counts.cnt, 0) AS message_count,
+                    s.project_id, s.conversation_type, s.pinned
+             FROM sessions s
+             LEFT JOIN (
+                 SELECT session_key, COUNT(*) AS cnt
+                 FROM session_messages
+                 GROUP BY session_key
+             ) counts ON counts.session_key = s.key
+             ORDER BY s.updated_at DESC
+             LIMIT ?1",
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// List all sessions with message counts, ordered by updated_at descending.
     pub async fn list_sessions(&self) -> Result<Vec<SessionListRow>, StorageError> {
         let rows = sqlx::query_as::<_, SessionListRow>(
