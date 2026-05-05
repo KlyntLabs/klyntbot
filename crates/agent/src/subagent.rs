@@ -134,6 +134,9 @@ pub struct SubagentManager {
     event_tx: std::sync::Mutex<
         Option<tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>>,
     >,
+    /// Live per-agent progress (iteration, last_tool) updated by the forwarder
+    /// spawned from `run_subagent_task`. Read by `list_active`.
+    progress: Arc<dashmap::DashMap<String, (u32, Option<String>)>>,
 }
 
 /// Builder for SubagentManager
@@ -217,6 +220,7 @@ impl SubagentManagerBuilder {
             hook_engine: std::sync::Mutex::new(self.hook_engine),
             registry_cache: std::sync::Mutex::new(HashMap::new()),
             event_tx: std::sync::Mutex::new(self.event_sender),
+            progress: Arc::new(dashmap::DashMap::new()),
         }
     }
 }
@@ -389,6 +393,7 @@ impl SubagentManager {
             let lock = self.event_tx.lock().unwrap();
             lock.clone()
         };
+        let progress_ref = Arc::clone(&self.progress);
 
         tokio::spawn(async move {
             // Acquire permit before running — limits concurrent subagents.
@@ -404,10 +409,17 @@ impl SubagentManager {
                 _ = cancel_token.cancelled() => {
                     Err("Cancelled by user".into())
                 }
-                r = run_subagent_task(&provider, &workspace, &model, &task, config, profile, tool_kit, hook_engine.clone(), origin_key.clone(), base_registry) => {
+                r = run_subagent_task(
+                    &provider, &workspace, &model, &task, config, profile,
+                    tool_kit, hook_engine.clone(), origin_key.clone(), base_registry,
+                    short_id_clone.clone(), Arc::clone(&progress_ref), event_tx_clone.clone(),
+                ) => {
                     r
                 }
             };
+
+            // Drop progress entry (subagent is no longer active).
+            progress_ref.remove(&short_id_clone);
 
             // Remove handle after completion
             {
@@ -499,14 +511,19 @@ impl SubagentManager {
             .filter(|(_, h)| !h.cancel_token.is_cancelled())
             .map(|(id, h)| {
                 let duration_ms = h.spawned_at.elapsed().as_millis() as u64;
+                let (iteration, last_tool) = self
+                    .progress
+                    .get(id)
+                    .map(|e| e.value().clone())
+                    .unwrap_or((0, None));
                 SubagentHandleSummary {
                     agent_id: id.clone(),
                     label: h.label.clone(),
                     profile: h.profile.to_string(),
-                    iteration: 0, // Progress events not yet wired; hard-coded default.
+                    iteration,
                     status: "running".into(),
                     started_at: h.spawned_at_ms,
-                    last_tool: None,
+                    last_tool,
                     duration_ms,
                 }
             })
@@ -566,6 +583,7 @@ impl SpawnHandler for SubagentManager {
 /// - ReadOnly: read-only / network / interaction tools
 /// - ReadWrite: read-only + mutating tools
 /// - Full: all tools including plan-mode
+#[allow(clippy::too_many_arguments)]
 async fn run_subagent_task(
     provider: &DynProvider,
     workspace: &std::path::Path,
@@ -577,6 +595,11 @@ async fn run_subagent_task(
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     session_key: String,
     base_registry: Option<Arc<RwLock<ToolRegistry>>>,
+    agent_id: String,
+    progress: Arc<dashmap::DashMap<String, (u32, Option<String>)>>,
+    lifecycle_tx: Option<
+        tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>,
+    >,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
     use crate::execution::budget::{DepthMode, ExecutionBudget};
     use crate::execution::core::ExecutionCore;
@@ -655,6 +678,49 @@ async fn run_subagent_task(
         120_000, // generous token budget for subagents
         profile.max_iterations(),
     );
+
+    // Side channel: translate AgentEvent::IterationStart / ToolStart into
+    // SubagentLifecycleEvent::Progress so the SubagentTray UI can update mid-flight,
+    // and keep a live (iteration, last_tool) snapshot in the shared progress map
+    // so SubagentManager::list_active reports the real iteration count.
+    let (agent_event_tx, mut agent_event_rx) =
+        tokio::sync::mpsc::channel::<crate::events::AgentEvent>(64);
+    let forwarder = tokio::spawn({
+        let progress = Arc::clone(&progress);
+        let agent_id = agent_id.clone();
+        async move {
+            while let Some(ev) = agent_event_rx.recv().await {
+                match ev {
+                    crate::events::AgentEvent::IterationStart { iteration, .. } => {
+                        let iter_u32 = iteration as u32;
+                        let last_tool = progress
+                            .get(&agent_id)
+                            .map(|e| e.value().1.clone())
+                            .unwrap_or(None);
+                        progress.insert(agent_id.clone(), (iter_u32, last_tool.clone()));
+                        if let Some(ref tx) = lifecycle_tx {
+                            let _ = tx.send(
+                                crate::subagent_events::SubagentLifecycleEvent::Progress {
+                                    agent_id: agent_id.clone(),
+                                    iteration: iter_u32,
+                                    last_tool,
+                                },
+                            );
+                        }
+                    }
+                    crate::events::AgentEvent::ToolStart { name, .. } => {
+                        let iteration = progress
+                            .get(&agent_id)
+                            .map(|e| e.value().0)
+                            .unwrap_or(0);
+                        progress.insert(agent_id.clone(), (iteration, Some(name)));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    });
+
     let result = execute_loop(
         &core,
         messages,
@@ -662,10 +728,15 @@ async fn run_subagent_task(
         &params,
         &mut budget,
         &routing_ctx,
-        None,
+        Some(agent_event_tx),
     )
     .await
-    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>);
+
+    // Channel sender dropped at this point (execute_loop returned, sender out of scope);
+    // forwarder loop terminates naturally as recv() returns None.
+    let _ = forwarder.await;
+    let result = result?;
 
     Ok(("ok".to_string(), result.content))
 }
@@ -867,6 +938,9 @@ mod tests {
             Some(kit),
             None,
             "test:session".to_string(),
+            None,
+            "agent-1".to_string(),
+            Arc::new(dashmap::DashMap::new()),
             None,
         )
         .await;

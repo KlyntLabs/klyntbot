@@ -29,6 +29,7 @@ export type SlashCategory =
   | "sessions"
   | "permissions"
   | "recall"
+  | "agent"
   | "help";
 
 export type DispatchResult =

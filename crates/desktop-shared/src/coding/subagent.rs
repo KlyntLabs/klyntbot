@@ -60,3 +60,11 @@ pub struct SubagentDetail {
     pub tokens_used: u64,
     pub duration_ms: u64,
 }
+
+// Per-thread channels are emitted as `agent:subagent_event#<thread_id>` via raw
+// `app.emit` (see crates/desktop/src/app_core.rs::fan_subagent_events_to_tauri).
+// Frontend uses `listen<SubagentEvent>(...)` raw; this `NAME` is a registration
+// placeholder so the type appears in the generated bindings.
+impl tauri_specta::Event for SubagentEvent {
+    const NAME: &'static str = "agent:subagent_event";
+}

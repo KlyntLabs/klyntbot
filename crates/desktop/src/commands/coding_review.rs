@@ -7,11 +7,10 @@ pub async fn coding_review_start(
     thread_id: String,
     target: Option<String>,
     delivery: Option<String>,
-) -> serde_json::Value {
+) -> app_core::coding::review_handler::ReviewResult {
     state
         .coding_review_start(&thread_id, target.as_deref(), delivery.as_deref())
         .await
-        .map(|r| serde_json::to_value(r).unwrap_or_default())
         .map_err(|e| ApiError::new("REVIEW_ERROR", e.to_string()))
 }
 

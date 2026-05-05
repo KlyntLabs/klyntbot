@@ -1273,6 +1273,7 @@ impl AppCore {
             subagent_events: bus::TypedBroker::new(256),
             thread_subscriptions: Arc::new(dashmap::DashMap::new()),
             steer_queue: Arc::new(crate::coding::steer_queue::SteerQueue::new()),
+            tool_kit: std::sync::Mutex::new(None),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────
@@ -1927,6 +1928,8 @@ impl AppCore {
             let kit_arc = Arc::new(kit);
             core.agent.runtime().set_tool_kit(Arc::clone(&kit_arc));
             core.agent.set_subagent_tool_kit(Arc::clone(&kit_arc));
+            // Sprint-A T2: stash for review_handler to build a read-only registry.
+            *core.tool_kit.lock().unwrap() = Some(Arc::clone(&kit_arc));
             if let Some(ref engine) = hook_engine {
                 core.agent.runtime().set_hook_engine(Arc::clone(engine));
                 core.agent.set_subagent_hook_engine(Arc::clone(engine));

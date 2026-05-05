@@ -142,7 +142,11 @@ async fn build_plan(
                     object,
                     confidence,
                     memory_type,
-                    sensitivity,
+                    sensitivity: match sensitivity.as_str() {
+                        "high" => crate::scope::Sensitivity::High,
+                        "excluded" => crate::scope::Sensitivity::Excluded,
+                        _ => crate::scope::Sensitivity::Normal,
+                    },
                     scope_repo_id,
                     valid_from,
                 }

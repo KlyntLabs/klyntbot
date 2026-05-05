@@ -6,7 +6,7 @@ export type CodingMode = "general" | "coding";
 
 export function useCodingMode(threadId: string | null) {
   const [mode, setModeState] = useState<CodingMode>("general");
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
 
   useEffect(() => {
     if (!threadId) return;

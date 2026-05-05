@@ -208,6 +208,10 @@ pub struct AppCore {
     /// iterations and persists each entry as a synthetic user message so the
     /// next iteration's prompt assembly picks it up.
     pub steer_queue: Arc<crate::coding::steer_queue::SteerQueue>,
+    /// Coding ToolKitBuilder — set by init/mod.rs after the kit is registered with
+    /// the agent runtime. Cloned on demand by handlers that need to construct a
+    /// scoped (e.g. read-only) registry — currently `coding_review_start`.
+    pub tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
 }
 
 /// State for an active thread subscription.

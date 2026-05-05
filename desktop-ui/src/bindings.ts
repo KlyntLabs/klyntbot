@@ -846,7 +846,7 @@ async codingThreadUnsubscribe(subscriptionId: string) : Promise<Result<null, Api
     else return { status: "error", error: e  as any };
 }
 },
-async codingThreadRefreshAgentsMd(threadId: string) : Promise<Result<JsonValue, ApiError>> {
+async codingThreadRefreshAgentsMd(threadId: string) : Promise<Result<AgentsMdSource[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_thread_refresh_agents_md", { threadId }) };
 } catch (e) {
@@ -886,7 +886,7 @@ async codingRecallStats(workspaceId: string, days: number | null) : Promise<Resu
     else return { status: "error", error: e  as any };
 }
 },
-async codingReviewStart(threadId: string, target: string | null, delivery: string | null) : Promise<Result<JsonValue, ApiError>> {
+async codingReviewStart(threadId: string, target: string | null, delivery: string | null) : Promise<Result<ReviewResult, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_review_start", { threadId, target, delivery }) };
 } catch (e) {
@@ -3663,6 +3663,30 @@ async showStatusBadge(text: string, kind: BadgeKind, durationMs: number | null) 
     else return { status: "error", error: e  as any };
 }
 },
+async subagentListActive(threadId: string) : Promise<Result<SubagentActiveSummary[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("subagent_list_active", { threadId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async subagentCancel(agentId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("subagent_cancel", { agentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async subagentInspect(agentId: string) : Promise<Result<SubagentDetail, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("subagent_inspect", { agentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async tracingListProviders() : Promise<Result<ProviderInfo[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("tracing_list_providers") };
@@ -4280,6 +4304,7 @@ activitySwitch: ActivitySwitchPayload,
 activityTick: ActivityTickPayload,
 agentAgentSelected: AgentSelectedPayload,
 agentError: AgentErrorPayload,
+agentSubagentEvent: SubagentEvent,
 autotunerPromotion: MemoryPromotedPayload,
 bucketCompleted: BucketPayload,
 budgetWarningPayload: BudgetWarningPayload,
@@ -4345,6 +4370,7 @@ activitySwitch: "activity:switch",
 activityTick: "activity:tick",
 agentAgentSelected: "agent:agent_selected",
 agentError: "agent:error",
+agentSubagentEvent: "agent:subagent_event",
 autotunerPromotion: "autotuner:promotion",
 bucketCompleted: "bucket:completed",
 budgetWarningPayload: "budget-warning-payload",
@@ -4466,6 +4492,22 @@ hasOverride: boolean }
 export type AgentProfileSummary = { name: string; description: string; isBuiltin: boolean; hasOverride: boolean; files: AgentFileSummary[] }
 export type AgentSelectedPayload = { sessionKey: string; name: string; description: string }
 export type AgentStatusResponse = { status: string; activeTaskCount: number; focusTask: TaskResponse | null }
+/**
+ * A discovered AGENTS.md file and its context.
+ */
+export type AgentsMdSource = { 
+/**
+ * Absolute path to the AGENTS.md file.
+ */
+path: string; 
+/**
+ * Directory the file was found in.
+ */
+dir: string; 
+/**
+ * File contents.
+ */
+contents: string }
 export type AiSuggestionResponse = { suggestion: string | null; confidence: number; relatedFactIds: string[] }
 /**
  * Info about a detected AI coding tool.
@@ -5229,6 +5271,11 @@ export type ResumeResult = { session_key: string; title: string }
 export type RetentionHistoryResponse = { overall: RetentionPoint[]; domains: DomainHistory[] }
 export type RetentionPoint = { date: string; avgRetention: number; reviewCount: number }
 export type RetrievalEnhancedPayload = { sessionKey: string; stages: EnhancementStagePayload[]; totalLatencyMs: number; totalLlmCalls: number }
+export type ReviewIssue = { severity: string; file: string | null; line: number | null; description: string; suggestion: string | null }
+/**
+ * Result for coding_review_start.
+ */
+export type ReviewResult = { reviewId: string; threadId: string; summary: string; issues: ReviewIssue[] }
 export type ReviewSessionSaveParams = { sessionId: string; cardsReviewed: number; avgScore: number; durationSeconds: number; modesUsed: string[]; propagationCount: number; weakCardIds: string[]; sessionData: string; 
 /**
  * "completed" | "abandoned"
@@ -5369,6 +5416,10 @@ export type StatusLabelResponse = { id: string; workflowId: string; name: string
 export type StatusWorkflowResponse = { id: string; name: string; isTemplate: boolean; isGlobalDefault: boolean; labels: StatusLabelResponse[] }
 export type StrategyFeedbackResponse = { strategyType: string; domain: string; timesUsed: number; acceptanceRate: number; effectiveness: number; behavioralPositive: number; behavioralNegative: number }
 export type StrugglingCardResponse = { id: string; front: string; back: string; deck: string; lapses: number; reviewCount: number; sourceNoteId: string | null }
+export type SubagentActiveSummary = { agentId: string; label: string; profile: string; iteration: number; status: string; startedAt: number; lastTool: string | null; durationMs: number }
+export type SubagentCancelReason = "user_requested" | "timeout" | "parent_cancelled" | "policy_violation"
+export type SubagentDetail = { agentId: string; messages: JsonValue[]; tokensUsed: number; durationMs: number }
+export type SubagentEvent = { kind: "spawned"; agent_id: string; label: string; profile: string; parent_session_id: string; spawned_at: number } | { kind: "progress"; agent_id: string; iteration: number; last_tool: string | null } | { kind: "completed"; agent_id: string; success: boolean; summary: string; tokens_used: number; duration_ms: number } | { kind: "cancelled"; agent_id: string; reason: SubagentCancelReason; cancelled_at: number }
 export type SubagentSpawnedPayload = { sessionKey: string; label: string; profile: string }
 export type SubagentSummary = { agentId: string; subagentType: string; status: string; description: string | null; createdAt: string; updatedAt: string; eventCount: number }
 export type SubagentTypeCount = { subagentType: string; count: number }

@@ -42,6 +42,7 @@ export function useCodingSessions(
             sessionKey: t.id,
             title: t.title ?? "Untitled session",
             updatedAt: new Date(t.updatedAt).toISOString(),
+            messageCount: 0,
           };
         }),
       );
