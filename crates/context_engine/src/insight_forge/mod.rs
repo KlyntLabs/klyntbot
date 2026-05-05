@@ -66,6 +66,55 @@ pub struct InsightForge {
     circuit_breaker: CircuitBreaker,
 }
 
+/// Reciprocal Rank Fusion merge across multiple ranked lists of memory entries.
+///
+/// For each ranked list, each item receives `1 / (k + rank + 1)` where
+/// `k = 60`. Items appearing in multiple lists accumulate scores.
+/// The result is sorted by score descending, deduplicated by ID, and
+/// re-normalised so the top score is 1.0.
+pub(super) fn rrf_merge(ranked_lists: &[Vec<MemoryEntry>], limit: usize) -> Vec<MemoryEntry> {
+    const K: f64 = 60.0;
+
+    // Accumulate scores per ID.
+    let mut score_map: HashMap<String, f64> = HashMap::new();
+    let mut entry_map: HashMap<String, MemoryEntry> = HashMap::new();
+
+    for list in ranked_lists {
+        for (rank, entry) in list.iter().enumerate() {
+            let rrf_score = 1.0 / (K + rank as f64 + 1.0);
+            *score_map.entry(entry.id.clone()).or_insert(0.0) += rrf_score;
+            // Keep the entry with the highest original score for each ID.
+            entry_map
+                .entry(entry.id.clone())
+                .and_modify(|existing| {
+                    if entry.score > existing.score {
+                        *existing = entry.clone();
+                    }
+                })
+                .or_insert_with(|| entry.clone());
+        }
+    }
+
+    // Sort by accumulated RRF score descending.
+    let mut scored: Vec<(String, f64)> = score_map.into_iter().collect();
+    scored.sort_by(|a, b| b.1.total_cmp(&a.1));
+    scored.truncate(limit);
+
+    // Re-normalise scores to 0.0–1.0.
+    let max_score = scored.first().map(|(_, s)| *s).unwrap_or(1.0);
+    let normaliser = if max_score > 0.0 { max_score } else { 1.0 };
+
+    scored
+        .into_iter()
+        .filter_map(|(id, rrf_score)| {
+            entry_map.remove(&id).map(|mut e| {
+                e.score = rrf_score / normaliser;
+                e
+            })
+        })
+        .collect()
+}
+
 impl InsightForge {
     /// Create a new InsightForge orchestrator.
     pub fn new(
@@ -347,53 +396,8 @@ impl InsightForge {
         budgeted
     }
 
-    /// Reciprocal Rank Fusion merge.
-    ///
-    /// For each ranked list, each item receives `1 / (k + rank + 1)` where
-    /// `k = 60`.  Items appearing in multiple lists accumulate scores.
-    /// The result is sorted by score descending, deduplicated by ID, and
-    /// re-normalised so the top score is 1.0.
     fn rrf_merge(&self, ranked_lists: &[Vec<MemoryEntry>], limit: usize) -> Vec<MemoryEntry> {
-        const K: f64 = 60.0;
-
-        // Accumulate scores per ID.
-        let mut score_map: HashMap<String, f64> = HashMap::new();
-        let mut entry_map: HashMap<String, MemoryEntry> = HashMap::new();
-
-        for list in ranked_lists {
-            for (rank, entry) in list.iter().enumerate() {
-                let rrf_score = 1.0 / (K + rank as f64 + 1.0);
-                *score_map.entry(entry.id.clone()).or_insert(0.0) += rrf_score;
-                // Keep the entry with the highest original score for each ID.
-                entry_map
-                    .entry(entry.id.clone())
-                    .and_modify(|existing| {
-                        if entry.score > existing.score {
-                            *existing = entry.clone();
-                        }
-                    })
-                    .or_insert_with(|| entry.clone());
-            }
-        }
-
-        // Sort by accumulated RRF score descending.
-        let mut scored: Vec<(String, f64)> = score_map.into_iter().collect();
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        scored.truncate(limit);
-
-        // Re-normalise scores to 0.0–1.0.
-        let max_score = scored.first().map(|(_, s)| *s).unwrap_or(1.0);
-        let normaliser = if max_score > 0.0 { max_score } else { 1.0 };
-
-        scored
-            .into_iter()
-            .filter_map(|(id, rrf_score)| {
-                entry_map.remove(&id).map(|mut e| {
-                    e.score = rrf_score / normaliser;
-                    e
-                })
-            })
-            .collect()
+        rrf_merge(ranked_lists, limit)
     }
 
     /// Fallback: plain memory retrieval without decomposition or domain search.
@@ -485,14 +489,10 @@ mod tests {
 
     #[test]
     fn test_rrf_merge_deduplicates() {
-        let retriever = Arc::new(MockRetriever { entries: vec![] });
-        let decomposer = Arc::new(HeuristicDecomposer);
-        let forge = InsightForge::new(InsightForgeConfig::default(), decomposer, retriever);
-
         let list1 = vec![make_entry("a", 0.9), make_entry("b", 0.7)];
         let list2 = vec![make_entry("a", 0.8), make_entry("c", 0.6)];
 
-        let merged = forge.rrf_merge(&[list1, list2], 10);
+        let merged = super::rrf_merge(&[list1, list2], 10);
 
         // "a" appears in both lists → should rank highest.
         assert_eq!(merged[0].id, "a", "Item in both lists should rank first");

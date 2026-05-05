@@ -387,7 +387,7 @@ impl NoteTreeNavigator {
         );
 
         // RRF merge.
-        let merged = rrf_merge(&[simple, hierarchical], limit);
+        let merged = super::rrf_merge(&[simple, hierarchical], limit);
 
         // Dedup by node_id.
         let deduped = dedup_by_node_id(merged);
@@ -577,50 +577,6 @@ impl DomainSearcher for NoteTreeNavigator {
 // ---------------------------------------------------------------------------
 // Shared utilities
 // ---------------------------------------------------------------------------
-
-/// Reciprocal Rank Fusion merge across multiple ranked lists.
-///
-/// Each item receives `1 / (k + rank + 1)` where `k = 60`. Items appearing
-/// in multiple lists accumulate scores. Result is sorted descending and
-/// re-normalised so the top score is 1.0.
-fn rrf_merge(ranked_lists: &[Vec<MemoryEntry>], limit: usize) -> Vec<MemoryEntry> {
-    const K: f64 = 60.0;
-
-    let mut score_map: HashMap<String, f64> = HashMap::new();
-    let mut entry_map: HashMap<String, MemoryEntry> = HashMap::new();
-
-    for list in ranked_lists {
-        for (rank, entry) in list.iter().enumerate() {
-            let rrf_score = 1.0 / (K + rank as f64 + 1.0);
-            *score_map.entry(entry.id.clone()).or_insert(0.0) += rrf_score;
-            entry_map
-                .entry(entry.id.clone())
-                .and_modify(|existing| {
-                    if entry.score > existing.score {
-                        *existing = entry.clone();
-                    }
-                })
-                .or_insert_with(|| entry.clone());
-        }
-    }
-
-    let mut scored: Vec<(String, f64)> = score_map.into_iter().collect();
-    scored.sort_by(|a, b| b.1.total_cmp(&a.1));
-    scored.truncate(limit);
-
-    let max_score = scored.first().map(|(_, s)| *s).unwrap_or(1.0);
-    let normaliser = if max_score > 0.0 { max_score } else { 1.0 };
-
-    scored
-        .into_iter()
-        .filter_map(|(id, rrf_score)| {
-            entry_map.remove(&id).map(|mut e| {
-                e.score = rrf_score / normaliser;
-                e
-            })
-        })
-        .collect()
-}
 
 /// Deduplicate entries by their `id` (node_id), keeping the highest-scored entry.
 fn dedup_by_node_id(entries: Vec<MemoryEntry>) -> Vec<MemoryEntry> {
@@ -841,7 +797,7 @@ mod tests {
             },
         ];
 
-        let merged = rrf_merge(&[list1, list2], 10);
+        let merged = super::rrf_merge(&[list1, list2], 10);
 
         // "x" appears in both lists → should rank first.
         assert_eq!(merged[0].id, "x");
