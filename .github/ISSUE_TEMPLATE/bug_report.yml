@@ -1,0 +1,119 @@
+name: Bug Report
+description: Report a reproducible bug in Klyntbot.
+title: "bug: <short description>"
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Please fill out as much as you can — incomplete reports are harder to act on.
+
+        **Do not file security vulnerabilities here.** See [SECURITY.md](https://github.com/KlyntLabs/klyntbot/blob/main/SECURITY.md).
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight checks
+      options:
+        - label: I have searched existing issues and Discussions and this is not a duplicate.
+          required: true
+        - label: I am using the latest release or `main`.
+          required: true
+        - label: This is not a security vulnerability (those go to a private Security Advisory).
+          required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences describing the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps. Include any config, prompts, or commands needed.
+      placeholder: |
+        1. Run `cargo tauri dev`
+        2. Open the launcher with Alt+Cmd+Period
+        3. Type "…"
+        4. Observe the crash
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error messages, stack traces, or screenshots if relevant.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Klyntbot version
+      description: Tagged release (e.g. `0.1.0`) or commit SHA if building from source.
+      placeholder: "0.1.0 or a1b2c3d"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: arch
+    attributes:
+      label: Architecture
+      options:
+        - Apple Silicon (arm64)
+        - Intel (x86_64)
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "14.5"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      multiple: true
+      options:
+        - Desktop app (Tauri)
+        - Browser dev mode
+        - MCP server
+        - Channel — Telegram
+        - Channel — Discord
+        - Channel — Slack
+        - Channel — Email
+        - Cognitive memory
+        - Agent runtime / tools
+        - Other / unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        Logs from `~/.klyntbot/` or terminal output. **Scrub API keys and personal data before pasting.**
+      render: shell
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else that might help — config snippets, related issues, recent changes you made.
