@@ -49,10 +49,13 @@ impl RetrievalSkill for QueryDecomposer {
     }
     async fn apply(&self, ctx: &EscalationContext) -> common::Result<EscalationOutcome> {
         let subs = decompose(&ctx.query);
+        let results = futures::future::try_join_all(
+            subs.iter().map(|q| (self.retrieve)(q.clone())),
+        )
+        .await?;
         let mut id_rank: HashMap<Uuid, f32> = HashMap::new();
         let mut sims_all = Vec::new();
-        for q in &subs {
-            let (sims, ids) = (self.retrieve)(q.clone()).await?;
+        for (sims, ids) in results {
             sims_all.extend(sims);
             for (rank, id) in ids.iter().enumerate() {
                 let rrf = 1.0_f32 / (60.0 + rank as f32);

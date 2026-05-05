@@ -21,14 +21,20 @@ impl CausalEdgeDetector {
 
     /// Run all three detection rules for one session. Returns count of edges inserted.
     pub async fn detect_for_session(&self, session_id: &str) -> common::Result<u32> {
-        let mut count = 0;
-        count += self.detect_test_flip(session_id).await?;
-        count += self.detect_fix_attempt_test_correlation(session_id).await?;
-        count += self.detect_problem_hash_chain(session_id).await?;
+        let (a, b, c) = tokio::try_join!(
+            self.detect_test_flip(session_id),
+            self.detect_fix_attempt_test_correlation(session_id),
+            self.detect_problem_hash_chain(session_id),
+        )?;
+        let mut all = a;
+        all.extend(b);
+        all.extend(c);
+        let count = u32::try_from(all.len()).unwrap_or(u32::MAX);
+        self.edges.insert_many(&all).await?;
         Ok(count)
     }
 
-    async fn detect_test_flip(&self, session_id: &str) -> common::Result<u32> {
+    async fn detect_test_flip(&self, session_id: &str) -> common::Result<Vec<CausalEdge>> {
         let pool = self.episodes.pool();
         let rows: Vec<(String, String, String, String)> =
             sqlx::query_as::<_, (String, String, String, String)>(
@@ -43,7 +49,7 @@ impl CausalEdgeDetector {
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("test runs: {e}")))?;
 
-        let mut count = 0;
+        let mut out = Vec::new();
         for window in rows.windows(2) {
             let (prev_id, prev_content, _, _) = &window[0];
             let (curr_id, curr_content, _, _) = &window[1];
@@ -56,22 +62,23 @@ impl CausalEdgeDetector {
                 .and_then(|v| v.get("failed").and_then(|n| n.as_u64()).map(|n| n > 0))
                 .unwrap_or(false);
             if prev_passed && curr_failed {
-                let edge = CausalEdge {
+                out.push(CausalEdge {
                     id: uuid::Uuid::new_v4(),
                     from_id: uuid::Uuid::parse_str(prev_id).unwrap_or_else(|_| uuid::Uuid::nil()),
                     to_id: uuid::Uuid::parse_str(curr_id).unwrap_or_else(|_| uuid::Uuid::nil()),
                     edge_kind: crate::scope::CausalEdgeKind::FlippedToFail,
                     confidence: 0.85,
                     inferred_at: jiff::Timestamp::now(),
-                };
-                self.edges.insert(&edge).await?;
-                count += 1;
+                });
             }
         }
-        Ok(count)
+        Ok(out)
     }
 
-    async fn detect_fix_attempt_test_correlation(&self, session_id: &str) -> common::Result<u32> {
+    async fn detect_fix_attempt_test_correlation(
+        &self,
+        session_id: &str,
+    ) -> common::Result<Vec<CausalEdge>> {
         let pool = self.episodes.pool();
         let rows: Vec<(String, String, String, String)> =
             sqlx::query_as::<_, (String, String, String, String)>(
@@ -103,7 +110,7 @@ impl CausalEdgeDetector {
             by_turn.entry(turn).or_default().push((id, kind, v));
         }
 
-        let mut count = 0;
+        let mut out = Vec::new();
         for (_turn, items) in by_turn {
             let fix = items.iter().find(|(_, k, _)| k == "fix_attempt");
             let test = items.iter().find(|(_, k, _)| k == "test_run");
@@ -114,22 +121,20 @@ impl CausalEdgeDetector {
                 } else {
                     crate::scope::CausalEdgeKind::Broke
                 };
-                let edge = CausalEdge {
+                out.push(CausalEdge {
                     id: uuid::Uuid::new_v4(),
                     from_id: uuid::Uuid::parse_str(fix_id).unwrap_or_else(|_| uuid::Uuid::nil()),
                     to_id: uuid::Uuid::parse_str(test_id).unwrap_or_else(|_| uuid::Uuid::nil()),
                     edge_kind: kind,
                     confidence: 0.7,
                     inferred_at: jiff::Timestamp::now(),
-                };
-                self.edges.insert(&edge).await?;
-                count += 1;
+                });
             }
         }
-        Ok(count)
+        Ok(out)
     }
 
-    async fn detect_problem_hash_chain(&self, session_id: &str) -> common::Result<u32> {
+    async fn detect_problem_hash_chain(&self, session_id: &str) -> common::Result<Vec<CausalEdge>> {
         let pool = self.episodes.pool();
         let rows: Vec<(String, Option<String>)> = sqlx::query_as::<_, (String, Option<String>)>(
             "SELECT id, json_extract(metadata, '$.problemHash') AS h \
@@ -151,10 +156,10 @@ impl CausalEdgeDetector {
                 by_hash.entry(h).or_default().push(id);
             }
         }
-        let mut count = 0;
+        let mut out = Vec::new();
         for (_h, ids) in by_hash {
             for window in ids.windows(2) {
-                let edge = CausalEdge {
+                out.push(CausalEdge {
                     id: uuid::Uuid::new_v4(),
                     from_id: uuid::Uuid::parse_str(&window[0])
                         .unwrap_or_else(|_| uuid::Uuid::nil()),
@@ -162,11 +167,9 @@ impl CausalEdgeDetector {
                     edge_kind: crate::scope::CausalEdgeKind::SharesRootCause,
                     confidence: 0.6,
                     inferred_at: jiff::Timestamp::now(),
-                };
-                self.edges.insert(&edge).await?;
-                count += 1;
+                });
             }
         }
-        Ok(count)
+        Ok(out)
     }
 }

@@ -98,7 +98,7 @@ impl SymbolValidationPhase {
                 } else {
                     repo_root.join(&anchor.file_path)
                 };
-                let Ok(source) = std::fs::read_to_string(&abs_path) else {
+                let Ok(source) = tokio::fs::read_to_string(&abs_path).await else {
                     any_deleted = true;
                     continue;
                 };

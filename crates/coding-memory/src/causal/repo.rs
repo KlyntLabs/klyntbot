@@ -29,20 +29,39 @@ impl CausalEdgeRepo {
 
     /// Insert a new edge. Idempotent on `id`.
     pub async fn insert(&self, edge: &CausalEdge) -> common::Result<()> {
-        sqlx::query(
-            "INSERT OR IGNORE INTO memory_causal_edges \
-             (id, from_id, to_id, edge_kind, confidence, inferred_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        )
-        .bind(edge.id.to_string())
-        .bind(edge.from_id.to_string())
-        .bind(edge.to_id.to_string())
-        .bind(kind_str(edge.edge_kind))
-        .bind(edge.confidence as f64)
-        .bind(edge.inferred_at.to_string())
-        .execute(self.pool.inner())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(format!("causal insert: {e}")))?;
+        self.insert_many(std::slice::from_ref(edge)).await
+    }
+
+    /// Insert many edges in a single transaction. Idempotent on `id`.
+    pub async fn insert_many(&self, edges: &[CausalEdge]) -> common::Result<()> {
+        if edges.is_empty() {
+            return Ok(());
+        }
+        let mut tx = self
+            .pool
+            .inner()
+            .begin()
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("causal tx: {e}")))?;
+        for edge in edges {
+            sqlx::query(
+                "INSERT OR IGNORE INTO memory_causal_edges \
+                 (id, from_id, to_id, edge_kind, confidence, inferred_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            )
+            .bind(edge.id.to_string())
+            .bind(edge.from_id.to_string())
+            .bind(edge.to_id.to_string())
+            .bind(kind_str(edge.edge_kind))
+            .bind(edge.confidence as f64)
+            .bind(edge.inferred_at.to_string())
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("causal insert: {e}")))?;
+        }
+        tx.commit()
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("causal commit: {e}")))?;
         Ok(())
     }
 

@@ -2555,6 +2555,7 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
+ "specta",
  "tempfile",
  "tracing",
 ]
@@ -2600,6 +2601,7 @@ dependencies = [
  "common",
  "context_engine",
  "dirs",
+ "futures",
  "git2",
  "jiff",
  "lru",

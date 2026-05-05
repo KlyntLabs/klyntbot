@@ -338,6 +338,29 @@ impl SemanticFactRepo {
         Ok(row.0)
     }
 
+    /// Mark facts as invalidated (set `valid_until = now` if not already set) for
+    /// the given ids in a single batched UPDATE.
+    pub async fn invalidate_batch(&self, ids: &[&str]) -> Result<(), sqlx::Error> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let placeholders = (1..=ids.len())
+            .map(|i| format!("?{i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "UPDATE semantic_facts \
+             SET valid_until = COALESCE(valid_until, datetime('now')) \
+             WHERE id IN ({placeholders})"
+        );
+        let mut q = sqlx::query(&sql);
+        for id in ids {
+            q = q.bind(id);
+        }
+        q.execute(&self.pool).await?;
+        Ok(())
+    }
+
     /// Fetch multiple facts by ID in a single query.
     pub async fn get_batch(&self, ids: &[&str]) -> Result<Vec<SemanticFact>, sqlx::Error> {
         if ids.is_empty() {

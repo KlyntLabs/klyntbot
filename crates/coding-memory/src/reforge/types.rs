@@ -78,8 +78,14 @@ pub struct CausalChainGroup {
     pub problem_hash: String,
     /// Member edges.
     pub edge_ids: Vec<Uuid>,
-    /// Edge count.
-    pub count: u32,
+}
+
+impl CausalChainGroup {
+    /// Edge count, derived from `edge_ids`.
+    #[must_use]
+    pub fn count(&self) -> usize {
+        self.edge_ids.len()
+    }
 }
 
 /// Output bundle from the LLM — six action variants.
@@ -250,7 +256,7 @@ pub struct SerializableSemanticFact {
     /// Memory type (e.g. `fact`, `counterfactual`).
     pub memory_type: String,
     /// Sensitivity (`normal`/`high`/`excluded`).
-    pub sensitivity: String,
+    pub sensitivity: crate::scope::Sensitivity,
     /// Repo scope id.
     pub scope_repo_id: Option<String>,
     /// `valid_from`.

@@ -4,9 +4,9 @@
 
 use super::{BudgetTier, EscalationContext, EscalationOutcome, RetrievalSkill};
 use bus::{DomainEvent, DomainEventBus};
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// Result of running the selector.
 #[derive(Debug, Clone)]
@@ -20,7 +20,7 @@ pub struct SelectorOutcome {
 /// Registry — built once at AppCore boot.
 pub struct RetrievalSkillRegistry {
     skills: Vec<Arc<dyn RetrievalSkill>>,
-    effectiveness: RwLock<HashMap<String, f32>>,
+    effectiveness: Mutex<HashMap<String, f32>>,
     bus: Arc<DomainEventBus>,
 }
 
@@ -41,24 +41,19 @@ impl RetrievalSkillRegistry {
         }
         Self {
             skills,
-            effectiveness: RwLock::new(eff),
+            effectiveness: Mutex::new(eff),
             bus,
         }
     }
 
     /// Read the current EMA score for a skill.
-    pub async fn effectiveness_of(&self, name: &str) -> f32 {
-        self.effectiveness
-            .read()
-            .await
-            .get(name)
-            .copied()
-            .unwrap_or(0.5)
+    pub fn effectiveness_of(&self, name: &str) -> f32 {
+        self.effectiveness.lock().get(name).copied().unwrap_or(0.5)
     }
 
     /// Update EMA after observing `outcome_value` (1.0 success, 0.0 failure, 0.5 partial).
-    pub async fn record_outcome(&self, name: &str, outcome_value: f32) {
-        let mut w = self.effectiveness.write().await;
+    pub fn record_outcome(&self, name: &str, outcome_value: f32) {
+        let mut w = self.effectiveness.lock();
         let prev = w.get(name).copied().unwrap_or(0.5);
         let next = 0.9 * prev + 0.1 * outcome_value;
         w.insert(name.to_string(), next);
@@ -77,7 +72,7 @@ impl RetrievalSkillRegistry {
             .collect();
 
         // Sort by EMA descending.
-        let eff = self.effectiveness.read().await.clone();
+        let eff = self.effectiveness.lock().clone();
         candidates.sort_by(|a, b| {
             let ae = eff.get(a.name()).copied().unwrap_or(0.5);
             let be = eff.get(b.name()).copied().unwrap_or(0.5);
@@ -100,7 +95,7 @@ impl RetrievalSkillRegistry {
                 session_id: String::new(),
             });
             let outcome_value = if out.succeeded { 1.0 } else { 0.0 };
-            self.record_outcome(&name, outcome_value).await;
+            self.record_outcome(&name, outcome_value);
             if out.succeeded {
                 last = Some(out);
                 break;

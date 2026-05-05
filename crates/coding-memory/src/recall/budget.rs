@@ -10,26 +10,32 @@ pub trait TokenBudgeter: Send + Sync {
     fn count(&self, s: &str) -> usize;
 
     /// Truncate `s` so its token count is at most `budget`. Default impl
-    /// uses byte-prefix heuristic and verifies; concrete impls may override.
+    /// estimates a tokens/char ratio with a single tokenization, then slices
+    /// at a char boundary and verifies/shrinks once. Avoids per-iteration
+    /// re-tokenization and Vec<char> allocation.
     fn truncate_to(&self, s: &str, budget: usize) -> String {
-        if self.count(s) <= budget {
+        let total = self.count(s);
+        if total <= budget {
             return s.to_string();
         }
-        // Binary-search by char count.
-        let chars: Vec<char> = s.chars().collect();
-        let mut lo = 0usize;
-        let mut hi = chars.len();
-        while lo < hi {
-            let mid = (lo + hi).div_ceil(2);
-            let candidate: String = chars[..mid].iter().collect();
-            if self.count(&candidate) <= budget {
-                lo = mid;
-            } else {
-                hi = mid - 1;
-            }
+        let char_count = s.chars().count();
+        if char_count == 0 || total == 0 {
+            return String::new();
         }
-        let mut out: String = chars[..lo].iter().collect();
-        if out.len() < s.len() && self.count(&out) < budget {
+        let target_chars = budget.saturating_mul(char_count) / total;
+        let mut end = s
+            .char_indices()
+            .nth(target_chars)
+            .map_or(s.len(), |(i, _)| i);
+        // Verify; if still over budget, walk back one char at a time.
+        while end > 0 && self.count(&s[..end]) > budget {
+            end = s[..end]
+                .char_indices()
+                .next_back()
+                .map_or(0, |(i, _)| i);
+        }
+        let mut out = s[..end].to_string();
+        if end < s.len() && self.count(&out) < budget {
             out.push('…');
         }
         out

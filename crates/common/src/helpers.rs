@@ -75,6 +75,24 @@ pub fn strip_llm_fences(s: &str) -> &str {
         .trim()
 }
 
+/// Strip fences and extract the structured JSON payload that reasoning models
+/// often emit inline in `content` instead of via the function-call protocol.
+/// Tries (in order): last balanced top-level array, then last balanced object.
+pub fn extract_llm_json_value(content: &str) -> Option<serde_json::Value> {
+    let stripped = strip_llm_fences(content);
+    if let Some(slice) = extract_last_json_array(stripped) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(slice) {
+            return Some(v);
+        }
+    }
+    if let Some(slice) = extract_json_object(stripped) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(slice) {
+            return Some(v);
+        }
+    }
+    None
+}
+
 /// Truncate a `&str` at a UTF-8 char boundary so it fits within `max_bytes`.
 ///
 /// Returns the original slice unchanged if it is already short enough.
