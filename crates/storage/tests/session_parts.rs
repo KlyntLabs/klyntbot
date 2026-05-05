@@ -1,5 +1,5 @@
 use serde_json::json;
-use storage::messages::parts::{MessagePart, ToolOutput};
+use storage::messages::parts::MessagePart;
 use storage::repos::SessionRepo;
 use storage::StoragePool;
 

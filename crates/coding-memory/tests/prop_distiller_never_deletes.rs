@@ -4,8 +4,6 @@
 use coding_memory::scope::{ProvenanceKind, ProvenanceMetadata};
 use jiff::Timestamp;
 use proptest::prelude::*;
-use storage::StoragePool;
-use uuid::Uuid;
 
 mod common;
 

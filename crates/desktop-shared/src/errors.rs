@@ -197,7 +197,7 @@ mod alias_tests {
     fn command_result_is_alias_for_result_apierror() {
         // Trivial — proves the alias resolves at compile time.
         let v: CommandResult<i32> = Ok(42);
-        assert_eq!(v.unwrap(), 42);
+        assert_eq!(v, Ok(42));
 
         let e: CommandResult<()> = Err(ApiError {
             code: "TestKind".into(),

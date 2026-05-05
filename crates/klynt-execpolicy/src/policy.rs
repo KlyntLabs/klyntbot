@@ -393,9 +393,8 @@ impl Policy {
     /// callers should split via shlex first.
     pub fn eval(&self, argv: &[&str], _cwd: Option<&std::path::Path>) -> Decision {
         let cmd: Vec<String> = argv.iter().map(|s| s.to_string()).collect();
-        match self.check(&cmd, &|_| Decision::FallThrough) {
-            Evaluation { decision, .. } => decision,
-        }
+        let Evaluation { decision, .. } = self.check(&cmd, &|_| Decision::FallThrough);
+        decision
     }
 
     /// Persist a session-only "always allow this prefix" rule. Mutating in-memory

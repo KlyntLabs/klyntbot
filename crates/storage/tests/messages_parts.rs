@@ -1,5 +1,5 @@
 use serde_json::json;
-use storage::messages::parts::{MessagePart, ToolOutput};
+use storage::messages::parts::MessagePart;
 
 #[test]
 fn message_part_text_round_trip() {

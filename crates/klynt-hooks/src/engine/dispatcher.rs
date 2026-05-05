@@ -76,10 +76,8 @@ pub async fn dispatch_event(
                         reason: outcome.reason.unwrap_or_default(),
                     };
                 }
-                if supports_modify_args && outcome.modify_args.is_some() {
-                    return HookOutcome::ModifyArgs {
-                        args: outcome.modify_args.unwrap(),
-                    };
+                if let Some(args) = outcome.modify_args {
+                    return HookOutcome::ModifyArgs { args };
                 }
             }
         }

@@ -12,6 +12,9 @@ pub use common::coverage::{CoverageDelta, FileCoverage};
 
 use std::path::Path;
 
+/// Parser function signature for coverage formats.
+type CoverageParser = fn(&Path) -> Option<CoverageDelta>;
+
 /// Detect and parse coverage output from the working directory.
 ///
 /// Probes for known coverage file formats in priority order:
@@ -20,7 +23,7 @@ use std::path::Path;
 /// 3. `target/tarpaulin/tarpaulin-report.json` → tarpaulin
 /// 4. `target/llvm-cov/json/coverage.json` → cargo-llvm-cov
 pub fn detect_and_parse(working_dir: &Path) -> Option<CoverageDelta> {
-    let candidates: &[(&str, fn(&Path) -> Option<CoverageDelta>)] = &[
+    let candidates: &[(&str, CoverageParser)] = &[
         ("lcov.info", lcov::parse_file),
         ("coverage.lcov", lcov::parse_file),
         ("coverage.xml", cobertura::parse_file),

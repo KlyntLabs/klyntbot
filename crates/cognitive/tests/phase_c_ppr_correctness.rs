@@ -24,12 +24,12 @@ fn ppr_concentrates_mass_on_seed_neighborhood() {
     let scores = personalized_pagerank(&g, &[a], &PprConfig::default());
 
     // Disconnected E should have ~0 score.
-    let s_e = scores.get(&"E".to_string()).copied().unwrap_or(0.0);
+    let s_e = scores.get("E").copied().unwrap_or(0.0);
     assert!(s_e < 0.01, "disconnected E score = {s_e}");
 
     // A should have the highest score (it's the seed and the hub).
-    let s_a = scores.get(&"A".to_string()).copied().unwrap_or(0.0);
-    let s_b = scores.get(&"B".to_string()).copied().unwrap_or(0.0);
+    let s_a = scores.get("A").copied().unwrap_or(0.0);
+    let s_b = scores.get("B").copied().unwrap_or(0.0);
     assert!(s_a > s_b, "seed should outrank neighbor");
 
     // B, C, D should have nontrivial scores.

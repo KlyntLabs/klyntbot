@@ -618,11 +618,7 @@ pub(crate) async fn dispatch_dev(
         }
         "coding_memory_install_git_hook" => {
             let repo_root = try_field!(dev::get_str(body, "repoRoot"));
-            dev::val(
-                core.coding_memory_install_git_hook(repo_root)
-                    .await
-                    .map_err(ApiError::from),
-            )
+            dev::val(core.coding_memory_install_git_hook(repo_root).await)
         }
         _ => return None,
     })

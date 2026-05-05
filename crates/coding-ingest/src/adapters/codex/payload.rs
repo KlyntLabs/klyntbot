@@ -1,7 +1,5 @@
 //! Codex stdin payload shapes for the 5 hooks we listen on.
 
-#![allow(dead_code)]
-
 use serde::Deserialize;
 use std::path::PathBuf;
 

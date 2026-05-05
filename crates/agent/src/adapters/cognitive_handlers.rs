@@ -444,7 +444,7 @@ struct ExtractedRelationshipJson {
 /// `{user, employer, Anthropic}` fact because Alice never appears as a fact
 /// subject — only as the object of the `name` triple. This is the dominant
 /// cause of low long-mem recall on synthetic benchmarks.
-fn bind_user_identity(extractions: &mut Vec<cognitive::BatchExtraction>) {
+fn bind_user_identity(extractions: &mut [cognitive::BatchExtraction]) {
     let mut name: Option<String> = None;
     for ext in extractions.iter() {
         for fact in &ext.facts {

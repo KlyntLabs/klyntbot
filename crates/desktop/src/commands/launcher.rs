@@ -88,17 +88,19 @@ pub async fn launcher_system_command(
     let args = args.unwrap_or_default();
     let duration = args.get("duration").and_then(|s| parse_human_duration(s));
 
-    if matches!(action, SystemAction::ToggleDoNotDisturb) && duration.is_some() {
-        let ends_at = jiff::Timestamp::now()
-            .checked_add(duration.unwrap())
-            .map_err(|e| ApiError::new("BAD_DURATION", e.to_string()))?;
-        let mgr = state
-            .dnd_manager()
-            .map_err(|e| ApiError::new("DND_ERROR", e.to_string()))?;
-        mgr.activate(FocusMode::Dnd, ends_at)
-            .await
-            .map_err(|e| ApiError::new("FOCUS_ACTIVATE_ERROR", e.to_string()))?;
-        return Ok(());
+    if matches!(action, SystemAction::ToggleDoNotDisturb) {
+        if let Some(dur) = duration {
+            let ends_at = jiff::Timestamp::now()
+                .checked_add(dur)
+                .map_err(|e| ApiError::new("BAD_DURATION", e.to_string()))?;
+            let mgr = state
+                .dnd_manager()
+                .map_err(|e| ApiError::new("DND_ERROR", e.to_string()))?;
+            mgr.activate(FocusMode::Dnd, ends_at)
+                .await
+                .map_err(|e| ApiError::new("FOCUS_ACTIVATE_ERROR", e.to_string()))?;
+            return Ok(());
+        }
     }
 
     SystemCommands::execute(&action, duration)

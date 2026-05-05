@@ -8,6 +8,7 @@ use serde::Serialize;
 use shlex::try_join;
 use std::any::Any;
 use std::fmt::Debug;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -89,7 +90,7 @@ impl RuleMatch {
         }
     }
 
-    pub fn with_resolved_program(self, resolved_program: &PathBuf) -> Self {
+    pub fn with_resolved_program(self, resolved_program: &Path) -> Self {
         match self {
             Self::PrefixRuleMatch {
                 matched_prefix,
@@ -99,7 +100,7 @@ impl RuleMatch {
             } => Self::PrefixRuleMatch {
                 matched_prefix,
                 decision,
-                resolved_program: Some(resolved_program.clone()),
+                resolved_program: Some(resolved_program.to_path_buf()),
                 justification,
             },
             other => other,

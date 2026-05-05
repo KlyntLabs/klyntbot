@@ -108,7 +108,7 @@ impl ToolExecute for GrepTool {
                     };
                     let reader = std::io::BufReader::new(file);
                     let file_lines: Vec<String> = std::io::BufRead::lines(reader)
-                        .filter_map(|l| l.ok())
+                        .map_while(Result::ok)
                         .collect();
                     let mut last_hi = 0usize;
                     for (i, line) in file_lines.iter().enumerate() {
@@ -118,7 +118,7 @@ impl ToolExecute for GrepTool {
                             if lo > last_hi && !out.is_empty() {
                                 out.push("--".into());
                             }
-                            for j in lo..hi {
+                            for (j, line_text) in file_lines.iter().enumerate().skip(lo).take(hi - lo) {
                                 let marker = if j == i { ":" } else { "-" };
                                 out.push(format!(
                                     "{}{}{}{}{}",
@@ -126,7 +126,7 @@ impl ToolExecute for GrepTool {
                                     marker,
                                     j + 1,
                                     marker,
-                                    file_lines[j]
+                                    line_text
                                 ));
                             }
                             last_hi = hi;
