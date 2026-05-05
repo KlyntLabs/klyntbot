@@ -257,6 +257,24 @@ impl ContextSource for CognitiveContextSource {
             sections.push(format!("## Learned Patterns\n{rules_text}"));
         }
 
+        // ── Themes (Wave 8) — top-3 community summaries by member count ──
+        if std::env::var("KCA_COMMUNITY_SUMMARIES").ok().as_deref() == Some("1") {
+            let community_repo =
+                crate::repos::community::CommunityRepo::new(self.fact_repo.pool().clone());
+            if let Ok(mut communities) = community_repo.list_active_communities().await {
+                communities.retain(|c| !c.summary.trim().is_empty());
+                communities.sort_by(|a, b| b.member_count.cmp(&a.member_count));
+                communities.truncate(3);
+                if !communities.is_empty() {
+                    let lines: Vec<String> = communities
+                        .iter()
+                        .map(|c| format!("- {}: {}", c.name, c.summary))
+                        .collect();
+                    sections.push(format!("## Themes\n{}", lines.join("\n")));
+                }
+            }
+        }
+
         // ── Confidence calibration ──
         if let Some(ref bits) = self.confidence_bits {
             let threshold = f32::from_bits(bits.load(Ordering::Relaxed));

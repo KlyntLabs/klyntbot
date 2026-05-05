@@ -161,6 +161,21 @@ impl CommunityRepo {
         Ok(row.map(|r| r.0))
     }
 
+    /// Update only the `summary` text for a community (Wave 8 / Phase 6.7).
+    pub async fn update_summary(&self, community_id: &str, summary: &str) -> Result<()> {
+        let now = jiff::Timestamp::now().to_string();
+        sqlx::query(
+            "UPDATE communities SET summary = ?1, updated_at = ?2 WHERE id = ?3",
+        )
+        .bind(summary)
+        .bind(now)
+        .bind(community_id)
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx)?;
+        Ok(())
+    }
+
     pub async fn list_active_communities(&self) -> Result<Vec<CommunityRow>> {
         sqlx::query_as::<_, CommunityRow>(
             "SELECT * FROM communities WHERE stability >= 0.3 ORDER BY member_count DESC",
