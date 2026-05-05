@@ -22,8 +22,7 @@ const DEFAULT_RRF_K: f64 = 60.0;
 /// Wave-A: reciprocal rank fusion of two ScoredFact lists. Dedupes by
 /// fact id; for facts present in both, RRF scores sum (boost). Score
 /// field is replaced with the RRF score and list is sorted descending.
-fn rrf_merge(a: Vec<ScoredFact>, b: Vec<ScoredFact>) -> Vec<ScoredFact> {
-    let k = DEFAULT_RRF_K;
+pub fn rrf_merge(a: Vec<ScoredFact>, b: Vec<ScoredFact>, k: f64) -> Vec<ScoredFact> {
     let mut by_id: std::collections::HashMap<String, (ScoredFact, f64)> = Default::default();
     for (rank, sf) in a.into_iter().enumerate() {
         let s = 1.0 / (k + (rank + 1) as f64);
@@ -191,7 +190,7 @@ pub async fn retrieve_relevant_facts(
                     depth_cache,
                 )
                 .await?;
-                rrf_merge(vector_scored, fallback_scored)
+                rrf_merge(vector_scored, fallback_scored, DEFAULT_RRF_K)
             }
             Err(e) => {
                 warn!("Vector search failed, using fallback: {e}");

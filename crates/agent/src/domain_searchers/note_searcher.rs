@@ -40,76 +40,28 @@ impl NoteSearcher {
     /// Sanitize the query for FTS5 MATCH: extract meaningful terms,
     /// join with OR so partial matches work, and quote special chars.
     fn sanitize_fts_query(query: &str) -> String {
-        let stop_words: std::collections::HashSet<&str> = [
-            "the",
-            "a",
-            "an",
-            "is",
-            "are",
-            "was",
-            "were",
-            "be",
-            "been",
-            "do",
-            "does",
-            "did",
-            "will",
-            "would",
-            "could",
-            "should",
-            "can",
-            "may",
-            "to",
-            "of",
-            "in",
-            "for",
-            "on",
-            "with",
-            "at",
-            "by",
-            "from",
-            "and",
-            "or",
-            "but",
-            "not",
-            "my",
-            "me",
-            "i",
-            "we",
-            "you",
-            "our",
-            "your",
-            "how",
-            "what",
-            "when",
-            "where",
-            "why",
-            "who",
-            "which",
-            "show",
-            "tell",
-            "give",
-            "remind",
-            "about",
-            "current",
-            "status",
-            "background",
-            "context",
-            "related",
-            "people",
-            "teams",
-            "risks",
-            "blockers",
-            "overview",
-            "details",
-            "skill",
-        ]
-        .into_iter()
-        .collect();
+        static ENGLISH_STOP_WORDS: std::sync::LazyLock<std::collections::HashSet<&str>> =
+            std::sync::LazyLock::new(|| {
+                [
+                    "the", "a", "an", "is", "was", "were", "be", "been", "do", "does",
+                    "did", "will", "would", "could", "should", "can", "may", "to", "of",
+                    "in", "on", "at", "by", "from", "or", "but", "not", "my", "me",
+                    "i", "we", "you", "our", "your", "when", "where", "why", "who",
+                    "which",
+                ]
+                .into_iter()
+                .collect()
+            });
 
         let terms: Vec<&str> = query
             .split(|c: char| !c.is_alphanumeric())
-            .filter(|w| w.len() > 2 && !stop_words.contains(&w.to_lowercase().as_str()))
+            .filter(|w| {
+                w.len() > 2 && {
+                    let lower = w.to_lowercase();
+                    !ENGLISH_STOP_WORDS.contains(lower.as_str())
+                        && !super::SEARCHER_STOP_WORDS.contains(&lower.as_str())
+                }
+            })
             .collect();
 
         if terms.is_empty() {

@@ -7,7 +7,7 @@ pub use note_searcher::NoteSearcher;
 pub use task_searcher::TaskSearcher;
 
 /// Shared stop words for domain searcher keyword extraction.
-const SEARCHER_STOP_WORDS: &[&str] = &[
+pub const SEARCHER_STOP_WORDS: &[&str] = &[
     "background",
     "context",
     "current",
