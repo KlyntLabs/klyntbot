@@ -1,6 +1,5 @@
 use klynt_hooks::events::{
-    pre_compact::PreCompactInput, pre_file_edit::PreFileEditInput, session_end::SessionEndInput,
-    subagent_spawn::SubagentSpawnInput,
+    pre_compact::PreCompactInput, pre_file_edit::PreFileEditInput,
 };
 
 #[test]

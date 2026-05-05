@@ -49,7 +49,7 @@ pub async fn run_hook(
             modify_args: None,
         }
     } else {
-        serde_json::from_str(&stdout).unwrap_or_else(|_| crate::types::HookResponse {
+        serde_json::from_str(&stdout).unwrap_or(crate::types::HookResponse {
             r#continue: true,
             block: false,
             reason: None,

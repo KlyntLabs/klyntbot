@@ -42,7 +42,7 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         {
             // Take up to first separator
             let city = rest
-                .split(|c: char| c == ',' || c == '.' || c == '!' || c == ';')
+                .split([',', '.', '!', ';'])
                 .next()
                 .unwrap_or("")
                 .trim()
@@ -66,7 +66,7 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         if let Some(idx) = lc.find(prefix) {
             let rest = &lc[idx + prefix.len()..];
             let org = rest
-                .split(|c: char| c == ',' || c == '.' || c == '!' || c == ';' || c == ' ')
+                .split([',', '.', '!', ';', ' '])
                 .next()
                 .unwrap_or("")
                 .trim();
@@ -98,7 +98,7 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
     // first-person-biased. We deliberately accept only a small whitelist
     // of high-signal verbs to avoid garbage extractions from narrative
     // assistant replies.
-    for sentence in content.split(|c: char| c == '.' || c == '!' || c == '?') {
+    for sentence in content.split(['.', '!', '?']) {
         let s = sentence.trim();
         let mut toks = s.split_whitespace();
         let Some(subj) = toks.next() else { continue };

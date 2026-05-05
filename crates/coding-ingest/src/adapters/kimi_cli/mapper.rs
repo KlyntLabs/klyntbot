@@ -188,7 +188,7 @@ fn buffer_tool_call(state: &mut SessionState, payload: &Value, occurred_at: Time
         .and_then(|f| f.get("arguments"))
         .and_then(Value::as_str)
         .or_else(|| payload.get("arguments").and_then(Value::as_str))
-        .map(|s| truncate_preview(s))
+        .map(truncate_preview)
         .unwrap_or_default();
     state.pending_tools.insert(
         id,

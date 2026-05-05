@@ -14,7 +14,7 @@ impl TaskRepo {
     ) -> Result<(), StorageError> {
         let mut tx = self.pool.begin().await?;
 
-        let would_cycle = self.would_create_cycle(&mut *tx, task_id, blocker_id).await?;
+        let would_cycle = self.would_create_cycle(&mut tx, task_id, blocker_id).await?;
         if would_cycle {
             tx.rollback().await?;
             return Err(StorageError::Conflict(format!(

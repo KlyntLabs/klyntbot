@@ -166,10 +166,10 @@ impl RecallInvocationRepo {
         .fetch_all(self.pool.inner())
         .await
         .map_err(|e| common::KlyntbotError::Storage(format!("top facts recall: {e}")))?;
-        Ok(rows
+        rows
             .into_iter()
             .map(|r| r.into_row())
-            .collect::<Result<Vec<_>, _>>()?)
+            .collect::<Result<Vec<_>, _>>()
     }
 
     /// List recent invocations across all sessions, paginated.

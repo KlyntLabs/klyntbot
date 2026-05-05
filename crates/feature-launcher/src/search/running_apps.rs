@@ -29,7 +29,7 @@ impl super::SearchSource for RunningAppsSource {
     }
 
     async fn refresh(&self) {
-        let snapshot = tokio::task::spawn_blocking(|| platform_macos::apps::running_applications())
+        let snapshot = tokio::task::spawn_blocking(platform_macos::apps::running_applications)
             .await
             .unwrap_or_default();
 

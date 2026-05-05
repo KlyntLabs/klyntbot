@@ -91,7 +91,7 @@ pub fn personalized_pagerank(
                 continue;
             }
             for &(t, w) in neighbors {
-                next[t.index() as usize] += (1.0 - cfg.alpha) * mass * w;
+                next[t.index()] += (1.0 - cfg.alpha) * mass * w;
             }
         }
 
@@ -286,7 +286,7 @@ fn extract_entity_names_from_query(query: &str) -> Vec<String> {
     // Heuristic: split on whitespace, keep tokens of length ≥3 that start with letter.
     query
         .split_whitespace()
-        .filter(|t| t.len() >= 3 && t.chars().next().map_or(false, |c| c.is_alphabetic()))
+        .filter(|t| t.len() >= 3 && t.chars().next().is_some_and(|c| c.is_alphabetic()))
         .map(|t| {
             t.trim_matches(|c: char| !c.is_alphanumeric())
                 .to_lowercase()

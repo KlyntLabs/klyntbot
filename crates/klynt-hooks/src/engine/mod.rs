@@ -30,7 +30,7 @@ impl HookEngine {
     pub fn from_config(cfg: HookConfig) -> Self {
         let mut handlers: HashMap<HookEventName, Vec<Hook>> = HashMap::new();
         for hook in cfg.hook {
-            handlers.entry(hook.event.clone()).or_default().push(hook);
+            handlers.entry(hook.event).or_default().push(hook);
         }
         Self { handlers }
     }

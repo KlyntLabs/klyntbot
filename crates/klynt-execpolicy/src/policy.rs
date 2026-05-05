@@ -421,8 +421,7 @@ impl Policy {
             let entry = match entry {
                 Ok(e) => e,
                 Err(e) => {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
+                    return Err(std::io::Error::other(
                         e.to_string(),
                     ))
                 }
