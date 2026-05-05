@@ -17,9 +17,9 @@ struct PendingReq {
 }
 
 impl ApprovalHistorySource {
-    pub fn new(repo: CodingApprovalHistoryRepo) -> Self {
+    pub fn new(repo: Arc<CodingApprovalHistoryRepo>) -> Self {
         Self {
-            repo: Arc::new(repo),
+            repo,
             pending: DashMap::new(),
         }
     }

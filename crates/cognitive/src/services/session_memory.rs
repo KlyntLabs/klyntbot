@@ -207,19 +207,12 @@ async fn generate_summary(
 fn heuristic_summary(messages: &[storage::SessionMessageRow]) -> String {
     let lines: Vec<String> = messages
         .iter()
-        .map(|m| format!("- **{}**: {}", m.role, truncate(&m.content, 120)))
+        .map(|m| format!("- **{}**: {}", m.role, common::helpers::truncate_at_boundary(&m.content, 120)))
         .collect();
 
     format!("## Recent Messages\n\n{}", lines.join("\n"))
 }
 
-/// Truncate a string to at most `max_chars` characters, appending "…" if truncated.
-fn truncate(s: &str, max_chars: usize) -> &str {
-    match s.char_indices().nth(max_chars) {
-        Some((idx, _)) => &s[..idx],
-        None => s,
-    }
-}
 
 #[cfg(test)]
 mod tests {

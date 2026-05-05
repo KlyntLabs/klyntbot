@@ -105,9 +105,10 @@ fn extract_insight_sentences(text: &str) -> Vec<String> {
 }
 
 fn keyword_confidence(insights: &[String]) -> f64 {
+    let lowered: Vec<String> = insights.iter().map(|s| s.to_lowercase()).collect();
     let unique_count = INSIGHT_KEYWORDS
         .iter()
-        .filter(|kw| insights.iter().any(|s| s.to_lowercase().contains(**kw)))
+        .filter(|kw| lowered.iter().any(|s| s.contains(**kw)))
         .count();
     (0.5 + unique_count as f64 / INSIGHT_KEYWORDS.len() as f64 * 0.3).min(0.8)
 }

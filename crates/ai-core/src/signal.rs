@@ -34,6 +34,16 @@ pub enum SalienceVerdict {
     Discard,
 }
 
+impl SalienceVerdict {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Extract => "extract",
+            Self::Accumulate => "accumulate",
+            Self::Discard => "discard",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct EntityRef {
     pub entity_type: &'static str,

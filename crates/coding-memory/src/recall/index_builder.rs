@@ -53,7 +53,7 @@ impl IndexBuilder {
         IndexEntry {
             id: f.id.parse().unwrap_or_else(|_| uuid::Uuid::nil()),
             kind,
-            title: truncate_chars(&title, 120),
+            title: common::helpers::truncate_chars(&title, 120, "…"),
             when,
             scope,
             confidence: f.confidence as f32,
@@ -78,7 +78,7 @@ impl IndexBuilder {
         IndexEntry {
             id: ep.id.parse().unwrap_or_else(|_| uuid::Uuid::nil()),
             kind: ep.kind.clone().unwrap_or_else(|| "episode".to_string()),
-            title: truncate_chars(&ep.summary.clone().unwrap_or_default(), 120),
+            title: common::helpers::truncate_chars(&ep.summary.clone().unwrap_or_default(), 120, "…"),
             when,
             scope,
             confidence: ep.importance as f32,
@@ -93,12 +93,3 @@ impl Default for IndexBuilder {
     }
 }
 
-fn truncate_chars(s: &str, n: usize) -> String {
-    if s.chars().count() <= n {
-        s.to_string()
-    } else {
-        let mut out: String = s.chars().take(n).collect();
-        out.push('…');
-        out
-    }
-}

@@ -12,7 +12,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::mirror::{
-    snippet_from_alert, MirrorAlert, MirrorRepo, NarrativeSnippet, RoutingSnapshot, SkillRouteStats,
+    MirrorAlert, MirrorRepo, RoutingSnapshot, SkillRouteStats,
 };
 
 const MAX_TRIGGER_PHRASES: usize = 100;
@@ -52,7 +52,7 @@ impl RoutingSignalSource {
         }
     }
 
-    fn accumulate_signal(&self, skill_name: &str, confidence: f64, triggers: Vec<String>) {
+    fn accumulate_signal(&self, skill_name: &str, confidence: f64, triggers: &[String]) {
         self.total_count.fetch_add(1, Ordering::Relaxed);
         if confidence < 0.6 {
             self.low_confidence_count.fetch_add(1, Ordering::Relaxed);
@@ -65,7 +65,7 @@ impl RoutingSignalSource {
         entry.confidence_sum += confidence;
         if entry.trigger_hits.len() < MAX_TRIGGER_PHRASES {
             for trigger in triggers {
-                *entry.trigger_hits.entry(trigger).or_insert(0) += 1;
+                *entry.trigger_hits.entry(trigger.clone()).or_insert(0) += 1;
             }
         }
     }
@@ -220,7 +220,7 @@ impl MirrorSignalSource for RoutingSignalSource {
             ..
         }) = &signal.raw_event
         {
-            self.accumulate_signal(skill_name, *confidence, trigger_phrases.clone());
+            self.accumulate_signal(skill_name, *confidence, trigger_phrases);
         }
         Ok(())
     }
@@ -252,8 +252,7 @@ impl MirrorSignalSource for RoutingSignalSource {
 
         if let Some(alert) = drift {
             info!(?alert, "Mirror: routing drift detected");
-            let snippet: NarrativeSnippet = snippet_from_alert(&alert);
-            if let Err(e) = self.repo.insert_snippet(&snippet).await {
+            if let Err(e) = self.repo.insert_snippet_from_alert(&alert).await {
                 warn!("Mirror: failed to persist drift snippet: {e}");
             }
         }

@@ -61,28 +61,39 @@ impl MirrorRetentionService {
     }
 
     pub async fn sweep_once(repo: &MirrorRepo, config: &MirrorRetentionConfig) {
-        let _ = repo
-            .cleanup_old_snapshots(config.routing_snapshot_days)
-            .await;
-        let _ = repo.cleanup_old_snippets(config.snippet_days).await;
-        let _ = repo
-            .cleanup_old_trend_narratives(config.narrative_days)
-            .await;
-        let _ = repo
-            .cleanup_old_meta_rules(config.disabled_meta_rule_days)
-            .await;
-        let _ = repo
-            .cleanup_reverted_brain_versions(config.reverted_brain_version_days)
-            .await;
-        let _ = repo
-            .cleanup_old_trial_previews(config.trial_preview_days)
-            .await;
-        let _ = repo
-            .cleanup_old_task_focus_snapshots(config.task_focus_snapshot_days)
-            .await;
-        let _ = repo
-            .cleanup_old_finance_drift_snapshots(config.finance_drift_snapshot_days)
-            .await;
+        let (
+            r1,
+            r2,
+            r3,
+            r4,
+            r5,
+            r6,
+            r7,
+            r8,
+        ) = tokio::join!(
+            repo.cleanup_old_snapshots(config.routing_snapshot_days),
+            repo.cleanup_old_snippets(config.snippet_days),
+            repo.cleanup_old_trend_narratives(config.narrative_days),
+            repo.cleanup_old_meta_rules(config.disabled_meta_rule_days),
+            repo.cleanup_reverted_brain_versions(config.reverted_brain_version_days),
+            repo.cleanup_old_trial_previews(config.trial_preview_days),
+            repo.cleanup_old_task_focus_snapshots(config.task_focus_snapshot_days),
+            repo.cleanup_old_finance_drift_snapshots(config.finance_drift_snapshot_days),
+        );
+        for (name, res) in [
+            ("snapshots", r1),
+            ("snippets", r2),
+            ("narratives", r3),
+            ("meta_rules", r4),
+            ("brain_versions", r5),
+            ("trial_previews", r6),
+            ("task_focus_snapshots", r7),
+            ("finance_drift_snapshots", r8),
+        ] {
+            if let Err(e) = res {
+                tracing::warn!("mirror retention cleanup_old_{name} failed: {e}");
+            }
+        }
         tracing::debug!("mirror retention sweep completed");
     }
 }

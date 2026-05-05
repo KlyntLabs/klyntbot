@@ -158,12 +158,7 @@ pub async fn build_graph_from_entities(
             Some(i) => *i,
             None => continue,
         };
-        let multiplier = match edge.edge_type.as_str() {
-            "causal" => 1.5,
-            "structural" => 1.2,
-            "temporal" => 1.1,
-            _ => 1.0,
-        };
+        let multiplier = crate::repos::entity::EdgeType::parse(&edge.edge_type).weight() as f32;
         g.add_edge(src, tgt, edge.strength as f32 * multiplier);
         // Add reverse for undirected expansion.
         g.add_edge(tgt, src, edge.strength as f32 * multiplier * 0.5);

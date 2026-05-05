@@ -34,13 +34,6 @@ impl RetrievalIndexer {
         self
     }
 
-    fn salience_str(s: SalienceVerdict) -> &'static str {
-        match s {
-            SalienceVerdict::Extract => "extract",
-            SalienceVerdict::Accumulate => "accumulate",
-            SalienceVerdict::Discard => "discard",
-        }
-    }
 }
 
 #[async_trait]
@@ -70,7 +63,7 @@ impl SignalConsumer for RetrievalIndexer {
                 signal.event_kind,
                 &signal.content,
                 signal.importance,
-                Self::salience_str(signal.salience),
+                signal.salience.as_str(),
                 entity_type,
                 entity_id,
                 &signal.timestamp.to_string(),

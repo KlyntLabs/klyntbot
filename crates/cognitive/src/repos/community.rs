@@ -1,6 +1,8 @@
 use common::Result;
 use sqlx::SqlitePool;
 
+use crate::repos::map_sqlx;
+
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct CommunityRow {
     pub id: String,
@@ -23,10 +25,6 @@ pub struct CommunityMemberRow {
     pub tree_node_id: String,
     pub membership_score: f64,
     pub joined_at: String,
-}
-
-fn map_sqlx(e: sqlx::Error) -> common::KlyntbotError {
-    common::KlyntbotError::Storage(e.to_string())
 }
 
 #[derive(Debug, Clone)]

@@ -154,24 +154,6 @@ pub struct Annotation {
     pub ai_suggestion: Option<String>,
 }
 
-/// Salience verdict for event filtering.
-#[derive(Debug, Clone, PartialEq)]
-pub enum SalienceVerdict {
-    Extract,
-    Accumulate,
-    Discard,
-}
-
-impl SalienceVerdict {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Extract => "extract",
-            Self::Accumulate => "accumulate",
-            Self::Discard => "discard",
-        }
-    }
-}
-
 /// Observation extracted from a DomainEvent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Observation {

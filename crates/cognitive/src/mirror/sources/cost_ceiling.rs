@@ -1,14 +1,13 @@
-use crate::mirror::{snippet_from_alert, MirrorAlert, MirrorRepo};
+use crate::mirror::{MirrorAlert, MirrorRepo};
 use ai_core::{mirror::MirrorSnapshotSpec, AiSignal, MirrorSignalSource};
 use async_trait::async_trait;
-use std::sync::Arc;
 
 pub struct CostCeilingSource {
-    repo: Arc<MirrorRepo>,
+    repo: MirrorRepo,
 }
 
 impl CostCeilingSource {
-    pub fn new(repo: Arc<MirrorRepo>) -> Self {
+    pub fn new(repo: MirrorRepo) -> Self {
         Self { repo }
     }
 
@@ -39,8 +38,7 @@ impl CostCeilingSource {
             ceiling_usd,
             percent,
         };
-        let snippet = snippet_from_alert(&alert);
-        self.repo.insert_snippet(&snippet).await?;
+        self.repo.insert_snippet_from_alert(&alert).await?;
         Ok(())
     }
 }

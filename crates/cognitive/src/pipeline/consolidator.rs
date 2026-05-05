@@ -114,11 +114,7 @@ pub fn heuristic_promote(clusters: &[KnowledgeCluster]) -> Vec<PromotionOp> {
                 source: promotion_source(&cluster.signals),
             });
         } else if cluster.max_confidence >= 0.5 {
-            let summary = if cluster.merged_subject.len() > 120 {
-                format!("{}...", &cluster.merged_subject[..117])
-            } else {
-                cluster.merged_subject.clone()
-            };
+            let summary = common::helpers::truncate_chars(&cluster.merged_subject, 120, "...");
             ops.push(PromotionOp::CreateEpisode {
                 content: cluster.merged_subject.clone(),
                 summary,
