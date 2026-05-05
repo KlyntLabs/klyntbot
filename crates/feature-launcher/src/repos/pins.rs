@@ -29,8 +29,7 @@ impl PinsRepo {
         .bind(item_id)
         .bind(kind)
         .execute(&self.pool)
-        .await
-        .map_err(storage::StorageError::from)?;
+        .await?;
         Ok(())
     }
 
@@ -39,8 +38,7 @@ impl PinsRepo {
             .bind(item_id)
             .bind(kind)
             .execute(&self.pool)
-            .await
-            .map_err(storage::StorageError::from)?;
+            .await?;
         Ok(())
     }
 
@@ -49,8 +47,7 @@ impl PinsRepo {
             "SELECT item_id, kind, position FROM launcher_pins ORDER BY position ASC",
         )
         .fetch_all(&self.pool)
-        .await
-        .map_err(storage::StorageError::from)?;
+        .await?;
         Ok(pins)
     }
 
@@ -60,8 +57,7 @@ impl PinsRepo {
                 .bind(item_id)
                 .bind(kind)
                 .fetch_optional(&self.pool)
-                .await
-                .map_err(storage::StorageError::from)?;
+                .await?;
         Ok(row.is_some())
     }
 

@@ -8,7 +8,7 @@ use std::sync::Arc;
 struct HistoryEntry {
     title: String,
     url: String,
-    last_visit: String,
+    last_visit: jiff::Timestamp,
 }
 
 #[derive(Clone)]
@@ -80,13 +80,11 @@ impl BrowserHistorySource {
             .filter(|(title, _, _)| !title.is_empty())
             .map(|(title, url, visit_time)| {
                 let ts_secs = (visit_time - 11_644_473_600_000_000) / 1_000_000;
-                let visited_at = jiff::Timestamp::from_second(ts_secs)
-                    .map(|ts| ts.to_string())
-                    .unwrap_or_default();
+                let last_visit = jiff::Timestamp::from_second(ts_secs).unwrap_or(jiff::Timestamp::now());
                 HistoryEntry {
                     title,
                     url,
-                    last_visit: visited_at,
+                    last_visit,
                 }
             })
             .collect())
@@ -122,7 +120,7 @@ impl super::SearchSource for BrowserHistorySource {
                 icon: Some("globe".to_string()),
                 kind: LauncherItemKind::BrowserHistory {
                     url: e.url.clone(),
-                    visited_at: e.last_visit.clone(),
+                    visited_at: e.last_visit,
                 },
                 score: (score as f64) / 1000.0 * 0.4,
                 no_view: false,

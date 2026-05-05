@@ -14,7 +14,6 @@ impl FrequencyRepo {
         Self { pool }
     }
 
-    /// Record a usage event.
     pub async fn record_usage(&self, item_id: &str, kind: &str) -> Result<(), StorageError> {
         let now = Timestamp::now().to_string();
         sqlx::query("INSERT INTO launcher_usage_log (item_id, kind, used_at) VALUES (?, ?, ?)")
@@ -26,7 +25,6 @@ impl FrequencyRepo {
         Ok(())
     }
 
-    /// Compute frecency scores for a batch of items.
     pub async fn get_frecency_batch(
         &self,
         items: &[(String, String)],
@@ -35,50 +33,59 @@ impl FrequencyRepo {
             return Ok(vec![]);
         }
 
-        let conditions: Vec<String> = items
-            .iter()
-            .enumerate()
-            .map(|(i, _)| format!("(item_id = ?{} AND kind = ?{})", i * 2 + 1, i * 2 + 2))
-            .collect();
-        let cutoff = (Timestamp::now() - jiff::SignedDuration::from_hours(90 * 24)).to_string();
-        let sql = format!(
-            "SELECT item_id, kind, used_at FROM launcher_usage_log WHERE ({}) AND used_at > ?{} ORDER BY used_at DESC",
-            conditions.join(" OR "),
-            items.len() * 2 + 1,
-        );
-
-        let mut query = sqlx::query_as::<_, (String, String, String)>(&sql);
-        for (item_id, kind) in items {
-            query = query.bind(item_id).bind(kind);
-        }
-        query = query.bind(&cutoff);
-        let rows = query.fetch_all(&self.pool).await?;
-
         let now = Timestamp::now();
         let lambda = (2.0_f64).ln() / HALF_LIFE_HOURS;
+        let cutoff = (Timestamp::now() - jiff::SignedDuration::from_hours(90 * 24)).to_string();
 
+        // SQLite has a 999-variable limit; each item needs 2 binds, so chunk at 400.
+        const CHUNK_SIZE: usize = 400;
         let mut results = Vec::with_capacity(items.len());
-        for (item_id, kind) in items {
-            let mut score = 0.0_f64;
-            let mut last_used: Option<String> = None;
-            for (rid, rk, used_at) in &rows {
-                if rid == item_id && rk == kind {
-                    if last_used.is_none() {
-                        last_used = Some(used_at.clone());
-                    }
-                    if let Ok(dt) = used_at.parse::<Timestamp>() {
-                        let hours =
-                            (now.as_millisecond() - dt.as_millisecond()) as f64 / 3_600_000.0;
-                        score += (-lambda * hours).exp();
+
+        for chunk in items.chunks(CHUNK_SIZE) {
+            let conditions: Vec<String> = chunk
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("(item_id = ?{} AND kind = ?{})", i * 2 + 1, i * 2 + 2))
+                .collect();
+            let sql = format!(
+                "SELECT item_id, kind, used_at FROM launcher_usage_log WHERE ({}) AND used_at > ?{} ORDER BY used_at DESC",
+                conditions.join(" OR "),
+                chunk.len() * 2 + 1,
+            );
+
+            let mut query = sqlx::query_as::<_, (String, String, String)>(&sql);
+            for (item_id, kind) in chunk {
+                query = query.bind(item_id).bind(kind);
+            }
+            query = query.bind(&cutoff);
+            let rows = query.fetch_all(&self.pool).await?;
+
+            // Group rows by (item_id, kind) for O(1) lookup instead of O(N×M) scan.
+            let mut grouped: std::collections::HashMap<(String, String), Vec<String>> =
+                std::collections::HashMap::new();
+            for (rid, rk, used_at) in rows {
+                grouped.entry((rid, rk)).or_default().push(used_at);
+            }
+
+            for (item_id, kind) in chunk {
+                let mut score = 0.0_f64;
+                let mut last_used: Option<String> = None;
+                if let Some(used_ats) = grouped.get(&(item_id.clone(), kind.clone())) {
+                    last_used = used_ats.first().cloned();
+                    for used_at in used_ats {
+                        if let Ok(dt) = used_at.parse::<Timestamp>() {
+                            let hours =
+                                (now.as_millisecond() - dt.as_millisecond()) as f64 / 3_600_000.0;
+                            score += (-lambda * hours).exp();
+                        }
                     }
                 }
+                results.push((score, last_used));
             }
-            results.push((score, last_used));
         }
         Ok(results)
     }
 
-    /// Get top N items by frecency for the default view.
     pub async fn top_frecency(
         &self,
         limit: usize,
@@ -113,7 +120,6 @@ impl FrequencyRepo {
         Ok(sorted)
     }
 
-    /// Prune entries older than 90 days.
     pub async fn prune_old_entries(&self) -> Result<u64, StorageError> {
         let cutoff = (Timestamp::now() - jiff::SignedDuration::from_hours(90 * 24)).to_string();
         let result = sqlx::query("DELETE FROM launcher_usage_log WHERE used_at < ?")

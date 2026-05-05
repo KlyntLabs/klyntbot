@@ -15,6 +15,8 @@ pub struct AppEntry {
     pub bundle_id: Option<SmolStr>,
     /// Path to the cached 64x64 PNG icon (resolved via sips).
     pub icon_path: Option<PathBuf>,
+    /// Pre-computed base64 data URL so search hot-path avoids disk I/O.
+    pub icon_data_url: Option<String>,
 }
 
 impl AppEntry {
@@ -29,6 +31,7 @@ impl AppEntry {
             path: path.to_path_buf(),
             bundle_id: None,
             icon_path: None,
+            icon_data_url: None,
         })
     }
 }
@@ -55,12 +58,9 @@ impl AppIndex {
     }
 
     pub fn with_cache_dir(cache_dir: PathBuf) -> Self {
-        Self {
-            apps: Arc::new(RwLock::new(Vec::new())),
-            icon_cache: Some(Arc::new(platform_macos::apps::AppIconCache::new(cache_dir))),
-            running_signals: new_running_signals(),
-            attention_signals: new_attention_signals(),
-        }
+        let mut s = Self::new();
+        s.icon_cache = Some(Arc::new(platform_macos::apps::AppIconCache::new(cache_dir)));
+        s
     }
 
     /// Builder: attach an externally-owned RunningSignals map (so other sources
@@ -123,14 +123,8 @@ impl AppIndex {
                     bid.and_then(|b| self.attention_signals.get(b).map(|s| s.value().clone()));
 
                 let icon = app
-                    .icon_path
-                    .as_ref()
-                    .and_then(|p| {
-                        let bytes = std::fs::read(p).ok()?;
-                        use base64::Engine;
-                        let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
-                        Some(format!("data:image/png;base64,{b64}"))
-                    })
+                    .icon_data_url
+                    .clone()
                     .or_else(|| Some("app-window".to_string()));
 
                 let id = match bid {
@@ -194,10 +188,17 @@ impl AppIndex {
         if let Some(cache) = &self.icon_cache {
             for app in &mut apps {
                 app.icon_path = cache.resolve_icon_path(&app.path);
+                app.icon_data_url = app.icon_path.as_ref().and_then(|p| {
+                    let bytes = std::fs::read(p).ok()?;
+                    use base64::Engine;
+                    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                    Some(format!("data:image/png;base64,{b64}"))
+                });
             }
         }
-        let icon_count = apps.iter().filter(|a| a.icon_path.is_some()).count();
-        let bundle_count = apps.iter().filter(|a| a.bundle_id.is_some()).count();
+        let (icon_count, bundle_count) = apps.iter().fold((0, 0), |(ic, bc), a| {
+            (ic + a.icon_path.is_some() as usize, bc + a.bundle_id.is_some() as usize)
+        });
         tracing::info!(
             "Indexed {} applications ({} with icons, {} with bundle ids)",
             apps.len(),
@@ -344,18 +345,21 @@ mod tests {
                 path: "/Applications/Visual Studio Code.app".into(),
                 bundle_id: None,
                 icon_path: None,
+                icon_data_url: None,
             },
             AppEntry {
                 name: "Safari".into(),
                 path: "/Applications/Safari.app".into(),
                 bundle_id: None,
                 icon_path: None,
+                icon_data_url: None,
             },
             AppEntry {
                 name: "Slack".into(),
                 path: "/Applications/Slack.app".into(),
                 bundle_id: None,
                 icon_path: None,
+                icon_data_url: None,
             },
         ]);
         let results = index.search("vsc", 10);
@@ -371,6 +375,7 @@ mod tests {
             path: "/Applications/Safari.app".into(),
             bundle_id: None,
             icon_path: None,
+            icon_data_url: None,
         }]);
         let results = index.search("", 10);
         assert!(results.is_empty());
@@ -415,12 +420,14 @@ mod tests {
                 path: "/System/Applications/Safari.app".into(),
                 bundle_id: Some("com.apple.Safari".into()),
                 icon_path: None,
+                icon_data_url: None,
             },
             AppEntry {
                 name: "Safari".into(),
                 path: "/Applications/Safari.app".into(),
                 bundle_id: Some("com.apple.Safari".into()),
                 icon_path: None,
+                icon_data_url: None,
             },
         ];
         let deduped = AppIndex::dedupe_by_bundle_id(apps);
@@ -439,12 +446,14 @@ mod tests {
                 path: "/Applications/Foo.app".into(),
                 bundle_id: None,
                 icon_path: None,
+                icon_data_url: None,
             },
             AppEntry {
                 name: "Bar".into(),
                 path: "/Applications/Bar.app".into(),
                 bundle_id: None,
                 icon_path: None,
+                icon_data_url: None,
             },
         ];
         let deduped = AppIndex::dedupe_by_bundle_id(apps);
@@ -473,6 +482,7 @@ mod tests {
             path: "/Applications/Safari.app".into(),
             bundle_id: Some(SmolStr::new("com.apple.Safari")),
             icon_path: None,
+            icon_data_url: None,
         }]);
         idx.running_signals_for_test().insert(
             SmolStr::new("com.apple.Safari"),
@@ -498,6 +508,7 @@ mod tests {
             path: "/Applications/Safari.app".into(),
             bundle_id: Some(SmolStr::new("com.apple.Safari")),
             icon_path: None,
+            icon_data_url: None,
         }]);
         let results = idx.search("safari", 5);
         assert_eq!(results[0].id, "app:com.apple.Safari");
@@ -511,6 +522,7 @@ mod tests {
             path: "/Applications/WeirdCli.app".into(),
             bundle_id: None,
             icon_path: None,
+            icon_data_url: None,
         }]);
         let results = idx.search("weird", 5);
         assert_eq!(results[0].id, "app:/Applications/WeirdCli.app");
@@ -525,6 +537,7 @@ mod tests {
             path: "/Applications/Safari.app".into(),
             bundle_id: Some(SmolStr::new("com.apple.Safari")),
             icon_path: None,
+            icon_data_url: None,
         }]);
 
         let baseline = idx.search("safari", 5)[0].score;
@@ -561,6 +574,7 @@ mod tests {
             path: "/Applications/Safari.app".into(),
             bundle_id: Some(SmolStr::new("com.apple.Safari")),
             icon_path: None,
+            icon_data_url: None,
         }]);
         idx.running_signals_for_test().insert(
             SmolStr::new("com.apple.Safari"),

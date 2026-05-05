@@ -1,3 +1,4 @@
+use futures_util::TryStreamExt;
 use rustc_hash::{FxHashMap, FxHashSet};
 use sqlx::SqlitePool;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -29,9 +30,23 @@ impl AttentionAggregator {
             .unwrap()
             .to_string();
 
-        // Stream events in batches to keep memory bounded.
-        // We only need the fields required for grouping + scoring.
-        let rows: Vec<ActivityEventLite> = sqlx::query_as(
+        let now = jiff::Timestamp::now();
+        let lambda = (2.0_f64).ln() / DECAY_HALF_LIFE_DAYS;
+
+        // Group by (canonical_id, kind) and accumulate decayed attention.
+        #[derive(Default)]
+        struct Accum {
+            display_name: String,
+            attention_secs: f64,
+            last_used_at: String,
+            category_id: Option<String>,
+        }
+
+        let mut groups: FxHashMap<(String, String), Accum> =
+            FxHashMap::with_capacity_and_hasher(1024, Default::default());
+
+        // Stream rows to keep memory bounded for large windows.
+        let mut stream = sqlx::query_as::<_, ActivityEventLite>(
             "SELECT
                 CASE
                     WHEN site_name IS NOT NULL AND site_name != ''
@@ -50,25 +65,9 @@ impl AttentionAggregator {
              ORDER BY canonical_id, kind, started_at",
         )
         .bind(&cutoff)
-        .fetch_all(&self.pool)
-        .await?;
+        .fetch(&self.pool);
 
-        let now = jiff::Timestamp::now();
-        let lambda = (2.0_f64).ln() / DECAY_HALF_LIFE_DAYS;
-
-        // Group by (canonical_id, kind) and accumulate decayed attention.
-        #[derive(Default)]
-        struct Accum {
-            display_name: String,
-            attention_secs: f64,
-            last_used_at: String,
-            category_id: Option<String>,
-        }
-
-        let mut groups: FxHashMap<(String, String), Accum> =
-            FxHashMap::with_capacity_and_hasher(rows.len() / 4, Default::default());
-
-        for row in rows {
+        while let Some(row) = stream.try_next().await? {
             let key = (row.canonical_id.clone(), row.kind.clone());
             let days_ago = match row.started_at.parse::<jiff::Timestamp>() {
                 Ok(ts) => {

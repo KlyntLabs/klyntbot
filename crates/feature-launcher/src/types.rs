@@ -116,7 +116,8 @@ pub enum LauncherItemKind {
     },
     BrowserHistory {
         url: String,
-        visited_at: String,
+        #[specta(type = String)]
+        visited_at: Timestamp,
     },
     BrewPackage {
         name: String,
@@ -156,6 +157,22 @@ pub enum SystemAction {
     ToggleDarkMode,
     ToggleDoNotDisturb,
     EjectAll,
+}
+
+impl SystemAction {
+    /// Stable string identifier for persistent storage (pins, usage logs).
+    pub fn as_id_str(&self) -> &'static str {
+        match self {
+            SystemAction::LockScreen => "lock_screen",
+            SystemAction::Sleep => "sleep",
+            SystemAction::Restart => "restart",
+            SystemAction::Shutdown => "shutdown",
+            SystemAction::EmptyTrash => "empty_trash",
+            SystemAction::ToggleDarkMode => "toggle_dark_mode",
+            SystemAction::ToggleDoNotDisturb => "toggle_dnd",
+            SystemAction::EjectAll => "eject_all",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]

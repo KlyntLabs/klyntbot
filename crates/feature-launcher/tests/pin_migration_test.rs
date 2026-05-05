@@ -46,6 +46,7 @@ async fn migrates_pins_and_frequency_to_bundle_ids() {
         path: PathBuf::from("/Applications/Safari.app"),
         bundle_id: Some(SmolStr::new("com.apple.Safari")),
         icon_path: None,
+        icon_data_url: None,
     }];
 
     let migrated = migrate_app_ids_to_bundle_ids(&pool, &apps).await.unwrap();
@@ -85,6 +86,7 @@ async fn idempotent_when_already_migrated() {
         path: PathBuf::from("/Applications/Safari.app"),
         bundle_id: Some(SmolStr::new("com.apple.Safari")),
         icon_path: None,
+        icon_data_url: None,
     }];
 
     let migrated = migrate_app_ids_to_bundle_ids(&pool, &apps).await.unwrap();
@@ -108,6 +110,7 @@ async fn skips_apps_without_bundle_id() {
         path: PathBuf::from("/Applications/Weird.app"),
         bundle_id: None,
         icon_path: None,
+        icon_data_url: None,
     }];
 
     let migrated = migrate_app_ids_to_bundle_ids(&pool, &apps).await.unwrap();

@@ -23,7 +23,6 @@ impl EntityAttentionRepo {
         Self { pool }
     }
 
-    /// Returns top-N entities by decay-weighted attention, optionally filtered by kind.
     pub async fn top_by_attention(
         &self,
         kind: Option<&str>,
@@ -55,7 +54,6 @@ impl EntityAttentionRepo {
         Ok(rows)
     }
 
-    /// Full-text search over display_name, ranked by combined BM25 and attention.
     pub async fn fts_search(
         &self,
         q: &str,
@@ -93,7 +91,6 @@ impl EntityAttentionRepo {
         Ok(rows)
     }
 
-    /// Upsert a single row. On conflict, overwrite attention_secs, last_used_at, display_name, category.
     pub async fn upsert(&self, row: &EntityAttentionRow) -> Result<(), StorageError> {
         sqlx::query(
             "INSERT INTO entity_attention
@@ -118,7 +115,6 @@ impl EntityAttentionRepo {
         Ok(())
     }
 
-    /// Delete entities whose last_used_at is older than the given number of days.
     pub async fn purge_older_than(&self, days: i64) -> Result<u64, StorageError> {
         let cutoff = jiff::Timestamp::now()
             .saturating_sub(jiff::SignedDuration::from_hours(days * 24))
@@ -131,8 +127,6 @@ impl EntityAttentionRepo {
         Ok(result.rows_affected())
     }
 
-    /// Returns a personal score map for the given file paths on a 0..1 scale.
-    /// Paths that have no attention record get a score of 0.0.
     pub async fn personal_for_paths(
         &self,
         paths: &[String],

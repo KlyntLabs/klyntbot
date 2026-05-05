@@ -33,7 +33,7 @@ impl ClipboardRepo {
         file_path: Option<&str>,
     ) -> Result<i64, StorageError> {
         let now = Timestamp::now().to_string();
-        let preview: String = content.chars().take(200).collect();
+        let preview = common::truncate_chars(content, 200, "");
         let result = sqlx::query(
             "INSERT INTO clipboard_history (content, content_type, source_app, preview, file_path, created_at) \
              VALUES (?, ?, ?, ?, ?, ?)",
@@ -140,10 +140,10 @@ impl crate::search::SearchSource for ClipboardRepo {
                     "file" => crate::ClipboardContentType::File,
                     _ => crate::ClipboardContentType::Text,
                 };
-                let preview: String = e
+                let preview = e
                     .preview
                     .clone()
-                    .unwrap_or_else(|| e.content.chars().take(80).collect());
+                    .unwrap_or_else(|| common::truncate_chars(&e.content, 80, ""));
                 crate::LauncherItem {
                     id: format!("clip:{}", e.id),
                     title: preview,
