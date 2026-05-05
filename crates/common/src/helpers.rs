@@ -13,6 +13,38 @@ pub fn extract_json_array(s: &str) -> &str {
     s
 }
 
+/// Extract the LAST balanced top-level JSON array from a string.
+///
+/// Reasoning-model output (Mimo, DeepSeek-R1, o1) interleaves chain-of-thought
+/// prose with the final structured answer. Stray brackets in prose
+/// (e.g. `"[option 1, option 2]"`) break the naive `find('[')..rfind(']')`
+/// approach because the slice spans both reasoning and answer, producing
+/// invalid JSON. This function scans from the end for `]`, then walks
+/// backwards counting brackets to find the matching `[`, returning the
+/// last balanced top-level array. Falls back to `None` if none found.
+pub fn extract_last_json_array(s: &str) -> Option<&str> {
+    let bytes = s.as_bytes();
+    let end = bytes.iter().rposition(|&b| b == b']')?;
+    let mut depth: i32 = 0;
+    let mut i = end;
+    loop {
+        match bytes[i] {
+            b']' => depth += 1,
+            b'[' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(&s[i..=end]);
+                }
+            }
+            _ => {}
+        }
+        if i == 0 {
+            return None;
+        }
+        i -= 1;
+    }
+}
+
 /// Extract a JSON object substring from a string that may contain prose or markdown.
 ///
 /// Finds the first `{` and last `}` and returns the slice between them (inclusive).
@@ -104,5 +136,44 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
         0.0
     } else {
         dot / denom
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_last_json_array_skips_reasoning_prose_brackets() {
+        // Mimo-style: reasoning emits stray brackets, then final answer.
+        let input = r#"First, I think about [option 1, option 2] and decide.
+Then I produce the final answer:
+["summary one", "summary two"]"#;
+        let got = extract_last_json_array(input).unwrap();
+        assert_eq!(got, r#"["summary one", "summary two"]"#);
+    }
+
+    #[test]
+    fn extract_last_json_array_handles_clean_input() {
+        let input = r#"["a", "b"]"#;
+        assert_eq!(extract_last_json_array(input).unwrap(), input);
+    }
+
+    #[test]
+    fn extract_last_json_array_returns_none_when_unbalanced() {
+        assert!(extract_last_json_array("no array here").is_none());
+        assert!(extract_last_json_array("only ] no opener").is_none());
+    }
+
+    #[test]
+    fn extract_last_json_array_picks_last_when_multiple() {
+        let input = r#"first [1, 2] then [3, 4]"#;
+        assert_eq!(extract_last_json_array(input).unwrap(), "[3, 4]");
+    }
+
+    #[test]
+    fn extract_last_json_array_handles_nested() {
+        let input = r#"prose [[1, 2], [3, 4]]"#;
+        assert_eq!(extract_last_json_array(input).unwrap(), "[[1, 2], [3, 4]]");
     }
 }
