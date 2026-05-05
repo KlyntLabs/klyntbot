@@ -44,10 +44,19 @@ impl SemanticFactSearchHandler for SemanticFactSearchHandlerImpl {
         limit: usize,
         widen: bool,
     ) -> common::Result<Vec<FactSearchResult>> {
+        // T2.2 v3: widen *recall* (more candidates) but keep *quality bar* high
+        // (similarity floor). Earlier widen mode dropped min_similarity to 0.2 —
+        // at 384-dim BGE that's essentially random, and the resulting 20-fact
+        // dump confused the model into empty output. Now: more candidates (top_k
+        // doubles) but min_similarity stays at the default. A post-hoc score
+        // filter caps the response at MAX_WIDEN_RESULTS so synthesis isn't drowned.
+        const MAX_WIDEN_RESULTS: usize = 6;
+        const MIN_WIDEN_SCORE: f64 = 0.30;
+
         let mut params = RetrievalParams::new(limit);
         if widen {
-            params.min_similarity = 0.2;
             params.vector_top_k = (limit * 2).max(60);
+            // Deliberately do NOT lower min_similarity — see comment above.
         }
         let scored = retrieve_relevant_facts(
             &self.fact_repo,
@@ -63,7 +72,17 @@ impl SemanticFactSearchHandler for SemanticFactSearchHandlerImpl {
         .await
         .map_err(|e| common::KlyntbotError::Storage(format!("fact search failed: {e}")))?;
 
-        Ok(scored
+        let filtered: Vec<_> = if widen {
+            scored
+                .into_iter()
+                .filter(|s| s.score >= MIN_WIDEN_SCORE)
+                .take(MAX_WIDEN_RESULTS)
+                .collect()
+        } else {
+            scored
+        };
+
+        Ok(filtered
             .into_iter()
             .map(|s| FactSearchResult {
                 id: s.fact.id.clone(),

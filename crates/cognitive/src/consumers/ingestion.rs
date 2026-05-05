@@ -22,8 +22,9 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         object: obj.trim().trim_end_matches('.').to_string(),
         confidence: 0.9,
         source: "regex_backstop".into(),
-
         speaker: None,
+        valid_until: None,
+        valid_from: None,
     };
 
     // "I moved to {city} ..." / "I'm now in {city}" → lives_in
@@ -168,8 +169,9 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
             object: obj.to_string(),
             confidence: 0.85,
             source: "regex_backstop_3p".into(),
-
             speaker: None,
+            valid_until: None,
+            valid_from: None,
         });
     }
 
@@ -215,7 +217,16 @@ impl IngestionConsumer {
             fact_repo: None,
             conflict_resolver: None,
             embedder: None,
-            episodic_importance_threshold: 0.7,
+            // Wave 6 / T1.1: env-configurable episodic threshold so raw
+            // turn preservation can be turned on for benches and Letta-style
+            // setups without a code change. KCA_EPISODIC_THRESHOLD=0.0
+            // preserves every observation as a raw episode (Letta default).
+            // Production keeps the 0.7 default to avoid log-noise pollution.
+            episodic_importance_threshold: std::env::var("KCA_EPISODIC_THRESHOLD")
+                .ok()
+                .and_then(|v| v.parse::<f64>().ok())
+                .filter(|v| (0.0..=1.0).contains(v))
+                .unwrap_or(0.7),
         }
     }
 

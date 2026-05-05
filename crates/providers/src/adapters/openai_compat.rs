@@ -155,8 +155,30 @@ impl OpenAiCompatProvider {
             }
         }
 
+        // Reasoning-model fallback: when `content` is empty/None but
+        // `reasoning_content` is set, treat the reasoning as the answer.
+        // Reasoning models (Mimo, deepseek-r1, qwq, glm-zero) emit empty
+        // `content` when finish_reason=length triggers mid-reasoning. The
+        // partial reasoning often contains the working-out and the answer
+        // — discarding it produces silent empty output across the agent.
+        // For non-reasoning models, reasoning_content is None so behavior
+        // is unchanged; for reasoning models that complete normally,
+        // content is non-empty so behavior is unchanged.
+        let content_is_empty = message
+            .content
+            .as_ref()
+            .map(|s| s.trim().is_empty())
+            .unwrap_or(true);
+        let resolved_content = if content_is_empty
+            && message.reasoning_content.as_deref().map(str::trim).map(str::is_empty) == Some(false)
+        {
+            message.reasoning_content.clone()
+        } else {
+            message.content.clone()
+        };
+
         Ok(LlmResponse {
-            content: message.content.clone(),
+            content: resolved_content,
             tool_calls,
             finish_reason: choice
                 .finish_reason

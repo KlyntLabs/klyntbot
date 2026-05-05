@@ -98,10 +98,15 @@ pub async fn execute_loop(
                 });
             }
             synthesis_attempted = true;
-            // No content yet — inject wrap-up and do one final LLM call
+            // No content yet — inject wrap-up and do one final LLM call.
+            // The next iteration's run_cycle will be invoked with tools=&[]
+            // (see synthesis-pass branch below) so reasoning models that
+            // would otherwise emit yet another tool_call are forced to
+            // commit text into `content`.
             messages.push(providers::types::Message::system(
-                "Your budget is exhausted. Provide a concise final response \
-                 summarizing any results you have so far.",
+                "Your budget is exhausted. Do NOT call any more tools. \
+                 Write a concise final answer in plain text using whatever \
+                 information you already have.",
             ));
         }
 
@@ -139,10 +144,20 @@ pub async fn execute_loop(
         .await;
 
         // ── LLM call (streaming) ─────────────────────────────
+        // On the synthesis pass (budget exhausted, last attempt before
+        // giving up) hide tools so reasoning models can't keep emitting
+        // tool_calls and starving content. Forces the model to commit
+        // a textual answer.
+        const NO_TOOLS: &[serde_json::Value] = &[];
+        let cycle_tools: &[serde_json::Value] = if synthesis_attempted && last_content.is_empty() {
+            NO_TOOLS
+        } else {
+            tools
+        };
         let (outcome, cycle_usage) = core
             .run_cycle(
                 &mut messages,
-                tools,
+                cycle_tools,
                 params,
                 ctx,
                 event_tx.as_ref(),

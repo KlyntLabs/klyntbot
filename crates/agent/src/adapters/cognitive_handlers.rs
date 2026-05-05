@@ -34,8 +34,9 @@ impl HeuristicExtractionHandler {
             object: observation.content.clone(),
             confidence,
             source: source.into(),
-
             speaker: None,
+            valid_until: None,
+            valid_from: None,
         };
         let od = observation.domain.as_str();
 
@@ -69,8 +70,9 @@ impl HeuristicExtractionHandler {
                         object,
                         confidence: 0.8,
                         source: "user_stated".into(),
-
                         speaker: None,
+                        valid_until: None,
+                        valid_from: None,
                     }]
                 }
             }
@@ -403,6 +405,17 @@ struct ExtractedFactJson {
     /// the speaker IS the subject or the LLM omitted it.
     #[serde(default)]
     speaker: Option<String>,
+    /// Wave 5 / T1.2: temporal end-bound (YYYY-MM-DD / YYYY-MM / YYYY) when
+    /// the observation contains a clear end-date or duration. None for
+    /// open-ended facts.
+    #[serde(default)]
+    valid_until: Option<String>,
+    /// Wave 5b: explicit start-date the model parsed from the source
+    /// turn (header dates, "on 7 May 2023", etc). Overrides the bench-run
+    /// timestamp during fact persistence. Critical for temporal LoCoMo
+    /// questions — without it, every fact gets stamped with TODAY's date.
+    #[serde(default)]
+    valid_from: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -458,8 +471,9 @@ fn bind_user_identity(extractions: &mut Vec<cognitive::BatchExtraction>) {
                     object: fact.object.clone(),
                     confidence: fact.confidence,
                     source: fact.source.clone(),
-
                     speaker: None,
+                    valid_until: fact.valid_until.clone(),
+                    valid_from: fact.valid_from.clone(),
                 });
             }
         }
@@ -507,8 +521,16 @@ impl ExtractionHandler for LlmExtractionHandler {
             .unwrap();
         }
         user_msg.push_str(
-            "Extract facts from ALL observations. Return JSON:\n\
-             {\"results\": [{\"observation_index\": 1, \"facts\": [{\"domain\": \"...\", \"subject\": \"...\", \"predicate\": \"...\", \"object\": \"...\", \"confidence\": 0.0, \"source\": \"...\"}]}]}",
+            "Extract facts from ALL observations. Return JSON. Each fact has \
+             {domain, subject, predicate, object, confidence, source, speaker?, valid_from?, valid_until?}.\n\
+             - valid_from: REQUIRED whenever the source turn header or text mentions a date. \
+               Use the date the event occurred (e.g. observation header '[Session 1 — 4:04 pm \
+               on 20 January, 2023]' → valid_from='2023-01-20'). When the turn says 'yesterday' \
+               or 'last Sunday', resolve relative to the header date. Format YYYY-MM-DD or \
+               YYYY-MM if day unknown. Omit only when no date is mentioned anywhere.\n\
+             - valid_until: set ONLY when the observation contains a clear end-date or duration \
+               (e.g. 'left job in March 2024' → valid_until='2024-03'). Otherwise OMIT.\n\
+             {\"results\": [{\"observation_index\": 1, \"facts\": [{\"domain\": \"...\", \"subject\": \"...\", \"predicate\": \"...\", \"object\": \"...\", \"confidence\": 0.0, \"source\": \"...\", \"valid_from\": \"YYYY-MM-DD\"}]}]}",
         );
 
         let messages = vec![
@@ -556,6 +578,8 @@ impl ExtractionHandler for LlmExtractionHandler {
                                             confidence: f.confidence,
                                             source: f.source,
                                             speaker: f.speaker,
+                                            valid_until: f.valid_until,
+                                            valid_from: f.valid_from,
                                         })
                                         .collect(),
                                 }
