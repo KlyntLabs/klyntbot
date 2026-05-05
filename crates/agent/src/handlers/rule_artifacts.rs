@@ -131,7 +131,7 @@ fn recover_artifact(raw: &str, artifact: &RuleArtifact) -> RuleArtifactOutput {
 mod tests {
     use super::*;
     use crate::test_utils::MockProvider;
-    use async_trait::async_trait;
+    
     use coding_memory::reforge::types::RepoArtifactPlan;
     use std::sync::Arc;
 

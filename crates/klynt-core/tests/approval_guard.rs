@@ -3,7 +3,7 @@ use common::tool_channel::{Channel, NonUiPolicy};
 use config::schema::CodingPermissions;
 use klynt_core::approval::{
     decision::{ApprovalDecision, ApprovalLayer},
-    guard::{evaluate, GuardCtx, APPROVAL_TIMEOUT},
+    guard::{evaluate, GuardCtx},
     round_trip::PendingApprovalsMap,
     Layer1,
 };

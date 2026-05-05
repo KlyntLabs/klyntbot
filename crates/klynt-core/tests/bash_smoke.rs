@@ -71,7 +71,7 @@ async fn denied_command_returns_error_and_does_not_run() {
     let privacy = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
     let pending = Arc::new(PendingApprovalsMap::new());
     let bus = Arc::new(DomainEventBus::new(64));
-    let (tx, _rx) = mpsc::channel::<tools_core::events::ToolEvent>(32);
+    let (_tx, _rx) = mpsc::channel::<tools_core::events::ToolEvent>(32);
     let tool = BashTool::new(layer1, policy, privacy, pending, bus, NonUiPolicy::Allow);
     let r = tool
         .execute(

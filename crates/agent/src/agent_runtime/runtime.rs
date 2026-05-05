@@ -989,7 +989,7 @@ impl AgentRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use providers::{ChatParams, DynProvider, LlmResponse, Usage};
+    use providers::{DynProvider, LlmResponse, Usage};
     use std::sync::Arc;
     use tools::registry::ToolRegistry;
 

@@ -211,7 +211,7 @@ impl IntelligenceSessionRepo {
 mod tests {
     use super::*;
     use crate::types::SessionSource;
-    use crate::ProductivityFeature;
+    
 
     async fn setup_pool() -> SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();

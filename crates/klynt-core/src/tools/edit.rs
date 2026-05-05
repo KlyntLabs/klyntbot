@@ -108,7 +108,7 @@ impl ToolExecute for EditTool {
             self.bus.clone(),
             ctx.cancel_token
                 .clone()
-                .unwrap_or_else(CancellationToken::new),
+                .unwrap_or_default(),
             common::tool_channel::Channel::from_name(ctx.channel.as_str()),
             self.non_ui_policy,
             ctx.hook_engine.clone(),

@@ -765,7 +765,7 @@ impl ReforgeHandler for NoopReforgeHandler {
 mod tests {
     use super::*;
     use crate::test_utils::MockProvider;
-    use providers::ChatParams;
+    
 
     #[tokio::test]
     async fn cross_cli_synthesis_handler_confirms_strong_evidence() {

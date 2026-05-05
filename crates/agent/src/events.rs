@@ -538,7 +538,7 @@ pub enum AgentEvent {
 #[cfg(test)]
 mod recall_skill_variant_tests {
     use super::*;
-    use serde_json::json;
+    
 
     #[test]
     fn recall_injected_serializes_with_camel_case_tag() {
@@ -602,7 +602,7 @@ mod recall_skill_variant_tests {
 #[cfg(test)]
 mod approval_sandbox_variant_tests {
     use super::*;
-    use serde_json::json;
+    
 
     #[test]
     fn approval_requested_carries_requires_user_input_field() {

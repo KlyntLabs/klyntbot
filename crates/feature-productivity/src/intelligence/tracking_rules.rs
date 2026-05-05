@@ -255,7 +255,7 @@ fn matches_pattern(value: &str, pattern: &str, mode: MatchMode) -> bool {
 mod tests {
     use super::*;
     use crate::repos::{PrivacyRuleRepo, RuleEvolutionLogRepo, TrackingRuleRepo};
-    use crate::ProductivityFeature;
+    
     use jiff::Timestamp;
     use sqlx::SqlitePool;
 

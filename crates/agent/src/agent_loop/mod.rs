@@ -709,7 +709,7 @@ impl AgentLoop {
 
         // Run through pipeline
         let mut routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
-        routing_ctx.session_key = Some(session_key.clone().into());
+        routing_ctx.session_key = Some(session_key.clone());
         routing_ctx.message_id = embed_msg_id.map(|id| id.to_string());
         let response_content = self
             .run_pipeline(&msg.content, history, &routing_ctx, None, None, correction)

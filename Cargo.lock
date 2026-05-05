@@ -92,6 +92,7 @@ dependencies = [
  "klynt-truncation",
  "mcp",
  "plugin-runtime",
+ "proptest",
  "providers",
  "regex",
  "scheduling",

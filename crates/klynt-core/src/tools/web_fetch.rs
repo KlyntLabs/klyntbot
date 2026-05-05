@@ -105,7 +105,7 @@ impl ToolExecute for WebFetchTool {
             self.bus.clone(),
             ctx.cancel_token
                 .clone()
-                .unwrap_or_else(CancellationToken::new),
+                .unwrap_or_default(),
             self.client.clone(),
             common::tool_channel::Channel::from_name(ctx.channel.as_str()),
             self.non_ui_policy,

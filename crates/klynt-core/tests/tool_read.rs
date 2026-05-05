@@ -1,6 +1,6 @@
 use common::{ChannelName, ChatId};
 use klynt_core::privacy::PrivacyGuard;
-use klynt_core::tools::read::{ReadArgs, ReadTool};
+use klynt_core::tools::read::ReadTool;
 use std::sync::Arc;
 use tools_core::{RoutingContext, Tool};
 

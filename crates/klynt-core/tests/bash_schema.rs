@@ -14,7 +14,7 @@ fn bash_tool_metadata() {
     let policy = Arc::new(Policy::empty());
     let privacy = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
     let pending = Arc::new(PendingApprovalsMap::new());
-    let (tx, _rx) = mpsc::channel::<tools_core::events::ToolEvent>(1);
+    let (_tx, _rx) = mpsc::channel::<tools_core::events::ToolEvent>(1);
     let bus = Arc::new(DomainEventBus::new(1));
 
     let t = BashTool::new(layer1, policy, privacy, pending, bus, NonUiPolicy::Allow);

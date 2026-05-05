@@ -7,7 +7,7 @@ use jiff::{SignedDuration, Timestamp};
 use storage::StoragePool;
 
 use activity_log::{
-    activity_log_migrations, ActivityIngestionService, ActivityLog, ActivityLogRepo,
+    activity_log_migrations, ActivityIngestionService, ActivityLogRepo,
     ActivitySource, ChatMessageInput, ChatMessageNormalizer, NormalizerSignalConsumer,
     PrivacyFilter, WindowEventInput, WindowEventNormalizer,
 };

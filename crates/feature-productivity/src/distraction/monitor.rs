@@ -247,7 +247,7 @@ fn update_context(previous_app: &mut String, previous_context: &mut String, tick
 mod tests {
     use super::*;
     use crate::repos::ProductivityRepos;
-    use crate::ProductivityFeature;
+    
 
     async fn setup_pool() -> sqlx::SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();

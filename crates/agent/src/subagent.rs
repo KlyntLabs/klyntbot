@@ -304,17 +304,13 @@ impl SubagentManager {
                 task_summary: label_text.clone(),
                 base: Default::default(),
             };
-            match engine
+            if let klynt_hooks::HookOutcome::Block { reason } = engine
                 .fire(klynt_hooks::engine::HookFireInput::SubagentSpawn(input))
-                .await
-            {
-                klynt_hooks::HookOutcome::Block { reason } => {
-                    return format!(
-                        "Subagent spawn blocked by hook: {} (ID: {})",
-                        reason, short_id
-                    );
-                }
-                _ => {}
+                .await {
+                return format!(
+                    "Subagent spawn blocked by hook: {} (ID: {})",
+                    reason, short_id
+                );
             }
         }
 
@@ -602,8 +598,7 @@ async fn run_subagent_task(
         t
     } else {
         let kit = tool_kit.ok_or_else(|| {
-            Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            Box::new(std::io::Error::other(
                 "subagent tool kit not initialized",
             )) as Box<dyn std::error::Error + Send + Sync>
         })?;

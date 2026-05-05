@@ -11,7 +11,7 @@ fn ppr_concentrates_mass_on_seed_neighborhood() {
     let b = g.add_node("B".into());
     let c = g.add_node("C".into());
     let d = g.add_node("D".into());
-    let e = g.add_node("E".into());
+    let _e = g.add_node("E".into());
 
     g.add_edge(a, b, 1.0);
     g.add_edge(b, a, 1.0);

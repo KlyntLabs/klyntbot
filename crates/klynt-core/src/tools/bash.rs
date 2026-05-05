@@ -8,7 +8,6 @@ use klynt_sandbox::SandboxRunner;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio_util::sync::CancellationToken;
 use tools_core::events::ToolEvent;
 use tools_core::{RoutingContext, ToolExecute, ToolParams};
 use uuid::Uuid;
@@ -90,7 +89,7 @@ impl ToolExecute for BashTool {
             cancel: ctx
                 .cancel_token
                 .clone()
-                .unwrap_or_else(CancellationToken::new),
+                .unwrap_or_default(),
             request_id,
             args: Some(serde_json::to_value(&args).unwrap_or(serde_json::Value::Null)),
             cwd: args.cwd.clone(),
@@ -159,7 +158,7 @@ impl ToolExecute for BashTool {
                         })
                         .await;
                 }
-                if let Some(ref bus) = Some(&self.bus) {
+                if let Some(bus) = Some(&self.bus) {
                     let payload = serde_json::json!({
                         "type": "sandboxPolicyApplied",
                         "tool": "bash",

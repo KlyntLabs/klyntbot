@@ -1549,7 +1549,7 @@ impl LlmQueryPredictorHandler {
             predictions: Vec<String>,
         }
         let parsed: R = serde_json::from_str(&resp.content.unwrap_or_default())
-            .map_err(|e| common::KlyntbotError::Json(e))?;
+            .map_err(common::KlyntbotError::Json)?;
         Ok(parsed.predictions.into_iter().take(n as usize).collect())
     }
 }
@@ -1674,7 +1674,7 @@ impl cognitive::services::temporal_pruner::TemporalPrunerHandler for LlmTemporal
         if input.facts.is_empty() {
             return Ok(Default::default());
         }
-        let user = serde_json::to_string(&input).map_err(|e| common::KlyntbotError::Json(e))?;
+        let user = serde_json::to_string(&input).map_err(common::KlyntbotError::Json)?;
         let messages = vec![
             providers::Message::system(TEMPORAL_PRUNE_SYSTEM_PROMPT),
             providers::Message::user(user),
@@ -1706,10 +1706,10 @@ mod tests {
     use crate::test_utils::MockProvider;
     use cognitive::situation::UserSituation;
     use cognitive::types::{SemanticFact, DEFAULT_MEMORY_TYPE};
-    use common::{KlyntbotError, ProviderError};
+    
     use feature_coaching::signal_accumulator::TriggerFired;
-    use providers::{LlmProvider, LlmResponse, ProviderCapabilities, ProviderHealth, Usage};
-    use serde_json::Value;
+    use providers::{LlmResponse, Usage};
+    
 
     // ── Test helpers ──
 
