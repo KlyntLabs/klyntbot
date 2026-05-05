@@ -22,14 +22,7 @@ impl AppCore {
         &self,
         params: TranslateBreakdownParams,
     ) -> Result<TranslateBreakdownResponse, ApiError> {
-        let provider = self
-            .cognitive_provider
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
-
-        let config = self.config.read().await;
-        let chat_params = providers::cognitive_chat_params(&config, 4096);
-        drop(config);
+        let (provider, chat_params) = self.cognitive_chat_context(4096).await?;
 
         let system =
             language_prompts::translate_breakdown_prompt(&params.source_lang, &params.target_lang);
@@ -90,14 +83,7 @@ impl AppCore {
         &self,
         params: EvaluateTranslationParams,
     ) -> Result<TranslationEvalResponse, ApiError> {
-        let provider = self
-            .cognitive_provider
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
-
-        let config = self.config.read().await;
-        let chat_params = providers::cognitive_chat_params(&config, 2048);
-        drop(config);
+        let (provider, chat_params) = self.cognitive_chat_context(2048).await?;
 
         let system =
             language_prompts::evaluate_translation_prompt(&params.source_lang, &params.target_lang);
@@ -375,14 +361,7 @@ impl AppCore {
         &self,
         params: EnrichAnnotationParams,
     ) -> Result<AnnotationEnrichmentResponse, ApiError> {
-        let provider = self
-            .cognitive_provider
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
-
-        let config = self.config.read().await;
-        let chat_params = providers::cognitive_chat_params(&config, 2048);
-        drop(config);
+        let (provider, chat_params) = self.cognitive_chat_context(2048).await?;
 
         let system =
             language_prompts::enrich_annotation_prompt(&params.source_lang, &params.target_lang);
@@ -425,14 +404,7 @@ impl AppCore {
         &self,
         params: QuickTranslateParams,
     ) -> Result<QuickTranslateResponse, ApiError> {
-        let provider = self
-            .cognitive_provider
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
-
-        let config = self.config.read().await;
-        let chat_params = providers::cognitive_chat_params(&config, 512);
-        drop(config);
+        let (provider, chat_params) = self.cognitive_chat_context(512).await?;
 
         let system =
             language_prompts::quick_translate_prompt(&params.source_lang, &params.target_lang);

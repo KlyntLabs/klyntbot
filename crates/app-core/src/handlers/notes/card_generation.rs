@@ -93,11 +93,6 @@ impl AppCore {
         &self,
         params: FlashcardGenerateParams,
     ) -> Result<FlashcardGenerateResponse, ApiError> {
-        let provider = self
-            .cognitive_provider
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
-
         // Resolve content: from note or raw text
         let (note_title, note_content, note_id) = match (&params.note_id, &params.text_content) {
             (Some(nid), _) => {
@@ -145,9 +140,7 @@ impl AppCore {
         let (system_prompt, user_prompt) = feature_learning::build_generation_prompt(&ctx);
 
         // Call LLM
-        let config = self.config.read().await;
-        let chat_params = providers::cognitive_chat_params(&config, 4096);
-        drop(config);
+        let (provider, chat_params) = self.cognitive_chat_context(4096).await?;
 
         let messages = vec![
             providers::Message::System {

@@ -1002,9 +1002,11 @@ impl AppCore {
                 ::cognitive::UnifiedMemoryService::new(fact_repo)
                     .with_embedder_opt(cognitive_fact_embedder.clone()),
             ) as Arc<dyn context_engine::MemoryRetriever>;
-            let mut distiller_cfg = coding_memory::distiller::DistillerConfig::default();
             // Respect coding-memory config model if set.
-            distiller_cfg.model = config.coding_memory.distiller.model.clone();
+            let distiller_cfg = coding_memory::distiller::DistillerConfig {
+                model: config.coding_memory.distiller.model.clone(),
+                ..Default::default()
+            };
             let mut d = coding_memory::distiller::Distiller::with_extractor(
                 distiller_cfg,
                 ingest_repo,

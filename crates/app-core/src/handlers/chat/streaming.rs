@@ -198,6 +198,7 @@ async fn resolve_ancestry(
 
 // ── Public free functions ────────────────────────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 #[tracing::instrument(skip(repos, agent, active_streams), err)]
 pub async fn chat_send(
     repos: &Repos,

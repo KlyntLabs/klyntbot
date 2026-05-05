@@ -229,14 +229,7 @@ impl AppCore {
         }
 
         // Call LLM
-        let provider = self
-            .cognitive_provider
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
-
-        let config = self.config.read().await;
-        let chat_params = providers::cognitive_chat_params(&config, 2048);
-        drop(config);
+        let (provider, chat_params) = self.cognitive_chat_context(2048).await?;
 
         let system =
             practice_prompts::evaluation_prompt(&session.source_lang, &session.target_lang);

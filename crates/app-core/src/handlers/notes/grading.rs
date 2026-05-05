@@ -279,14 +279,7 @@ impl AppCore {
         system_prompt: &str,
         user_prompt: &str,
     ) -> Result<LlmGradeResult, ApiError> {
-        let provider = self
-            .cognitive_provider
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
-
-        let config = self.config.read().await;
-        let chat_params = providers::cognitive_chat_params(&config, 2048);
-        drop(config);
+        let (provider, chat_params) = self.cognitive_chat_context(2048).await?;
 
         let messages = vec![
             providers::Message::System {
@@ -349,14 +342,7 @@ Be concise — 2-4 sentences max."#
         );
 
         // 3. Call LLM
-        let provider = self
-            .cognitive_provider
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
-
-        let config = self.config.read().await;
-        let chat_params = providers::cognitive_chat_params(&config, 1024);
-        drop(config);
+        let (provider, chat_params) = self.cognitive_chat_context(1024).await?;
 
         let messages = vec![
             providers::Message::System { content: system },

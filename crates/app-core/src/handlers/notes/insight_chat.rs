@@ -158,12 +158,6 @@ impl AppCore {
         params: &InsightChatParams,
         emitter: Arc<dyn crate::events::AppEventEmitter>,
     ) -> Result<InsightChatStarted, ApiError> {
-        let provider = self
-            .cognitive_provider
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?
-            .clone();
-
         // Load note for title + context.
         let note = self
             .note_repo
@@ -245,9 +239,7 @@ impl AppCore {
             }
         }
 
-        let config = self.config.read().await;
-        let chat_params = providers::cognitive_chat_params(&config, 1024);
-        drop(config);
+        let (provider, chat_params) = self.cognitive_chat_context(1024).await?;
 
         let session_key_clone = params.session_key.clone();
 

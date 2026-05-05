@@ -120,9 +120,8 @@ impl AppCore {
 
         let provider = self
             .cognitive_provider
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?
-            .clone();
+            .clone()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
 
         // NoteRow doesn't carry tags — fetch them separately
         let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
@@ -340,7 +339,7 @@ impl AppCore {
 
         let provider = self
             .cognitive_provider
-            .as_ref()
+            .clone()
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
 
         let config = self.config.read().await;
@@ -511,7 +510,7 @@ impl AppCore {
     ) -> Result<ScenarioChallengeResponse, ApiError> {
         let provider = self
             .cognitive_provider
-            .as_ref()
+            .clone()
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
 
         let note = self
@@ -596,7 +595,7 @@ impl AppCore {
     ) -> Result<TabContent, ApiError> {
         let provider = self
             .cognitive_provider
-            .as_ref()
+            .clone()
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
 
         let note = self

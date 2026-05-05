@@ -46,7 +46,7 @@ mod tests {
     fn installs_and_uninstalls() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("repo");
-        std::fs::create_dir_all(&repo.join(".git").join("hooks")).unwrap();
+        std::fs::create_dir_all(repo.join(".git").join("hooks")).unwrap();
         install(&repo).unwrap();
         let hook = repo.join(".git").join("hooks").join("post-commit");
         assert!(hook.exists());

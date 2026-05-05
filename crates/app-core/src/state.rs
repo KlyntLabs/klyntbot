@@ -729,6 +729,21 @@ impl AppCore {
         Ok(workspace_row_to_dto(row))
     }
 
+    /// Resolve the cognitive LLM provider and chat parameters.
+    /// Returns `Err(ApiError::NOT_AVAILABLE)` when no provider is configured.
+    pub async fn cognitive_chat_context(
+        &self,
+        max_tokens: u32,
+    ) -> Result<(providers::DynProvider, providers::ChatParams), ApiError> {
+        let provider = self
+            .cognitive_provider
+            .clone()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
+        let config = self.config.read().await;
+        let params = providers::cognitive_chat_params(&config, max_tokens);
+        Ok((provider, params))
+    }
+
     #[tracing::instrument(skip(self), err)]
     pub async fn is_workspace_path_dir(&self, path: String) -> common::Result<bool> {
         match tokio::fs::metadata(&path).await {

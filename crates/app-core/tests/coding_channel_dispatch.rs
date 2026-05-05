@@ -1,5 +1,5 @@
 use common::tool_channel::Channel;
-use common::{ChannelName, CODING_CHANNEL};
+use common::CODING_CHANNEL;
 
 #[test]
 fn coding_mode_resolves_to_coding_channel() {
