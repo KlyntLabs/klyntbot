@@ -98,65 +98,19 @@ impl AppCore {
 
         let mut out: Vec<ModelEntry> = Vec::new();
 
-        // Walk every configured provider with an API key. The api_base
-        // is what disambiguates compat-providers (Kimi via Anthropic,
-        // AiHubMix multi-brand, etc.).
-        let entries: &[(&str, &str, &str)] = &[
-            (
-                "anthropic",
-                providers_cfg.anthropic.api_key.expose(),
-                providers_cfg.anthropic.api_base.as_deref().unwrap_or(""),
-            ),
-            (
-                "openai",
-                providers_cfg.openai.api_key.expose(),
-                providers_cfg.openai.api_base.as_deref().unwrap_or(""),
-            ),
-            (
-                "openrouter",
-                providers_cfg.openrouter.api_key.expose(),
-                providers_cfg.openrouter.api_base.as_deref().unwrap_or(""),
-            ),
-            (
-                "deepseek",
-                providers_cfg.deepseek.api_key.expose(),
-                providers_cfg.deepseek.api_base.as_deref().unwrap_or(""),
-            ),
-            (
-                "gemini",
-                providers_cfg.gemini.api_key.expose(),
-                providers_cfg.gemini.api_base.as_deref().unwrap_or(""),
-            ),
-            (
-                "groq",
-                providers_cfg.groq.api_key.expose(),
-                providers_cfg.groq.api_base.as_deref().unwrap_or(""),
-            ),
-            (
-                "zhipu",
-                providers_cfg.zhipu.api_key.expose(),
-                providers_cfg.zhipu.api_base.as_deref().unwrap_or(""),
-            ),
-            (
-                "dashscope",
-                providers_cfg.dashscope.api_key.expose(),
-                providers_cfg.dashscope.api_base.as_deref().unwrap_or(""),
-            ),
-            (
-                "moonshot",
-                providers_cfg.moonshot.api_key.expose(),
-                providers_cfg.moonshot.api_base.as_deref().unwrap_or(""),
-            ),
-        ];
-
-        for (provider_id, api_key, api_base) in entries {
-            if api_key.is_empty() {
+        // Walk every configured provider with an API key. Re-use the
+        // `KNOWN_PROVIDERS` list from `providers_handler` so adding a
+        // new provider only requires a single edit.
+        for &(provider_id, _, _) in super::providers_handler::KNOWN_PROVIDERS {
+            let Some((_api_key, api_base)) =
+                crate::AppCore::provider_entry(provider_id, providers_cfg)
+            else {
                 continue;
-            }
+            };
             let brands = brands_for(provider_id, api_base);
             let mut models_for_provider: Vec<ProviderModel> = Vec::new();
             for b in &brands {
-                models_for_provider.extend(catalogue::for_brand(b));
+                models_for_provider.extend(catalogue::for_brand(b).iter().cloned());
             }
 
             // If the configured default model isn't in the catalogue,
@@ -166,8 +120,7 @@ impl AppCore {
                 if !models_for_provider.iter().any(|m| m.id.as_str() == dm)
                     && Self::default_belongs_to(provider_id, api_base, dm)
                 {
-                    let mut m = ProviderModel::from_id(dm);
-                    catalogue::enrich(&mut m);
+                    let m = ProviderModel::from_id_enriched(dm);
                     models_for_provider.push(m);
                 }
             }

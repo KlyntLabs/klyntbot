@@ -1,5 +1,6 @@
 use crate::privacy::PrivacyGuard;
 use crate::tools::shared::file_edit_event::fan_out_tool_event;
+use crate::tools::shared::fs_resolve::resolve_path;
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
 use async_trait::async_trait;
 use bus::DomainEventBus;
@@ -115,17 +116,7 @@ impl ToolExecute for BashTool {
 
             #[cfg(target_os = "macos")]
             {
-                let cwd = match args.cwd.as_deref() {
-                    Some(p) => {
-                        let path = PathBuf::from(p);
-                        if path.is_absolute() {
-                            path
-                        } else {
-                            self.cwd.join(path)
-                        }
-                    }
-                    None => self.cwd.clone(),
-                };
+                let cwd = args.cwd.as_deref().map(|p| resolve_path(p, &self.cwd)).unwrap_or_else(|| self.cwd.clone());
                 let sandbox_policy = klynt_sandbox::SandboxPolicy::cwd_writes_only(cwd.clone());
                 fan_out_tool_event(
                     ctx.event_tx.as_ref(),

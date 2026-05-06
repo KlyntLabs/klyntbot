@@ -592,7 +592,7 @@ impl LlmProvider for OpenAiCompatProvider {
             Ok(r) => r,
             Err(e) => {
                 debug!(provider = self.name(), error = %e, "list_models: request failed, falling back to default model");
-                return Ok(vec![crate::types::ProviderModel::from_id(&self.default_model)]);
+                return Ok(vec![crate::types::ProviderModel::from_id_enriched(&self.default_model)]);
             }
         };
 
@@ -609,7 +609,7 @@ impl LlmProvider for OpenAiCompatProvider {
             Ok(b) => b,
             Err(e) => {
                 debug!(provider = self.name(), error = %e, "list_models: invalid JSON, falling back to default model");
-                return Ok(vec![crate::types::ProviderModel::from_id(&self.default_model)]);
+                return Ok(vec![crate::types::ProviderModel::from_id_enriched(&self.default_model)]);
             }
         };
 
@@ -617,8 +617,8 @@ impl LlmProvider for OpenAiCompatProvider {
         let entries = body
             .get("data")
             .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
+            .map(|a| a.as_slice())
+            .unwrap_or(&[]);
         for entry in entries {
             let Some(id) = entry.get("id").and_then(|v| v.as_str()) else {
                 continue;
@@ -633,12 +633,9 @@ impl LlmProvider for OpenAiCompatProvider {
                 .get("context_length")
                 .or_else(|| entry.get("context_window"))
                 .and_then(|v| v.as_u64());
-            let mut model = crate::types::ProviderModel::from_id(id);
+            let mut model = crate::types::ProviderModel::from_id_enriched(id);
             model.display_name = display_name;
             model.context_window = context_window;
-            // Catalogue may have richer metadata (cost, max_tokens,
-            // attachments). Merge in if a matching entry exists.
-            crate::catalogue::enrich(&mut model);
             models.push(model);
         }
         if models.is_empty() {

@@ -1082,7 +1082,7 @@ impl LlmProvider for AnthropicNativeProvider {
                     error = %e,
                     "list_models: request failed, falling back to default model",
                 );
-                return Ok(vec![crate::types::ProviderModel::from_id(&self.model)]);
+                return Ok(vec![crate::types::ProviderModel::from_id_enriched(&self.model)]);
             }
         };
         if !response.status().is_success() {
@@ -1097,15 +1097,15 @@ impl LlmProvider for AnthropicNativeProvider {
             Ok(b) => b,
             Err(e) => {
                 tracing::debug!(provider = self.name(), error = %e, "list_models: invalid JSON");
-                return Ok(vec![crate::types::ProviderModel::from_id(&self.model)]);
+                return Ok(vec![crate::types::ProviderModel::from_id_enriched(&self.model)]);
             }
         };
         let mut models = Vec::new();
         let entries = body
             .get("data")
             .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
+            .map(|a| a.as_slice())
+            .unwrap_or(&[]);
         for entry in entries {
             let Some(id) = entry.get("id").and_then(|v| v.as_str()) else {
                 continue;
@@ -1115,9 +1115,8 @@ impl LlmProvider for AnthropicNativeProvider {
                 .and_then(|v| v.as_str())
                 .unwrap_or(id)
                 .to_string();
-            let mut model = crate::types::ProviderModel::from_id(id);
+            let mut model = crate::types::ProviderModel::from_id_enriched(id);
             model.display_name = display_name;
-            crate::catalogue::enrich(&mut model);
             models.push(model);
         }
         if models.is_empty() {

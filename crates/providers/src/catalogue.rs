@@ -16,6 +16,8 @@
 //! a future-cleanup task, not a correctness issue.
 
 use crate::types::ProviderModel;
+use std::collections::HashMap;
+use std::sync::LazyLock;
 
 /// Brand identifier used in `ProviderModel::brand`. Matches the lower-
 /// case keys used by `useProviders` in the FE.
@@ -32,22 +34,39 @@ pub mod brand {
     pub const OPENROUTER: &str = "openrouter";
 }
 
+static ANTHROPIC_MODELS: LazyLock<Vec<ProviderModel>> =
+    LazyLock::new(anthropic_models);
+static OPENAI_MODELS: LazyLock<Vec<ProviderModel>> =
+    LazyLock::new(openai_models);
+static MOONSHOT_MODELS: LazyLock<Vec<ProviderModel>> =
+    LazyLock::new(moonshot_models);
+static DEEPSEEK_MODELS: LazyLock<Vec<ProviderModel>> =
+    LazyLock::new(deepseek_models);
+static ZHIPU_MODELS: LazyLock<Vec<ProviderModel>> =
+    LazyLock::new(zhipu_models);
+static GROQ_MODELS: LazyLock<Vec<ProviderModel>> =
+    LazyLock::new(groq_models);
+static XAI_MODELS: LazyLock<Vec<ProviderModel>> =
+    LazyLock::new(xai_models);
+static GEMINI_MODELS: LazyLock<Vec<ProviderModel>> =
+    LazyLock::new(gemini_models);
+
 /// Look up catalogue entries for a given brand.
 ///
 /// Brand keys match `crate::catalogue::brand::*`. Unknown brands
 /// return an empty slice — adapters fall back to dynamic discovery
 /// or the configured default model.
-pub fn for_brand(brand: &str) -> Vec<ProviderModel> {
+pub fn for_brand(brand: &str) -> &'static [ProviderModel] {
     match brand {
-        brand::ANTHROPIC => anthropic_models(),
-        brand::OPENAI => openai_models(),
-        brand::MOONSHOT => moonshot_models(),
-        brand::DEEPSEEK => deepseek_models(),
-        brand::ZHIPU => zhipu_models(),
-        brand::GROQ => groq_models(),
-        brand::XAI => xai_models(),
-        brand::GEMINI => gemini_models(),
-        _ => Vec::new(),
+        brand::ANTHROPIC => &ANTHROPIC_MODELS,
+        brand::OPENAI => &OPENAI_MODELS,
+        brand::MOONSHOT => &MOONSHOT_MODELS,
+        brand::DEEPSEEK => &DEEPSEEK_MODELS,
+        brand::ZHIPU => &ZHIPU_MODELS,
+        brand::GROQ => &GROQ_MODELS,
+        brand::XAI => &XAI_MODELS,
+        brand::GEMINI => &GEMINI_MODELS,
+        _ => &[],
     }
 }
 
@@ -95,23 +114,25 @@ pub fn enrich(model: &mut ProviderModel) {
 
 /// Try to find a catalogue entry matching the given id.
 fn lookup(id: &str) -> Option<ProviderModel> {
-    for brand in [
-        brand::ANTHROPIC,
-        brand::OPENAI,
-        brand::MOONSHOT,
-        brand::DEEPSEEK,
-        brand::ZHIPU,
-        brand::GROQ,
-        brand::XAI,
-        brand::GEMINI,
-    ] {
-        for entry in for_brand(brand) {
-            if entry.id == id {
-                return Some(entry);
+    static ALL_BY_ID: LazyLock<HashMap<String, ProviderModel>> = LazyLock::new(|| {
+        let mut map = HashMap::new();
+        for brand in [
+            brand::ANTHROPIC,
+            brand::OPENAI,
+            brand::MOONSHOT,
+            brand::DEEPSEEK,
+            brand::ZHIPU,
+            brand::GROQ,
+            brand::XAI,
+            brand::GEMINI,
+        ] {
+            for entry in for_brand(brand) {
+                map.insert(entry.id.clone(), entry.clone());
             }
         }
-    }
-    None
+        map
+    });
+    ALL_BY_ID.get(id).cloned()
 }
 
 fn make(

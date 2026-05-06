@@ -287,7 +287,7 @@ impl AgentRuntime {
         cancel_token: Option<tokio_util::sync::CancellationToken>,
         depth: DepthMode,
     ) -> Result<RuntimeResult> {
-        tracing::info!("AgentRuntime::process_message: function body entered");
+        tracing::debug!("AgentRuntime::process_message: function body entered");
         let mut ctx = ctx.clone();
         // Bridge ToolEvent channel → AgentEvent channel so klynt-core tools
         // can emit events without depending on the agent crate.
@@ -390,22 +390,22 @@ impl AgentRuntime {
         ctx.hook_engine = self.hook_engine();
         let ctx = &ctx;
         let pipeline_start = Instant::now();
-        tracing::info!("AgentRuntime::process_message: about to acquire hot_config read lock");
+        tracing::debug!("AgentRuntime::process_message: about to acquire hot_config read lock");
         let hot = self.hot_config.read().await;
-        tracing::info!("AgentRuntime::process_message: hot_config lock acquired");
+        tracing::debug!("AgentRuntime::process_message: hot_config lock acquired");
         let safety_timeout_secs = hot.safety_timeout_secs;
         drop(hot);
 
-        tracing::info!(session = %ctx.chat_id.as_str(), "runtime.process_message: entered");
+        tracing::debug!(session = %ctx.chat_id.as_str(), "runtime.process_message: entered");
         // Emit pipeline start
         if let Some(ref tx) = event_tx {
             let _ = tx.send(AgentEvent::PipelineStarted).await;
         }
 
         // ── Phase 1: Prepare ─────────────────────────────────────
-        tracing::info!("runtime.process_message: calling build_retrieval_context");
+        tracing::debug!("runtime.process_message: calling build_retrieval_context");
         let retrieval_context = self.build_retrieval_context(&history).await;
-        tracing::info!("runtime.process_message: build_retrieval_context done");
+        tracing::debug!("runtime.process_message: build_retrieval_context done");
 
         let enhancement_budget = self.build_enhancement_budget(depth);
 
@@ -422,7 +422,7 @@ impl AgentRuntime {
         // assembler would receive an empty system message and the model would
         // run on pretraining defaults — see KLYNTBOT.md for the canonical
         // tone/formatting rules that this prompt carries into every turn.
-        tracing::info!("runtime.process_message: calling build_system_prompt");
+        tracing::debug!("runtime.process_message: calling build_system_prompt");
         let system_prompt = self
             .context_engine
             .build_system_prompt(
@@ -432,7 +432,7 @@ impl AgentRuntime {
                 ctx.session_mode,
             )
             .await;
-        tracing::info!(prompt_len = system_prompt.len(), "runtime.process_message: build_system_prompt done");
+        tracing::debug!(prompt_len = system_prompt.len(), "runtime.process_message: build_system_prompt done");
 
         let context_request = ContextRequest {
             message_text: message.to_string(),
@@ -447,11 +447,11 @@ impl AgentRuntime {
             tier0_count: Some(tier0),
         };
 
-        tracing::info!("runtime.process_message: calling context_engine.assemble");
+        tracing::debug!("runtime.process_message: calling context_engine.assemble");
         let assemble_start = Instant::now();
         let mut assembled = self.context_engine.assemble(context_request).await;
         let assemble_ms = assemble_start.elapsed().as_millis() as u64;
-        tracing::info!(ms = assemble_ms, tokens = assembled.token_count, "runtime.process_message: assemble done");
+        tracing::debug!(ms = assemble_ms, tokens = assembled.token_count, "runtime.process_message: assemble done");
 
         let context_fill_tokens = assembled.token_count;
         let context_fill_budget = self.context_window;
@@ -546,7 +546,7 @@ impl AgentRuntime {
             None
         };
 
-        tracing::info!(safety_timeout_secs, "runtime.process_message: calling execute_loop");
+        tracing::debug!(safety_timeout_secs, "runtime.process_message: calling execute_loop");
         let mut loop_result = tokio::time::timeout(
             safety_timeout,
             execute_loop(

@@ -269,6 +269,14 @@ impl ProviderModel {
             cost_per_1m_out_cached: None,
         }
     }
+
+    /// Same as `from_id` but enriched with static catalogue metadata
+    /// (cost, context window, brand, etc.) if a matching entry exists.
+    pub fn from_id_enriched(id: impl Into<String>) -> Self {
+        let mut m = Self::from_id(id);
+        crate::catalogue::enrich(&mut m);
+        m
+    }
 }
 
 /// Heuristic: does a model identifier suggest extended-thinking output?

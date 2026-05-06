@@ -284,11 +284,11 @@ async fn call_provider_streaming(
     domain_bus: Option<&Arc<bus::DomainEventBus>>,
     cache_breakpoints: &[providers::CacheBreakpoint],
 ) -> Result<providers::LlmResponse> {
-    tracing::info!(messages = messages.len(), tools = tools.len(), "call_provider_streaming: about to call provider.chat_stream");
+    tracing::debug!(messages = messages.len(), tools = tools.len(), "call_provider_streaming: about to call provider.chat_stream");
     let mut stream = provider
         .chat_stream(messages, Some(tools), params, cache_breakpoints)
         .await?;
-    tracing::info!("call_provider_streaming: chat_stream returned, awaiting first chunk");
+    tracing::debug!("call_provider_streaming: chat_stream returned, awaiting first chunk");
 
     let mut content = String::new();
     let mut partials: Vec<PartialToolCall> = Vec::with_capacity(4);
@@ -563,6 +563,11 @@ impl ExecutionCore {
         seen_tool_calls: Option<&mut HashSet<String>>,
         cache_breakpoints: &[providers::CacheBreakpoint],
     ) -> Result<(CycleOutcome, Usage)> {
+        // Pre-compute tool names once for fabrication detection.
+        // Only meaningful in assistant mode; coding mode skips the check.
+        let tool_names: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
+        let in_coding = routing_ctx.channel.as_str() == common::tool_channel::CODING_CHANNEL;
+
         // When an event channel is available, stream tokens so the UI updates
         // in real-time. Non-streaming providers already have a default
         // `chat_stream()` impl that wraps `chat()` into a single-chunk stream,
@@ -603,7 +608,7 @@ impl ExecutionCore {
             );
         }
 
-        tracing::info!(
+        tracing::debug!(
             content_len = response.content.as_deref().map(|s| s.len()).unwrap_or(0),
             tool_calls = response.tool_calls.len(),
             "run_cycle: LLM response decoded"
@@ -949,33 +954,30 @@ impl ExecutionCore {
         }
 
         // No tool calls — check for text content.
-        tracing::info!("run_cycle: no tool calls, checking content");
+        tracing::debug!("run_cycle: no tool calls, checking content");
         if let Some(content) = response.content {
             if !content.trim().is_empty() {
-                // Fabrication detection is only meaningful in assistant mode,
-                // where the model might pretend to have called a tool. Coding
-                // mode uses real tool execution, and the fabrication scan was
-                // observed to hang the loop pre-LLM-response on some inputs —
-                // skip it for the coding channel.
-                let in_coding =
-                    routing_ctx.channel.as_str() == common::tool_channel::CODING_CHANNEL;
-                if !in_coding {
-                    let tool_names: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
-                    if !tool_names.is_empty()
-                        && is_fabricated_tool_response(&content, &tool_names)
-                    {
-                        tracing::info!("run_cycle: returning FabricatedResponse");
-                        return Ok((CycleOutcome::FabricatedResponse { content }, usage));
-                    }
+                if Self::check_fabrication(&content, &tool_names, in_coding) {
+                    tracing::debug!("run_cycle: returning FabricatedResponse");
+                    return Ok((CycleOutcome::FabricatedResponse { content }, usage));
                 }
 
-                tracing::info!(content_len = content.len(), "run_cycle: returning FinalResponse");
+                tracing::debug!(content_len = content.len(), "run_cycle: returning FinalResponse");
                 return Ok((CycleOutcome::FinalResponse { content }, usage));
             }
         }
 
-        tracing::info!("run_cycle: returning EmptyResponse");
+        tracing::debug!("run_cycle: returning EmptyResponse");
         Ok((CycleOutcome::EmptyResponse, usage))
+    }
+
+    /// Returns true if the content looks like a fabricated tool response.
+    /// Skipped in coding mode where real tool execution is used.
+    fn check_fabrication(content: &str, tool_names: &[&str], in_coding: bool) -> bool {
+        if in_coding || tool_names.is_empty() {
+            return false;
+        }
+        is_fabricated_tool_response(content, tool_names)
     }
 }
 

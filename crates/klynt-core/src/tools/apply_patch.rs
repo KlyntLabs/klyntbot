@@ -208,6 +208,7 @@ pub async fn run_for_test(
             }
             Err(reason) => return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason))),
         }
+        crate::tools::shared::fs_resolve::ensure_parent_dir(&resolved).await?;
         let write_result = tokio::fs::write(&resolved, final_content.as_bytes()).await;
         let write_ok = write_result.is_ok();
         fire_post_file_edit(

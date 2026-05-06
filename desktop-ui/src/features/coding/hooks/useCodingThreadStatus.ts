@@ -3,10 +3,6 @@ import { useEffect, useState } from "react";
 
 type CodingStatus = {
   isProcessing: boolean;
-  hasUnread: boolean;
-  isReviewing: boolean;
-  processingStartedAt: number | null;
-  lastDurationMs: number | null;
 };
 
 /// Tracks per-thread "is a turn in flight?" for coding threads by listening to
@@ -29,27 +25,12 @@ export function useCodingThreadStatus() {
       if (evt.kind === "turn_started") {
         setStatusById((prev) => ({
           ...prev,
-          [threadId]: {
-            isProcessing: true,
-            hasUnread: false,
-            isReviewing: false,
-            processingStartedAt: Date.now(),
-            lastDurationMs: prev[threadId]?.lastDurationMs ?? null,
-          },
+          [threadId]: { isProcessing: true },
         }));
       } else if (evt.kind === "turn_completed") {
         setStatusById((prev) => ({
           ...prev,
-          [threadId]: {
-            isProcessing: false,
-            hasUnread: false,
-            isReviewing: false,
-            processingStartedAt: null,
-            lastDurationMs:
-              prev[threadId]?.processingStartedAt != null
-                ? Date.now() - prev[threadId].processingStartedAt!
-                : (prev[threadId]?.lastDurationMs ?? null),
-          },
+          [threadId]: { isProcessing: false },
         }));
       }
     }).then((un) => {

@@ -3,6 +3,13 @@ use common::Result;
 use desktop_shared::coding::{MessageDto, ThreadEvent};
 use storage::messages::parts::MessagePart;
 
+/// Kind discriminator for the bridge loop's dual text/reasoning buffers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PartKind {
+    Text,
+    Reasoning,
+}
+
 /// Response returned synchronously from `coding_message_send`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,7 +47,7 @@ impl AppCore {
                 id: user_msg_id.to_string(),
                 session_id: thread_id.to_string(),
                 role: "user".into(),
-                parts: vec![serde_json::json!({ "kind": "text", "text": text })],
+                parts: vec![serde_json::to_value(MessagePart::Text { text: text.to_string() }).unwrap()],
                 model: None,
                 turn_id: Some(turn_id.clone()),
                 created_at: started_at,
@@ -178,7 +185,7 @@ impl AppCore {
                         // into text or dropped entirely.
                         let mut text_buffer = String::new();
                         let mut reasoning_buffer = String::new();
-                        let mut last_kind: Option<&'static str> = None;
+                        let mut last_kind: Option<PartKind> = None;
                         let mut pending_parts: Vec<MessagePart> = Vec::new();
                         // Tracks which `part_idx` the next live ItemDelta should
                         // target. Increments at every kind transition so the FE
@@ -214,7 +221,7 @@ impl AppCore {
                                     // part_idx so the FE renders this text as a
                                     // distinct sibling part, not appended to the
                                     // reasoning block.
-                                    if last_kind == Some("reasoning")
+                                    if last_kind == Some(PartKind::Reasoning)
                                         && !reasoning_buffer.is_empty()
                                     {
                                         pending_parts.push(MessagePart::Reasoning {
@@ -223,7 +230,7 @@ impl AppCore {
                                         });
                                         current_part_idx += 1;
                                     }
-                                    last_kind = Some("text");
+                                    last_kind = Some(PartKind::Text);
                                     text_buffer.push_str(&data);
                                     broker.publish(ThreadEvent::ItemDelta {
                                         thread_id: tid.clone(),
@@ -258,13 +265,13 @@ impl AppCore {
                                     }
                                     // Kind transition: text → reasoning. Commit the
                                     // text burst before starting the reasoning part.
-                                    if last_kind == Some("text") && !text_buffer.is_empty() {
+                                    if last_kind == Some(PartKind::Text) && !text_buffer.is_empty() {
                                         pending_parts.push(MessagePart::Text {
                                             text: std::mem::take(&mut text_buffer),
                                         });
                                         current_part_idx += 1;
                                     }
-                                    last_kind = Some("reasoning");
+                                    last_kind = Some(PartKind::Reasoning);
                                     reasoning_buffer.push_str(&data);
                                     broker.publish(ThreadEvent::ItemDelta {
                                         thread_id: tid.clone(),
@@ -358,12 +365,11 @@ impl AppCore {
                                             id: tool_item_id.clone(),
                                             session_id: tid.clone(),
                                             role: "assistant".into(),
-                                            parts: vec![serde_json::json!({
-                                                "kind": "tool_call",
-                                                "call_id": call_id,
-                                                "name": name,
-                                                "args": args,
-                                            })],
+                                            parts: vec![serde_json::to_value(MessagePart::ToolCall {
+                                                call_id: call_id.clone(),
+                                                name: name.clone(),
+                                                args: args.clone(),
+                                            }).unwrap()],
                                             model: None,
                                             turn_id: Some(tuid_bridge.clone()),
                                             created_at: jiff::Timestamp::now()
@@ -421,16 +427,15 @@ impl AppCore {
                                             id: format!("tres-{}", uuid::Uuid::new_v4()),
                                             session_id: tid.clone(),
                                             role: "assistant".into(),
-                                            parts: vec![serde_json::json!({
-                                                "kind": "tool_result",
-                                                "call_id": "unknown",
-                                                "output": {
-                                                    "text": result_text,
-                                                    "mime": null,
-                                                    "truncated": false,
+                                            parts: vec![serde_json::to_value(MessagePart::ToolResult {
+                                                call_id: "unknown".into(),
+                                                output: storage::messages::parts::ToolOutput {
+                                                    text: result_text.clone(),
+                                                    mime: None,
+                                                    truncated: false,
                                                 },
-                                                "is_error": !success,
-                                            })],
+                                                is_error: !success,
+                                            }).unwrap()],
                                             model: None,
                                             turn_id: Some(tuid_bridge.clone()),
                                             created_at: jiff::Timestamp::now()
@@ -601,10 +606,9 @@ impl AppCore {
                                             id: format!("err-{}", uuid::Uuid::new_v4()),
                                             session_id: tid.clone(),
                                             role: "assistant".into(),
-                                            parts: vec![serde_json::json!({
-                                                "kind": "text",
-                                                "text": format!("⚠️ {message}"),
-                                            })],
+                                            parts: vec![serde_json::to_value(MessagePart::Text {
+                                                text: format!("⚠️ {message}"),
+                                            }).unwrap()],
                                             model: None,
                                             turn_id: Some(tuid_bridge.clone()),
                                             created_at: jiff::Timestamp::now()

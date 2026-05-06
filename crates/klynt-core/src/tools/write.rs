@@ -199,22 +199,7 @@ pub async fn run_for_test(
             }
             Err(reason) => return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason))),
         }
-        // Create the parent directory tree if it doesn't exist yet —
-        // matches every other coding-agent's expectation (Claude Code,
-        // Codex, opencode, kimi-cli) and avoids the misleading
-        // `write: No such file or directory (os error 2)` ENOENT
-        // failure when the model creates files in fresh directories.
-        if let Some(parent) = resolved.parent() {
-            if !parent.as_os_str().is_empty() {
-                if let Err(e) = tokio::fs::create_dir_all(parent).await {
-                    return Err(KlyntbotError::Tool(ToolError::ExecutionFailed(format!(
-                        "write: failed to create parent directory {}: {}",
-                        parent.display(),
-                        e
-                    ))));
-                }
-            }
-        }
+        crate::tools::shared::fs_resolve::ensure_parent_dir(&resolved).await?;
         let write_result = tokio::fs::write(&resolved, final_content.as_bytes()).await;
         let write_ok = write_result.is_ok();
         fire_post_file_edit(

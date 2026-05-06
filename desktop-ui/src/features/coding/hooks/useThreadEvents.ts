@@ -103,7 +103,7 @@ const initialState: State = {
 function sameTextParts(a: MessagePart[], b: MessagePart[]): boolean {
   const at = a.find((p) => p.kind === "text");
   const bt = b.find((p) => p.kind === "text");
-  return Boolean(at && bt && at.kind === "text" && bt.kind === "text" && at.text === bt.text);
+  return Boolean(at && bt && at.text === bt.text);
 }
 
 function appendPartToLatestAssistant(items: MessageDto[], part: MessagePart): MessageDto[] {
@@ -131,9 +131,7 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
       const exists = state.items.some(
         (m) =>
           m.id === incoming.id ||
-          (m.role === "user" &&
-            incoming.role === "user" &&
-            sameTextParts(m.parts, incoming.parts)),
+          (m.role === "user" && incoming.role === "user" && sameTextParts(m.parts, incoming.parts)),
       );
       if (exists) return state;
       return { ...state, items: [...state.items, incoming] };
