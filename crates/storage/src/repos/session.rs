@@ -123,13 +123,17 @@ impl SessionRepo {
         if keys.is_empty() {
             return Ok(Vec::new());
         }
-        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM sessions WHERE key IN (");
+        let mut qb =
+            sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM sessions WHERE key IN (");
         let mut sep = qb.separated(", ");
         for key in keys {
             sep.push_bind(key);
         }
         qb.push(")");
-        let rows = qb.build_query_as::<SessionRow>().fetch_all(&self.pool).await?;
+        let rows = qb
+            .build_query_as::<SessionRow>()
+            .fetch_all(&self.pool)
+            .await?;
         Ok(rows)
     }
 
@@ -942,7 +946,6 @@ pub struct SessionMessageWithParts {
     pub timestamp: jiff::Timestamp,
     pub metadata: Option<serde_json::Value>,
 }
-
 
 #[cfg(test)]
 mod tests {

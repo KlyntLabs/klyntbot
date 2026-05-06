@@ -36,7 +36,11 @@ pub async fn aggregate(sessions: &[DiscoveredSession]) -> Result<StatsBundle> {
                 .and_then(|n| n.to_str())
                 .unwrap_or("")
                 .to_string(),
-            cwd: scan.cwd.clone().map(std::path::PathBuf::from).unwrap_or_default(),
+            cwd: scan
+                .cwd
+                .clone()
+                .map(std::path::PathBuf::from)
+                .unwrap_or_default(),
             session_count: 0,
             turn_count: 0,
             tool_call_count: 0,
@@ -169,11 +173,18 @@ async fn scan_one(path: &Path) -> Result<OneScan> {
         let kind = v.get("type").and_then(Value::as_str).unwrap_or("");
         match kind {
             "user" => {
-                if let Some(blocks) = v.get("message").and_then(|m| m.get("content")).and_then(Value::as_array) {
-                    let has_text = blocks.iter().any(|b| b.get("type").and_then(Value::as_str) == Some("text"));
+                if let Some(blocks) = v
+                    .get("message")
+                    .and_then(|m| m.get("content"))
+                    .and_then(Value::as_array)
+                {
+                    let has_text = blocks
+                        .iter()
+                        .any(|b| b.get("type").and_then(Value::as_str) == Some("text"));
                     for b in blocks {
                         if b.get("type").and_then(Value::as_str) == Some("tool_result") {
-                            let is_err = b.get("is_error").and_then(Value::as_bool).unwrap_or(false);
+                            let is_err =
+                                b.get("is_error").and_then(Value::as_bool).unwrap_or(false);
                             if let Some(uid) = b.get("tool_use_id").and_then(Value::as_str) {
                                 if let Some(name) = tool_id_to_name.get(uid).cloned() {
                                     let e = s.tool_calls.entry(name).or_insert((0, 0));
@@ -196,11 +207,23 @@ async fn scan_one(path: &Path) -> Result<OneScan> {
                 }
             }
             "assistant" => {
-                if let Some(blocks) = v.get("message").and_then(|m| m.get("content")).and_then(Value::as_array) {
+                if let Some(blocks) = v
+                    .get("message")
+                    .and_then(|m| m.get("content"))
+                    .and_then(Value::as_array)
+                {
                     for b in blocks {
                         if b.get("type").and_then(Value::as_str) == Some("tool_use") {
-                            let name = b.get("name").and_then(Value::as_str).unwrap_or("").to_string();
-                            let id = b.get("id").and_then(Value::as_str).unwrap_or("").to_string();
+                            let name = b
+                                .get("name")
+                                .and_then(Value::as_str)
+                                .unwrap_or("")
+                                .to_string();
+                            let id = b
+                                .get("id")
+                                .and_then(Value::as_str)
+                                .unwrap_or("")
+                                .to_string();
                             if !id.is_empty() && !name.is_empty() {
                                 tool_id_to_name.insert(id, name.clone());
                             }
@@ -215,11 +238,12 @@ async fn scan_one(path: &Path) -> Result<OneScan> {
                     s.output_tokens += g("output_tokens");
                     s.cache_read_tokens += g("cache_read_input_tokens");
                     s.cache_creation_tokens += g("cache_creation_input_tokens");
-                    if let Some(ts) = v.get("timestamp").and_then(Value::as_str).and_then(|x| x.parse::<jiff::Timestamp>().ok()) {
-                        let day = ts
-                            .to_zoned(TimeZone::UTC)
-                            .strftime("%Y-%m-%d")
-                            .to_string();
+                    if let Some(ts) = v
+                        .get("timestamp")
+                        .and_then(Value::as_str)
+                        .and_then(|x| x.parse::<jiff::Timestamp>().ok())
+                    {
+                        let day = ts.to_zoned(TimeZone::UTC).strftime("%Y-%m-%d").to_string();
                         let e = s.daily_tokens.entry(day).or_insert((0, 0));
                         e.0 += g("input_tokens") + g("cache_creation_input_tokens");
                         e.1 += g("output_tokens");
@@ -241,7 +265,10 @@ mod tests {
     use tokio::io::AsyncWriteExt;
 
     async fn write(lines: &[&str]) -> tempfile::NamedTempFile {
-        let f = tempfile::Builder::new().suffix(".jsonl").tempfile().unwrap();
+        let f = tempfile::Builder::new()
+            .suffix(".jsonl")
+            .tempfile()
+            .unwrap();
         let mut h = tokio::fs::File::create(f.path()).await.unwrap();
         for l in lines {
             h.write_all(l.as_bytes()).await.unwrap();
@@ -267,7 +294,15 @@ mod tests {
         };
         let bundle = aggregate(&[d]).await.unwrap();
         assert_eq!(bundle.per_project.len(), 1);
-        assert_eq!(bundle.tool_usage.iter().find(|t| t.tool == "Bash").unwrap().call_count, 1);
+        assert_eq!(
+            bundle
+                .tool_usage
+                .iter()
+                .find(|t| t.tool == "Bash")
+                .unwrap()
+                .call_count,
+            1
+        );
         let day = &bundle.token_series[0];
         assert_eq!(day.input_tokens, 10);
         assert_eq!(day.output_tokens, 2);

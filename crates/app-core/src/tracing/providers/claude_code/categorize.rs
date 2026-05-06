@@ -9,8 +9,12 @@ pub fn categorize_line(top_kind: &str, payload: &Value) -> SemanticCategory {
     match top_kind {
         "system" => categorize_system(payload),
         "pr-link" => SemanticCategory::StatusUpdate,
-        "attachment" | "permission-mode" | "ai-title" | "last-prompt"
-        | "file-history-snapshot" | "queue-operation" => SemanticCategory::Other,
+        "attachment"
+        | "permission-mode"
+        | "ai-title"
+        | "last-prompt"
+        | "file-history-snapshot"
+        | "queue-operation" => SemanticCategory::Other,
         _ => SemanticCategory::Other,
     }
 }
@@ -20,7 +24,10 @@ fn categorize_system(payload: &Value) -> SemanticCategory {
     match sub {
         "compact_boundary" => SemanticCategory::CompactionBegin,
         "api_error" => SemanticCategory::Error,
-        "turn_duration" | "stop_hook_summary" | "away_summary" | "local_command"
+        "turn_duration"
+        | "stop_hook_summary"
+        | "away_summary"
+        | "local_command"
         | "scheduled_task_fire" => SemanticCategory::StatusUpdate,
         _ => SemanticCategory::Other,
     }
@@ -123,10 +130,7 @@ mod tests {
 
     #[test]
     fn user_string_content() {
-        assert_eq!(
-            user_string_content_category(),
-            SemanticCategory::UserInput
-        );
+        assert_eq!(user_string_content_category(), SemanticCategory::UserInput);
     }
 
     #[test]

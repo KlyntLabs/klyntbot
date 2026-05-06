@@ -133,7 +133,8 @@ pub fn coding_memory_migrations() -> Vec<FeatureMigration> {
         FeatureMigration {
             feature_name: "coding_memory".to_string(),
             version: 8,
-            description: "Fix coding_reviews FK referencing sessions(id) -> sessions(key).".to_string(),
+            description: "Fix coding_reviews FK referencing sessions(id) -> sessions(key)."
+                .to_string(),
             sql: include_str!("../migrations/008_fix_coding_reviews_fk.sql").to_string(),
         },
     ]

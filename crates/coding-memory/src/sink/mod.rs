@@ -16,7 +16,6 @@ pub mod subscriber;
 pub mod translator;
 
 pub use subscriber::MemorySinkSubscriber;
-#[cfg(any(test, feature = "test-helpers"))]
 pub use subscriber::RecordingSink;
 
 /// Abstraction over "accept an `AgentEvent` from a native source".

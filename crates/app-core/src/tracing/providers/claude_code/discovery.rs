@@ -126,7 +126,9 @@ mod tests {
         let project = root.join("-Users-foo-bar");
         fs::create_dir_all(&project).await.unwrap();
         fs::write(project.join("aaaa.jsonl"), "").await.unwrap();
-        let out = discover_sessions(&root, &tmp.path().join("imp")).await.unwrap();
+        let out = discover_sessions(&root, &tmp.path().join("imp"))
+            .await
+            .unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].session_id, "aaaa");
         assert_eq!(out[0].encoded_cwd.as_deref(), Some("-Users-foo-bar"));
@@ -144,7 +146,9 @@ mod tests {
         let sub = project.join("sess").join("subagents");
         fs::create_dir_all(&sub).await.unwrap();
         fs::write(sub.join("agent-x.jsonl"), "").await.unwrap();
-        let out = discover_sessions(&root, &tmp.path().join("imp")).await.unwrap();
+        let out = discover_sessions(&root, &tmp.path().join("imp"))
+            .await
+            .unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].session_id, "sess");
     }
@@ -157,7 +161,9 @@ mod tests {
         fs::create_dir_all(&project).await.unwrap();
         fs::write(project.join("sess.json"), "").await.unwrap();
         fs::write(project.join("sess.txt"), "").await.unwrap();
-        let out = discover_sessions(&root, &tmp.path().join("imp")).await.unwrap();
+        let out = discover_sessions(&root, &tmp.path().join("imp"))
+            .await
+            .unwrap();
         assert!(out.is_empty());
     }
 
@@ -168,7 +174,9 @@ mod tests {
         let dir = imp.join("uuid-1");
         fs::create_dir_all(&dir).await.unwrap();
         fs::write(dir.join("uuid-1.jsonl"), "").await.unwrap();
-        let out = discover_sessions(&tmp.path().join("nope"), &imp).await.unwrap();
+        let out = discover_sessions(&tmp.path().join("nope"), &imp)
+            .await
+            .unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].session_id, "uuid-1");
         assert!(out[0].imported);

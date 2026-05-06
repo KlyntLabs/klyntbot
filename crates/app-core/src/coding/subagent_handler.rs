@@ -8,10 +8,9 @@ impl AppCore {
         &self,
         thread_id: &str,
     ) -> Result<Vec<SubagentActiveSummary>> {
-        let mgr = self
-            .agent
-            .subagent_manager()
-            .ok_or_else(|| common::KlyntbotError::Storage("subagent manager not available".into()))?;
+        let mgr = self.agent.subagent_manager().ok_or_else(|| {
+            common::KlyntbotError::Storage("subagent manager not available".into())
+        })?;
         let active = mgr.list_active(thread_id).await;
         Ok(active
             .into_iter()
@@ -30,10 +29,9 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn subagent_cancel(&self, agent_id: &str) -> Result<()> {
-        let mgr = self
-            .agent
-            .subagent_manager()
-            .ok_or_else(|| common::KlyntbotError::Storage("subagent manager not available".into()))?;
+        let mgr = self.agent.subagent_manager().ok_or_else(|| {
+            common::KlyntbotError::Storage("subagent manager not available".into())
+        })?;
         mgr.cancel_subagent(agent_id).await?;
         Ok(())
     }

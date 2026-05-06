@@ -2,7 +2,6 @@ use desktop_macros::klynt_command;
 use desktop_shared::coding::{ApprovalPolicy, Thread, ThreadSummary};
 use desktop_shared::errors::ApiError;
 
-
 #[klynt_command]
 pub async fn coding_thread_start(
     workspace_id: String,
@@ -159,7 +158,10 @@ pub(crate) async fn dispatch_dev(
             )
         }
         "coding_thread_list" => {
-            let workspace_id = body.get("workspaceId").and_then(|v| v.as_str()).map(String::from);
+            let workspace_id = body
+                .get("workspaceId")
+                .and_then(|v| v.as_str())
+                .map(String::from);
             let cursor = body
                 .get("cursor")
                 .and_then(|v| v.as_str())

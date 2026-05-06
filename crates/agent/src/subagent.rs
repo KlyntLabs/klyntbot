@@ -469,8 +469,6 @@ impl SubagentManager {
             info!("Subagent {} completed", subagent_id_clone);
         });
 
-
-
         format!(
             "Subagent spawned (ID: {}). Working on '{}' in the background...",
             short_id, label_text

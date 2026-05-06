@@ -56,12 +56,7 @@ impl AppCore {
             .unwrap_or_else(|| REVIEW_DEFAULT_MODEL.to_string());
 
         let raw_output = self
-            .review_provider_call(
-                &system_prompt,
-                &recent_msgs,
-                &model,
-                REVIEW_TOOL_TIMEOUT,
-            )
+            .review_provider_call(&system_prompt, &recent_msgs, &model, REVIEW_TOOL_TIMEOUT)
             .await?;
 
         let parsed = parse_review_output(&raw_output)?;

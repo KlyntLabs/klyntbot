@@ -86,7 +86,10 @@ impl TaskRepo {
         let mut tx = self.pool.begin().await?;
 
         if let Some(parent_id) = new_parent_id {
-            if self.would_create_parent_cycle(&mut *tx, id, parent_id).await? {
+            if self
+                .would_create_parent_cycle(&mut *tx, id, parent_id)
+                .await?
+            {
                 tx.rollback().await?;
                 return Err(StorageError::Conflict(format!(
                     "Setting parent {parent_id} for task {id} would create a cycle"

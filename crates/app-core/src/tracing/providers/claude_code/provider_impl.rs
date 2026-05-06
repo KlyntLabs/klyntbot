@@ -50,7 +50,9 @@ impl ClaudeCodeTracingProvider {
         let all = self.discovered().await?;
         all.into_iter()
             .find(|d| d.session_id == session_id)
-            .ok_or_else(|| KlyntbotError::StorageNotFound(format!("claudeCode session: {session_id}")))
+            .ok_or_else(|| {
+                KlyntbotError::StorageNotFound(format!("claudeCode session: {session_id}"))
+            })
     }
 }
 

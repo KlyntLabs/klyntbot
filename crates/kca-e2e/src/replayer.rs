@@ -297,8 +297,7 @@ impl ReplayContext {
             .split_whitespace()
             .filter_map(|w| {
                 let cleaned = w.trim_matches(|c: char| !c.is_alphanumeric());
-                if cleaned.len() >= 3 && cleaned.chars().next().is_some_and(|c| c.is_uppercase())
-                {
+                if cleaned.len() >= 3 && cleaned.chars().next().is_some_and(|c| c.is_uppercase()) {
                     Some(cleaned.to_string())
                 } else {
                     None
@@ -335,12 +334,11 @@ impl ReplayContext {
             std::env::var("KCA_BENCH_DIRECT_DIAG").ok().as_deref(),
             Some("1")
         ) {
-            let with_until: Option<(i64,)> = sqlx::query_as(
-                "SELECT COUNT(*) FROM semantic_facts WHERE valid_until IS NOT NULL",
-            )
-            .fetch_optional(self.pool.inner())
-            .await
-            .unwrap_or(None);
+            let with_until: Option<(i64,)> =
+                sqlx::query_as("SELECT COUNT(*) FROM semantic_facts WHERE valid_until IS NOT NULL")
+                    .fetch_optional(self.pool.inner())
+                    .await
+                    .unwrap_or(None);
             let total: Option<(i64,)> = sqlx::query_as("SELECT COUNT(*) FROM semantic_facts")
                 .fetch_optional(self.pool.inner())
                 .await
@@ -407,7 +405,9 @@ impl ReplayContext {
                 .await
                 .unwrap_or(None);
             let n = total.map(|t| t.0).unwrap_or(-1);
-            eprintln!("[bench-direct-diag] episodic_memories total rows: {n}; question: {question:?}");
+            eprintln!(
+                "[bench-direct-diag] episodic_memories total rows: {n}; question: {question:?}"
+            );
         }
         match cognitive::search::bm25::search_episodic_memories(
             self.pool.inner(),
@@ -480,9 +480,10 @@ impl ReplayContext {
             .send()
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("direct QA request: {e}")))?;
-        let json: serde_json::Value = resp.json().await.map_err(|e| {
-            common::KlyntbotError::Storage(format!("direct QA parse: {e}"))
-        })?;
+        let json: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("direct QA parse: {e}")))?;
         let msg = &json["choices"][0]["message"];
         let content = msg["content"].as_str().unwrap_or("").to_string();
         if !content.trim().is_empty() {

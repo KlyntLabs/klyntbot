@@ -12,9 +12,7 @@ use crate::state::{AppCore, HandlerResult};
 
 fn map_cron_err(e: storage::error::StorageError) -> ApiError {
     match e {
-        storage::error::StorageError::NotFound(_) => {
-            ApiError::new("NOT_FOUND", e.to_string())
-        }
+        storage::error::StorageError::NotFound(_) => ApiError::new("NOT_FOUND", e.to_string()),
         other => ApiError::new("CRON_ERROR", other.to_string()),
     }
 }
@@ -69,11 +67,7 @@ impl AppCore {
         &self,
         include_disabled: bool,
     ) -> Result<Vec<CronJobResponse>, ApiError> {
-        let mut rows = self
-            .cron_repo
-            .list()
-            .await
-            .map_err(map_cron_err)?;
+        let mut rows = self.cron_repo.list().await.map_err(map_cron_err)?;
 
         if !include_disabled {
             rows.retain(|r| r.enabled);
@@ -87,11 +81,7 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn cron_status(&self) -> Result<CronStatusResponse, ApiError> {
-        let rows = self
-            .cron_repo
-            .list()
-            .await
-            .map_err(map_cron_err)?;
+        let rows = self.cron_repo.list().await.map_err(map_cron_err)?;
 
         let jobs = rows.len();
         let next_wake_at_ms = rows
@@ -127,11 +117,7 @@ impl AppCore {
             .await
             .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
 
-        let row = self
-            .cron_repo
-            .get(&id)
-            .await
-            .map_err(map_cron_err)?;
+        let row = self.cron_repo.get(&id).await.map_err(map_cron_err)?;
 
         Ok((to_response(&row), vec![]))
     }
@@ -151,10 +137,7 @@ impl AppCore {
         row.next_run_at_ms = Some(now_ms);
         row.updated_at_ms = now_ms;
 
-        self.cron_repo
-            .upsert(&row)
-            .await
-            .map_err(map_cron_err)?;
+        self.cron_repo.upsert(&row).await.map_err(map_cron_err)?;
 
         self.cron_bridge
             .reconcile_all()
@@ -172,22 +155,13 @@ impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub async fn cron_delete(&self, id: String) -> Result<bool, ApiError> {
         // Guard: system jobs cannot be deleted.
-        if let Some(row) = self
-            .cron_repo
-            .get_opt(&id)
-            .await
-            .map_err(map_cron_err)?
-        {
+        if let Some(row) = self.cron_repo.get_opt(&id).await.map_err(map_cron_err)? {
             if row.origin == "system" {
                 return Err(ApiError::new("FORBIDDEN", "Cannot delete system cron jobs"));
             }
         }
 
-        let deleted = self
-            .cron_repo
-            .delete(&id)
-            .await
-            .map_err(map_cron_err)?;
+        let deleted = self.cron_repo.delete(&id).await.map_err(map_cron_err)?;
 
         if deleted {
             self.cron_bridge
@@ -232,11 +206,7 @@ impl AppCore {
             intent_pending_since_ms: None,
         };
 
-        let saved = self
-            .cron_repo
-            .upsert(&row)
-            .await
-            .map_err(map_cron_err)?;
+        let saved = self.cron_repo.upsert(&row).await.map_err(map_cron_err)?;
 
         self.cron_bridge
             .reconcile_all()

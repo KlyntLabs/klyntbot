@@ -1240,8 +1240,6 @@ fn resolve_response_lang(config: &config::Config) -> Option<String> {
         .or_else(|| config.language.native_lang.clone())
 }
 
-
-
 async fn generate_tab(
     provider: &providers::DynProvider,
     emitter: &Arc<dyn AppEventEmitter>,

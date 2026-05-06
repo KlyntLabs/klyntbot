@@ -1,13 +1,12 @@
 //! Integration test for the Claude Code tracing provider against a hand-crafted fixture.
 
-use app_core::tracing::providers::claude_code::ClaudeCodeTracingProvider;
 use app_core::tracing::provider::TracingProvider;
+use app_core::tracing::providers::claude_code::ClaudeCodeTracingProvider;
 use app_core::tracing::types::{HeaderChip, Scope, SessionTab};
 use std::path::PathBuf;
 
 fn fixture_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/claude_code/projects")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/claude_code/projects")
 }
 
 fn imported_root() -> PathBuf {
@@ -28,7 +27,10 @@ async fn declares_two_tabs_and_claude_code_header_chips() {
 async fn list_sessions_finds_fixture() {
     let p = ClaudeCodeTracingProvider::new(fixture_root(), imported_root());
     let sessions = p.list_sessions().await.unwrap();
-    let s = sessions.iter().find(|s| s.session_id == "sess1").expect("sess1");
+    let s = sessions
+        .iter()
+        .find(|s| s.session_id == "sess1")
+        .expect("sess1");
     assert_eq!(s.provider_id, "claudeCode");
     assert_eq!(s.project_basename.as_deref(), Some("fixture"));
     assert_eq!(s.custom_title.as_deref(), Some("Refactor session"));
@@ -61,7 +63,12 @@ async fn list_subagents_returns_meta() {
 async fn load_subagent_session_works() {
     let p = ClaudeCodeTracingProvider::new(fixture_root(), imported_root());
     let detail = p
-        .load_session("sess1", Scope::Subagent { agent_id: "AGENT1".into() })
+        .load_session(
+            "sess1",
+            Scope::Subagent {
+                agent_id: "AGENT1".into(),
+            },
+        )
         .await
         .unwrap();
     assert!(!detail.events.is_empty());
@@ -72,10 +79,7 @@ async fn unsupported_methods_return_not_implemented() {
     let p = ClaudeCodeTracingProvider::new(fixture_root(), imported_root());
     assert!(p.load_state("sess1").await.is_err());
     assert!(p.load_context("sess1", Scope::Main).await.is_err());
-    assert!(p
-        .load_subagent_context("sess1", "AGENT1")
-        .await
-        .is_err());
+    assert!(p.load_subagent_context("sess1", "AGENT1").await.is_err());
 }
 
 #[tokio::test]

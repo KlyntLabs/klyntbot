@@ -44,7 +44,11 @@ impl AppCore {
             .await
             .map_err(map_storage_err)?
             .ok_or_else(|| ApiError::new("NOT_FOUND", format!("note '{id}' not found")))?;
-        let tags = self.note_repo.get_tags(&id).await.map_err(map_storage_err)?;
+        let tags = self
+            .note_repo
+            .get_tags(&id)
+            .await
+            .map_err(map_storage_err)?;
         Ok(note_row_to_response(&row, tags))
     }
 
@@ -414,26 +418,24 @@ impl AppCore {
         // 2. Semantic search (only if embedding handler available)
         let semantic_notes = if let Some(ref handler) = self.note_embedding_handler {
             match handler.embed_query(query).await {
-                Ok(query_vec) => {
-                    match handler.search_similar(&query_vec, 10, 0.35).await {
-                        Ok(results) => {
-                            let keyword_ids: std::collections::HashSet<&str> =
-                                keyword_notes.iter().map(|n| n.id.as_str()).collect();
-                            let note_ids: Vec<String> = results
-                                .into_iter()
-                                .filter(|(id, _)| !keyword_ids.contains(id.as_str()))
-                                .map(|(id, _)| id)
-                                .collect();
-                            let note_rows = self
-                                .note_repo
-                                .get_notes_by_ids(&note_ids)
-                                .await
-                                .map_err(map_storage_err)?;
-                            notes_with_tags_batch(self, &note_rows).await?
-                        }
-                        Err(_) => Vec::new(),
+                Ok(query_vec) => match handler.search_similar(&query_vec, 10, 0.35).await {
+                    Ok(results) => {
+                        let keyword_ids: std::collections::HashSet<&str> =
+                            keyword_notes.iter().map(|n| n.id.as_str()).collect();
+                        let note_ids: Vec<String> = results
+                            .into_iter()
+                            .filter(|(id, _)| !keyword_ids.contains(id.as_str()))
+                            .map(|(id, _)| id)
+                            .collect();
+                        let note_rows = self
+                            .note_repo
+                            .get_notes_by_ids(&note_ids)
+                            .await
+                            .map_err(map_storage_err)?;
+                        notes_with_tags_batch(self, &note_rows).await?
                     }
-                }
+                    Err(_) => Vec::new(),
+                },
                 Err(_) => Vec::new(),
             }
         } else {

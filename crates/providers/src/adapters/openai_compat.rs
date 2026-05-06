@@ -170,7 +170,12 @@ impl OpenAiCompatProvider {
             .map(|s| s.trim().is_empty())
             .unwrap_or(true);
         let resolved_content = if content_is_empty
-            && message.reasoning_content.as_deref().map(str::trim).map(str::is_empty) == Some(false)
+            && message
+                .reasoning_content
+                .as_deref()
+                .map(str::trim)
+                .map(str::is_empty)
+                == Some(false)
         {
             message.reasoning_content.clone()
         } else {

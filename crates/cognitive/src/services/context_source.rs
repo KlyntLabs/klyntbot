@@ -509,6 +509,7 @@ mod tests {
             message: Some("what are my peak hours".into()),
             intent_summary: None,
             project_id: None,
+            session_mode: common::SessionMode::Assistant,
         };
 
         let result = source.provide(&ctx).await.unwrap();
@@ -536,6 +537,7 @@ mod tests {
             message: Some("when is my deadline".into()),
             intent_summary: None,
             project_id: None,
+            session_mode: common::SessionMode::Assistant,
         };
         let out = source.provide(&ctx).await.unwrap();
         // Registry-ranked feature recommendations appear in the output

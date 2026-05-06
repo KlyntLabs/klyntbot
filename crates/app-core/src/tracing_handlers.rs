@@ -5,7 +5,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 impl AppCore {
-    fn tracing_provider(&self, id: &str) -> Result<Arc<dyn crate::tracing::provider::TracingProvider>, ApiError> {
+    fn tracing_provider(
+        &self,
+        id: &str,
+    ) -> Result<Arc<dyn crate::tracing::provider::TracingProvider>, ApiError> {
         self.tracing_registry.get(id).map_err(ApiError::from)
     }
 
@@ -165,7 +168,10 @@ impl AppCore {
         &self,
         provider_id: String,
     ) -> Result<Vec<SessionTab>, ApiError> {
-        Ok(self.tracing_provider(&provider_id)?.supported_tabs().to_vec())
+        Ok(self
+            .tracing_provider(&provider_id)?
+            .supported_tabs()
+            .to_vec())
     }
 
     #[tracing::instrument(skip(self), err)]
@@ -173,6 +179,9 @@ impl AppCore {
         &self,
         provider_id: String,
     ) -> Result<Vec<HeaderChip>, ApiError> {
-        Ok(self.tracing_provider(&provider_id)?.header_layout().to_vec())
+        Ok(self
+            .tracing_provider(&provider_id)?
+            .header_layout()
+            .to_vec())
     }
 }

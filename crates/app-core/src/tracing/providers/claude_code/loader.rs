@@ -50,9 +50,21 @@ pub async fn load_session(jsonl_path: &Path) -> Result<LoadedSession> {
             Ok(v) => v,
             Err(_) => continue,
         };
-        accumulate_usage(&v, &mut total_input, &mut total_output, &mut total_cache_read, &mut total_cache_creation);
+        accumulate_usage(
+            &v,
+            &mut total_input,
+            &mut total_output,
+            &mut total_cache_read,
+            &mut total_cache_creation,
+        );
         track_model(&v, &mut latest_model);
-        maybe_emit_turn_begin(&v, &mut events, &mut seq, &mut current_turn, &mut last_turn_prompt_id);
+        maybe_emit_turn_begin(
+            &v,
+            &mut events,
+            &mut seq,
+            &mut current_turn,
+            &mut last_turn_prompt_id,
+        );
         emit_for_line_with_turn(&v, &mut events, &mut seq, current_turn);
     }
 
@@ -147,7 +159,11 @@ fn maybe_emit_turn_begin(
 
     let occurred_at = parse_ts(v).unwrap_or_else(Timestamp::now);
     events.push(TraceEvent {
-        seq: { let s = *seq; *seq += 1; s },
+        seq: {
+            let s = *seq;
+            *seq += 1;
+            s
+        },
         provider_id: PROVIDER_ID.to_string(),
         raw_kind: "synthetic.TurnBegin".to_string(),
         payload: serde_json::json!({"promptId":pid}),
@@ -189,7 +205,11 @@ fn emit_for_line(v: &Value, events: &mut Vec<TraceEvent>, seq: &mut u64) {
         _ => {
             let category = categorize_line(top_kind, v);
             events.push(TraceEvent {
-                seq: { let s = *seq; *seq += 1; s },
+                seq: {
+                    let s = *seq;
+                    *seq += 1;
+                    s
+                },
                 provider_id: PROVIDER_ID.to_string(),
                 raw_kind: top_kind.to_string(),
                 payload: v.clone(),
@@ -223,7 +243,11 @@ fn emit_for_message(
                     block.get("type").and_then(Value::as_str).unwrap_or("?")
                 );
                 events.push(TraceEvent {
-                    seq: { let s = *seq; *seq += 1; s },
+                    seq: {
+                        let s = *seq;
+                        *seq += 1;
+                        s
+                    },
                     provider_id: PROVIDER_ID.to_string(),
                     raw_kind,
                     payload: block.clone(),
@@ -239,7 +263,11 @@ fn emit_for_message(
         }
         Some(Value::String(s)) => {
             events.push(TraceEvent {
-                seq: { let n = *seq; *seq += 1; n },
+                seq: {
+                    let n = *seq;
+                    *seq += 1;
+                    n
+                },
                 provider_id: PROVIDER_ID.to_string(),
                 raw_kind: format!("{role}.text"),
                 payload: serde_json::json!({"type":"text","text":s}),
@@ -334,7 +362,10 @@ mod tests {
 
     #[tokio::test]
     async fn system_compact_boundary_emits_compaction_begin() {
-        let f = write_fixture(&[r#"{"type":"system","subtype":"compact_boundary","timestamp":"2026-05-01T00:00:00Z"}"#]).await;
+        let f = write_fixture(&[
+            r#"{"type":"system","subtype":"compact_boundary","timestamp":"2026-05-01T00:00:00Z"}"#,
+        ])
+        .await;
         let out = load_session(f.path()).await.unwrap();
         assert_eq!(out.events.len(), 1);
         assert_eq!(out.events[0].category, SemanticCategory::CompactionBegin);
@@ -398,7 +429,10 @@ mod tests {
             .iter()
             .filter(|e| e.category == SemanticCategory::TurnBegin)
             .count();
-        assert_eq!(turns, 1, "tool-result-only user line must not start a new turn");
+        assert_eq!(
+            turns, 1,
+            "tool-result-only user line must not start a new turn"
+        );
     }
 
     #[tokio::test]

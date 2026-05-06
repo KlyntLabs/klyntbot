@@ -79,7 +79,11 @@ impl CodingApprovalHistoryRepo {
     }
 
     #[tracing::instrument(skip(self), err)]
-    pub async fn clear_for_tool(&self, tool: &str, repo_id: Option<&str>) -> Result<u64, StorageError> {
+    pub async fn clear_for_tool(
+        &self,
+        tool: &str,
+        repo_id: Option<&str>,
+    ) -> Result<u64, StorageError> {
         let res = match repo_id {
             Some(rid) => {
                 sqlx::query("DELETE FROM coding_approval_history WHERE tool = ? AND repo_id = ?")

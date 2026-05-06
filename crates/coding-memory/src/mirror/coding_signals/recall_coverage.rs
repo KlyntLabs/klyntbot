@@ -57,7 +57,6 @@ impl RecallCoverageSignal {
     }
 
     /// Drain pending alerts (test helper).
-    #[cfg(any(test, feature = "test-helpers"))]
     pub async fn drain(&self) -> common::Result<Vec<MirrorAlert>> {
         let mut g = self.inner.lock().await;
         Ok(std::mem::take(&mut g.pending_alerts))

@@ -23,7 +23,6 @@ impl MemorySinkSubscriber {
     }
 
     /// Test helper — construct from a `RecordingSink`.
-    #[cfg(any(test, feature = "test-helpers"))]
     pub fn for_test(sink: RecordingSink) -> Self {
         Self::new(Arc::new(sink))
     }
@@ -69,14 +68,12 @@ fn generic_to_runtime(_kind: &str, payload: &serde_json::Value) -> Option<Runtim
 // RecordingSink — test helper
 // ---------------------------------------------------------------------------
 
-#[cfg(any(test, feature = "test-helpers"))]
 /// Test helper that records every accepted event in memory.
 #[derive(Clone, Default)]
 pub struct RecordingSink {
     inner: Arc<Mutex<Vec<coding_ingest::event::AgentEvent>>>,
 }
 
-#[cfg(any(test, feature = "test-helpers"))]
 impl RecordingSink {
     /// Create an empty recording sink.
     #[must_use]
@@ -90,7 +87,6 @@ impl RecordingSink {
     }
 }
 
-#[cfg(any(test, feature = "test-helpers"))]
 #[async_trait::async_trait]
 impl MemorySink for RecordingSink {
     async fn accept_event(&self, evt: coding_ingest::event::AgentEvent) -> Result<()> {

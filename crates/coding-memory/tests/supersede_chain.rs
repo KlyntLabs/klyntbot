@@ -52,6 +52,7 @@ async fn supersede_chain_links_predecessor() {
         scope_id: None,
         scope_repo_id: None,
         metadata: None,
+        speaker: None,
     };
     writer.facts().upsert(&old).await.unwrap();
 
@@ -78,6 +79,7 @@ async fn supersede_chain_links_predecessor() {
         scope_id: None,
         scope_repo_id: None,
         metadata: None,
+        speaker: None,
     };
     writer
         .write_fact(coding_memory::distiller::PreparedFact {

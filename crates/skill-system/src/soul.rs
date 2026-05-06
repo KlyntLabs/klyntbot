@@ -88,8 +88,12 @@ impl SoulContextSource {
 
         let assistant_content = std::fs::read_to_string(&assistant_path)?;
         let coding_content = std::fs::read_to_string(&coding_path)?;
-        let assistant_mtime = std::fs::metadata(&assistant_path).and_then(|m| m.modified()).ok();
-        let coding_mtime = std::fs::metadata(&coding_path).and_then(|m| m.modified()).ok();
+        let assistant_mtime = std::fs::metadata(&assistant_path)
+            .and_then(|m| m.modified())
+            .ok();
+        let coding_mtime = std::fs::metadata(&coding_path)
+            .and_then(|m| m.modified())
+            .ok();
 
         Ok(Self {
             assistant: Arc::new(RwLock::new(assistant_content)),
@@ -140,11 +144,9 @@ impl ContextSource for SoulContextSource {
 
     async fn provide(&self, ctx: &SourceContext) -> Option<String> {
         let (path, content, last_mtime) = match ctx.session_mode {
-            common::SessionMode::Coding => (
-                &self.coding_path,
-                &self.coding,
-                &self.last_coding_mtime,
-            ),
+            common::SessionMode::Coding => {
+                (&self.coding_path, &self.coding, &self.last_coding_mtime)
+            }
             common::SessionMode::Assistant => (
                 &self.assistant_path,
                 &self.assistant,

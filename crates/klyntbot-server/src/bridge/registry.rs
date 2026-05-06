@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use common::{ChannelName, ChatId, MCP_CHANNEL, SessionMode};
+use common::{ChannelName, ChatId, SessionMode, MCP_CHANNEL};
 use rmcp::model::{CallToolResult, Content, Tool as McpTool};
 use rmcp::ErrorData as McpError;
 use tokio::sync::RwLock;

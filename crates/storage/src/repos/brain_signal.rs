@@ -71,7 +71,8 @@ impl BrainSignalFeedbackRepo {
         entity_pair: &str,
         hours: i64,
     ) -> Result<bool, StorageError> {
-        self.was_action_recently(entity_pair, "surfaced", hours).await
+        self.was_action_recently(entity_pair, "surfaced", hours)
+            .await
     }
 
     /// Returns `true` if this `entity_pair` was dismissed within the last `days` days.
@@ -80,7 +81,8 @@ impl BrainSignalFeedbackRepo {
         entity_pair: &str,
         days: i64,
     ) -> Result<bool, StorageError> {
-        self.was_action_recently(entity_pair, "dismissed", days * 24).await
+        self.was_action_recently(entity_pair, "dismissed", days * 24)
+            .await
     }
 
     /// Count the number of dismissals recorded in the last `hours` hours (across all entity pairs).

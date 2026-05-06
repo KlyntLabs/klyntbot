@@ -9,7 +9,7 @@ use sqlx::FromRow;
 #[serde(rename_all = "camelCase")]
 pub struct SessionRow {
     pub key: String,
-    pub mode: String,  // "assistant" | "coding"  (mirrors common::SessionMode)
+    pub mode: String, // "assistant" | "coding"  (mirrors common::SessionMode)
     pub metadata: serde_json::Value,
     pub created_at: SqlTs,
     pub updated_at: SqlTs,

@@ -158,7 +158,10 @@ mod tests {
             .await
             .unwrap();
 
-        let deleted = repo.delete_older_than(90, jiff::Timestamp::now()).await.unwrap();
+        let deleted = repo
+            .delete_older_than(90, jiff::Timestamp::now())
+            .await
+            .unwrap();
         assert_eq!(deleted, 1);
 
         assert!(repo.get("old-session").await.unwrap().is_none());

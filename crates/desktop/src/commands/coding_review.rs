@@ -1,7 +1,6 @@
 use desktop_macros::klynt_command;
 use desktop_shared::errors::ApiError;
 
-
 #[klynt_command]
 pub async fn coding_review_start(
     thread_id: String,

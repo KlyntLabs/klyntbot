@@ -85,7 +85,11 @@ async fn scan_jsonl(path: &Path) -> Result<Scan> {
             Ok(v) => v,
             Err(_) => continue,
         };
-        if let Some(ts) = v.get("timestamp").and_then(Value::as_str).and_then(|x| x.parse::<Timestamp>().ok()) {
+        if let Some(ts) = v
+            .get("timestamp")
+            .and_then(Value::as_str)
+            .and_then(|x| x.parse::<Timestamp>().ok())
+        {
             if s.first_ts.is_none() {
                 s.first_ts = Some(ts);
             }
@@ -167,7 +171,10 @@ mod tests {
     use tokio::io::AsyncWriteExt;
 
     async fn write(lines: &[&str]) -> tempfile::NamedTempFile {
-        let f = tempfile::Builder::new().suffix(".jsonl").tempfile().unwrap();
+        let f = tempfile::Builder::new()
+            .suffix(".jsonl")
+            .tempfile()
+            .unwrap();
         let mut h = tokio::fs::File::create(f.path()).await.unwrap();
         for l in lines {
             h.write_all(l.as_bytes()).await.unwrap();

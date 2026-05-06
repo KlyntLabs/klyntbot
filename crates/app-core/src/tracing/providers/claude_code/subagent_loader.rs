@@ -6,7 +6,7 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
 use super::loader;
-use crate::tracing::types::{SessionDetail, Scope, SubagentSummary};
+use crate::tracing::types::{Scope, SessionDetail, SubagentSummary};
 
 #[derive(Debug, Deserialize)]
 struct AgentMeta {
@@ -26,7 +26,12 @@ pub async fn list_subagents(source_dir: &Path, session_id: &str) -> Result<Vec<S
     let mut entries = match tokio::fs::read_dir(&dir).await {
         Ok(d) => d,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(out),
-        Err(e) => return Err(common::KlyntbotError::Storage(format!("read {}: {e}", dir.display()))),
+        Err(e) => {
+            return Err(common::KlyntbotError::Storage(format!(
+                "read {}: {e}",
+                dir.display()
+            )))
+        }
     };
     while let Some(e) = entries
         .next_entry()
