@@ -81,6 +81,7 @@ impl ToolKitBuilder {
     /// Five mutating tools (`ChannelMask::CODING_ONLY`).
     pub fn register_mutating(&self, reg: &mut ToolRegistry) {
         let mut bash = BashTool::new(
+            self.cwd.clone(),
             self.policy.clone(),
             self.privacy.clone(),
             self.bus.clone(),

@@ -38,6 +38,14 @@ pub struct BashArgs {
     approval_scope = "command"
 )]
 pub struct BashTool {
+    /// Workspace root that all relative `args.cwd` values resolve against and
+    /// that is used as the cwd when `args.cwd` is absent. Symmetric with
+    /// `WriteTool`/`EditTool`/`ApplyPatchTool` — the per-turn rebind in
+    /// `coding/turn_handler.rs` swaps this in by re-registering the tool.
+    /// Never falls back to `std::env::current_dir()`: a process-cwd fallback
+    /// previously caused new coding threads to scaffold files inside the
+    /// running binary's launch directory instead of the workspace.
+    cwd: PathBuf,
     policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
     bus: Arc<DomainEventBus>,
@@ -51,12 +59,14 @@ pub struct BashTool {
 
 impl BashTool {
     pub fn new(
+        cwd: PathBuf,
         policy: Arc<Policy>,
         privacy: Arc<PrivacyGuard>,
         bus: Arc<DomainEventBus>,
         non_ui_policy: common::tool_channel::NonUiPolicy,
     ) -> Self {
         Self {
+            cwd,
             policy,
             privacy,
             bus,
@@ -105,10 +115,17 @@ impl ToolExecute for BashTool {
 
             #[cfg(target_os = "macos")]
             {
-                let cwd = args
-                    .cwd
-                    .map(PathBuf::from)
-                    .unwrap_or_else(|| std::env::current_dir().unwrap());
+                let cwd = match args.cwd.as_deref() {
+                    Some(p) => {
+                        let path = PathBuf::from(p);
+                        if path.is_absolute() {
+                            path
+                        } else {
+                            self.cwd.join(path)
+                        }
+                    }
+                    None => self.cwd.clone(),
+                };
                 let sandbox_policy = klynt_sandbox::SandboxPolicy::cwd_writes_only(cwd.clone());
                 fan_out_tool_event(
                     ctx.event_tx.as_ref(),

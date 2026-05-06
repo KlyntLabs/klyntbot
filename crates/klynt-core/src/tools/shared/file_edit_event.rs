@@ -49,9 +49,23 @@ pub async fn emit_file_edit(
 }
 
 /// Compute a unified diff of `before` → `after`. Empty `before` = pure write.
+///
+/// Replaces `diffy`'s default `--- original / +++ modified` headers with
+/// path-based headers so the FE diff parser (`PierreDiffBlock`) sees a
+/// well-formed single-header unified diff. Also strips the standard
+/// `\ No newline at end of file` markers — these are correct unified-diff
+/// convention but visually noisy in the chat UI, and we never pipe these
+/// diffs through `patch`, so dropping them is safe.
 pub fn unified_diff(path: &str, before: &str, after: &str) -> String {
-    let patch = diffy::create_patch(before, after);
-    format!("--- {path}\n+++ {path}\n{patch}")
+    let raw = diffy::create_patch(before, after).to_string();
+    // diffy always prefixes two header lines; skip them and prepend ours.
+    let body = raw.splitn(3, '\n').nth(2).unwrap_or("");
+    let cleaned: String = body
+        .lines()
+        .filter(|line| !line.starts_with("\\ No newline at end of file"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!("--- {path}\n+++ {path}\n{cleaned}")
 }
 
 pub(crate) async fn fan_out_tool_event(
