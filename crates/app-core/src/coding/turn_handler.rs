@@ -101,8 +101,28 @@ impl AppCore {
             });
         }
 
-        // 5. Spawn agent task via process_direct_streaming
+        // 5. Re-bind the coding tools to this thread's workspace cwd before
+        // spawning the agent. Failure here is a hard error — we used to
+        // tracing::warn! and run the turn anyway with the boot-time default
+        // cwd, which silently scaffolded files inside the running binary's
+        // launch directory. The cost of failing here is one rejected turn
+        // with a clear error message; the cost of falling through is
+        // polluting the user's filesystem.
+        if let Err(e) = self.rebind_tool_kit_for_thread(thread_id).await {
+            tracing::error!(thread = %thread_id, error = %e, "cwd-rebind failed; aborting turn");
+            self.thread_events.publish(ThreadEvent::TurnCompleted {
+                thread_id: thread_id.to_string(),
+                turn_id: turn_id.clone(),
+                finish_reason: serde_json::json!({ "error": e.to_string() }),
+                completed_at: jiff::Timestamp::now().as_millisecond(),
+                duration_ms: 0,
+            });
+            return Err(e);
+        }
+
+        // 6. Spawn agent task via process_direct_streaming
         let agent = self.agent.clone();
+        let repos_for_bridge = self.repos.clone();
         let active_streams = self.active_streams.clone();
         let thread_events = self.thread_events.clone();
         let cost_events = self.cost_events.clone();
@@ -139,10 +159,32 @@ impl AppCore {
                     let cost_broker = cost_events.clone();
                     let tid = thread_id_owned.clone();
                     let tuid_bridge = turn_id_clone.clone();
+                    // Repos handle for persisting tool/file/command parts so they
+                    // survive a thread reload (without this, only user prompts and
+                    // the final assistant text persist; transparency steps vanish).
+                    let repos_bridge = repos_for_bridge.clone();
 
                     let bridge_handle = tokio::spawn(async move {
                         let mut item_started = false;
                         let mut item_id = String::new();
+                        // Two parallel buffers — one per stream channel — and a
+                        // chronologically ordered `pending_parts` list. The model can
+                        // alternate between text and reasoning within a single
+                        // iteration ("answer prose" then "let me think more" then
+                        // more answer); we capture each kind-burst as its own
+                        // MessagePart and persist them in arrival order. Mirrors
+                        // kimi-cli's TextPart vs ThinkPart distinction so reasoning
+                        // shows in its natural place rather than being collapsed
+                        // into text or dropped entirely.
+                        let mut text_buffer = String::new();
+                        let mut reasoning_buffer = String::new();
+                        let mut last_kind: Option<&'static str> = None;
+                        let mut pending_parts: Vec<MessagePart> = Vec::new();
+                        // Tracks which `part_idx` the next live ItemDelta should
+                        // target. Increments at every kind transition so the FE
+                        // reducer renders each burst as its own part instead of
+                        // merging them into one accumulating row.
+                        let mut current_part_idx: u32 = 0;
 
                         while let Some(evt) = event_rx.recv().await {
                             match evt {
@@ -165,23 +207,146 @@ impl AppCore {
                                             item: placeholder,
                                         });
                                         item_started = true;
+                                        current_part_idx = 0;
                                     }
+                                    // Kind transition: reasoning → text. Commit the
+                                    // reasoning burst as its own MessagePart and bump
+                                    // part_idx so the FE renders this text as a
+                                    // distinct sibling part, not appended to the
+                                    // reasoning block.
+                                    if last_kind == Some("reasoning")
+                                        && !reasoning_buffer.is_empty()
+                                    {
+                                        pending_parts.push(MessagePart::Reasoning {
+                                            text: std::mem::take(&mut reasoning_buffer),
+                                            redacted: false,
+                                        });
+                                        current_part_idx += 1;
+                                    }
+                                    last_kind = Some("text");
+                                    text_buffer.push_str(&data);
                                     broker.publish(ThreadEvent::ItemDelta {
                                         thread_id: tid.clone(),
                                         turn_id: tuid_bridge.clone(),
                                         item_id: item_id.clone(),
-                                        part_idx: 0,
+                                        part_idx: current_part_idx,
                                         delta: desktop_shared::coding::PartDelta::Text {
                                             append: data,
                                         },
                                     });
                                 }
+                                agent::AgentEvent::ReasoningChunk { data, .. } => {
+                                    if !item_started {
+                                        item_id = format!("msg-{}", uuid::Uuid::new_v4());
+                                        let placeholder = MessageDto {
+                                            id: item_id.clone(),
+                                            session_id: tid.clone(),
+                                            role: "assistant".into(),
+                                            parts: vec![],
+                                            model: None,
+                                            turn_id: Some(tuid_bridge.clone()),
+                                            created_at: jiff::Timestamp::now().as_millisecond(),
+                                            finish_reason: None,
+                                        };
+                                        broker.publish(ThreadEvent::ItemStarted {
+                                            thread_id: tid.clone(),
+                                            turn_id: tuid_bridge.clone(),
+                                            item: placeholder,
+                                        });
+                                        item_started = true;
+                                        current_part_idx = 0;
+                                    }
+                                    // Kind transition: text → reasoning. Commit the
+                                    // text burst before starting the reasoning part.
+                                    if last_kind == Some("text") && !text_buffer.is_empty() {
+                                        pending_parts.push(MessagePart::Text {
+                                            text: std::mem::take(&mut text_buffer),
+                                        });
+                                        current_part_idx += 1;
+                                    }
+                                    last_kind = Some("reasoning");
+                                    reasoning_buffer.push_str(&data);
+                                    broker.publish(ThreadEvent::ItemDelta {
+                                        thread_id: tid.clone(),
+                                        turn_id: tuid_bridge.clone(),
+                                        item_id: item_id.clone(),
+                                        part_idx: current_part_idx,
+                                        delta: desktop_shared::coding::PartDelta::Reasoning {
+                                            append: data,
+                                            redacted: false,
+                                        },
+                                    });
+                                }
                                 agent::AgentEvent::ToolStart { name, args, .. } => {
+                                    // Iteration boundary: commit any in-flight
+                                    // text/reasoning bursts in arrival order, then
+                                    // persist all pending parts as one assistant row.
+                                    // Each iteration's prose becomes its own
+                                    // MessageDto so the FE renders narration
+                                    // interleaved with tool calls instead of one
+                                    // oversized blob at the top.
+                                    if !text_buffer.is_empty() {
+                                        pending_parts.push(MessagePart::Text {
+                                            text: std::mem::take(&mut text_buffer),
+                                        });
+                                    }
+                                    if !reasoning_buffer.is_empty() {
+                                        pending_parts.push(MessagePart::Reasoning {
+                                            text: std::mem::take(&mut reasoning_buffer),
+                                            redacted: false,
+                                        });
+                                    }
+                                    if !pending_parts.is_empty() {
+                                        let parts = std::mem::take(&mut pending_parts);
+                                        let row_id = uuid::Uuid::new_v4();
+                                        if let Err(e) = repos_bridge
+                                            .sessions
+                                            .add_message_with_parts(
+                                                &tid,
+                                                row_id,
+                                                "assistant",
+                                                &parts,
+                                                Some(&tuid_bridge),
+                                                None,
+                                            )
+                                            .await
+                                        {
+                                            tracing::warn!(
+                                                "iteration parts persist failed: {e}"
+                                            );
+                                        }
+                                        item_started = false;
+                                        last_kind = None;
+                                        current_part_idx = 0;
+                                    }
                                     let call_id = args
                                         .get("call_id")
                                         .and_then(|v| v.as_str())
                                         .unwrap_or("unknown")
                                         .to_string();
+                                    // Persist so the tool call shows up on thread reload
+                                    // (without this, tool transparency only exists during
+                                    // the live turn and disappears on refresh).
+                                    let tool_call_part = MessagePart::ToolCall {
+                                        call_id: call_id.clone(),
+                                        name: name.clone(),
+                                        args: args.clone(),
+                                    };
+                                    let row_id = uuid::Uuid::new_v4();
+                                    if let Err(e) = repos_bridge
+                                        .sessions
+                                        .add_message_with_parts(
+                                            &tid,
+                                            row_id,
+                                            "assistant",
+                                            &[tool_call_part],
+                                            Some(&tuid_bridge),
+                                            None,
+                                        )
+                                        .await
+                                    {
+                                        tracing::warn!("tool_call persist failed: {e}");
+                                    }
                                     // Surface the tool call as its own item so the
                                     // FE renders it inline (transparency for the user).
                                     let tool_item_id =
@@ -224,6 +389,31 @@ impl AppCore {
                                     // Render the tool's output as a user-visible item
                                     // (prefix with bash/file/etc. via the kind tag).
                                     let result_text = result.unwrap_or_default();
+                                    // Persist tool result so reload still shows it.
+                                    let result_part = MessagePart::ToolResult {
+                                        call_id: "unknown".into(),
+                                        output: storage::messages::parts::ToolOutput {
+                                            text: result_text.clone(),
+                                            mime: None,
+                                            truncated: false,
+                                        },
+                                        is_error: !success,
+                                    };
+                                    let row_id = uuid::Uuid::new_v4();
+                                    if let Err(e) = repos_bridge
+                                        .sessions
+                                        .add_message_with_parts(
+                                            &tid,
+                                            row_id,
+                                            "assistant",
+                                            &[result_part],
+                                            Some(&tuid_bridge),
+                                            None,
+                                        )
+                                        .await
+                                    {
+                                        tracing::warn!("tool_result persist failed: {e}");
+                                    }
                                     broker.publish(ThreadEvent::ItemStarted {
                                         thread_id: tid.clone(),
                                         turn_id: tuid_bridge.clone(),
@@ -279,6 +469,40 @@ impl AppCore {
                                 }
                                 agent::AgentEvent::Done { .. } => {
                                     if item_started {
+                                        // Final flush — commit any trailing
+                                        // text/reasoning bursts and persist the
+                                        // chronologically-ordered parts as one row.
+                                        if !text_buffer.is_empty() {
+                                            pending_parts.push(MessagePart::Text {
+                                                text: std::mem::take(&mut text_buffer),
+                                            });
+                                        }
+                                        if !reasoning_buffer.is_empty() {
+                                            pending_parts.push(MessagePart::Reasoning {
+                                                text: std::mem::take(&mut reasoning_buffer),
+                                                redacted: false,
+                                            });
+                                        }
+                                        if !pending_parts.is_empty() {
+                                            let parts = std::mem::take(&mut pending_parts);
+                                            let row_id = uuid::Uuid::new_v4();
+                                            if let Err(e) = repos_bridge
+                                                .sessions
+                                                .add_message_with_parts(
+                                                    &tid,
+                                                    row_id,
+                                                    "assistant",
+                                                    &parts,
+                                                    Some(&tuid_bridge),
+                                                    None,
+                                                )
+                                                .await
+                                            {
+                                                tracing::warn!(
+                                                    "final parts persist failed: {e}"
+                                                );
+                                            }
+                                        }
                                         let completed = MessageDto {
                                             id: item_id.clone(),
                                             session_id: tid.clone(),
@@ -300,7 +524,12 @@ impl AppCore {
                                 agent::AgentEvent::TurnComplete { .. } => {
                                     // Will be followed by Done — handled there
                                 }
-                                agent::AgentEvent::FileEditWithSymbols { path, op, .. } => {
+                                agent::AgentEvent::FileEditWithSymbols {
+                                    path,
+                                    op,
+                                    diff_full,
+                                    ..
+                                } => {
                                     let change = match op.as_str() {
                                         "write" => {
                                             desktop_shared::coding::FileChangeKindDto::Created
@@ -310,11 +539,40 @@ impl AppCore {
                                         }
                                         _ => desktop_shared::coding::FileChangeKindDto::Modified,
                                     };
+                                    // Persist file_change part so reload shows the file
+                                    // mutation history, not just text replies. Tools
+                                    // already computed the unified diff via diffy; we
+                                    // just stop dropping it on the floor here.
+                                    let fc_part = MessagePart::FileChange(Box::new(
+                                        storage::messages::parts::FileChangeData {
+                                            path: std::path::PathBuf::from(&path),
+                                            before: None,
+                                            after: String::new(),
+                                            diff_unified: diff_full.clone(),
+                                            applied: true,
+                                        },
+                                    ));
+                                    let row_id = uuid::Uuid::new_v4();
+                                    if let Err(e) = repos_bridge
+                                        .sessions
+                                        .add_message_with_parts(
+                                            &tid,
+                                            row_id,
+                                            "assistant",
+                                            &[fc_part],
+                                            Some(&tuid_bridge),
+                                            None,
+                                        )
+                                        .await
+                                    {
+                                        tracing::warn!("file_change persist failed: {e}");
+                                    }
                                     broker.publish(ThreadEvent::FileChanged {
                                         thread_id: tid.clone(),
                                         turn_id: tuid_bridge.clone(),
                                         path,
                                         change,
+                                        diff_unified: diff_full,
                                     });
                                 }
                                 agent::AgentEvent::UsageReport {
@@ -439,6 +697,52 @@ impl AppCore {
         text: &str,
     ) -> Result<()> {
         self.steer_queue.push(turn_id, text.to_string())
+    }
+
+    /// Resolve the workspace path for `thread_id` and re-register every tool
+    /// in the shared registry with that path as its cwd. Returns Err on any
+    /// failure — caller must abort the turn rather than fall through with a
+    /// stale cwd. Failure modes (all hard errors, never warnings):
+    ///   - the session row is missing
+    ///   - the session row has no workspace_id
+    ///   - the workspace row is missing
+    ///   - the agent has no tool kit registered
+    async fn rebind_tool_kit_for_thread(&self, thread_id: &str) -> Result<()> {
+        let session =
+            self.repos.sessions.get_session(thread_id).await.map_err(|e| {
+                common::KlyntbotError::Storage(format!(
+                    "cwd-rebind: get_session({thread_id}) failed: {e}"
+                ))
+            })?;
+        let ws_id = session.workspace_id.as_deref().ok_or_else(|| {
+            common::KlyntbotError::Storage(format!(
+                "cwd-rebind: coding session {thread_id} has no workspace_id"
+            ))
+        })?;
+        let ws = self.repos.workspaces.get(ws_id).await.map_err(|e| {
+            common::KlyntbotError::Storage(format!(
+                "cwd-rebind: workspaces.get({ws_id}) failed: {e}"
+            ))
+        })?;
+        let kit = self
+            .tool_kit
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| {
+                common::KlyntbotError::Storage("cwd-rebind: tool_kit is None".to_string())
+            })?;
+        let ws_path = std::path::PathBuf::from(&ws.path);
+        let rebound = (*kit).clone().with_cwd(ws_path.clone());
+        let reg = self.agent.tool_registry();
+        let mut registry = reg.write().await;
+        rebound.register_all(&mut registry);
+        tracing::info!(
+            thread = %thread_id,
+            workspace = %ws_path.display(),
+            "cwd-rebind: tool kit rebound"
+        );
+        Ok(())
     }
 }
 

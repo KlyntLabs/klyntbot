@@ -1853,26 +1853,18 @@ impl AppCore {
                 .clone()
                 .unwrap_or_else(|| Arc::new(bus::DomainEventBus::new(64)));
 
-            // Toolkit cwd: walk up from the running binary's cwd to find the
-            // outermost workspace root (`.git` marker). Fixes the case where
-            // `cargo tauri dev` cd's into `crates/desktop`, leaving tools
-            // sandboxed to that subdir instead of the actual repo.
-            let cwd = {
-                let start =
-                    std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-                let mut cur = start.clone();
-                let mut found = None;
-                loop {
-                    if cur.join(".git").exists() {
-                        found = Some(cur.clone());
-                    }
-                    match cur.parent() {
-                        Some(p) if p != cur => cur = p.to_path_buf(),
-                        _ => break,
-                    }
-                }
-                found.unwrap_or(start)
-            };
+            // Toolkit cwd: bare process cwd. The previous implementation
+            // walked up to the outermost `.git` ancestor, which silently
+            // disguised cwd-rebind failures as "files landed somewhere
+            // plausible" instead of "files landed where the binary was
+            // launched from." Coding turns now require an explicit per-turn
+            // rebind via `coding/turn_handler.rs::rebind_tool_kit_for_thread`;
+            // any failure there returns Err and the turn never spawns. So
+            // this default only matters for non-coding contexts (e.g. the
+            // assistant chat shell, MCP server) where an explicit cwd is set
+            // at the callsite, or where shell access isn't permitted at all.
+            let cwd =
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
             let non_ui_policy = config_guard.tools.approval_policy.non_ui_channels;
 
             let hook_engine: Option<Arc<klynt_hooks::HookEngine>> = {

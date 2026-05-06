@@ -17,7 +17,9 @@ use crate::state::AppCore;
 pub async fn chat_threads(repos: &Repos) -> Result<Vec<ChatThreadResponse>, ApiError> {
     let default_filter = ProjectFilter::default();
     let (sessions, visible_contexts, all_areas, all_projects) = tokio::join!(
-        repos.sessions.list_sessions(),
+        repos
+            .sessions
+            .list_sessions_by_mode(common::SessionMode::Assistant),
         repos.session_context.list_visible(),
         repos.areas.list(None),
         repos.projects.list(&default_filter),
