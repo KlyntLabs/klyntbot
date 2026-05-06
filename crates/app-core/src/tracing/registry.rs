@@ -99,6 +99,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn default_supported_tabs_match_kimi_legacy() {
+        let stub = Stub;
+        let tabs = stub.supported_tabs();
+        assert_eq!(
+            tabs,
+            &[
+                SessionTab::Wire,
+                SessionTab::Context,
+                SessionTab::State,
+                SessionTab::Dual,
+                SessionTab::Agents,
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn default_header_layout_matches_kimi_legacy() {
+        let stub = Stub;
+        let chips = stub.header_layout();
+        assert!(chips.contains(&HeaderChip::Turns));
+        assert!(chips.contains(&HeaderChip::Steps));
+        assert!(chips.contains(&HeaderChip::Compactions));
+    }
+
+    #[tokio::test]
     async fn register_and_get() {
         let mut r = TracingRegistry::new();
         r.register(Arc::new(Stub));
