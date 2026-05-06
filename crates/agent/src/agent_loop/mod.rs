@@ -944,10 +944,14 @@ impl AgentLoop {
         cancel_token: Option<CancellationToken>,
         _correction: Option<context_engine::CorrectionContext>,
     ) -> Result<String> {
+        tracing::info!(session = %routing_ctx.chat_id.as_str(), "run_pipeline: entered");
         let history_messages = Self::convert_history(&history);
+        tracing::info!("run_pipeline: convert_history done");
         let (tool_defs, _tool_names) = self.get_tool_info().await;
+        tracing::info!(tools = tool_defs.len(), "run_pipeline: get_tool_info done");
         let channel = common::tool_channel::Channel::from_name(routing_ctx.channel.as_str());
         let registry = self.tool_registry.read().await;
+        tracing::info!("run_pipeline: tool_registry read lock acquired");
         let filtered_defs: Arc<Vec<serde_json::Value>> = Arc::new(
             tool_defs
                 .iter()
@@ -966,6 +970,7 @@ impl AgentLoop {
                 .collect(),
         );
         drop(registry);
+        tracing::info!(filtered = filtered_defs.len(), "run_pipeline: tool filter done, calling runtime.process_message");
 
         let result = self
             .runtime
@@ -1148,9 +1153,11 @@ impl AgentLoop {
             false
         };
 
+        tracing::info!(session = %session_key, "process_direct_streaming: before setup_session");
         let (history, user_msg_id) = self
             .setup_session(&content, &session_key, "streaming direct")
             .await?;
+        tracing::info!(session = %session_key, history_len = history.len(), "process_direct_streaming: after setup_session");
 
         // Create event channel and interaction channel
         let (event_tx, event_rx) = mpsc::channel(64);
@@ -1205,6 +1212,7 @@ impl AgentLoop {
         let sk = session_key.clone();
 
         let handle = tokio::spawn(async move {
+            tracing::info!(session = %sk, "process_direct_streaming: pipeline task entered");
             let pipeline_event_tx = event_tx.clone();
             let result = match agent
                 .run_pipeline(

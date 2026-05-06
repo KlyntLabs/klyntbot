@@ -26,15 +26,27 @@ impl AppCore {
         let turn_id = format!("turn-{}", uuid::Uuid::new_v4());
         let started_at = jiff::Timestamp::now().as_millisecond();
 
-        // 1. Append user message with Parts
+        // 1. Echo the user message to the FE so the chat shows the prompt
+        // immediately rather than only the assistant reply. The actual
+        // persistence happens inside `setup_session` (writes both `content`
+        // and parts via `session.add_message`); writing here too produced a
+        // duplicate row whose `content` was empty, which Anthropic rejected
+        // with HTTP 400 ("position 1 user must not be empty").
         let user_msg_id = uuid::Uuid::new_v4();
-        let parts = vec![MessagePart::Text {
-            text: text.to_string(),
-        }];
-        self.repos
-            .sessions
-            .add_message_with_parts(thread_id, user_msg_id, "user", &parts, Some(&turn_id), None)
-            .await?;
+        self.thread_events.publish(ThreadEvent::ItemStarted {
+            thread_id: thread_id.to_string(),
+            turn_id: turn_id.clone(),
+            item: MessageDto {
+                id: user_msg_id.to_string(),
+                session_id: thread_id.to_string(),
+                role: "user".into(),
+                parts: vec![serde_json::json!({ "kind": "text", "text": text })],
+                model: None,
+                turn_id: Some(turn_id.clone()),
+                created_at: started_at,
+                finish_reason: None,
+            },
+        });
 
         // 2. Resolve model
         let config = self.config.read().await;
@@ -100,6 +112,7 @@ impl AppCore {
         let text_owned = text.to_string();
 
         tokio::spawn(async move {
+            tracing::info!(turn = %turn_id_clone, "coding turn spawn: entering process_direct_streaming");
             let result = agent
                 .process_direct_streaming(
                     text_owned,
@@ -107,6 +120,11 @@ impl AppCore {
                     Some("coding".into()),
                 )
                 .await;
+            tracing::info!(
+                turn = %turn_id_clone,
+                ok = result.is_ok(),
+                "coding turn spawn: process_direct_streaming returned"
+            );
 
             match result {
                 Ok(handle) => {
@@ -164,10 +182,34 @@ impl AppCore {
                                         .and_then(|v| v.as_str())
                                         .unwrap_or("unknown")
                                         .to_string();
+                                    // Surface the tool call as its own item so the
+                                    // FE renders it inline (transparency for the user).
+                                    let tool_item_id =
+                                        format!("tool-{}", uuid::Uuid::new_v4());
+                                    broker.publish(ThreadEvent::ItemStarted {
+                                        thread_id: tid.clone(),
+                                        turn_id: tuid_bridge.clone(),
+                                        item: MessageDto {
+                                            id: tool_item_id.clone(),
+                                            session_id: tid.clone(),
+                                            role: "assistant".into(),
+                                            parts: vec![serde_json::json!({
+                                                "kind": "tool_call",
+                                                "call_id": call_id,
+                                                "name": name,
+                                                "args": args,
+                                            })],
+                                            model: None,
+                                            turn_id: Some(tuid_bridge.clone()),
+                                            created_at: jiff::Timestamp::now()
+                                                .as_millisecond(),
+                                            finish_reason: None,
+                                        },
+                                    });
                                     broker.publish(ThreadEvent::ToolCallStarted {
                                         thread_id: tid.clone(),
                                         turn_id: tuid_bridge.clone(),
-                                        item_id: item_id.clone(),
+                                        item_id: tool_item_id,
                                         call_id,
                                         tool: name,
                                     });
@@ -176,8 +218,36 @@ impl AppCore {
                                     name,
                                     success,
                                     duration_ms,
+                                    result,
                                     ..
                                 } => {
+                                    // Render the tool's output as a user-visible item
+                                    // (prefix with bash/file/etc. via the kind tag).
+                                    let result_text = result.unwrap_or_default();
+                                    broker.publish(ThreadEvent::ItemStarted {
+                                        thread_id: tid.clone(),
+                                        turn_id: tuid_bridge.clone(),
+                                        item: MessageDto {
+                                            id: format!("tres-{}", uuid::Uuid::new_v4()),
+                                            session_id: tid.clone(),
+                                            role: "assistant".into(),
+                                            parts: vec![serde_json::json!({
+                                                "kind": "tool_result",
+                                                "call_id": "unknown",
+                                                "output": {
+                                                    "text": result_text,
+                                                    "mime": null,
+                                                    "truncated": false,
+                                                },
+                                                "is_error": !success,
+                                            })],
+                                            model: None,
+                                            turn_id: Some(tuid_bridge.clone()),
+                                            created_at: jiff::Timestamp::now()
+                                                .as_millisecond(),
+                                            finish_reason: None,
+                                        },
+                                    });
                                     broker.publish(ThreadEvent::ToolCallCompleted {
                                         thread_id: tid.clone(),
                                         turn_id: tuid_bridge.clone(),
@@ -262,6 +332,27 @@ impl AppCore {
                                         usd_delta: estimated_cost_usd,
                                         thread_total_usd: None,
                                         ceiling_breached: false,
+                                    });
+                                }
+                                agent::AgentEvent::Error { message } => {
+                                    // Surface errors in the chat so silent hangs become visible.
+                                    broker.publish(ThreadEvent::ItemStarted {
+                                        thread_id: tid.clone(),
+                                        turn_id: tuid_bridge.clone(),
+                                        item: MessageDto {
+                                            id: format!("err-{}", uuid::Uuid::new_v4()),
+                                            session_id: tid.clone(),
+                                            role: "assistant".into(),
+                                            parts: vec![serde_json::json!({
+                                                "kind": "text",
+                                                "text": format!("⚠️ {message}"),
+                                            })],
+                                            model: None,
+                                            turn_id: Some(tuid_bridge.clone()),
+                                            created_at: jiff::Timestamp::now()
+                                                .as_millisecond(),
+                                            finish_reason: None,
+                                        },
                                     });
                                 }
                                 _ => {

@@ -1,3 +1,4 @@
+import { CodingThreadView } from "@/features/coding/components/CodingThreadView";
 import { useAppBootstrapOrchestration } from "@app/bootstrap/useAppBootstrapOrchestration";
 import { MainAppShell } from "@app/components/MainAppShell";
 import { AppView } from "@app/constants/appViews";
@@ -1890,8 +1891,18 @@ export default function MainApp() {
   ) : (
     messagesNode
   );
-  const mainMessagesNode =
-    showWorkspaceHome && appView !== "chat" ? workspaceHomeNode : chatMessagesNode;
+  // Coding mode renders the new transparency view (every reasoning step,
+  // tool call, and tool result inline) instead of the legacy assistant
+  // Messages.tsx, which doesn't subscribe to `agent:thread_event`.
+  const codingMessagesNode =
+    mode === "code" && activeThreadId && activeThreadId.startsWith("coding:") ? (
+      <CodingThreadView threadId={activeThreadId} />
+    ) : null;
+  const mainMessagesNode = codingMessagesNode
+    ? codingMessagesNode
+    : showWorkspaceHome && appView !== "chat"
+      ? workspaceHomeNode
+      : chatMessagesNode;
   const compactThreadConnectionState: "live" | "polling" | "disconnected" =
     !activeWorkspace?.connected ? "disconnected" : remoteThreadConnectionState;
   const mainAppShellProps = useMainAppShellProps({

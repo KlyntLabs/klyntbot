@@ -12,12 +12,10 @@ export function AgentsMdPanel({ threadId, initialSources }: Props) {
   const { sources, refresh, refreshing, lastRefreshedAt } = useAgentsMd(threadId, initialSources);
   const [expanded, setExpanded] = useState(false);
 
+  // AGENTS.md is optional — render nothing when no sources are loaded
+  // rather than a noisy "not found" aside.
   if (sources.length === 0) {
-    return (
-      <aside className="agents-md-panel agents-md-panel--empty">
-        No AGENTS.md found in workspace ancestor chain.
-      </aside>
-    );
+    return null;
   }
 
   return (

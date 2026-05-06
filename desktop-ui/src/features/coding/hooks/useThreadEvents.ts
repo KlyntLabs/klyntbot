@@ -1,5 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { MessagePart } from "../components/parts/types";
 
 /// Mirrors `desktop_shared::coding::events::ThreadEvent`. Kept loose (string
@@ -98,6 +98,22 @@ const initialState: State = {
   turnState: { kind: "idle" },
 };
 
+function sameTextParts(a: MessagePart[], b: MessagePart[]): boolean {
+  const at = a.find((p) => p.kind === "text");
+  const bt = b.find((p) => p.kind === "text");
+  return Boolean(at && bt && at.kind === "text" && bt.kind === "text" && at.text === bt.text);
+}
+
+function appendPartToLatestAssistant(items: MessageDto[], part: MessagePart): MessageDto[] {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i].role === "assistant") {
+      const updated = { ...items[i], parts: [...items[i].parts, part] };
+      return [...items.slice(0, i), updated, ...items.slice(i + 1)];
+    }
+  }
+  return items;
+}
+
 /// Pure reducer — exhaustive over `ThreadEvent.kind`. Unknown kinds are no-ops.
 export function applyThreadEvent(state: State, event: ThreadEvent): State {
   switch (event.kind) {
@@ -106,8 +122,20 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
         ...state,
         turnState: { kind: "streaming", turnId: event.turn_id, model: event.model },
       };
-    case "item_started":
-      return { ...state, items: [...state.items, event.item] };
+    case "item_started": {
+      // Dedupe: backend may echo a user message that the FE already pushed
+      // optimistically (same id), or content (text) we just rendered.
+      const incoming = event.item;
+      const exists = state.items.some(
+        (m) =>
+          m.id === incoming.id ||
+          (m.role === "user" &&
+            incoming.role === "user" &&
+            sameTextParts(m.parts, incoming.parts)),
+      );
+      if (exists) return state;
+      return { ...state, items: [...state.items, incoming] };
+    }
     case "item_delta": {
       const items = state.items.map((m) => {
         if (m.id !== event.item_id) return m;
@@ -135,6 +163,21 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
               redacted: event.delta.redacted,
             };
           }
+        } else if (event.delta.type === "tool_call_args") {
+          const existing = parts[idx];
+          if (existing && existing.kind === "tool_call") {
+            parts[idx] = { ...existing, args: event.delta.json_patch };
+          }
+        } else if (event.delta.type === "command_stdout") {
+          const existing = parts[idx];
+          if (existing && existing.kind === "command_execution") {
+            parts[idx] = { ...existing, stdout: existing.stdout + event.delta.append };
+          }
+        } else if (event.delta.type === "command_stderr") {
+          const existing = parts[idx];
+          if (existing && existing.kind === "command_execution") {
+            parts[idx] = { ...existing, stderr: existing.stderr + event.delta.append };
+          }
         }
         return { ...m, parts };
       });
@@ -152,8 +195,28 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
       };
     case "tool_call_completed":
       return state;
-    case "file_changed":
-    case "command_executed":
+    case "file_changed": {
+      const items = appendPartToLatestAssistant(state.items, {
+        kind: "file_change",
+        path: event.path,
+        before: null,
+        after: "",
+        diff_unified: "",
+        applied: true,
+      });
+      return { ...state, items };
+    }
+    case "command_executed": {
+      const items = appendPartToLatestAssistant(state.items, {
+        kind: "command_execution",
+        command: event.command,
+        cwd: "",
+        exit_code: event.exit_code,
+        stdout: "",
+        stderr: "",
+      });
+      return { ...state, items };
+    }
     case "context_compressed":
     case "heartbeat":
       return state;
@@ -171,11 +234,11 @@ export function useThreadEvents(threadId: string | null) {
   const [state, setState] = useState<State>(initialState);
 
   useEffect(() => {
+    setState(initialState);
     if (!threadId) return;
     let unlisten: (() => void) | null = null;
     listen<ThreadEvent>("agent:thread_event", (e) => {
       const evt = e.payload;
-      // Filter by thread — only relevant events update state.
       const evThreadId = (evt as { thread_id?: string }).thread_id;
       if (evThreadId && evThreadId !== threadId) return;
       setState((prev) => applyThreadEvent(prev, evt));
@@ -187,5 +250,27 @@ export function useThreadEvents(threadId: string | null) {
     };
   }, [threadId]);
 
-  return state;
+  /// Optimistically render a user message before the backend's echo arrives.
+  /// Avoids the listener-registration race where the FE-published `ItemStarted`
+  /// for the user's own turn would otherwise be dropped.
+  const pushUserMessage = useCallback((text: string) => {
+    setState((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          id: `local-user-${Date.now()}`,
+          session_id: "",
+          role: "user",
+          parts: [{ kind: "text", text }],
+          model: null,
+          turn_id: null,
+          created_at: Date.now(),
+          finish_reason: null,
+        },
+      ],
+    }));
+  }, []);
+
+  return { ...state, pushUserMessage };
 }

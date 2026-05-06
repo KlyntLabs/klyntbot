@@ -827,11 +827,11 @@ impl LlmProvider for AnthropicNativeProvider {
         let url = format!("{}/v1/messages", self.base_url);
         let body = self.build_request_body(messages, tools, params, true, cache_breakpoints);
 
-        debug!(
-            "Calling Anthropic native (streaming): model={}, messages={}, thinking={}",
-            params.model,
-            messages.len(),
-            self.extended_thinking.as_ref().is_some_and(|et| et.enabled),
+        tracing::info!(
+            url = %url,
+            model = %params.model,
+            messages = messages.len(),
+            "anthropic_native chat_stream: preparing request"
         );
 
         let (_, needs_header) = self.prepare_cache_markers(messages, tools, cache_breakpoints);
@@ -847,11 +847,32 @@ impl LlmProvider for AnthropicNativeProvider {
             request = request.header("anthropic-beta", "extended-cache-ttl-2025-04-11");
         }
 
+        // Diagnostic: dump message variant + length to find empty messages
+        let summary: Vec<String> = messages.iter().enumerate().map(|(i, m)| {
+            use crate::types::Message as M;
+            match m {
+                M::System { content } => format!("[{i}]System len={}", content.len()),
+                M::User { content } => format!("[{i}]User content={:?}", content),
+                M::Assistant { content, tool_calls, .. } => format!(
+                    "[{i}]Assistant content_len={} tools={}",
+                    content.as_deref().map(|s| s.len()).unwrap_or(0),
+                    tool_calls.as_ref().map(|t| t.len()).unwrap_or(0)
+                ),
+                M::Tool { tool_call_id, .. } => format!("[{i}]Tool id={tool_call_id}"),
+                M::ContextUpdate { content, .. } => format!("[{i}]ContextUpdate len={}", content.len()),
+            }
+        }).collect();
+        tracing::info!(messages = ?summary, "anthropic_native chat_stream: message summary");
+        tracing::info!("anthropic_native chat_stream: sending HTTP POST");
         let response = request
             .json(&body)
             .send()
             .await
-            .map_err(|e| ProviderError::Http(e.to_string()))?;
+            .map_err(|e| {
+                tracing::error!(error = %e, "anthropic_native chat_stream: HTTP send failed");
+                ProviderError::Http(e.to_string())
+            })?;
+        tracing::info!(status = %response.status(), "anthropic_native chat_stream: response received");
 
         if !response.status().is_success() {
             let status = response.status();
@@ -859,6 +880,7 @@ impl LlmProvider for AnthropicNativeProvider {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
+            tracing::error!(status = %status, body = %error_text, "anthropic_native chat_stream: error response body");
 
             return Err(crate::types::map_http_error(
                 status.as_u16(),

@@ -35,8 +35,16 @@ pub fn start_config_watcher(
                     break;
                 }
                 _ = interval.tick() => {
-                    let previous = hot_config.read().await;
-                    if let Some((new_config, diff, new_hot)) = config::reload_if_changed(&*previous, &mut last_mtime).await {
+                    // Snapshot under a short-lived read lock, then drop it
+                    // before any further awaits. Holding the read across
+                    // `reload_if_changed` and the subsequent write below
+                    // self-deadlocks: tokio RwLock blocks new writes until
+                    // all readers drop, including ones held by the same task.
+                    let previous_snapshot = {
+                        let guard = hot_config.read().await;
+                        (*guard).clone()
+                    };
+                    if let Some((new_config, diff, new_hot)) = config::reload_if_changed(&previous_snapshot, &mut last_mtime).await {
                         info!(
                             model_changed = diff.model_changed,
                             temp_changed = diff.temperature_changed,

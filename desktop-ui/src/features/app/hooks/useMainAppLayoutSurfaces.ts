@@ -358,6 +358,7 @@ function buildPrimarySurface({
   errorToasts,
   dismissErrorToast,
   chatView,
+  promptActions,
 }: MainAppLayoutSurfacesContext): LayoutNodesOptions["primary"] {
   return {
     sidebarProps: {
@@ -561,6 +562,7 @@ function buildPrimarySurface({
       onSelectProject: threadNavigation.selectWorkspace,
       onAddProject: handleAddWorkspace,
       onImportProject: openWorkspaceFromUrlPrompt,
+      onSubmitTask: activeWorkspace ? promptActions.handleSendPromptToNewAgent : undefined,
     },
     mainHeaderProps: activeWorkspace
       ? {

@@ -10,10 +10,11 @@ export function useCodingMode(threadId: string | null) {
 
   useEffect(() => {
     if (!threadId) return;
-    // Chat sessions are created lazily on first message; skip fetching mode
-    // for not-yet-persisted chat keys to avoid NOT_FOUND backend noise.
-    if (threadId.startsWith("chat:")) {
-      setModeState("general");
+    // Only assistant-mode chat sessions live in the chat_sessions table.
+    // Coding threads (`coding:`) and workspace IDs (`ws-`) are not stored
+    // there, so skip the lookup to avoid NOT_FOUND backend noise.
+    if (!threadId.startsWith("chat:") || threadId === "chat:new") {
+      setModeState(threadId.startsWith("coding:") ? "coding" : "general");
       return;
     }
     let cancelled = false;

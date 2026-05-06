@@ -131,6 +131,7 @@ pub async fn execute_loop(
         } else {
             Vec::new()
         };
+        tracing::info!(turn = cap.turns_used() + 1, "execute_loop: calling core.run_cycle (LLM)");
         let (outcome, cycle_usage) = core
             .run_cycle(
                 &mut messages,
@@ -142,6 +143,7 @@ pub async fn execute_loop(
                 &cache_bps,
             )
             .await?;
+        tracing::info!(turn = cap.turns_used() + 1, "execute_loop: core.run_cycle returned");
 
         accumulate_usage(&mut accumulated_usage, &cycle_usage);
         cap.deduct(&cycle_usage);

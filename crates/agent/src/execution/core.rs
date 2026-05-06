@@ -284,9 +284,11 @@ async fn call_provider_streaming(
     domain_bus: Option<&Arc<bus::DomainEventBus>>,
     cache_breakpoints: &[providers::CacheBreakpoint],
 ) -> Result<providers::LlmResponse> {
+    tracing::info!(messages = messages.len(), tools = tools.len(), "call_provider_streaming: about to call provider.chat_stream");
     let mut stream = provider
         .chat_stream(messages, Some(tools), params, cache_breakpoints)
         .await?;
+    tracing::info!("call_provider_streaming: chat_stream returned, awaiting first chunk");
 
     let mut content = String::new();
     let mut partials: Vec<PartialToolCall> = Vec::with_capacity(4);
@@ -580,6 +582,12 @@ impl ExecutionCore {
                 "cache hit ratio for this call"
             );
         }
+
+        tracing::info!(
+            content_len = response.content.as_deref().map(|s| s.len()).unwrap_or(0),
+            tool_calls = response.tool_calls.len(),
+            "run_cycle: LLM response decoded"
+        );
 
         if !response.tool_calls.is_empty() {
             debug!(
@@ -901,25 +909,33 @@ impl ExecutionCore {
             return Ok((CycleOutcome::ToolsExecuted { results }, usage));
         }
 
-        // No tool calls — check for text content
-        debug!("ExecutionCore: LLM returned text response (no tool calls)");
+        // No tool calls — check for text content.
+        tracing::info!("run_cycle: no tool calls, checking content");
         if let Some(content) = response.content {
             if !content.trim().is_empty() {
-                // Extract tool names from the tool definitions for fabrication check
-                let tool_names: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
-
-                if !tool_names.is_empty() && is_fabricated_tool_response(&content, &tool_names) {
-                    debug!(
-                        "ExecutionCore: detected fabricated tool response (tools available: {:?})",
-                        tool_names
-                    );
-                    return Ok((CycleOutcome::FabricatedResponse { content }, usage));
+                // Fabrication detection is only meaningful in assistant mode,
+                // where the model might pretend to have called a tool. Coding
+                // mode uses real tool execution, and the fabrication scan was
+                // observed to hang the loop pre-LLM-response on some inputs —
+                // skip it for the coding channel.
+                let in_coding =
+                    routing_ctx.channel.as_str() == common::tool_channel::CODING_CHANNEL;
+                if !in_coding {
+                    let tool_names: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
+                    if !tool_names.is_empty()
+                        && is_fabricated_tool_response(&content, &tool_names)
+                    {
+                        tracing::info!("run_cycle: returning FabricatedResponse");
+                        return Ok((CycleOutcome::FabricatedResponse { content }, usage));
+                    }
                 }
 
+                tracing::info!(content_len = content.len(), "run_cycle: returning FinalResponse");
                 return Ok((CycleOutcome::FinalResponse { content }, usage));
             }
         }
 
+        tracing::info!("run_cycle: returning EmptyResponse");
         Ok((CycleOutcome::EmptyResponse, usage))
     }
 }
