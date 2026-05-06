@@ -570,6 +570,82 @@ impl LlmProvider for OpenAiCompatProvider {
             Err(e) => Ok(ProviderHealth::Unhealthy(e.to_string())),
         }
     }
+
+    /// Discover models via `GET {api_base}/models`. Parses the standard
+    /// OpenAI shape `{ data: [{ id, ... }, ...] }`. Falls back to the
+    /// configured default model if the endpoint isn't reachable or the
+    /// shape doesn't match — keeps the dropdown populated even when a
+    /// provider is misconfigured. `supports_reasoning` is heuristic on
+    /// the id substring (see `id_implies_reasoning`).
+    async fn list_models(&self) -> Result<Vec<crate::types::ProviderModel>> {
+        let url = format!("{}/models", self.api_base);
+        let mut request = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .timeout(Duration::from_secs(10));
+        for (key, value) in &self.extra_headers {
+            request = request.header(key, value);
+        }
+
+        let response = match request.send().await {
+            Ok(r) => r,
+            Err(e) => {
+                debug!(provider = self.name(), error = %e, "list_models: request failed, falling back to default model");
+                return Ok(vec![crate::types::ProviderModel::from_id(&self.default_model)]);
+            }
+        };
+
+        if !response.status().is_success() {
+            debug!(
+                provider = self.name(),
+                status = %response.status(),
+                "list_models: non-success status, falling back to default model",
+            );
+            return Ok(vec![crate::types::ProviderModel::from_id(&self.default_model)]);
+        }
+
+        let body: Value = match response.json().await {
+            Ok(b) => b,
+            Err(e) => {
+                debug!(provider = self.name(), error = %e, "list_models: invalid JSON, falling back to default model");
+                return Ok(vec![crate::types::ProviderModel::from_id(&self.default_model)]);
+            }
+        };
+
+        let mut models = Vec::new();
+        let entries = body
+            .get("data")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        for entry in entries {
+            let Some(id) = entry.get("id").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let display_name = entry
+                .get("display_name")
+                .or_else(|| entry.get("name"))
+                .and_then(|v| v.as_str())
+                .unwrap_or(id)
+                .to_string();
+            let context_window = entry
+                .get("context_length")
+                .or_else(|| entry.get("context_window"))
+                .and_then(|v| v.as_u64());
+            let mut model = crate::types::ProviderModel::from_id(id);
+            model.display_name = display_name;
+            model.context_window = context_window;
+            // Catalogue may have richer metadata (cost, max_tokens,
+            // attachments). Merge in if a matching entry exists.
+            crate::catalogue::enrich(&mut model);
+            models.push(model);
+        }
+        if models.is_empty() {
+            models.push(crate::types::ProviderModel::from_id(&self.default_model));
+        }
+        Ok(models)
+    }
 }
 
 /// OpenAI API chat completion response

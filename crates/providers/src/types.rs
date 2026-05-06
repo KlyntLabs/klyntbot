@@ -191,6 +191,104 @@ impl ChatParams {
     }
 }
 
+/// A single model advertised by a provider.
+///
+/// Returned by `LlmProvider::list_models()`. Aggregated by the app-core
+/// `ModelDiscovery` service, tagged with the config-provider key, and
+/// surfaced to the FE via the `model_list` IPC.
+///
+/// Field set is modelled on opencode's `Model` struct
+/// (`opencode/internal/llm/models/models.go`) — we carry cost,
+/// context window, default max tokens, attachment support, and the
+/// reasoning bit in one record so both the FE selector and the
+/// downstream chat call can make informed decisions without a second
+/// roundtrip.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderModel {
+    /// Model identifier sent in chat requests (e.g. `kimi-k2.6`,
+    /// `claude-sonnet-4-20250514`, `deepseek-reasoner`).
+    pub id: String,
+    /// Human-friendly label. Defaults to `id` if no display name is
+    /// surfaced by the provider.
+    pub display_name: String,
+    /// Brand tag (e.g. `anthropic`, `openai`, `moonshot`, `deepseek`).
+    /// This is the *brand* — not the configured provider key. The
+    /// app-core discovery layer adds a separate `provider` tag when
+    /// surfacing through the `model_list` IPC.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub brand: Option<String>,
+    /// Whether the model emits `reasoning_content` (extended-thinking
+    /// scratchpad). Heuristic: id substring matches a known marker
+    /// (`reasoner`, `thinking`, `r1`, `qwq`, `glm-zero`) unless the
+    /// catalogue / adapter explicitly tags it.
+    #[serde(default)]
+    pub supports_reasoning: bool,
+    /// Whether the model accepts image / file attachments.
+    #[serde(default)]
+    pub supports_attachments: bool,
+    /// Context window in tokens, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
+    /// Provider-recommended default `max_tokens` for the response.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_max_tokens: Option<u32>,
+    /// USD per 1M input tokens (0 if unknown / free).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_per_1m_in: Option<f64>,
+    /// USD per 1M cached input tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_per_1m_in_cached: Option<f64>,
+    /// USD per 1M output tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_per_1m_out: Option<f64>,
+    /// USD per 1M cached output tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_per_1m_out_cached: Option<f64>,
+}
+
+impl ProviderModel {
+    /// Construct from an id, defaulting display name to id and
+    /// inferring `supports_reasoning` from the id substring. All other
+    /// fields are left unspecified — adapters / catalogues populate
+    /// them.
+    pub fn from_id(id: impl Into<String>) -> Self {
+        let id = id.into();
+        let supports_reasoning = id_implies_reasoning(&id);
+        Self {
+            display_name: id.clone(),
+            id,
+            brand: None,
+            supports_reasoning,
+            supports_attachments: false,
+            context_window: None,
+            default_max_tokens: None,
+            cost_per_1m_in: None,
+            cost_per_1m_in_cached: None,
+            cost_per_1m_out: None,
+            cost_per_1m_out_cached: None,
+        }
+    }
+}
+
+/// Heuristic: does a model identifier suggest extended-thinking output?
+/// Lower-cased substring match keeps this cheap and adapter-independent.
+pub fn id_implies_reasoning(id: &str) -> bool {
+    let lower = id.to_lowercase();
+    [
+        "reasoner",
+        "thinking",
+        "-r1",
+        "qwq",
+        "glm-zero",
+        "o1",
+        "o3",
+        "o4",
+    ]
+    .iter()
+    .any(|marker| lower.contains(marker))
+}
+
 /// Health status of an LLM provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProviderHealth {
@@ -301,6 +399,18 @@ pub trait LlmProvider: Send + Sync {
     /// Returns `None` by default (use self for classification).
     fn classifier_provider(&self) -> Option<DynProvider> {
         None
+    }
+
+    /// Discover models advertised by this provider.
+    ///
+    /// Default returns just the configured `default_model()`. Adapters that
+    /// know how to query a real `/v1/models` endpoint (or maintain a static
+    /// catalogue) override this to expose every available model. The result
+    /// is consumed by `app-core::models::ModelDiscovery` which aggregates
+    /// across providers, caches, and exposes the union to the FE via the
+    /// `model_list` IPC.
+    async fn list_models(&self) -> Result<Vec<ProviderModel>> {
+        Ok(vec![ProviderModel::from_id(self.default_model())])
     }
 }
 
@@ -586,15 +696,20 @@ impl Message {
         }
     }
 
-    /// Create an assistant message with tool calls and optional text content.
+    /// Create an assistant message with tool calls, optional text content,
+    /// and optional reasoning_content. Reasoning is required when the
+    /// model emitted a thinking block alongside tool calls — Anthropic
+    /// (and compat endpoints like Kimi) reject follow-up requests that
+    /// elide the thinking from the conversation history.
     pub fn assistant_with_content_and_tools(
         content: Option<String>,
         tool_calls: Vec<ToolCallMessage>,
+        reasoning_content: Option<String>,
     ) -> Self {
         Self::Assistant {
             content,
             tool_calls: Some(tool_calls),
-            reasoning_content: None,
+            reasoning_content,
         }
     }
 

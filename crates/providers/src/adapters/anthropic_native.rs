@@ -273,9 +273,23 @@ impl AnthropicNativeProvider {
                 Message::Assistant {
                     content,
                     tool_calls,
-                    ..
+                    reasoning_content,
                 } => {
                     let mut blocks = Vec::new();
+                    // Anthropic requires `thinking` blocks to come BEFORE
+                    // text and tool_use when extended thinking is enabled.
+                    // Skipping this on follow-up requests is what triggers
+                    // the "thinking is enabled but reasoning_content is
+                    // missing in assistant tool call message" 400 error
+                    // from compat endpoints (Kimi, etc.).
+                    if let Some(reasoning) = reasoning_content {
+                        if !reasoning.is_empty() {
+                            blocks.push(json!({
+                                "type": "thinking",
+                                "thinking": reasoning,
+                            }));
+                        }
+                    }
                     if let Some(text) = content {
                         if !text.is_empty() {
                             blocks.push(json!({"type": "text", "text": text}));
@@ -295,7 +309,19 @@ impl AnthropicNativeProvider {
                         }
                     }
                     if !blocks.is_empty() {
-                        result.push(json!({"role": "assistant", "content": blocks}));
+                        // Mirror reasoning at the message-top-level too —
+                        // Kimi's anthropic-compat endpoint validates against
+                        // an OpenAI-style `reasoning_content` field on the
+                        // assistant message, distinct from the Anthropic
+                        // `thinking` block. Emitting both is harmless on
+                        // pure Anthropic (extra fields are ignored).
+                        let mut msg = json!({"role": "assistant", "content": blocks});
+                        if let Some(reasoning) = reasoning_content {
+                            if !reasoning.is_empty() {
+                                msg["reasoning_content"] = json!(reasoning);
+                            }
+                        }
+                        result.push(msg);
                     }
                 }
                 Message::Tool {
@@ -1028,6 +1054,76 @@ impl LlmProvider for AnthropicNativeProvider {
             )),
             Err(e) => Ok(ProviderHealth::Unhealthy(e.to_string())),
         }
+    }
+
+    /// Discover models via `GET {base_url}/v1/models`.
+    ///
+    /// Anthropic's official API exposes `/v1/models` returning
+    /// `{ data: [{ id, display_name, type, created_at, ... }] }`.
+    /// Anthropic-compatible third-party endpoints (e.g. Kimi at
+    /// `https://api.kimi.com/coding/v1/models`) follow the same shape.
+    /// On failure, falls back to the configured default model so the
+    /// FE dropdown stays populated.
+    async fn list_models(&self) -> Result<Vec<crate::types::ProviderModel>> {
+        let url = format!("{}/v1/models", self.base_url.trim_end_matches('/'));
+        let response = match self
+            .client
+            .get(&url)
+            .header("x-api-key", self.api_key.expose())
+            .header("anthropic-version", &self.api_version)
+            .timeout(Duration::from_secs(10))
+            .send()
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::debug!(
+                    provider = self.name(),
+                    error = %e,
+                    "list_models: request failed, falling back to default model",
+                );
+                return Ok(vec![crate::types::ProviderModel::from_id(&self.model)]);
+            }
+        };
+        if !response.status().is_success() {
+            tracing::debug!(
+                provider = self.name(),
+                status = %response.status(),
+                "list_models: non-success, falling back to default model",
+            );
+            return Ok(vec![crate::types::ProviderModel::from_id(&self.model)]);
+        }
+        let body: serde_json::Value = match response.json().await {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::debug!(provider = self.name(), error = %e, "list_models: invalid JSON");
+                return Ok(vec![crate::types::ProviderModel::from_id(&self.model)]);
+            }
+        };
+        let mut models = Vec::new();
+        let entries = body
+            .get("data")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        for entry in entries {
+            let Some(id) = entry.get("id").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let display_name = entry
+                .get("display_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or(id)
+                .to_string();
+            let mut model = crate::types::ProviderModel::from_id(id);
+            model.display_name = display_name;
+            crate::catalogue::enrich(&mut model);
+            models.push(model);
+        }
+        if models.is_empty() {
+            models.push(crate::types::ProviderModel::from_id(&self.model));
+        }
+        Ok(models)
     }
 }
 
