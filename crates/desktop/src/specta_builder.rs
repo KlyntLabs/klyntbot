@@ -513,6 +513,8 @@ desktop_macros::klynt_collect_commands![
     crate::commands::tracing::tracing_open_dir,
     crate::commands::tracing::tracing_session_summary,
     crate::commands::tracing::tracing_stats,
+    crate::commands::tracing::tracing_supported_tabs,
+    crate::commands::tracing::tracing_header_layout,
     crate::commands::tasks::task_get,
     crate::commands::tasks::task_list,
     crate::commands::tasks::task_create,

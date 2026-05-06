@@ -101,3 +101,17 @@ pub async fn tracing_load_subagent_context(
         .tracing_load_subagent_context(provider_id, session_id, agent_id)
         .await
 }
+
+#[klynt_command]
+pub async fn tracing_supported_tabs(
+    provider_id: String,
+) -> Vec<app_core::tracing::types::SessionTab> {
+    state.tracing_supported_tabs(provider_id).await
+}
+
+#[klynt_command]
+pub async fn tracing_header_layout(
+    provider_id: String,
+) -> Vec<app_core::tracing::types::HeaderChip> {
+    state.tracing_header_layout(provider_id).await
+}

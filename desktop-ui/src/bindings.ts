@@ -3767,6 +3767,22 @@ async tracingStats(providerId: string) : Promise<Result<StatsBundle, ApiError>> 
     else return { status: "error", error: e  as any };
 }
 },
+async tracingSupportedTabs(providerId: string) : Promise<Result<SessionTab[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_supported_tabs", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async tracingHeaderLayout(providerId: string) : Promise<Result<HeaderChip[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("tracing_header_layout", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async taskGet(id: string) : Promise<Result<TaskResponse | null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("task_get", { id }) };
@@ -4869,6 +4885,7 @@ export type GoalProgressResponse = { id: number; goalType: string; metric: strin
 export type GradeResultResponse = { score: number | null; suggestedRating: string; gradingMethod: string; explanation: string | null; diffHighlights: DiffSegmentResponse[]; expectedAnswer: string; coachingNudge: string | null; socraticSuggestion: string | null; keyConceptsPresent: string[]; keyConceptsMissing: string[] }
 export type GrammarPattern = { pattern: string; explanation: string; patternType: string | null }
 export type GraphStats = { totalFacts: number; totalTopics: number; totalEdges: number; totalCommunities: number; avgConvergence: number }
+export type HeaderChip = "turns" | "steps" | "messages" | "toolCalls" | "errors" | "compactions" | "agents" | "duration" | "tokens" | "cacheHitPct" | "model"
 export type HeaderStats = { turnCount: number; stepCount: number; toolCallCount: number; errorCount: number; compactionCount: number; agentCount: number; totalDurationMs: number; totalInputTokens: number; totalOutputTokens: number; cacheReadTokens: number; cacheHitPct: number; model: string | null }
 export type HelpEntry = { command: string; description: string; category: string; arg_hint: string | null }
 export type HooksTomlSnapshot = { path: string; exists: boolean; content: string }
@@ -5332,6 +5349,7 @@ export type SessionSummary = { sessionId: string; providerId: string; sourceDir:
  */
 export type SessionSummaryDto = { sessionId: string; source: string; cwd: string | null; repoId: string | null; startedAt: string; lastEventAt: string; eventCount: number; turnCount: number; toolCallCount: number; errorCount: number; totalInputTokens: number; totalOutputTokens: number; totalCostUsd: number }
 export type SessionSummaryResponse = { key: string; title: string | null; conversationType: string | null; updatedAt: string }
+export type SessionTab = "wire" | "tree" | "context" | "state" | "dual" | "agents"
 /**
  * Parameters for setting the active desktop view.
  */
@@ -5438,7 +5456,12 @@ rawKind: string;
 /**
  * Verbatim payload from the source.
  */
-payload: unknown; occurredAt: string; category: SemanticCategory; turnIndex: number | null; stepIndex: number | null; parentSubagentId: string | null }
+payload: unknown; occurredAt: string; category: SemanticCategory; turnIndex: number | null; stepIndex: number | null; parentSubagentId: string | null; 
+/**
+ * True when the source line carried `isMeta: true` (Claude Code metadata).
+ * Kimi sets this to false. UI default-filters meta events with a toggle.
+ */
+meta?: boolean }
 export type TrackedAppResponse = { displayName: string; appName: string; siteName: string | null; categoryId: string | null; categoryName: string | null; totalSecs: number; eventCount: number }
 export type TranslateBreakdownParams = { text: string; sourceLang: string; targetLang: string; noteId?: string | null; isSelection?: boolean }
 export type TranslateBreakdownResponse = { translation: string; words: WordBreakdown[]; grammarPatterns: GrammarPattern[] }
