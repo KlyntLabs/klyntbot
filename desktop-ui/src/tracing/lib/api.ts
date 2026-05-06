@@ -4,7 +4,17 @@
 import { invoke } from "@/api/client";
 import { apiCache } from "./cache";
 
-const PROVIDER_ID = "kimi";
+// Provider id passed from the parent (CodingMemoryPlugin chip selection).
+// Map UI chip ids → backend tracing provider ids.
+export type TracingProviderId = "kimi" | "claudeCode";
+
+export function chipToTracingProvider(
+  chip: "all" | "claudeCode" | "codex" | "kimiCli" | "openCode" | "klyntCli",
+): TracingProviderId | null {
+  if (chip === "kimiCli") return "kimi";
+  if (chip === "claudeCode") return "claudeCode";
+  return null; // codex/openCode/klyntCli/all → no tracing provider yet
+}
 
 // ── Upstream-shaped types the ported components import ───────────────
 
@@ -215,13 +225,13 @@ function reshapeSession(b: BackendSessionSummary): SessionInfo {
   };
 }
 
-export async function listSessions(forceRefresh = false): Promise<SessionInfo[]> {
+export async function listSessions(providerId: string, forceRefresh = false): Promise<SessionInfo[]> {
   if (forceRefresh) apiCache.invalidate("sessions");
   return apiCache.get(
     "sessions",
     async () => {
       const rows = await invoke<BackendSessionSummary[]>("tracing_list_sessions", {
-        providerId: PROVIDER_ID,
+        providerId,
       });
       return rows.map(reshapeSession);
     },
@@ -303,12 +313,12 @@ function reshapeWire(detail: BackendSessionDetail): WireResponse {
   };
 }
 
-export function getWireEvents(sessionId: string, forceRefresh = false): Promise<WireResponse> {
+export function getWireEvents(providerId: string, sessionId: string, forceRefresh = false): Promise<WireResponse> {
   const key = `wire:${sessionId}`;
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
     const detail = await invoke<BackendSessionDetail>("tracing_load_session", {
-      providerId: PROVIDER_ID,
+      providerId,
       sessionId,
       scope: { kind: "main" },
     });
@@ -336,6 +346,7 @@ function reshapeContext(rows: BackendContextMessage[]): ContextResponse {
 }
 
 export function getContextMessages(
+  providerId: string,
   sessionId: string,
   forceRefresh = false,
 ): Promise<ContextResponse> {
@@ -343,7 +354,7 @@ export function getContextMessages(
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
     const rows = await invoke<BackendContextMessage[]>("tracing_load_context", {
-      providerId: PROVIDER_ID,
+      providerId,
       sessionId,
       scope: { kind: "main" },
     });
@@ -354,6 +365,7 @@ export function getContextMessages(
 // ── getSessionState + getSessionSummary ───────────────────────────────
 
 export function getSessionState(
+  providerId: string,
   sessionId: string,
   forceRefresh = false,
 ): Promise<Record<string, unknown>> {
@@ -361,13 +373,14 @@ export function getSessionState(
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, () =>
     invoke<Record<string, unknown>>("tracing_load_state", {
-      providerId: PROVIDER_ID,
+      providerId,
       sessionId,
     }),
   );
 }
 
 export function getSessionSummary(
+  providerId: string,
   sessionId: string,
   forceRefresh = false,
 ): Promise<SessionSummary> {
@@ -375,7 +388,7 @@ export function getSessionSummary(
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
     const b = await invoke<BackendSessionSummary>("tracing_session_summary", {
-      providerId: PROVIDER_ID,
+      providerId,
       sessionId,
     });
     return {
@@ -422,12 +435,12 @@ function reshapeSubagent(b: BackendSubagentSummary): SubagentInfo {
   };
 }
 
-export function getSubagents(sessionId: string, forceRefresh = false): Promise<SubagentInfo[]> {
+export function getSubagents(providerId: string, sessionId: string, forceRefresh = false): Promise<SubagentInfo[]> {
   const key = `subagents:${sessionId}`;
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
     const rows = await invoke<BackendSubagentSummary[]>("tracing_list_subagents", {
-      providerId: PROVIDER_ID,
+      providerId,
       sessionId,
     });
     return rows.map(reshapeSubagent);
@@ -435,6 +448,7 @@ export function getSubagents(sessionId: string, forceRefresh = false): Promise<S
 }
 
 export function getSubagentWireEvents(
+  providerId: string,
   sessionId: string,
   agentId: string,
   forceRefresh = false,
@@ -443,7 +457,7 @@ export function getSubagentWireEvents(
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
     const detail = await invoke<BackendSessionDetail>("tracing_load_subagent_session", {
-      providerId: PROVIDER_ID,
+      providerId,
       sessionId,
       agentId,
     });
@@ -452,6 +466,7 @@ export function getSubagentWireEvents(
 }
 
 export function getSubagentContextMessages(
+  providerId: string,
   sessionId: string,
   agentId: string,
   forceRefresh = false,
@@ -460,7 +475,7 @@ export function getSubagentContextMessages(
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
     const rows = await invoke<BackendContextMessage[]>("tracing_load_subagent_context", {
-      providerId: PROVIDER_ID,
+      providerId,
       sessionId,
       agentId,
     });
@@ -489,13 +504,13 @@ type BackendStats = {
   cacheHitPct: number;
 };
 
-export async function getAggregateStats(forceRefresh = false): Promise<AggregateStats> {
+export async function getAggregateStats(providerId: string, forceRefresh = false): Promise<AggregateStats> {
   const key = "aggregate-stats";
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(
     key,
     async () => {
-      const b = await invoke<BackendStats>("tracing_stats", { providerId: PROVIDER_ID });
+      const b = await invoke<BackendStats>("tracing_stats", { providerId });
       const totalSessions = b.perProject.reduce((s, p) => s + p.sessionCount, 0);
       const totalTurns = b.perProject.reduce((s, p) => s + p.turnCount, 0);
       const totalInput = b.perProject.reduce((s, p) => s + p.totalInputTokens, 0);
@@ -530,22 +545,23 @@ export function getVisCapabilities(_forceRefresh = false): Promise<VisCapabiliti
   return Promise.resolve({ open_in_supported: true });
 }
 
-export function getSessionDownloadUrl(_sessionId: string): string {
+export function getSessionDownloadUrl(_providerId: string, _sessionId: string): string {
   // Download not supported in the desktop port.
   return "";
 }
 
-export async function openInPath(_app: "finder", sessionId: string): Promise<void> {
-  await invoke("tracing_open_dir", { providerId: PROVIDER_ID, sessionId });
+export async function openInPath(providerId: string, _app: "finder", sessionId: string): Promise<void> {
+  await invoke("tracing_open_dir", { providerId, sessionId });
 }
 
 export async function importSession(
+  providerId: string,
   file: File,
 ): Promise<{ session_id: string; work_dir_hash: string }> {
   const arrayBuffer = await file.arrayBuffer();
   const bytes = Array.from(new Uint8Array(arrayBuffer));
   const result = await invoke<{ sessionId: string; workDirHash: string }>("tracing_import", {
-    providerId: PROVIDER_ID,
+    providerId,
     bytes,
     fileName: file.name,
   });
@@ -555,4 +571,40 @@ export async function importSession(
 
 export async function deleteSession(_sessionId: string): Promise<void> {
   throw new Error("Session deletion is not supported in the desktop port.");
+}
+
+export interface SessionTabsResponse {
+  tabs: ("wire" | "tree" | "context" | "state" | "dual" | "agents")[];
+}
+
+export interface HeaderLayoutResponse {
+  chips: (
+    | "turns"
+    | "steps"
+    | "messages"
+    | "toolCalls"
+    | "errors"
+    | "compactions"
+    | "agents"
+    | "duration"
+    | "tokens"
+    | "cacheHitPct"
+    | "model"
+  )[];
+}
+
+export async function fetchSupportedTabs(providerId: string): Promise<SessionTabsResponse> {
+  const tabs = await invoke<SessionTabsResponse["tabs"]>(
+    "tracing_supported_tabs",
+    { providerId },
+  );
+  return { tabs };
+}
+
+export async function fetchHeaderLayout(providerId: string): Promise<HeaderLayoutResponse> {
+  const chips = await invoke<HeaderLayoutResponse["chips"]>(
+    "tracing_header_layout",
+    { providerId },
+  );
+  return { chips };
 }
