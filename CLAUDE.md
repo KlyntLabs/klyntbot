@@ -105,6 +105,15 @@ Dependencies flow strictly upward. `plugin-sdk` and `tests/fixtures/hello_plugin
 - **Config:** `#[serde(rename_all = "camelCase")]`. File at `~/.klyntbot/config.json`. API keys in `Secret<String>` (access via `.expose()`). Env override: `KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o`.
 - **Re-export facade:** `src/lib.rs` re-exports all public types. Use `klyntbot::AgentLoop`, `klyntbot::Config`, etc.
 
+### Approval gate
+
+Every tool call passes through `approval::ApprovalGate::check` (`crates/approval/`) before
+execution. Tools declare `approval_class` (Safe/Sensitive/Destructive/Admin) on the `Tool`
+trait; coding-mode shell/edit/web_fetch get runtime classification via `CodingApprovalPolicy`.
+Persistent grants live in the `approval_grants` table; remote channels (Telegram, MCP, etc.)
+implement `ApprovalChannel`. Desktop modal at `desktop-ui/src/features/approvals/ApprovalModal.tsx`.
+`BlockingFallbackChannel` handles Discord/Slack/Email until real impls land.
+
 ### Skill system & MCP
 
 Five built-in orchestrator skills in `skills/`: task-management, finance-management, automation, learning, notebook. Each has `SKILL.md` (Agent Skills spec YAML frontmatter); some have `references/` folders. Compiled via `include_str!` in `skill-system` crate. `SkillRouter` selects orchestrator per-message via keyword + semantic scoring. MCP tool names: `mcp_{server}_{tool}` (see `mcp::sanitize`). MCP access controlled per-skill via `mcp_tools` field (`["*"]` = all, `[]` = none). Task-management skill has `mcp_tools: ["google-calendar"]`.

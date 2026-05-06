@@ -10,7 +10,7 @@ use serde_json::Value;
 use std::sync::Arc;
 
 use crate::params::ParamExtractor;
-use crate::{RoutingContext, Tool};
+use crate::{approval_class::ApprovalClass, RoutingContext, Tool};
 use common::{Result, ToolError};
 use storage::{KeyResultRepo, ObjectiveRepo};
 use tools_core::ProgressHandler;
@@ -514,6 +514,14 @@ impl Tool for OkrTool {
             }
 
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),
+        }
+    }
+
+    fn approval_class(&self, args: &Value) -> ApprovalClass {
+        match args.get("action").and_then(|v| v.as_str()) {
+            Some("objective.create" | "objective.update" | "kr.create" | "kr.update" | "kr.update_metric" | "kr.set_progress") => ApprovalClass::Sensitive,
+            Some("objective.delete" | "kr.delete") => ApprovalClass::Destructive,
+            _ => ApprovalClass::Safe,
         }
     }
 }

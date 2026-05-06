@@ -401,6 +401,7 @@ fn run_desktop_app() {
             }
 
             app.manage(core);
+            app.manage(Arc::new(desktop::approval::DesktopApprovalChannel::new(app.handle().clone())));
             app.manage(Arc::new(focus_timer::FocusTimer::new()));
 
             // No periodic mi_collect timer needed — common::memory::purge_freed_memory()

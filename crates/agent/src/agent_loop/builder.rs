@@ -1995,6 +1995,7 @@ impl AgentLoopBuilder {
             },
             cognitive_bg_service: tokio::sync::Mutex::new(cognitive_bg_service),
             _session_memory_service: session_memory_service,
+            approval_grants_repo: self.pool.as_ref().map(|p| approval::ApprovalGrantsRepo::new(storage::StoragePool::from_existing(p.clone()))),
             _inference_loop_token,
             _tree_builder_token: tree_builder_token,
             activity_svc: self.activity_svc,

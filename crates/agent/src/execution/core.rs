@@ -466,6 +466,7 @@ pub struct ExecutionCore {
     pub outcome_recorder: Option<Arc<crate::learning::recorder::OutcomeRecorder>>,
     pub domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     pub interceptor_chain: Option<Arc<tools_core::InterceptorChain>>,
+    pub approval_gate: Option<Arc<approval::ApprovalGate>>,
     token_counter: Arc<dyn TokenCounter>,
     tool_semaphore: Arc<Semaphore>,
 }
@@ -478,6 +479,7 @@ impl ExecutionCore {
             outcome_recorder: None,
             domain_event_bus: None,
             interceptor_chain: None,
+            approval_gate: None,
             token_counter: Arc::new(context_engine::CharTokenCounter),
             tool_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_TOOLS)),
         }
@@ -515,6 +517,12 @@ impl ExecutionCore {
     /// rely on registry state, which may change between `prepare()` and `check()`.
     pub fn with_interceptor_chain(mut self, chain: Arc<tools_core::InterceptorChain>) -> Self {
         self.interceptor_chain = Some(chain);
+        self
+    }
+
+    /// Set the approval gate for pre-execution permission checks.
+    pub fn with_approval_gate(mut self, gate: Arc<approval::ApprovalGate>) -> Self {
+        self.approval_gate = Some(gate);
         self
     }
 
@@ -693,6 +701,7 @@ impl ExecutionCore {
                     let registry = self.tool_registry.clone();
                     let semaphore = self.tool_semaphore.clone();
                     let interceptor_chain = interceptor_ref.clone();
+                    let approval_gate = self.approval_gate.clone();
                     let name = tc.name.clone();
                     let args = tc.arguments.clone();
                     let mut ctx = routing_ctx.clone();
@@ -707,6 +716,46 @@ impl ExecutionCore {
                     let tx = event_tx.cloned();
 
                     async move {
+                        // Pre-flight: look up tool and run permission checks before
+                        // acquiring the semaphore so that interactive approval prompts
+                        // don't starve concurrent tool slots.
+                        let preflight = async {
+                            let tool = {
+                                let reg = registry.read().await;
+                                reg.prepare(&name, &args, &ctx)?
+                            };
+                            if let Some(ref chain) = interceptor_chain {
+                                chain.check(&name, &args, None).await?;
+                            }
+                            if let Some(ref gate) = approval_gate {
+                                let req = approval::ApprovalRequest {
+                                    tool_name: name.clone(),
+                                    action: args.get("action").and_then(|v| v.as_str()).map(String::from),
+                                    args: args.clone(),
+                                    class: tool.approval_class(&args),
+                                    scope: tool.approval_scope(&args),
+                                    ctx: approval::ApprovalContext {
+                                        mode: ctx.session_mode,
+                                        channel: approval::ChannelKind::from(ctx.channel.as_str()),
+                                        session_id: ctx.chat_id.to_string(),
+                                        user_id: None,
+                                    },
+                                };
+                                match gate.check(req).await? {
+                                    approval::GateOutcome::Allow => {}
+                                    approval::GateOutcome::Deny { reason } => {
+                                        return Err(common::KlyntbotError::PermissionDenied(reason));
+                                    }
+                                    approval::GateOutcome::Cancel => {
+                                        return Err(common::KlyntbotError::Cancelled("user cancelled approval".into()));
+                                    }
+                                }
+                            }
+                            Ok(tool)
+                        }.await;
+
+                        let args_snapshot = args.clone();
+
                         // Limit concurrent tool executions to prevent runaway parallelism.
                         let _permit = semaphore.acquire().await.expect("semaphore closed");
 
@@ -723,23 +772,12 @@ impl ExecutionCore {
                         .await;
 
                         let start = Instant::now();
-                        let args_snapshot = args.clone();
-                        // Look up the tool and release the read lock BEFORE executing.
-                        // This prevents deadlocks when a tool (e.g., delegate) needs
-                        // write access to the registry during execution.
-                        let exec_result = tokio::time::timeout(timeout_dur, async {
-                            let tool = {
-                                let reg = registry.read().await;
-                                reg.prepare(&name, &args, &ctx)?
-                            };
-                            // Run interceptor chain before executing (if configured)
-                            if let Some(ref chain) = interceptor_chain {
-                                chain.check(&name, &args, None).await?;
-                            }
-                            // Read lock is dropped — safe for tools that re-enter the registry
-                            tool.execute(args, &ctx).await
-                        })
-                        .await;
+                        let exec_result = match preflight {
+                            Ok(tool) => tokio::time::timeout(timeout_dur, async {
+                                tool.execute(args, &ctx).await
+                            }).await,
+                            Err(e) => Ok(Err(e)),
+                        };
                         let duration_ms = start.elapsed().as_millis() as u64;
 
                         let (result_str, success) = match exec_result {

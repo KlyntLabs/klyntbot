@@ -1,6 +1,5 @@
-use crate::approval::guard::fan_out_tool_event;
-use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
+use crate::tools::shared::file_edit_event::fan_out_tool_event;
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
 use async_trait::async_trait;
 use bus::DomainEventBus;
@@ -11,7 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tools_core::events::ToolEvent;
 use tools_core::{RoutingContext, ToolExecute, ToolParams};
-use uuid::Uuid;
+
 
 #[derive(Debug, Clone, serde::Serialize, ToolParams)]
 pub struct BashArgs {
@@ -34,13 +33,13 @@ pub struct BashArgs {
                    truncated to 50KB.",
     params = "BashArgs",
     allowed_channels = "coding_only",
-    custom_timeout_secs = "600"
+    custom_timeout_secs = "600",
+    approval_class = "destructive",
+    approval_scope = "command"
 )]
 pub struct BashTool {
-    layer1: Arc<Layer1>,
     policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
-    pending: Arc<PendingApprovalsMap>,
     bus: Arc<DomainEventBus>,
     non_ui_policy: common::tool_channel::NonUiPolicy,
     pub history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
@@ -52,18 +51,14 @@ pub struct BashTool {
 
 impl BashTool {
     pub fn new(
-        layer1: Arc<Layer1>,
         policy: Arc<Policy>,
         privacy: Arc<PrivacyGuard>,
-        pending: Arc<PendingApprovalsMap>,
         bus: Arc<DomainEventBus>,
         non_ui_policy: common::tool_channel::NonUiPolicy,
     ) -> Self {
         Self {
-            layer1,
             policy,
             privacy,
-            pending,
             bus,
             non_ui_policy,
             history_repo: None,
@@ -80,36 +75,6 @@ impl ToolExecute for BashTool {
     type Params = BashArgs;
 
     async fn execute(&self, args: BashArgs, ctx: &RoutingContext) -> common::Result<String> {
-        let request_id = Uuid::new_v4().to_string();
-        let guard_ctx = GuardCtx {
-            layer1: &self.layer1,
-            policy: &self.policy,
-            privacy: &self.privacy,
-            pending: &self.pending,
-            event_tx: ctx.event_tx.as_ref(),
-            domain_bus: &self.bus,
-            cancel: ctx.cancel_token.clone().unwrap_or_default(),
-            request_id,
-            args: Some(serde_json::to_value(&args).unwrap_or(serde_json::Value::Null)),
-            cwd: args.cwd.clone(),
-            channel: common::tool_channel::Channel::from_name(ctx.channel.as_str()),
-            non_ui_policy: self.non_ui_policy,
-            history_repo: self.history_repo.clone(),
-            repo_id: self.repo_id.clone(),
-            mirror_learning_enabled: self.mirror_learning_enabled,
-            mirror_min_approvals: self.mirror_min_approvals,
-            mirror_cooldown_seconds: self.mirror_cooldown_seconds,
-            now_unix: jiff::Timestamp::now().as_second(),
-            thread_id: ctx.session_key.as_ref().map(ToString::to_string),
-            turn_id: ctx.message_id.clone(),
-        };
-        let decision = evaluate(guard_ctx, "bash", &args.command).await;
-        if !decision.allowed() {
-            return Err(common::KlyntbotError::Tool(
-                common::ToolError::PermissionDenied(format!("bash denied: {:?}", decision)),
-            ));
-        }
-
         let session_id = ctx
             .session_key
             .clone()

@@ -14,6 +14,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
+use syn::spanned::Spanned;
 use syn::{parse_macro_input, DeriveInput, Lit, Meta};
 
 pub fn derive(input: TokenStream) -> TokenStream {
@@ -25,13 +26,14 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let mut tool_name: Option<String> = None;
     let mut tool_description: Option<String> = None;
     let mut params_type: Option<syn::Ident> = None;
-    let mut permission: Option<String> = None;
     let mut category: Option<String> = None;
     let mut tags: Option<String> = None;
     let mut cost: Option<String> = None;
     let mut concurrency_safe: Option<bool> = None;
     let mut allowed_channels: Option<String> = None;
     let mut custom_timeout_secs: Option<u64> = None;
+    let mut approval_class: Option<String> = None;
+    let mut approval_scope: Option<String> = None;
 
     for attr in &input.attrs {
         if attr.path().is_ident("tool") {
@@ -40,71 +42,48 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 let parser = syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated;
                 let parsed = syn::parse::Parser::parse2(parser, tokens)
                     .expect("Failed to parse #[tool(...)] attributes");
-                for meta in parsed {
+                /// Extract a string literal from a `Meta::NameValue`.
+    fn expect_str_lit(nv: &syn::MetaNameValue) -> Option<String> {
+        if let syn::Expr::Lit(lit) = &nv.value {
+            if let Lit::Str(s) = &lit.lit {
+                return Some(s.value());
+            }
+        }
+        None
+    }
+
+    for meta in parsed {
                     if let Meta::NameValue(nv) = &meta {
                         if nv.path.is_ident("name") {
-                            if let syn::Expr::Lit(lit) = &nv.value {
-                                if let Lit::Str(s) = &lit.lit {
-                                    tool_name = Some(s.value());
-                                }
-                            }
+                            tool_name = expect_str_lit(nv);
                         } else if nv.path.is_ident("description") {
-                            if let syn::Expr::Lit(lit) = &nv.value {
-                                if let Lit::Str(s) = &lit.lit {
-                                    tool_description = Some(s.value());
-                                }
-                            }
+                            tool_description = expect_str_lit(nv);
                         } else if nv.path.is_ident("params") {
-                            if let syn::Expr::Lit(lit) = &nv.value {
-                                if let Lit::Str(s) = &lit.lit {
-                                    params_type = Some(syn::Ident::new(&s.value(), s.span()));
-                                }
-                            }
-                        } else if nv.path.is_ident("permission") {
-                            if let syn::Expr::Lit(lit) = &nv.value {
-                                if let Lit::Str(s) = &lit.lit {
-                                    permission = Some(s.value());
-                                }
+                            if let Some(s) = expect_str_lit(nv) {
+                                params_type = Some(syn::Ident::new(&s, nv.value.span()));
                             }
                         } else if nv.path.is_ident("category") {
-                            if let syn::Expr::Lit(lit) = &nv.value {
-                                if let Lit::Str(s) = &lit.lit {
-                                    category = Some(s.value());
-                                }
-                            }
+                            category = expect_str_lit(nv);
                         } else if nv.path.is_ident("tags") {
-                            if let syn::Expr::Lit(lit) = &nv.value {
-                                if let Lit::Str(s) = &lit.lit {
-                                    tags = Some(s.value());
-                                }
-                            }
+                            tags = expect_str_lit(nv);
                         } else if nv.path.is_ident("cost") {
-                            if let syn::Expr::Lit(lit) = &nv.value {
-                                if let Lit::Str(s) = &lit.lit {
-                                    cost = Some(s.value());
-                                }
-                            }
+                            cost = expect_str_lit(nv);
                         } else if nv.path.is_ident("concurrency_safe") {
-                            if let syn::Expr::Lit(lit) = &nv.value {
-                                if let Lit::Str(s) = &lit.lit {
-                                    concurrency_safe =
-                                        Some(matches!(s.value().as_str(), "true" | "1"));
-                                }
+                            if let Some(s) = expect_str_lit(nv) {
+                                concurrency_safe = Some(matches!(s.as_str(), "true" | "1"));
                             }
                         } else if nv.path.is_ident("allowed_channels") {
-                            if let syn::Expr::Lit(lit) = &nv.value {
-                                if let Lit::Str(s) = &lit.lit {
-                                    allowed_channels = Some(s.value());
-                                }
-                            }
+                            allowed_channels = expect_str_lit(nv);
                         } else if nv.path.is_ident("custom_timeout_secs") {
-                            if let syn::Expr::Lit(lit) = &nv.value {
-                                if let Lit::Str(s) = &lit.lit {
-                                    custom_timeout_secs = Some(s.value().parse().unwrap_or_else(|_| {
-                                        panic!("#[tool(custom_timeout_secs = \"...\")] must be a valid integer")
-                                    }));
-                                }
+                            if let Some(s) = expect_str_lit(nv) {
+                                custom_timeout_secs = Some(s.parse().unwrap_or_else(|_| {
+                                    panic!("#[tool(custom_timeout_secs = \"...\")] must be a valid integer")
+                                }));
                             }
+                        } else if nv.path.is_ident("approval_class") {
+                            approval_class = expect_str_lit(nv);
+                        } else if nv.path.is_ident("approval_scope") {
+                            approval_scope = expect_str_lit(nv);
                         }
                     }
                 }
@@ -118,26 +97,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
         .unwrap_or_else(|| panic!("#[derive(Tool)] requires #[tool(description = \"...\")]"));
     let params_type =
         params_type.unwrap_or_else(|| panic!("#[derive(Tool)] requires #[tool(params = \"...\")]"));
-
-    let permission_impl = if let Some(perm) = permission {
-        let perm_variant = match perm.as_str() {
-            "read_only" => quote! { ::tools_core::PermissionLevel::ReadOnly },
-            "standard" => quote! { ::tools_core::PermissionLevel::Standard },
-            "elevated" => quote! { ::tools_core::PermissionLevel::Elevated },
-            "admin" => quote! { ::tools_core::PermissionLevel::Admin },
-            other => panic!(
-                "#[tool(permission = \"{}\")] is invalid. Use \"read_only\", \"standard\", \"elevated\", or \"admin\"",
-                other
-            ),
-        };
-        quote! {
-            fn permission_level(&self) -> ::tools_core::PermissionLevel {
-                #perm_variant
-            }
-        }
-    } else {
-        quote! {}
-    };
 
     let metadata_impl = crate::helpers::gen_metadata_impl(&category, &tags, &cost);
 
@@ -178,6 +137,41 @@ pub fn derive(input: TokenStream) -> TokenStream {
         quote! {}
     };
 
+    let approval_class_impl = if let Some(ref class) = approval_class {
+        let variant = match class.as_str() {
+            "safe" => quote! { ::tools_core::approval_class::ApprovalClass::Safe },
+            "sensitive" => quote! { ::tools_core::approval_class::ApprovalClass::Sensitive },
+            "destructive" => quote! { ::tools_core::approval_class::ApprovalClass::Destructive },
+            "admin" => quote! { ::tools_core::approval_class::ApprovalClass::Admin },
+            other => panic!(
+                "#[tool(approval_class = \"{}\")] is invalid. Use \"safe\", \"sensitive\", \"destructive\", or \"admin\"",
+                other
+            ),
+        };
+        quote! {
+            fn approval_class(&self, _args: &::serde_json::Value) -> ::tools_core::approval_class::ApprovalClass {
+                #variant
+            }
+        }
+    } else {
+        quote! {}
+    };
+
+    let approval_scope_impl = if let Some(ref resource_key) = approval_scope {
+        let key = resource_key.clone();
+        quote! {
+            fn approval_scope(&self, args: &::serde_json::Value) -> ::tools_core::approval_class::ApprovalScope {
+                if let Some(val) = args.get(#key).and_then(|v| v.as_str()) {
+                    ::tools_core::approval_class::ApprovalScope::ToolActionResource(val.to_string())
+                } else {
+                    ::tools_core::approval_class::ApprovalScope::ToolAction
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let expanded = quote! {
         #[::async_trait::async_trait]
         impl ::tools_core::Tool for #name {
@@ -202,11 +196,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 <Self as ::tools_core::ToolExecute>::execute(self, params, ctx).await
             }
 
-            #permission_impl
             #metadata_impl
             #concurrency_impl
             #allowed_channels_impl
             #custom_timeout_impl
+            #approval_class_impl
+            #approval_scope_impl
         }
     };
 

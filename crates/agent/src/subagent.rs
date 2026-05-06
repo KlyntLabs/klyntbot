@@ -871,27 +871,18 @@ mod tests {
     }
 
     fn make_tool_kit(pool: &storage::StoragePool) -> Arc<klynt_core::ToolKitBuilder> {
-        let layer1 = Arc::new(
-            klynt_core::approval::Layer1::compile(&config::schema::CodingPermissions::default())
-                .unwrap(),
-        );
         let policy = Arc::new(klynt_execpolicy::Policy::empty());
         let privacy = Arc::new(klynt_core::privacy::PrivacyGuard::from_globs(&[]).unwrap());
-        let pending = Arc::new(klynt_core::approval::PendingApprovalsMap::default());
         let bus = Arc::new(bus::DomainEventBus::new(16));
         let repos = storage::Repos::from_pool(pool);
-        let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
         let non_ui_policy = common::tool_channel::NonUiPolicy::Allow;
 
         Arc::new(klynt_core::ToolKitBuilder {
             cwd: std::path::PathBuf::from("/tmp"),
-            layer1,
             policy,
             privacy,
-            pending,
             bus,
             repos,
-            host_cache,
             non_ui_policy,
             hook_engine: None,
             snapshot_repo: None,

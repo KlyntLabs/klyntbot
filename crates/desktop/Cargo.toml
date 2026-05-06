@@ -12,6 +12,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 app-core = { workspace = true }
+approval = { workspace = true }
 autotuner = { workspace = true }
 coding-ingest = { workspace = true }
 desktop-shared = { workspace = true }

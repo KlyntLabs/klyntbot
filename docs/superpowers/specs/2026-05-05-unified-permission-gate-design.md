@@ -1,7 +1,7 @@
 # Unified Permission Gate — Design
 
 **Date:** 2026-05-05
-**Status:** Draft (pre-implementation)
+**Status:** Implemented (2026-05-06)
 **Scope:** Replace Klynt's two partial permission systems (coding-mode 3-layer guard + latent `PermissionLevel`) with a single pre-tool-execution gate that works across every mode and channel.
 
 ---

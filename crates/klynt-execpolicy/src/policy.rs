@@ -386,8 +386,8 @@ fn render_pattern_token(token: &PatternToken) -> String {
 }
 
 impl Policy {
-    /// Adapter for klynt-core/approval/guard.rs:94 — wraps `Policy::check` to
-    /// return the simpler `Decision` rather than `Evaluation`.
+    /// Wraps `Policy::check` to return the simpler `Decision` rather than
+    /// `Evaluation`.
     ///
     /// Splits on whitespace if `argv` was constructed from a string; production
     /// callers should split via shlex first.

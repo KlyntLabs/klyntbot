@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::fmt::Write;
 
 use common::{Result, ToolError};
-use tools_core::{ParamExtractor, RoutingContext, Tool};
+use tools_core::{approval_class::ApprovalClass, ParamExtractor, RoutingContext, Tool};
 use tracing::warn;
 
 use crate::aggregator::DailyAggregator;
@@ -699,6 +699,13 @@ impl Tool for ProductivityTool {
             "list_categories" => self.handle_list_categories().await,
             "set_category" => self.handle_set_category(&p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {action}")).into()),
+        }
+    }
+
+    fn approval_class(&self, args: &Value) -> ApprovalClass {
+        match args.get("action").and_then(|v| v.as_str()) {
+            Some("focus_start" | "focus_end" | "pomodoro_start" | "set_goal" | "remove_goal" | "log_time" | "set_category") => ApprovalClass::Sensitive,
+            _ => ApprovalClass::Safe,
         }
     }
 }

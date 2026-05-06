@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::sync::Arc;
 
 use crate::params::ParamExtractor;
-use crate::{PermissionLevel, RoutingContext, Tool};
+use crate::{approval_class::ApprovalClass, RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// Handler trait for agent task operations (dependency inversion).
@@ -48,10 +48,6 @@ impl Tool for AgentTaskTool {
         "Manage your assigned tasks from the task board. Use 'list' to see all tasks, \
          'claim' to take ownership of an unclaimed task, \
          'complete' to mark a task done with results, or 'fail' to report a failure."
-    }
-
-    fn permission_level(&self) -> PermissionLevel {
-        PermissionLevel::Standard
     }
 
     fn metadata(&self) -> tools_core::ToolMetadata {
@@ -106,6 +102,13 @@ impl Tool for AgentTaskTool {
                 self.handler.fail_task(task_id, error).await
             }
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),
+        }
+    }
+
+    fn approval_class(&self, args: &Value) -> ApprovalClass {
+        match args.get("action").and_then(|v| v.as_str()) {
+            Some("claim" | "complete" | "fail") => ApprovalClass::Sensitive,
+            _ => ApprovalClass::Safe,
         }
     }
 }

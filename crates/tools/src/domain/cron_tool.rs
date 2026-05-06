@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 use crate::params::ParamExtractor;
-use crate::{RoutingContext, Tool};
+use crate::{approval_class::ApprovalClass, RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// Format timestamp milliseconds to human-readable string
@@ -302,6 +302,13 @@ impl Tool for CronTool {
                 }
             }
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),
+        }
+    }
+
+    fn approval_class(&self, args: &Value) -> ApprovalClass {
+        match args.get("action").and_then(|v| v.as_str()) {
+            Some("add" | "remove" | "enable" | "disable" | "run") => ApprovalClass::Destructive,
+            _ => ApprovalClass::Safe,
         }
     }
 }

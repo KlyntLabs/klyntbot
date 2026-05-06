@@ -55,6 +55,7 @@ desktop_macros::klynt_collect_commands![
     crate::commands::agents::agent_delete_file,
     crate::commands::app_icon::app_icon_read,
     crate::commands::approval::approval_respond,
+    crate::commands::approvals::approval_channel_respond,
     crate::commands::annotations::annotation_create,
     crate::commands::annotations::annotation_update,
     crate::commands::annotations::annotation_delete,

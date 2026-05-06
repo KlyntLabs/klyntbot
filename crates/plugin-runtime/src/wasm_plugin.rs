@@ -7,9 +7,9 @@ use serde_json::Value;
 use tokio::sync::Mutex;
 use tracing::debug;
 
-use crate::manifest::{PluginManifest, PluginPermission, PluginToolDef};
+use crate::manifest::{PluginManifest, PluginToolDef};
 use common::Result;
-use tools_core::{PermissionLevel, RoutingContext, Tool};
+use tools_core::{RoutingContext, Tool};
 
 /// A single tool backed by a WASM plugin via Extism.
 pub struct WasmPlugin {
@@ -29,18 +29,6 @@ impl WasmPlugin {
             plugin,
             tool_def,
             manifest,
-        }
-    }
-
-    /// Determine the permission level based on the plugin's declared permissions.
-    /// Plugins requesting network or agent access get Elevated; otherwise Standard.
-    fn compute_permission_level(manifest: &PluginManifest) -> PermissionLevel {
-        if manifest.has_permission(&PluginPermission::Network)
-            || manifest.has_permission(&PluginPermission::Agent)
-        {
-            PermissionLevel::Elevated
-        } else {
-            PermissionLevel::Standard
         }
     }
 }
@@ -86,81 +74,5 @@ impl Tool for WasmPlugin {
         })?;
 
         Ok(output.to_string())
-    }
-
-    fn permission_level(&self) -> PermissionLevel {
-        Self::compute_permission_level(&self.manifest)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::manifest::PluginManifest;
-
-    fn make_manifest(permissions: Vec<PluginPermission>) -> PluginManifest {
-        let mut json = serde_json::json!({
-            "id": "test-plugin",
-            "name": "Test Plugin",
-            "version": "0.1.0",
-            "description": "A test plugin",
-            "author": "Test"
-        });
-        let perms: Vec<String> = permissions
-            .iter()
-            .map(|p| match p {
-                PluginPermission::Network => "network".to_string(),
-                PluginPermission::Storage => "storage".to_string(),
-                PluginPermission::Agent => "agent".to_string(),
-            })
-            .collect();
-        json["permissions"] =
-            serde_json::Value::Array(perms.into_iter().map(serde_json::Value::String).collect());
-        serde_json::from_value(json).unwrap()
-    }
-
-    #[test]
-    fn test_permission_level_standard_no_perms() {
-        let manifest = make_manifest(vec![]);
-        assert_eq!(
-            WasmPlugin::compute_permission_level(&manifest),
-            PermissionLevel::Standard
-        );
-    }
-
-    #[test]
-    fn test_permission_level_standard_storage_only() {
-        let manifest = make_manifest(vec![PluginPermission::Storage]);
-        assert_eq!(
-            WasmPlugin::compute_permission_level(&manifest),
-            PermissionLevel::Standard
-        );
-    }
-
-    #[test]
-    fn test_permission_level_elevated_network() {
-        let manifest = make_manifest(vec![PluginPermission::Network]);
-        assert_eq!(
-            WasmPlugin::compute_permission_level(&manifest),
-            PermissionLevel::Elevated
-        );
-    }
-
-    #[test]
-    fn test_permission_level_elevated_agent() {
-        let manifest = make_manifest(vec![PluginPermission::Agent]);
-        assert_eq!(
-            WasmPlugin::compute_permission_level(&manifest),
-            PermissionLevel::Elevated
-        );
-    }
-
-    #[test]
-    fn test_permission_level_elevated_both() {
-        let manifest = make_manifest(vec![PluginPermission::Network, PluginPermission::Agent]);
-        assert_eq!(
-            WasmPlugin::compute_permission_level(&manifest),
-            PermissionLevel::Elevated
-        );
     }
 }

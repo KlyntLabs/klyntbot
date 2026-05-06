@@ -1,7 +1,5 @@
 use bus::DomainEventBus;
 use common::tool_channel::{Channel, NonUiPolicy};
-use config::schema::CodingPermissions;
-use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::{
     edit::{run_for_test as edit_run, EditArgs},
@@ -34,13 +32,7 @@ async fn grep_then_edit_emits_diff() {
     assert!(grep_out.contains("f.rs:1::fn old_name"));
 
     // edit
-    let perms = CodingPermissions {
-        allow: vec!["Edit(**)".into()],
-        ..Default::default()
-    };
-    let l1 = Arc::new(Layer1::compile(&perms).unwrap());
     let pol = Arc::new(Policy::empty());
-    let pen = Arc::new(PendingApprovalsMap::new());
     let bus = Arc::new(DomainEventBus::new(64));
     let (tx, mut rx) = mpsc::channel(32);
     edit_run(
@@ -50,10 +42,8 @@ async fn grep_then_edit_emits_diff() {
             new_text: "new_name".into(),
         },
         cwd.clone(),
-        l1,
         pol,
         privacy,
-        pen,
         Some(tx.clone()),
         bus,
         CancellationToken::new(),

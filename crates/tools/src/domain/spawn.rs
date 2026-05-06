@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 use crate::params::ParamExtractor;
-use crate::{PermissionLevel, RoutingContext, Tool};
+use crate::{approval_class::ApprovalClass, RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// Trait for spawning subagents (dependency inversion to avoid circular dependencies).
@@ -63,10 +63,6 @@ impl Tool for SpawnTool {
 
     fn description(&self) -> &str {
         "Spawn a subagent to handle a task in the background. Use this for complex or time-consuming tasks that can run independently. The subagent will complete the task and report back when done."
-    }
-
-    fn permission_level(&self) -> PermissionLevel {
-        PermissionLevel::Admin
     }
 
     fn metadata(&self) -> tools_core::ToolMetadata {
@@ -151,5 +147,9 @@ impl Tool for SpawnTool {
                 Ok(result)
             }
         }
+    }
+
+    fn approval_class(&self, _args: &Value) -> ApprovalClass {
+        ApprovalClass::Admin
     }
 }

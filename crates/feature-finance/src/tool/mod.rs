@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 use bus::DomainEventBus;
 use common::{Result, ToolError};
-use tools_core::{ConfigPersistence, ParamExtractor, RoutingContext, Tool};
+use tools_core::{approval_class::ApprovalClass, ConfigPersistence, ParamExtractor, RoutingContext, Tool};
 
 /// Parse a `YYYY-MM-DD` date string into a `jiff::civil::Date`.
 pub(crate) fn parse_date(s: &str) -> Result<jiff::civil::Date> {
@@ -361,6 +361,14 @@ impl Tool for FinanceTool {
             _ => {
                 Err(ToolError::InvalidParams(format!("Unknown finance action: {}", action)).into())
             }
+        }
+    }
+
+    fn approval_class(&self, args: &Value) -> ApprovalClass {
+        match args.get("action").and_then(|v| v.as_str()) {
+            Some("account_add" | "account_update" | "tx_add" | "tx_update" | "tx_recurring_add" | "budget_create" | "budget_update" | "portfolio_create" | "investment_add" | "investment_update" | "investment_tx" | "liability_add" | "liability_update" | "goal_create" | "goal_update" | "snapshot_record" | "settings_update" | "allocation_target_set" | "price_refresh" | "portfolio_rebalance") => ApprovalClass::Sensitive,
+            Some("account_delete" | "tx_delete" | "budget_delete" | "portfolio_delete" | "investment_delete" | "liability_delete" | "goal_delete" | "allocation_target_delete") => ApprovalClass::Destructive,
+            _ => ApprovalClass::Safe,
         }
     }
 }

@@ -60,6 +60,7 @@ impl LlmProvider for MockProvider {
         _messages: &[Message],
         _tools: Option<&[serde_json::Value]>,
         _params: &ChatParams,
+        _cache_breakpoints: &[providers::CacheBreakpoint],
     ) -> Result<LlmResponse> {
         let mut count = self.call_count.lock().unwrap();
         *count += 1;
@@ -98,6 +99,7 @@ impl LlmProvider for ErrorProvider {
         _messages: &[Message],
         _tools: Option<&[serde_json::Value]>,
         _params: &ChatParams,
+        _cache_breakpoints: &[providers::CacheBreakpoint],
     ) -> Result<LlmResponse> {
         Err(KlyntbotError::Provider(ProviderError::InvalidResponse(
             self.error_message.clone(),

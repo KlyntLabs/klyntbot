@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use bus::{DomainEvent, DomainEventBus};
 use common::{Result, ToolError};
-use tools_core::{ParamExtractor, RoutingContext, Tool};
+use tools_core::{approval_class::ApprovalClass, ParamExtractor, RoutingContext, Tool};
 
 use crate::models::{Note, NoteRow, Notebook, NotebookRow};
 use crate::repo::{utc_now_str, NoteRepo};
@@ -117,6 +117,14 @@ impl Tool for NotesTool {
             "delete_inbox_item" => self.handle_delete_inbox_item(&p).await,
             "update_notebook" => self.handle_update_notebook(&p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {action}")).into()),
+        }
+    }
+
+    fn approval_class(&self, args: &Value) -> ApprovalClass {
+        match args.get("action").and_then(|v| v.as_str()) {
+            Some("create_note" | "update_note" | "tag_note" | "link_notes" | "create_notebook" | "capture_inbox" | "update_notebook" | "archive_note" | "unarchive_note") => ApprovalClass::Sensitive,
+            Some("delete_note" | "delete_notebook" | "delete_inbox_item") => ApprovalClass::Destructive,
+            _ => ApprovalClass::Safe,
         }
     }
 }

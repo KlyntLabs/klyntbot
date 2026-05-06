@@ -91,6 +91,8 @@ pub struct AgentLoop {
     /// Background session memory service (per-session scratchpad maintenance).
     /// Stored to prevent drop which would cancel the background task.
     pub(crate) _session_memory_service: Option<cognitive::SessionMemoryService>,
+    /// Approval grants repo for purging session-scoped grants.
+    pub(crate) approval_grants_repo: Option<approval::ApprovalGrantsRepo>,
     /// Cancellation token for the work context inference loop.
     pub(crate) _inference_loop_token: Option<CancellationToken>,
     /// Parent cancellation token for all tree builder subscriber tasks.
@@ -758,6 +760,12 @@ impl AgentLoop {
             let key = msg.chat_id.as_str();
             if let Err(e) = self.session_manager.reset_session(key).await {
                 warn!("Failed to reset session {}: {}", key, e);
+            }
+            // Purge session-scoped approval grants
+            if let Some(ref repo) = self.approval_grants_repo {
+                if let Err(e) = repo.purge_session(key).await {
+                    warn!("Failed to purge approval grants for session {}: {}", key, e);
+                }
             }
             return Ok(());
         }

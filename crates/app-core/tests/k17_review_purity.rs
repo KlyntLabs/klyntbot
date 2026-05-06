@@ -99,15 +99,9 @@ const EXPECTED_READ_ONLY_TOOL_NAMES: &[&str] = &[
 ];
 
 fn build_test_kit() -> klynt_core::ToolKitBuilder {
-    let layer1 = Arc::new(
-        klynt_core::approval::Layer1::compile(&config::schema::CodingPermissions::default())
-            .unwrap(),
-    );
     let policy = Arc::new(klynt_execpolicy::Policy::empty());
     let privacy = Arc::new(klynt_core::privacy::PrivacyGuard::from_globs(&[]).unwrap());
-    let pending = Arc::new(klynt_core::approval::PendingApprovalsMap::default());
     let bus = Arc::new(bus::DomainEventBus::new(16));
-    let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
     let rt = tokio::runtime::Runtime::new().unwrap();
     let pool = rt
         .block_on(storage::StoragePool::connect_in_memory())
@@ -116,13 +110,10 @@ fn build_test_kit() -> klynt_core::ToolKitBuilder {
 
     klynt_core::ToolKitBuilder {
         cwd: std::path::PathBuf::from("/tmp"),
-        layer1,
         policy,
         privacy,
-        pending,
         bus,
         repos,
-        host_cache,
         non_ui_policy: common::tool_channel::NonUiPolicy::Allow,
         hook_engine: None,
         snapshot_repo: None,

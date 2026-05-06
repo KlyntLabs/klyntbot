@@ -181,8 +181,6 @@ pub struct AppCore {
     pub symbol_extractor: Option<Arc<dyn coding_memory::symbols::SymbolExtractor>>,
     /// Map of repo_id → filesystem root (Phase 6 symbol validation).
     pub repo_roots: Arc<std::sync::RwLock<std::collections::HashMap<String, std::path::PathBuf>>>,
-    /// Pending coding approval requests keyed by request_id.
-    pub pending_approvals: Arc<klynt_core::approval::PendingApprovalsMap>,
     pub tracing_registry: std::sync::Arc<crate::tracing::TracingRegistry>,
     /// Tracks which sessions have already fired the SessionStart hook (coding mode).
     pub session_start_fired: Arc<dashmap::DashMap<String, ()>>,

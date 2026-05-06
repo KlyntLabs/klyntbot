@@ -1,4 +1,3 @@
-use crate::approval::guard::fan_out_tool_event;
 use bus::DomainEventBus;
 use std::path::Path;
 use std::sync::Arc;
@@ -53,4 +52,24 @@ pub async fn emit_file_edit(
 pub fn unified_diff(path: &str, before: &str, after: &str) -> String {
     let patch = diffy::create_patch(before, after);
     format!("--- {path}\n+++ {path}\n{patch}")
+}
+
+pub(crate) async fn fan_out_tool_event(
+    event_tx: Option<&mpsc::Sender<ToolEvent>>,
+    domain_bus: Option<&Arc<DomainEventBus>>,
+    evt: ToolEvent,
+) {
+    if let Some(tx) = event_tx {
+        let _ = tx.send(evt.clone()).await;
+    }
+    if let Some(bus) = domain_bus {
+        let payload = serde_json::to_value(&evt).unwrap_or_else(|e| {
+            tracing::error!("failed to serialize ToolEvent: {e}");
+            serde_json::json!({"type": "unknown"})
+        });
+        bus.publish(bus::DomainEvent::Generic {
+            kind: "agent_event".into(),
+            payload,
+        });
+    }
 }

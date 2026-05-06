@@ -1259,7 +1259,6 @@ impl AppCore {
             causal_edge_repo: None,
             symbol_extractor: None,
             repo_roots: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
-            pending_approvals: Arc::new(klynt_core::approval::PendingApprovalsMap::new()),
             tracing_registry,
             session_start_fired: Arc::new(dashmap::DashMap::new()),
             session_end_fired: Arc::new(dashmap::DashMap::new()),
@@ -1832,11 +1831,6 @@ impl AppCore {
         // ── Register BashTool in agent's tool registry (post-init) ──────
         {
             let config_guard = core.config.read().await;
-            let perms = &config_guard.coding.permissions;
-            let layer1 =
-                Arc::new(klynt_core::approval::Layer1::compile(perms).expect(
-                    "Layer 1 rules failed to compile; fix coding.permissions in config.json",
-                ));
             let exclude_globs: Vec<&str> = config_guard
                 .coding_memory
                 .ingest
@@ -1854,7 +1848,6 @@ impl AppCore {
                     .and_then(|p| klynt_execpolicy::Policy::load_from_dir(&p).ok())
                     .unwrap_or_else(klynt_execpolicy::Policy::empty),
             );
-            let pending = core.pending_approvals.clone();
             let bus = core
                 .domain_event_bus
                 .clone()
@@ -1881,7 +1874,6 @@ impl AppCore {
                 found.unwrap_or(start)
             };
             let non_ui_policy = config_guard.tools.approval_policy.non_ui_channels;
-            let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
 
             let hook_engine: Option<Arc<klynt_hooks::HookEngine>> = {
                 let hooks_path = config_guard.data_dir_path().join("hooks.toml");
@@ -1900,13 +1892,10 @@ impl AppCore {
 
             let kit = klynt_core::ToolKitBuilder {
                 cwd: cwd.clone(),
-                layer1: layer1.clone(),
                 policy: policy.clone(),
                 privacy: privacy.clone(),
-                pending: pending.clone(),
                 bus: bus.clone(),
                 repos: core.repos.clone(),
-                host_cache,
                 non_ui_policy,
                 hook_engine: hook_engine.clone(),
                 snapshot_repo: core.snapshot_repo.clone(),

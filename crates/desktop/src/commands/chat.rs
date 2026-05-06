@@ -106,9 +106,8 @@ pub async fn chat_respond_approval(
     request_id: String,
     decision: app_core::coding::approval_handler::AppApprovalDecision,
 ) -> () {
-    let core = app.state::<std::sync::Arc<app_core::AppCore>>();
+    let _core = app.state::<std::sync::Arc<app_core::AppCore>>();
     app_core::coding::approval_handler::respond_approval(
-        &core.pending_approvals,
         &request_id,
         decision,
     )
@@ -206,7 +205,6 @@ pub(crate) async fn dispatch_dev(
             let decision: app_core::coding::approval_handler::AppApprovalDecision =
                 try_field!(dev::require(body, "decision"));
             let result = app_core::coding::approval_handler::respond_approval(
-                &core.pending_approvals,
                 &request_id,
                 decision,
             )

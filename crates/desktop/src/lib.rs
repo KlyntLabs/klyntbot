@@ -1,4 +1,5 @@
 pub mod app_core;
+pub mod approval;
 pub mod claude_code_integration;
 pub mod commands;
 #[cfg(debug_assertions)]

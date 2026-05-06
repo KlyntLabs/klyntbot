@@ -14,6 +14,7 @@ common.workspace = true
 bus.workspace = true
 config.workspace = true
 providers.workspace = true
+approval = { path = "../approval" }
 async-trait.workspace = true
 reqwest = { workspace = true }
 tokio = { workspace = true }
@@ -25,6 +26,7 @@ tracing.workspace = true
 dashmap.workspace = true
 futures-util.workspace = true
 html2text.workspace = true
+uuid = { workspace = true, features = ["v4"] }
 
 # Optional email dependencies
 async-imap = { workspace = true, optional = true }

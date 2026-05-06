@@ -8,9 +8,11 @@ pub mod discord;
 pub mod email;
 pub mod slack;
 pub mod telegram;
+pub mod telegram_approval;
 
 pub use discord::DiscordChannel;
 #[cfg(feature = "email")]
 pub use email::EmailChannel;
 pub use slack::SlackChannel;
 pub use telegram::TelegramChannel;
+pub use telegram_approval::TelegramApprovalChannel;
