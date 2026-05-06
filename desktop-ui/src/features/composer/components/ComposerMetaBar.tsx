@@ -141,7 +141,7 @@ export function ComposerMetaBar({
               onChange={(event) => onSelectProvider(event.target.value || null)}
               disabled={disabled}
             >
-              <option value="">Select provider...</option>
+              {!selectedProviderId && <option value="">Loading…</option>}
               {providers.map((provider) => (
                 <option key={provider.id} value={provider.id}>
                   {provider.displayName}
@@ -180,13 +180,11 @@ export function ComposerMetaBar({
             disabled={disabled || models.length === 0}
             style={modelSelectStyle}
           >
-            {providers.length > 0 && !selectedProviderId ? (
-              <option value="">Select provider first</option>
-            ) : models.length === 0 ? (
+            {models.length === 0 ? (
               <option value="">No models available</option>
             ) : (
               <>
-                <option value="">Select model...</option>
+                {!selectedModelId && <option value="">Select model…</option>}
                 {models.map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.displayName || model.model}

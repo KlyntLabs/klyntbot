@@ -121,8 +121,13 @@ export function useMainAppPromptActions({
       if (!activeWorkspace.connected) {
         await connectWorkspace(activeWorkspace);
       }
+      // Activate the new coding thread so `activeThreadIdByWorkspace` is
+      // promoted to the real `coding:…` value before the first message
+      // dispatches. Without activation, `MainApp` keeps the workspace ID in
+      // the slot, `CodingThreadView` never mounts, and the agent's streaming
+      // events for this turn land in the void.
       const threadId = await startThreadForWorkspace(activeWorkspace.id, {
-        activate: false,
+        activate: true,
       });
       if (!threadId) {
         return;
