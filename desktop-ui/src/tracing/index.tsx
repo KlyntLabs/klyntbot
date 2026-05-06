@@ -30,111 +30,30 @@ import { DualView } from "@/tracing/features/dual-view/dual-view";
 import { SessionsExplorer } from "@/tracing/features/sessions-explorer/sessions-explorer";
 import { StateViewer } from "@/tracing/features/state-viewer/state-viewer";
 import { StatisticsView } from "@/tracing/features/statistics/statistics-view";
-import { isErrorEvent } from "@/tracing/features/wire-viewer/wire-event-card";
+
+import { ClaudeCodeAgentsPanel } from "@/tracing/features/providers/claude-code/agents-panel/claude-code-agents-panel";
+import { ClaudeCodeWireViewer } from "@/tracing/features/providers/claude-code/wire-viewer/claude-code-wire-viewer";
+import { HeaderChips } from "@/tracing/features/session-detail/header-chips";
 import { WireViewer } from "@/tracing/features/wire-viewer/wire-viewer";
 import { useTheme } from "@/tracing/hooks/use-theme";
 import {
+  fetchHeaderLayout,
+  fetchSupportedTabs,
   getSessionDownloadUrl,
+  getSessionSummary,
   getSubagents,
   getVisCapabilities,
   getWireEvents,
   listSessions,
   openInPath,
+  type HeaderLayoutResponse,
   type SessionInfo,
+  type SessionSummary,
+  type SubagentInfo,
   type WireEvent,
 } from "@/tracing/lib/api";
 
 type Tab = "wire" | "context" | "state" | "dual" | "agents";
-
-interface SessionStatsData {
-  turns: number;
-  steps: number;
-  toolCalls: number;
-  errors: number;
-  compactions: number;
-  durationSec: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheRate: number;
-}
-
-function computeStats(events: WireEvent[]): SessionStatsData {
-  let turns = 0;
-  let steps = 0;
-  let toolCalls = 0;
-  let errors = 0;
-  let compactions = 0;
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let totalCacheRead = 0;
-  let totalInputOther = 0;
-  let totalCacheCreation = 0;
-
-  for (const e of events) {
-    if (e.type === "TurnBegin") turns++;
-    if (e.type === "StepBegin") steps++;
-    if (e.type === "ToolCall") toolCalls++;
-    if (e.type === "CompactionBegin") compactions++;
-    if (isErrorEvent(e)) errors++;
-    if (e.type === "StatusUpdate") {
-      const tu = e.payload.token_usage as Record<string, number> | undefined;
-      if (tu) {
-        inputTokens +=
-          (tu.input_other ?? 0) + (tu.input_cache_read ?? 0) + (tu.input_cache_creation ?? 0);
-        outputTokens += tu.output ?? 0;
-        totalCacheRead += tu.input_cache_read ?? 0;
-        totalInputOther += tu.input_other ?? 0;
-        totalCacheCreation += tu.input_cache_creation ?? 0;
-      }
-    }
-    // Count tokens from SubagentEvent-wrapped StatusUpdate
-    if (e.type === "SubagentEvent") {
-      const inner = e.payload.event as Record<string, unknown> | undefined;
-      if (inner?.type === "StatusUpdate") {
-        const innerPayload = inner.payload as Record<string, unknown> | undefined;
-        const tu = innerPayload?.token_usage as Record<string, number> | undefined;
-        if (tu) {
-          inputTokens +=
-            (tu.input_other ?? 0) + (tu.input_cache_read ?? 0) + (tu.input_cache_creation ?? 0);
-          outputTokens += tu.output ?? 0;
-          totalCacheRead += tu.input_cache_read ?? 0;
-          totalInputOther += tu.input_other ?? 0;
-          totalCacheCreation += tu.input_cache_creation ?? 0;
-        }
-      }
-    }
-  }
-
-  const durationSec =
-    events.length >= 2 ? events[events.length - 1].timestamp - events[0].timestamp : 0;
-
-  const totalInput = totalCacheRead + totalInputOther + totalCacheCreation;
-  const cacheRate = totalInput > 0 ? (totalCacheRead / totalInput) * 100 : 0;
-
-  return {
-    turns,
-    steps,
-    toolCalls,
-    errors,
-    compactions,
-    durationSec,
-    inputTokens,
-    outputTokens,
-    cacheRate,
-  };
-}
-
-function formatDuration(sec: number): string {
-  if (sec < 1) return `${(sec * 1000).toFixed(0)}ms`;
-  if (sec < 60) return `${sec.toFixed(1)}s`;
-  return `${(sec / 60).toFixed(1)}min`;
-}
-
-function formatTokens(n: number): string {
-  if (n === 0) return "0";
-  if (n < 1000) return `${n}`;
-  return `${(n / 1000).toFixed(1)}k`;
-}
 
 function getSessionDir(session: SessionInfo): string {
   return session.session_dir;
@@ -234,10 +153,19 @@ function SessionDirectoryActions({
   );
 }
 
-function SessionStats({ sessionId, refreshKey, providerId }: { sessionId: string; refreshKey: number; providerId: string }) {
+function SessionStats({
+  sessionId,
+  summary,
+  layout,
+  modelName,
+}: {
+  sessionId: string;
+  summary: SessionSummary | null;
+  layout: HeaderLayoutResponse | null;
+  modelName?: string;
+}) {
   const [copied, setCopied] = useState(false);
   const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [events, setEvents] = useState<WireEvent[]>([]);
 
   useEffect(() => {
     return () => {
@@ -246,33 +174,6 @@ function SessionStats({ sessionId, refreshKey, providerId }: { sessionId: string
       }
     };
   }, []);
-  const [loaded, setLoaded] = useState(false);
-  const [agentCount, setAgentCount] = useState(0);
-
-  useEffect(() => {
-    setLoaded(false);
-    getWireEvents(providerId, sessionId, refreshKey > 0)
-      .then((res) => setEvents(res.events))
-      .catch(() => setEvents([]))
-      .finally(() => setLoaded(true));
-    getSubagents(providerId, sessionId, refreshKey > 0)
-      .then((agents) => setAgentCount(agents.length))
-      .catch(() => setAgentCount(0));
-  }, [sessionId, refreshKey]);
-
-  const stats = useMemo(() => computeStats(events), [events]);
-
-  if (!loaded || events.length === 0) return null;
-
-  const parts: string[] = [
-    `${stats.turns} turn${stats.turns !== 1 ? "s" : ""}`,
-    `${stats.steps} step${stats.steps !== 1 ? "s" : ""}`,
-    `${stats.toolCalls} tool call${stats.toolCalls !== 1 ? "s" : ""}`,
-  ];
-  if (stats.errors > 0) parts.push(`${stats.errors} error${stats.errors !== 1 ? "s" : ""}`);
-  if (stats.compactions > 0)
-    parts.push(`${stats.compactions} compaction${stats.compactions !== 1 ? "s" : ""}`);
-  if (agentCount > 0) parts.push(`${agentCount} agent${agentCount !== 1 ? "s" : ""}`);
 
   return (
     <div className="min-w-0 flex flex-1 items-center gap-2 overflow-x-auto px-4 py-1.5 text-xs text-muted-foreground">
@@ -296,22 +197,10 @@ function SessionStats({ sessionId, refreshKey, providerId }: { sessionId: string
         </TooltipTrigger>
         <TooltipContent>{copied ? "Copied!" : "Click to copy"}</TooltipContent>
       </Tooltip>
-      <span className="text-border">|</span>
-      <span className="shrink-0">{parts.join(" · ")}</span>
-      <span className="text-border">|</span>
-      <span className="shrink-0">{formatDuration(stats.durationSec)}</span>
-      {(stats.inputTokens > 0 || stats.outputTokens > 0) && (
+      {summary && layout && (
         <>
           <span className="text-border">|</span>
-          <span className="shrink-0">
-            {formatTokens(stats.inputTokens)} in / {formatTokens(stats.outputTokens)} out
-          </span>
-          {stats.cacheRate > 0 && (
-            <>
-              <span className="text-border">|</span>
-              <span className="shrink-0">{Math.round(stats.cacheRate)}% cache</span>
-            </>
-          )}
+          <HeaderChips chips={layout.chips} stats={summary} model={modelName} />
         </>
       )}
     </div>
@@ -354,6 +243,11 @@ export function TracingApp({ providerId }: TracingAppProps) {
   const [refreshing, setRefreshing] = useState(false);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openInSupported, setOpenInSupported] = useState(false);
+  const [supportedTabs, setSupportedTabs] = useState<string[] | null>(null);
+  const [headerLayout, setHeaderLayout] = useState<HeaderLayoutResponse | null>(null);
+  const [wireEvents, setWireEvents] = useState<WireEvent[]>([]);
+  const [subagents, setSubagents] = useState<SubagentInfo[]>([]);
+  const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null);
 
   useEffect(() => {
     return () => {
@@ -398,6 +292,34 @@ export function TracingApp({ providerId }: TracingAppProps) {
     window.addEventListener("popstate", handler);
     return () => window.removeEventListener("popstate", handler);
   }, []);
+
+  useEffect(() => {
+    if (!providerId) {
+      setSupportedTabs(null);
+      setHeaderLayout(null);
+      return;
+    }
+    fetchSupportedTabs(providerId).then((r) => setSupportedTabs(r.tabs));
+    fetchHeaderLayout(providerId).then((r) => setHeaderLayout(r));
+  }, [providerId]);
+
+  useEffect(() => {
+    if (!sessionId || !providerId) {
+      setWireEvents([]);
+      setSubagents([]);
+      setSessionSummary(null);
+      return;
+    }
+    getWireEvents(providerId, sessionId, refreshKey > 0)
+      .then((r) => setWireEvents(r.events))
+      .catch(() => setWireEvents([]));
+    getSubagents(providerId, sessionId, refreshKey > 0)
+      .then((r) => setSubagents(r))
+      .catch(() => setSubagents([]));
+    getSessionSummary(providerId, sessionId, refreshKey > 0)
+      .then((r) => setSessionSummary(r))
+      .catch(() => setSessionSummary(null));
+  }, [sessionId, refreshKey, providerId]);
 
   // Dynamic page title
   const [sessions, setSessions] = useState<Awaited<ReturnType<typeof listSessions>>>([]);
@@ -496,7 +418,11 @@ export function TracingApp({ providerId }: TracingAppProps) {
         {/* Session Stats */}
         {sessionId && (
           <div className="flex items-center border-b">
-            <SessionStats sessionId={sessionId} refreshKey={refreshKey} providerId={providerId} />
+            <SessionStats
+              sessionId={sessionId}
+              summary={sessionSummary}
+              layout={headerLayout}
+            />
             {currentSession && (
               <SessionDirectoryActions session={currentSession} openInSupported={openInSupported} providerId={providerId} />
             )}
@@ -541,24 +467,29 @@ export function TracingApp({ providerId }: TracingAppProps) {
                   { key: "dual", label: "Dual", icon: <Columns size={14} /> },
                   { key: "agents", label: "Agents", icon: <Bot size={14} /> },
                 ] as const
-              ).map(({ key, label, icon }) => (
-                <button
-                  type="button"
-                  key={key}
-                  onClick={() => setActiveTab(key)}
-                  className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors ${
-                    activeTab === key
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {icon}
-                  {label}
-                  {activeTab === key && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-                  )}
-                </button>
-              ))}
+              )
+                .filter(
+                  ({ key }) =>
+                    supportedTabs === null || supportedTabs.includes(key as Tab),
+                )
+                .map(({ key, label, icon }) => (
+                  <button
+                    type="button"
+                    key={key}
+                    onClick={() => setActiveTab(key)}
+                    className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors ${
+                      activeTab === key
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {icon}
+                    {label}
+                    {activeTab === key && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                    )}
+                  </button>
+                ))}
             </div>
 
             {/* Agent Scope Bar - shown on wire/context/dual tabs */}
@@ -576,7 +507,7 @@ export function TracingApp({ providerId }: TracingAppProps) {
 
             {/* Tab Content */}
             <div className="flex-1 min-h-0 overflow-hidden">
-              {activeTab === "wire" && (
+              {activeTab === "wire" && providerId === "kimi" && (
                 <WireViewer
                   sessionId={sessionId}
                   refreshKey={refreshKey}
@@ -586,6 +517,9 @@ export function TracingApp({ providerId }: TracingAppProps) {
                   agentScope={agentScope}
                   providerId={providerId}
                 />
+              )}
+              {activeTab === "wire" && providerId === "claudeCode" && (
+                <ClaudeCodeWireViewer events={wireEvents} />
               )}
               {activeTab === "context" && (
                 <ContextViewer
@@ -604,7 +538,7 @@ export function TracingApp({ providerId }: TracingAppProps) {
               {activeTab === "dual" && (
                 <DualView sessionId={sessionId} refreshKey={refreshKey} agentScope={agentScope} providerId={providerId} />
               )}
-              {activeTab === "agents" && (
+              {activeTab === "agents" && providerId === "kimi" && (
                 <AgentsPanel
                   sessionId={sessionId}
                   refreshKey={refreshKey}
@@ -618,6 +552,12 @@ export function TracingApp({ providerId }: TracingAppProps) {
                     setActiveTab("wire");
                   }}
                   providerId={providerId}
+                />
+              )}
+              {activeTab === "agents" && providerId === "claudeCode" && (
+                <ClaudeCodeAgentsPanel
+                  agents={subagents}
+                  onSelect={(id) => setAgentScope(id)}
                 />
               )}
             </div>
