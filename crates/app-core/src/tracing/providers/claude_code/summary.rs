@@ -13,6 +13,24 @@ const PROVIDER_ID: &str = "claudeCode";
 
 pub async fn build_summary(d: &DiscoveredSession) -> Result<SessionSummary> {
     let scan = scan_jsonl(&d.jsonl_path).await?;
+    let subagent_count = {
+        let sub_dir = d.source_dir.join(&d.session_id).join("subagents");
+        match tokio::fs::read_dir(&sub_dir).await {
+            Ok(mut entries) => {
+                let mut count = 0u32;
+                while let Ok(Some(e)) = entries.next_entry().await {
+                    if e.file_type().await.map(|t| t.is_file()).unwrap_or(false) {
+                        let name = e.file_name().to_string_lossy().to_string();
+                        if name.ends_with(".meta.json") {
+                            count += 1;
+                        }
+                    }
+                }
+                count
+            }
+            Err(_) => 0,
+        }
+    };
     let size_bytes = tokio::fs::metadata(&d.jsonl_path)
         .await
         .map(|m| m.len())
@@ -36,10 +54,10 @@ pub async fn build_summary(d: &DiscoveredSession) -> Result<SessionSummary> {
         last_event_at: scan.last_ts.unwrap_or_else(Timestamp::now),
         size_bytes,
         turn_count: scan.turn_count,
-        step_count: 0,
+        step_count: 0, // Claude Code JSONL has no step concept
         tool_call_count: scan.tool_call_count,
         error_count: scan.error_count,
-        subagent_count: scan.subagent_count,
+        subagent_count,
         has_wire: true,
         has_context: false,
         imported: d.imported,
@@ -63,7 +81,6 @@ struct Scan {
     turn_count: u32,
     tool_call_count: u32,
     error_count: u32,
-    subagent_count: u32,
 }
 
 async fn scan_jsonl(path: &Path) -> Result<Scan> {

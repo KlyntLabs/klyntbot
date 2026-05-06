@@ -52,9 +52,31 @@ pub async fn tracing_list_subagents(
     state.tracing_list_subagents(provider_id, session_id).await
 }
 
+#[derive(serde::Serialize, specta::Type)]
+pub struct ImportResponse {
+    pub session_id: String,
+    pub work_dir_hash: String,
+}
+
 #[klynt_command]
-pub async fn tracing_import(provider_id: String, file_path: String) -> String {
-    state.tracing_import(provider_id, file_path).await
+pub async fn tracing_import(
+    provider_id: String,
+    bytes: Vec<u8>,
+    file_name: String,
+) -> ImportResponse {
+    let temp_dir = std::env::temp_dir().join("klyntbot_imports");
+    let _ = tokio::fs::create_dir_all(&temp_dir).await;
+    let temp_path = temp_dir.join(&file_name);
+    tokio::fs::write(&temp_path, &bytes)
+        .await
+        .expect("write temp import file");
+    let session_id = state
+        .tracing_import(provider_id, temp_path.to_string_lossy().to_string())
+        .await?;
+    Ok(ImportResponse {
+        session_id,
+        work_dir_hash: "".to_string(),
+    })
 }
 
 #[klynt_command]

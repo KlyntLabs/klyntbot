@@ -1,4 +1,4 @@
-import { Markdown } from "@/features/messages/components/Markdown";
+import { Markdown } from "@/tracing/components/markdown";
 import type { WireEvent } from "@/tracing/lib/api";
 
 interface Props {
@@ -9,7 +9,7 @@ export function AssistantTextCard({ event }: Props) {
   const text = (event.payload as { text?: string }).text ?? "";
   return (
     <div className="cc-card cc-card--assistant-text">
-      <Markdown value={text} />
+      <Markdown>{text}</Markdown>
     </div>
   );
 }

@@ -10,7 +10,7 @@ fn fixture_root() -> PathBuf {
 }
 
 fn imported_root() -> PathBuf {
-    tempfile::tempdir().unwrap().into_path()
+    tempfile::tempdir().unwrap().keep()
 }
 
 #[tokio::test]

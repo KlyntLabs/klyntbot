@@ -68,6 +68,7 @@ export interface WireEvent {
   timestamp: number;
   type: string;
   payload: Record<string, unknown>;
+  meta?: boolean;
 }
 
 export interface WireResponse {
@@ -289,6 +290,7 @@ type BackendTraceEvent = {
   turnIndex: number | null;
   stepIndex: number | null;
   parentSubagentId: string | null;
+  meta: boolean;
 };
 
 type BackendSessionDetail = {
@@ -309,6 +311,7 @@ function reshapeWire(detail: BackendSessionDetail): WireResponse {
       timestamp: new Date(ev.occurredAt).getTime() / 1000,
       type: ev.rawKind,
       payload: ev.payload,
+      meta: ev.meta,
     })),
   };
 }

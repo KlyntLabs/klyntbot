@@ -223,14 +223,6 @@ export interface TracingAppProps {
 }
 
 export function TracingApp({ providerId }: TracingAppProps) {
-  if (!providerId) {
-    return (
-      <div className="cm-state cm-state--empty">
-        Select a provider from the chips above to view its tracing data.
-      </div>
-    );
-  }
-
   const { theme, toggleTheme } = useTheme();
   const [sessionId, setSessionId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -324,10 +316,12 @@ export function TracingApp({ providerId }: TracingAppProps) {
   // Dynamic page title
   const [sessions, setSessions] = useState<Awaited<ReturnType<typeof listSessions>>>([]);
   useEffect(() => {
+    setSessions([]);
+    if (!providerId) return;
     listSessions(providerId)
       .then(setSessions)
       .catch(() => {});
-  }, []);
+  }, [providerId]);
   useEffect(() => {
     getVisCapabilities()
       .then((capabilities) => setOpenInSupported(capabilities.open_in_supported))
@@ -373,15 +367,28 @@ export function TracingApp({ providerId }: TracingAppProps) {
         return;
       }
 
+      const setIfSupported = (tab: Tab) => {
+        if (supportedTabs?.includes(tab)) {
+          setActiveTab(tab);
+        }
+      };
       if (e.key === "1") setActiveTab("wire");
-      else if (e.key === "2") setActiveTab("context");
-      else if (e.key === "3") setActiveTab("state");
-      else if (e.key === "4") setActiveTab("dual");
-      else if (e.key === "5") setActiveTab("agents");
+      else if (e.key === "2") setIfSupported("context");
+      else if (e.key === "3") setIfSupported("state");
+      else if (e.key === "4") setIfSupported("dual");
+      else if (e.key === "5") setIfSupported("agents");
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [showShortcutHelp]);
+  }, [showShortcutHelp, supportedTabs]);
+
+  if (!providerId) {
+    return (
+      <div className="cm-state cm-state--empty">
+        Select a provider from the chips above to view its tracing data.
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider>

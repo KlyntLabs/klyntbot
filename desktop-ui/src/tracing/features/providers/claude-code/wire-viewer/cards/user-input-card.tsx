@@ -1,4 +1,4 @@
-import { Markdown } from "@/features/messages/components/Markdown";
+import { Markdown } from "@/tracing/components/markdown";
 import type { WireEvent } from "@/tracing/lib/api";
 
 interface Props {
@@ -10,7 +10,7 @@ export function UserInputCard({ event }: Props) {
   const isImage = p.type === "image";
   return (
     <div className="cc-card cc-card--user">
-      {isImage ? <span>[image]</span> : <Markdown value={p.text ?? ""} />}
+      {isImage ? <span>[image]</span> : <Markdown>{p.text ?? ""}</Markdown>}
     </div>
   );
 }

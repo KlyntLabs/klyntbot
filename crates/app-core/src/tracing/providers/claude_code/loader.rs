@@ -281,7 +281,6 @@ fn emit_for_message(
         }
         _ => {}
     }
-    let _ = (line, meta);
 }
 
 fn parse_ts(v: &Value) -> Option<Timestamp> {
