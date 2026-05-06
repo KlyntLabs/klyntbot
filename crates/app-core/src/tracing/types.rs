@@ -329,3 +329,52 @@ mod metadata_tests {
         assert!(s.contains(r#""wireMtime":1700000000"#));
     }
 }
+
+// ── SessionTab + HeaderChip ─────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum SessionTab {
+    Wire,
+    Tree,
+    Context,
+    State,
+    Dual,
+    Agents,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum HeaderChip {
+    Turns,
+    Steps,
+    Messages,
+    ToolCalls,
+    Errors,
+    Compactions,
+    Agents,
+    Duration,
+    Tokens,
+    CacheHitPct,
+    Model,
+}
+
+#[cfg(test)]
+mod session_tab_tests {
+    use super::*;
+    #[test]
+    fn session_tab_serializes_camel_case() {
+        let s = serde_json::to_string(&SessionTab::Wire).unwrap();
+        assert_eq!(s, r#""wire""#);
+        let s = serde_json::to_string(&SessionTab::Agents).unwrap();
+        assert_eq!(s, r#""agents""#);
+    }
+
+    #[test]
+    fn header_chip_serializes_camel_case() {
+        let s = serde_json::to_string(&HeaderChip::ToolCalls).unwrap();
+        assert_eq!(s, r#""toolCalls""#);
+        let s = serde_json::to_string(&HeaderChip::CacheHitPct).unwrap();
+        assert_eq!(s, r#""cacheHitPct""#);
+    }
+}
