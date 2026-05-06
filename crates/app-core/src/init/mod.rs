@@ -1125,6 +1125,14 @@ impl AppCore {
             registry.register(Arc::new(
                 crate::tracing::providers::kimi::KimiTracingProvider::new(&home, &data_dir, widx),
             ));
+            let claude_root = home.join(".claude/projects");
+            let imported_claude_root = data_dir.join("coding_memory/imported_claude_code");
+            registry.register(Arc::new(
+                crate::tracing::providers::claude_code::ClaudeCodeTracingProvider::new(
+                    claude_root,
+                    imported_claude_root,
+                ),
+            ));
             Arc::new(registry)
         };
 
