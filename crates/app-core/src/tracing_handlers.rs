@@ -159,4 +159,20 @@ impl AppCore {
             .await
             .map_err(ApiError::from)
     }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn tracing_supported_tabs(
+        &self,
+        provider_id: String,
+    ) -> Result<Vec<SessionTab>, ApiError> {
+        Ok(self.tracing_provider(&provider_id)?.supported_tabs().to_vec())
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn tracing_header_layout(
+        &self,
+        provider_id: String,
+    ) -> Result<Vec<HeaderChip>, ApiError> {
+        Ok(self.tracing_provider(&provider_id)?.header_layout().to_vec())
+    }
 }
