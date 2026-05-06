@@ -934,6 +934,14 @@ async providerStatus(providerId: string) : Promise<Result<JsonValue, ApiError>> 
     else return { status: "error", error: e  as any };
 }
 },
+async modelList(workspaceId: string) : Promise<Result<JsonValue, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("model_list", { workspaceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async listWorkspaces() : Promise<Result<unknown, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_workspaces") };

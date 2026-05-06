@@ -162,6 +162,7 @@ desktop_macros::klynt_collect_commands![
     crate::commands::coding_thread_metadata::coding_thread_metadata_generate,
     crate::commands::providers::providers_list,
     crate::commands::providers::provider_status,
+    crate::commands::providers::model_list,
     crate::commands::workspace_lifecycle::list_workspaces,
     crate::commands::workspace_lifecycle::add_workspace,
     crate::commands::workspace_lifecycle::is_workspace_path_dir,
