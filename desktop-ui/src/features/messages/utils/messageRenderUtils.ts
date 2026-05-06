@@ -22,22 +22,6 @@ export type MessageImage = {
   label: string;
 };
 
-export type ToolGroupItem = Extract<
-  ConversationItem,
-  { kind: "tool" | "reasoning" | "explore" | "userInput" }
->;
-
-export type ToolGroup = {
-  id: string;
-  items: ToolGroupItem[];
-  toolCount: number;
-  messageCount: number;
-};
-
-export type MessageListEntry =
-  | { kind: "item"; item: ConversationItem }
-  | { kind: "toolGroup"; group: ToolGroup };
-
 export const SCROLL_THRESHOLD_PX = 120;
 export const MAX_COMMAND_OUTPUT_LINES = 200;
 
@@ -138,10 +122,6 @@ export function toolNameFromTitle(title: string) {
   return segments.length ? segments[segments.length - 1] : "";
 }
 
-export function formatCount(value: number, singular: string, plural: string) {
-  return `${value} ${value === 1 ? singular : plural}`;
-}
-
 function sanitizeReasoningTitle(title: string) {
   return title
     .replace(/[`*_~]/g, "")
@@ -211,109 +191,6 @@ export function normalizeMessageImageSrc(path: string) {
   } catch {
     return "";
   }
-}
-
-function isToolGroupItem(item: ConversationItem): item is ToolGroupItem {
-  return (
-    item.kind === "tool" ||
-    item.kind === "reasoning" ||
-    item.kind === "explore" ||
-    item.kind === "userInput"
-  );
-}
-
-function mergeExploreItems(
-  items: Extract<ConversationItem, { kind: "explore" }>[],
-): Extract<ConversationItem, { kind: "explore" }> {
-  const first = items[0];
-  const last = items[items.length - 1];
-  const status = last?.status ?? "explored";
-  const entries = items.flatMap((item) => item.entries);
-  return {
-    id: first.id,
-    kind: "explore",
-    status,
-    entries,
-  };
-}
-
-function mergeConsecutiveExploreRuns(items: ToolGroupItem[]): ToolGroupItem[] {
-  const result: ToolGroupItem[] = [];
-  let run: Extract<ConversationItem, { kind: "explore" }>[] = [];
-
-  const flushRun = () => {
-    if (run.length === 0) {
-      return;
-    }
-    if (run.length === 1) {
-      result.push(run[0]);
-    } else {
-      result.push(mergeExploreItems(run));
-    }
-    run = [];
-  };
-
-  items.forEach((item) => {
-    if (item.kind === "explore") {
-      run.push(item);
-      return;
-    }
-    flushRun();
-    result.push(item);
-  });
-  flushRun();
-  return result;
-}
-
-export function buildToolGroups(items: ConversationItem[]): MessageListEntry[] {
-  const entries: MessageListEntry[] = [];
-  let buffer: ToolGroupItem[] = [];
-
-  const flush = () => {
-    if (buffer.length === 0) {
-      return;
-    }
-    const normalizedBuffer = mergeConsecutiveExploreRuns(buffer);
-    const toolCount = normalizedBuffer.reduce((total, item) => {
-      if (item.kind === "tool") {
-        return total + 1;
-      }
-      if (item.kind === "explore") {
-        return total + item.entries.length;
-      }
-      return total;
-    }, 0);
-    const messageCount = normalizedBuffer.filter(
-      (item) => item.kind !== "tool" && item.kind !== "explore",
-    ).length;
-    if (toolCount === 0 || normalizedBuffer.length === 1) {
-      normalizedBuffer.forEach((item) => {
-        entries.push({ kind: "item", item });
-      });
-    } else {
-      entries.push({
-        kind: "toolGroup",
-        group: {
-          id: normalizedBuffer[0].id,
-          items: normalizedBuffer,
-          toolCount,
-          messageCount,
-        },
-      });
-    }
-    buffer = [];
-  };
-
-  items.forEach((item) => {
-    if (isToolGroupItem(item)) {
-      buffer.push(item);
-    } else {
-      flush();
-      entries.push({ kind: "item", item });
-    }
-  });
-  flush();
-  return entries;
 }
 
 export function cleanCommandText(commandText: string) {

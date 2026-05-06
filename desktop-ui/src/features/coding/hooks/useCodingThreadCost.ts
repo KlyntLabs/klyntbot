@@ -8,9 +8,10 @@ export function useCodingThreadCost(threadId: string | null) {
 
   useEffect(() => {
     if (!threadId) return;
-    // Chat sessions are not coding threads; skip fetching cost to avoid
-    // Storage not found backend noise.
-    if (threadId.startsWith("chat:")) {
+    // Strict allow-list: only real coding thread IDs hit the backend. Any
+    // other flavor (`chat:…`, `ws-…`, custom) no-ops to avoid silent 404s
+    // when upstream wiring regresses. Mirrors `useCodingMode` discrimination.
+    if (!threadId.startsWith("coding:")) {
       setCost(0);
       setTokens(0);
       return;

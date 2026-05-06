@@ -1019,10 +1019,55 @@
   border-radius: 10px;
 }
 
-.reasoning-inline-detail {
+/* Inline thinking block — matches Claude Code / kimi-cli's transcript style:
+   italicized prose under a small meta header ("Thinking · N tokens"), no
+   toggle, no truncation. Sits in-stream right above the tool call it
+   narrates. */
+.reasoning-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0 6px 12px;
+  border-left: 2px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  font-style: italic;
+  color: var(--text-muted);
   font-size: var(--fs-sm);
   line-height: 1.55;
+}
+
+.reasoning-inline-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
+  opacity: 0.7;
+  font-style: normal;
+}
+
+.reasoning-inline-label {
+  font-weight: 600;
+}
+
+.reasoning-inline-meta-dot {
+  opacity: 0.5;
+}
+
+.reasoning-inline-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.reasoning-inline-body p,
+.reasoning-inline-body ul,
+.reasoning-inline-body ol {
+  margin: 0 0 0.4em 0;
+}
+
+.reasoning-inline-body p:last-child,
+.reasoning-inline-body ul:last-child,
+.reasoning-inline-body ol:last-child {
+  margin-bottom: 0;
 }
 
 @media (max-width: 720px) {

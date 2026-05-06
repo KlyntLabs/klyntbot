@@ -7,6 +7,9 @@ export function useSubagents(threadId: string) {
   const [active, setActive] = useState<SubagentActiveSummary[]>([]);
 
   useEffect(() => {
+    // Refuse to fire on non-coding thread IDs — `listActiveSubagents` would
+    // otherwise reject with an unobserved promise on `ws-…` / `chat:…` IDs.
+    if (!threadId.startsWith("coding:")) return;
     let cancelled = false;
     listActiveSubagents(threadId).then((s) => { if (!cancelled) setActive(s); });
 

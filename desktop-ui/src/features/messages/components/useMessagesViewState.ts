@@ -2,7 +2,6 @@ import { isPlanReadyTaggedMessage } from "@utils/internalPlanReadyMessages";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ConversationItem } from "@/types";
 import {
-  buildToolGroups,
   computePlanFollowupState,
   parseReasoning,
   SCROLL_THRESHOLD_PX,
@@ -49,7 +48,6 @@ export function useMessagesViewState({
   const manuallyToggledExpandedRef = useRef<Set<string>>(new Set());
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [collapsedToolGroups, setCollapsedToolGroups] = useState<Set<string>>(new Set());
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [dismissedPlanFollowupByThread, setDismissedPlanFollowupByThread] = useState<
     Record<string, string>
@@ -113,18 +111,6 @@ export function useMessagesViewState({
   const toggleExpanded = useCallback((id: string) => {
     manuallyToggledExpandedRef.current.add(id);
     setExpandedItems((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
-
-  const toggleToolGroup = useCallback((id: string) => {
-    setCollapsedToolGroups((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -237,7 +223,6 @@ export function useMessagesViewState({
     }
   }, [visibleItems]);
 
-  const groupedItems = useMemo(() => buildToolGroups(visibleItems), [visibleItems]);
 
   const planFollowup = useMemo(() => {
     if (!onPlanAccept || !onPlanSubmitChanges) {
@@ -285,14 +270,12 @@ export function useMessagesViewState({
     requestAutoScroll,
     expandedItems,
     toggleExpanded,
-    collapsedToolGroups,
-    toggleToolGroup,
     copiedMessageId,
     handleCopyMessage,
     handleQuoteMessage,
     reasoningMetaById,
     latestReasoningLabel,
-    groupedItems,
+    visibleItems,
     planFollowup,
     dismissPlanFollowup,
   };

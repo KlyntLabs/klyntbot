@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
 import type { MessagePart } from "../components/parts/types";
@@ -39,6 +40,7 @@ export type ThreadEvent =
       turn_id: string;
       path: string;
       change: string;
+      diff_unified: string;
     }
   | {
       kind: "command_executed";
@@ -183,11 +185,18 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
       });
       return { ...state, items };
     }
-    case "item_completed":
-      return {
-        ...state,
-        items: state.items.map((m) => (m.id === event.item.id ? event.item : m)),
-      };
+    case "item_completed": {
+      // Merge instead of replace: the BE bridge sends a "completed" item with
+      // empty parts when the body was streamed via deltas. Replacing would
+      // wipe the assistant text we just rendered.
+      const items = state.items.map((m) => {
+        if (m.id !== event.item.id) return m;
+        const incoming = event.item;
+        const parts = incoming.parts.length === 0 ? m.parts : incoming.parts;
+        return { ...incoming, parts };
+      });
+      return { ...state, items };
+    }
     case "tool_call_started":
       return {
         ...state,
@@ -201,7 +210,7 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
         path: event.path,
         before: null,
         after: "",
-        diff_unified: "",
+        diff_unified: event.diff_unified ?? "",
         applied: true,
       });
       return { ...state, items };
@@ -236,16 +245,44 @@ export function useThreadEvents(threadId: string | null) {
   useEffect(() => {
     setState(initialState);
     if (!threadId) return;
+    // Track cancellation so a StrictMode double-mount (or stale effect run)
+    // can't both register two listeners and apply every event twice.
+    let cancelled = false;
     let unlisten: (() => void) | null = null;
+    // Seed persisted history before opening the live listener. Without this,
+    // clicking an existing session shows nothing until a new turn fires —
+    // because `agent:thread_event` is live-only, never replayed. Live events
+    // for *this* thread that arrive during the await will land on top via
+    // the reducer once the listener attaches.
+    invoke<{ items?: MessageDto[] }>("coding_thread_resume", {
+      threadId,
+      includeItems: true,
+    })
+      .then((thread) => {
+        if (cancelled) return;
+        const items = thread?.items ?? [];
+        if (items.length === 0) return;
+        setState((prev) => ({ ...prev, items }));
+      })
+      .catch(() => {
+        // Resume can 404 for a brand-new thread that has no DB row yet;
+        // that's expected — the live event stream will fill it.
+      });
     listen<ThreadEvent>("agent:thread_event", (e) => {
+      if (cancelled) return;
       const evt = e.payload;
       const evThreadId = (evt as { thread_id?: string }).thread_id;
       if (evThreadId && evThreadId !== threadId) return;
       setState((prev) => applyThreadEvent(prev, evt));
     }).then((un) => {
-      unlisten = un;
+      if (cancelled) {
+        un();
+      } else {
+        unlisten = un;
+      }
     });
     return () => {
+      cancelled = true;
       unlisten?.();
     };
   }, [threadId]);

@@ -1,7 +1,6 @@
 import { exportMarkdownFile } from "@services/tauri";
 import { pushErrorToast } from "@services/toasts";
 import type { ParsedFileLocation } from "@utils/fileLinks";
-import Brain from "lucide-react/dist/esm/icons/brain";
 import Check from "lucide-react/dist/esm/icons/check";
 import Copy from "lucide-react/dist/esm/icons/copy";
 import Diff from "lucide-react/dist/esm/icons/diff";
@@ -32,7 +31,6 @@ import {
   type MessageImage,
   normalizeMessageImageSrc,
   type ParsedReasoning,
-  type StatusTone,
   type ToolSummary,
   toolNameFromTitle,
   toolStatusTone,
@@ -68,8 +66,6 @@ type MessageRowProps = MarkdownFileLinkProps & {
 type ReasoningRowProps = MarkdownFileLinkProps & {
   item: Extract<ConversationItem, { kind: "reasoning" }>;
   parsed: ParsedReasoning;
-  isExpanded: boolean;
-  onToggle: (id: string) => void;
 };
 
 type ReviewRowProps = MarkdownFileLinkProps & {
@@ -517,50 +513,39 @@ export const MessageRow = memo(function MessageRow({
   );
 });
 
+/// Inline thinking block — renders the model's chain-of-thought as plain
+/// italicized prose with a `Thinking:` label, sitting in-stream right above
+/// the tool call it narrates. No collapse, no truncation; the goal is the
+/// transcript-style readability of Claude Code's terminal UI.
 export const ReasoningRow = memo(function ReasoningRow({
-  item,
   parsed,
-  isExpanded,
-  onToggle,
   showMessageFilePath,
   workspacePath,
   onOpenFileLink,
   onOpenFileLinkMenu,
   onOpenThreadLink,
 }: ReasoningRowProps) {
-  const { summaryTitle, bodyText, hasBody } = parsed;
-  const reasoningTone: StatusTone = hasBody ? "completed" : "processing";
+  const { bodyText, hasBody } = parsed;
+  if (!hasBody) return null;
+  // Approx token count via 4 chars/token heuristic. Cheap, stable, no extra
+  // dependency. Mirrors kimi-cli's "Thought for Ns · N tokens" summary line.
+  const approxTokens = Math.max(1, Math.round(bodyText.length / 4));
   return (
-    <div className="tool-inline reasoning-inline">
-      <button
-        type="button"
-        className="tool-inline-bar-toggle"
-        onClick={() => onToggle(item.id)}
-        aria-expanded={isExpanded}
-        aria-label="Toggle reasoning details"
-      />
-      <div className="tool-inline-content">
-        <button
-          type="button"
-          className="tool-inline-summary tool-inline-toggle"
-          onClick={() => onToggle(item.id)}
-          aria-expanded={isExpanded}
-        >
-          <Brain className={`tool-inline-icon ${reasoningTone}`} size={14} aria-hidden />
-          <span className="tool-inline-value">{summaryTitle}</span>
-        </button>
-        {hasBody && (
-          <Markdown
-            value={bodyText}
-            className={`reasoning-inline-detail markdown ${isExpanded ? "" : "tool-inline-clamp"}`}
-            showFilePath={showMessageFilePath}
-            workspacePath={workspacePath}
-            onOpenFileLink={onOpenFileLink}
-            onOpenFileLinkMenu={onOpenFileLinkMenu}
-            onOpenThreadLink={onOpenThreadLink}
-          />
-        )}
+    <div className="reasoning-inline">
+      <div className="reasoning-inline-meta">
+        <span className="reasoning-inline-label">Thinking</span>
+        <span className="reasoning-inline-meta-dot">·</span>
+        <span className="reasoning-inline-meta-tokens">~{approxTokens} tokens</span>
       </div>
+      <Markdown
+        value={bodyText}
+        className="reasoning-inline-body markdown"
+        showFilePath={showMessageFilePath}
+        workspacePath={workspacePath}
+        onOpenFileLink={onOpenFileLink}
+        onOpenFileLinkMenu={onOpenFileLinkMenu}
+        onOpenThreadLink={onOpenThreadLink}
+      />
     </div>
   );
 });
