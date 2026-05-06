@@ -104,6 +104,10 @@ pub struct TraceEvent {
     pub turn_index: Option<u32>,
     pub step_index: Option<u32>,
     pub parent_subagent_id: Option<String>,
+    /// True when the source line carried `isMeta: true` (Claude Code metadata).
+    /// Kimi sets this to false. UI default-filters meta events with a toggle.
+    #[serde(default)]
+    pub meta: bool,
 }
 
 // ── Phase 4.1: HeaderStats ──────────────────────────────────────────────
