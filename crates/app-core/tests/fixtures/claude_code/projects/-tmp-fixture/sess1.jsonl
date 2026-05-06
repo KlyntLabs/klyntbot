@@ -1,0 +1,9 @@
+{"type":"user","timestamp":"2026-05-01T00:00:00Z","cwd":"/tmp/fixture","sessionId":"sess1","promptId":"P1","message":{"role":"user","content":[{"type":"text","text":"please refactor"}]}}
+{"type":"assistant","timestamp":"2026-05-01T00:00:01Z","message":{"role":"assistant","model":"claude-opus-4-7","content":[{"type":"thinking","thinking":"plan"},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}}],"usage":{"input_tokens":100,"output_tokens":20,"cache_read_input_tokens":80,"cache_creation_input_tokens":10}}}
+{"type":"user","timestamp":"2026-05-01T00:00:02Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","is_error":false,"content":"a\nb\n"}]}}
+{"type":"assistant","timestamp":"2026-05-01T00:00:03Z","message":{"role":"assistant","model":"claude-opus-4-7","content":[{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"oops"}}],"usage":{"input_tokens":5,"output_tokens":3,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
+{"type":"user","timestamp":"2026-05-01T00:00:04Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","is_error":true,"content":"command not found"}]}}
+{"type":"system","subtype":"api_error","timestamp":"2026-05-01T00:00:05Z","error":{"type":null}}
+{"type":"system","subtype":"compact_boundary","timestamp":"2026-05-01T00:00:10Z","compactMetadata":{"trigger":"manual","preTokens":1000,"postTokens":500,"durationMs":2000}}
+{"type":"user","timestamp":"2026-05-01T00:00:20Z","cwd":"/tmp/fixture","promptId":"P2","message":{"role":"user","content":[{"type":"text","text":"continue"}]}}
+{"type":"ai-title","aiTitle":"Refactor session","sessionId":"sess1"}
