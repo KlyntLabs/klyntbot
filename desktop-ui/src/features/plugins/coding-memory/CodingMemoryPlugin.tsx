@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { listCodingSessions } from "@/api/endpoints/codingMemory";
+import { chipToTracingProvider } from "@/tracing/lib/api";
 import { TracingApp } from "@/tracing";
 import { ProviderChips } from "./ProviderChips";
 import { ReforgeCycleDiff } from "./ReforgeCycleDiff";
@@ -151,7 +152,7 @@ export function CodingMemoryPlugin() {
           </main>
         ) : (
           <main className="cm-plugin__main">
-            <TracingApp />
+            <TracingApp providerId={chipToTracingProvider(provider)} />
           </main>
         )}
       </div>
