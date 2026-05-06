@@ -143,15 +143,17 @@ function getSessionDir(session: SessionInfo): string {
 function SessionDirectoryActions({
   session,
   openInSupported,
+  providerId,
 }: {
   session: SessionInfo;
   openInSupported: boolean;
+  providerId: string;
 }) {
   const [copied, setCopied] = useState(false);
 
   const handleOpenSessionDir = useCallback(async () => {
     try {
-      await openInPath("finder", session.session_id);
+      await openInPath(providerId, "finder", session.session_id);
     } catch (error) {
       console.error("Failed to open session directory:", error);
       window.alert(
@@ -232,7 +234,7 @@ function SessionDirectoryActions({
   );
 }
 
-function SessionStats({ sessionId, refreshKey }: { sessionId: string; refreshKey: number }) {
+function SessionStats({ sessionId, refreshKey, providerId }: { sessionId: string; refreshKey: number; providerId: string }) {
   const [copied, setCopied] = useState(false);
   const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [events, setEvents] = useState<WireEvent[]>([]);
@@ -249,11 +251,11 @@ function SessionStats({ sessionId, refreshKey }: { sessionId: string; refreshKey
 
   useEffect(() => {
     setLoaded(false);
-    getWireEvents(sessionId, refreshKey > 0)
+    getWireEvents(providerId, sessionId, refreshKey > 0)
       .then((res) => setEvents(res.events))
       .catch(() => setEvents([]))
       .finally(() => setLoaded(true));
-    getSubagents(sessionId, refreshKey > 0)
+    getSubagents(providerId, sessionId, refreshKey > 0)
       .then((agents) => setAgentCount(agents.length))
       .catch(() => setAgentCount(0));
   }, [sessionId, refreshKey]);
@@ -327,7 +329,19 @@ function ShortcutRow({ keys, desc }: { keys: string; desc: string }) {
   );
 }
 
-export function TracingApp() {
+export interface TracingAppProps {
+  providerId: string | null; // null when chip is "all" or unsupported
+}
+
+export function TracingApp({ providerId }: TracingAppProps) {
+  if (!providerId) {
+    return (
+      <div className="cm-state cm-state--empty">
+        Select a provider from the chips above to view its tracing data.
+      </div>
+    );
+  }
+
   const { theme, toggleTheme } = useTheme();
   const [sessionId, setSessionId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -388,7 +402,7 @@ export function TracingApp() {
   // Dynamic page title
   const [sessions, setSessions] = useState<Awaited<ReturnType<typeof listSessions>>>([]);
   useEffect(() => {
-    listSessions()
+    listSessions(providerId)
       .then(setSessions)
       .catch(() => {});
   }, []);
@@ -482,12 +496,12 @@ export function TracingApp() {
         {/* Session Stats */}
         {sessionId && (
           <div className="flex items-center border-b">
-            <SessionStats sessionId={sessionId} refreshKey={refreshKey} />
+            <SessionStats sessionId={sessionId} refreshKey={refreshKey} providerId={providerId} />
             {currentSession && (
-              <SessionDirectoryActions session={currentSession} openInSupported={openInSupported} />
+              <SessionDirectoryActions session={currentSession} openInSupported={openInSupported} providerId={providerId} />
             )}
             <a
-              href={getSessionDownloadUrl(sessionId)}
+              href={getSessionDownloadUrl(providerId, sessionId)}
               download
               className="shrink-0 rounded-md p-1.5 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
               title="Download session files as ZIP"
@@ -499,7 +513,7 @@ export function TracingApp() {
               onClick={() => {
                 setRefreshing(true);
                 setRefreshKey((k) => k + 1);
-                listSessions(true)
+                listSessions(providerId, true)
                   .then(setSessions)
                   .catch(() => {});
                 if (refreshTimeoutRef.current) {
@@ -556,6 +570,7 @@ export function TracingApp() {
                 onSelectAgent={(id) => {
                   setAgentScope(id);
                 }}
+                providerId={providerId}
               />
             )}
 
@@ -569,6 +584,7 @@ export function TracingApp() {
                   scrollToToolCallId={wireScrollTarget}
                   onScrollTargetConsumed={() => setWireScrollTarget(null)}
                   agentScope={agentScope}
+                  providerId={providerId}
                 />
               )}
               {activeTab === "context" && (
@@ -579,13 +595,14 @@ export function TracingApp() {
                   scrollToToolCallId={contextScrollTarget}
                   onScrollTargetConsumed={() => setContextScrollTarget(null)}
                   agentScope={agentScope}
+                  providerId={providerId}
                 />
               )}
               {activeTab === "state" && (
-                <StateViewer sessionId={sessionId} refreshKey={refreshKey} />
+                <StateViewer sessionId={sessionId} refreshKey={refreshKey} providerId={providerId} />
               )}
               {activeTab === "dual" && (
-                <DualView sessionId={sessionId} refreshKey={refreshKey} agentScope={agentScope} />
+                <DualView sessionId={sessionId} refreshKey={refreshKey} agentScope={agentScope} providerId={providerId} />
               )}
               {activeTab === "agents" && (
                 <AgentsPanel
@@ -600,6 +617,7 @@ export function TracingApp() {
                     setAgentScope(null);
                     setActiveTab("wire");
                   }}
+                  providerId={providerId}
                 />
               )}
             </div>
@@ -634,9 +652,9 @@ export function TracingApp() {
 
             {/* Explorer content */}
             {explorerView === "sessions" ? (
-              <SessionsExplorer onSelectSession={handleSessionChange} />
+              <SessionsExplorer onSelectSession={handleSessionChange} providerId={providerId} />
             ) : (
-              <StatisticsView />
+              <StatisticsView providerId={providerId} />
             )}
           </div>
         )}

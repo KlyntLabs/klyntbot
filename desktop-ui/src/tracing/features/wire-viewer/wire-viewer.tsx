@@ -29,6 +29,7 @@ interface WireViewerProps {
   onScrollTargetConsumed?: () => void;
   /** When set, show wire events for this sub-agent instead of the main agent */
   agentScope?: string | null;
+  providerId: string;
 }
 
 /** Metadata attached to each event for tool call grouping */
@@ -99,6 +100,7 @@ export function WireViewer({
   scrollToToolCallId,
   onScrollTargetConsumed,
   agentScope,
+  providerId,
 }: WireViewerProps) {
   const [events, setEvents] = useState<WireEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,8 +126,8 @@ export function WireViewer({
       setErrorsOnly(false);
     }
     const fetch = agentScope
-      ? getSubagentWireEvents(sessionId, agentScope, refreshKey > 0)
-      : getWireEvents(sessionId, refreshKey > 0);
+      ? getSubagentWireEvents(providerId, sessionId, agentScope, refreshKey > 0)
+      : getWireEvents(providerId, sessionId, refreshKey > 0);
     fetch
       .then((res) => setEvents(res.events))
       .catch((err) => setError(err.message))

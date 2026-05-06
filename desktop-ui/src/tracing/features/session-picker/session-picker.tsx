@@ -8,6 +8,7 @@ import { listSessions, type SessionInfo } from "@/tracing/lib/api";
 interface SessionPickerProps {
   value: string | null;
   onChange: (sessionId: string | null) => void;
+  providerId: string;
 }
 
 function formatTime(ts: number): string {
@@ -19,7 +20,7 @@ function shortId(id: string): string {
   return id.slice(0, 8);
 }
 
-export function SessionPicker({ value, onChange }: SessionPickerProps) {
+export function SessionPicker({ value, onChange, providerId }: SessionPickerProps) {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -27,7 +28,7 @@ export function SessionPicker({ value, onChange }: SessionPickerProps) {
   const [inputValue, setInputValue] = useState(value ?? "");
 
   useEffect(() => {
-    listSessions()
+    listSessions(providerId)
       .then(setSessions)
       .catch(console.error)
       .finally(() => setLoading(false));

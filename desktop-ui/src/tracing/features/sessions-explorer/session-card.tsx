@@ -71,6 +71,7 @@ interface SessionCardProps {
   compact?: boolean;
   searchQuery?: string;
   onDeleted?: (sessionId: string) => void;
+  providerId: string;
 }
 
 export function SessionCard({
@@ -79,6 +80,7 @@ export function SessionCard({
   compact,
   searchQuery,
   onDeleted,
+  providerId,
 }: SessionCardProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -89,7 +91,7 @@ export function SessionCard({
       : session.title || "Untitled Session";
 
   const sessionPath = `${session.work_dir_hash}/${session.session_id}`;
-  const downloadUrl = getSessionDownloadUrl(sessionPath);
+  const downloadUrl = getSessionDownloadUrl(providerId, sessionPath);
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -151,7 +153,7 @@ export function SessionCard({
           <span className="text-xs truncate flex-1">
             <HighlightText text={displayTitle} query={searchQuery} />
           </span>
-          <LazyStats sessionId={sessionPath} hasWire={session.has_wire} inline />
+          <LazyStats sessionId={sessionPath} hasWire={session.has_wire} inline providerId={providerId} />
           <span className="text-[10px] text-muted-foreground shrink-0 w-14 text-right">
             {formatBytes(session.total_size)}
           </span>
@@ -260,7 +262,7 @@ export function SessionCard({
         </div>
 
         {/* Row 4+: Lazy-loaded stats */}
-        <LazyStats sessionId={sessionPath} hasWire={session.has_wire} />
+        <LazyStats sessionId={sessionPath} hasWire={session.has_wire} providerId={providerId} />
       </button>
       {deleteDialog}
     </>
@@ -271,10 +273,12 @@ function LazyStats({
   sessionId,
   hasWire,
   inline,
+  providerId,
 }: {
   sessionId: string;
   hasWire: boolean;
   inline?: boolean;
+  providerId: string;
 }) {
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -288,7 +292,7 @@ function LazyStats({
       ([entry]) => {
         if (entry.isIntersecting) {
           setLoading(true);
-          getSessionSummary(sessionId)
+          getSessionSummary(providerId, sessionId)
             .then(setSummary)
             .catch((err) => {
               console.warn(`Failed to load summary for ${sessionId}:`, err);

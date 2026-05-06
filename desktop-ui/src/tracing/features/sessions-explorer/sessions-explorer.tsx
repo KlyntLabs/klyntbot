@@ -18,6 +18,7 @@ function formatBytes(bytes: number): string {
 
 interface SessionsExplorerProps {
   onSelectSession: (sessionId: string) => void;
+  providerId: string;
 }
 
 interface ProjectGroupData {
@@ -25,7 +26,7 @@ interface ProjectGroupData {
   sessions: SessionInfo[];
 }
 
-export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
+export function SessionsExplorer({ onSelectSession, providerId }: SessionsExplorerProps) {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -44,7 +45,7 @@ export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
 
   const refreshSessions = async () => {
     try {
-      const updated = await listSessions(true);
+      const updated = await listSessions(providerId, true);
       setSessions(updated);
     } catch (err) {
       console.error(err);
@@ -52,7 +53,7 @@ export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
   };
 
   useEffect(() => {
-    listSessions()
+    listSessions(providerId)
       .then(setSessions)
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -76,7 +77,7 @@ export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
   const handleImport = async (file: File) => {
     setImporting(true);
     try {
-      await importSession(file);
+      await importSession(providerId, file);
       await refreshSessions();
     } catch (err) {
       console.error("Import failed:", err);
@@ -252,6 +253,7 @@ export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
               compact={viewMode === "compact"}
               searchQuery={search}
               onSessionDeleted={handleSessionDeleted}
+              providerId={providerId}
             />
           ))
         ) : viewMode === "compact" ? (
@@ -264,6 +266,7 @@ export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
                 compact
                 searchQuery={search}
                 onDeleted={handleSessionDeleted}
+                providerId={providerId}
               />
             ))}
           </div>
@@ -276,6 +279,7 @@ export function SessionsExplorer({ onSelectSession }: SessionsExplorerProps) {
                 onSelect={() => onSelectSession(`${s.work_dir_hash}/${s.session_id}`)}
                 searchQuery={search}
                 onDeleted={handleSessionDeleted}
+                providerId={providerId}
               />
             ))}
           </div>
