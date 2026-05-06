@@ -314,7 +314,22 @@ async fn call_provider_streaming(
         }
 
         if let Some(r) = chunk.reasoning_content {
-            reasoning.push_str(&r);
+            if !r.is_empty() {
+                reasoning.push_str(&r);
+                // Emit reasoning as a first-class event so the bridge can
+                // surface it to the FE as a `PartDelta::Reasoning` (rendered
+                // inline as italic "Thinking:" prose). Previously we silently
+                // buffered reasoning and only fell back to a synthetic
+                // ContentChunk if `content` was empty — meaning models that
+                // emit BOTH a reasoning channel and visible answer (most
+                // extended-thinking models) had their reasoning dropped.
+                fan_out_event(
+                    Some(event_tx),
+                    domain_bus,
+                    crate::events::AgentEvent::ReasoningChunk { data: r },
+                )
+                .await;
+            }
         }
 
         if let Some(delta) = chunk.tool_call_delta {
@@ -426,8 +441,13 @@ async fn call_provider_streaming(
     // any downstream consumer that scrapes the live event stream (the bench
     // harness, streaming UIs) since no ContentChunk was ever emitted for
     // reasoning chunks during the loop.
+    //
+    // Skip the fallback when tool_calls are present — the model already
+    // expressed itself via the tool call, and duplicating the reasoning
+    // into a synthetic ContentChunk would render the SAME text twice
+    // (once as the italic Thinking block, once as plain answer body).
     let resolved_content = if content.trim().is_empty() {
-        if reasoning.trim().is_empty() {
+        if reasoning.trim().is_empty() || !tool_calls.is_empty() {
             None
         } else {
             fan_out_event(
@@ -630,11 +650,16 @@ impl ExecutionCore {
                         .collect::<Vec<_>>()
                 );
 
-                // Append assistant message so the conversation stays coherent
+                // Append assistant message so the conversation stays coherent.
+                // Carry reasoning_content forward — providers with extended
+                // thinking enabled (Anthropic, Kimi compat, etc.) reject
+                // follow-up requests that omit the original thinking block
+                // alongside replayed tool_use messages.
                 let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
                 messages.push(Message::assistant_with_content_and_tools(
                     response.content.clone(),
                     tool_call_msgs,
+                    response.reasoning_content.clone(),
                 ));
 
                 // Append synthetic "already called" tool results
@@ -663,20 +688,20 @@ impl ExecutionCore {
                 return Ok((CycleOutcome::ToolsExecuted { results }, usage));
             }
 
-            // Register current calls for future duplicate detection
-            if let Some(seen) = seen_tool_calls {
-                if let Some(keys) = current_keys {
-                    for key in keys {
-                        seen.insert(key);
-                    }
-                }
-            }
+            // Note: dedup registration is intentionally deferred until after
+            // execution (see post-`join_all` block below). Registering before
+            // execution made failed calls indistinguishable from successful
+            // ones, so a transient `write` failure poisoned the dedup set and
+            // the model could never retry with identical args. Now we register
+            // only on success — failed calls remain retryable.
 
-            // Append assistant message with tool calls (preserving any text content)
+            // Append assistant message with tool calls (preserving any text
+            // content AND reasoning_content for thinking-enabled providers).
             let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
             messages.push(Message::assistant_with_content_and_tools(
                 response.content.clone(),
                 tool_call_msgs,
+                response.reasoning_content.clone(),
             ));
 
             // Execute all tools in parallel, each with a timeout.
@@ -835,6 +860,20 @@ impl ExecutionCore {
             drop(entity_tx);
 
             let results = join_all(futures).await;
+
+            // Register dedup keys for *successful* tool calls only. A failed
+            // call (e.g. `write` to a non-existent dir) must remain retryable
+            // with identical args. `current_keys` and `results` are both
+            // index-aligned with `response.tool_calls`, so the zip is 1:1.
+            if let Some(seen) = seen_tool_calls {
+                if let Some(keys) = current_keys.as_ref() {
+                    for (key, r) in keys.iter().zip(results.iter()) {
+                        if r.success {
+                            seen.insert(key.clone());
+                        }
+                    }
+                }
+            }
 
             // Emit EntityCreated events for any entities tools created
             while let Ok(card) = entity_rx.try_recv() {

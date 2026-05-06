@@ -10,8 +10,15 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type", rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum AgentEvent {
-    /// A chunk of content streamed from the LLM.
+    /// A chunk of content streamed from the LLM (visible answer text).
     ContentChunk { data: String },
+
+    /// A chunk of reasoning_content streamed from the LLM (extended-thinking
+    /// scratchpad emitted by models like Kimi-Reasoner / DeepSeek-R1 / qwq /
+    /// glm-zero). Distinct from `ContentChunk` so the FE can render reasoning
+    /// inline as a "Thinking:" block while keeping the model's visible answer
+    /// as a separate text part.
+    ReasoningChunk { data: String },
 
     /// Pipeline processing has begun (emitted immediately, before classification).
     PipelineStarted,
