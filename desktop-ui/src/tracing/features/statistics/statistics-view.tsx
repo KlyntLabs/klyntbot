@@ -281,7 +281,7 @@ function ProjectTable({ projects }: { projects: AggregateStats["per_project"] })
 /*  Main StatisticsView                                                */
 /* ------------------------------------------------------------------ */
 
-export function StatisticsView() {
+export function StatisticsView({ providerId }: { providerId: string }) {
   const [stats, setStats] = useState<AggregateStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -290,7 +290,7 @@ export function StatisticsView() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    getAggregateStats()
+    getAggregateStats(providerId)
       .then((res) => {
         if (!cancelled) setStats(res);
       })

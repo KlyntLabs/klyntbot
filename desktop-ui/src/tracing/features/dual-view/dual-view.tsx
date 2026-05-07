@@ -18,6 +18,7 @@ interface DualViewProps {
   sessionId: string;
   refreshKey?: number;
   agentScope?: string | null;
+  providerId: string;
 }
 
 // ── Type badge colors (simplified from wire-event-card) ──
@@ -152,7 +153,7 @@ function getContextToolCallIds(msg: ContextMessage): string[] {
   return ids;
 }
 
-export function DualView({ sessionId, refreshKey = 0, agentScope }: DualViewProps) {
+export function DualView({ sessionId, refreshKey = 0, agentScope, providerId }: DualViewProps) {
   const [wireEvents, setWireEvents] = useState<WireEvent[]>([]);
   const [contextMessages, setContextMessages] = useState<ContextMessage[]>([]);
   const [wireLoading, setWireLoading] = useState(true);
@@ -172,8 +173,8 @@ export function DualView({ sessionId, refreshKey = 0, agentScope }: DualViewProp
     setWireLoading(true);
     setWireError(null);
     const wireFetch = agentScope
-      ? getSubagentWireEvents(sessionId, agentScope, forceRefresh)
-      : getWireEvents(sessionId, forceRefresh);
+      ? getSubagentWireEvents(providerId, sessionId, agentScope, forceRefresh)
+      : getWireEvents(providerId, sessionId, forceRefresh);
     wireFetch
       .then((res) => {
         if (!cancelled) setWireEvents(res.events);
@@ -188,8 +189,8 @@ export function DualView({ sessionId, refreshKey = 0, agentScope }: DualViewProp
     setContextLoading(true);
     setContextError(null);
     const ctxFetch = agentScope
-      ? getSubagentContextMessages(sessionId, agentScope, forceRefresh)
-      : getContextMessages(sessionId, forceRefresh);
+      ? getSubagentContextMessages(providerId, sessionId, agentScope, forceRefresh)
+      : getContextMessages(providerId, sessionId, forceRefresh);
     ctxFetch
       .then((res) => {
         if (!cancelled) setContextMessages(res.messages.filter((m) => !m.role.startsWith("_")));

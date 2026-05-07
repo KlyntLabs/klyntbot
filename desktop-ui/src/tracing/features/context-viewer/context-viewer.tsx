@@ -41,6 +41,7 @@ interface ContextViewerProps {
   onScrollTargetConsumed?: () => void;
   /** When set, show context for this sub-agent instead of the main agent */
   agentScope?: string | null;
+  providerId: string;
 }
 
 /** React context for cross-reference navigation */
@@ -138,6 +139,7 @@ export function ContextViewer({
   scrollToToolCallId,
   onScrollTargetConsumed,
   agentScope,
+  providerId,
 }: ContextViewerProps) {
   const [allMessages, setAllMessages] = useState<ContextMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,8 +156,8 @@ export function ContextViewer({
     setLoading(true);
     setError(null);
     const fetch = agentScope
-      ? getSubagentContextMessages(sessionId, agentScope, refreshKey > 0)
-      : getContextMessages(sessionId, refreshKey > 0);
+      ? getSubagentContextMessages(providerId, sessionId, agentScope, refreshKey > 0)
+      : getContextMessages(providerId, sessionId, refreshKey > 0);
     fetch
       .then((res) => {
         setAllMessages(res.messages);

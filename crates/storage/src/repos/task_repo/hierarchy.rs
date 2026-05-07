@@ -87,7 +87,7 @@ impl TaskRepo {
 
         if let Some(parent_id) = new_parent_id {
             if self
-                .would_create_parent_cycle(&mut tx, id, parent_id)
+                .would_create_parent_cycle(&mut *tx, id, parent_id)
                 .await?
             {
                 tx.rollback().await?;

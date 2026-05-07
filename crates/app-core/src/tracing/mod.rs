@@ -12,7 +12,7 @@ pub mod types;
 pub use provider::TracingProvider;
 pub use registry::TracingRegistry;
 pub use types::{
-    ContextMessage, ErrorByTool, HeaderStats, KimiTodo, ProjectTotals, ProviderInfo, Scope,
-    SemanticCategory, SessionDetail, SessionState, SessionSummary, StatsBundle, SubagentSummary,
-    SubagentTypeCount, TokenSeriesPoint, ToolUsage, TraceEvent,
+    ContextMessage, ErrorByTool, HeaderChip, HeaderStats, KimiTodo, ProjectTotals, ProviderInfo,
+    Scope, SemanticCategory, SessionDetail, SessionState, SessionSummary, SessionTab, StatsBundle,
+    SubagentSummary, SubagentTypeCount, TokenSeriesPoint, ToolUsage, TraceEvent,
 };

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
+//
+// Kimi-only tracing app. Claude Code has a separate, independent app at
+// `@/tracing/providers/claude-code/ClaudeCodeTracingApp`.
 
 import {
   ArrowLeft,
@@ -27,114 +30,26 @@ import { AgentScopeBar } from "@/tracing/features/agents-panel/agent-scope-bar";
 import { AgentsPanel } from "@/tracing/features/agents-panel/agents-panel";
 import { ContextViewer } from "@/tracing/features/context-viewer/context-viewer";
 import { DualView } from "@/tracing/features/dual-view/dual-view";
+import { HeaderChips } from "@/tracing/features/session-detail/header-chips";
 import { SessionsExplorer } from "@/tracing/features/sessions-explorer/sessions-explorer";
 import { StateViewer } from "@/tracing/features/state-viewer/state-viewer";
 import { StatisticsView } from "@/tracing/features/statistics/statistics-view";
-import { isErrorEvent } from "@/tracing/features/wire-viewer/wire-event-card";
 import { WireViewer } from "@/tracing/features/wire-viewer/wire-viewer";
 import { useTheme } from "@/tracing/hooks/use-theme";
 import {
+  fetchHeaderLayout,
   getSessionDownloadUrl,
-  getSubagents,
+  getSessionSummary,
   getVisCapabilities,
-  getWireEvents,
   listSessions,
   openInPath,
+  type HeaderLayoutResponse,
   type SessionInfo,
-  type WireEvent,
+  type SessionSummary,
 } from "@/tracing/lib/api";
 
+const PROVIDER_ID = "kimi";
 type Tab = "wire" | "context" | "state" | "dual" | "agents";
-
-interface SessionStatsData {
-  turns: number;
-  steps: number;
-  toolCalls: number;
-  errors: number;
-  compactions: number;
-  durationSec: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheRate: number;
-}
-
-function computeStats(events: WireEvent[]): SessionStatsData {
-  let turns = 0;
-  let steps = 0;
-  let toolCalls = 0;
-  let errors = 0;
-  let compactions = 0;
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let totalCacheRead = 0;
-  let totalInputOther = 0;
-  let totalCacheCreation = 0;
-
-  for (const e of events) {
-    if (e.type === "TurnBegin") turns++;
-    if (e.type === "StepBegin") steps++;
-    if (e.type === "ToolCall") toolCalls++;
-    if (e.type === "CompactionBegin") compactions++;
-    if (isErrorEvent(e)) errors++;
-    if (e.type === "StatusUpdate") {
-      const tu = e.payload.token_usage as Record<string, number> | undefined;
-      if (tu) {
-        inputTokens +=
-          (tu.input_other ?? 0) + (tu.input_cache_read ?? 0) + (tu.input_cache_creation ?? 0);
-        outputTokens += tu.output ?? 0;
-        totalCacheRead += tu.input_cache_read ?? 0;
-        totalInputOther += tu.input_other ?? 0;
-        totalCacheCreation += tu.input_cache_creation ?? 0;
-      }
-    }
-    // Count tokens from SubagentEvent-wrapped StatusUpdate
-    if (e.type === "SubagentEvent") {
-      const inner = e.payload.event as Record<string, unknown> | undefined;
-      if (inner?.type === "StatusUpdate") {
-        const innerPayload = inner.payload as Record<string, unknown> | undefined;
-        const tu = innerPayload?.token_usage as Record<string, number> | undefined;
-        if (tu) {
-          inputTokens +=
-            (tu.input_other ?? 0) + (tu.input_cache_read ?? 0) + (tu.input_cache_creation ?? 0);
-          outputTokens += tu.output ?? 0;
-          totalCacheRead += tu.input_cache_read ?? 0;
-          totalInputOther += tu.input_other ?? 0;
-          totalCacheCreation += tu.input_cache_creation ?? 0;
-        }
-      }
-    }
-  }
-
-  const durationSec =
-    events.length >= 2 ? events[events.length - 1].timestamp - events[0].timestamp : 0;
-
-  const totalInput = totalCacheRead + totalInputOther + totalCacheCreation;
-  const cacheRate = totalInput > 0 ? (totalCacheRead / totalInput) * 100 : 0;
-
-  return {
-    turns,
-    steps,
-    toolCalls,
-    errors,
-    compactions,
-    durationSec,
-    inputTokens,
-    outputTokens,
-    cacheRate,
-  };
-}
-
-function formatDuration(sec: number): string {
-  if (sec < 1) return `${(sec * 1000).toFixed(0)}ms`;
-  if (sec < 60) return `${sec.toFixed(1)}s`;
-  return `${(sec / 60).toFixed(1)}min`;
-}
-
-function formatTokens(n: number): string {
-  if (n === 0) return "0";
-  if (n < 1000) return `${n}`;
-  return `${(n / 1000).toFixed(1)}k`;
-}
 
 function getSessionDir(session: SessionInfo): string {
   return session.session_dir;
@@ -151,7 +66,7 @@ function SessionDirectoryActions({
 
   const handleOpenSessionDir = useCallback(async () => {
     try {
-      await openInPath("finder", session.session_id);
+      await openInPath(PROVIDER_ID, "finder", session.session_id);
     } catch (error) {
       console.error("Failed to open session directory:", error);
       window.alert(
@@ -232,10 +147,19 @@ function SessionDirectoryActions({
   );
 }
 
-function SessionStats({ sessionId, refreshKey }: { sessionId: string; refreshKey: number }) {
+function SessionStats({
+  sessionId,
+  summary,
+  layout,
+  modelName,
+}: {
+  sessionId: string;
+  summary: SessionSummary | null;
+  layout: HeaderLayoutResponse | null;
+  modelName?: string;
+}) {
   const [copied, setCopied] = useState(false);
   const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [events, setEvents] = useState<WireEvent[]>([]);
 
   useEffect(() => {
     return () => {
@@ -244,33 +168,6 @@ function SessionStats({ sessionId, refreshKey }: { sessionId: string; refreshKey
       }
     };
   }, []);
-  const [loaded, setLoaded] = useState(false);
-  const [agentCount, setAgentCount] = useState(0);
-
-  useEffect(() => {
-    setLoaded(false);
-    getWireEvents(sessionId, refreshKey > 0)
-      .then((res) => setEvents(res.events))
-      .catch(() => setEvents([]))
-      .finally(() => setLoaded(true));
-    getSubagents(sessionId, refreshKey > 0)
-      .then((agents) => setAgentCount(agents.length))
-      .catch(() => setAgentCount(0));
-  }, [sessionId, refreshKey]);
-
-  const stats = useMemo(() => computeStats(events), [events]);
-
-  if (!loaded || events.length === 0) return null;
-
-  const parts: string[] = [
-    `${stats.turns} turn${stats.turns !== 1 ? "s" : ""}`,
-    `${stats.steps} step${stats.steps !== 1 ? "s" : ""}`,
-    `${stats.toolCalls} tool call${stats.toolCalls !== 1 ? "s" : ""}`,
-  ];
-  if (stats.errors > 0) parts.push(`${stats.errors} error${stats.errors !== 1 ? "s" : ""}`);
-  if (stats.compactions > 0)
-    parts.push(`${stats.compactions} compaction${stats.compactions !== 1 ? "s" : ""}`);
-  if (agentCount > 0) parts.push(`${agentCount} agent${agentCount !== 1 ? "s" : ""}`);
 
   return (
     <div className="min-w-0 flex flex-1 items-center gap-2 overflow-x-auto px-4 py-1.5 text-xs text-muted-foreground">
@@ -294,22 +191,10 @@ function SessionStats({ sessionId, refreshKey }: { sessionId: string; refreshKey
         </TooltipTrigger>
         <TooltipContent>{copied ? "Copied!" : "Click to copy"}</TooltipContent>
       </Tooltip>
-      <span className="text-border">|</span>
-      <span className="shrink-0">{parts.join(" · ")}</span>
-      <span className="text-border">|</span>
-      <span className="shrink-0">{formatDuration(stats.durationSec)}</span>
-      {(stats.inputTokens > 0 || stats.outputTokens > 0) && (
+      {summary && layout && (
         <>
           <span className="text-border">|</span>
-          <span className="shrink-0">
-            {formatTokens(stats.inputTokens)} in / {formatTokens(stats.outputTokens)} out
-          </span>
-          {stats.cacheRate > 0 && (
-            <>
-              <span className="text-border">|</span>
-              <span className="shrink-0">{Math.round(stats.cacheRate)}% cache</span>
-            </>
-          )}
+          <HeaderChips chips={layout.chips} stats={summary} model={modelName} />
         </>
       )}
     </div>
@@ -327,7 +212,7 @@ function ShortcutRow({ keys, desc }: { keys: string; desc: string }) {
   );
 }
 
-export function TracingApp() {
+export function KimiTracingApp() {
   const { theme, toggleTheme } = useTheme();
   const [sessionId, setSessionId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -340,6 +225,8 @@ export function TracingApp() {
   const [refreshing, setRefreshing] = useState(false);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openInSupported, setOpenInSupported] = useState(false);
+  const [headerLayout, setHeaderLayout] = useState<HeaderLayoutResponse | null>(null);
+  const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null);
 
   useEffect(() => {
     return () => {
@@ -385,10 +272,26 @@ export function TracingApp() {
     return () => window.removeEventListener("popstate", handler);
   }, []);
 
+  useEffect(() => {
+    fetchHeaderLayout(PROVIDER_ID)
+      .then(setHeaderLayout)
+      .catch(() => setHeaderLayout(null));
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setSessionSummary(null);
+      return;
+    }
+    getSessionSummary(PROVIDER_ID, sessionId, refreshKey > 0)
+      .then(setSessionSummary)
+      .catch(() => setSessionSummary(null));
+  }, [sessionId, refreshKey]);
+
   // Dynamic page title
   const [sessions, setSessions] = useState<Awaited<ReturnType<typeof listSessions>>>([]);
   useEffect(() => {
-    listSessions()
+    listSessions(PROVIDER_ID)
       .then(setSessions)
       .catch(() => {});
   }, []);
@@ -407,20 +310,20 @@ export function TracingApp() {
   useEffect(() => {
     const previousTitle = document.title;
     if (!sessionId) {
-      document.title = "Agent Tracing";
+      document.title = "Kimi Tracing";
       return () => {
         document.title = previousTitle;
       };
     }
     const rawId = sessionId.split("/").pop() ?? sessionId;
     const label = currentSession?.metadata?.title || currentSession?.title || rawId.slice(0, 8);
-    document.title = `${label} — Agent Tracing`;
+    document.title = `${label} — Kimi Tracing`;
     return () => {
       document.title = previousTitle;
     };
   }, [currentSession, sessionId]);
 
-  // Global keyboard shortcuts: 1/2/3 to switch tabs
+  // Global keyboard shortcuts: 1-5 to switch tabs
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Don't intercept when focused on input elements
@@ -467,7 +370,7 @@ export function TracingApp() {
             title={sessionId ? "Back to Sessions Explorer" : undefined}
           >
             {sessionId && <ArrowLeft size={16} className="text-muted-foreground" />}
-            Agent Tracing
+            Kimi Tracing
           </h1>
           <button
             type="button"
@@ -482,12 +385,16 @@ export function TracingApp() {
         {/* Session Stats */}
         {sessionId && (
           <div className="flex items-center border-b">
-            <SessionStats sessionId={sessionId} refreshKey={refreshKey} />
+            <SessionStats
+              sessionId={sessionId}
+              summary={sessionSummary}
+              layout={headerLayout}
+            />
             {currentSession && (
               <SessionDirectoryActions session={currentSession} openInSupported={openInSupported} />
             )}
             <a
-              href={getSessionDownloadUrl(sessionId)}
+              href={getSessionDownloadUrl(PROVIDER_ID, sessionId)}
               download
               className="shrink-0 rounded-md p-1.5 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
               title="Download session files as ZIP"
@@ -499,7 +406,7 @@ export function TracingApp() {
               onClick={() => {
                 setRefreshing(true);
                 setRefreshKey((k) => k + 1);
-                listSessions(true)
+                listSessions(PROVIDER_ID, true)
                   .then(setSessions)
                   .catch(() => {});
                 if (refreshTimeoutRef.current) {
@@ -556,6 +463,7 @@ export function TracingApp() {
                 onSelectAgent={(id) => {
                   setAgentScope(id);
                 }}
+                providerId={PROVIDER_ID}
               />
             )}
 
@@ -569,6 +477,7 @@ export function TracingApp() {
                   scrollToToolCallId={wireScrollTarget}
                   onScrollTargetConsumed={() => setWireScrollTarget(null)}
                   agentScope={agentScope}
+                  providerId={PROVIDER_ID}
                 />
               )}
               {activeTab === "context" && (
@@ -579,13 +488,14 @@ export function TracingApp() {
                   scrollToToolCallId={contextScrollTarget}
                   onScrollTargetConsumed={() => setContextScrollTarget(null)}
                   agentScope={agentScope}
+                  providerId={PROVIDER_ID}
                 />
               )}
               {activeTab === "state" && (
-                <StateViewer sessionId={sessionId} refreshKey={refreshKey} />
+                <StateViewer sessionId={sessionId} refreshKey={refreshKey} providerId={PROVIDER_ID} />
               )}
               {activeTab === "dual" && (
-                <DualView sessionId={sessionId} refreshKey={refreshKey} agentScope={agentScope} />
+                <DualView sessionId={sessionId} refreshKey={refreshKey} agentScope={agentScope} providerId={PROVIDER_ID} />
               )}
               {activeTab === "agents" && (
                 <AgentsPanel
@@ -600,6 +510,7 @@ export function TracingApp() {
                     setAgentScope(null);
                     setActiveTab("wire");
                   }}
+                  providerId={PROVIDER_ID}
                 />
               )}
             </div>
@@ -634,9 +545,9 @@ export function TracingApp() {
 
             {/* Explorer content */}
             {explorerView === "sessions" ? (
-              <SessionsExplorer onSelectSession={handleSessionChange} />
+              <SessionsExplorer onSelectSession={handleSessionChange} providerId={PROVIDER_ID} />
             ) : (
-              <StatisticsView />
+              <StatisticsView providerId={PROVIDER_ID} />
             )}
           </div>
         )}

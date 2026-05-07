@@ -664,10 +664,21 @@ export default function MainApp() {
   // in here. Without this, `isProcessing` for a coding thread never flips back
   // to false and the composer stays in "queue" mode forever.
   const codingThreadStatus = useCodingThreadStatus();
-  const threadStatusById = useMemo(
-    () => ({ ...assistantThreadStatusById, ...codingThreadStatus }),
-    [assistantThreadStatusById, codingThreadStatus],
-  );
+  const threadStatusById = useMemo(() => {
+    const merged: typeof assistantThreadStatusById = { ...assistantThreadStatusById };
+    for (const [threadId, status] of Object.entries(codingThreadStatus)) {
+      // Coding bridge only tracks isProcessing; pad to the full
+      // ThreadActivityStatus shape consumers expect.
+      merged[threadId] = {
+        isProcessing: status.isProcessing,
+        hasUnread: false,
+        isReviewing: false,
+        processingStartedAt: null,
+        lastDurationMs: null,
+      };
+    }
+    return merged;
+  }, [assistantThreadStatusById, codingThreadStatus]);
   const { connectionState: remoteThreadConnectionState } = useRemoteThreadLiveConnection({
     backendMode: appSettings.backendMode,
     activeWorkspace,

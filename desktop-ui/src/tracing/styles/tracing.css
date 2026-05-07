@@ -46,3 +46,538 @@
    * breaks the flex-shrink chain for scrolling children. */
   min-height: 0;
 }
+
+/* ── Claude Code wire viewer cards ─────────────────────────────────────── */
+
+.cc-wire-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.cc-card {
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  padding: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.cc-card--thinking {
+  border-left: 4px solid #f59e0b;
+}
+
+.cc-card--assistant-text {
+  border-left: 4px solid #10b981;
+}
+
+.cc-card--user {
+  border-left: 4px solid #3b82f6;
+}
+
+.cc-card--tool-call {
+  border-left: 4px solid #8b5cf6;
+}
+
+.cc-card--tool-result {
+  border-left: 4px solid #6b7280;
+}
+
+.cc-card--error {
+  border-left: 4px solid #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.cc-card--compaction {
+  border-left: 4px solid #f97316;
+  background: rgba(249, 115, 22, 0.05);
+}
+
+.cc-card--api-error {
+  border-left: 4px solid #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.cc-card--status {
+  border-left: 4px solid #06b6d4;
+}
+
+.cc-card--pr-link {
+  border-left: 4px solid #ec4899;
+}
+
+.cc-card--other {
+  opacity: 0.7;
+}
+
+.cc-card__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+}
+
+.cc-card__toggle:hover {
+  opacity: 0.8;
+}
+
+.cc-card__body {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  overflow: auto;
+  max-height: 40vh;
+  background: var(--color-muted);
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.cc-card__type {
+  font-size: 0.75rem;
+  font-family: ui-monospace, monospace;
+  color: var(--color-muted-foreground);
+  text-transform: uppercase;
+}
+
+.cc-card__payload {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  overflow: auto;
+  max-height: 30vh;
+}
+
+.cc-card__tool-name {
+  font-weight: 600;
+  color: #7c3aed;
+}
+
+.cc-card__tool-preview {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cc-card__tool-id {
+  font-size: 0.75rem;
+  font-family: ui-monospace, monospace;
+  color: var(--color-muted-foreground);
+}
+
+.cc-card__chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.25rem;
+  background: var(--color-secondary);
+  padding: 0.125rem 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.cc-card__chip-list {
+  margin-top: 0.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  list-style: none;
+  padding: 0;
+}
+
+.cc-card__compact-trigger {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #c2410c;
+}
+
+.cc-turn-divider {
+  margin: 0.75rem 0;
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  font-weight: 500;
+  padding: 0.25rem 0;
+}
+
+.cc-header-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cc-header-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  background: var(--color-secondary);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.cc-agents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  list-style: none;
+}
+
+.cc-agents-list__item {
+  border-radius: 0.375rem;
+  border: 1px solid var(--color-border);
+  padding: 0.75rem;
+}
+
+.cc-agents-list__item:hover {
+  background: var(--color-accent);
+  cursor: pointer;
+}
+
+.cc-agents-list__item button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.cc-agents-list__type {
+  font-size: 0.75rem;
+  font-family: ui-monospace, monospace;
+  color: var(--color-muted-foreground);
+}
+
+.cc-agents-list__desc {
+  font-size: 0.875rem;
+}
+
+/* ── Claude Code standalone app shell ──────────────────────────────────── */
+
+.cc-app {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.cc-app__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.75rem 1rem;
+}
+
+.cc-app__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0;
+}
+
+.cc-app__title--clickable {
+  cursor: pointer;
+}
+
+.cc-app__title--clickable:hover {
+  color: var(--color-primary);
+}
+
+.cc-app__theme-toggle {
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.cc-app__theme-toggle:hover {
+  background: var(--color-accent);
+}
+
+.cc-app__session-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.375rem 1rem;
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+}
+
+.cc-app__id-pill {
+  font-family: ui-monospace, monospace;
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.cc-app__id-pill:hover {
+  color: var(--color-foreground);
+}
+
+.cc-app__chips {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  margin-left: 0.5rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--color-border);
+}
+
+.cc-app__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  background: var(--color-secondary);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.cc-app__chip-label {
+  color: var(--color-muted-foreground);
+}
+
+.cc-app__session-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.cc-app__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: transparent;
+  border: none;
+  color: var(--color-muted-foreground);
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.cc-app__icon-btn:hover {
+  background: var(--color-accent);
+  color: var(--color-foreground);
+}
+
+.cc-spin {
+  animation: cc-spin 1s linear infinite;
+}
+
+@keyframes cc-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cc-app__tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 1rem;
+}
+
+.cc-app__tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: transparent;
+  border: none;
+  color: var(--color-muted-foreground);
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cc-app__tab:hover {
+  color: var(--color-foreground);
+}
+
+.cc-app__tab--active {
+  color: var(--color-foreground);
+}
+
+.cc-app__tab--active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-primary);
+}
+
+.cc-app__tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.125rem;
+  padding: 0 0.375rem;
+  border-radius: 9999px;
+  background: var(--color-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.cc-app__content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* ── Sessions list ───────────────────────────────────────────────────── */
+
+.cc-app__list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.75rem 1rem;
+}
+
+.cc-app__group + .cc-app__group {
+  margin-top: 1.25rem;
+}
+
+.cc-app__group-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  margin-bottom: 0.25rem;
+}
+
+.cc-app__group-name {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  word-break: break-all;
+}
+
+.cc-app__group-count {
+  font-size: 0.6875rem;
+  color: var(--color-muted-foreground);
+  opacity: 0.7;
+}
+
+.cc-app__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.cc-app__rows li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.cc-app__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cc-app__row:hover {
+  background: var(--color-accent);
+}
+
+.cc-app__row-id {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  flex-shrink: 0;
+  width: 5rem;
+}
+
+.cc-app__row-title {
+  flex: 1;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cc-app__row-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  flex-shrink: 0;
+}
+
+.cc-app__row-errors {
+  color: #ef4444;
+}
+
+.cc-app__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--color-muted-foreground);
+  font-size: 0.875rem;
+  padding: 3rem 1rem;
+}
+
+.cc-app__empty-hint {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.cc-app__empty-hint code {
+  background: var(--color-muted);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-family: ui-monospace, monospace;
+}

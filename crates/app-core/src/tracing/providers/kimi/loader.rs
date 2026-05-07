@@ -134,6 +134,7 @@ pub async fn load_session_events(
                         turn_index,
                         step_index,
                         parent_subagent_id: parent_subagent_id.clone(),
+                        meta: false,
                     });
                     if events.len() > MAX_EVENTS_DEFAULT {
                         events.pop_front();

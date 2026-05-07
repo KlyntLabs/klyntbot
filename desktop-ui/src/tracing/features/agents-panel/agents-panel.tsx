@@ -26,6 +26,7 @@ interface AgentsPanelProps {
   selectedAgentId: string | null;
   /** Called when user wants to go back to main agent view */
   onSelectMain: () => void;
+  providerId: string;
 }
 
 const STATUS_CONFIG: Record<string, { icon: typeof Bot; color: string; label: string }> = {
@@ -79,6 +80,7 @@ export function AgentsPanel({
   onSelectAgent,
   selectedAgentId,
   onSelectMain,
+  providerId,
 }: AgentsPanelProps) {
   const [agents, setAgents] = useState<SubagentInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,7 +90,7 @@ export function AgentsPanel({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    getSubagents(sessionId, refreshKey > 0)
+    getSubagents(providerId, sessionId, refreshKey > 0)
       .then((res) => {
         if (!cancelled) setAgents(res);
       })

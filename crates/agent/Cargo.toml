@@ -54,7 +54,7 @@ dashmap = { workspace = true }
 [dev-dependencies]
 tempfile.workspace = true
 criterion = { version = "0.5", features = ["async_tokio"] }
-proptest = { workspace = true }
+proptest.workspace = true
 
 [[bench]]
 name = "chat_send_to_first_token"

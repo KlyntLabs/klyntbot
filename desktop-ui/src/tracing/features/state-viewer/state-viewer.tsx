@@ -8,6 +8,7 @@ import { getSessionState } from "@/tracing/lib/api";
 interface StateViewerProps {
   sessionId: string;
   refreshKey?: number;
+  providerId: string;
 }
 
 function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
@@ -95,7 +96,7 @@ function JsonValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
   return <span>{String(value)}</span>;
 }
 
-export function StateViewer({ sessionId, refreshKey = 0 }: StateViewerProps) {
+export function StateViewer({ sessionId, refreshKey = 0, providerId }: StateViewerProps) {
   const [state, setState] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +104,7 @@ export function StateViewer({ sessionId, refreshKey = 0 }: StateViewerProps) {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    getSessionState(sessionId, refreshKey > 0)
+    getSessionState(providerId, sessionId, refreshKey > 0)
       .then(setState)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));

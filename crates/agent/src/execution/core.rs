@@ -665,7 +665,7 @@ impl ExecutionCore {
                 // follow-up requests that omit the original thinking block
                 // alongside replayed tool_use messages.
                 let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
-                messages.push(Message::assistant_with_content_and_tools(
+                messages.push(Message::assistant_with_content_tools_and_reasoning(
                     response.content.clone(),
                     tool_call_msgs,
                     response.reasoning_content.clone(),
@@ -707,7 +707,7 @@ impl ExecutionCore {
             // Append assistant message with tool calls (preserving any text
             // content AND reasoning_content for thinking-enabled providers).
             let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
-            messages.push(Message::assistant_with_content_and_tools(
+            messages.push(Message::assistant_with_content_tools_and_reasoning(
                 response.content.clone(),
                 tool_call_msgs,
                 response.reasoning_content.clone(),

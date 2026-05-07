@@ -5,15 +5,42 @@ use common::Result;
 use std::path::{Path, PathBuf};
 
 use super::types::{
-    ContextMessage, Scope, SessionDetail, SessionState, SessionSummary, StatsBundle,
-    SubagentSummary,
+    ContextMessage, HeaderChip, Scope, SessionDetail, SessionState, SessionSummary, SessionTab,
+    StatsBundle, SubagentSummary,
 };
 
-/// Per-CLI agent-tracing provider. v1 implements only Kimi.
 #[async_trait]
 pub trait TracingProvider: Send + Sync {
     fn id(&self) -> &'static str;
     fn display_name(&self) -> &'static str;
+
+    /// Tabs this provider supports in the session detail page.
+    /// Default returns Kimi's five-tab layout for back-compat.
+    fn supported_tabs(&self) -> &'static [SessionTab] {
+        &[
+            SessionTab::Wire,
+            SessionTab::Context,
+            SessionTab::State,
+            SessionTab::Dual,
+            SessionTab::Agents,
+        ]
+    }
+
+    /// Header chip set for the session detail page, in render order.
+    /// Default returns Kimi's chip set.
+    fn header_layout(&self) -> &'static [HeaderChip] {
+        &[
+            HeaderChip::Turns,
+            HeaderChip::Steps,
+            HeaderChip::ToolCalls,
+            HeaderChip::Errors,
+            HeaderChip::Compactions,
+            HeaderChip::Agents,
+            HeaderChip::Duration,
+            HeaderChip::Tokens,
+            HeaderChip::CacheHitPct,
+        ]
+    }
 
     async fn list_sessions(&self) -> Result<Vec<SessionSummary>>;
     async fn load_session(&self, session_id: &str, scope: Scope) -> Result<SessionDetail>;
@@ -23,18 +50,12 @@ pub trait TracingProvider: Send + Sync {
     async fn import_from_file(&self, path: &Path) -> Result<String>;
     async fn open_dir(&self, session_id: &str) -> Result<PathBuf>;
     async fn stats(&self) -> Result<StatsBundle>;
-
-    /// Per-session aggregate summary (deeper than `list_sessions` row).
     async fn session_summary(&self, session_id: &str) -> Result<SessionSummary>;
-
-    /// Wire events for a single subagent within a session.
     async fn load_subagent_session(
         &self,
         session_id: &str,
         agent_id: &str,
     ) -> Result<SessionDetail>;
-
-    /// Context messages for a single subagent within a session.
     async fn load_subagent_context(
         &self,
         session_id: &str,

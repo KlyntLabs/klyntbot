@@ -11,6 +11,7 @@ interface AgentScopeBarProps {
   /** null = main agent, string = specific sub-agent */
   selectedAgentId: string | null;
   onSelectAgent: (agentId: string | null) => void;
+  providerId: string;
 }
 
 const TYPE_DOTS: Record<string, string> = {
@@ -25,12 +26,13 @@ export function AgentScopeBar({
   refreshKey = 0,
   selectedAgentId,
   onSelectAgent,
+  providerId,
 }: AgentScopeBarProps) {
   const [agents, setAgents] = useState<SubagentInfo[]>([]);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    getSubagents(sessionId, refreshKey > 0)
+    getSubagents(providerId, sessionId, refreshKey > 0)
       .then(setAgents)
       .catch(() => setAgents([]));
   }, [sessionId, refreshKey]);

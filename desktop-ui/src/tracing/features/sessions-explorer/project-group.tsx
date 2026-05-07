@@ -19,6 +19,7 @@ interface ProjectGroupProps {
   compact?: boolean;
   searchQuery?: string;
   onSessionDeleted?: (sessionId: string) => void;
+  providerId: string;
 }
 
 export function ProjectGroup({
@@ -28,6 +29,7 @@ export function ProjectGroup({
   compact,
   searchQuery,
   onSessionDeleted,
+  providerId,
 }: ProjectGroupProps) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -65,6 +67,7 @@ export function ProjectGroup({
               compact={compact}
               searchQuery={searchQuery}
               onDeleted={onSessionDeleted}
+              providerId={providerId}
             />
           ))}
         </div>
