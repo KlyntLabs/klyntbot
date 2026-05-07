@@ -3727,9 +3727,9 @@ async tracingListSubagents(providerId: string, sessionId: string) : Promise<Resu
     else return { status: "error", error: e  as any };
 }
 },
-async tracingImport(providerId: string, filePath: string) : Promise<Result<string, ApiError>> {
+async tracingImport(providerId: string, bytes: number[], fileName: string) : Promise<Result<ImportResponse, ApiError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("tracing_import", { providerId, filePath }) };
+    return { status: "ok", data: await TAURI_INVOKE("tracing_import", { providerId, bytes, fileName }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -4891,6 +4891,7 @@ export type HelpEntry = { command: string; description: string; category: string
 export type HooksTomlSnapshot = { path: string; exists: boolean; content: string }
 export type HourlyBreakdownResponse = { hour: number; productiveSecs: number; neutralSecs: number; distractingSecs: number; idleSecs: number; totalSecs: number; productiveRatio: number }
 export type HybridSearchResponse = { exact: NoteResponse[]; related: NoteResponse[] }
+export type ImportResponse = { session_id: string; work_dir_hash: string }
 export type InboxCreateParams = { content: string }
 export type InboxItemResponse = { id: string; content: string; status: string; createdAt: string }
 export type InferenceConfigUpdate = { assignmentThreshold: number | null; mergeThreshold: number | null; semanticWeight: number | null; temporalWeight: number | null; resourceWeight: number | null; inferenceIntervalMins: number | null; maxDormancyDays: number | null; maxActiveContexts: number | null }

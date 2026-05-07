@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { listCodingSessions } from "@/api/endpoints/codingMemory";
-import { chipToTracingProvider } from "@/tracing/lib/api";
-import { TracingApp } from "@/tracing";
+import { KimiTracingApp } from "@/tracing";
+import { ClaudeCodeTracingApp } from "@/tracing/providers/claude-code/ClaudeCodeTracingApp";
 import { ProviderChips } from "./ProviderChips";
 import { ReforgeCycleDiff } from "./ReforgeCycleDiff";
 import { SessionList } from "./SessionList";
@@ -152,7 +152,15 @@ export function CodingMemoryPlugin() {
           </main>
         ) : (
           <main className="cm-plugin__main">
-            <TracingApp providerId={chipToTracingProvider(provider)} />
+            {provider === "claudeCode" ? (
+              <ClaudeCodeTracingApp />
+            ) : provider === "kimiCli" ? (
+              <KimiTracingApp />
+            ) : (
+              <div className="cm-state cm-state--empty">
+                Tracing is available for Claude Code and Kimi. Select one of those chips above.
+              </div>
+            )}
           </main>
         )}
       </div>

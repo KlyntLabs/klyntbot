@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Derived from upstream Apache-2.0 source. See THIRD_PARTY_NOTICES.md.
+//
+// Kimi-only tracing app. Claude Code has a separate, independent app at
+// `@/tracing/providers/claude-code/ClaudeCodeTracingApp`.
 
 import {
   ArrowLeft,
@@ -27,32 +30,25 @@ import { AgentScopeBar } from "@/tracing/features/agents-panel/agent-scope-bar";
 import { AgentsPanel } from "@/tracing/features/agents-panel/agents-panel";
 import { ContextViewer } from "@/tracing/features/context-viewer/context-viewer";
 import { DualView } from "@/tracing/features/dual-view/dual-view";
+import { HeaderChips } from "@/tracing/features/session-detail/header-chips";
 import { SessionsExplorer } from "@/tracing/features/sessions-explorer/sessions-explorer";
 import { StateViewer } from "@/tracing/features/state-viewer/state-viewer";
 import { StatisticsView } from "@/tracing/features/statistics/statistics-view";
-
-import { ClaudeCodeAgentsPanel } from "@/tracing/features/providers/claude-code/agents-panel/claude-code-agents-panel";
-import { ClaudeCodeWireViewer } from "@/tracing/features/providers/claude-code/wire-viewer/claude-code-wire-viewer";
-import { HeaderChips } from "@/tracing/features/session-detail/header-chips";
 import { WireViewer } from "@/tracing/features/wire-viewer/wire-viewer";
 import { useTheme } from "@/tracing/hooks/use-theme";
 import {
   fetchHeaderLayout,
-  fetchSupportedTabs,
   getSessionDownloadUrl,
   getSessionSummary,
-  getSubagents,
   getVisCapabilities,
-  getWireEvents,
   listSessions,
   openInPath,
   type HeaderLayoutResponse,
   type SessionInfo,
   type SessionSummary,
-  type SubagentInfo,
-  type WireEvent,
 } from "@/tracing/lib/api";
 
+const PROVIDER_ID = "kimi";
 type Tab = "wire" | "context" | "state" | "dual" | "agents";
 
 function getSessionDir(session: SessionInfo): string {
@@ -62,17 +58,15 @@ function getSessionDir(session: SessionInfo): string {
 function SessionDirectoryActions({
   session,
   openInSupported,
-  providerId,
 }: {
   session: SessionInfo;
   openInSupported: boolean;
-  providerId: string;
 }) {
   const [copied, setCopied] = useState(false);
 
   const handleOpenSessionDir = useCallback(async () => {
     try {
-      await openInPath(providerId, "finder", session.session_id);
+      await openInPath(PROVIDER_ID, "finder", session.session_id);
     } catch (error) {
       console.error("Failed to open session directory:", error);
       window.alert(
@@ -218,11 +212,7 @@ function ShortcutRow({ keys, desc }: { keys: string; desc: string }) {
   );
 }
 
-export interface TracingAppProps {
-  providerId: string | null; // null when chip is "all" or unsupported
-}
-
-export function TracingApp({ providerId }: TracingAppProps) {
+export function KimiTracingApp() {
   const { theme, toggleTheme } = useTheme();
   const [sessionId, setSessionId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -235,10 +225,7 @@ export function TracingApp({ providerId }: TracingAppProps) {
   const [refreshing, setRefreshing] = useState(false);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openInSupported, setOpenInSupported] = useState(false);
-  const [supportedTabs, setSupportedTabs] = useState<string[] | null>(null);
   const [headerLayout, setHeaderLayout] = useState<HeaderLayoutResponse | null>(null);
-  const [wireEvents, setWireEvents] = useState<WireEvent[]>([]);
-  const [subagents, setSubagents] = useState<SubagentInfo[]>([]);
   const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null);
 
   useEffect(() => {
@@ -286,42 +273,28 @@ export function TracingApp({ providerId }: TracingAppProps) {
   }, []);
 
   useEffect(() => {
-    if (!providerId) {
-      setSupportedTabs(null);
-      setHeaderLayout(null);
-      return;
-    }
-    fetchSupportedTabs(providerId).then((r) => setSupportedTabs(r.tabs));
-    fetchHeaderLayout(providerId).then((r) => setHeaderLayout(r));
-  }, [providerId]);
+    fetchHeaderLayout(PROVIDER_ID)
+      .then(setHeaderLayout)
+      .catch(() => setHeaderLayout(null));
+  }, []);
 
   useEffect(() => {
-    if (!sessionId || !providerId) {
-      setWireEvents([]);
-      setSubagents([]);
+    if (!sessionId) {
       setSessionSummary(null);
       return;
     }
-    getWireEvents(providerId, sessionId, refreshKey > 0)
-      .then((r) => setWireEvents(r.events))
-      .catch(() => setWireEvents([]));
-    getSubagents(providerId, sessionId, refreshKey > 0)
-      .then((r) => setSubagents(r))
-      .catch(() => setSubagents([]));
-    getSessionSummary(providerId, sessionId, refreshKey > 0)
-      .then((r) => setSessionSummary(r))
+    getSessionSummary(PROVIDER_ID, sessionId, refreshKey > 0)
+      .then(setSessionSummary)
       .catch(() => setSessionSummary(null));
-  }, [sessionId, refreshKey, providerId]);
+  }, [sessionId, refreshKey]);
 
   // Dynamic page title
   const [sessions, setSessions] = useState<Awaited<ReturnType<typeof listSessions>>>([]);
   useEffect(() => {
-    setSessions([]);
-    if (!providerId) return;
-    listSessions(providerId)
+    listSessions(PROVIDER_ID)
       .then(setSessions)
       .catch(() => {});
-  }, [providerId]);
+  }, []);
   useEffect(() => {
     getVisCapabilities()
       .then((capabilities) => setOpenInSupported(capabilities.open_in_supported))
@@ -337,20 +310,20 @@ export function TracingApp({ providerId }: TracingAppProps) {
   useEffect(() => {
     const previousTitle = document.title;
     if (!sessionId) {
-      document.title = "Agent Tracing";
+      document.title = "Kimi Tracing";
       return () => {
         document.title = previousTitle;
       };
     }
     const rawId = sessionId.split("/").pop() ?? sessionId;
     const label = currentSession?.metadata?.title || currentSession?.title || rawId.slice(0, 8);
-    document.title = `${label} — Agent Tracing`;
+    document.title = `${label} — Kimi Tracing`;
     return () => {
       document.title = previousTitle;
     };
   }, [currentSession, sessionId]);
 
-  // Global keyboard shortcuts: 1/2/3 to switch tabs
+  // Global keyboard shortcuts: 1-5 to switch tabs
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Don't intercept when focused on input elements
@@ -367,28 +340,15 @@ export function TracingApp({ providerId }: TracingAppProps) {
         return;
       }
 
-      const setIfSupported = (tab: Tab) => {
-        if (supportedTabs?.includes(tab)) {
-          setActiveTab(tab);
-        }
-      };
       if (e.key === "1") setActiveTab("wire");
-      else if (e.key === "2") setIfSupported("context");
-      else if (e.key === "3") setIfSupported("state");
-      else if (e.key === "4") setIfSupported("dual");
-      else if (e.key === "5") setIfSupported("agents");
+      else if (e.key === "2") setActiveTab("context");
+      else if (e.key === "3") setActiveTab("state");
+      else if (e.key === "4") setActiveTab("dual");
+      else if (e.key === "5") setActiveTab("agents");
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [showShortcutHelp, supportedTabs]);
-
-  if (!providerId) {
-    return (
-      <div className="cm-state cm-state--empty">
-        Select a provider from the chips above to view its tracing data.
-      </div>
-    );
-  }
+  }, [showShortcutHelp]);
 
   return (
     <TooltipProvider>
@@ -410,7 +370,7 @@ export function TracingApp({ providerId }: TracingAppProps) {
             title={sessionId ? "Back to Sessions Explorer" : undefined}
           >
             {sessionId && <ArrowLeft size={16} className="text-muted-foreground" />}
-            Agent Tracing
+            Kimi Tracing
           </h1>
           <button
             type="button"
@@ -431,10 +391,10 @@ export function TracingApp({ providerId }: TracingAppProps) {
               layout={headerLayout}
             />
             {currentSession && (
-              <SessionDirectoryActions session={currentSession} openInSupported={openInSupported} providerId={providerId} />
+              <SessionDirectoryActions session={currentSession} openInSupported={openInSupported} />
             )}
             <a
-              href={getSessionDownloadUrl(providerId, sessionId)}
+              href={getSessionDownloadUrl(PROVIDER_ID, sessionId)}
               download
               className="shrink-0 rounded-md p-1.5 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
               title="Download session files as ZIP"
@@ -446,7 +406,7 @@ export function TracingApp({ providerId }: TracingAppProps) {
               onClick={() => {
                 setRefreshing(true);
                 setRefreshKey((k) => k + 1);
-                listSessions(providerId, true)
+                listSessions(PROVIDER_ID, true)
                   .then(setSessions)
                   .catch(() => {});
                 if (refreshTimeoutRef.current) {
@@ -474,29 +434,24 @@ export function TracingApp({ providerId }: TracingAppProps) {
                   { key: "dual", label: "Dual", icon: <Columns size={14} /> },
                   { key: "agents", label: "Agents", icon: <Bot size={14} /> },
                 ] as const
-              )
-                .filter(
-                  ({ key }) =>
-                    supportedTabs === null || supportedTabs.includes(key as Tab),
-                )
-                .map(({ key, label, icon }) => (
-                  <button
-                    type="button"
-                    key={key}
-                    onClick={() => setActiveTab(key)}
-                    className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors ${
-                      activeTab === key
-                        ? "text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {icon}
-                    {label}
-                    {activeTab === key && (
-                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-                    )}
-                  </button>
-                ))}
+              ).map(({ key, label, icon }) => (
+                <button
+                  type="button"
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors ${
+                    activeTab === key
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {icon}
+                  {label}
+                  {activeTab === key && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                  )}
+                </button>
+              ))}
             </div>
 
             {/* Agent Scope Bar - shown on wire/context/dual tabs */}
@@ -508,13 +463,13 @@ export function TracingApp({ providerId }: TracingAppProps) {
                 onSelectAgent={(id) => {
                   setAgentScope(id);
                 }}
-                providerId={providerId}
+                providerId={PROVIDER_ID}
               />
             )}
 
             {/* Tab Content */}
             <div className="flex-1 min-h-0 overflow-hidden">
-              {activeTab === "wire" && providerId === "kimi" && (
+              {activeTab === "wire" && (
                 <WireViewer
                   sessionId={sessionId}
                   refreshKey={refreshKey}
@@ -522,11 +477,8 @@ export function TracingApp({ providerId }: TracingAppProps) {
                   scrollToToolCallId={wireScrollTarget}
                   onScrollTargetConsumed={() => setWireScrollTarget(null)}
                   agentScope={agentScope}
-                  providerId={providerId}
+                  providerId={PROVIDER_ID}
                 />
-              )}
-              {activeTab === "wire" && providerId === "claudeCode" && (
-                <ClaudeCodeWireViewer events={wireEvents} />
               )}
               {activeTab === "context" && (
                 <ContextViewer
@@ -536,16 +488,16 @@ export function TracingApp({ providerId }: TracingAppProps) {
                   scrollToToolCallId={contextScrollTarget}
                   onScrollTargetConsumed={() => setContextScrollTarget(null)}
                   agentScope={agentScope}
-                  providerId={providerId}
+                  providerId={PROVIDER_ID}
                 />
               )}
               {activeTab === "state" && (
-                <StateViewer sessionId={sessionId} refreshKey={refreshKey} providerId={providerId} />
+                <StateViewer sessionId={sessionId} refreshKey={refreshKey} providerId={PROVIDER_ID} />
               )}
               {activeTab === "dual" && (
-                <DualView sessionId={sessionId} refreshKey={refreshKey} agentScope={agentScope} providerId={providerId} />
+                <DualView sessionId={sessionId} refreshKey={refreshKey} agentScope={agentScope} providerId={PROVIDER_ID} />
               )}
-              {activeTab === "agents" && providerId === "kimi" && (
+              {activeTab === "agents" && (
                 <AgentsPanel
                   sessionId={sessionId}
                   refreshKey={refreshKey}
@@ -558,13 +510,7 @@ export function TracingApp({ providerId }: TracingAppProps) {
                     setAgentScope(null);
                     setActiveTab("wire");
                   }}
-                  providerId={providerId}
-                />
-              )}
-              {activeTab === "agents" && providerId === "claudeCode" && (
-                <ClaudeCodeAgentsPanel
-                  agents={subagents}
-                  onSelect={(id) => setAgentScope(id)}
+                  providerId={PROVIDER_ID}
                 />
               )}
             </div>
@@ -599,9 +545,9 @@ export function TracingApp({ providerId }: TracingAppProps) {
 
             {/* Explorer content */}
             {explorerView === "sessions" ? (
-              <SessionsExplorer onSelectSession={handleSessionChange} providerId={providerId} />
+              <SessionsExplorer onSelectSession={handleSessionChange} providerId={PROVIDER_ID} />
             ) : (
-              <StatisticsView providerId={providerId} />
+              <StatisticsView providerId={PROVIDER_ID} />
             )}
           </div>
         )}

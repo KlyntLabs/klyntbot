@@ -4,17 +4,11 @@
 import { invoke } from "@/api/client";
 import { apiCache } from "./cache";
 
-// Provider id passed from the parent (CodingMemoryPlugin chip selection).
-// Map UI chip ids → backend tracing provider ids.
+// Backend tracing provider id. The UI dispatches between two independent
+// apps (KimiTracingApp / ClaudeCodeTracingApp) at the parent level
+// (CodingMemoryPlugin), and each hard-codes its own provider id when
+// calling these helpers — so a chip→provider mapper is no longer needed.
 export type TracingProviderId = "kimi" | "claudeCode";
-
-export function chipToTracingProvider(
-  chip: "all" | "claudeCode" | "codex" | "kimiCli" | "openCode" | "klyntCli",
-): TracingProviderId | null {
-  if (chip === "kimiCli") return "kimi";
-  if (chip === "claudeCode") return "claudeCode";
-  return null; // codex/openCode/klyntCli/all → no tracing provider yet
-}
 
 // ── Upstream-shaped types the ported components import ───────────────
 
