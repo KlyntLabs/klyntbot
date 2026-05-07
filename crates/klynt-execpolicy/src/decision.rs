@@ -9,8 +9,8 @@ pub enum Decision {
     Ask,
     /// Codex calls this `Forbidden`; klyntbot uses `Forbid` for brevity.
     Forbid,
-    /// Klynt-specific: signals "no rule matched"; falls through to Layer 1
-    /// or Layer 3 in the orchestrator at klynt-core/src/approval/guard.rs.
+    /// Klynt-specific: signals "no rule matched"; falls through to the
+    /// unified approval gate.
     FallThrough,
 }
 

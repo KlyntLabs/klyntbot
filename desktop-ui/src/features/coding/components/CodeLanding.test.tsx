@@ -53,26 +53,17 @@ describe("CodeLanding (populated)", () => {
     expect(onSelectProject).toHaveBeenCalledWith("ws-1");
   });
 
-  it("clicking the trailing + New project card calls onAddProject", () => {
+  it("clicking the trailing Import folder card calls onAddProject", () => {
     const onAddProject = vi.fn();
     render(<CodeLanding projects={sampleProjects} {...baseHandlers} onAddProject={onAddProject} />);
-    fireEvent.click(screen.getByRole("button", { name: /new project/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Import folder" }));
     expect(onAddProject).toHaveBeenCalled();
   });
 
-  it("clicking the header Import button calls onImportProject", () => {
-    const onImportProject = vi.fn();
-    render(
-      <CodeLanding projects={sampleProjects} {...baseHandlers} onImportProject={onImportProject} />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Import" }));
-    expect(onImportProject).toHaveBeenCalled();
-  });
-
-  it("clicking the header + New button also calls onAddProject", () => {
+  it("clicking the header + Import folder button calls onAddProject", () => {
     const onAddProject = vi.fn();
     render(<CodeLanding projects={sampleProjects} {...baseHandlers} onAddProject={onAddProject} />);
-    fireEvent.click(screen.getByRole("button", { name: "+ New" }));
+    fireEvent.click(screen.getByRole("button", { name: "+ Import folder" }));
     expect(onAddProject).toHaveBeenCalled();
   });
 
@@ -99,24 +90,16 @@ describe("CodeLanding (empty)", () => {
     expect(document.querySelector(".code-landing__grid")).toBeNull();
   });
 
-  it("renders both empty-state CTAs", () => {
+  it("renders the single Import folder CTA", () => {
     render(<CodeLanding projects={[]} {...baseHandlers} />);
-    expect(screen.getByRole("button", { name: "Create first project" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Import existing repo" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /import folder/i })).toBeTruthy();
   });
 
-  it("Create first project calls onAddProject", () => {
+  it("Import folder calls onAddProject", () => {
     const onAddProject = vi.fn();
     render(<CodeLanding projects={[]} {...baseHandlers} onAddProject={onAddProject} />);
-    fireEvent.click(screen.getByRole("button", { name: "Create first project" }));
+    fireEvent.click(screen.getByRole("button", { name: /import folder/i }));
     expect(onAddProject).toHaveBeenCalled();
-  });
-
-  it("Import existing repo calls onImportProject", () => {
-    const onImportProject = vi.fn();
-    render(<CodeLanding projects={[]} {...baseHandlers} onImportProject={onImportProject} />);
-    fireEvent.click(screen.getByRole("button", { name: "Import existing repo" }));
-    expect(onImportProject).toHaveBeenCalled();
   });
 
   it("does not render the descriptive subtitle in empty state", () => {

@@ -72,7 +72,14 @@ impl AppEventEmitter for TauriEventEmitter {
 /// browsers at localhost:1420 (brain:ambient, provider:degraded, focus:state, etc.).
 pub async fn init(
     app_handle: tauri::AppHandle,
-) -> Result<(AppCore, broadcast::Sender<(String, Value)>), String> {
+) -> Result<
+    (
+        AppCore,
+        broadcast::Sender<(String, Value)>,
+        Arc<crate::approval::DesktopApprovalChannel>,
+    ),
+    String,
+> {
     let sender = Arc::new(crate::notify::TauriNotificationSender::new(
         app_handle.clone(),
     ));
@@ -87,9 +94,22 @@ pub async fn init(
     let emitter: Arc<dyn AppEventEmitter> =
         Arc::new(CompoundEmitter::new(tauri_emitter, global_event_tx.clone()));
 
-    let (core, channels) =
-        AppCore::init_with_sender(common::AppMode::Desktop, None, Some(sender), Some(emitter))
-            .await?;
+    // Build the desktop approval channel up-front so AgentLoopBuilder can wire
+    // the gate against it. The same Arc is returned to main.rs and registered
+    // as Tauri-managed state — the `approval_respond` command resolves the
+    // pending request through this exact instance.
+    let approval_channel = Arc::new(crate::approval::DesktopApprovalChannel::new(
+        app_handle.clone(),
+    ));
+
+    let (core, channels) = AppCore::init_with_sender(
+        common::AppMode::Desktop,
+        None,
+        Some(sender),
+        Some(emitter),
+        Some(approval_channel.clone() as Arc<dyn ::approval::ApprovalChannel>),
+    )
+    .await?;
     // Cross-process event bridge — receives frames from a child
     // `klyntbot mcp serve --stdio` process and re-emits them via Tauri's
     // global broadcast so every webview's `tauriEventBridge` (Plan 1) picks
@@ -133,7 +153,7 @@ pub async fn init(
     }
 
     wire_event_channels(&core, channels, &app_handle, &global_event_tx);
-    Ok((core, global_event_tx))
+    Ok((core, global_event_tx, approval_channel))
 }
 
 /// Wire all `EventChannels` receivers to Tauri event emitters.

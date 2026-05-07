@@ -1,5 +1,6 @@
 //! Configuration for the coding-memory subsystem.
 
+use super::core::default_true;
 use serde::{Deserialize, Serialize};
 
 /// Root config for coding memory.
@@ -201,9 +202,6 @@ pub struct CodingSkillsConfig {
     pub never_activate: Vec<String>,
 }
 
-fn default_true() -> bool {
-    true
-}
 fn default_max_active() -> u32 {
     30
 }

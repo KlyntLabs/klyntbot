@@ -14,7 +14,7 @@ prefix_rule(["git", "status"], decision="allow")
     .unwrap();
 
     let policy = Policy::load_from_dir(dir.path()).expect("load");
-    let cmd = vec!["git".to_string(), "status".to_string()];
+    let cmd = ["git".to_string(), "status".to_string()];
     let dec = policy.eval(&cmd.iter().map(String::as_str).collect::<Vec<_>>(), None);
     assert_eq!(dec, Decision::Allow);
 }

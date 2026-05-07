@@ -1,8 +1,7 @@
 //! Agent-level test: `CodingRecallContextSource` is registered and produces
 //! text when the channel is coding and a query is present.
 
-use agent::context_sources::CodingRecallContextSource;
-use context_engine::source::{ContextSource, SourceContext};
+use context_engine::source::SourceContext;
 
 fn make_ctx(channel: &str, message: Option<&str>, project_id: Option<&str>) -> SourceContext {
     SourceContext {

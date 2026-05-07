@@ -16,6 +16,9 @@ pub use tools_core::{
     FeaturePackage, HealthStatus, InteractionBundle, Page, RoutingContext, Searchable, Tool,
 };
 
+// Re-export approval_class module from tools-core so domain tools can use crate::approval_class
+pub use tools_core::approval_class;
+
 // ── Grouped modules ─────────────────────────────────────────────────────────
 pub mod domain;
 pub mod embedding;
@@ -36,7 +39,6 @@ pub mod todo_types;
 
 // ── Tool framework ──────────────────────────────────────────────────────────
 pub mod params;
-pub mod permissions;
 pub mod registry;
 pub use params::ParamExtractor;
 
@@ -70,9 +72,6 @@ pub use memory_tool::MemoryTool;
 
 // OKR
 pub use okr_tool::OkrTool;
-
-// Permissions
-pub use permissions::{PermissionLevel, ToolPermissions};
 
 // Progress handler
 pub use progress_handler::ProgressHandler;

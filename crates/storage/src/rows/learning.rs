@@ -43,7 +43,7 @@ pub struct StrategyRecordRow {
     pub execution_mode: Option<String>,
     /// Number of memory entries retrieved from the context engine for this message.
     pub retrieved_memory_count: Option<i32>,
-    pub budget_exhausted: bool,
+    pub safety_cap_hit: bool,
     pub turns_used: i32,
     pub loop_detected: bool,
     pub loop_tools: Option<String>,

@@ -59,7 +59,7 @@ impl BookTreeRepo for SqliteBookTreeRepo {
         .bind(&node.metadata)
         .execute(&self.pool)
         .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        .map_err(crate::repos::map_sqlx)?;
         Ok(())
     }
 
@@ -80,7 +80,7 @@ impl BookTreeRepo for SqliteBookTreeRepo {
             .bind(id)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .map_err(crate::repos::map_sqlx)?;
 
         Ok(row.map(
             |(
@@ -120,7 +120,7 @@ impl BookTreeRepo for SqliteBookTreeRepo {
             .bind(parent_id)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .map_err(crate::repos::map_sqlx)?;
 
         Ok(rows
             .into_iter()
@@ -168,7 +168,7 @@ impl BookTreeRepo for SqliteBookTreeRepo {
             .bind(node_id)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .map_err(crate::repos::map_sqlx)?;
 
         Ok(rows
             .into_iter()
@@ -211,7 +211,7 @@ impl BookTreeRepo for SqliteBookTreeRepo {
             .bind(source_type.as_str())
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .map_err(crate::repos::map_sqlx)?;
 
         Ok(rows
             .into_iter()
@@ -259,7 +259,7 @@ impl BookTreeRepo for SqliteBookTreeRepo {
             .bind(node_id)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .map_err(crate::repos::map_sqlx)?;
 
         Ok(rows
             .into_iter()
@@ -300,7 +300,7 @@ impl BookTreeRepo for SqliteBookTreeRepo {
                 .bind(source_id)
                 .execute(&self.pool)
                 .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                .map_err(crate::repos::map_sqlx)?;
         Ok(result.rows_affected())
     }
 
@@ -317,7 +317,7 @@ impl BookTreeRepo for SqliteBookTreeRepo {
             .bind(limit as i32)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .map_err(crate::repos::map_sqlx)?;
 
         Ok(rows
             .into_iter()
@@ -355,7 +355,7 @@ impl BookTreeRepo for SqliteBookTreeRepo {
         let row: (i64,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM book_tree_nodes LIMIT 1)")
             .fetch_one(&self.pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .map_err(crate::repos::map_sqlx)?;
         Ok(row.0 == 1)
     }
 }

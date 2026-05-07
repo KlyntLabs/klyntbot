@@ -68,6 +68,11 @@ use tracing::warn;
 
 use crate::types::UserModel;
 
+/// Map a `sqlx::Error` to our domain error type.
+pub(crate) fn map_sqlx(e: sqlx::Error) -> common::KlyntbotError {
+    common::KlyntbotError::Storage(e.to_string())
+}
+
 /// Shared domain list for user model fields.
 ///
 /// This is the semantic-fact taxonomy — it categorizes what a *fact about the

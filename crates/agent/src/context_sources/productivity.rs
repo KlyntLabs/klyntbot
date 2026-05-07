@@ -88,7 +88,14 @@ impl ProductivityContextSource {
                 let expires = jiff::Timestamp::now()
                     .checked_add(jiff::SignedDuration::from_secs(PATTERN_CACHE_TTL_SECS))
                     .unwrap();
-                *self.pattern_cache.lock().await = Some((patterns.clone(), expires));
+                let mut cache = self.pattern_cache.lock().await;
+                if let Some((ref existing, _)) = *cache {
+                    if existing == &patterns {
+                        return Some(patterns);
+                    }
+                }
+                *cache = Some((patterns.clone(), expires));
+                drop(cache);
                 Some(patterns)
             }
             Err(e) => {

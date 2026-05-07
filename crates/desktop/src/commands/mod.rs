@@ -2,6 +2,7 @@ pub mod agents;
 pub mod annotations;
 pub mod app_icon;
 pub mod approval;
+pub mod approvals;
 pub mod areas;
 pub mod autotuner;
 pub mod capture;

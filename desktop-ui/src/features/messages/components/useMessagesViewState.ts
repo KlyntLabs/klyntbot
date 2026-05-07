@@ -2,7 +2,6 @@ import { isPlanReadyTaggedMessage } from "@utils/internalPlanReadyMessages";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ConversationItem } from "@/types";
 import {
-  buildToolGroups,
   computePlanFollowupState,
   parseReasoning,
   SCROLL_THRESHOLD_PX,
@@ -49,7 +48,6 @@ export function useMessagesViewState({
   const manuallyToggledExpandedRef = useRef<Set<string>>(new Set());
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [collapsedToolGroups, setCollapsedToolGroups] = useState<Set<string>>(new Set());
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [dismissedPlanFollowupByThread, setDismissedPlanFollowupByThread] = useState<
     Record<string, string>
@@ -113,18 +111,6 @@ export function useMessagesViewState({
   const toggleExpanded = useCallback((id: string) => {
     manuallyToggledExpandedRef.current.add(id);
     setExpandedItems((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
-
-  const toggleToolGroup = useCallback((id: string) => {
-    setCollapsedToolGroups((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -237,7 +223,25 @@ export function useMessagesViewState({
     }
   }, [visibleItems]);
 
-  const groupedItems = useMemo(() => buildToolGroups(visibleItems), [visibleItems]);
+  // Auto-expand-on-error: when a tool transitions to a failed status, add its
+  // id to expandedItems on first observation. Mirrors the plan-expand effect
+  // above and respects manual user collapse via manuallyToggledExpandedRef.
+  useEffect(() => {
+    setExpandedItems((prev) => {
+      let next: Set<string> | null = null;
+      for (const item of visibleItems) {
+        if (item.kind !== "tool") continue;
+        const status = (item.status ?? "").toLowerCase();
+        if (!/(fail|error)/.test(status)) continue;
+        if (manuallyToggledExpandedRef.current.has(item.id)) continue;
+        if (prev.has(item.id)) continue;
+        if (!next) next = new Set(prev);
+        next.add(item.id);
+      }
+      return next ?? prev;
+    });
+  }, [visibleItems]);
+
 
   const planFollowup = useMemo(() => {
     if (!onPlanAccept || !onPlanSubmitChanges) {
@@ -285,14 +289,12 @@ export function useMessagesViewState({
     requestAutoScroll,
     expandedItems,
     toggleExpanded,
-    collapsedToolGroups,
-    toggleToolGroup,
     copiedMessageId,
     handleCopyMessage,
     handleQuoteMessage,
     reasoningMetaById,
     latestReasoningLabel,
-    groupedItems,
+    visibleItems,
     planFollowup,
     dismissPlanFollowup,
   };

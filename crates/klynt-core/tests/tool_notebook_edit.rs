@@ -1,7 +1,5 @@
 use bus::DomainEventBus;
 use common::tool_channel::{Channel, NonUiPolicy};
-use config::schema::CodingPermissions;
-use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::notebook_edit::{run_for_test as nb_run, NotebookEditArgs};
 use klynt_execpolicy::Policy;
@@ -21,14 +19,8 @@ const NB: &str = r##"{
 async fn replaces_cell_source() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("nb.ipynb"), NB).unwrap();
-    let perms = CodingPermissions {
-        allow: vec!["NotebookEdit(**)".into()],
-        ..Default::default()
-    };
-    let l1 = Arc::new(Layer1::compile(&perms).unwrap());
     let pol = Arc::new(Policy::empty());
     let pri = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
-    let pen = Arc::new(PendingApprovalsMap::new());
     let bus = Arc::new(DomainEventBus::new(64));
     let (tx, _rx) = mpsc::channel(32);
     nb_run(
@@ -38,10 +30,8 @@ async fn replaces_cell_source() {
             new_source: "print('updated')\n".into(),
         },
         dir.path().to_path_buf(),
-        l1,
         pol,
         pri,
-        pen,
         Some(tx),
         bus,
         CancellationToken::new(),
@@ -69,14 +59,8 @@ async fn replaces_cell_source() {
 async fn rejects_out_of_range_index() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("nb.ipynb"), NB).unwrap();
-    let perms = CodingPermissions {
-        allow: vec!["NotebookEdit(**)".into()],
-        ..Default::default()
-    };
-    let l1 = Arc::new(Layer1::compile(&perms).unwrap());
     let pol = Arc::new(Policy::empty());
     let pri = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
-    let pen = Arc::new(PendingApprovalsMap::new());
     let bus = Arc::new(DomainEventBus::new(64));
     let (tx, _rx) = mpsc::channel(32);
     let r = nb_run(
@@ -86,10 +70,8 @@ async fn rejects_out_of_range_index() {
             new_source: "x".into(),
         },
         dir.path().to_path_buf(),
-        l1,
         pol,
         pri,
-        pen,
         Some(tx),
         bus,
         CancellationToken::new(),

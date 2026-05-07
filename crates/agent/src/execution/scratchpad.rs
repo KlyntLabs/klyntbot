@@ -5,8 +5,6 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
-use super::loop_detector::LoopDetector;
-
 fn plan_step_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
@@ -78,11 +76,14 @@ pub struct ReasoningTrace {
 const MAX_TRACES: usize = 20;
 
 /// Accumulates reasoning traces across execution cycles for context injection.
+///
+/// Note: loop detection lives in `execute_loop` as a session-scoped local;
+/// it is intentionally not held by `Scratchpad` to keep state ownership
+/// in one place.
 #[derive(Debug, Default)]
 pub struct Scratchpad {
     traces: Vec<ReasoningTrace>,
     plan: Option<ExecutionPlan>,
-    pub loop_detector: LoopDetector,
 }
 
 impl Scratchpad {
@@ -90,7 +91,6 @@ impl Scratchpad {
         Self {
             traces: Vec::new(),
             plan: None,
-            loop_detector: LoopDetector::new(),
         }
     }
 

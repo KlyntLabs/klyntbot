@@ -1,4 +1,3 @@
-use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
 use crate::tools::shared::file_edit_event::{emit_file_edit, FileEditEvent};
 use crate::tools::shared::fs_resolve::resolve_under_cwd;
@@ -17,7 +16,7 @@ use tokio_util::sync::CancellationToken;
 use tools_core::events::ToolEvent;
 use tools_core::{RoutingContext, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
-use uuid::Uuid;
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
 pub struct ApplyPatchArgs {
@@ -40,14 +39,14 @@ pub struct ApplyPatchArgs {
     category = "FileSystem",
     cost = "Free",
     tags = "fs,patch,coding",
-    allowed_channels = "coding_only"
+    allowed_channels = "coding_only",
+    approval_class = "destructive",
+    approval_scope = "path"
 )]
 pub struct ApplyPatchTool {
     cwd: PathBuf,
-    layer1: Arc<Layer1>,
     policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
-    pending: Arc<PendingApprovalsMap>,
     bus: Arc<DomainEventBus>,
     non_ui_policy: common::tool_channel::NonUiPolicy,
     pub snapshot_repo: Option<std::sync::Arc<crate::snapshots::SnapshotRepo>>,
@@ -61,19 +60,15 @@ pub struct ApplyPatchTool {
 impl ApplyPatchTool {
     pub fn new(
         cwd: PathBuf,
-        layer1: Arc<Layer1>,
         policy: Arc<Policy>,
         privacy: Arc<PrivacyGuard>,
-        pending: Arc<PendingApprovalsMap>,
         bus: Arc<DomainEventBus>,
         non_ui_policy: common::tool_channel::NonUiPolicy,
     ) -> Self {
         Self {
             cwd,
-            layer1,
             policy,
             privacy,
-            pending,
             bus,
             non_ui_policy,
             snapshot_repo: None,
@@ -98,15 +93,11 @@ impl ToolExecute for ApplyPatchTool {
         run_for_test(
             args,
             self.cwd.clone(),
-            self.layer1.clone(),
             self.policy.clone(),
             self.privacy.clone(),
-            self.pending.clone(),
             ctx.event_tx.clone(),
             self.bus.clone(),
-            ctx.cancel_token
-                .clone()
-                .unwrap_or_else(CancellationToken::new),
+            ctx.cancel_token.clone().unwrap_or_default(),
             common::tool_channel::Channel::from_name(ctx.channel.as_str()),
             self.non_ui_policy,
             ctx.hook_engine.clone(),
@@ -127,10 +118,8 @@ impl ToolExecute for ApplyPatchTool {
 pub async fn run_for_test(
     args: ApplyPatchArgs,
     cwd: PathBuf,
-    layer1: Arc<Layer1>,
     policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
-    pending: Arc<PendingApprovalsMap>,
     event_tx: Option<mpsc::Sender<ToolEvent>>,
     bus: Arc<DomainEventBus>,
     cancel: CancellationToken,
@@ -149,35 +138,6 @@ pub async fn run_for_test(
     let resolved = resolve_under_cwd(&args.path, &cwd, &privacy)
         .map_err(|e| KlyntbotError::Tool(ToolError::PermissionDenied(e.to_string())))?;
     let path_str = resolved.to_string_lossy().into_owned();
-    let request_id = Uuid::new_v4().to_string();
-    let guard_ctx = GuardCtx {
-        layer1: &layer1,
-        policy: &policy,
-        privacy: &privacy,
-        pending: &pending,
-        event_tx: event_tx.as_ref(),
-        domain_bus: &bus,
-        cancel,
-        request_id,
-        args: Some(serde_json::to_value(&args).unwrap_or_default()),
-        cwd: Some(cwd.to_string_lossy().into_owned()),
-        channel,
-        non_ui_policy,
-        history_repo,
-        repo_id,
-        mirror_learning_enabled,
-        mirror_min_approvals,
-        mirror_cooldown_seconds,
-        now_unix: jiff::Timestamp::now().as_second(),
-        thread_id: Some(session_id.clone()),
-        turn_id: message_id.clone(),
-    };
-    let decision = evaluate(guard_ctx, "apply_patch", &path_str).await;
-    if !decision.allowed() {
-        return Err(KlyntbotError::Tool(ToolError::PermissionDenied(format!(
-            "{decision:?}"
-        ))));
-    }
 
     if let Some(repo) = snapshot_repo.as_ref() {
         let (content, existed) = match tokio::fs::read(&resolved).await {
@@ -248,6 +208,7 @@ pub async fn run_for_test(
             }
             Err(reason) => return Err(KlyntbotError::Tool(ToolError::HookBlocked(reason))),
         }
+        crate::tools::shared::fs_resolve::ensure_parent_dir(&resolved).await?;
         let write_result = tokio::fs::write(&resolved, final_content.as_bytes()).await;
         let write_ok = write_result.is_ok();
         fire_post_file_edit(

@@ -26,6 +26,8 @@ pub struct ScoredEntry {
 pub struct InvertedFileIndex {
     pub(crate) entries: Vec<IndexEntry>,
     pub(crate) token_index: TokenIndex,
+    /// Fast path-to-index lookup for incremental updates.
+    pub(crate) path_to_idx: FxHashMap<PathBuf, u32>,
 }
 
 impl InvertedFileIndex {
@@ -33,6 +35,7 @@ impl InvertedFileIndex {
         Self {
             entries: Vec::new(),
             token_index: TokenIndex::build(vec![]),
+            path_to_idx: FxHashMap::default(),
         }
     }
 
@@ -194,24 +197,7 @@ impl InvertedFileIndex {
                     name_compact,
                 });
 
-                // Index full tokens only (no prefix explosion)
-                for token in tokenize(&name) {
-                    token_map
-                        .entry(SmolStr::new(&token))
-                        .or_default()
-                        .insert(idx);
-                }
-                for component in path.components().filter_map(|c| c.as_os_str().to_str()) {
-                    if component == name {
-                        continue;
-                    }
-                    for token in tokenize(component) {
-                        token_map
-                            .entry(SmolStr::new(&token))
-                            .or_default()
-                            .insert(idx);
-                    }
-                }
+                Self::index_entry_tokens(&mut token_map, idx, &name, path);
             }
         }
 
@@ -227,9 +213,41 @@ impl InvertedFileIndex {
 
         let token_index = TokenIndex::build(tokens);
 
+        let mut path_to_idx =
+            FxHashMap::with_capacity_and_hasher(entries.len(), Default::default());
+        for (i, e) in entries.iter().enumerate() {
+            path_to_idx.insert(e.path.clone(), i as u32);
+        }
+
         Self {
             entries,
             token_index,
+            path_to_idx,
+        }
+    }
+
+    fn index_entry_tokens(
+        token_map: &mut FxHashMap<SmolStr, roaring::RoaringBitmap>,
+        idx: u32,
+        name: &str,
+        path: &Path,
+    ) {
+        for token in tokenize(name) {
+            token_map
+                .entry(SmolStr::new(&token))
+                .or_default()
+                .insert(idx);
+        }
+        for component in path.components().filter_map(|c| c.as_os_str().to_str()) {
+            if component == name {
+                continue;
+            }
+            for token in tokenize(component) {
+                token_map
+                    .entry(SmolStr::new(&token))
+                    .or_default()
+                    .insert(idx);
+            }
         }
     }
 }
@@ -381,7 +399,7 @@ impl InvertedFileIndex {
             return;
         }
         // Skip if already indexed
-        if self.entries.iter().any(|e| e.path == path) {
+        if self.path_to_idx.contains_key(path) {
             return;
         }
         let name = match path.file_name().and_then(|n| n.to_str()) {
@@ -400,6 +418,7 @@ impl InvertedFileIndex {
             name_lc,
             name_compact,
         });
+        self.path_to_idx.insert(path.to_path_buf(), idx);
         for token in tokenize(&name) {
             self.token_index.insert_pending(SmolStr::new(&token), idx);
         }
@@ -419,9 +438,9 @@ impl InvertedFileIndex {
 
     /// Remove a path from the index. Tombstones the entry (we don't compact mid-flight).
     pub fn apply_event_remove(&mut self, path: &Path) {
-        let target = self.entries.iter().position(|e| e.path == path);
+        let target = self.path_to_idx.remove(path);
         let target = match target {
-            Some(t) => t as u32,
+            Some(t) => t,
             None => return,
         };
         // Mark entry as empty (keep slot to preserve indices).

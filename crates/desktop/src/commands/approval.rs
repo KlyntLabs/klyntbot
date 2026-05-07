@@ -6,7 +6,6 @@ use desktop_shared::errors::ApiError;
 pub async fn approval_respond(approval_id: String, decision: ApprovalDecisionDto) -> () {
     let internal = map_decision(decision);
     app_core::coding::approval_handler::respond_approval(
-        &state.pending_approvals,
         &approval_id,
         internal,
     )
@@ -38,7 +37,7 @@ fn map_decision(
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
-    core: &::app_core::state::AppCore,
+    _core: &::app_core::state::AppCore,
     body: &serde_json::Value,
 ) -> Option<desktop_shared::CommandResult<serde_json::Value>> {
     use super::dev_helpers::{self as dev, try_field};
@@ -48,7 +47,6 @@ pub(crate) async fn dispatch_dev(
             let decision: ApprovalDecisionDto = try_field!(dev::require(body, "decision"));
             let internal = map_decision(decision);
             match app_core::coding::approval_handler::respond_approval(
-                &core.pending_approvals,
                 &approval_id,
                 internal,
             )

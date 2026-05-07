@@ -34,7 +34,7 @@ impl GitInvalidationHandlerImpl {
 
     /// Build per-file diffs synchronously; git2 types are dropped before returning.
     fn build_diffs(
-        &self,
+        extractor: &dyn crate::symbols::SymbolExtractor,
         repo_root: &std::path::Path,
         changed_files: &[std::path::PathBuf],
         commit_hash: &str,
@@ -64,9 +64,9 @@ impl GitInvalidationHandlerImpl {
                 .and_then(|entry| repo.find_blob(entry.id()).ok())
                 .map(|blob| String::from_utf8_lossy(blob.content()).to_string())
                 .unwrap_or_default();
-            let new_symbols = self.extractor.extract(&abs, &new_source, commit_hash);
+            let new_symbols = extractor.extract(&abs, &new_source, commit_hash);
             let old_symbols = if let Some(ref parent) = parent_hash {
-                self.extractor.extract(&abs, &old_source, parent)
+                extractor.extract(&abs, &old_source, parent)
             } else {
                 Vec::new()
             };
@@ -94,36 +94,66 @@ impl GitInvalidationHandler for GitInvalidationHandlerImpl {
             return Ok(());
         };
 
-        let diffs = self.build_diffs(repo_root, changed_files, commit_hash, parent_hash)?;
-
-        let mut affected: Vec<(String, String)> = Vec::new();
-
-        for diff in &diffs {
-            let pattern = format!("%{}%", diff.rel.to_string_lossy());
-            let rows: Vec<(String, String)> = sqlx::query_as(
-                "SELECT id, metadata FROM semantic_facts \
-                 WHERE metadata LIKE ?1 \
-                 UNION ALL \
-                 SELECT id, metadata FROM episodic_memories \
-                 WHERE metadata LIKE ?1",
+        let extractor = self.extractor.clone();
+        let repo_root = repo_root.clone();
+        let changed_files = changed_files.clone();
+        let commit_hash = commit_hash.clone();
+        let parent_hash = parent_hash.clone();
+        let diffs = tokio::task::spawn_blocking(move || {
+            Self::build_diffs(
+                &*extractor,
+                &repo_root,
+                &changed_files,
+                &commit_hash,
+                &parent_hash,
             )
-            .bind(&pattern)
+        })
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("spawn_blocking: {e}")))??;
+
+        if diffs.is_empty() {
+            return Ok(());
+        }
+
+        // Single scan: OR-joined LIKE patterns, one bind per changed file.
+        let mut sql = String::from("SELECT id, metadata FROM semantic_facts WHERE ");
+        let placeholders: Vec<String> = (1..=diffs.len())
+            .map(|i| format!("metadata LIKE ?{i}"))
+            .collect();
+        sql.push_str(&placeholders.join(" OR "));
+        sql.push_str(" UNION ALL SELECT id, metadata FROM episodic_memories WHERE ");
+        sql.push_str(&placeholders.join(" OR "));
+        let mut q = sqlx::query_as::<_, (String, String)>(&sql);
+        let patterns: Vec<String> = diffs
+            .iter()
+            .map(|d| format!("%{}%", d.rel.to_string_lossy()))
+            .collect();
+        for p in &patterns {
+            q = q.bind(p);
+        }
+        for p in &patterns {
+            q = q.bind(p);
+        }
+        let rows = q
             .fetch_all(self.pool.inner())
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("scan: {e}")))?;
 
-            for (id, metadata) in rows {
-                let parsed: serde_json::Value = match metadata.parse() {
-                    Ok(v) => v,
+        let mut to_delete: Vec<String> = Vec::new();
+        let mut to_stale: Vec<String> = Vec::new();
+        for (id, metadata) in rows {
+            let parsed: serde_json::Value = match metadata.parse() {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let anchors: Vec<crate::scope::AnchoredSymbol> =
+                match serde_json::from_value(parsed["anchoredSymbols"].clone()) {
+                    Ok(a) => a,
                     Err(_) => continue,
                 };
-                let anchors: Vec<crate::scope::AnchoredSymbol> =
-                    match serde_json::from_value(parsed["anchoredSymbols"].clone()) {
-                        Ok(a) => a,
-                        Err(_) => continue,
-                    };
-                let mut deleted = false;
-                let mut modified = false;
+            let mut deleted = false;
+            let mut modified = false;
+            for diff in &diffs {
                 for anchor in anchors.iter().filter(|a| a.file_path == diff.rel) {
                     let in_old = diff
                         .old_symbols
@@ -139,37 +169,23 @@ impl GitInvalidationHandler for GitInvalidationHandlerImpl {
                         modified = true;
                     }
                 }
-                if deleted {
-                    affected.push((id, "delete".into()));
-                } else if modified {
-                    affected.push((id, "stale".into()));
-                }
+            }
+            if deleted {
+                to_delete.push(id);
+            } else if modified {
+                to_stale.push(id);
             }
         }
 
-        for (id, mode) in affected {
-            match mode.as_str() {
-                "delete" => {
-                    sqlx::query(
-                        "UPDATE semantic_facts SET valid_until = COALESCE(valid_until, datetime('now')) WHERE id = ?1",
-                    )
-                    .bind(&id)
-                    .execute(self.pool.inner())
-                    .await
-                    .ok();
-                    sqlx::query(
-                        "UPDATE episodic_memories SET valid_until = COALESCE(valid_until, datetime('now')) WHERE id = ?1",
-                    )
-                    .bind(&id)
-                    .execute(self.pool.inner())
-                    .await
-                    .ok();
-                }
-                "stale" => {
-                    let _ = update_metadata_status(&self.pool, &id, "stale_candidate").await;
-                }
-                _ => {}
-            }
+        if !to_delete.is_empty() {
+            let id_refs: Vec<&str> = to_delete.iter().map(String::as_str).collect();
+            let fact_repo = cognitive::SemanticFactRepo::new(self.pool.inner().clone());
+            let ep_repo = cognitive::EpisodicMemoryRepo::new(self.pool.inner().clone());
+            let _ = fact_repo.invalidate_batch(&id_refs).await;
+            let _ = ep_repo.invalidate_batch(&id_refs).await;
+        }
+        for id in &to_stale {
+            let _ = update_metadata_status(&self.pool, id, "stale_candidate").await;
         }
         Ok(())
     }

@@ -58,7 +58,7 @@ impl NarrativeHandler for LlmNarrativeHandler {
         let params = providers::ChatParams::new(&self.model)
             .with_response_format(providers::ResponseFormat::JsonObject);
 
-        let response = self.provider.chat(&messages, None, &params).await?;
+        let response = self.provider.chat(&messages, None, &params, &[]).await?;
         let content = response.content.unwrap_or_default();
 
         serde_json::from_str::<GeneratedNarrative>(&content)
@@ -76,7 +76,7 @@ impl NarrativeHandler for LlmNarrativeHandler {
 
         let params = providers::ChatParams::new(&self.model);
 
-        let response = self.provider.chat(&messages, None, &params).await?;
+        let response = self.provider.chat(&messages, None, &params, &[]).await?;
         Ok(response.content.unwrap_or_default())
     }
 }

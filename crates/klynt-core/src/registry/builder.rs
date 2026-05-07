@@ -7,7 +7,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tools_core::ToolRegistry;
 
-use crate::approval::{HostApprovalCache, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
 use crate::tools::{
     apply_patch::ApplyPatchTool,
@@ -36,13 +35,10 @@ use storage::{repos::CodingApprovalHistoryRepo, Repos};
 #[derive(Clone)]
 pub struct ToolKitBuilder {
     pub cwd: PathBuf,
-    pub layer1: Arc<crate::approval::Layer1>,
     pub policy: Arc<Policy>,
     pub privacy: Arc<PrivacyGuard>,
-    pub pending: Arc<PendingApprovalsMap>,
     pub bus: Arc<DomainEventBus>,
     pub repos: Repos,
-    pub host_cache: Arc<HostApprovalCache>,
     pub non_ui_policy: common::tool_channel::NonUiPolicy,
     pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     pub snapshot_repo: Option<Arc<crate::snapshots::SnapshotRepo>>,
@@ -69,13 +65,10 @@ impl ToolKitBuilder {
         reg.register(ToolSearchTool::new());
         reg.register(AskUserTool);
         let mut web = WebFetchTool::new(
-            self.layer1.clone(),
             self.policy.clone(),
             self.privacy.clone(),
-            self.pending.clone(),
             self.bus.clone(),
             self.non_ui_policy,
-            self.host_cache.clone(),
         );
         web.history_repo = self.history_repo.clone();
         web.mirror_learning_enabled = self.mirror_learning_enabled;
@@ -88,10 +81,9 @@ impl ToolKitBuilder {
     /// Five mutating tools (`ChannelMask::CODING_ONLY`).
     pub fn register_mutating(&self, reg: &mut ToolRegistry) {
         let mut bash = BashTool::new(
-            self.layer1.clone(),
+            self.cwd.clone(),
             self.policy.clone(),
             self.privacy.clone(),
-            self.pending.clone(),
             self.bus.clone(),
             self.non_ui_policy,
         );
@@ -103,10 +95,8 @@ impl ToolKitBuilder {
         reg.register(bash);
         let mut write = WriteTool::new(
             self.cwd.clone(),
-            self.layer1.clone(),
             self.policy.clone(),
             self.privacy.clone(),
-            self.pending.clone(),
             self.bus.clone(),
             self.non_ui_policy,
         );
@@ -119,10 +109,8 @@ impl ToolKitBuilder {
         reg.register(write);
         let mut edit = EditTool::new(
             self.cwd.clone(),
-            self.layer1.clone(),
             self.policy.clone(),
             self.privacy.clone(),
-            self.pending.clone(),
             self.bus.clone(),
             self.non_ui_policy,
         );
@@ -135,10 +123,8 @@ impl ToolKitBuilder {
         reg.register(edit);
         let mut patch = ApplyPatchTool::new(
             self.cwd.clone(),
-            self.layer1.clone(),
             self.policy.clone(),
             self.privacy.clone(),
-            self.pending.clone(),
             self.bus.clone(),
             self.non_ui_policy,
         );
@@ -151,10 +137,8 @@ impl ToolKitBuilder {
         reg.register(patch);
         let mut notebook = NotebookEditTool::new(
             self.cwd.clone(),
-            self.layer1.clone(),
             self.policy.clone(),
             self.privacy.clone(),
-            self.pending.clone(),
             self.bus.clone(),
             self.non_ui_policy,
         );

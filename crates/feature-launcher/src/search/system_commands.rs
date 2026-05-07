@@ -95,7 +95,7 @@ impl SystemCommands {
             return COMMANDS
                 .iter()
                 .map(|cmd| LauncherItem {
-                    id: format!("system:{:?}", cmd.action),
+                    id: format!("system:{}", cmd.action.as_id_str()),
                     title: cmd.title.to_string(),
                     subtitle: Some(cmd.subtitle.to_string()),
                     icon: Some("terminal".to_string()),
@@ -146,7 +146,7 @@ impl SystemCommands {
         scored
             .into_iter()
             .map(|(score, cmd)| LauncherItem {
-                id: format!("system:{:?}", cmd.action),
+                id: format!("system:{}", cmd.action.as_id_str()),
                 title: cmd.title.to_string(),
                 subtitle: Some(cmd.subtitle.to_string()),
                 icon: Some("terminal".to_string()),

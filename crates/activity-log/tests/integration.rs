@@ -7,9 +7,9 @@ use jiff::{SignedDuration, Timestamp};
 use storage::StoragePool;
 
 use activity_log::{
-    activity_log_migrations, ActivityIngestionService, ActivityLog, ActivityLogRepo,
-    ActivitySource, ChatMessageInput, ChatMessageNormalizer, NormalizerSignalConsumer,
-    PrivacyFilter, WindowEventInput, WindowEventNormalizer,
+    activity_log_migrations, ActivityIngestionService, ActivityLogRepo, ActivitySource,
+    ChatMessageInput, ChatMessageNormalizer, NormalizerSignalConsumer, PrivacyFilter,
+    WindowEventInput, WindowEventNormalizer,
 };
 
 async fn setup() -> StoragePool {

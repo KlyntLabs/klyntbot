@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use tracing::{debug, warn};
 
 use crate::metadata::{ToolCategory, ToolMetadata};
-use crate::{DynTool, RoutingContext, Tool, ToolPermissions};
+use crate::{DynTool, RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// A tool entry for search result output.
@@ -32,7 +32,6 @@ pub struct ToolRegistry {
     metadata: HashMap<String, ToolMetadata>,
     usage_counts: Mutex<HashMap<String, u64>>,
     cached_definitions: Mutex<Option<Arc<Vec<Value>>>>,
-    permissions: Option<ToolPermissions>,
 }
 
 impl Clone for ToolRegistry {
@@ -42,7 +41,6 @@ impl Clone for ToolRegistry {
             metadata: self.metadata.clone(),
             usage_counts: Mutex::new(self.usage_counts.lock().unwrap().clone()),
             cached_definitions: Mutex::new(self.cached_definitions.lock().unwrap().clone()),
-            permissions: self.permissions.clone(),
         }
     }
 }
@@ -55,13 +53,7 @@ impl ToolRegistry {
             metadata: HashMap::new(),
             usage_counts: Mutex::new(HashMap::new()),
             cached_definitions: Mutex::new(None),
-            permissions: None,
         }
-    }
-
-    /// Set the permission configuration for this registry.
-    pub fn set_permissions(&mut self, permissions: ToolPermissions) {
-        self.permissions = Some(permissions);
     }
 
     /// Register a tool
@@ -161,25 +153,12 @@ impl ToolRegistry {
     /// registry borrow before calling `tool.execute()`. This prevents deadlocks
     /// when a tool (e.g., `delegate`) needs write access to the same registry
     /// during execution.
-    pub fn prepare(&self, name: &str, params: &Value, ctx: &RoutingContext) -> Result<DynTool> {
+    pub fn prepare(&self, name: &str, params: &Value, _ctx: &RoutingContext) -> Result<DynTool> {
         let tool = self
             .tools
             .get(name)
             .cloned()
             .ok_or_else(|| ToolError::NotFound(name.to_string()))?;
-
-        // Check permissions if configured
-        if let Some(ref perms) = self.permissions {
-            let required = tool.permission_level();
-            let channel = ctx.channel.as_str();
-            if !perms.is_allowed(channel, required) {
-                return Err(ToolError::PermissionDenied(format!(
-                    "Tool '{}' requires {} permission, channel '{}' has insufficient access",
-                    name, required, channel
-                ))
-                .into());
-            }
-        }
 
         // Validate parameters
         let errors = tool.validate_params(params);

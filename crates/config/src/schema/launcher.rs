@@ -1,3 +1,4 @@
+use super::core::default_true;
 use serde::{Deserialize, Serialize};
 
 fn default_scan_dirs() -> Vec<String> {
@@ -30,9 +31,6 @@ fn default_120() -> u64 {
 }
 fn default_max_entries() -> usize {
     1_000_000
-}
-fn default_true() -> bool {
-    true
 }
 fn default_mdfind_threshold() -> usize {
     20

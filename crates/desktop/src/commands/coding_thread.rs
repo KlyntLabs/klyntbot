@@ -100,11 +100,12 @@ pub async fn coding_thread_unsubscribe(subscription_id: String) -> () {
 }
 
 #[klynt_command]
-pub async fn coding_thread_refresh_agents_md(thread_id: String) -> serde_json::Value {
+pub async fn coding_thread_refresh_agents_md(
+    thread_id: String,
+) -> Vec<coding_agents_md::AgentsMdSource> {
     state
         .coding_thread_refresh_agents_md(&thread_id)
         .await
-        .map(|sources| serde_json::to_value(&sources).unwrap_or_default())
         .map_err(ApiError::from)
 }
 

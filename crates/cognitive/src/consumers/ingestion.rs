@@ -1,5 +1,7 @@
 use crate::{
-    repos::{AccumulatedObservationRepo, EntityRepo, EpisodicMemoryRepo, SemanticFactRepo},
+    repos::{
+        map_sqlx, AccumulatedObservationRepo, EntityRepo, EpisodicMemoryRepo, SemanticFactRepo,
+    },
     services::extraction::{to_semantic_fact, ExtractedFact, ExtractionHandler},
     types::Observation,
 };
@@ -42,7 +44,7 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         {
             // Take up to first separator
             let city = rest
-                .split(|c: char| c == ',' || c == '.' || c == '!' || c == ';')
+                .split([',', '.', '!', ';'])
                 .next()
                 .unwrap_or("")
                 .trim()
@@ -51,7 +53,7 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
             if !city.is_empty() && city.len() < 60 {
                 // Restore original casing by finding the slice in `content`
                 let case_corrected =
-                    original_case(content, city).unwrap_or_else(|| city.to_string());
+                    original_case(content, &lc, city).unwrap_or_else(|| city.to_string());
                 out.push(mk("identity", "lives_in", &case_corrected));
                 if prefix.contains("moved") {
                     out.push(mk("identity", "moved_to", &case_corrected));
@@ -66,12 +68,13 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
         if let Some(idx) = lc.find(prefix) {
             let rest = &lc[idx + prefix.len()..];
             let org = rest
-                .split(|c: char| c == ',' || c == '.' || c == '!' || c == ';' || c == ' ')
+                .split([',', '.', '!', ';', ' '])
                 .next()
                 .unwrap_or("")
                 .trim();
             if !org.is_empty() && org.len() < 40 {
-                let case_corrected = original_case(content, org).unwrap_or_else(|| org.to_string());
+                let case_corrected =
+                    original_case(content, &lc, org).unwrap_or_else(|| org.to_string());
                 out.push(mk("work", "works_at", &case_corrected));
                 break;
             }
@@ -98,7 +101,7 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
     // first-person-biased. We deliberately accept only a small whitelist
     // of high-signal verbs to avoid garbage extractions from narrative
     // assistant replies.
-    for sentence in content.split(|c: char| c == '.' || c == '!' || c == '?') {
+    for sentence in content.split(['.', '!', '?']) {
         let s = sentence.trim();
         let mut toks = s.split_whitespace();
         let Some(subj) = toks.next() else { continue };
@@ -180,15 +183,10 @@ fn regex_backstop_facts(content: &str, domain: &str) -> Vec<ExtractedFact> {
 
 /// Recover original casing of `lc_slice` from `original` (a longer string
 /// containing the slice in some casing). Returns None if not found.
-fn original_case(original: &str, lc_slice: &str) -> Option<String> {
-    let lc_orig = original.to_lowercase();
+fn original_case(original: &str, lc_orig: &str, lc_slice: &str) -> Option<String> {
     let idx = lc_orig.find(lc_slice)?;
     let end = idx + lc_slice.len();
     Some(original[idx..end].to_string())
-}
-
-fn map_sqlx(e: sqlx::Error) -> common::KlyntbotError {
-    common::KlyntbotError::Storage(e.to_string())
 }
 
 pub struct IngestionConsumer {
@@ -463,23 +461,24 @@ impl SignalConsumer for IngestionConsumer {
                             // exist in memory and never reach the FTS5
                             // index used by recall.
                             if let Some(repo) = fact_repo {
-                                // RE-lookup user_name AFTER extraction. The
-                                // pre-extraction lookup is best-effort for
-                                // prompt context, but turn N's spawn often
-                                // races ahead of turn N-1's write — so the
-                                // pre-lookup returns None and the mirror
-                                // skips. By re-querying here, the natural
-                                // 2-4s LLM call gave turn N-1 time to land.
-                                let user_name = repo
-                                    .find_by_subject_predicate("user", "name")
-                                    .await
-                                    .ok()
-                                    .and_then(|rows| {
-                                        rows.into_iter()
-                                            .find(|f| f.superseded_at.is_none())
-                                            .map(|f| f.object)
-                                    })
-                                    .or(user_name);
+                                // RE-lookup user_name AFTER extraction only if
+                                // the pre-extraction lookup came up empty. Turn
+                                // N's spawn often races ahead of turn N-1's
+                                // write, so the pre-lookup returns None; by
+                                // re-querying here the natural 2-4s LLM call
+                                // gave turn N-1 time to land.
+                                let user_name = if user_name.is_none() {
+                                    repo.find_by_subject_predicate("user", "name")
+                                        .await
+                                        .ok()
+                                        .and_then(|rows| {
+                                            rows.into_iter()
+                                                .find(|f| f.superseded_at.is_none())
+                                                .map(|f| f.object)
+                                        })
+                                } else {
+                                    user_name
+                                };
                                 let mut written = 0usize;
                                 for ext in &result.extractions {
                                     for f in &ext.facts {

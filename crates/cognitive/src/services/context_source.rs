@@ -12,41 +12,10 @@ use tokio::sync::Mutex;
 use tracing::warn;
 
 use crate::repos::{load_user_model, ProceduralRuleRepo, SemanticFactRepo, RULE_DOMAINS};
-use crate::types::UserModel;
+use crate::types::{freshness_label, UserModel};
 
 /// Cache TTL for user model data (seconds).
 const CACHE_TTL_SECS: u64 = 60;
-
-/// Returns a freshness label for a semantic fact based on convergence score,
-/// confidence, and recency of last access.
-fn freshness_label(fact: &crate::types::SemanticFact) -> &'static str {
-    // A just-recorded fact has `last_accessed = None` because nothing has
-    // queried it yet. Treat that as fresh by falling back to `recorded_at`
-    // — otherwise every newly extracted fact would be labeled `"weak"` and
-    // the LLM would refuse to use it. (Use `recorded_at` rather than
-    // `last_accessed.unwrap_or(recorded_at)` so we cover both the new-fact
-    // case and the never-accessed-but-old case symmetrically.)
-    let reference_ts = fact
-        .last_accessed
-        .as_deref()
-        .or(Some(fact.recorded_at.as_str()));
-    let days_old = reference_ts
-        .and_then(|ts| ts.parse::<jiff::Timestamp>().ok())
-        .map(|ts| (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()) / 86_400_000)
-        .unwrap_or(90);
-    if fact.convergence_score >= 0.4 || (fact.confidence >= 0.8 && days_old <= 7) {
-        "trusted"
-    } else if fact.confidence >= 0.5 && days_old <= 30 {
-        "noted"
-    } else {
-        // Was "weak -- verify" — but the LLM, seeing "verify" in the
-        // label, would reflexively hedge ("you may want to verify this")
-        // even when the fact was right in front of it. Use a neutral
-        // descriptor; the LLM can still reason about confidence from
-        // explicit numeric scores when needed.
-        "low-confidence"
-    }
-}
 
 struct CachedModel {
     model: UserModel,
@@ -255,6 +224,24 @@ impl ContextSource for CognitiveContextSource {
 
         if !rules_text.is_empty() {
             sections.push(format!("## Learned Patterns\n{rules_text}"));
+        }
+
+        // ── Themes (Wave 8) — top-3 community summaries by member count ──
+        if std::env::var("KCA_COMMUNITY_SUMMARIES").ok().as_deref() == Some("1") {
+            let community_repo =
+                crate::repos::community::CommunityRepo::new(self.fact_repo.pool().clone());
+            if let Ok(mut communities) = community_repo.list_active_communities().await {
+                communities.retain(|c| !c.summary.trim().is_empty());
+                communities.sort_by(|a, b| b.member_count.cmp(&a.member_count));
+                communities.truncate(3);
+                if !communities.is_empty() {
+                    let lines: Vec<String> = communities
+                        .iter()
+                        .map(|c| format!("- {}: {}", c.name, c.summary))
+                        .collect();
+                    sections.push(format!("## Themes\n{}", lines.join("\n")));
+                }
+            }
         }
 
         // ── Confidence calibration ──

@@ -49,7 +49,7 @@ pub async fn run_hook(
             modify_args: None,
         }
     } else {
-        serde_json::from_str(&stdout).unwrap_or_else(|_| crate::types::HookResponse {
+        serde_json::from_str(&stdout).unwrap_or(crate::types::HookResponse {
             r#continue: true,
             block: false,
             reason: None,
@@ -76,10 +76,8 @@ pub async fn dispatch_event(
                         reason: outcome.reason.unwrap_or_default(),
                     };
                 }
-                if supports_modify_args && outcome.modify_args.is_some() {
-                    return HookOutcome::ModifyArgs {
-                        args: outcome.modify_args.unwrap(),
-                    };
+                if let Some(args) = outcome.modify_args {
+                    return HookOutcome::ModifyArgs { args };
                 }
             }
         }

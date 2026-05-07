@@ -19,6 +19,15 @@ pub async fn provider_status(provider_id: String) -> serde_json::Value {
         .map_err(|e| ApiError::new("PROVIDER_ERROR", e.to_string()))
 }
 
+#[klynt_command]
+pub async fn model_list(workspace_id: String) -> serde_json::Value {
+    state
+        .model_list(&workspace_id)
+        .await
+        .map(|r| serde_json::to_value(r).unwrap_or_default())
+        .map_err(|e| ApiError::new("PROVIDER_ERROR", e.to_string()))
+}
+
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
@@ -34,6 +43,15 @@ pub(crate) async fn dispatch_dev(
         "provider_status" => {
             let provider_id = try_field!(dev::get_str(body, "providerId"));
             match core.provider_status(&provider_id).await {
+                Ok(r) => Ok(serde_json::to_value(r).unwrap_or_default()),
+                Err(e) => Err(ApiError::new("PROVIDER_ERROR", e.to_string())),
+            }
+        }
+        "model_list" => {
+            // workspaceId is optional in browser dev; downstream
+            // handler ignores it today.
+            let workspace_id = dev::get_str(body, "workspaceId").unwrap_or_default();
+            match core.model_list(&workspace_id).await {
                 Ok(r) => Ok(serde_json::to_value(r).unwrap_or_default()),
                 Err(e) => Err(ApiError::new("PROVIDER_ERROR", e.to_string())),
             }

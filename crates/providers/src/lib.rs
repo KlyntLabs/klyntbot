@@ -17,6 +17,7 @@ pub enum ProviderRole {
 }
 
 pub mod adapters;
+pub mod catalogue;
 mod factory;
 pub mod manager;
 pub mod registry;
@@ -38,10 +39,11 @@ pub use registry::{ProviderRegistry, ProviderSpec, PROVIDERS};
 
 // -- Types --
 pub use types::{
-    tool_calls_to_messages, ChatParams, ContentPart, DynProvider, FunctionCall, ImageUrl,
-    LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
-    ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage, ToolContent,
-    ToolContentPart, Usage, UserContent, DEFAULT_CONTEXT_WINDOW,
+    id_implies_reasoning, tool_calls_to_messages, CacheAnchor, CacheBreakpoint, CacheTtl,
+    ChatParams, ContentPart, DynProvider, FunctionCall, ImageUrl, LlmProvider, LlmResponse,
+    LlmStream, LlmStreamChunk, Message, ProviderCapabilities, ProviderHealth, ProviderModel,
+    ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage, ToolContent, ToolContentPart, Usage,
+    UserContent, DEFAULT_CONTEXT_WINDOW,
 };
 
 // -- Factory --

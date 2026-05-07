@@ -134,6 +134,9 @@ pub struct SubagentManager {
     event_tx: std::sync::Mutex<
         Option<tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>>,
     >,
+    /// Live per-agent progress (iteration, last_tool) updated by the forwarder
+    /// spawned from `run_subagent_task`. Read by `list_active`.
+    progress: Arc<dashmap::DashMap<String, (u32, Option<String>)>>,
 }
 
 /// Builder for SubagentManager
@@ -217,6 +220,7 @@ impl SubagentManagerBuilder {
             hook_engine: std::sync::Mutex::new(self.hook_engine),
             registry_cache: std::sync::Mutex::new(HashMap::new()),
             event_tx: std::sync::Mutex::new(self.event_sender),
+            progress: Arc::new(dashmap::DashMap::new()),
         }
     }
 }
@@ -304,17 +308,14 @@ impl SubagentManager {
                 task_summary: label_text.clone(),
                 base: Default::default(),
             };
-            match engine
+            if let klynt_hooks::HookOutcome::Block { reason } = engine
                 .fire(klynt_hooks::engine::HookFireInput::SubagentSpawn(input))
                 .await
             {
-                klynt_hooks::HookOutcome::Block { reason } => {
-                    return format!(
-                        "Subagent spawn blocked by hook: {} (ID: {})",
-                        reason, short_id
-                    );
-                }
-                _ => {}
+                return format!(
+                    "Subagent spawn blocked by hook: {} (ID: {})",
+                    reason, short_id
+                );
             }
         }
 
@@ -393,6 +394,7 @@ impl SubagentManager {
             let lock = self.event_tx.lock().unwrap();
             lock.clone()
         };
+        let progress_ref = Arc::clone(&self.progress);
 
         tokio::spawn(async move {
             // Acquire permit before running — limits concurrent subagents.
@@ -408,10 +410,17 @@ impl SubagentManager {
                 _ = cancel_token.cancelled() => {
                     Err("Cancelled by user".into())
                 }
-                r = run_subagent_task(&provider, &workspace, &model, &task, config, profile, tool_kit, hook_engine.clone(), origin_key.clone(), base_registry) => {
+                r = run_subagent_task(
+                    &provider, &workspace, &model, &task, config, profile,
+                    tool_kit, hook_engine.clone(), origin_key.clone(), base_registry,
+                    short_id_clone.clone(), Arc::clone(&progress_ref), event_tx_clone.clone(),
+                ) => {
                     r
                 }
             };
+
+            // Drop progress entry (subagent is no longer active).
+            progress_ref.remove(&short_id_clone);
 
             // Remove handle after completion
             {
@@ -501,14 +510,19 @@ impl SubagentManager {
             .filter(|(_, h)| !h.cancel_token.is_cancelled())
             .map(|(id, h)| {
                 let duration_ms = h.spawned_at.elapsed().as_millis() as u64;
+                let (iteration, last_tool) = self
+                    .progress
+                    .get(id)
+                    .map(|e| e.value().clone())
+                    .unwrap_or((0, None));
                 SubagentHandleSummary {
                     agent_id: id.clone(),
                     label: h.label.clone(),
                     profile: h.profile.to_string(),
-                    iteration: 0, // Progress events not yet wired; hard-coded default.
+                    iteration,
                     status: "running".into(),
                     started_at: h.spawned_at_ms,
-                    last_tool: None,
+                    last_tool,
                     duration_ms,
                 }
             })
@@ -568,6 +582,7 @@ impl SpawnHandler for SubagentManager {
 /// - ReadOnly: read-only / network / interaction tools
 /// - ReadWrite: read-only + mutating tools
 /// - Full: all tools including plan-mode
+#[allow(clippy::too_many_arguments)]
 async fn run_subagent_task(
     provider: &DynProvider,
     workspace: &std::path::Path,
@@ -579,8 +594,13 @@ async fn run_subagent_task(
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     session_key: String,
     base_registry: Option<Arc<RwLock<ToolRegistry>>>,
+    agent_id: String,
+    progress: Arc<dashmap::DashMap<String, (u32, Option<String>)>>,
+    lifecycle_tx: Option<
+        tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>,
+    >,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
-    use crate::execution::budget::{DepthMode, ExecutionBudget};
+    use crate::execution::budget::{DepthMode, SafetyCap};
     use crate::execution::core::ExecutionCore;
     use crate::execution::execute_loop::execute_loop;
     use crate::execution::types::ExecutionParams;
@@ -600,10 +620,8 @@ async fn run_subagent_task(
         t
     } else {
         let kit = tool_kit.ok_or_else(|| {
-            Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "subagent tool kit not initialized",
-            )) as Box<dyn std::error::Error + Send + Sync>
+            Box::new(std::io::Error::other("subagent tool kit not initialized"))
+                as Box<dyn std::error::Error + Send + Sync>
         })?;
         let kit = (*kit).clone().with_cwd(workspace.to_path_buf());
 
@@ -646,18 +664,57 @@ async fn run_subagent_task(
         Message::user(task.to_string()),
     ];
 
-    let params = ExecutionParams::new(model)
+    let params = ExecutionParams::new(model, provider.context_window())
         .with_timeout(std::time::Duration::from_secs(config.task_timeout));
     let mut routing_ctx = RoutingContext::new("subagent".into(), "background".into());
     routing_ctx.hook_engine = hook_engine;
     routing_ctx.session_key = Some(session_key.into());
 
-    // Execute via unified execute loop with a fixed budget
-    let mut budget = ExecutionBudget::with_limits(
+    // Execute via unified execute loop with a fixed safety cap
+    let mut budget = SafetyCap::with_limits(
         DepthMode::Normal,
         120_000, // generous token budget for subagents
         profile.max_iterations(),
     );
+
+    // Side channel: translate AgentEvent::IterationStart / ToolStart into
+    // SubagentLifecycleEvent::Progress so the SubagentTray UI can update mid-flight,
+    // and keep a live (iteration, last_tool) snapshot in the shared progress map
+    // so SubagentManager::list_active reports the real iteration count.
+    let (agent_event_tx, mut agent_event_rx) =
+        tokio::sync::mpsc::channel::<crate::events::AgentEvent>(64);
+    let forwarder = tokio::spawn({
+        let progress = Arc::clone(&progress);
+        let agent_id = agent_id.clone();
+        async move {
+            while let Some(ev) = agent_event_rx.recv().await {
+                match ev {
+                    crate::events::AgentEvent::IterationStart { iteration, .. } => {
+                        let iter_u32 = iteration as u32;
+                        let last_tool = progress
+                            .get(&agent_id)
+                            .map(|e| e.value().1.clone())
+                            .unwrap_or(None);
+                        progress.insert(agent_id.clone(), (iter_u32, last_tool.clone()));
+                        if let Some(ref tx) = lifecycle_tx {
+                            let _ =
+                                tx.send(crate::subagent_events::SubagentLifecycleEvent::Progress {
+                                    agent_id: agent_id.clone(),
+                                    iteration: iter_u32,
+                                    last_tool,
+                                });
+                        }
+                    }
+                    crate::events::AgentEvent::ToolStart { name, .. } => {
+                        let iteration = progress.get(&agent_id).map(|e| e.value().0).unwrap_or(0);
+                        progress.insert(agent_id.clone(), (iteration, Some(name)));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    });
+
     let result = execute_loop(
         &core,
         messages,
@@ -665,10 +722,15 @@ async fn run_subagent_task(
         &params,
         &mut budget,
         &routing_ctx,
-        None,
+        Some(agent_event_tx),
     )
     .await
-    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>);
+
+    // Channel sender dropped at this point (execute_loop returned, sender out of scope);
+    // forwarder loop terminates naturally as recv() returns None.
+    let _ = forwarder.await;
+    let result = result?;
 
     Ok(("ok".to_string(), result.content))
 }
@@ -809,27 +871,18 @@ mod tests {
     }
 
     fn make_tool_kit(pool: &storage::StoragePool) -> Arc<klynt_core::ToolKitBuilder> {
-        let layer1 = Arc::new(
-            klynt_core::approval::Layer1::compile(&config::schema::CodingPermissions::default())
-                .unwrap(),
-        );
         let policy = Arc::new(klynt_execpolicy::Policy::empty());
         let privacy = Arc::new(klynt_core::privacy::PrivacyGuard::from_globs(&[]).unwrap());
-        let pending = Arc::new(klynt_core::approval::PendingApprovalsMap::default());
         let bus = Arc::new(bus::DomainEventBus::new(16));
         let repos = storage::Repos::from_pool(pool);
-        let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
         let non_ui_policy = common::tool_channel::NonUiPolicy::Allow;
 
         Arc::new(klynt_core::ToolKitBuilder {
             cwd: std::path::PathBuf::from("/tmp"),
-            layer1,
             policy,
             privacy,
-            pending,
             bus,
             repos,
-            host_cache,
             non_ui_policy,
             hook_engine: None,
             snapshot_repo: None,
@@ -870,6 +923,9 @@ mod tests {
             Some(kit),
             None,
             "test:session".to_string(),
+            None,
+            "agent-1".to_string(),
+            Arc::new(dashmap::DashMap::new()),
             None,
         )
         .await;

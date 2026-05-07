@@ -13,7 +13,7 @@ proptest! {
     ) {
         let td = TempDir::new().unwrap();
         let mut cur = td.path().to_path_buf();
-        for (i, d) in depths.iter().enumerate() {
+        for (i, _d) in depths.iter().enumerate() {
             let dirname = format!("d{i}");
             cur = cur.join(dirname);
             fs::create_dir_all(&cur).unwrap();

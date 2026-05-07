@@ -1,5 +1,6 @@
-use crate::approval::{evaluate, GuardCtx, Layer1, PendingApprovalsMap};
 use crate::privacy::PrivacyGuard;
+use crate::tools::shared::file_edit_event::fan_out_tool_event;
+use crate::tools::shared::fs_resolve::resolve_path;
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
 use async_trait::async_trait;
 use bus::DomainEventBus;
@@ -8,10 +9,9 @@ use klynt_sandbox::SandboxRunner;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio_util::sync::CancellationToken;
 use tools_core::events::ToolEvent;
 use tools_core::{RoutingContext, ToolExecute, ToolParams};
-use uuid::Uuid;
+
 
 #[derive(Debug, Clone, serde::Serialize, ToolParams)]
 pub struct BashArgs {
@@ -33,13 +33,22 @@ pub struct BashArgs {
                    Approval and sandbox rules apply. Output is captured and \
                    truncated to 50KB.",
     params = "BashArgs",
-    allowed_channels = "coding_only"
+    allowed_channels = "coding_only",
+    custom_timeout_secs = "600",
+    approval_class = "destructive",
+    approval_scope = "command"
 )]
 pub struct BashTool {
-    layer1: Arc<Layer1>,
+    /// Workspace root that all relative `args.cwd` values resolve against and
+    /// that is used as the cwd when `args.cwd` is absent. Symmetric with
+    /// `WriteTool`/`EditTool`/`ApplyPatchTool` — the per-turn rebind in
+    /// `coding/turn_handler.rs` swaps this in by re-registering the tool.
+    /// Never falls back to `std::env::current_dir()`: a process-cwd fallback
+    /// previously caused new coding threads to scaffold files inside the
+    /// running binary's launch directory instead of the workspace.
+    cwd: PathBuf,
     policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
-    pending: Arc<PendingApprovalsMap>,
     bus: Arc<DomainEventBus>,
     non_ui_policy: common::tool_channel::NonUiPolicy,
     pub history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
@@ -51,18 +60,16 @@ pub struct BashTool {
 
 impl BashTool {
     pub fn new(
-        layer1: Arc<Layer1>,
+        cwd: PathBuf,
         policy: Arc<Policy>,
         privacy: Arc<PrivacyGuard>,
-        pending: Arc<PendingApprovalsMap>,
         bus: Arc<DomainEventBus>,
         non_ui_policy: common::tool_channel::NonUiPolicy,
     ) -> Self {
         Self {
-            layer1,
+            cwd,
             policy,
             privacy,
-            pending,
             bus,
             non_ui_policy,
             history_repo: None,
@@ -79,39 +86,6 @@ impl ToolExecute for BashTool {
     type Params = BashArgs;
 
     async fn execute(&self, args: BashArgs, ctx: &RoutingContext) -> common::Result<String> {
-        let request_id = Uuid::new_v4().to_string();
-        let guard_ctx = GuardCtx {
-            layer1: &self.layer1,
-            policy: &self.policy,
-            privacy: &self.privacy,
-            pending: &self.pending,
-            event_tx: ctx.event_tx.as_ref(),
-            domain_bus: &self.bus,
-            cancel: ctx
-                .cancel_token
-                .clone()
-                .unwrap_or_else(CancellationToken::new),
-            request_id,
-            args: Some(serde_json::to_value(&args).unwrap_or(serde_json::Value::Null)),
-            cwd: args.cwd.clone(),
-            channel: common::tool_channel::Channel::from_name(ctx.channel.as_str()),
-            non_ui_policy: self.non_ui_policy,
-            history_repo: self.history_repo.clone(),
-            repo_id: self.repo_id.clone(),
-            mirror_learning_enabled: self.mirror_learning_enabled,
-            mirror_min_approvals: self.mirror_min_approvals,
-            mirror_cooldown_seconds: self.mirror_cooldown_seconds,
-            now_unix: jiff::Timestamp::now().as_second(),
-            thread_id: ctx.session_key.as_ref().map(ToString::to_string),
-            turn_id: ctx.message_id.clone(),
-        };
-        let decision = evaluate(guard_ctx, "bash", &args.command).await;
-        if !decision.allowed() {
-            return Err(common::KlyntbotError::Tool(
-                common::ToolError::PermissionDenied(format!("bash denied: {:?}", decision)),
-            ));
-        }
-
         let session_id = ctx
             .session_key
             .clone()
@@ -142,38 +116,21 @@ impl ToolExecute for BashTool {
 
             #[cfg(target_os = "macos")]
             {
-                let cwd = args
-                    .cwd
-                    .map(PathBuf::from)
-                    .unwrap_or_else(|| std::env::current_dir().unwrap());
+                let cwd = args.cwd.as_deref().map(|p| resolve_path(p, &self.cwd)).unwrap_or_else(|| self.cwd.clone());
                 let sandbox_policy = klynt_sandbox::SandboxPolicy::cwd_writes_only(cwd.clone());
-                if let Some(ref tx) = ctx.event_tx {
-                    let _ = tx
-                        .send(ToolEvent::SandboxPolicyApplied {
-                            tool: "bash".into(),
-                            policy_summary: sandbox_policy.summary(),
-                            policy_hash: sandbox_policy.policy_hash(),
-                            fallback_unsandboxed: false,
-                            fs_constraints: vec![format!("{:?}", sandbox_policy.fs)],
-                            network_constraints: vec![format!("{:?}", sandbox_policy.network)],
-                        })
-                        .await;
-                }
-                if let Some(ref bus) = Some(&self.bus) {
-                    let payload = serde_json::json!({
-                        "type": "sandboxPolicyApplied",
-                        "tool": "bash",
-                        "policySummary": sandbox_policy.summary(),
-                        "policyHash": sandbox_policy.policy_hash(),
-                        "fallbackUnsandboxed": false,
-                        "fsConstraints": vec![format!("{:?}", sandbox_policy.fs)],
-                        "networkConstraints": vec![format!("{:?}", sandbox_policy.network)],
-                    });
-                    bus.publish(bus::DomainEvent::Generic {
-                        kind: "agent_event".into(),
-                        payload,
-                    });
-                }
+                fan_out_tool_event(
+                    ctx.event_tx.as_ref(),
+                    Some(&self.bus),
+                    ToolEvent::SandboxPolicyApplied {
+                        tool: "bash".into(),
+                        policy_summary: sandbox_policy.summary(),
+                        policy_hash: sandbox_policy.policy_hash(),
+                        fallback_unsandboxed: false,
+                        fs_constraints: vec![format!("{:?}", sandbox_policy.fs)],
+                        network_constraints: vec![format!("{:?}", sandbox_policy.network)],
+                    },
+                )
+                .await;
                 let runner = klynt_sandbox::MacOsSeatbeltRunner::new();
                 let timeout = Duration::from_millis(args.timeout_ms.unwrap_or(60_000));
                 let out = runner

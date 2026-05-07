@@ -1,12 +1,9 @@
 //! Inv 5 — SUPERSEDE chain: predecessor.valid_until == successor.valid_from.
 
-use coding_memory::distiller::writer::DistillerWriter;
 use coding_memory::scope::{ProvenanceKind, ProvenanceMetadata};
 use cognitive::types::SemanticFact;
 use jiff::{Timestamp, ToSpan};
 use proptest::prelude::*;
-use storage::StoragePool;
-use uuid::Uuid;
 
 mod common;
 
@@ -22,7 +19,6 @@ proptest! {
 
             let base_time = Timestamp::now();
             let mut prev_id: Option<String> = None;
-            let mut prev_valid_from = base_time;
 
             for i in 0..chain_len {
                 let id = format!("fact_{i}");
@@ -50,15 +46,14 @@ proptest! {
                     scope_id: None,
                     scope_repo_id: None,
                     metadata: None,
-
-                    speaker: None,};
+                    speaker: None,
+};
                 writer.facts().upsert(&fact).await.unwrap();
 
                 if let Some(prev) = prev_id {
                     writer.complete_supersede(&prev, &id, &valid_from.to_string()).await.unwrap();
                 }
                 prev_id = Some(id);
-                prev_valid_from = valid_from;
             }
 
             let chain = writer.facts().list_supersede_chain("repo:x", "fw").await.unwrap();

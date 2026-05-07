@@ -192,6 +192,29 @@ impl EpisodicMemoryRepo {
         Ok(rows)
     }
 
+    /// Mark episodic memories as invalidated (set `valid_until = now` if not
+    /// already set) for the given ids in a single batched UPDATE.
+    pub async fn invalidate_batch(&self, ids: &[&str]) -> Result<(), sqlx::Error> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let placeholders = (1..=ids.len())
+            .map(|i| format!("?{i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "UPDATE episodic_memories \
+             SET valid_until = COALESCE(valid_until, datetime('now')) \
+             WHERE id IN ({placeholders})"
+        );
+        let mut q = sqlx::query(&sql);
+        for id in ids {
+            q = q.bind(id);
+        }
+        q.execute(&self.pool).await?;
+        Ok(())
+    }
+
     /// Delete a row by id. Used by `coding-memory`'s session-end dedup pass.
     pub async fn delete_by_id(&self, id: &str) -> Result<(), sqlx::Error> {
         sqlx::query("DELETE FROM episodic_memories WHERE id = ?1")

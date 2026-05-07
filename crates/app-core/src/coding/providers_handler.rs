@@ -32,7 +32,7 @@ pub struct ProviderStatusResult {
 }
 
 /// Known provider IDs and their display names + default models.
-const KNOWN_PROVIDERS: &[(&str, &str, &str)] = &[
+pub(crate) const KNOWN_PROVIDERS: &[(&str, &str, &str)] = &[
     ("anthropic", "Anthropic", "claude-sonnet-4-20250514"),
     ("openai", "OpenAI", "gpt-4o"),
     ("openrouter", "OpenRouter", ""),
@@ -61,21 +61,7 @@ impl AppCore {
         let mut providers = Vec::new();
 
         for &(id, name, default_model) in KNOWN_PROVIDERS {
-            let has_api_key = match id {
-                "anthropic" => !providers_cfg.anthropic.api_key.expose().is_empty(),
-                "openai" => !providers_cfg.openai.api_key.expose().is_empty(),
-                "openrouter" => !providers_cfg.openrouter.api_key.expose().is_empty(),
-                "deepseek" => !providers_cfg.deepseek.api_key.expose().is_empty(),
-                "gemini" => !providers_cfg.gemini.api_key.expose().is_empty(),
-                "groq" => !providers_cfg.groq.api_key.expose().is_empty(),
-                "vllm" => !providers_cfg.vllm.api_key.expose().is_empty(),
-                "zhipu" => !providers_cfg.zhipu.api_key.expose().is_empty(),
-                "dashscope" => !providers_cfg.dashscope.api_key.expose().is_empty(),
-                "moonshot" => !providers_cfg.moonshot.api_key.expose().is_empty(),
-                "minimax" => !providers_cfg.minimax.api_key.expose().is_empty(),
-                "aihubmix" => !providers_cfg.aihubmix.api_key.expose().is_empty(),
-                _ => false,
-            };
+            let has_api_key = Self::has_api_key(id, providers_cfg);
 
             providers.push(ProviderInfo {
                 id: id.to_string(),
@@ -107,21 +93,7 @@ impl AppCore {
         let config = self.config.read().await;
         let providers_cfg = &config.providers;
 
-        let has_key = match provider_id {
-            "anthropic" => !providers_cfg.anthropic.api_key.expose().is_empty(),
-            "openai" => !providers_cfg.openai.api_key.expose().is_empty(),
-            "openrouter" => !providers_cfg.openrouter.api_key.expose().is_empty(),
-            "deepseek" => !providers_cfg.deepseek.api_key.expose().is_empty(),
-            "gemini" => !providers_cfg.gemini.api_key.expose().is_empty(),
-            "groq" => !providers_cfg.groq.api_key.expose().is_empty(),
-            "vllm" => !providers_cfg.vllm.api_key.expose().is_empty(),
-            "zhipu" => !providers_cfg.zhipu.api_key.expose().is_empty(),
-            "dashscope" => !providers_cfg.dashscope.api_key.expose().is_empty(),
-            "moonshot" => !providers_cfg.moonshot.api_key.expose().is_empty(),
-            "minimax" => !providers_cfg.minimax.api_key.expose().is_empty(),
-            "aihubmix" => !providers_cfg.aihubmix.api_key.expose().is_empty(),
-            _ => false,
-        };
+        let has_key = Self::has_api_key(provider_id, providers_cfg);
 
         if !has_key {
             return Ok(ProviderStatusResult {
@@ -137,5 +109,72 @@ impl AppCore {
             available: true,
             error: None,
         })
+    }
+
+    fn has_api_key(id: &str, cfg: &config::schema::ProvidersConfig) -> bool {
+        Self::provider_entry(id, cfg).is_some()
+    }
+
+    /// Return `(api_key, api_base)` for a known provider if the key is non-empty.
+    pub(crate) fn provider_entry<'a>(
+        id: &str,
+        cfg: &'a config::schema::ProvidersConfig,
+    ) -> Option<(&'a str, &'a str)> {
+        let (key, base) = match id {
+            "anthropic" => (
+                cfg.anthropic.api_key.expose(),
+                cfg.anthropic.api_base.as_deref().unwrap_or(""),
+            ),
+            "openai" => (
+                cfg.openai.api_key.expose(),
+                cfg.openai.api_base.as_deref().unwrap_or(""),
+            ),
+            "openrouter" => (
+                cfg.openrouter.api_key.expose(),
+                cfg.openrouter.api_base.as_deref().unwrap_or(""),
+            ),
+            "deepseek" => (
+                cfg.deepseek.api_key.expose(),
+                cfg.deepseek.api_base.as_deref().unwrap_or(""),
+            ),
+            "gemini" => (
+                cfg.gemini.api_key.expose(),
+                cfg.gemini.api_base.as_deref().unwrap_or(""),
+            ),
+            "groq" => (
+                cfg.groq.api_key.expose(),
+                cfg.groq.api_base.as_deref().unwrap_or(""),
+            ),
+            "vllm" => (
+                cfg.vllm.api_key.expose(),
+                cfg.vllm.api_base.as_deref().unwrap_or(""),
+            ),
+            "zhipu" => (
+                cfg.zhipu.api_key.expose(),
+                cfg.zhipu.api_base.as_deref().unwrap_or(""),
+            ),
+            "dashscope" => (
+                cfg.dashscope.api_key.expose(),
+                cfg.dashscope.api_base.as_deref().unwrap_or(""),
+            ),
+            "moonshot" => (
+                cfg.moonshot.api_key.expose(),
+                cfg.moonshot.api_base.as_deref().unwrap_or(""),
+            ),
+            "minimax" => (
+                cfg.minimax.api_key.expose(),
+                cfg.minimax.api_base.as_deref().unwrap_or(""),
+            ),
+            "aihubmix" => (
+                cfg.aihubmix.api_key.expose(),
+                cfg.aihubmix.api_base.as_deref().unwrap_or(""),
+            ),
+            _ => return None,
+        };
+        if key.is_empty() {
+            None
+        } else {
+            Some((key, base))
+        }
     }
 }

@@ -49,7 +49,7 @@ pub async fn compute_graph_boosts(
         let mut weighted_score = 0.0;
         for (name, edge_type) in &neighborhood {
             if name.len() > 2 && content_lower.contains(name.as_str()) {
-                weighted_score += weight_for_edge_type(edge_type);
+                weighted_score += edge_type.weight();
                 if weighted_score >= 1.0 {
                     break;
                 }
@@ -62,15 +62,6 @@ pub async fn compute_graph_boosts(
     }
 
     boosts
-}
-
-fn weight_for_edge_type(t: &EdgeType) -> f64 {
-    match t {
-        EdgeType::Causal => 1.5,
-        EdgeType::Structural => 1.2,
-        EdgeType::Temporal => 1.1,
-        EdgeType::Correlational => 1.0,
-    }
 }
 
 /// Extract potential entity names from a query string.

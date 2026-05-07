@@ -141,7 +141,7 @@ impl QueryStage for MultiQueryStage {
         let timeout_dur = Duration::from_millis(timeout_ms);
 
         let result =
-            tokio::time::timeout(timeout_dur, provider.chat(&messages, None, &params)).await;
+            tokio::time::timeout(timeout_dur, provider.chat(&messages, None, &params, &[])).await;
 
         match result {
             Ok(Ok(response)) => {

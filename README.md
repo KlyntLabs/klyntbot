@@ -1,135 +1,150 @@
-# Klyntbot — Personal Cognitive Agent OS
+<h1 align="center">Klyntbot</h1>
 
-Klyntbot turns your machine into a **personal cognitive agent OS**:  
-a local-first Rust agent with long-term memory, self-reflection, and multi-channel access to your digital life — without depending on the cloud.
+<p align="center">
+  <strong>A local-first personal cognitive agent OS for macOS.</strong><br>
+  Long-term memory · self-reflection · multi-channel access — all running on your machine.
+</p>
 
-- 🧠 **Cognitive memory** — Semantic and episodic memory, FSRS-style decay, knowledge graphs, and procedural rules.
-- 💻 **Local-first desktop** — Built with Tauri 2 and React 19; all data lives locally in SQLite and LanceDB.
-- 🤖 **Real agent runtime** — Budget-aware execution, tool calls, context assembly, and fabrication detection.
-- 🧩 **Extensible by design** — Skills, feature packages, WASM plugins, and MCP client/server support.
+<p align="center">
+  <a href="./LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>
+  <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-lightgrey">
+  <img alt="Status: pre-1.0" src="https://img.shields.io/badge/status-pre--1.0-orange">
+  <img alt="Rust 1.93+" src="https://img.shields.io/badge/rust-1.93%2B-orange?logo=rust">
+  <a href="https://github.com/KlyntLabs/klyntbot/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/badge/discuss-GitHub-181717?logo=github"></a>
+</p>
+
+> **Pre-1.0 / unstable.** APIs, schemas, and config formats may change between releases without migrations. Don't rely on Klyntbot for anything you can't afford to rebuild.
 
 ---
 
 ## What is Klyntbot?
 
-Klyntbot is not just an LLM wrapper.  
-It is a **personal cognitive agent OS** built in Rust, designed to think, remember, act, and improve over time.
+Klyntbot is a personal cognitive agent OS built in Rust. It runs entirely on your local machine and is designed to **think, remember, act, and improve over time**.
 
-It includes:
+- 🧠 **Cognitive memory** — semantic + episodic memory, FSRS-style decay, knowledge graphs, procedural rules
+- 💻 **Local-first** — Tauri 2 desktop app; all data lives in SQLite (WAL) and LanceDB under `~/.klyntbot/`
+- 🤖 **Real agent runtime** — budget-aware execution, tool calls, mid-loop compression, fabrication detection
+- 🌐 **Multi-channel** — Telegram, Discord, Slack, Email, and [MCP](https://modelcontextprotocol.io) — all sharing the same memory and persona
+- 🧩 **Extensible** — feature crates, skills, WASM plugins, and an MCP server that exposes tools to other AI clients
 
-- A dedicated agent runtime that understands **context**, **tools**, **budgets**, and **multi-step execution**.
-- A cognitive layer with **semantic, episodic, and procedural memory**.
-- A local-first desktop app and multi-platform chat integrations, all powered by the same core brain.
-
----
-
-## Core Ideas
-
-### Cognitive Operating System
-
-- **Bi-temporal semantic facts** — Tracks both *when a fact was true* and *when the system learned it*.
-- **FSRS-style memory decay** — Memories strengthen with use and fade naturally over time.
-- **Self-reflection** — The agent observes its own behavior, learns patterns, and improves its strategies over time.
-
-### Local-First by Default
-
-- All data is stored locally in **SQLite (WAL)** and **LanceDB**.
-- No cloud dependency is required for storage or core functionality.
-- The desktop experience is powered by **Tauri 2** and **React 19**.
-
-### A Real Agent Runtime
-
-- **Budget-aware execution** — Normal / DeepThink / Ultra depth modes with explicit token and turn limits.
-- **Context engine** — Dynamically assembles system prompt, history, memory, and tools based on strategy and budget.
-- **Execute loop** — Handles LLM ↔ tool cycles, mid-loop compression, live context refresh, and streaming updates.
+It is not a chat wrapper. It is a 39-crate Rust workspace organized into 9 strict layers, with a dedicated agent runtime, cognitive layer, and skill router as first-class primitives.
 
 ---
 
-## What It Can Do
+## Quick start
 
-Klyntbot is designed to handle deep personal workflows, not just chat:
+### Requirements
 
-- ✅ **Tasks and projects** — Agentic execution, decomposition, forecasting, and planning.
-- 📓 **Notes and knowledge** — Backlinks, knowledge graphs, flashcards, and spaced repetition.
-- 💰 **Finance and FIRE** — Budgeting, transactions, portfolios, and Monte Carlo FIRE planning.
-- 📈 **Productivity and coaching** — Focus sessions, activity analytics, behavior tracking, and interventions.
-- 🌐 **Multi-channel chat** — Telegram, Discord, Slack, Email, and desktop, all sharing the same memory and persona.
-- 🧠 **Learning and language** — Flashcard generation, learning insights, and language practice.
-
-Each capability is packaged as a self-contained **feature package** with its own tools, migrations, config, and health checks.
-
----
-
-## Why Klyntbot?
-
-Klyntbot is built for power users, developers, and builders who want a real agent OS instead of another SaaS chatbot.
-
-- **Architected, not glued together** — A 37-crate Rust workspace organized into 9 layers with strict upward-only dependencies.
-- **Cognitive layer first** — Memory, reflection, and learning are core features, not add-ons.
-- **Extensible like an OS** — Skills, feature crates, WASM plugins, and MCP integration.
-- **Developer-friendly** — Clear architecture, testable layers, and a desktop + browser development workflow.
-
----
-
-## Quick Start
-
-### Prerequisites
-
-```bash
-rustup install stable
-cargo install cargo-nextest tauri-cli@^2
-curl -fsSL https://bun.sh/install | bash
-```
+- **macOS** (Apple Silicon or Intel) — the only supported platform
+- Rust **stable** ≥ 1.93 (`rustup install stable`)
+- [`bun`](https://bun.sh) (`curl -fsSL https://bun.sh/install | bash`)
+- `cargo install cargo-nextest tauri-cli@^2`
 
 ### Build
 
 ```bash
-git clone <repo-url> && cd klyntbot
+git clone https://github.com/KlyntLabs/klyntbot.git
+cd klyntbot
 cargo build --workspace
 cd desktop-ui && bun install && cd ..
 ```
 
 ### Configure
 
-Create `~/.klyntbot/config.json`:
+Create `~/.klyntbot/config.json` with at least one provider:
 
 ```json
 {
   "providers": {
-    "anthropic": {
-      "apiKey": "sk-ant-..."
-    }
+    "anthropic": { "apiKey": "sk-ant-..." }
   }
 }
 ```
 
+> ⚠️ API keys are stored in plaintext on disk. This is intentional for a single-user local app — see [SECURITY.md](./SECURITY.md) for the threat model.
+
 ### Run
 
-**Browser dev mode:**
+```bash
+cargo tauri dev   # Full desktop app
+```
+
+Or browser-only dev mode:
 
 ```bash
-# Terminal 1 — backend + dev HTTP server
+# Terminal 1 — backend + dev HTTP server (:3456)
 cargo tauri dev
-
 # Terminal 2 — frontend
 cd desktop-ui && bun run dev
 # Open http://localhost:1420
 ```
 
-**Full desktop app:**
+For an isolated dev instance that doesn't touch production data:
 
 ```bash
-cargo tauri dev
+echo 'KLYNTBOT_HOME=~/.klyntbot-dev' > .env
 ```
 
 ---
 
-## Learn More
+## What it can do
 
-- **Architecture Overview** — system diagram, crate hierarchy, and message flow.
-- **Agent Runtime** — execution loop, budgets, compression, and streaming.
-- **Cognitive Memory** — FSRS decay, 12-factor relevance, mirror, and reforge.
-- **Context Engine** — token budgets, memory retrieval, and history compression.
-- **Desktop App** — AppCore, Tauri adapter, and React frontend.
+| Capability | Notes |
+|---|---|
+| **Tasks & projects** | First-class entities with deadlines, recurrence, and cron + skill composition |
+| **Notes & knowledge** | Backlinks, knowledge graphs, flashcards (FSRS5) |
+| **Finance & FIRE** | Budgeting, transactions, portfolios, Monte Carlo planning |
+| **Productivity & coaching** | Focus sessions, activity analytics, behavior interventions |
+| **Multi-channel chat** | Telegram, Discord, Slack, Email, desktop, MCP |
+| **Learning & language** | Flashcard generation, language practice, exam tracking |
+| **MCP server** | Exposes Klyntbot tools to Claude Code, Cursor, and other MCP clients |
 
-See the `docs/architecture/` folder for the full deep dive.
+Each capability is a self-contained **feature package** with its own tools, migrations, config, and health checks.
+
+---
+
+## Why Klyntbot
+
+- **Architected, not glued together** — strict 9-layer crate hierarchy with upward-only dependencies
+- **Cognitive layer is first-class** — memory, reflection, and learning are core, not retrofits
+- **Extensible like an OS** — skills, feature crates, WASM plugins, MCP client + server
+- **Honest local-first** — no cloud sync, no telemetry, no account, no SaaS
+
+If you want a SaaS chatbot, this isn't it. If you want a real agent OS you can read, fork, and extend, keep going.
+
+---
+
+## Documentation
+
+| | |
+|---|---|
+| 📖 **Architecture deep dives** | [`docs/architecture/`](./docs/architecture/) |
+| 🛠 **Contributing & dev workflow** | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |
+| 🔒 **Security policy** | [`SECURITY.md`](./SECURITY.md) |
+| 📓 **Release history** | [`CHANGELOG.md`](./CHANGELOG.md) |
+| 💬 **Questions & ideas** | [GitHub Discussions](https://github.com/KlyntLabs/klyntbot/discussions) |
+| 🐛 **Report a bug** | [Open an issue](https://github.com/KlyntLabs/klyntbot/issues/new/choose) |
+
+> User-facing installation, configuration, plugin, and skill authoring guides are planned. For now, the architecture docs and `CLAUDE.md` are the source of truth.
+
+---
+
+## License
+
+Klyntbot is licensed under [**AGPL-3.0**](./LICENSE).
+
+**Why AGPL?** Klyntbot is built to be a personal agent OS, not a SaaS substrate. AGPL ensures that anyone who runs a modified version as a network service must publish their changes — keeping improvements in the commons rather than locked behind a hosted product. If you're building a personal tool, a self-hosted deployment, or a contribution back upstream, AGPL is unobtrusive. If you want to wrap Klyntbot into a closed-source hosted service, AGPL will be in your way — that's by design.
+
+**Running Klyntbot locally on your own machine — including the bundled MCP server consumed by your local AI clients — does not trigger AGPL's network-service clause.** The clause activates when you offer modified Klyntbot to *other users* over a network.
+
+For commercial licensing inquiries, contact **jayden.dangvu@gmail.com**.
+
+---
+
+## Status & expectations
+
+Klyntbot is pre-1.0, single-maintainer, and built primarily for the maintainer's own use. We welcome contributions, bug reports, and feedback — but please don't expect SLAs, polished UX in every corner, or stable APIs yet. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the realistic response time and how to file useful reports.
+
+---
+
+<p align="center"><sub>Made with Rust, Tauri, and an embarrassing amount of self-talk.</sub></p>

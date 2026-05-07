@@ -10,9 +10,8 @@
 mod tests {
     use std::sync::Arc;
 
-    use async_trait::async_trait;
     use bus::MessageBus;
-    use providers::ChatParams;
+
     use tempfile::TempDir;
 
     use crate::agent_loop::AgentLoop;

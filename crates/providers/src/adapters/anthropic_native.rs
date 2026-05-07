@@ -14,12 +14,115 @@ use config::{ExtendedThinkingConfig, Secret};
 
 use crate::registry::ProviderRegistry;
 use crate::types::{
-    ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
-    ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta, Usage,
+    CacheAnchor, CacheBreakpoint, CacheTtl, ChatParams, LlmProvider, LlmResponse, LlmStream,
+    LlmStreamChunk, Message, ProviderCapabilities, ProviderHealth, ResponseFormat, ToolCall,
+    ToolCallDelta, Usage,
 };
 
 const ANTHROPIC_CONTEXT_WINDOW: usize = 200_000;
 const DEFAULT_ANTHROPIC_VERSION: &str = "2023-06-01";
+
+/// Resolved cache-marker placement: which content block to mark, and how.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ResolvedMarker {
+    /// Section of the request payload (lower numbers come earlier).
+    /// SECTION_SYSTEM = 0, SECTION_TOOLS = 1, SECTION_MESSAGES = 2.
+    section: u8,
+    /// Index within that section.
+    index: usize,
+    /// TTL hint.
+    ttl: CacheTtl,
+}
+
+const SECTION_SYSTEM: u8 = 0;
+const SECTION_TOOLS: u8 = 1;
+const SECTION_MESSAGES: u8 = 2;
+
+/// Resolve `CacheBreakpoint` anchors against the actual message vec / tools array.
+///
+/// Returns a list of `ResolvedMarker` sorted ascending by absolute payload position,
+/// with at most 4 entries (Anthropic's per-request limit). When more than 4 markers
+/// would be emitted, the EARLIEST ones are dropped — caching at a later position
+/// implicitly covers everything before it, so trailing markers dominate.
+fn resolve_breakpoints(
+    messages: &[Message],
+    tools: Option<&[Value]>,
+    breakpoints: &[CacheBreakpoint],
+) -> Vec<ResolvedMarker> {
+    let mut out: Vec<ResolvedMarker> = Vec::with_capacity(breakpoints.len());
+
+    for bp in breakpoints {
+        match &bp.anchor {
+            CacheAnchor::LastSystem => {
+                let last = messages
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .find_map(|(i, m)| m.is_system().then_some(i));
+                if let Some(i) = last {
+                    out.push(ResolvedMarker {
+                        section: SECTION_SYSTEM,
+                        index: i,
+                        ttl: bp.ttl,
+                    });
+                }
+            }
+            CacheAnchor::LastTool => {
+                if let Some(t) = tools {
+                    if !t.is_empty() {
+                        out.push(ResolvedMarker {
+                            section: SECTION_TOOLS,
+                            index: t.len() - 1,
+                            ttl: bp.ttl,
+                        });
+                    }
+                }
+            }
+            CacheAnchor::MessageIndex(n) => {
+                if *n < messages.len() {
+                    // Convert original index to wire index by counting system
+                    // messages at or before this position (they're stripped from
+                    // the wire messages array).
+                    let system_offset = messages[..=*n].iter().filter(|m| m.is_system()).count();
+                    let wire_idx = n.saturating_sub(system_offset);
+                    out.push(ResolvedMarker {
+                        section: SECTION_MESSAGES,
+                        index: wire_idx,
+                        ttl: bp.ttl,
+                    });
+                } else {
+                    warn!(
+                        target: "klynt::providers::anthropic",
+                        index = *n,
+                        len = messages.len(),
+                        "MessageIndex breakpoint out of range; skipping"
+                    );
+                }
+            }
+        }
+    }
+
+    // Stable sort by (section, index) ascending.
+    out.sort_by_key(|r| (r.section, r.index));
+
+    // Anthropic permits at most 4 cache_control blocks per request.
+    // Caching at position N implicitly caches everything before N, so when
+    // we have to drop, drop the EARLIEST entries.
+    if out.len() > 4 {
+        let drop_count = out.len() - 4;
+        out.drain(..drop_count);
+    }
+
+    out
+}
+
+/// True if any resolved marker has Persistent TTL and the request thus
+/// needs the `anthropic-beta: extended-cache-ttl-2025-04-11` header.
+fn needs_extended_cache_ttl_header(resolved: &[ResolvedMarker]) -> bool {
+    resolved
+        .iter()
+        .any(|r| matches!(r.ttl, CacheTtl::Persistent))
+}
 
 /// Anthropic native API provider with prompt caching and token counting.
 pub struct AnthropicNativeProvider {
@@ -61,6 +164,19 @@ impl AnthropicNativeProvider {
         self
     }
 
+    /// Create a test provider with configurable cache_system_prompt flag.
+    pub fn new_for_test(cache_system_prompt: bool) -> Self {
+        Self {
+            client: Client::new(),
+            api_key: Secret::new(String::new()),
+            base_url: "https://api.anthropic.com".to_string(),
+            model: "claude-sonnet-4-20250514".to_string(),
+            api_version: DEFAULT_ANTHROPIC_VERSION.to_string(),
+            cache_system_prompt,
+            extended_thinking: None,
+        }
+    }
+
     /// Enable or disable prompt caching for system prompts.
     pub fn with_cache_system_prompt(mut self, enabled: bool) -> Self {
         self.cache_system_prompt = enabled;
@@ -71,6 +187,35 @@ impl AnthropicNativeProvider {
     pub fn with_extended_thinking(mut self, config: Option<ExtendedThinkingConfig>) -> Self {
         self.extended_thinking = config;
         self
+    }
+
+    /// Resolve breakpoints, synthesizing a legacy fallback if the caller passed
+    /// no explicit breakpoints and the legacy `cache_system_prompt` flag is on.
+    /// Returns the resolved markers and whether any marker needs the extended
+    /// cache TTL header.
+    fn prepare_cache_markers(
+        &self,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+        cache_breakpoints: &[CacheBreakpoint],
+    ) -> (Vec<ResolvedMarker>, bool) {
+        let bps_owned: Vec<CacheBreakpoint>;
+        let bps: &[CacheBreakpoint] = if cache_breakpoints.is_empty() && self.cache_system_prompt {
+            debug!(
+                target: "klynt::providers::anthropic",
+                "no explicit cache_breakpoints; synthesizing legacy LastSystem/Ephemeral fallback"
+            );
+            bps_owned = vec![CacheBreakpoint {
+                anchor: CacheAnchor::LastSystem,
+                ttl: CacheTtl::Ephemeral,
+            }];
+            &bps_owned
+        } else {
+            cache_breakpoints
+        };
+        let resolved = resolve_breakpoints(messages, tools, bps);
+        let needs_header = needs_extended_cache_ttl_header(&resolved);
+        (resolved, needs_header)
     }
 
     /// Extract all system prompts from messages, preserving order.
@@ -128,9 +273,23 @@ impl AnthropicNativeProvider {
                 Message::Assistant {
                     content,
                     tool_calls,
-                    ..
+                    reasoning_content,
                 } => {
                     let mut blocks = Vec::new();
+                    // Anthropic requires `thinking` blocks to come BEFORE
+                    // text and tool_use when extended thinking is enabled.
+                    // Skipping this on follow-up requests is what triggers
+                    // the "thinking is enabled but reasoning_content is
+                    // missing in assistant tool call message" 400 error
+                    // from compat endpoints (Kimi, etc.).
+                    if let Some(reasoning) = reasoning_content {
+                        if !reasoning.is_empty() {
+                            blocks.push(json!({
+                                "type": "thinking",
+                                "thinking": reasoning,
+                            }));
+                        }
+                    }
                     if let Some(text) = content {
                         if !text.is_empty() {
                             blocks.push(json!({"type": "text", "text": text}));
@@ -150,7 +309,19 @@ impl AnthropicNativeProvider {
                         }
                     }
                     if !blocks.is_empty() {
-                        result.push(json!({"role": "assistant", "content": blocks}));
+                        // Mirror reasoning at the message-top-level too —
+                        // Kimi's anthropic-compat endpoint validates against
+                        // an OpenAI-style `reasoning_content` field on the
+                        // assistant message, distinct from the Anthropic
+                        // `thinking` block. Emitting both is harmless on
+                        // pure Anthropic (extra fields are ignored).
+                        let mut msg = json!({"role": "assistant", "content": blocks});
+                        if let Some(reasoning) = reasoning_content {
+                            if !reasoning.is_empty() {
+                                msg["reasoning_content"] = json!(reasoning);
+                            }
+                        }
+                        result.push(msg);
                     }
                 }
                 Message::Tool {
@@ -425,12 +596,13 @@ impl AnthropicNativeProvider {
     }
 
     /// Build the common request body shared by `chat()` and `chat_stream()`.
-    fn build_request_body(
+    pub fn build_request_body(
         &self,
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
         stream: bool,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Value {
         let overrides = ProviderRegistry::get_model_overrides(&params.model);
 
@@ -444,33 +616,31 @@ impl AnthropicNativeProvider {
             body["stream"] = json!(true);
         }
 
+        let (resolved, _) = self.prepare_cache_markers(messages, tools, cache_breakpoints);
+
+        // Build a quick-lookup: section -> set of (index, ttl)
+        fn marker_for(resolved: &[ResolvedMarker], section: u8, index: usize) -> Option<CacheTtl> {
+            resolved
+                .iter()
+                .find(|r| r.section == section && r.index == index)
+                .map(|r| r.ttl)
+        }
+
         // System prompt — collect all system messages into content block array.
-        // Anthropic's API accepts `system` as an array of content blocks.
         let system_prompts = Self::extract_system_prompts(messages);
         if !system_prompts.is_empty() {
-            let last_idx = system_prompts.len() - 1;
-            if self.cache_system_prompt {
-                let blocks: Vec<Value> = system_prompts
-                    .iter()
-                    .enumerate()
-                    .map(|(i, text)| {
-                        let mut block = json!({"type": "text", "text": text});
-                        // Apply cache_control to the LAST block — Anthropic caches
-                        // everything up to and including this block.
-                        if i == last_idx {
-                            block["cache_control"] = json!({"type": "ephemeral"});
-                        }
-                        block
-                    })
-                    .collect();
-                body["system"] = json!(blocks);
-            } else {
-                let blocks: Vec<Value> = system_prompts
-                    .iter()
-                    .map(|text| json!({"type": "text", "text": text}))
-                    .collect();
-                body["system"] = json!(blocks);
-            }
+            let blocks: Vec<Value> = system_prompts
+                .iter()
+                .enumerate()
+                .map(|(i, text)| {
+                    let mut block = json!({"type": "text", "text": text});
+                    if let Some(ttl) = marker_for(&resolved, SECTION_SYSTEM, i) {
+                        block["cache_control"] = ttl.to_cache_control();
+                    }
+                    block
+                })
+                .collect();
+            body["system"] = json!(blocks);
         }
 
         if let Some(temp) = params.temperature {
@@ -498,9 +668,41 @@ impl AnthropicNativeProvider {
             body["tools"] = json!(&anthropic_tools);
         }
 
+        // Apply LastTool cache_control on the converted tools array.
+        if let Some(tools_arr) = body.get_mut("tools").and_then(|t| t.as_array_mut()) {
+            for (i, tool) in tools_arr.iter_mut().enumerate() {
+                if let Some(ttl) = marker_for(&resolved, SECTION_TOOLS, i) {
+                    tool["cache_control"] = ttl.to_cache_control();
+                }
+            }
+        }
+
         // Apply structured output format (may inject synthetic tool + tool_choice)
         if let Some(ref format) = params.response_format {
             Self::apply_response_format(&mut body, format, &mut anthropic_tools);
+        }
+
+        // Apply MessageIndex cache_control. Anthropic puts cache_control on the
+        // LAST content block of the marked message.
+        let converted = body.get_mut("messages").and_then(|m| m.as_array_mut());
+        if let Some(msgs_arr) = converted {
+            for (i, msg) in msgs_arr.iter_mut().enumerate() {
+                if let Some(ttl) = marker_for(&resolved, SECTION_MESSAGES, i) {
+                    if let Some(content) = msg.as_object_mut().and_then(|o| o.remove("content")) {
+                        let mut blocks: Vec<Value> = match content {
+                            Value::String(s) => vec![json!({"type": "text", "text": s})],
+                            Value::Array(a) => a,
+                            other => vec![other],
+                        };
+                        if let Some(last) = blocks.last_mut() {
+                            if let Some(obj) = last.as_object_mut() {
+                                obj.insert("cache_control".to_string(), ttl.to_cache_control());
+                            }
+                        }
+                        msg["content"] = json!(blocks);
+                    }
+                }
+            }
         }
 
         body
@@ -589,9 +791,10 @@ impl LlmProvider for AnthropicNativeProvider {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmResponse> {
         let url = format!("{}/v1/messages", self.base_url);
-        let body = self.build_request_body(messages, tools, params, false);
+        let body = self.build_request_body(messages, tools, params, false, cache_breakpoints);
 
         debug!(
             "Calling Anthropic native: model={}, messages={}, thinking={}",
@@ -600,12 +803,20 @@ impl LlmProvider for AnthropicNativeProvider {
             self.extended_thinking.as_ref().is_some_and(|et| et.enabled),
         );
 
-        let response = self
+        let (_, needs_header) = self.prepare_cache_markers(messages, tools, cache_breakpoints);
+
+        let mut request = self
             .client
             .post(&url)
             .header("x-api-key", self.api_key.expose())
             .header("anthropic-version", &self.api_version)
-            .header("content-type", "application/json")
+            .header("content-type", "application/json");
+
+        if needs_header {
+            request = request.header("anthropic-beta", "extended-cache-ttl-2025-04-11");
+        }
+
+        let response = request
             .json(&body)
             .send()
             .await
@@ -637,27 +848,57 @@ impl LlmProvider for AnthropicNativeProvider {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmStream> {
         let url = format!("{}/v1/messages", self.base_url);
-        let body = self.build_request_body(messages, tools, params, true);
+        let body = self.build_request_body(messages, tools, params, true, cache_breakpoints);
 
-        debug!(
-            "Calling Anthropic native (streaming): model={}, messages={}, thinking={}",
-            params.model,
-            messages.len(),
-            self.extended_thinking.as_ref().is_some_and(|et| et.enabled),
+        tracing::info!(
+            url = %url,
+            model = %params.model,
+            messages = messages.len(),
+            "anthropic_native chat_stream: preparing request"
         );
 
-        let response = self
+        let (_, needs_header) = self.prepare_cache_markers(messages, tools, cache_breakpoints);
+
+        let mut request = self
             .client
             .post(&url)
             .header("x-api-key", self.api_key.expose())
             .header("anthropic-version", &self.api_version)
-            .header("content-type", "application/json")
+            .header("content-type", "application/json");
+
+        if needs_header {
+            request = request.header("anthropic-beta", "extended-cache-ttl-2025-04-11");
+        }
+
+        // Diagnostic: dump message variant + length to find empty messages
+        let summary: Vec<String> = messages.iter().enumerate().map(|(i, m)| {
+            use crate::types::Message as M;
+            match m {
+                M::System { content } => format!("[{i}]System len={}", content.len()),
+                M::User { content } => format!("[{i}]User content={:?}", content),
+                M::Assistant { content, tool_calls, .. } => format!(
+                    "[{i}]Assistant content_len={} tools={}",
+                    content.as_deref().map(|s| s.len()).unwrap_or(0),
+                    tool_calls.as_ref().map(|t| t.len()).unwrap_or(0)
+                ),
+                M::Tool { tool_call_id, .. } => format!("[{i}]Tool id={tool_call_id}"),
+                M::ContextUpdate { content, .. } => format!("[{i}]ContextUpdate len={}", content.len()),
+            }
+        }).collect();
+        tracing::info!(messages = ?summary, "anthropic_native chat_stream: message summary");
+        tracing::info!("anthropic_native chat_stream: sending HTTP POST");
+        let response = request
             .json(&body)
             .send()
             .await
-            .map_err(|e| ProviderError::Http(e.to_string()))?;
+            .map_err(|e| {
+                tracing::error!(error = %e, "anthropic_native chat_stream: HTTP send failed");
+                ProviderError::Http(e.to_string())
+            })?;
+        tracing::info!(status = %response.status(), "anthropic_native chat_stream: response received");
 
         if !response.status().is_success() {
             let status = response.status();
@@ -665,6 +906,7 @@ impl LlmProvider for AnthropicNativeProvider {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
+            tracing::error!(status = %status, body = %error_text, "anthropic_native chat_stream: error response body");
 
             return Err(crate::types::map_http_error(
                 status.as_u16(),
@@ -741,6 +983,7 @@ impl LlmProvider for AnthropicNativeProvider {
             extended_thinking: true,
             structured_outputs: true,
             prompt_caching: true,
+            explicit_cache_markers: true,
             native_token_counting: true,
             vision: true,
             streaming: true,
@@ -811,6 +1054,75 @@ impl LlmProvider for AnthropicNativeProvider {
             )),
             Err(e) => Ok(ProviderHealth::Unhealthy(e.to_string())),
         }
+    }
+
+    /// Discover models via `GET {base_url}/v1/models`.
+    ///
+    /// Anthropic's official API exposes `/v1/models` returning
+    /// `{ data: [{ id, display_name, type, created_at, ... }] }`.
+    /// Anthropic-compatible third-party endpoints (e.g. Kimi at
+    /// `https://api.kimi.com/coding/v1/models`) follow the same shape.
+    /// On failure, falls back to the configured default model so the
+    /// FE dropdown stays populated.
+    async fn list_models(&self) -> Result<Vec<crate::types::ProviderModel>> {
+        let url = format!("{}/v1/models", self.base_url.trim_end_matches('/'));
+        let response = match self
+            .client
+            .get(&url)
+            .header("x-api-key", self.api_key.expose())
+            .header("anthropic-version", &self.api_version)
+            .timeout(Duration::from_secs(10))
+            .send()
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::debug!(
+                    provider = self.name(),
+                    error = %e,
+                    "list_models: request failed, falling back to default model",
+                );
+                return Ok(vec![crate::types::ProviderModel::from_id_enriched(&self.model)]);
+            }
+        };
+        if !response.status().is_success() {
+            tracing::debug!(
+                provider = self.name(),
+                status = %response.status(),
+                "list_models: non-success, falling back to default model",
+            );
+            return Ok(vec![crate::types::ProviderModel::from_id(&self.model)]);
+        }
+        let body: serde_json::Value = match response.json().await {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::debug!(provider = self.name(), error = %e, "list_models: invalid JSON");
+                return Ok(vec![crate::types::ProviderModel::from_id_enriched(&self.model)]);
+            }
+        };
+        let mut models = Vec::new();
+        let entries = body
+            .get("data")
+            .and_then(|v| v.as_array())
+            .map(|a| a.as_slice())
+            .unwrap_or(&[]);
+        for entry in entries {
+            let Some(id) = entry.get("id").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let display_name = entry
+                .get("display_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or(id)
+                .to_string();
+            let mut model = crate::types::ProviderModel::from_id_enriched(id);
+            model.display_name = display_name;
+            models.push(model);
+        }
+        if models.is_empty() {
+            models.push(crate::types::ProviderModel::from_id(&self.model));
+        }
+        Ok(models)
     }
 }
 
@@ -1342,5 +1654,247 @@ mod tests {
 
         // tool_choice forces the synthetic tool
         assert_eq!(body["tool_choice"]["name"], "output");
+    }
+
+    mod resolve_breakpoints_tests {
+        use super::*;
+
+        fn sys(text: &str) -> Message {
+            Message::System {
+                content: text.to_string(),
+            }
+        }
+
+        fn user(text: &str) -> Message {
+            Message::user(text)
+        }
+
+        fn assistant(text: &str) -> Message {
+            Message::Assistant {
+                content: Some(text.to_string()),
+                tool_calls: None,
+                reasoning_content: None,
+            }
+        }
+
+        #[test]
+        fn resolve_last_system_finds_last_system_block() {
+            let messages = vec![sys("first"), sys("second"), user("hi")];
+            let bps = vec![CacheBreakpoint {
+                anchor: CacheAnchor::LastSystem,
+                ttl: CacheTtl::Persistent,
+            }];
+            let resolved = resolve_breakpoints(&messages, None, &bps);
+            assert_eq!(resolved.len(), 1);
+            assert_eq!(resolved[0].section, SECTION_SYSTEM);
+            assert_eq!(resolved[0].index, 1);
+            assert_eq!(resolved[0].ttl, CacheTtl::Persistent);
+        }
+
+        #[test]
+        fn resolve_last_system_skips_when_no_system_messages() {
+            let messages = vec![user("hi")];
+            let bps = vec![CacheBreakpoint {
+                anchor: CacheAnchor::LastSystem,
+                ttl: CacheTtl::Ephemeral,
+            }];
+            let resolved = resolve_breakpoints(&messages, None, &bps);
+            assert!(resolved.is_empty());
+        }
+
+        #[test]
+        fn resolve_last_tool_marks_last_tool_index() {
+            let tools = vec![
+                serde_json::json!({"name": "a"}),
+                serde_json::json!({"name": "b"}),
+            ];
+            let bps = vec![CacheBreakpoint {
+                anchor: CacheAnchor::LastTool,
+                ttl: CacheTtl::Persistent,
+            }];
+            let resolved = resolve_breakpoints(&[], Some(&tools), &bps);
+            assert_eq!(resolved.len(), 1);
+            assert_eq!(resolved[0].section, SECTION_TOOLS);
+            assert_eq!(resolved[0].index, 1);
+        }
+
+        #[test]
+        fn resolve_last_tool_skips_when_no_tools() {
+            let bps = vec![CacheBreakpoint {
+                anchor: CacheAnchor::LastTool,
+                ttl: CacheTtl::Persistent,
+            }];
+            let resolved = resolve_breakpoints(&[], None, &bps);
+            assert!(resolved.is_empty());
+
+            let resolved2 = resolve_breakpoints(&[], Some(&[]), &bps);
+            assert!(resolved2.is_empty());
+        }
+
+        #[test]
+        fn resolve_message_index_in_range() {
+            let messages = vec![sys("s"), user("u"), assistant("a")];
+            let bps = vec![CacheBreakpoint {
+                anchor: CacheAnchor::MessageIndex(2),
+                ttl: CacheTtl::Ephemeral,
+            }];
+            let resolved = resolve_breakpoints(&messages, None, &bps);
+            assert_eq!(resolved.len(), 1);
+            assert_eq!(resolved[0].section, SECTION_MESSAGES);
+            // Original index 2, 1 system message before it → wire index 1
+            assert_eq!(resolved[0].index, 1);
+        }
+
+        #[test]
+        fn resolve_message_index_out_of_range_skipped() {
+            let messages = vec![sys("s"), user("u")];
+            let bps = vec![CacheBreakpoint {
+                anchor: CacheAnchor::MessageIndex(99),
+                ttl: CacheTtl::Ephemeral,
+            }];
+            let resolved = resolve_breakpoints(&messages, None, &bps);
+            assert!(resolved.is_empty());
+        }
+
+        #[test]
+        fn resolve_sorts_and_keeps_trailing_four() {
+            let messages = vec![
+                sys("s"),
+                user("u0"),
+                user("u1"),
+                user("u2"),
+                user("u3"),
+                user("u4"),
+            ];
+            let tools = vec![serde_json::json!({"name": "t"})];
+            let bps = vec![
+                CacheBreakpoint {
+                    anchor: CacheAnchor::LastSystem,
+                    ttl: CacheTtl::Persistent,
+                },
+                CacheBreakpoint {
+                    anchor: CacheAnchor::LastTool,
+                    ttl: CacheTtl::Persistent,
+                },
+                CacheBreakpoint {
+                    anchor: CacheAnchor::MessageIndex(1),
+                    ttl: CacheTtl::Ephemeral,
+                },
+                CacheBreakpoint {
+                    anchor: CacheAnchor::MessageIndex(2),
+                    ttl: CacheTtl::Ephemeral,
+                },
+                CacheBreakpoint {
+                    anchor: CacheAnchor::MessageIndex(3),
+                    ttl: CacheTtl::Ephemeral,
+                },
+            ];
+            let resolved = resolve_breakpoints(&messages, Some(&tools), &bps);
+            // 5 inputs → keep trailing 4
+            assert_eq!(resolved.len(), 4);
+            // Earliest one (LastSystem) should have been dropped
+            assert!(!resolved.iter().any(|r| r.section == SECTION_SYSTEM));
+            // Verify ascending order
+            let positions: Vec<(u8, usize)> =
+                resolved.iter().map(|r| (r.section, r.index)).collect();
+            let mut sorted = positions.clone();
+            sorted.sort();
+            assert_eq!(positions, sorted);
+        }
+
+        #[test]
+        fn persistent_breakpoint_triggers_extended_cache_ttl_header() {
+            let resolved = vec![ResolvedMarker {
+                section: SECTION_SYSTEM,
+                index: 0,
+                ttl: CacheTtl::Persistent,
+            }];
+            assert!(needs_extended_cache_ttl_header(&resolved));
+
+            let resolved = vec![ResolvedMarker {
+                section: SECTION_SYSTEM,
+                index: 0,
+                ttl: CacheTtl::Ephemeral,
+            }];
+            assert!(!needs_extended_cache_ttl_header(&resolved));
+
+            let resolved: Vec<ResolvedMarker> = vec![];
+            assert!(!needs_extended_cache_ttl_header(&resolved));
+        }
+    }
+
+    mod build_request_body_cache_tests {
+        use super::*;
+
+        fn ttl_value(block: &Value) -> Option<&str> {
+            block
+                .get("cache_control")
+                .and_then(|c| c.get("ttl"))
+                .and_then(|t| t.as_str())
+        }
+
+        fn has_cache_control(block: &Value) -> bool {
+            block.get("cache_control").is_some()
+        }
+
+        #[test]
+        fn explicit_breakpoint_overrides_legacy_flag() {
+            let provider = AnthropicNativeProvider::new_for_test(true);
+            let messages = vec![
+                Message::System {
+                    content: "sys".into(),
+                },
+                Message::user("hi"),
+            ];
+            let bps = vec![CacheBreakpoint {
+                anchor: CacheAnchor::LastSystem,
+                ttl: CacheTtl::Persistent,
+            }];
+            let body = provider.build_request_body(
+                &messages,
+                None,
+                &ChatParams::new("claude-3-5-sonnet"),
+                false,
+                &bps,
+            );
+            let system_blocks = body.get("system").unwrap().as_array().unwrap();
+            assert!(has_cache_control(&system_blocks[0]));
+            assert_eq!(ttl_value(&system_blocks[0]), Some("1h"));
+        }
+
+        #[test]
+        fn empty_breakpoints_with_legacy_flag_synthesizes_fallback() {
+            let provider = AnthropicNativeProvider::new_for_test(true);
+            let messages = vec![Message::System {
+                content: "sys".into(),
+            }];
+            let body = provider.build_request_body(
+                &messages,
+                None,
+                &ChatParams::new("claude-3-5-sonnet"),
+                false,
+                &[],
+            );
+            let system_blocks = body.get("system").unwrap().as_array().unwrap();
+            assert!(has_cache_control(&system_blocks[0]));
+            assert_eq!(ttl_value(&system_blocks[0]), None);
+        }
+
+        #[test]
+        fn empty_breakpoints_without_legacy_flag_no_marker() {
+            let provider = AnthropicNativeProvider::new_for_test(false);
+            let messages = vec![Message::System {
+                content: "sys".into(),
+            }];
+            let body = provider.build_request_body(
+                &messages,
+                None,
+                &ChatParams::new("claude-3-5-sonnet"),
+                false,
+                &[],
+            );
+            let system_blocks = body.get("system").unwrap().as_array().unwrap();
+            assert!(!has_cache_control(&system_blocks[0]));
+        }
     }
 }

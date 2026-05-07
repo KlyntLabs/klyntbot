@@ -47,8 +47,11 @@ pub async fn fan_out_event(
     }
 }
 
-/// Extended timeout for interactive tools that wait on user input.
-const INTERACTIVE_TOOL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
+/// Extended timeout for interactive tools (ask_user) and long-running tools
+/// (shell / build / test) whose wall-time can legitimately exceed
+/// `params.tool_timeout` (default 30 s). Tools opt in by returning
+/// `Some(LONG_RUNNING_TOOL_TIMEOUT)` from `Tool::custom_timeout()`.
+pub const LONG_RUNNING_TOOL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
 
 /// Maximum number of tool calls that can execute concurrently within a single cycle.
 const MAX_CONCURRENT_TOOLS: usize = 10;
@@ -150,12 +153,55 @@ fn hash_value_into(value: &serde_json::Value, hasher: &mut impl Hasher) {
 /// looks like a tool result. This function uses heuristics to detect that pattern.
 ///
 /// Returns `true` if the text appears to be a fabricated tool execution.
+/// Case-insensitive `find` for ASCII needles. Returns byte offset if found.
+fn ifind(haystack: &str, needle: &str) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    let mut offset = 0;
+    let mut chars = haystack.chars();
+    loop {
+        if chars
+            .clone()
+            .zip(needle.chars())
+            .all(|(a, b)| a.eq_ignore_ascii_case(&b))
+        {
+            return Some(offset);
+        }
+        match chars.next() {
+            Some(c) => offset += c.len_utf8(),
+            None => break,
+        }
+    }
+    None
+}
+
+/// Case-insensitive `contains` for ASCII needles.
+fn icontains(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    let mut chars = haystack.chars();
+    loop {
+        if chars
+            .clone()
+            .zip(needle.chars())
+            .all(|(a, b)| a.eq_ignore_ascii_case(&b))
+        {
+            return true;
+        }
+        if chars.next().is_none() {
+            break;
+        }
+    }
+    false
+}
+
 fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
     if tool_names.is_empty() {
         return false;
     }
 
-    let lower = text.to_lowercase();
     let has_todo = tool_names.contains(&"todo");
     let has_search = tool_names.iter().any(|t| t.contains("search"));
 
@@ -163,8 +209,8 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
     let has_fake_id = {
         let mut found = false;
         for pattern in &["id:", "(id:"] {
-            if let Some(pos) = lower.find(pattern) {
-                let after = &lower[pos + pattern.len()..];
+            if let Some(pos) = ifind(text, pattern) {
+                let after = &text[pos + pattern.len()..];
                 let trimmed = after.trim_start();
                 let hex_chars = trimmed
                     .chars()
@@ -188,8 +234,8 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
         "here are the results",
         "i found these results",
     ];
-    let has_todo_result = has_todo && todo_indicators.iter().any(|p| lower.contains(p));
-    let has_search_result = has_search && search_indicators.iter().any(|p| lower.contains(p));
+    let has_todo_result = has_todo && todo_indicators.iter().any(|p| icontains(text, p));
+    let has_search_result = has_search && search_indicators.iter().any(|p| icontains(text, p));
     let has_structured_result = has_todo_result || has_search_result;
 
     // Pattern 3: Has multiple field-like patterns (Priority:, Due Date:, Description:, Tags:)
@@ -202,13 +248,13 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
     ];
     let field_count = field_patterns
         .iter()
-        .filter(|p| lower.contains(**p))
+        .filter(|p| icontains(text, **p))
         .count();
     let has_multiple_fields = field_count >= 2;
 
     // Pattern 4: Search with numbered list — requires fake ID for corroboration
     let has_search_with_list =
-        has_search_result && has_fake_id && lower.contains("\n1.") && lower.contains("\n2.");
+        has_search_result && has_fake_id && text.contains("\n1.") && text.contains("\n2.");
 
     // Decision: fabricated if structured result with (fake ID or multiple fields),
     // or search with numbered list and corroborating fake ID
@@ -236,8 +282,13 @@ async fn call_provider_streaming(
     params: &providers::ChatParams,
     event_tx: &tokio::sync::mpsc::Sender<crate::events::AgentEvent>,
     domain_bus: Option<&Arc<bus::DomainEventBus>>,
+    cache_breakpoints: &[providers::CacheBreakpoint],
 ) -> Result<providers::LlmResponse> {
-    let mut stream = provider.chat_stream(messages, Some(tools), params).await?;
+    tracing::debug!(messages = messages.len(), tools = tools.len(), "call_provider_streaming: about to call provider.chat_stream");
+    let mut stream = provider
+        .chat_stream(messages, Some(tools), params, cache_breakpoints)
+        .await?;
+    tracing::debug!("call_provider_streaming: chat_stream returned, awaiting first chunk");
 
     let mut content = String::new();
     let mut partials: Vec<PartialToolCall> = Vec::with_capacity(4);
@@ -263,7 +314,22 @@ async fn call_provider_streaming(
         }
 
         if let Some(r) = chunk.reasoning_content {
-            reasoning.push_str(&r);
+            if !r.is_empty() {
+                reasoning.push_str(&r);
+                // Emit reasoning as a first-class event so the bridge can
+                // surface it to the FE as a `PartDelta::Reasoning` (rendered
+                // inline as italic "Thinking:" prose). Previously we silently
+                // buffered reasoning and only fell back to a synthetic
+                // ContentChunk if `content` was empty — meaning models that
+                // emit BOTH a reasoning channel and visible answer (most
+                // extended-thinking models) had their reasoning dropped.
+                fan_out_event(
+                    Some(event_tx),
+                    domain_bus,
+                    crate::events::AgentEvent::ReasoningChunk { data: r },
+                )
+                .await;
+            }
         }
 
         if let Some(delta) = chunk.tool_call_delta {
@@ -375,8 +441,13 @@ async fn call_provider_streaming(
     // any downstream consumer that scrapes the live event stream (the bench
     // harness, streaming UIs) since no ContentChunk was ever emitted for
     // reasoning chunks during the loop.
+    //
+    // Skip the fallback when tool_calls are present — the model already
+    // expressed itself via the tool call, and duplicating the reasoning
+    // into a synthetic ContentChunk would render the SAME text twice
+    // (once as the italic Thinking block, once as plain answer body).
     let resolved_content = if content.trim().is_empty() {
-        if reasoning.trim().is_empty() {
+        if reasoning.trim().is_empty() || !tool_calls.is_empty() {
             None
         } else {
             fan_out_event(
@@ -417,6 +488,7 @@ pub struct ExecutionCore {
     pub outcome_recorder: Option<Arc<crate::learning::recorder::OutcomeRecorder>>,
     pub domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     pub interceptor_chain: Option<Arc<tools_core::InterceptorChain>>,
+    pub approval_gate: Option<Arc<approval::ApprovalGate>>,
     token_counter: Arc<dyn TokenCounter>,
     tool_semaphore: Arc<Semaphore>,
 }
@@ -429,6 +501,7 @@ impl ExecutionCore {
             outcome_recorder: None,
             domain_event_bus: None,
             interceptor_chain: None,
+            approval_gate: None,
             token_counter: Arc::new(context_engine::CharTokenCounter),
             tool_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_TOOLS)),
         }
@@ -469,6 +542,12 @@ impl ExecutionCore {
         self
     }
 
+    /// Set the approval gate for pre-execution permission checks.
+    pub fn with_approval_gate(mut self, gate: Arc<approval::ApprovalGate>) -> Self {
+        self.approval_gate = Some(gate);
+        self
+    }
+
     /// Run a single LLM-tool cycle:
     /// 1. Call provider.chat() with the current messages and tool definitions
     /// 2. If tool calls returned: execute all in parallel with timeout → ToolsExecuted
@@ -482,7 +561,13 @@ impl ExecutionCore {
         routing_ctx: &RoutingContext,
         event_tx: Option<&tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
         seen_tool_calls: Option<&mut HashSet<String>>,
+        cache_breakpoints: &[providers::CacheBreakpoint],
     ) -> Result<(CycleOutcome, Usage)> {
+        // Pre-compute tool names once for fabrication detection.
+        // Only meaningful in assistant mode; coding mode skips the check.
+        let tool_names: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
+        let in_coding = routing_ctx.channel.as_str() == common::tool_channel::CODING_CHANNEL;
+
         // When an event channel is available, stream tokens so the UI updates
         // in real-time. Non-streaming providers already have a default
         // `chat_stream()` impl that wraps `chat()` into a single-chunk stream,
@@ -495,15 +580,39 @@ impl ExecutionCore {
                 &params.chat_params,
                 tx,
                 self.domain_event_bus.as_ref(),
+                cache_breakpoints,
             )
             .await?
         } else {
             self.provider
-                .chat(messages, Some(tools), &params.chat_params)
+                .chat(
+                    messages,
+                    Some(tools),
+                    &params.chat_params,
+                    cache_breakpoints,
+                )
                 .await?
         };
 
         let usage = response.usage.clone();
+
+        if usage.prompt_tokens > 0 {
+            let hit_rate = usage.cache_read_tokens as f64 / usage.prompt_tokens as f64;
+            tracing::info!(
+                target: "klynt::execution::cache",
+                cache_read = usage.cache_read_tokens,
+                cache_write = usage.cache_write_tokens,
+                prompt = usage.prompt_tokens,
+                hit_rate,
+                "cache hit ratio for this call"
+            );
+        }
+
+        tracing::debug!(
+            content_len = response.content.as_deref().map(|s| s.len()).unwrap_or(0),
+            tool_calls = response.tool_calls.len(),
+            "run_cycle: LLM response decoded"
+        );
 
         if !response.tool_calls.is_empty() {
             debug!(
@@ -546,7 +655,11 @@ impl ExecutionCore {
                         .collect::<Vec<_>>()
                 );
 
-                // Append assistant message so the conversation stays coherent
+                // Append assistant message so the conversation stays coherent.
+                // Carry reasoning_content forward — providers with extended
+                // thinking enabled (Anthropic, Kimi compat, etc.) reject
+                // follow-up requests that omit the original thinking block
+                // alongside replayed tool_use messages.
                 let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
                 messages.push(Message::assistant_with_content_tools_and_reasoning(
                     response.content.clone(),
@@ -580,17 +693,15 @@ impl ExecutionCore {
                 return Ok((CycleOutcome::ToolsExecuted { results }, usage));
             }
 
-            // Register current calls for future duplicate detection
-            if let Some(seen) = seen_tool_calls {
-                if let Some(keys) = current_keys {
-                    for key in keys {
-                        seen.insert(key);
-                    }
-                }
-            }
+            // Note: dedup registration is intentionally deferred until after
+            // execution (see post-`join_all` block below). Registering before
+            // execution made failed calls indistinguishable from successful
+            // ones, so a transient `write` failure poisoned the dedup set and
+            // the model could never retry with identical args. Now we register
+            // only on success — failed calls remain retryable.
 
-            // Append assistant message with tool calls (preserving any text content)
-            // and reasoning_content — required by providers like Kimi For Coding.
+            // Append assistant message with tool calls (preserving any text
+            // content AND reasoning_content for thinking-enabled providers).
             let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
             messages.push(Message::assistant_with_content_tools_and_reasoning(
                 response.content.clone(),
@@ -628,6 +739,7 @@ impl ExecutionCore {
                     let registry = self.tool_registry.clone();
                     let semaphore = self.tool_semaphore.clone();
                     let interceptor_chain = interceptor_ref.clone();
+                    let approval_gate = self.approval_gate.clone();
                     let name = tc.name.clone();
                     let args = tc.arguments.clone();
                     let mut ctx = routing_ctx.clone();
@@ -635,13 +747,53 @@ impl ExecutionCore {
                     ctx.cancel_token = params.cancel_token.clone();
                     let id = tc.id.clone();
                     let timeout_dur = if name == ASK_USER_TOOL_NAME {
-                        INTERACTIVE_TOOL_TIMEOUT
+                        LONG_RUNNING_TOOL_TIMEOUT
                     } else {
                         custom_timeouts[i].unwrap_or(params.tool_timeout)
                     };
                     let tx = event_tx.cloned();
 
                     async move {
+                        // Pre-flight: look up tool and run permission checks before
+                        // acquiring the semaphore so that interactive approval prompts
+                        // don't starve concurrent tool slots.
+                        let preflight = async {
+                            let tool = {
+                                let reg = registry.read().await;
+                                reg.prepare(&name, &args, &ctx)?
+                            };
+                            if let Some(ref chain) = interceptor_chain {
+                                chain.check(&name, &args, None).await?;
+                            }
+                            if let Some(ref gate) = approval_gate {
+                                let req = approval::ApprovalRequest {
+                                    tool_name: name.clone(),
+                                    action: args.get("action").and_then(|v| v.as_str()).map(String::from),
+                                    args: args.clone(),
+                                    class: tool.approval_class(&args),
+                                    scope: tool.approval_scope(&args),
+                                    ctx: approval::ApprovalContext {
+                                        mode: ctx.session_mode,
+                                        channel: approval::ChannelKind::from(ctx.channel.as_str()),
+                                        session_id: ctx.chat_id.to_string(),
+                                        user_id: None,
+                                    },
+                                };
+                                match gate.check(req).await? {
+                                    approval::GateOutcome::Allow => {}
+                                    approval::GateOutcome::Deny { reason } => {
+                                        return Err(common::KlyntbotError::PermissionDenied(reason));
+                                    }
+                                    approval::GateOutcome::Cancel => {
+                                        return Err(common::KlyntbotError::Cancelled("user cancelled approval".into()));
+                                    }
+                                }
+                            }
+                            Ok(tool)
+                        }.await;
+
+                        let args_snapshot = args.clone();
+
                         // Limit concurrent tool executions to prevent runaway parallelism.
                         let _permit = semaphore.acquire().await.expect("semaphore closed");
 
@@ -658,23 +810,12 @@ impl ExecutionCore {
                         .await;
 
                         let start = Instant::now();
-                        let args_snapshot = args.clone();
-                        // Look up the tool and release the read lock BEFORE executing.
-                        // This prevents deadlocks when a tool (e.g., delegate) needs
-                        // write access to the registry during execution.
-                        let exec_result = tokio::time::timeout(timeout_dur, async {
-                            let tool = {
-                                let reg = registry.read().await;
-                                reg.prepare(&name, &args, &ctx)?
-                            };
-                            // Run interceptor chain before executing (if configured)
-                            if let Some(ref chain) = interceptor_chain {
-                                chain.check(&name, &args, None).await?;
-                            }
-                            // Read lock is dropped — safe for tools that re-enter the registry
-                            tool.execute(args, &ctx).await
-                        })
-                        .await;
+                        let exec_result = match preflight {
+                            Ok(tool) => tokio::time::timeout(timeout_dur, async {
+                                tool.execute(args, &ctx).await
+                            }).await,
+                            Err(e) => Ok(Err(e)),
+                        };
                         let duration_ms = start.elapsed().as_millis() as u64;
 
                         let (result_str, success) = match exec_result {
@@ -724,6 +865,20 @@ impl ExecutionCore {
             drop(entity_tx);
 
             let results = join_all(futures).await;
+
+            // Register dedup keys for *successful* tool calls only. A failed
+            // call (e.g. `write` to a non-existent dir) must remain retryable
+            // with identical args. `current_keys` and `results` are both
+            // index-aligned with `response.tool_calls`, so the zip is 1:1.
+            if let Some(seen) = seen_tool_calls {
+                if let Some(keys) = current_keys.as_ref() {
+                    for (key, r) in keys.iter().zip(results.iter()) {
+                        if r.success {
+                            seen.insert(key.clone());
+                        }
+                    }
+                }
+            }
 
             // Emit EntityCreated events for any entities tools created
             while let Ok(card) = entity_rx.try_recv() {
@@ -798,26 +953,31 @@ impl ExecutionCore {
             return Ok((CycleOutcome::ToolsExecuted { results }, usage));
         }
 
-        // No tool calls — check for text content
-        debug!("ExecutionCore: LLM returned text response (no tool calls)");
+        // No tool calls — check for text content.
+        tracing::debug!("run_cycle: no tool calls, checking content");
         if let Some(content) = response.content {
             if !content.trim().is_empty() {
-                // Extract tool names from the tool definitions for fabrication check
-                let tool_names: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
-
-                if !tool_names.is_empty() && is_fabricated_tool_response(&content, &tool_names) {
-                    debug!(
-                        "ExecutionCore: detected fabricated tool response (tools available: {:?})",
-                        tool_names
-                    );
+                if Self::check_fabrication(&content, &tool_names, in_coding) {
+                    tracing::debug!("run_cycle: returning FabricatedResponse");
                     return Ok((CycleOutcome::FabricatedResponse { content }, usage));
                 }
 
+                tracing::debug!(content_len = content.len(), "run_cycle: returning FinalResponse");
                 return Ok((CycleOutcome::FinalResponse { content }, usage));
             }
         }
 
+        tracing::debug!("run_cycle: returning EmptyResponse");
         Ok((CycleOutcome::EmptyResponse, usage))
+    }
+
+    /// Returns true if the content looks like a fabricated tool response.
+    /// Skipped in coding mode where real tool execution is used.
+    fn check_fabrication(content: &str, tool_names: &[&str], in_coding: bool) -> bool {
+        if in_coding || tool_names.is_empty() {
+            return false;
+        }
+        is_fabricated_tool_response(content, tool_names)
     }
 }
 
@@ -893,11 +1053,19 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("hi")];
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 
@@ -919,11 +1087,19 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("use echo")];
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 
@@ -951,11 +1127,19 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("run slow")];
-        let params = ExecutionParams::new("mock").with_timeout(Duration::from_millis(100));
+        let params = ExecutionParams::new("mock", 128_000).with_timeout(Duration::from_millis(100));
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 
@@ -1068,11 +1252,19 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("empty")];
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 
@@ -1097,7 +1289,7 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("create task: buy")];
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         let tools = vec![serde_json::json!({
             "type": "function",
             "function": {
@@ -1108,7 +1300,15 @@ mod tests {
         })];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 
@@ -1124,7 +1324,7 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("create task: buy")];
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         let tools = vec![serde_json::json!({
             "type": "function",
             "function": {
@@ -1135,7 +1335,15 @@ mod tests {
         })];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 
@@ -1190,11 +1398,19 @@ mod tests {
         let core = ExecutionCore::new(provider, registry);
 
         let mut messages = vec![Message::user("search")];
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .run_cycle(
+                &mut messages,
+                &tools,
+                &params,
+                &routing_ctx(),
+                None,
+                None,
+                &[],
+            )
             .await
             .unwrap();
 

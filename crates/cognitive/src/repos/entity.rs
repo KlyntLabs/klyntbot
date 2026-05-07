@@ -148,6 +148,15 @@ impl EdgeType {
             _ => Self::Correlational,
         }
     }
+
+    pub fn weight(&self) -> f64 {
+        match self {
+            Self::Causal => 1.5,
+            Self::Structural => 1.2,
+            Self::Temporal => 1.1,
+            Self::Correlational => 1.0,
+        }
+    }
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Causal => "causal",

@@ -10,8 +10,7 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::mirror::{
-    snippet_from_alert, MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlert,
-    MirrorRepo,
+    MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlert, MirrorRepo,
 };
 
 const LOW_CONFIDENCE_THRESHOLD: f64 = 0.4;
@@ -143,8 +142,7 @@ impl MetaRuleSignalSource {
                 warn!("MetaRuleSignalSource: failed to insert meta-rule: {e}");
             }
 
-            let snippet = snippet_from_alert(alert);
-            if let Err(e) = self.repo.insert_snippet(&snippet).await {
+            if let Err(e) = self.repo.insert_snippet_from_alert(alert).await {
                 warn!("MetaRuleSignalSource: failed to insert snippet: {e}");
             }
         }

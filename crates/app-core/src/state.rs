@@ -181,8 +181,6 @@ pub struct AppCore {
     pub symbol_extractor: Option<Arc<dyn coding_memory::symbols::SymbolExtractor>>,
     /// Map of repo_id → filesystem root (Phase 6 symbol validation).
     pub repo_roots: Arc<std::sync::RwLock<std::collections::HashMap<String, std::path::PathBuf>>>,
-    /// Pending coding approval requests keyed by request_id.
-    pub pending_approvals: Arc<klynt_core::approval::PendingApprovalsMap>,
     pub tracing_registry: std::sync::Arc<crate::tracing::TracingRegistry>,
     /// Tracks which sessions have already fired the SessionStart hook (coding mode).
     pub session_start_fired: Arc<dashmap::DashMap<String, ()>>,
@@ -208,6 +206,10 @@ pub struct AppCore {
     /// iterations and persists each entry as a synthetic user message so the
     /// next iteration's prompt assembly picks it up.
     pub steer_queue: Arc<crate::coding::steer_queue::SteerQueue>,
+    /// Coding ToolKitBuilder — set by init/mod.rs after the kit is registered with
+    /// the agent runtime. Cloned on demand by handlers that need to construct a
+    /// scoped (e.g. read-only) registry — currently `coding_review_start`.
+    pub tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
 }
 
 /// State for an active thread subscription.
@@ -827,7 +829,7 @@ impl AppCore {
             config.data_dir = Some(home);
         }
         let (core, _channels) =
-            Self::init_with_sender(common::AppMode::Server, Some(config), None, None).await?;
+            Self::init_with_sender(common::AppMode::Server, Some(config), None, None, None).await?;
         Ok(core)
     }
 }

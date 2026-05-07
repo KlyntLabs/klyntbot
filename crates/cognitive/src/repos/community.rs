@@ -1,6 +1,8 @@
 use common::Result;
 use sqlx::SqlitePool;
 
+use crate::repos::map_sqlx;
+
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct CommunityRow {
     pub id: String,
@@ -23,10 +25,6 @@ pub struct CommunityMemberRow {
     pub tree_node_id: String,
     pub membership_score: f64,
     pub joined_at: String,
-}
-
-fn map_sqlx(e: sqlx::Error) -> common::KlyntbotError {
-    common::KlyntbotError::Storage(e.to_string())
 }
 
 #[derive(Debug, Clone)]
@@ -159,6 +157,19 @@ impl CommunityRepo {
                 .await
                 .map_err(map_sqlx)?;
         Ok(row.map(|r| r.0))
+    }
+
+    /// Update only the `summary` text for a community (Wave 8 / Phase 6.7).
+    pub async fn update_summary(&self, community_id: &str, summary: &str) -> Result<()> {
+        let now = jiff::Timestamp::now().to_string();
+        sqlx::query("UPDATE communities SET summary = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(summary)
+            .bind(now)
+            .bind(community_id)
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx)?;
+        Ok(())
     }
 
     pub async fn list_active_communities(&self) -> Result<Vec<CommunityRow>> {

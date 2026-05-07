@@ -1,3 +1,4 @@
+use super::core::default_true;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,7 +61,7 @@ pub struct CodingPermissions {
     #[serde(default)]
     pub ask: Vec<String>,
     #[serde(default = "default_match")]
-    pub default_if_no_match: String,
+    pub default_if_no_match: DefaultPolicy,
     #[serde(default)]
     pub mirror_learning: bool,
     #[serde(default = "default_mirror_min_approvals")]
@@ -68,8 +69,22 @@ pub struct CodingPermissions {
     #[serde(default = "default_mirror_cooldown_hours")]
     pub mirror_cooldown_hours: u32,
 }
-fn default_match() -> String {
-    "ask".into()
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DefaultPolicy {
+    Allow,
+    Ask,
+}
+
+impl Default for DefaultPolicy {
+    fn default() -> Self {
+        Self::Ask
+    }
+}
+
+fn default_match() -> DefaultPolicy {
+    DefaultPolicy::Ask
 }
 fn default_mirror_min_approvals() -> u32 {
     5
@@ -83,7 +98,7 @@ impl Default for CodingPermissions {
             allow: vec![],
             deny: vec![],
             ask: vec![],
-            default_if_no_match: "ask".into(),
+            default_if_no_match: DefaultPolicy::default(),
             mirror_learning: false,
             mirror_min_approvals: default_mirror_min_approvals(),
             mirror_cooldown_hours: default_mirror_cooldown_hours(),
@@ -96,9 +111,6 @@ impl Default for CodingPermissions {
 pub struct CodingSandbox {
     #[serde(default = "default_true")]
     pub enforce: bool,
-}
-fn default_true() -> bool {
-    true
 }
 impl Default for CodingSandbox {
     fn default() -> Self {

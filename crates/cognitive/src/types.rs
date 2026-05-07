@@ -49,6 +49,37 @@ pub struct SemanticFact {
     pub speaker: Option<String>,
 }
 
+/// Returns a freshness label for a semantic fact based on convergence score,
+/// confidence, and recency of last access.
+pub fn freshness_label(fact: &SemanticFact) -> &'static str {
+    // A just-recorded fact has `last_accessed = None` because nothing has
+    // queried it yet. Treat that as fresh by falling back to `recorded_at`
+    // — otherwise every newly extracted fact would be labeled `"weak"` and
+    // the LLM would refuse to use it. (Use `recorded_at` rather than
+    // `last_accessed.unwrap_or(recorded_at)` so we cover both the new-fact
+    // case and the never-accessed-but-old case symmetrically.)
+    let reference_ts = fact
+        .last_accessed
+        .as_deref()
+        .or(Some(fact.recorded_at.as_str()));
+    let days_old = reference_ts
+        .and_then(|ts| ts.parse::<jiff::Timestamp>().ok())
+        .map(|ts| (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()) / 86_400_000)
+        .unwrap_or(90);
+    if fact.convergence_score >= 0.4 || (fact.confidence >= 0.8 && days_old <= 7) {
+        "trusted"
+    } else if fact.confidence >= 0.5 && days_old <= 30 {
+        "noted"
+    } else {
+        // Was "weak -- verify" — but the LLM, seeing "verify" in the
+        // label, would reflexively hedge ("you may want to verify this")
+        // even when the fact was right in front of it. Use a neutral
+        // descriptor; the LLM can still reason about confidence from
+        // explicit numeric scores when needed.
+        "low-confidence"
+    }
+}
+
 /// An episodic memory entry.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, sqlx::FromRow)]
 #[sqlx(default)]
@@ -121,24 +152,6 @@ pub struct Annotation {
     pub range_start: Option<i64>,
     pub range_end: Option<i64>,
     pub ai_suggestion: Option<String>,
-}
-
-/// Salience verdict for event filtering.
-#[derive(Debug, Clone, PartialEq)]
-pub enum SalienceVerdict {
-    Extract,
-    Accumulate,
-    Discard,
-}
-
-impl SalienceVerdict {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Extract => "extract",
-            Self::Accumulate => "accumulate",
-            Self::Discard => "discard",
-        }
-    }
 }
 
 /// Observation extracted from a DomainEvent.

@@ -597,13 +597,14 @@ impl Distiller {
                     // Task 27 — Tier B1 counterfactual derivation.
                     // When a FixAttempt observation reports outcome ∈ {failure, abandoned},
                     // emit a derived `DeadEndAttempt` semantic fact via `derive_dead_end`.
-                    if matches!(obs.kind, crate::facts::CodingKind::FixAttempt)
-                        && matches!(
-                            obs.outcome,
-                            Some(crate::facts::FixOutcome::Failure)
-                                | Some(crate::facts::FixOutcome::Abandoned)
-                        )
-                    {
+                    if matches!(obs.kind, crate::facts::CodingKind::FixAttempt) {
+                        let Some(outcome) = obs.outcome else { continue };
+                        if !matches!(
+                            outcome,
+                            crate::facts::FixOutcome::Failure | crate::facts::FixOutcome::Abandoned
+                        ) {
+                            continue;
+                        }
                         let files: Vec<std::path::PathBuf> = obs.files.clone();
                         let anchors = if files.is_empty() {
                             vec![]
@@ -623,7 +624,7 @@ impl Distiller {
                             problem: obs.subject.clone(),
                             files,
                             approach: obs.object.clone(),
-                            outcome: obs.outcome.unwrap(),
+                            outcome,
                             insight: Some(obs.reasoning.clone()),
                             duration_ms: 0,
                             test_before: None,

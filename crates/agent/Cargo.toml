@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 activity-log.workspace = true
+approval.workspace = true
 autotuner.workspace = true
 ai-core.workspace = true
 common.workspace = true

@@ -24,7 +24,9 @@ pub async fn init_coding_subscribers(
     let skill_eff = Arc::new(SkillEffectivenessSignal::new(mirror_repo.clone()));
     let recall_cov = Arc::new(RecallCoverageSignal::new(mirror_repo));
 
-    let history_repo = storage::repos::CodingApprovalHistoryRepo::new(storage_pool.inner().clone());
+    let history_repo = Arc::new(storage::repos::CodingApprovalHistoryRepo::new(
+        storage_pool.inner().clone(),
+    ));
     let approval_source = Arc::new(ApprovalHistorySource::new(history_repo));
 
     let mut rx = bus.subscribe();

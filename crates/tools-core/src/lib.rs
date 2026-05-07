@@ -6,6 +6,7 @@
 
 // ── Modules ─────────────────────────────────────────────────────────────
 
+pub mod approval_class;
 pub mod config_persistence;
 pub mod events;
 pub mod feature;
@@ -13,7 +14,6 @@ pub mod interceptor;
 pub mod metadata;
 pub mod pagination;
 pub mod params;
-pub mod permissions;
 pub mod registry;
 pub mod routing;
 pub mod search;
@@ -32,7 +32,6 @@ pub use interceptor::{InterceptorChain, ToolCallInterceptor};
 pub use metadata::{CostHint, ToolCategory, ToolMetadata, ToolSource};
 pub use pagination::Page;
 pub use params::ParamExtractor;
-pub use permissions::{PermissionLevel, ToolPermissions};
 pub use registry::ToolRegistry;
 pub use routing::{InteractionBundle, InteractionChannel, ProgressHandler, RoutingContext};
 pub use search::{rrf_merge, rrf_merge_triple, Searchable};
@@ -83,12 +82,6 @@ pub trait Tool: Send + Sync {
     /// Execute the tool with given arguments and routing context
     async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String>;
 
-    /// Permission level required to use this tool.
-    /// Defaults to `Standard`. Override for sensitive tools.
-    fn permission_level(&self) -> PermissionLevel {
-        PermissionLevel::Standard
-    }
-
     /// Rich metadata for discovery. Override to provide category, tags, etc.
     fn metadata(&self) -> ToolMetadata {
         ToolMetadata::default()
@@ -120,6 +113,18 @@ pub trait Tool: Send + Sync {
     /// `tool_timeout_sec` configuration.
     fn custom_timeout(&self) -> Option<std::time::Duration> {
         None
+    }
+
+    /// Approval class for this tool given specific arguments.
+    /// Defaults to `Safe`. Override for tools that require approval.
+    fn approval_class(&self, _args: &Value) -> crate::approval_class::ApprovalClass {
+        crate::approval_class::ApprovalClass::Safe
+    }
+
+    /// Approval scope for this tool given specific arguments.
+    /// Defaults to `ToolAction`. Override to provide per-resource scoping.
+    fn approval_scope(&self, _args: &Value) -> crate::approval_class::ApprovalScope {
+        crate::approval_class::ApprovalScope::ToolAction
     }
 
     /// Convert to OpenAI function schema format

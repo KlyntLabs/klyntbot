@@ -222,7 +222,7 @@ CREATE TABLE strategy_records (
     complexity_signals TEXT NOT NULL DEFAULT '{}',
     execution_mode     TEXT,
     retrieved_memory_count INTEGER,
-    budget_exhausted   INTEGER DEFAULT 0,
+    safety_cap_hit     INTEGER DEFAULT 0,
     turns_used         INTEGER DEFAULT 0,
     loop_detected      INTEGER DEFAULT 0,
     loop_tools         TEXT,
@@ -857,24 +857,22 @@ CREATE TABLE IF NOT EXISTS response_warnings (
 CREATE INDEX IF NOT EXISTS idx_response_warnings_created
     ON response_warnings(created_at);
 
--- Phase 2: Mirror-learned approval cache (Layer 3)
--- Append-only log of every ApprovalResolved event keyed by (tool, args_hash, repo_id).
-CREATE TABLE IF NOT EXISTS coding_approval_history (
+-- Unified approval grants (replaces coding_approval_history; pre-release, no migration).
+CREATE TABLE IF NOT EXISTS approval_grants (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    tool            TEXT NOT NULL,
-    args_hash       TEXT NOT NULL,
-    repo_id         TEXT NOT NULL DEFAULT '',
-    decision        TEXT NOT NULL,           -- 'allow' | 'deny'
-    decided_by      TEXT NOT NULL,           -- 'user' | 'auto_allow' | 'auto_deny' | 'timeout' | 'cancelled'
-    layer           TEXT NOT NULL,           -- which layer fired
-    created_at      INTEGER NOT NULL DEFAULT (cast(strftime('%s','now') as integer))
+    class           TEXT NOT NULL CHECK (class IN ('safe','sensitive','destructive','admin')),
+    tool_name       TEXT NOT NULL,
+    action          TEXT,
+    resource_key    TEXT,
+    lifetime        TEXT NOT NULL CHECK (lifetime IN ('session','forever')),
+    session_id      TEXT,
+    granted_at      INTEGER NOT NULL,
+    expires_at      INTEGER,
+    UNIQUE (class, tool_name, action, resource_key, lifetime, session_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_coding_approval_history_key
-  ON coding_approval_history(tool, args_hash, repo_id);
-
-CREATE INDEX IF NOT EXISTS idx_coding_approval_history_clear
-  ON coding_approval_history(tool, repo_id);
+CREATE INDEX IF NOT EXISTS idx_approval_grants_lookup
+    ON approval_grants(tool_name, action, class, resource_key, session_id);
 
 -- Phase 2: file snapshots for /sessions rewind
 CREATE TABLE IF NOT EXISTS coding_snapshots (

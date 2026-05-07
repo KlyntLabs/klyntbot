@@ -209,7 +209,7 @@ async fn draft_skill_md(pm: &ProviderManager, rule_text: &str) -> Result<String>
     }];
     let params = providers::types::ChatParams::new("default".to_string());
     let resp = pm
-        .chat_with_role(ProviderRole::ReforgeRules, &messages, None, &params)
+        .chat_with_role(ProviderRole::ReforgeRules, &messages, None, &params, &[])
         .await
         .map_err(|e| KlyntbotError::Storage(format!("skill draft: {e}")))?;
     Ok(resp.content.unwrap_or_else(|| rule_text.to_string()))

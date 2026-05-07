@@ -384,6 +384,15 @@ impl MirrorRepo {
         Ok(())
     }
 
+    /// Convenience: build a snippet from an alert and insert it.
+    pub async fn insert_snippet_from_alert(
+        &self,
+        alert: &crate::mirror::types::MirrorAlert,
+    ) -> Result<()> {
+        let snippet = crate::mirror::snippet_from_alert(alert);
+        self.insert_snippet(&snippet).await
+    }
+
     pub async fn get_pending_snippets(&self) -> Result<Vec<NarrativeSnippet>> {
         let rows = sqlx::query_as::<_, SnippetRow>(
             "SELECT * FROM mirror_snippets WHERE dismissed_at IS NULL ORDER BY created_at DESC LIMIT 20",
@@ -488,74 +497,79 @@ impl MirrorRepo {
     // Cleanup / retention
     // -----------------------------------------------------------------------
 
-    /// Delete hourly routing snapshots older than `max_age_days`.
-    /// Daily aggregates (window_hours != 1) are preserved.
-    pub async fn cleanup_old_snapshots(&self, max_age_days: u32) -> Result<u64> {
+    /// Delete rows from `table` where `time_col` < cutoff, with an optional
+    /// `extra_where` clause (e.g. `AND window_hours = 1`).
+    async fn delete_older_than(
+        &self,
+        table: &str,
+        time_col: &str,
+        max_age_days: u32,
+        extra_where: Option<&str>,
+    ) -> Result<u64> {
         let cutoff =
             Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
-        let result = sqlx::query(
-            "DELETE FROM mirror_routing_snapshots WHERE captured_at < ?1 AND window_hours = 1",
-        )
-        .bind(cutoff.to_string())
-        .execute(self.db())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(result.rows_affected())
-    }
-
-    pub async fn cleanup_old_snippets(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff =
-            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
-        let result = sqlx::query("DELETE FROM mirror_snippets WHERE created_at < ?1")
+        let sql = format!(
+            "DELETE FROM {table} WHERE {time_col} < ?1 {}",
+            extra_where.unwrap_or("")
+        );
+        let result = sqlx::query(&sql)
             .bind(cutoff.to_string())
             .execute(self.db())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(result.rows_affected())
+    }
+
+    /// Delete hourly routing snapshots older than `max_age_days`.
+    /// Daily aggregates (window_hours != 1) are preserved.
+    pub async fn cleanup_old_snapshots(&self, max_age_days: u32) -> Result<u64> {
+        self.delete_older_than(
+            "mirror_routing_snapshots",
+            "captured_at",
+            max_age_days,
+            Some("AND window_hours = 1"),
+        )
+        .await
+    }
+
+    pub async fn cleanup_old_snippets(&self, max_age_days: u32) -> Result<u64> {
+        self.delete_older_than("mirror_snippets", "created_at", max_age_days, None)
+            .await
     }
 
     /// Delete trend narratives older than `max_age_days`. Returns rows removed.
     pub async fn cleanup_old_trend_narratives(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff =
-            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
-        let result = sqlx::query("DELETE FROM mirror_trend_narratives WHERE generated_at < ?1")
-            .bind(cutoff.to_string())
-            .execute(self.db())
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(result.rows_affected())
+        self.delete_older_than(
+            "mirror_trend_narratives",
+            "generated_at",
+            max_age_days,
+            None,
+        )
+        .await
     }
 
     /// Delete `Disabled` meta-rules older than `max_age_days`. Active/Pending
     /// rules are never auto-removed. Returns rows removed.
     pub async fn cleanup_old_meta_rules(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff =
-            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
-        let result = sqlx::query(
-            "DELETE FROM mirror_meta_rules
-             WHERE status = 'Disabled' AND updated_at < ?1",
+        self.delete_older_than(
+            "mirror_meta_rules",
+            "updated_at",
+            max_age_days,
+            Some("AND status = 'Disabled'"),
         )
-        .bind(cutoff.to_string())
-        .execute(self.db())
         .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(result.rows_affected())
     }
 
     /// Delete brain versions marked `reverted = 1` older than `max_age_days`.
     /// Promoted versions are never deleted.
     pub async fn cleanup_reverted_brain_versions(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff =
-            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
-        let result = sqlx::query(
-            "DELETE FROM mirror_brain_versions
-             WHERE reverted = 1 AND promoted_at < ?1",
+        self.delete_older_than(
+            "mirror_brain_versions",
+            "promoted_at",
+            max_age_days,
+            Some("AND reverted = 1"),
         )
-        .bind(cutoff.to_string())
-        .execute(self.db())
         .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(result.rows_affected())
     }
 
     // -----------------------------------------------------------------------
@@ -782,37 +796,28 @@ impl MirrorRepo {
     }
 
     pub async fn cleanup_old_trial_previews(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff =
-            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
-        let result = sqlx::query("DELETE FROM mirror_trial_previews WHERE preview_at < ?1")
-            .bind(cutoff.to_string())
-            .execute(self.db())
+        self.delete_older_than("mirror_trial_previews", "preview_at", max_age_days, None)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(result.rows_affected())
     }
 
     pub async fn cleanup_old_task_focus_snapshots(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff =
-            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
-        let result = sqlx::query("DELETE FROM mirror_task_focus_snapshots WHERE captured_at < ?1")
-            .bind(cutoff.to_string())
-            .execute(self.db())
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(result.rows_affected())
+        self.delete_older_than(
+            "mirror_task_focus_snapshots",
+            "captured_at",
+            max_age_days,
+            None,
+        )
+        .await
     }
 
     pub async fn cleanup_old_finance_drift_snapshots(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff =
-            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
-        let result =
-            sqlx::query("DELETE FROM mirror_finance_drift_snapshots WHERE captured_at < ?1")
-                .bind(cutoff.to_string())
-                .execute(self.db())
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(result.rows_affected())
+        self.delete_older_than(
+            "mirror_finance_drift_snapshots",
+            "captured_at",
+            max_age_days,
+            None,
+        )
+        .await
     }
 
     // -----------------------------------------------------------------------

@@ -22,21 +22,26 @@ export type MessageImage = {
   label: string;
 };
 
-export type ToolGroupItem = Extract<
-  ConversationItem,
-  { kind: "tool" | "reasoning" | "explore" | "userInput" }
->;
+export type ToolFamily =
+  | "filesystem"
+  | "shell"
+  | "search"
+  | "web"
+  | "domain"
+  | "agent"
+  | "mcp"
+  | "system"
+  | "approval";
 
-export type ToolGroup = {
-  id: string;
-  items: ToolGroupItem[];
-  toolCount: number;
-  messageCount: number;
+export type ToolRowDescriptor = {
+  family: ToolFamily;
+  /** Display name in the header — capitalised, no trailing colon. */
+  name: string;
+  /** Primary argument shown after the name (path, command, query, action verb). */
+  arg: string;
+  /** Optional right-side meta fragments joined with " · " when rendered. */
+  meta: string[];
 };
-
-export type MessageListEntry =
-  | { kind: "item"; item: ConversationItem }
-  | { kind: "toolGroup"; group: ToolGroup };
 
 export const SCROLL_THRESHOLD_PX = 120;
 export const MAX_COMMAND_OUTPUT_LINES = 200;
@@ -138,10 +143,6 @@ export function toolNameFromTitle(title: string) {
   return segments.length ? segments[segments.length - 1] : "";
 }
 
-export function formatCount(value: number, singular: string, plural: string) {
-  return `${value} ${value === 1 ? singular : plural}`;
-}
-
 function sanitizeReasoningTitle(title: string) {
   return title
     .replace(/[`*_~]/g, "")
@@ -211,109 +212,6 @@ export function normalizeMessageImageSrc(path: string) {
   } catch {
     return "";
   }
-}
-
-function isToolGroupItem(item: ConversationItem): item is ToolGroupItem {
-  return (
-    item.kind === "tool" ||
-    item.kind === "reasoning" ||
-    item.kind === "explore" ||
-    item.kind === "userInput"
-  );
-}
-
-function mergeExploreItems(
-  items: Extract<ConversationItem, { kind: "explore" }>[],
-): Extract<ConversationItem, { kind: "explore" }> {
-  const first = items[0];
-  const last = items[items.length - 1];
-  const status = last?.status ?? "explored";
-  const entries = items.flatMap((item) => item.entries);
-  return {
-    id: first.id,
-    kind: "explore",
-    status,
-    entries,
-  };
-}
-
-function mergeConsecutiveExploreRuns(items: ToolGroupItem[]): ToolGroupItem[] {
-  const result: ToolGroupItem[] = [];
-  let run: Extract<ConversationItem, { kind: "explore" }>[] = [];
-
-  const flushRun = () => {
-    if (run.length === 0) {
-      return;
-    }
-    if (run.length === 1) {
-      result.push(run[0]);
-    } else {
-      result.push(mergeExploreItems(run));
-    }
-    run = [];
-  };
-
-  items.forEach((item) => {
-    if (item.kind === "explore") {
-      run.push(item);
-      return;
-    }
-    flushRun();
-    result.push(item);
-  });
-  flushRun();
-  return result;
-}
-
-export function buildToolGroups(items: ConversationItem[]): MessageListEntry[] {
-  const entries: MessageListEntry[] = [];
-  let buffer: ToolGroupItem[] = [];
-
-  const flush = () => {
-    if (buffer.length === 0) {
-      return;
-    }
-    const normalizedBuffer = mergeConsecutiveExploreRuns(buffer);
-    const toolCount = normalizedBuffer.reduce((total, item) => {
-      if (item.kind === "tool") {
-        return total + 1;
-      }
-      if (item.kind === "explore") {
-        return total + item.entries.length;
-      }
-      return total;
-    }, 0);
-    const messageCount = normalizedBuffer.filter(
-      (item) => item.kind !== "tool" && item.kind !== "explore",
-    ).length;
-    if (toolCount === 0 || normalizedBuffer.length === 1) {
-      normalizedBuffer.forEach((item) => {
-        entries.push({ kind: "item", item });
-      });
-    } else {
-      entries.push({
-        kind: "toolGroup",
-        group: {
-          id: normalizedBuffer[0].id,
-          items: normalizedBuffer,
-          toolCount,
-          messageCount,
-        },
-      });
-    }
-    buffer = [];
-  };
-
-  items.forEach((item) => {
-    if (isToolGroupItem(item)) {
-      buffer.push(item);
-    } else {
-      flush();
-      entries.push({ kind: "item", item });
-    }
-  });
-  flush();
-  return entries;
 }
 
 export function cleanCommandText(commandText: string) {
@@ -566,4 +464,161 @@ export function exploreKindLabel(
   kind: Extract<ConversationItem, { kind: "explore" }>["entries"][number]["kind"],
 ) {
   return kind[0].toUpperCase() + kind.slice(1);
+}
+
+const SHELL_SEARCH_TOOLS = ["grep", "glob", "rg", "ripgrep", "fd", "find"];
+
+function classifyShellCommand(command: string): "search" | "shell" {
+  const head = command.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+  return SHELL_SEARCH_TOOLS.includes(head) ? "search" : "shell";
+}
+
+function formatDurationCompact(ms: number | null | undefined): string | null {
+  if (typeof ms !== "number" || !Number.isFinite(ms) || ms <= 0) return null;
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rem = Math.round(seconds % 60);
+  return `${minutes}m${rem.toString().padStart(2, "0")}s`;
+}
+
+function summarizeDiffStats(diff: string): { added: number; removed: number } {
+  let added = 0;
+  let removed = 0;
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) added += 1;
+    else if (line.startsWith("-") && !line.startsWith("---")) removed += 1;
+  }
+  return { added, removed };
+}
+
+function fileChangeName(kind: string | undefined): "Read" | "Write" | "Edit" | "Patch" {
+  switch (kind) {
+    case "read":
+      return "Read";
+    case "add":
+    case "write":
+      return "Write";
+    case "apply_patch":
+    case "notebook_edit":
+      return "Patch";
+    default:
+      return "Edit";
+  }
+}
+
+function parseMcpTitle(title: string): { server: string; tool: string } {
+  const match = title.match(/^Tool:\s*([^\s/]+)\s*(?:\/\s*(.+))?$/i);
+  if (!match) return { server: "", tool: title };
+  return { server: match[1] ?? "", tool: (match[2] ?? "").trim() };
+}
+
+const KLYNTBOT_MCP_SERVERS = new Set(["klyntbot", "klynt", "klyntcoach"]);
+
+function capitalize(input: string): string {
+  if (!input) return input;
+  return input[0].toUpperCase() + input.slice(1);
+}
+
+function summarizeMcpArgs(detail: string): string[] {
+  const args = parseToolArgs(detail);
+  if (!args) return [];
+  const interesting: string[] = [];
+  for (const key of ["title", "name", "query", "path", "id"]) {
+    const v = args[key];
+    if (typeof v === "string" && v.trim()) {
+      interesting.push(`${key}=${v.length > 40 ? `${v.slice(0, 40)}…` : v}`);
+      break;
+    }
+  }
+  return interesting;
+}
+
+export function toolRowDescriptor(
+  item: Extract<ConversationItem, { kind: "tool" }>,
+): ToolRowDescriptor {
+  if (item.toolType === "commandExecution") {
+    const command = item.title.replace(/^Command:\s*/i, "").trim() || "command";
+    const family = classifyShellCommand(command);
+    const meta: string[] = [];
+    const dur = formatDurationCompact(item.durationMs ?? null);
+    if (dur) meta.push(dur);
+    return {
+      family,
+      name: family === "search" ? "Grep" : "Bash",
+      arg: command,
+      meta,
+    };
+  }
+  if (item.toolType === "fileChange") {
+    const change = item.changes?.[0];
+    const path = change?.path ?? item.detail ?? "";
+    const name = fileChangeName(change?.kind);
+    const meta: string[] = [];
+    if (change?.diff) {
+      const { added, removed } = summarizeDiffStats(change.diff);
+      if (name === "Write" && added > 0) meta.push(`+${added}`);
+      else if (name !== "Read" && (added > 0 || removed > 0))
+        meta.push(`+${added} −${removed}`);
+    }
+    if ((item.changes?.length ?? 0) > 1) {
+      meta.push(`${item.changes!.length} files`);
+    }
+    return { family: "filesystem", name, arg: path, meta };
+  }
+  if (item.toolType === "webSearch") {
+    return {
+      family: "web",
+      name: "WebSearch",
+      arg: item.detail || "",
+      meta: [],
+    };
+  }
+  if (item.toolType === "mcpToolCall") {
+    const { server, tool } = parseMcpTitle(item.title);
+    const isKlyntbot = KLYNTBOT_MCP_SERVERS.has(server.toLowerCase());
+    const args = parseToolArgs(item.detail);
+    if (isKlyntbot) {
+      const action = (args && typeof args.action === "string" ? args.action : "") || tool || "";
+      return {
+        family: "domain",
+        name: capitalize(tool || "Tool"),
+        arg: action,
+        meta: summarizeMcpArgs(item.detail),
+      };
+    }
+    return {
+      family: "mcp",
+      name: server || "mcp",
+      arg: tool || "",
+      meta: summarizeMcpArgs(item.detail),
+    };
+  }
+  if (item.toolType === "collabToolCall" || item.toolType === "collabAgentToolCall") {
+    return {
+      family: "agent",
+      name: "Agent",
+      arg: item.detail || item.title || "",
+      meta: formatDurationCompact(item.durationMs ?? null) ? [formatDurationCompact(item.durationMs ?? null)!] : [],
+    };
+  }
+  if (item.toolType === "hook") {
+    return {
+      family: "system",
+      name: "Hook",
+      arg: item.title.replace(/^Hook:\s*/i, "").trim() || "",
+      meta: item.detail ? [item.detail] : [],
+    };
+  }
+  if (item.toolType === "contextCompaction") {
+    return { family: "system", name: "Context", arg: "compacted", meta: [] };
+  }
+  if (item.toolType === "imageView") {
+    return { family: "system", name: "Image", arg: item.detail || "", meta: [] };
+  }
+  if (item.toolType === "plan") {
+    return { family: "domain", name: "Plan", arg: "", meta: [] };
+  }
+  return { family: "system", name: item.title || "Tool", arg: "", meta: [] };
 }

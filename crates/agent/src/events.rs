@@ -10,8 +10,15 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type", rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum AgentEvent {
-    /// A chunk of content streamed from the LLM.
+    /// A chunk of content streamed from the LLM (visible answer text).
     ContentChunk { data: String },
+
+    /// A chunk of reasoning_content streamed from the LLM (extended-thinking
+    /// scratchpad emitted by models like Kimi-Reasoner / DeepSeek-R1 / qwq /
+    /// glm-zero). Distinct from `ContentChunk` so the FE can render reasoning
+    /// inline as a "Thinking:" block while keeping the model's visible answer
+    /// as a separate text part.
+    ReasoningChunk { data: String },
 
     /// Pipeline processing has begun (emitted immediately, before classification).
     PipelineStarted,
@@ -321,12 +328,10 @@ pub enum AgentEvent {
         max_turns: u32,
         cost_usd: f64,
         depth: String,
-    },
-
-    /// User extended the budget mid-conversation.
-    BudgetExtended {
-        additional_turns: u32,
-        new_max_turns: u32,
+        #[serde(default)]
+        cache_read_tokens: u32,
+        #[serde(default)]
+        cache_write_tokens: u32,
     },
 
     // ── Depth suggestion (adaptive layer) ────────────────────
@@ -538,7 +543,6 @@ pub enum AgentEvent {
 #[cfg(test)]
 mod recall_skill_variant_tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn recall_injected_serializes_with_camel_case_tag() {
@@ -602,7 +606,6 @@ mod recall_skill_variant_tests {
 #[cfg(test)]
 mod approval_sandbox_variant_tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn approval_requested_carries_requires_user_input_field() {

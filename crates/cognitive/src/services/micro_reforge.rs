@@ -149,7 +149,7 @@ impl MicroReforgeService {
                 .await
                 .into_iter()
                 .map(|o| crate::services::micro_reforge_types::ObservationRef {
-                    content_truncated: truncate(&o.content, 200),
+                    content_truncated: common::helpers::truncate_chars(&o.content, 200, "…"),
                     domain: o.domain,
                     importance: o.importance,
                 })
@@ -245,14 +245,6 @@ fn normalize(s: &str) -> String {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-fn truncate(s: &str, n: usize) -> String {
-    if s.len() <= n {
-        s.to_string()
-    } else {
-        format!("{}…", &s[..n])
-    }
 }
 
 #[cfg(test)]

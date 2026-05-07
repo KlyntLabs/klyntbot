@@ -10,6 +10,7 @@
 
 pub mod alarm_side_effects;
 pub mod alarms;
+pub mod api;
 pub mod complexity;
 pub mod config;
 pub mod events;

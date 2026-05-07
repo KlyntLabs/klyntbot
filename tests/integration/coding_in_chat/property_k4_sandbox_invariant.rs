@@ -1,8 +1,5 @@
 #![cfg(target_os = "macos")]
 use bus::DomainEventBus;
-use common::tool_channel::NonUiPolicy;
-use config::schema::CodingPermissions;
-use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::bash::{BashArgs, BashTool};
 use klynt_execpolicy::Policy;
@@ -13,14 +10,8 @@ use tools_core::ToolExecute;
 
 #[tokio::test]
 async fn k4_sandbox_event_emitted_before_exec() {
-    let perms = CodingPermissions {
-        allow: vec!["Bash(*)".into()],
-        ..Default::default()
-    };
-    let layer1 = Arc::new(Layer1::compile(&perms).unwrap());
     let policy = Arc::new(Policy::empty());
     let privacy = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
-    let pending = Arc::new(PendingApprovalsMap::new());
     let bus = Arc::new(DomainEventBus::new(64));
     let (tx, mut rx) = mpsc::channel(64);
 
@@ -31,7 +22,7 @@ async fn k4_sandbox_event_emitted_before_exec() {
         outside.display()
     );
 
-    let tool = BashTool::new(layer1, policy, privacy, pending, bus, NonUiPolicy::Allow);
+    let tool = BashTool::new(policy, privacy, bus, common::tool_channel::NonUiPolicy::Allow);
     let mut routing_ctx = tools_core::RoutingContext::new(
         ::common::ChannelName::new("coding"),
         ::common::ChatId::new("test"),

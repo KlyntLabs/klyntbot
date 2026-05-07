@@ -820,7 +820,7 @@ impl SessionRepo {
         let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         let parts_json = serde_json::to_string(parts).map_err(StorageError::serialization)?;
         let finish_json = finish_reason
-            .map(|f| serde_json::to_string(f))
+            .map(serde_json::to_string)
             .transpose()
             .map_err(StorageError::serialization)?;
 
@@ -949,7 +949,6 @@ pub struct SessionMessageWithParts {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[tokio::test]
     async fn upsert_session_with_mode_persists_coding() {

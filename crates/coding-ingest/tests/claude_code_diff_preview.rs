@@ -4,7 +4,7 @@ use coding_ingest::event::{AgentEvent, EventKind, FileOp};
 
 #[test]
 fn edit_emits_diff_preview() {
-    let adapter = ClaudeCodeAdapter::default();
+    let adapter = ClaudeCodeAdapter;
     let raw = serde_json::json!({
         "session_id": "s1",
         "cwd": "/tmp",

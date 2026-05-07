@@ -33,7 +33,10 @@ pub(super) async fn relay_insight_stream(
     repos: Repos,
     emitter: Arc<dyn AppEventEmitter>,
 ) {
-    let mut stream = match provider.chat_stream(&messages, None, &chat_params).await {
+    let mut stream = match provider
+        .chat_stream(&messages, None, &chat_params, &[])
+        .await
+    {
         Ok(s) => s,
         Err(e) => {
             emitter.emit_event(

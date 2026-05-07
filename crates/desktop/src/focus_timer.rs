@@ -137,11 +137,17 @@ pub struct FocusTimer {
     state: Mutex<Option<SessionState>>,
 }
 
-impl FocusTimer {
-    pub fn new() -> Self {
+impl Default for FocusTimer {
+    fn default() -> Self {
         Self {
             state: Mutex::new(None),
         }
+    }
+}
+
+impl FocusTimer {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     #[allow(clippy::too_many_arguments)]

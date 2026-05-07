@@ -1,7 +1,4 @@
-use klynt_hooks::events::{
-    pre_compact::PreCompactInput, pre_file_edit::PreFileEditInput, session_end::SessionEndInput,
-    subagent_spawn::SubagentSpawnInput,
-};
+use klynt_hooks::events::{pre_compact::PreCompactInput, pre_file_edit::PreFileEditInput};
 
 #[test]
 fn extension_event_inputs_serialize_round_trip() {

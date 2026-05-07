@@ -12,7 +12,10 @@ use super::converters::{resolve_status_label, row_to_task, row_to_task_response,
 impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub async fn task_get(&self, id: String) -> Result<Option<TaskResponse>, ApiError> {
-        match self.repos.tasks.get(&id).await.map_err(map_storage_err)? {
+        match feature_tasks::api::get_task(&self.repos.tasks, &id)
+            .await
+            .map_err(map_storage_err)?
+        {
             Some(row) => Ok(Some(row_to_task(&self.repos, &row).await?)),
             None => Ok(None),
         }
@@ -32,10 +35,7 @@ impl AppCore {
             root_only: true,
             ..Default::default()
         };
-        let rows = self
-            .repos
-            .tasks
-            .list(&filter)
+        let rows = feature_tasks::api::list_tasks(&self.repos.tasks, &filter)
             .await
             .map_err(map_storage_err)?;
 
@@ -143,7 +143,9 @@ impl AppCore {
             scheduled_end: None,
         };
 
-        let created = self.repos.tasks.add(&row).await.map_err(map_storage_err)?;
+        let created = feature_tasks::api::create_task(&self.repos.tasks, &row)
+            .await
+            .map_err(map_storage_err)?;
 
         let updates = vec![EntityUpdate {
             kind: EntityKind::Task,
@@ -213,10 +215,7 @@ impl AppCore {
             ..Default::default()
         };
 
-        let updated = self
-            .repos
-            .tasks
-            .update(&patch)
+        let updated = feature_tasks::api::update_task(&self.repos.tasks, &patch)
             .await
             .map_err(map_storage_err)?;
 
@@ -253,10 +252,7 @@ impl AppCore {
 
     #[tracing::instrument(skip(self))]
     pub async fn task_delete(&self, id: String) -> HandlerResult<bool> {
-        let deleted = self
-            .repos
-            .tasks
-            .delete(&id)
+        let deleted = feature_tasks::api::delete_task(&self.repos.tasks, &id)
             .await
             .map_err(map_storage_err)?;
 
@@ -274,30 +270,7 @@ impl AppCore {
 
     #[tracing::instrument(skip(self))]
     pub async fn task_toggle_complete(&self, id: String) -> HandlerResult<TaskResponse> {
-        let row = self
-            .repos
-            .tasks
-            .get_or_err(&id)
-            .await
-            .map_err(map_storage_err)?;
-
-        let new_status = if row.completed {
-            "todo".to_string()
-        } else {
-            "done".to_string()
-        };
-
-        let patch = TaskPatch {
-            id: id.clone(),
-            status: Some(new_status),
-            completed: Some(!row.completed),
-            ..Default::default()
-        };
-
-        let updated = self
-            .repos
-            .tasks
-            .update(&patch)
+        let updated = feature_tasks::api::toggle_complete(&self.repos.tasks, &id)
             .await
             .map_err(map_storage_err)?;
 
@@ -351,10 +324,7 @@ impl AppCore {
         &self,
         parent_id: String,
     ) -> Result<Vec<TaskResponse>, ApiError> {
-        let rows = self
-            .repos
-            .tasks
-            .get_children(&parent_id)
+        let rows = feature_tasks::api::list_children(&self.repos.tasks, &parent_id)
             .await
             .map_err(map_storage_err)?;
 
@@ -369,9 +339,7 @@ impl AppCore {
         task_id: String,
         blocker_id: String,
     ) -> Result<(), ApiError> {
-        self.repos
-            .tasks
-            .add_dependency(&task_id, &blocker_id, "blocks")
+        feature_tasks::api::add_dependency(&self.repos.tasks, &task_id, &blocker_id)
             .await
             .map_err(map_storage_err)
     }
@@ -381,10 +349,7 @@ impl AppCore {
         &self,
         task_id: String,
     ) -> Result<Vec<TaskResponse>, ApiError> {
-        let rows = self
-            .repos
-            .tasks
-            .get_blockers(&task_id)
+        let rows = feature_tasks::api::list_dependencies(&self.repos.tasks, &task_id)
             .await
             .map_err(map_storage_err)?;
 
@@ -401,18 +366,15 @@ impl AppCore {
         value: String,
         title: Option<String>,
     ) -> Result<TaskAttachmentRow, ApiError> {
-        self.repos
-            .tasks
-            .add_attachment(
-                &task_id,
-                &attachment_type,
-                &value,
-                title.as_deref(),
-                &[],
-                "user",
-            )
-            .await
-            .map_err(map_storage_err)
+        feature_tasks::api::add_attachment(
+            &self.repos.tasks,
+            &task_id,
+            &attachment_type,
+            &value,
+            title.as_deref(),
+        )
+        .await
+        .map_err(map_storage_err)
     }
 
     #[tracing::instrument(skip(self), err)]
@@ -420,9 +382,7 @@ impl AppCore {
         &self,
         task_id: String,
     ) -> Result<Vec<TaskAttachmentRow>, ApiError> {
-        self.repos
-            .tasks
-            .list_attachments(&task_id)
+        feature_tasks::api::list_attachments(&self.repos.tasks, &task_id)
             .await
             .map_err(map_storage_err)
     }
@@ -437,18 +397,15 @@ impl AppCore {
         duration_secs: Option<i64>,
         note: Option<String>,
     ) -> Result<TaskTimeEntryRow, ApiError> {
-        self.repos
-            .tasks
-            .add_time_entry(
-                &task_id,
-                "user",
-                started_at,
-                duration_secs,
-                note.as_deref(),
-                None,
-            )
-            .await
-            .map_err(map_storage_err)
+        feature_tasks::api::add_time_entry(
+            &self.repos.tasks,
+            &task_id,
+            started_at,
+            duration_secs,
+            note.as_deref(),
+        )
+        .await
+        .map_err(map_storage_err)
     }
 
     #[tracing::instrument(skip(self), err)]
@@ -456,9 +413,7 @@ impl AppCore {
         &self,
         task_id: String,
     ) -> Result<Vec<TaskTimeEntryRow>, ApiError> {
-        self.repos
-            .tasks
-            .list_time_entries(&task_id)
+        feature_tasks::api::list_time_entries(&self.repos.tasks, &task_id)
             .await
             .map_err(map_storage_err)
     }

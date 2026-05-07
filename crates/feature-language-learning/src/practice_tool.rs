@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use common::{Result, ToolError};
-use tools_core::{RoutingContext, Tool};
+use tools_core::{approval_class::ApprovalClass, RoutingContext, Tool};
 
 #[derive(Default)]
 pub struct LanguagePracticeTool;
@@ -112,5 +112,12 @@ impl Tool for LanguagePracticeTool {
         };
 
         Ok(serde_json::to_string(&result)?)
+    }
+
+    fn approval_class(&self, args: &Value) -> ApprovalClass {
+        match args.get("action").and_then(|v| v.as_str()) {
+            Some("start_session" | "end_session" | "log_exam") => ApprovalClass::Sensitive,
+            _ => ApprovalClass::Safe,
+        }
     }
 }

@@ -627,6 +627,48 @@ pub async fn run_reforge(
     }
 
     // ------------------------------------------------------------------
+    // Phase 6.7: Community Summaries (Wave 8) — gated KCA_COMMUNITY_SUMMARIES=1
+    // ------------------------------------------------------------------
+    if std::env::var("KCA_COMMUNITY_SUMMARIES").ok().as_deref() == Some("1") {
+        if let Some(community_repo) = community_repo {
+            info!("Reforge Phase 6.7: Community summaries");
+            match community_repo.list_active_communities().await {
+                Ok(communities) => {
+                    let mut wrote = 0u32;
+                    for c in communities.iter().filter(|c| c.member_count >= 5) {
+                        // Deterministic v0 summary: "Topics: <comma-joined top entities>".
+                        // Phase C will swap this for an LLM call.
+                        let entities: Vec<String> = c
+                            .top_entities
+                            .as_deref()
+                            .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+                            .unwrap_or_default()
+                            .into_iter()
+                            .take(5)
+                            .collect();
+                        if entities.is_empty() {
+                            continue;
+                        }
+                        let summary = format!("Topics: {}", entities.join(", "));
+                        if let Err(e) = community_repo.update_summary(&c.id, &summary).await {
+                            warn!(community_id = %c.id, error = %e, "Phase 6.7: update_summary failed");
+                        } else {
+                            wrote += 1;
+                        }
+                    }
+                    debug!(updated = wrote, "Reforge Phase 6.7 complete");
+                }
+                Err(e) => {
+                    warn!("Reforge Phase 6.7 failed to list communities: {e}");
+                    result
+                        .phase_errors
+                        .push(format!("community_summaries: {e}"));
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Phase 7: Compact
     // ------------------------------------------------------------------
     info!("Reforge Phase 7: Compact");
@@ -660,6 +702,55 @@ pub async fn run_reforge(
         Err(e) => {
             warn!("Reforge Phase 7 failed: {e}");
             result.phase_errors.push(format!("compact: {e}"));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 7.7: Compression (Wave 10) — gated KCA_REFORGE_COMPRESS=1
+    // Dedup near-identical facts: same (subject, predicate, object) triple
+    // (case-normalized) keeps the highest-confidence row, supersedes the rest.
+    // Phase C will swap deterministic dedup for LLM merge.
+    // ------------------------------------------------------------------
+    if std::env::var("KCA_REFORGE_COMPRESS").ok().as_deref() == Some("1") {
+        info!("Reforge Phase 7.7: Compression");
+        match fact_repo.list_all_active().await {
+            Ok(facts) => {
+                use std::collections::HashMap;
+                let mut groups: HashMap<(String, String, String), Vec<crate::types::SemanticFact>> =
+                    HashMap::new();
+                for f in facts {
+                    let key = (
+                        f.subject.to_lowercase(),
+                        f.predicate.to_lowercase(),
+                        f.object.to_lowercase(),
+                    );
+                    groups.entry(key).or_default().push(f);
+                }
+                let mut superseded = 0u32;
+                for (_, mut group) in groups {
+                    if group.len() < 2 {
+                        continue;
+                    }
+                    group.sort_by(|a, b| {
+                        b.confidence
+                            .partial_cmp(&a.confidence)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                    let winner_id = group[0].id.clone();
+                    for loser in &group[1..] {
+                        if let Err(e) = fact_repo.supersede(&loser.id, &winner_id).await {
+                            warn!(loser = %loser.id, error = %e, "Phase 7.7: supersede failed");
+                        } else {
+                            superseded += 1;
+                        }
+                    }
+                }
+                debug!(superseded, "Reforge Phase 7.7 complete");
+            }
+            Err(e) => {
+                warn!("Reforge Phase 7.7 failed to list facts: {e}");
+                result.phase_errors.push(format!("compression: {e}"));
+            }
         }
     }
 

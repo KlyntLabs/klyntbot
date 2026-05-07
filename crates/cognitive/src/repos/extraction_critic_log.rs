@@ -63,12 +63,21 @@ impl ExtractionCriticLogRepo {
     }
 
     pub async fn mark_reviewed(&self, ids: &[String]) -> common::Result<()> {
-        for id in ids {
-            sqlx::query("UPDATE extraction_critic_log SET reviewed_by_reforge_at = datetime('now') WHERE id = ?1")
-                .bind(id)
-                .execute(self.pool.inner()).await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        if ids.is_empty() {
+            return Ok(());
         }
+        let placeholders: Vec<String> = (1..=ids.len()).map(|i| format!("?{i}")).collect();
+        let sql = format!(
+            "UPDATE extraction_critic_log SET reviewed_by_reforge_at = datetime('now') WHERE id IN ({})",
+            placeholders.join(", ")
+        );
+        let mut q = sqlx::query(&sql);
+        for id in ids {
+            q = q.bind(id);
+        }
+        q.execute(self.pool.inner())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
     }
 }

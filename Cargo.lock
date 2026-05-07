@@ -67,6 +67,7 @@ version = "0.1.1"
 dependencies = [
  "activity-log",
  "ai-core",
+ "approval",
  "async-trait",
  "autotuner",
  "bus",
@@ -385,6 +386,7 @@ dependencies = [
  "activity-log",
  "agent",
  "ai-core",
+ "approval",
  "async-trait",
  "autotuner",
  "base64 0.22.1",
@@ -442,6 +444,29 @@ dependencies = [
  "uuid",
  "voice-engine",
  "walkdir",
+]
+
+[[package]]
+name = "approval"
+version = "0.1.0"
+dependencies = [
+ "activity-log",
+ "async-trait",
+ "bus",
+ "common",
+ "config",
+ "globset",
+ "jiff",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tools-core",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2349,6 +2374,7 @@ dependencies = [
 name = "channels"
 version = "0.1.1"
 dependencies = [
+ "approval",
  "async-imap",
  "async-trait",
  "bus",
@@ -2369,6 +2395,7 @@ dependencies = [
  "tokio-native-tls",
  "tokio-tungstenite 0.28.0",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2555,6 +2582,7 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
+ "specta",
  "tempfile",
  "tracing",
 ]
@@ -2600,6 +2628,7 @@ dependencies = [
  "common",
  "context_engine",
  "dirs",
+ "futures",
  "git2",
  "jiff",
  "lru",
@@ -4481,6 +4510,7 @@ version = "0.1.1"
 dependencies = [
  "anyhow",
  "app-core",
+ "approval",
  "async-trait",
  "autotuner",
  "axum",
@@ -9551,6 +9581,7 @@ version = "0.1.1"
 dependencies = [
  "ai-core",
  "anyhow",
+ "approval",
  "async-trait",
  "common",
  "config",
@@ -11801,6 +11832,7 @@ dependencies = [
  "async-trait",
  "common",
  "config",
+ "dashmap",
  "futures-util",
  "jiff",
  "reqwest 0.13.3",

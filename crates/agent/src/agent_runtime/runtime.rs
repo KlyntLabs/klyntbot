@@ -15,7 +15,7 @@ use tracing::warn;
 
 use crate::autotuner::hooks::AutoTunerHook;
 use crate::events::AgentEvent;
-use crate::execution::{execute_loop, DepthMode, ExecutionBudget, ExecutionParams};
+use crate::execution::{execute_loop, DepthMode, ExecutionParams, SafetyCap};
 use crate::output::cost_tracker::CostTracker;
 use crate::output::validator::{ResponseValidator, ValidationResult};
 
@@ -25,6 +25,7 @@ pub struct RuntimeConfig {
     pub provider_name: String,
     pub context_window: usize,
     pub max_response_tokens: usize,
+    pub cache_enabled: bool,
 }
 
 /// Result of processing a message through the agent runtime.
@@ -35,7 +36,7 @@ pub struct RuntimeResult {
     pub validation: ValidationResult,
     pub agent_name: String,
     pub turns: u32,
-    pub budget_exhausted: bool,
+    pub safety_cap_hit: bool,
     pub tool_calls: Vec<String>,
 }
 
@@ -81,6 +82,8 @@ pub struct AgentRuntime {
     hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
     /// Domain event bus for emitting cross-cutting events (e.g. Mirror alerts).
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    /// Global kill switch for cache-breakpoint placement.
+    cache_enabled: bool,
 }
 
 impl AgentRuntime {
@@ -121,6 +124,7 @@ impl AgentRuntime {
             tool_kit: std::sync::Mutex::new(None),
             hook_engine: std::sync::Mutex::new(None),
             domain_event_bus: None,
+            cache_enabled: cfg.cache_enabled,
         }
     }
 
@@ -283,6 +287,7 @@ impl AgentRuntime {
         cancel_token: Option<tokio_util::sync::CancellationToken>,
         depth: DepthMode,
     ) -> Result<RuntimeResult> {
+        tracing::debug!("AgentRuntime::process_message: function body entered");
         let mut ctx = ctx.clone();
         // Bridge ToolEvent channel → AgentEvent channel so klynt-core tools
         // can emit events without depending on the agent crate.
@@ -385,17 +390,22 @@ impl AgentRuntime {
         ctx.hook_engine = self.hook_engine();
         let ctx = &ctx;
         let pipeline_start = Instant::now();
+        tracing::debug!("AgentRuntime::process_message: about to acquire hot_config read lock");
         let hot = self.hot_config.read().await;
+        tracing::debug!("AgentRuntime::process_message: hot_config lock acquired");
         let safety_timeout_secs = hot.safety_timeout_secs;
         drop(hot);
 
+        tracing::debug!(session = %ctx.chat_id.as_str(), "runtime.process_message: entered");
         // Emit pipeline start
         if let Some(ref tx) = event_tx {
             let _ = tx.send(AgentEvent::PipelineStarted).await;
         }
 
         // ── Phase 1: Prepare ─────────────────────────────────────
+        tracing::debug!("runtime.process_message: calling build_retrieval_context");
         let retrieval_context = self.build_retrieval_context(&history).await;
+        tracing::debug!("runtime.process_message: build_retrieval_context done");
 
         let enhancement_budget = self.build_enhancement_budget(depth);
 
@@ -412,6 +422,7 @@ impl AgentRuntime {
         // assembler would receive an empty system message and the model would
         // run on pretraining defaults — see KLYNTBOT.md for the canonical
         // tone/formatting rules that this prompt carries into every turn.
+        tracing::debug!("runtime.process_message: calling build_system_prompt");
         let system_prompt = self
             .context_engine
             .build_system_prompt(
@@ -421,6 +432,7 @@ impl AgentRuntime {
                 ctx.session_mode,
             )
             .await;
+        tracing::debug!(prompt_len = system_prompt.len(), "runtime.process_message: build_system_prompt done");
 
         let context_request = ContextRequest {
             message_text: message.to_string(),
@@ -435,9 +447,11 @@ impl AgentRuntime {
             tier0_count: Some(tier0),
         };
 
+        tracing::debug!("runtime.process_message: calling context_engine.assemble");
         let assemble_start = Instant::now();
         let mut assembled = self.context_engine.assemble(context_request).await;
         let assemble_ms = assemble_start.elapsed().as_millis() as u64;
+        tracing::debug!(ms = assemble_ms, tokens = assembled.token_count, "runtime.process_message: assemble done");
 
         let context_fill_tokens = assembled.token_count;
         let context_fill_budget = self.context_window;
@@ -481,14 +495,14 @@ impl AgentRuntime {
             self.emit_learning_summary(tx).await;
         }
 
-        // Create budget
-        let mut budget = ExecutionBudget::new(depth);
+        // Create safety cap
+        let mut budget = SafetyCap::new(depth);
 
         // Build execution params
-        let mut params = ExecutionParams::new(&self.execution_model)
+        let mut params = ExecutionParams::new(&self.execution_model, self.context_window)
             .with_max_iterations(budget.max_turns())
             .with_original_message(message.to_string())
-            .with_context_window(self.context_window);
+            .with_cache_enabled(self.cache_enabled);
 
         if let Some(token) = cancel_token {
             params = params.with_cancel_token(token);
@@ -532,6 +546,7 @@ impl AgentRuntime {
             None
         };
 
+        tracing::debug!(safety_timeout_secs, "runtime.process_message: calling execute_loop");
         let mut loop_result = tokio::time::timeout(
             safety_timeout,
             execute_loop(
@@ -578,7 +593,7 @@ impl AgentRuntime {
                      concrete answer with specific names and details where possible."
                 };
                 retry_messages.push(providers::types::Message::user(nudge.to_string()));
-                let mut retry_budget = ExecutionBudget::new(depth);
+                let mut retry_budget = SafetyCap::new(depth);
                 let retry_result = tokio::time::timeout(
                     safety_timeout,
                     execute_loop(
@@ -663,7 +678,7 @@ impl AgentRuntime {
             let strategy_repo = strategy_repo.clone();
             let warning_repo = self.warning_repo.clone();
             let chat_id = ctx.chat_id.to_string();
-            let budget_exhausted = loop_result.budget_exhausted;
+            let safety_cap_hit = loop_result.safety_cap_hit;
             let turns = loop_result.turns;
             let tool_calls = loop_result.tool_calls.clone();
             let mode = mode_name.clone();
@@ -682,7 +697,7 @@ impl AgentRuntime {
                     escalation_count: 0,
                     iterations_used: turns as i32,
                     max_iterations: 0,
-                    success: !budget_exhausted,
+                    success: !safety_cap_hit,
                     user_satisfaction: None,
                     response_time_ms: pipeline_elapsed_ms as i64,
                     chat_id: Some(chat_id.clone()),
@@ -692,7 +707,7 @@ impl AgentRuntime {
                     complexity_signals: serde_json::json!({}),
                     execution_mode: Some(mode),
                     retrieved_memory_count: None,
-                    budget_exhausted,
+                    safety_cap_hit: safety_cap_hit,
                     turns_used: turns as i32,
                     loop_detected: false,
                     loop_tools: None,
@@ -787,7 +802,7 @@ impl AgentRuntime {
             validation,
             agent_name: "klyntbot".to_string(),
             turns: loop_result.turns,
-            budget_exhausted: loop_result.budget_exhausted,
+            safety_cap_hit: loop_result.safety_cap_hit,
             tool_calls: loop_result.tool_calls,
         })
     }
@@ -994,7 +1009,7 @@ impl AgentRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use providers::{ChatParams, DynProvider, LlmResponse, Usage};
+    use providers::{DynProvider, LlmResponse, Usage};
     use std::sync::Arc;
     use tools::registry::ToolRegistry;
 
@@ -1051,6 +1066,7 @@ mod tests {
                 provider_name: "mock".to_string(),
                 context_window: 128_000,
                 max_response_tokens: 8192,
+                cache_enabled: true,
             },
             hot_config,
         )

@@ -670,7 +670,18 @@ export type ModelOption = {
   model: string;
   displayName: string;
   description: string;
+  /// Config-provider key the backend will route this model through
+  /// (e.g. `anthropic`, `deepseek`). Useful for debug surfaces; the FE
+  /// dropdown filter no longer keys off this — it uses `brand`.
   provider: string | null;
+  /// Brand of the model (e.g. `moonshot`, `anthropic`, `openai`).
+  /// This is what the user picks from the provider pill. May differ
+  /// from `provider` when a compat endpoint serves another brand
+  /// (Kimi via Anthropic compat: `provider="anthropic"`,
+  /// `brand="moonshot"`). Optional because legacy callers / tests may
+  /// not populate it; the FE filter falls back to `provider` when
+  /// missing.
+  brand?: string | null;
   supportedReasoningEfforts: { reasoningEffort: string; description: string }[];
   defaultReasoningEffort: string | null;
   isDefault: boolean;

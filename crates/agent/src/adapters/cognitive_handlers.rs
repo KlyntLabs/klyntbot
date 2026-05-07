@@ -251,20 +251,31 @@ impl cognitive::services::extraction::ConflictResolver for LlmConflictResolver {
             Message::system(AUDD_SYSTEM_PROMPT.to_string()),
             Message::user(user_msg),
         ];
-        let response = match self.provider.chat(&messages, None, &self.params).await {
+        let response = match self.provider.chat(&messages, None, &self.params, &[]).await {
             Ok(r) => r,
             Err(e) => {
                 tracing::warn!(error = %e, "AUDD classify failed, defaulting to ADD");
                 return cognitive::services::extraction::ConflictDecision::Add;
             }
         };
-        let line = response
-            .content
-            .unwrap_or_default()
+        // Mimo and other reasoning models emit chain-of-thought prose and bury
+        // the verdict deep in the response (or in reasoning_content). Scan all
+        // lines from the end and pick the last one whose first token is a
+        // recognized verdict — this tolerates reasoning preambles like
+        // "First, the task is to..." while still parsing single-token replies.
+        let raw = response.content.unwrap_or_default();
+        let line = raw
             .lines()
-            .next()
-            .unwrap_or("")
-            .trim()
+            .rev()
+            .map(|l| {
+                l.trim()
+                    .trim_matches(|c: char| c == '`' || c == '"' || c == '*')
+            })
+            .find(|l| {
+                let head = l.split_whitespace().next().unwrap_or("").to_uppercase();
+                matches!(head.as_str(), "ADD" | "UPDATE" | "DELETE" | "NOOP")
+            })
+            .unwrap_or_else(|| raw.lines().next().unwrap_or("").trim())
             .to_string();
         let upper = line.to_uppercase();
         if upper == "NOOP" {
@@ -444,7 +455,7 @@ struct ExtractedRelationshipJson {
 /// `{user, employer, Anthropic}` fact because Alice never appears as a fact
 /// subject — only as the object of the `name` triple. This is the dominant
 /// cause of low long-mem recall on synthetic benchmarks.
-fn bind_user_identity(extractions: &mut Vec<cognitive::BatchExtraction>) {
+fn bind_user_identity(extractions: &mut [cognitive::BatchExtraction]) {
     let mut name: Option<String> = None;
     for ext in extractions.iter() {
         for fact in &ext.facts {
@@ -538,7 +549,7 @@ impl ExtractionHandler for LlmExtractionHandler {
             Message::user(user_msg),
         ];
 
-        match self.provider.chat(&messages, None, &self.params).await {
+        match self.provider.chat(&messages, None, &self.params, &[]).await {
             Ok(response) => {
                 let content = response.content.unwrap_or_default();
                 match serde_json::from_str::<BatchExtractionLlmResult>(&content) {
@@ -792,7 +803,7 @@ impl ConsolidationHandler for LlmConsolidationHandler {
             Message::user(user_msg),
         ];
 
-        match self.provider.chat(&messages, None, &self.params).await {
+        match self.provider.chat(&messages, None, &self.params, &[]).await {
             Ok(response) => {
                 let content = response.content.unwrap_or_default();
                 match serde_json::from_str::<BatchConsolidationLlmResult>(&content) {
@@ -901,7 +912,7 @@ impl cognitive::services::graph_linker::GraphLinkHandler for LlmGraphLinkHandler
 
         let resp = self
             .provider
-            .chat(&messages, None, &self.params)
+            .chat(&messages, None, &self.params, &[])
             .await
             .map_err(|e| crate::provider_err("graph_link", e))?;
 
@@ -1054,7 +1065,7 @@ impl cognitive::pipeline::DeepConsolidationHandler for LlmDeepConsolidationHandl
                 sources.join(", ")
             ));
             for obs in &cluster.combined_observations {
-                let truncated = if obs.len() > 200 { &obs[..200] } else { obs };
+                let truncated = common::truncate_at_boundary(obs, 200);
                 user_msg.push_str(&format!("  - \"{truncated}\"\n"));
             }
             user_msg.push('\n');
@@ -1065,7 +1076,10 @@ impl cognitive::pipeline::DeepConsolidationHandler for LlmDeepConsolidationHandl
             Message::user(user_msg),
         ];
 
-        let response = self.provider.chat(&messages, None, &self.params).await?;
+        let response = self
+            .provider
+            .chat(&messages, None, &self.params, &[])
+            .await?;
         let content = response.content.unwrap_or_default();
 
         let parsed: DeepConsolidationResponse = serde_json::from_str(&content)
@@ -1109,13 +1123,9 @@ impl cognitive::pipeline::DeepConsolidationHandler for LlmDeepConsolidationHandl
                 }
                 "episode" => {
                     let content = decision.content.unwrap_or(cluster.merged_subject.clone());
-                    let summary = decision.summary.unwrap_or_else(|| {
-                        if content.len() > 120 {
-                            content[..120].to_string()
-                        } else {
-                            content.clone()
-                        }
-                    });
+                    let summary = decision
+                        .summary
+                        .unwrap_or_else(|| common::truncate_at_boundary(&content, 120).to_string());
                     ops.push(cognitive::pipeline::PromotionOp::CreateEpisode {
                         content,
                         summary,
@@ -1253,7 +1263,7 @@ impl CoachingReasonerHandler for LlmCoachingReasonerHandler {
             Message::user(user_msg),
         ];
 
-        match self.provider.chat(&messages, None, &self.params).await {
+        match self.provider.chat(&messages, None, &self.params, &[]).await {
             Ok(response) => {
                 let content = response.content.unwrap_or_default();
                 match serde_json::from_str::<CoachingDecisionJson>(&content) {
@@ -1330,7 +1340,7 @@ impl ExtractionCriticHandler for LlmExtractionCriticHandler {
         ];
         let resp = self
             .provider
-            .chat(&messages, None, &self.params)
+            .chat(&messages, None, &self.params, &[])
             .await
             .map_err(|e| crate::provider_err("critic", e))?;
         match serde_json::from_str::<ExtractionCriticOutput>(&resp.content.unwrap_or_default()) {
@@ -1401,7 +1411,7 @@ impl LlmCommunityMembershipHandler {
         ];
         let resp = self
             .provider
-            .chat(&messages, None, &self.params)
+            .chat(&messages, None, &self.params, &[])
             .await
             .map_err(|e| crate::provider_err("community_membership", e))?;
 
@@ -1491,7 +1501,7 @@ impl MicroReforgeHandler for LlmMicroReforgeHandler {
         ];
         let resp = self
             .provider
-            .chat(&messages, None, &self.params)
+            .chat(&messages, None, &self.params, &[])
             .await
             .map_err(|e| crate::provider_err("micro_reforge", e))?;
         let text = resp.content.unwrap_or_default();
@@ -1541,7 +1551,7 @@ impl LlmQueryPredictorHandler {
         ];
         let resp = self
             .provider
-            .chat(&messages, None, &self.params)
+            .chat(&messages, None, &self.params, &[])
             .await
             .map_err(|e| crate::provider_err("query_predictor", e))?;
         #[derive(serde::Deserialize)]
@@ -1549,7 +1559,7 @@ impl LlmQueryPredictorHandler {
             predictions: Vec<String>,
         }
         let parsed: R = serde_json::from_str(&resp.content.unwrap_or_default())
-            .map_err(|e| common::KlyntbotError::Json(e))?;
+            .map_err(common::KlyntbotError::Json)?;
         Ok(parsed.predictions.into_iter().take(n as usize).collect())
     }
 }
@@ -1633,7 +1643,7 @@ impl cognitive::services::hierarchical_compressor::HierarchicalSummarizer
         ];
         let resp = self
             .provider
-            .chat(&messages, None, &self.params)
+            .chat(&messages, None, &self.params, &[])
             .await
             .map_err(|e| crate::provider_err("hier_summarize", e))?;
         Ok(resp.content.unwrap_or_default())
@@ -1674,14 +1684,14 @@ impl cognitive::services::temporal_pruner::TemporalPrunerHandler for LlmTemporal
         if input.facts.is_empty() {
             return Ok(Default::default());
         }
-        let user = serde_json::to_string(&input).map_err(|e| common::KlyntbotError::Json(e))?;
+        let user = serde_json::to_string(&input).map_err(common::KlyntbotError::Json)?;
         let messages = vec![
             providers::Message::system(TEMPORAL_PRUNE_SYSTEM_PROMPT),
             providers::Message::user(user),
         ];
         let resp = self
             .provider
-            .chat(&messages, None, &self.params)
+            .chat(&messages, None, &self.params, &[])
             .await
             .map_err(|e| crate::provider_err("temporal_prune", e))?;
         match serde_json::from_str::<cognitive::services::temporal_pruner::PruneOutput>(
@@ -1706,10 +1716,9 @@ mod tests {
     use crate::test_utils::MockProvider;
     use cognitive::situation::UserSituation;
     use cognitive::types::{SemanticFact, DEFAULT_MEMORY_TYPE};
-    use common::{KlyntbotError, ProviderError};
+
     use feature_coaching::signal_accumulator::TriggerFired;
-    use providers::{LlmProvider, LlmResponse, ProviderCapabilities, ProviderHealth, Usage};
-    use serde_json::Value;
+    use providers::{LlmResponse, Usage};
 
     // ── Test helpers ──
 

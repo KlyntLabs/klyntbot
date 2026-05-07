@@ -11,8 +11,8 @@ use tokio::task::JoinHandle;
 use uuid::Uuid;
 
 use crate::mirror::{
-    snippet_from_alert, EarlyTrialEvaluator, MirrorAlert, MirrorRepo, PreviewRecommendation,
-    TrialEarlySignals, TrialPreview,
+    EarlyTrialEvaluator, MirrorAlert, MirrorRepo, PreviewRecommendation, TrialEarlySignals,
+    TrialPreview,
 };
 
 const PREVIEW_DELAY_SECS: u64 = 4 * 60 * 60;
@@ -87,8 +87,7 @@ impl TrialPreviewSource {
                     trial_id: trial_id.clone(),
                     reason: narrative,
                 };
-                let snippet = snippet_from_alert(&alert);
-                let _ = repo.insert_snippet(&snippet).await;
+                let _ = repo.insert_snippet_from_alert(&alert).await;
             }
 
             timers.remove(&trial_id);

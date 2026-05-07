@@ -45,17 +45,13 @@ pub struct ThreadSummary {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ApprovalPolicy {
     AskAlways,
+    #[default]
     AskOnRisky,
     AskOnFailure,
     YoloMode,
-}
-
-impl Default for ApprovalPolicy {
-    fn default() -> Self {
-        Self::AskOnRisky
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

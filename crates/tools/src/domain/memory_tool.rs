@@ -14,7 +14,7 @@ use crate::conversation_recall::{ConversationRecallHandler, PurgeFilter, RecallS
 use crate::embedding_engine::EmbeddingHandler;
 use crate::semantic_fact_search::SemanticFactSearchHandler;
 use crate::todo_types::Action;
-use crate::{RoutingContext, Tool};
+use crate::{approval_class::ApprovalClass, RoutingContext, Tool};
 use common::Result;
 
 /// Tool for semantic search over conversation history.
@@ -216,6 +216,14 @@ impl Tool for MemoryTool {
             _ => Err(common::KlyntbotError::Tool(
                 common::ToolError::InvalidParams(format!("Unknown action: {}", action)),
             )),
+        }
+    }
+
+    fn approval_class(&self, args: &Value) -> ApprovalClass {
+        match args.get("action").and_then(|v| v.as_str()) {
+            Some("record_fact") => ApprovalClass::Sensitive,
+            Some("purge") => ApprovalClass::Destructive,
+            _ => ApprovalClass::Safe,
         }
     }
 }

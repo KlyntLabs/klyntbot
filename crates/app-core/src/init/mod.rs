@@ -77,7 +77,7 @@ impl AppCore {
         mode: common::AppMode,
         config_override: Option<config::Config>,
     ) -> Result<(Self, EventChannels), String> {
-        Self::init_with_sender(mode, config_override, None, None).await
+        Self::init_with_sender(mode, config_override, None, None, None).await
     }
 
     /// Initialize with an optional custom notification sender and event emitter.
@@ -89,12 +89,13 @@ impl AppCore {
     /// When `event_emitter` is `Some`, entity update events from MCP tool
     /// mutations are forwarded to the frontend. When `None`, a no-op emitter
     /// is used (CLI / standalone MCP server).
-    #[tracing::instrument(skip(notification_sender, event_emitter), err)]
+    #[tracing::instrument(skip(notification_sender, event_emitter, approval_channel), err)]
     pub async fn init_with_sender(
         mode: common::AppMode,
         config_override: Option<config::Config>,
         notification_sender: Option<Arc<dyn common::NotificationSender>>,
         event_emitter: Option<Arc<dyn AppEventEmitter>>,
+        approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
     ) -> Result<(Self, EventChannels), String> {
         // ── Phase 1: Storage ─────────────────────────────────────────────
         let storage::StorageResult {
@@ -341,6 +342,7 @@ impl AppCore {
             Some(Arc::clone(&context_update_queue)),
             appcore_embedding_engine.clone(),
             recall.clone(),
+            approval_channel,
         )
         .await?;
 
@@ -1267,7 +1269,6 @@ impl AppCore {
             causal_edge_repo: None,
             symbol_extractor: None,
             repo_roots: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
-            pending_approvals: Arc::new(klynt_core::approval::PendingApprovalsMap::new()),
             tracing_registry,
             session_start_fired: Arc::new(dashmap::DashMap::new()),
             session_end_fired: Arc::new(dashmap::DashMap::new()),
@@ -1281,6 +1282,7 @@ impl AppCore {
             subagent_events: bus::TypedBroker::new(256),
             thread_subscriptions: Arc::new(dashmap::DashMap::new()),
             steer_queue: Arc::new(crate::coding::steer_queue::SteerQueue::new()),
+            tool_kit: std::sync::Mutex::new(None),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────
@@ -1839,11 +1841,6 @@ impl AppCore {
         // ── Register BashTool in agent's tool registry (post-init) ──────
         {
             let config_guard = core.config.read().await;
-            let perms = &config_guard.coding.permissions;
-            let layer1 =
-                Arc::new(klynt_core::approval::Layer1::compile(perms).expect(
-                    "Layer 1 rules failed to compile; fix coding.permissions in config.json",
-                ));
             let exclude_globs: Vec<&str> = config_guard
                 .coding_memory
                 .ingest
@@ -1861,34 +1858,24 @@ impl AppCore {
                     .and_then(|p| klynt_execpolicy::Policy::load_from_dir(&p).ok())
                     .unwrap_or_else(klynt_execpolicy::Policy::empty),
             );
-            let pending = core.pending_approvals.clone();
             let bus = core
                 .domain_event_bus
                 .clone()
                 .unwrap_or_else(|| Arc::new(bus::DomainEventBus::new(64)));
 
-            // Toolkit cwd: walk up from the running binary's cwd to find the
-            // outermost workspace root (`.git` marker). Fixes the case where
-            // `cargo tauri dev` cd's into `crates/desktop`, leaving tools
-            // sandboxed to that subdir instead of the actual repo.
-            let cwd = {
-                let start =
-                    std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-                let mut cur = start.clone();
-                let mut found = None;
-                loop {
-                    if cur.join(".git").exists() {
-                        found = Some(cur.clone());
-                    }
-                    match cur.parent() {
-                        Some(p) if p != cur => cur = p.to_path_buf(),
-                        _ => break,
-                    }
-                }
-                found.unwrap_or(start)
-            };
+            // Toolkit cwd: bare process cwd. The previous implementation
+            // walked up to the outermost `.git` ancestor, which silently
+            // disguised cwd-rebind failures as "files landed somewhere
+            // plausible" instead of "files landed where the binary was
+            // launched from." Coding turns now require an explicit per-turn
+            // rebind via `coding/turn_handler.rs::rebind_tool_kit_for_thread`;
+            // any failure there returns Err and the turn never spawns. So
+            // this default only matters for non-coding contexts (e.g. the
+            // assistant chat shell, MCP server) where an explicit cwd is set
+            // at the callsite, or where shell access isn't permitted at all.
+            let cwd =
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
             let non_ui_policy = config_guard.tools.approval_policy.non_ui_channels;
-            let host_cache = Arc::new(klynt_core::approval::HostApprovalCache::default());
 
             let hook_engine: Option<Arc<klynt_hooks::HookEngine>> = {
                 let hooks_path = config_guard.data_dir_path().join("hooks.toml");
@@ -1907,13 +1894,10 @@ impl AppCore {
 
             let kit = klynt_core::ToolKitBuilder {
                 cwd: cwd.clone(),
-                layer1: layer1.clone(),
                 policy: policy.clone(),
                 privacy: privacy.clone(),
-                pending: pending.clone(),
                 bus: bus.clone(),
                 repos: core.repos.clone(),
-                host_cache,
                 non_ui_policy,
                 hook_engine: hook_engine.clone(),
                 snapshot_repo: core.snapshot_repo.clone(),
@@ -1935,6 +1919,8 @@ impl AppCore {
             let kit_arc = Arc::new(kit);
             core.agent.runtime().set_tool_kit(Arc::clone(&kit_arc));
             core.agent.set_subagent_tool_kit(Arc::clone(&kit_arc));
+            // Sprint-A T2: stash for review_handler to build a read-only registry.
+            *core.tool_kit.lock().unwrap() = Some(Arc::clone(&kit_arc));
             if let Some(ref engine) = hook_engine {
                 core.agent.runtime().set_hook_engine(Arc::clone(engine));
                 core.agent.set_subagent_hook_engine(Arc::clone(engine));

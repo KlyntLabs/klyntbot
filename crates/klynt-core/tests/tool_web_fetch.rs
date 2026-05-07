@@ -1,7 +1,5 @@
 use bus::DomainEventBus;
 use common::tool_channel::{Channel, NonUiPolicy};
-use config::schema::CodingPermissions;
-use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::web_fetch::{run_for_test as fetch_run, WebFetchArgs};
 use klynt_execpolicy::Policy;
@@ -31,14 +29,8 @@ async fn fetches_text_from_local_server() {
             .unwrap();
     });
 
-    let perms = CodingPermissions {
-        allow: vec!["WebFetch(*)".into()],
-        ..Default::default()
-    };
-    let l1 = Arc::new(Layer1::compile(&perms).unwrap());
     let pol = Arc::new(Policy::empty());
     let pri = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
-    let pen = Arc::new(PendingApprovalsMap::new());
     let bus = Arc::new(DomainEventBus::new(64));
     let (tx, _rx) = mpsc::channel(32);
     let url = format!("http://127.0.0.1:{port}/");
@@ -52,17 +44,14 @@ async fn fetches_text_from_local_server() {
             format: Some("text".into()),
             max_bytes: Some(8192),
         },
-        l1,
         pol,
         pri,
-        pen,
         Some(tx),
         bus,
         CancellationToken::new(),
         client,
         Channel::Coding,
         NonUiPolicy::Allow,
-        Arc::new(klynt_core::approval::HostApprovalCache::default()),
         None,
         "".to_string(),
         None,

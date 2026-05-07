@@ -1,5 +1,4 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use storage::repos::ApprovalHistorySummary;
 
 /// Benchmark Phase-2 critical paths that contribute to first-token latency.
 ///
@@ -13,30 +12,6 @@ use storage::repos::ApprovalHistorySummary;
 ///     when KLYNTBOT.md has not changed between turns.
 ///   • Tool-registry per-thread cache and SkillActivator LRU remain as future
 ///     optimisations if profiling shows they are needed.
-
-fn bench_layer3_approval_eval(c: &mut Criterion) {
-    let cfg = klynt_core::approval::layer3::Layer3Config {
-        enabled: true,
-        min_approvals: 5,
-        cooldown_seconds: 86400,
-    };
-    let summary = ApprovalHistorySummary {
-        approval_count: 10,
-        denial_count: 0,
-        last_decided_at: Some(1),
-    };
-    let now = 86400 * 2;
-
-    c.bench_function("layer3_mirror_approval_eval", |b| {
-        b.iter(|| {
-            let _ = klynt_core::approval::layer3::evaluate(
-                black_box(&cfg),
-                black_box(&summary),
-                black_box(now),
-            );
-        });
-    });
-}
 
 fn bench_tool_search(c: &mut Criterion) {
     let meta: Vec<klynt_core::tools::tool_search::ToolMeta> = vec![
@@ -71,31 +46,5 @@ fn bench_tool_search(c: &mut Criterion) {
     });
 }
 
-fn bench_args_hash(c: &mut Criterion) {
-    let bash_json = r#"{"command":"cat foo.txt | grep bar"}"#;
-    let edit_json = r#"{"path":"/some/path/to/file.rs","content":"fn main() {}"}"#;
-    c.bench_function("layer3_args_hash_bash", |b| {
-        b.iter(|| {
-            let _ = klynt_core::approval::layer3::args_hash_for_relevance(
-                black_box("bash"),
-                black_box(bash_json),
-            );
-        });
-    });
-    c.bench_function("layer3_args_hash_edit", |b| {
-        b.iter(|| {
-            let _ = klynt_core::approval::layer3::args_hash_for_relevance(
-                black_box("edit"),
-                black_box(edit_json),
-            );
-        });
-    });
-}
-
-criterion_group!(
-    benches,
-    bench_layer3_approval_eval,
-    bench_tool_search,
-    bench_args_hash
-);
+criterion_group!(benches, bench_tool_search);
 criterion_main!(benches);

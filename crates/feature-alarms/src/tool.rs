@@ -15,7 +15,7 @@ use notifications::channel::names_to_mask;
 use scheduling::temporal::fire_store::{FireSpec, FireStore};
 use serde_json::{json, Value};
 use storage::repos::scheduled_fires::ScheduledFiresRepo;
-use tools_core::{ParamExtractor, RoutingContext, Tool};
+use tools_core::{approval_class::ApprovalClass, ParamExtractor, RoutingContext, Tool};
 use tracing::warn;
 use uuid::Uuid;
 
@@ -271,6 +271,14 @@ impl Tool for AlarmTool {
                 warn!("AlarmTool: unknown action '{other}'");
                 Err(ToolError::InvalidParams(format!("unknown action '{other}'")).into())
             }
+        }
+    }
+
+    fn approval_class(&self, args: &Value) -> ApprovalClass {
+        match args.get("action").and_then(|v| v.as_str()) {
+            Some("create" | "snooze") => ApprovalClass::Sensitive,
+            Some("cancel") => ApprovalClass::Destructive,
+            _ => ApprovalClass::Safe,
         }
     }
 }

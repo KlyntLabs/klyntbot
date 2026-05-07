@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 ai-core = { path = "../ai-core" }
+approval.workspace = true
 common.workspace = true
 config.workspace = true
 tools-core.workspace = true

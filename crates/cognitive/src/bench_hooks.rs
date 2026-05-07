@@ -76,7 +76,7 @@ pub fn record_hits(vector: u32, fts: u32, episodic: u32) {
 pub fn record_entities(entities: &[String]) {
     let mut g = slot().lock().unwrap();
     for ent in entities {
-        if !g.entities.iter().any(|x| x == ent) {
+        if !g.entities.contains(ent) {
             g.entities.push(ent.clone());
         }
     }

@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use bus::DomainEvent;
 use context_engine::book_index::GTLinkRepo;
@@ -45,31 +45,16 @@ impl EntityTreeLinker {
     /// tree nodes are persisted, so no delay is needed.
     pub async fn run(
         self: Arc<Self>,
-        mut rx: broadcast::Receiver<DomainEvent>,
+        rx: broadcast::Receiver<DomainEvent>,
         shutdown: CancellationToken,
     ) {
-        info!("EntityTreeLinker: subscriber started");
-
-        loop {
-            tokio::select! {
-                _ = shutdown.cancelled() => {
-                    info!("EntityTreeLinker: shutdown received");
-                    break;
-                }
-                result = rx.recv() => {
-                    match result {
-                        Ok(_) => {}
-                        Err(broadcast::error::RecvError::Lagged(n)) => {
-                            warn!("EntityTreeLinker: lagged, skipped {n} events");
-                        }
-                        Err(broadcast::error::RecvError::Closed) => {
-                            info!("EntityTreeLinker: event channel closed");
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        crate::adapters::tree_builder_base::run_event_loop(
+            "EntityTreeLinker",
+            rx,
+            shutdown,
+            |_event| async {},
+        )
+        .await;
     }
 
     /// Link entities to tree nodes for a specific source (note, task, etc.).

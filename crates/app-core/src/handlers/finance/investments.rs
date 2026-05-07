@@ -4,7 +4,6 @@ use desktop_shared::commands::{
     FinancePortfolioResponse,
 };
 use desktop_shared::errors::ApiError;
-use futures_util::future::try_join_all;
 use storage::rows::finance::{
     FinanceAllocationTargetRow, FinanceInvestmentFilter, FinanceInvestmentPatch,
     FinanceInvestmentRow, FinanceInvestmentTxRow, FinancePortfolioRow,
@@ -16,32 +15,24 @@ use crate::state::{AppCore, HandlerResult};
 impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub async fn finance_portfolios(&self) -> Result<Vec<FinancePortfolioResponse>, ApiError> {
-        let portfolios = self
-            .repos
-            .finance
-            .investments
-            .list_portfolios()
+        let portfolios = feature_finance::api::list_portfolios(&self.repos.finance)
             .await
             .map_err(map_storage_err)?;
 
         let default_currency = self.default_currency().await;
-        let summaries = try_join_all(portfolios.iter().map(|p| {
-            self.repos
-                .finance
-                .investments
-                .portfolio_summary(&p.id, &default_currency)
-        }))
-        .await
-        .map_err(map_storage_err)?;
+        let summaries =
+            feature_finance::api::portfolio_summaries(&self.repos.finance, &default_currency)
+                .await
+                .map_err(map_storage_err)?;
 
         Ok(portfolios
-            .iter()
+            .into_iter()
             .zip(summaries)
             .map(|(p, summary)| FinancePortfolioResponse {
-                id: p.id.clone(),
-                name: p.name.clone(),
-                description: p.description.clone(),
-                currency: p.currency.clone(),
+                id: p.id,
+                name: p.name,
+                description: p.description,
+                currency: p.currency,
                 total_value: summary.total_current_value,
                 total_cost_basis: summary.total_cost_basis,
                 holding_count: summary.holding_count,
@@ -51,10 +42,7 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn finance_investments(&self) -> Result<Vec<FinanceInvestmentRow>, ApiError> {
-        self.repos
-            .finance
-            .investments
-            .list_investments(&Default::default())
+        feature_finance::api::list_investments(&self.repos.finance, &Default::default())
             .await
             .map_err(map_storage_err)
     }
@@ -78,10 +66,7 @@ impl AppCore {
             created_at: now,
             updated_at: now,
         };
-        self.repos
-            .finance
-            .investments
-            .add_portfolio(&row)
+        let row = feature_finance::api::create_portfolio(&self.repos.finance, &row)
             .await
             .map_err(map_storage_err)?;
         Ok((row, Self::finance_updates(id)))
@@ -126,10 +111,7 @@ impl AppCore {
             purchase_rate: 1.0,
             market_rate: 1.0,
         };
-        self.repos
-            .finance
-            .investments
-            .add_investment(&row)
+        let row = feature_finance::api::create_investment(&self.repos.finance, &row)
             .await
             .map_err(map_storage_err)?;
         Ok((row, Self::finance_updates(id)))
@@ -148,11 +130,7 @@ impl AppCore {
             notes: params.notes,
             ..Default::default()
         };
-        let row = self
-            .repos
-            .finance
-            .investments
-            .update_investment(&patch)
+        let row = feature_finance::api::update_investment(&self.repos.finance, &patch)
             .await
             .map_err(map_storage_err)?;
         Ok((row, Self::finance_updates(params.id)))
@@ -167,10 +145,7 @@ impl AppCore {
             portfolio_id,
             ..Default::default()
         };
-        self.repos
-            .finance
-            .investments
-            .list_investments(&filter)
+        feature_finance::api::list_investments(&self.repos.finance, &filter)
             .await
             .map_err(map_storage_err)
     }
@@ -182,18 +157,15 @@ impl AppCore {
         &self,
         params: FinanceAllocationTargetUpsertParams,
     ) -> HandlerResult<FinanceAllocationTargetRow> {
-        let row = self
-            .repos
-            .finance
-            .allocations
-            .add(
-                &params.portfolio_id,
-                &params.asset_class,
-                &params.target_weight,
-                &params.tolerance_band,
-            )
-            .await
-            .map_err(map_storage_err)?;
+        let row = feature_finance::api::upsert_allocation_target(
+            &self.repos.finance,
+            &params.portfolio_id,
+            &params.asset_class,
+            &params.target_weight,
+            &params.tolerance_band,
+        )
+        .await
+        .map_err(map_storage_err)?;
         Ok((row, Self::finance_updates(params.portfolio_id)))
     }
 
@@ -202,10 +174,7 @@ impl AppCore {
         &self,
         portfolio_id: String,
     ) -> Result<Vec<FinanceAllocationTargetRow>, ApiError> {
-        self.repos
-            .finance
-            .allocations
-            .list_by_portfolio(&portfolio_id)
+        feature_finance::api::list_allocation_targets(&self.repos.finance, &portfolio_id)
             .await
             .map_err(map_storage_err)
     }
@@ -238,10 +207,7 @@ impl AppCore {
             base_currency: params.currency,
             exchange_rate: 1.0,
         };
-        self.repos
-            .finance
-            .investments
-            .add_investment_tx(&row)
+        let row = feature_finance::api::create_investment_tx(&self.repos.finance, &row)
             .await
             .map_err(map_storage_err)?;
         Ok((row, Self::finance_updates(id)))
@@ -252,10 +218,7 @@ impl AppCore {
         &self,
         investment_id: String,
     ) -> Result<Vec<FinanceInvestmentTxRow>, ApiError> {
-        self.repos
-            .finance
-            .investments
-            .list_investment_txs(&investment_id)
+        feature_finance::api::list_investment_txs(&self.repos.finance, &investment_id)
             .await
             .map_err(map_storage_err)
     }

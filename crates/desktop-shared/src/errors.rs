@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// Standardized API error response for Tauri commands.
 /// Sent to the frontend with structured error information.
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiError {
     /// Machine-readable error code (e.g., "NOT_FOUND", "INVALID_PARAMS")
@@ -140,6 +140,8 @@ impl From<KlyntbotError> for ApiError {
             KlyntbotError::Json(e) => ApiError::new("JSON_ERROR", e.to_string()),
             KlyntbotError::Timeout(msg) => ApiError::new("TIMEOUT", msg),
             KlyntbotError::NotImplemented(msg) => ApiError::new("NOT_IMPLEMENTED", msg),
+            KlyntbotError::PermissionDenied(msg) => ApiError::new("PERMISSION_DENIED", msg),
+            KlyntbotError::Cancelled(msg) => ApiError::new("CANCELLED", msg),
         }
     }
 }
@@ -197,7 +199,7 @@ mod alias_tests {
     fn command_result_is_alias_for_result_apierror() {
         // Trivial — proves the alias resolves at compile time.
         let v: CommandResult<i32> = Ok(42);
-        assert_eq!(v.unwrap(), 42);
+        assert_eq!(v, Ok(42));
 
         let e: CommandResult<()> = Err(ApiError {
             code: "TestKind".into(),

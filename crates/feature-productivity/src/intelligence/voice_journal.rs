@@ -47,7 +47,7 @@ impl VoiceJournalProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ProductivityFeature;
+
     use sqlx::SqlitePool;
 
     async fn setup_pool() -> SqlitePool {

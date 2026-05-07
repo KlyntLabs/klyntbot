@@ -10,10 +10,11 @@ use crate::context_source::CognitiveRetrievalConfig;
 use crate::conversation_recall::ConversationRecallService;
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::{CoActivationRepo, EpisodicMemoryRepo, SemanticFactRepo, USER_MODEL_DOMAINS};
-use crate::retrieval::{retrieve_relevant_facts, RetrievalParams, ScoredFact};
+use crate::retrieval::{retrieve_relevant_facts, rrf_merge, RetrievalParams, ScoredFact};
 use crate::search::bm25::search_episodic_memories;
 use crate::services::scoring::{CommunityCache, KnowledgeDepthCache};
 use crate::situation::UserSituation;
+use crate::types::freshness_label;
 
 /// RRF constant — same as used in retrieval.rs BM25 merge.
 const RRF_K: f64 = 60.0;
@@ -25,33 +26,6 @@ const RRF_K: f64 = 60.0;
 /// could ever be recalled. 0.15 still filters noise while admitting fresh
 /// extractions on first query.
 const MIN_FACT_SCORE: f64 = 0.15;
-
-/// Returns a freshness label for a semantic fact based on convergence score,
-/// confidence, and recency of last access.
-fn freshness_label(fact: &crate::types::SemanticFact) -> &'static str {
-    // A just-recorded fact has `last_accessed = None`. Treat that as fresh
-    // by falling back to `recorded_at` — otherwise every newly extracted
-    // fact would be labeled `"weak"` and the LLM, seeing every retrieved
-    // fact tagged "weak -- verify", would refuse to use it ("you may want
-    // to verify"). Mirrors the same fix in `context_source.rs`.
-    let reference_ts = fact
-        .last_accessed
-        .as_deref()
-        .or(Some(fact.recorded_at.as_str()));
-    let days_old = reference_ts
-        .and_then(|ts| ts.parse::<jiff::Timestamp>().ok())
-        .map(|ts| (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()) / 86_400_000)
-        .unwrap_or(90);
-    if fact.convergence_score >= 0.4 || (fact.confidence >= 0.8 && days_old <= 7) {
-        "trusted"
-    } else if fact.confidence >= 0.5 && days_old <= 30 {
-        "noted"
-    } else {
-        // Match `context_source.rs`: avoid the imperative "verify"
-        // suffix, which the LLM was treating as an instruction.
-        "low-confidence"
-    }
-}
 
 /// Unified memory service that merges conversation recall and cognitive facts.
 ///
@@ -317,7 +291,7 @@ impl UnifiedMemoryService {
                     .await
                     .unwrap_or_default();
                     if !ppr_results.is_empty() {
-                        facts = rrf_merge_scored_facts(facts, ppr_results, 60);
+                        facts = rrf_merge(facts, ppr_results, RRF_K);
                     }
                 }
 
@@ -490,7 +464,7 @@ impl UnifiedMemoryService {
             )
             .await
             .unwrap_or_default();
-            facts = rrf_merge_scored_facts(facts, ppr_results, 60);
+            facts = rrf_merge(facts, ppr_results, RRF_K);
         }
 
         // KCA Track 13: temporal prune.
@@ -764,38 +738,6 @@ fn normalize_scores(scores: &[f64]) -> Vec<f64> {
         return vec![1.0; scores.len()];
     }
     scores.iter().map(|s| (s - min) / range).collect()
-}
-
-/// RRF merge two ScoredFact lists. Dedupes by fact id.
-fn rrf_merge_scored_facts(a: Vec<ScoredFact>, b: Vec<ScoredFact>, k: usize) -> Vec<ScoredFact> {
-    let mut by_id: std::collections::HashMap<String, (ScoredFact, f64)> = Default::default();
-    for (rank, sf) in a.into_iter().enumerate() {
-        let s = 1.0 / (k as f64 + (rank + 1) as f64);
-        by_id
-            .entry(sf.fact.id.clone())
-            .and_modify(|v| v.1 += s)
-            .or_insert((sf, s));
-    }
-    for (rank, sf) in b.into_iter().enumerate() {
-        let s = 1.0 / (k as f64 + (rank + 1) as f64);
-        by_id
-            .entry(sf.fact.id.clone())
-            .and_modify(|v| v.1 += s)
-            .or_insert((sf, s));
-    }
-    let mut out: Vec<_> = by_id
-        .into_iter()
-        .map(|(_, (mut sf, score))| {
-            sf.score = score;
-            sf
-        })
-        .collect();
-    out.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    out
 }
 
 /// Check if a recall's content overlaps with any fact predicate.

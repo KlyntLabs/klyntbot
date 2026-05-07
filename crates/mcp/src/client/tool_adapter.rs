@@ -11,7 +11,7 @@ use std::time::Duration;
 use tracing::{debug, warn};
 
 use common::{KlyntbotError, Result};
-use tools_core::{PermissionLevel, RoutingContext, Tool};
+use tools_core::{RoutingContext, Tool};
 
 use super::sanitize;
 use crate::allowlist::{AllowDecision, McpChannelAllowlist};
@@ -182,11 +182,6 @@ impl Tool for McpTool {
 
     fn parameters(&self) -> Value {
         self.input_schema.clone()
-    }
-
-    fn permission_level(&self) -> PermissionLevel {
-        // MCP tools make network calls to external servers
-        PermissionLevel::Elevated
     }
 
     fn custom_timeout(&self) -> Option<Duration> {

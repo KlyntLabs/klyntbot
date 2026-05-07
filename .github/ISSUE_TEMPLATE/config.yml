@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or open-ended discussion
+    url: https://github.com/KlyntLabs/klyntbot/discussions
+    about: Use Discussions for "how do I…" questions, ideas, show-and-tell, and architecture debates.
+  - name: Security vulnerability
+    url: https://github.com/KlyntLabs/klyntbot/security/advisories/new
+    about: Do NOT open a public issue. Report privately via a Security Advisory. See SECURITY.md.
+  - name: Read the contributing guide
+    url: https://github.com/KlyntLabs/klyntbot/blob/main/CONTRIBUTING.md
+    about: Setup, workflow, code style, and PR process.

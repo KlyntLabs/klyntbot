@@ -23,16 +23,12 @@ impl GTLinkRepo for SqliteGTLinkRepo {
         .bind(tree_node_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        .map_err(crate::repos::map_sqlx)?;
         Ok(())
     }
 
     async fn link_batch(&self, links: &[(String, String)]) -> Result<()> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let mut tx = self.pool.begin().await.map_err(crate::repos::map_sqlx)?;
         for (entity_id, tree_node_id) in links {
             sqlx::query(
                 "INSERT OR IGNORE INTO entity_tree_links (entity_id, tree_node_id) VALUES (?1, ?2)",
@@ -41,11 +37,9 @@ impl GTLinkRepo for SqliteGTLinkRepo {
             .bind(tree_node_id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .map_err(crate::repos::map_sqlx)?;
         }
-        tx.commit()
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        tx.commit().await.map_err(crate::repos::map_sqlx)?;
         Ok(())
     }
 
@@ -60,7 +54,7 @@ impl GTLinkRepo for SqliteGTLinkRepo {
             .bind(entity_id)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .map_err(crate::repos::map_sqlx)?;
 
         Ok(rows
             .into_iter()
@@ -109,7 +103,7 @@ impl GTLinkRepo for SqliteGTLinkRepo {
         .bind(node_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        .map_err(crate::repos::map_sqlx)?;
 
         Ok(rows.into_iter().map(|(id,)| id).collect())
     }
@@ -119,7 +113,7 @@ impl GTLinkRepo for SqliteGTLinkRepo {
             .bind(tree_node_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .map_err(crate::repos::map_sqlx)?;
         Ok(result.rows_affected())
     }
 
@@ -128,11 +122,7 @@ impl GTLinkRepo for SqliteGTLinkRepo {
         source_entity_id: &str,
         target_entity_id: &str,
     ) -> Result<()> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let mut tx = self.pool.begin().await.map_err(crate::repos::map_sqlx)?;
 
         sqlx::query(
             "INSERT OR IGNORE INTO entity_tree_links (entity_id, tree_node_id, created_at)
@@ -142,17 +132,15 @@ impl GTLinkRepo for SqliteGTLinkRepo {
         .bind(source_entity_id)
         .execute(&mut *tx)
         .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        .map_err(crate::repos::map_sqlx)?;
 
         sqlx::query("DELETE FROM entity_tree_links WHERE entity_id = ?1")
             .bind(source_entity_id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .map_err(crate::repos::map_sqlx)?;
 
-        tx.commit()
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        tx.commit().await.map_err(crate::repos::map_sqlx)?;
         Ok(())
     }
 }

@@ -199,7 +199,7 @@ async fn generate_summary(
         .with_temperature(0.2)
         .with_max_tokens(800);
 
-    let response = provider.chat(&llm_messages, None, &params).await?;
+    let response = provider.chat(&llm_messages, None, &params, &[]).await?;
     Ok(response.content.unwrap_or_default())
 }
 
@@ -207,18 +207,16 @@ async fn generate_summary(
 fn heuristic_summary(messages: &[storage::SessionMessageRow]) -> String {
     let lines: Vec<String> = messages
         .iter()
-        .map(|m| format!("- **{}**: {}", m.role, truncate(&m.content, 120)))
+        .map(|m| {
+            format!(
+                "- **{}**: {}",
+                m.role,
+                common::helpers::truncate_at_boundary(&m.content, 120)
+            )
+        })
         .collect();
 
     format!("## Recent Messages\n\n{}", lines.join("\n"))
-}
-
-/// Truncate a string to at most `max_chars` characters, appending "…" if truncated.
-fn truncate(s: &str, max_chars: usize) -> &str {
-    match s.char_indices().nth(max_chars) {
-        Some((idx, _)) => &s[..idx],
-        None => s,
-    }
 }
 
 #[cfg(test)]
@@ -240,11 +238,5 @@ mod tests {
         assert!(should_update(6));
         // Turn 9 — update
         assert!(should_update(9));
-    }
-
-    #[test]
-    fn test_truncate() {
-        assert_eq!(truncate("hello", 10), "hello");
-        assert_eq!(truncate("hello world", 5), "hello");
     }
 }

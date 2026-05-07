@@ -42,6 +42,7 @@ async fn safari_appears_once_with_running_and_attention_layers() {
         path: PathBuf::from("/Applications/Safari.app"),
         bundle_id: Some(SmolStr::new("com.apple.Safari")),
         icon_path: None,
+        icon_data_url: None,
     }]);
 
     // Pre-populate the running signal directly (skip NSWorkspace).

@@ -58,7 +58,8 @@ impl WorkspaceAgentsSource {
 }
 
 /// A discovered AGENTS.md file and its context.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentsMdSource {
     /// Absolute path to the AGENTS.md file.
     pub path: PathBuf,

@@ -79,13 +79,11 @@ impl MirrorEngine {
         register!(finance_drift);
 
         if let Some(ah_repo) = approval_history_repo {
-            let approval_history = Arc::new(ApprovalHistorySource::new(
-                Arc::try_unwrap(ah_repo).unwrap_or_else(|arc| (*arc).clone()),
-            ));
+            let approval_history = Arc::new(ApprovalHistorySource::new(ah_repo));
             register!(approval_history);
         }
 
-        let cost_ceiling = Arc::new(CostCeilingSource::new(Arc::new(repo.clone())));
+        let cost_ceiling = Arc::new(CostCeilingSource::new(repo.clone()));
         register!(cost_ceiling);
 
         // Build the facade (unchanged API; drop the now-unused domain_event_bus).

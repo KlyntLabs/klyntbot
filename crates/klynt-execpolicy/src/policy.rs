@@ -386,16 +386,15 @@ fn render_pattern_token(token: &PatternToken) -> String {
 }
 
 impl Policy {
-    /// Adapter for klynt-core/approval/guard.rs:94 — wraps `Policy::check` to
-    /// return the simpler `Decision` rather than `Evaluation`.
+    /// Wraps `Policy::check` to return the simpler `Decision` rather than
+    /// `Evaluation`.
     ///
     /// Splits on whitespace if `argv` was constructed from a string; production
     /// callers should split via shlex first.
     pub fn eval(&self, argv: &[&str], _cwd: Option<&std::path::Path>) -> Decision {
         let cmd: Vec<String> = argv.iter().map(|s| s.to_string()).collect();
-        match self.check(&cmd, &|_| Decision::FallThrough) {
-            Evaluation { decision, .. } => decision,
-        }
+        let Evaluation { decision, .. } = self.check(&cmd, &|_| Decision::FallThrough);
+        decision
     }
 
     /// Persist a session-only "always allow this prefix" rule. Mutating in-memory
@@ -420,12 +419,7 @@ impl Policy {
         for entry in walkdir::WalkDir::new(path).follow_links(false) {
             let entry = match entry {
                 Ok(e) => e,
-                Err(e) => {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        e.to_string(),
-                    ))
-                }
+                Err(e) => return Err(std::io::Error::other(e.to_string())),
             };
             if !entry.file_type().is_file() {
                 continue;

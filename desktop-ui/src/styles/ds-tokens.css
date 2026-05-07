@@ -133,4 +133,17 @@
   --cm-color-warning-line: color-mix(in srgb, #f59e0b 35%, transparent);
   --cm-color-danger-fg: #b91c1c;
   --cm-color-danger-line: color-mix(in srgb, #ef4444 40%, transparent);
+
+  /* Tool-row family colours — referenced by .tool-row left-border.
+     Each family aliases a CodeMirror color FG token so themes only
+     need to override the --cm-color-*-fg values. */
+  --tool-family-filesystem: var(--cm-color-blue-fg);
+  --tool-family-shell: var(--cm-color-orange-fg);
+  --tool-family-search: var(--cm-color-green-fg);
+  --tool-family-web: var(--cm-color-purple-fg);
+  --tool-family-domain: var(--cm-color-indigo-fg);
+  --tool-family-agent: var(--cm-color-pink-fg);
+  --tool-family-mcp: var(--cm-color-teal-fg);
+  --tool-family-system: var(--text-subtle);
+  --tool-family-approval: var(--cm-color-amber-fg);
 }

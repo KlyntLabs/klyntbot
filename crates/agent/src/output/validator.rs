@@ -64,10 +64,9 @@ const MEMORY_REFUSAL_PATTERNS: &[&str] = &[
 /// Public so the agent runtime can check whether a retry is warranted
 /// without re-running the full `validate()` pipeline.
 pub fn detect_memory_refusal(content: &str) -> Option<&'static str> {
-    let lower = content.to_lowercase();
     MEMORY_REFUSAL_PATTERNS
         .iter()
-        .find(|p| lower.contains(*p))
+        .find(|p| icontains(content, **p))
         .copied()
 }
 
@@ -85,6 +84,27 @@ const SYSTEM_LEAK_PATTERNS: &[&str] = &[
     "<<sys>>",
     "<|system|>",
 ];
+
+/// Case-insensitive `contains` for ASCII needles.
+fn icontains(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    let mut chars = haystack.chars();
+    loop {
+        if chars
+            .clone()
+            .zip(needle.chars())
+            .all(|(a, b)| a.eq_ignore_ascii_case(&b))
+        {
+            return true;
+        }
+        if chars.next().is_none() {
+            break;
+        }
+    }
+    false
+}
 
 fn structural_leak_patterns() -> &'static [Regex] {
     static PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
@@ -110,8 +130,9 @@ fn detect_instruction_density(text: &str) -> bool {
     let count = words
         .iter()
         .filter(|w| {
-            let lower = w.to_lowercase();
-            instruction_markers.iter().any(|m| lower == *m)
+            instruction_markers
+                .iter()
+                .any(|m| w.eq_ignore_ascii_case(m))
         })
         .count();
     (count as f32 / words.len() as f32) > 0.05
@@ -153,19 +174,16 @@ impl ResponseValidator {
 
         // 2. System prompt leak detection — redact matched patterns
         if self.check_leaked_system_prompt {
-            let lower = filtered.to_lowercase();
             for pattern in SYSTEM_LEAK_PATTERNS {
-                if lower.contains(pattern) {
+                if icontains(&filtered, pattern) {
                     warnings.push(ValidationWarning::PotentialSystemLeak {
                         pattern: pattern.to_string(),
                     });
-                    // Redact the leaked pattern from the output
-                    let redacted = "[redacted]";
                     // Case-insensitive replacement
+                    let redacted = "[redacted]";
                     let mut result = String::with_capacity(filtered.len());
-                    let lower_filtered = filtered.to_lowercase();
                     let mut last_end = 0;
-                    for (start, _) in lower_filtered.match_indices(pattern) {
+                    for (start, _) in filtered.to_lowercase().match_indices(pattern) {
                         result.push_str(&filtered[last_end..start]);
                         result.push_str(redacted);
                         last_end = start + pattern.len();

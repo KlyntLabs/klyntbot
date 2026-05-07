@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 ai-core = { workspace = true }
+approval = { workspace = true }
 desktop-shared = { workspace = true }
 klynt-core = { workspace = true }
 klynt-execpolicy = { workspace = true }

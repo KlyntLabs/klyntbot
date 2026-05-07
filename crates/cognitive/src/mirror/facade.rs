@@ -20,17 +20,6 @@ use crate::mirror::{
 use crate::repos::EpisodicMemoryRepo;
 use crate::types::ProceduralRule;
 
-/// Cosine similarity between two f32 embedding vectors.
-fn cosine_similarity_f32(a: &[f32], b: &[f32]) -> f64 {
-    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm_a == 0.0 || norm_b == 0.0 {
-        return 0.0;
-    }
-    (dot / (norm_a * norm_b)) as f64
-}
-
 // ---------------------------------------------------------------------------
 // MirrorFacade
 // ---------------------------------------------------------------------------
@@ -450,7 +439,8 @@ impl MirrorFacade {
         for snippet in &snippets {
             let snippet_text = format!("{} {}", snippet.headline, snippet.body);
             if let Ok(snippet_embedding) = embedder.embed(&snippet_text).await {
-                let score = cosine_similarity_f32(&query_embedding, &snippet_embedding);
+                let score =
+                    common::helpers::cosine_similarity(&query_embedding, &snippet_embedding);
                 if score > best_score {
                     best_score = score;
                     best_text = Some(snippet.headline.clone());
@@ -611,35 +601,34 @@ impl MirrorFacade {
         proposal_id: &str,
         skills_dir: &std::path::Path,
     ) -> common::Result<std::path::PathBuf> {
-        let row: (String, String, String, String) = sqlx::query_as(
-            "SELECT name, yaml_frontmatter, body_markdown, status FROM skill_proposals WHERE id = ?1",
+        // Atomic UPDATE — avoids SELECT-then-UPDATE race.
+        let update = sqlx::query(
+            "UPDATE skill_proposals SET status = 'approved', decided_at = datetime('now'), decided_by = 'user' WHERE id = ?1 AND status = 'pending'",
         )
         .bind(proposal_id)
-        .fetch_optional(self.repo.db())
+        .execute(self.repo.db())
         .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?
-        .ok_or_else(|| common::KlyntbotError::StorageNotFound(format!("skill proposal {proposal_id}")))?;
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
 
-        if row.3 != "pending" {
+        if update.rows_affected() == 0 {
             return Err(common::KlyntbotError::Storage(format!(
-                "proposal {proposal_id} is {}",
-                row.3
+                "proposal {proposal_id} not found or not pending"
             )));
         }
+
+        let row: (String, String, String) = sqlx::query_as(
+            "SELECT name, yaml_frontmatter, body_markdown FROM skill_proposals WHERE id = ?1",
+        )
+        .bind(proposal_id)
+        .fetch_one(self.repo.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
 
         let dir = skills_dir.join(&row.0);
         tokio::fs::create_dir_all(&dir).await?;
         let path = dir.join("SKILL.md");
         let content = format!("{}\n\n{}", row.1, row.2);
         tokio::fs::write(&path, content).await?;
-
-        sqlx::query(
-            "UPDATE skill_proposals SET status = 'approved', decided_at = datetime('now'), decided_by = 'user' WHERE id = ?1",
-        )
-        .bind(proposal_id)
-        .execute(self.repo.db())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
 
         Ok(path)
     }

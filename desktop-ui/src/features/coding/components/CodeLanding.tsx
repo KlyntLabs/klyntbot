@@ -13,20 +13,27 @@ export type CodeLandingProps = {
   projects: CodeLandingProject[];
   onSelectProject: (id: string) => void;
   onAddProject: () => void;
-  onImportProject: () => void;
+  onImportProject?: () => void;
+  onSubmitTask?: (text: string) => void;
 };
 
 export function CodeLanding({
   projects,
   onSelectProject,
   onAddProject,
-  onImportProject,
+  onSubmitTask,
 }: CodeLandingProps) {
   useEffect(() => {
     import("@/styles/code-landing.css");
   }, []);
   const [draft, setDraft] = useState("");
   const isEmpty = projects.length === 0;
+  const canSubmit = draft.trim().length > 0 && typeof onSubmitTask === "function";
+  const submit = () => {
+    if (!canSubmit || !onSubmitTask) return;
+    onSubmitTask(draft.trim());
+    setDraft("");
+  };
 
   return (
     <div className="code-landing">
@@ -40,13 +47,20 @@ export function CodeLanding({
               placeholder="Describe a task…"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
               aria-label="Describe a task"
             />
             <button
               type="button"
               className="code-landing__input-send"
               aria-label="Send task"
-              disabled={draft.trim().length === 0}
+              disabled={!canSubmit}
+              onClick={submit}
             >
               <ArrowUp size={14} aria-hidden />
             </button>
@@ -55,17 +69,10 @@ export function CodeLanding({
 
         {isEmpty ? (
           <div className="code-landing__empty">
-            <p>No projects yet. Create one or import an existing repo to begin.</p>
+            <p>No projects yet. Pick a folder on your machine to start.</p>
             <div className="code-landing__empty-actions">
               <button type="button" className="code-landing__empty-primary" onClick={onAddProject}>
-                Create first project
-              </button>
-              <button
-                type="button"
-                className="code-landing__empty-secondary"
-                onClick={onImportProject}
-              >
-                Import existing repo
+                <FolderPlus size={14} aria-hidden /> Import folder
               </button>
             </div>
           </div>
@@ -75,11 +82,8 @@ export function CodeLanding({
               <h2>Projects</h2>
               <span className="count">{projects.length}</span>
               <div className="code-landing__projects-actions">
-                <button type="button" className="code-landing__ghost-btn" onClick={onImportProject}>
-                  Import
-                </button>
                 <button type="button" className="code-landing__ghost-btn" onClick={onAddProject}>
-                  + New
+                  + Import folder
                 </button>
               </div>
             </div>
@@ -105,12 +109,12 @@ export function CodeLanding({
                 type="button"
                 className="code-landing__card code-landing__card--add"
                 onClick={onAddProject}
-                aria-label="New project"
+                aria-label="Import folder"
               >
                 <span className="plus" aria-hidden>
                   +
                 </span>
-                <span>New project</span>
+                <span>Import folder</span>
               </button>
             </div>
           </section>

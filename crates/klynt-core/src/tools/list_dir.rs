@@ -96,12 +96,12 @@ impl ToolExecute for ListDirTool {
                     "Failed to read directory entry: {e}"
                 )))
             })? {
-                let metadata = entry.metadata().await.map_err(|e| {
+                let file_type = entry.file_type().await.map_err(|e| {
                     KlyntbotError::Tool(ToolError::ExecutionFailed(format!(
-                        "Failed to read metadata: {e}"
+                        "Failed to read file type: {e}"
                     )))
                 })?;
-                let prefix = if metadata.is_dir() { "📁 " } else { "📄 " };
+                let prefix = if file_type.is_dir() { "📁 " } else { "📄 " };
                 let name = entry.file_name().to_string_lossy().to_string();
                 items.push(format!("{}{}", prefix, name));
             }

@@ -605,7 +605,7 @@ async fn call_extraction_llm(
         .with_max_tokens(max_tokens)
         .with_temperature(0.2);
 
-    let response = provider.chat(&messages, None, &params).await?;
+    let response = provider.chat(&messages, None, &params, &[]).await?;
 
     let content = response.content.unwrap_or_default();
     parse_extraction_response(&content)

@@ -270,7 +270,10 @@ impl ReforgeHandler for LlmReforgeHandler {
         let user_msg = format_synthesize_input(input);
         let messages = vec![Message::system(SYNTHESIZE_PROMPT), Message::user(user_msg)];
 
-        let response = self.provider.chat(&messages, None, &self.params).await?;
+        let response = self
+            .provider
+            .chat(&messages, None, &self.params, &[])
+            .await?;
         let content = response.content.unwrap_or_default();
 
         serde_json::from_str::<SynthesizeOutput>(&content).map_err(|e| {
@@ -285,7 +288,10 @@ impl ReforgeHandler for LlmReforgeHandler {
         let user_msg = format_review_input(input);
         let messages = vec![Message::system(REVIEW_PROMPT), Message::user(user_msg)];
 
-        let response = self.provider.chat(&messages, None, &self.params).await?;
+        let response = self
+            .provider
+            .chat(&messages, None, &self.params, &[])
+            .await?;
         let content = response.content.unwrap_or_default();
 
         serde_json::from_str::<ReviewOutput>(&content).map_err(|e| {
@@ -309,7 +315,10 @@ impl ReforgeHandler for LlmReforgeHandler {
             .clone()
             .with_response_format(ResponseFormat::Text);
 
-        let response = self.provider.chat(&messages, None, &text_params).await?;
+        let response = self
+            .provider
+            .chat(&messages, None, &text_params, &[])
+            .await?;
         Ok(response.content.unwrap_or_default())
     }
 }
@@ -403,8 +412,12 @@ impl cognitive::services::reforge::GraphEnrichmentHandler for LlmGraphEnrichment
             Message::user(user_msg),
         ];
 
-        let response = self.provider.chat(&messages, None, &self.params).await?;
+        let response = self
+            .provider
+            .chat(&messages, None, &self.params, &[])
+            .await?;
         let content = response.content.unwrap_or_default();
+
         let text = content.trim();
 
         // Parse response JSON
@@ -519,8 +532,12 @@ impl cognitive::services::reforge::CommunityIntelligenceHandler for LlmGraphEnri
             Message::user(user_msg),
         ];
 
-        let response = self.provider.chat(&messages, None, &self.params).await?;
+        let response = self
+            .provider
+            .chat(&messages, None, &self.params, &[])
+            .await?;
         let content = response.content.unwrap_or_default();
+
         let text = content.trim();
 
         let parsed: CommunityIntelligenceResponse =
@@ -620,7 +637,10 @@ impl LlmCrossCliSynthesisHandler {
             Message::system(CROSS_CLI_SYNTHESIS_PROMPT),
             Message::user(user),
         ];
-        let resp = self.provider.chat(&messages, None, &self.params).await?;
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params, &[])
+            .await?;
         let text = resp.content.unwrap_or_default();
         Ok(serde_json::from_str(&text).unwrap_or_default())
     }
@@ -720,7 +740,10 @@ impl LlmSkillDiscoveryHandler {
         };
         let user = serde_json::to_string(&payload)?;
         let messages = vec![Message::system(SKILL_DISCOVERY_PROMPT), Message::user(user)];
-        let resp = self.provider.chat(&messages, None, &self.params).await?;
+        let resp = self
+            .provider
+            .chat(&messages, None, &self.params, &[])
+            .await?;
         let text = resp.content.unwrap_or_default();
         Ok(serde_json::from_str(&text).unwrap_or_default())
     }
@@ -765,7 +788,6 @@ impl ReforgeHandler for NoopReforgeHandler {
 mod tests {
     use super::*;
     use crate::test_utils::MockProvider;
-    use providers::ChatParams;
 
     #[tokio::test]
     async fn cross_cli_synthesis_handler_confirms_strong_evidence() {

@@ -89,15 +89,15 @@ impl super::SearchSource for ContentGrepSource {
                 .get("line_number")
                 .and_then(|n| n.as_u64())
                 .unwrap_or(0) as u32;
-            let preview = data
-                .get("lines")
-                .and_then(|l| l.get("text"))
-                .and_then(|t| t.as_str())
-                .unwrap_or("")
-                .trim()
-                .chars()
-                .take(100)
-                .collect::<String>();
+            let preview = common::truncate_chars(
+                data.get("lines")
+                    .and_then(|l| l.get("text"))
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("")
+                    .trim(),
+                100,
+                "",
+            );
             let path = PathBuf::from(path_str);
             let file_name = path
                 .file_name()

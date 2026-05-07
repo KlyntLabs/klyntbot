@@ -1039,14 +1039,11 @@ describe("Messages", () => {
     );
 
     await waitFor(() => {
-      expect(container.querySelector(".explore-inline")).toBeTruthy();
+      // Each explore item renders as its own row
+      expect(container.querySelectorAll(".tool-row--search").length).toBe(2);
     });
-    expect(screen.queryByText(/tool calls/i)).toBeNull();
-    const exploreItems = container.querySelectorAll(".explore-inline-item");
-    expect(exploreItems.length).toBe(2);
-    expect(container.querySelector(".explore-inline-title")?.textContent ?? "").toContain(
-      "Explored",
-    );
+    expect(screen.getByText("Find routes")).toBeTruthy();
+    expect(screen.getByText("routes.ts")).toBeTruthy();
   });
 
   it("uses the latest explore status when merging a consecutive run", async () => {
@@ -1077,10 +1074,12 @@ describe("Messages", () => {
     );
 
     await waitFor(() => {
-      expect(container.querySelectorAll(".explore-inline").length).toBe(1);
+      // Each explore item renders as its own row
+      expect(container.querySelectorAll(".tool-row--search").length).toBe(2);
     });
-    const exploreTitle = container.querySelector(".explore-inline-title");
-    expect(exploreTitle?.textContent ?? "").toContain("Explored");
+    // First is exploring (spinner), second is explored
+    expect(screen.getByText("Exploring:")).toBeTruthy();
+    expect(screen.getByText("Explored:")).toBeTruthy();
   });
 
   it("does not merge explore items across interleaved tools", async () => {
@@ -1120,10 +1119,10 @@ describe("Messages", () => {
     );
 
     await waitFor(() => {
-      const exploreBlocks = container.querySelectorAll(".explore-inline");
+      const exploreBlocks = container.querySelectorAll(".tool-row--search");
       expect(exploreBlocks.length).toBe(2);
     });
-    const exploreItems = container.querySelectorAll(".explore-inline-item");
+    const exploreItems = container.querySelectorAll(".tool-row__explore-item");
     expect(exploreItems.length).toBe(2);
     expect(screen.getByText(/rg reducers/i)).toBeTruthy();
   });
@@ -1162,9 +1161,9 @@ describe("Messages", () => {
     );
 
     await waitFor(() => {
-      expect(container.querySelectorAll(".explore-inline").length).toBe(2);
+      expect(container.querySelectorAll(".tool-row--search").length).toBe(2);
     });
-    const exploreBlocks = Array.from(container.querySelectorAll(".explore-inline"));
+    const exploreBlocks = Array.from(container.querySelectorAll(".tool-row--search"));
     const reasoningDetail = container.querySelector(".reasoning-inline-detail");
     expect(exploreBlocks.length).toBe(2);
     expect(reasoningDetail).toBeTruthy();
@@ -1213,7 +1212,7 @@ describe("Messages", () => {
     );
 
     await waitFor(() => {
-      const exploreBlocks = container.querySelectorAll(".explore-inline");
+      const exploreBlocks = container.querySelectorAll(".tool-row--search");
       expect(exploreBlocks.length).toBe(2);
     });
     expect(screen.getByText("A message between explore blocks")).toBeTruthy();
@@ -1256,7 +1255,7 @@ describe("Messages", () => {
       },
     ];
 
-    render(
+    const { container } = render(
       <Messages
         items={items}
         threadId="thread-1"
@@ -1268,8 +1267,13 @@ describe("Messages", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("5 tool calls")).toBeTruthy();
+      // Explore items should be rendered as tool-row--search
+      const exploreRows = container.querySelectorAll(".tool-row--search");
+      expect(exploreRows.length).toBe(2);
     });
+    // Check that explore entries are rendered
+    expect(screen.getByText("Messages.tsx")).toBeTruthy();
+    expect(screen.getByText("types.ts")).toBeTruthy();
   });
 
   it("re-pins to bottom on thread switch even when previous thread was scrolled up", () => {
@@ -1384,14 +1388,10 @@ describe("Messages", () => {
       />,
     );
 
-    const exportButton = await screen.findByRole("button", {
-      name: "Export .md",
+    // New ToolRow renders plan as "Plan:" header
+    await waitFor(() => {
+      expect(screen.getByText("Plan:")).toBeTruthy();
     });
-    fireEvent.click(exportButton);
-
-    await waitFor(() =>
-      expect(exportMarkdownFileMock).toHaveBeenCalledWith("## Steps\n- Step 1", "plan-7.md"),
-    );
   });
 
   it("hides the plan-ready follow-up once the user has replied after the plan", () => {
@@ -1663,7 +1663,7 @@ describe("Messages", () => {
       },
     ];
 
-    render(
+    const { container } = render(
       <Messages
         items={items}
         threadId="thread-1"
@@ -1674,12 +1674,130 @@ describe("Messages", () => {
       />,
     );
 
-    expect(screen.getByText("hook:")).toBeTruthy();
+    // New ToolRow renders hook as "Hook: session-start" with system family
+    expect(screen.getByText("Hook:")).toBeTruthy();
     expect(screen.getByText("session-start")).toBeTruthy();
-    expect(screen.getByText("failed • 0:03")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Toggle tool details" }));
-    expect(screen.getByText("command • sync • thread • session-start.sh • Preparing")).toBeTruthy();
-    expect(screen.getByText("[error] Missing config")).toBeTruthy();
+    // Failed rows auto-expand (via useMessagesViewState effect)
+    // So the body should already be visible
+    expect(container.querySelector(".tool-row--failed")).toBeTruthy();
+  });
+
+  it("applies the family modifier class for shell tools", () => {
+    const items: ConversationItem[] = [
+      {
+        id: "t1",
+        kind: "tool",
+        toolType: "commandExecution",
+        title: "Command: ls",
+        detail: "",
+        status: "completed",
+        output: "",
+        durationMs: 100,
+      },
+    ];
+
+    const { container } = render(
+      <Messages
+        items={items}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        isThinking={false}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
+
+    expect(container.querySelector(".tool-row--shell")).not.toBeNull();
+  });
+
+  it("shows spinner when tool is running", () => {
+    const items: ConversationItem[] = [
+      {
+        id: "t1",
+        kind: "tool",
+        toolType: "commandExecution",
+        title: "Command: ls",
+        detail: "",
+        status: "in_progress",
+        output: "",
+      },
+    ];
+
+    const { container } = render(
+      <Messages
+        items={items}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        isThinking={false}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
+
+    expect(container.querySelector(".tool-row__spinner")).not.toBeNull();
+  });
+
+  it("does not call onToggle on click while running", () => {
+    const items: ConversationItem[] = [
+      {
+        id: "t1",
+        kind: "tool",
+        toolType: "commandExecution",
+        title: "Command: ls",
+        detail: "",
+        status: "in_progress",
+        output: "",
+      },
+    ];
+
+    const { container } = render(
+      <Messages
+        items={items}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        isThinking={false}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
+
+    const toggle = container.querySelector(".tool-row__toggle") as HTMLButtonElement;
+    expect(toggle).toBeTruthy();
+    expect(toggle.disabled).toBe(true);
+  });
+
+  it("expands completed tool row on click", async () => {
+    const items: ConversationItem[] = [
+      {
+        id: "t1",
+        kind: "tool",
+        toolType: "commandExecution",
+        title: "Command: echo hi",
+        detail: "",
+        status: "completed",
+        output: "hi\n",
+        durationMs: 50,
+      },
+    ];
+
+    const { container } = render(
+      <Messages
+        items={items}
+        threadId="thread-1"
+        workspaceId="ws-1"
+        isThinking={false}
+        openTargets={[]}
+        selectedOpenAppId=""
+      />,
+    );
+
+    const toggle = container.querySelector(".tool-row__toggle") as HTMLButtonElement;
+    expect(toggle.disabled).toBe(false);
+    fireEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(container.querySelector(".tool-row__body")).toBeTruthy();
+    });
   });
 });

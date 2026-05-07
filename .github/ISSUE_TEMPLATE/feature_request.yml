@@ -1,0 +1,70 @@
+name: Feature Request
+description: Propose a concrete, scoped feature or enhancement.
+title: "feat: <short description>"
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For open-ended ideas or "I wonder if Klyntbot could…", please start a [Discussion](https://github.com/KlyntLabs/klyntbot/discussions) instead. Use this template only when the scope is clear enough to act on.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight checks
+      options:
+        - label: I have searched existing issues and Discussions for similar proposals.
+          required: true
+        - label: I have read [CONTRIBUTING.md](https://github.com/KlyntLabs/klyntbot/blob/main/CONTRIBUTING.md).
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the user-facing pain point. Skip the implementation for now.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should Klyntbot do? UX, behavior, or API as appropriate.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else did you think about? Why is this proposal preferable?
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Rough scope
+      options:
+        - Small (single crate, no migration, <200 LOC)
+        - Medium (cross-crate, may need migration)
+        - Large (new feature crate, design doc warranted)
+        - Unsure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Are you willing to contribute this?
+      options:
+        - "Yes, I plan to send a PR"
+        - "Yes, with guidance"
+        - "No, just proposing"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, links, related issues, prior art.

@@ -291,7 +291,7 @@ impl AppCore {
         ];
 
         let response = provider
-            .chat(&messages, None, &chat_params)
+            .chat(&messages, None, &chat_params, &[])
             .await
             .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
 
@@ -352,7 +352,7 @@ Be concise — 2-4 sentences max."#
         ];
 
         let response = provider
-            .chat(&messages, None, &chat_params)
+            .chat(&messages, None, &chat_params, &[])
             .await
             .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
 

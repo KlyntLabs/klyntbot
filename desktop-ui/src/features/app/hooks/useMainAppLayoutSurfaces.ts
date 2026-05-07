@@ -358,6 +358,7 @@ function buildPrimarySurface({
   errorToasts,
   dismissErrorToast,
   chatView,
+  promptActions,
 }: MainAppLayoutSurfacesContext): LayoutNodesOptions["primary"] {
   return {
     sidebarProps: {
@@ -465,7 +466,10 @@ function buildPrimarySurface({
           prompts,
           files: composerWorkspaceState.files,
           textareaRef: composerInputRef,
-          historyKey: activeWorkspace?.id ?? null,
+          // Thread-scoped composer children (CostPill, etc.) must key off the
+          // active *thread*, never the workspace ID — feeding `ws-…` here
+          // breaks `coding_thread_read` lookups and silently 404s.
+          historyKey: activeThreadId ?? null,
           editorSettings: composerEditorSettings,
           editorExpanded: composerEditorExpanded,
           onToggleEditorExpanded: onToggleComposerEditorExpanded,
@@ -558,9 +562,18 @@ function buildPrimarySurface({
           branch: ws.worktree?.branch ?? null,
           sessionCount: (threadsByWorkspace[ws.id] ?? []).length,
         })),
-      onSelectProject: threadNavigation.selectWorkspace,
+      // From the "What should we build today?" landing, the click semantics
+      // are "start fresh in this project" — clear the per-workspace active
+      // thread first so the workspace home view appears (composer ready, no
+      // resumed session). Existing sessions are not deleted; they remain in
+      // the sidebar and can be reopened with a single click.
+      onSelectProject: (workspaceId: string) => {
+        threadNavigation.setActiveThreadId(null, workspaceId);
+        threadNavigation.selectWorkspace(workspaceId);
+      },
       onAddProject: handleAddWorkspace,
       onImportProject: openWorkspaceFromUrlPrompt,
+      onSubmitTask: activeWorkspace ? promptActions.handleSendPromptToNewAgent : undefined,
     },
     mainHeaderProps: activeWorkspace
       ? {

@@ -280,7 +280,10 @@ export function useThreadMessaging({
         }
         const result = (response?.result ?? response) as Record<string, unknown>;
         const turn = (result?.turn ?? response?.turn ?? null) as Record<string, unknown> | null;
-        const turnId = asString(turn?.id ?? "");
+        // Coding turn responses are flat: `{ turnId, turnStartedAt }` at the top.
+        const turnId = asString(
+          turn?.id ?? result?.turnId ?? result?.turn_id ?? response?.turnId ?? response?.turn_id ?? "",
+        );
         if (!turnId) {
           markProcessing(threadId, false);
           setActiveTurnId(threadId, null);

@@ -48,6 +48,10 @@ pub enum ThreadEvent {
         turn_id: TurnId,
         path: String,
         change: FileChangeKindDto,
+        /// Unified-diff text computed by the write/edit/apply_patch tool.
+        /// Empty if the tool didn't compute one. The FE renders it via
+        /// `DiffPreview` / `FileChangePart`.
+        diff_unified: String,
     },
     CommandExecuted {
         thread_id: ThreadId,

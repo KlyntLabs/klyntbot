@@ -40,6 +40,7 @@ pub(super) async fn init_agent(
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
     coding_recall: Option<Arc<coding_memory::recall::CodingRecallService>>,
+    approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
 ) -> Result<AgentResult, String> {
     // Run activity-log migrations (unified activity log).
     StoragePool::run_feature_migrations(
@@ -97,6 +98,10 @@ pub(super) async fn init_agent(
     }
 
     builder = builder.with_coding_recall_service(coding_recall);
+
+    if let Some(channel) = approval_channel {
+        builder = builder.with_approval_channel(channel);
+    }
 
     let mut agent_loop_raw = builder
         .build()

@@ -45,9 +45,6 @@ impl Default for CodingRecallServiceConfig {
 pub struct CodingRecallService {
     config: CodingRecallServiceConfig,
     ums: Arc<UnifiedMemoryService>,
-    #[allow(dead_code)]
-    fact_repo: Arc<cognitive::SemanticFactRepo>,
-    #[allow(dead_code)]
     ep_repo: Arc<cognitive::EpisodicMemoryRepo>,
     telemetry: RecallInvocationRepo,
     index_builder: IndexBuilder,
@@ -92,7 +89,6 @@ impl CodingRecallService {
             decision_points: DecisionPointsService::new(ep_repo.clone()),
             dead_end: DeadEndChecker::new(fact_repo.clone(), Default::default()),
             ums,
-            fact_repo,
             ep_repo,
             telemetry,
             skills: None,
@@ -266,23 +262,30 @@ impl CodingRecallService {
                     .ums
                     .retrieve_with_overrides(&q, 25, 0.0, default_weights())
                     .await?;
-                let _ = days;
-                let _ = repo;
+                let cutoff = Timestamp::now()
+                    .checked_sub(jiff::ToSpan::days(i64::from(days)))
+                    .unwrap_or(Timestamp::MIN);
                 scored
                     .into_iter()
-                    .map(|s| TimelineInput {
-                        id: s.fact.id.parse().unwrap_or_else(|_| Uuid::nil()),
-                        kind: s.fact.memory_type.clone(),
-                        when: s
-                            .fact
-                            .recorded_at
-                            .parse()
-                            .unwrap_or_else(|_| Timestamp::now()),
-                        snippet: format!(
-                            "{} {} {}",
-                            s.fact.subject, s.fact.predicate, s.fact.object
-                        ),
-                        related_ids: vec![],
+                    .filter(|s| match repo {
+                        Some(r) => s.fact.scope_repo_id.as_deref() == Some(r),
+                        None => true,
+                    })
+                    .filter_map(|s| {
+                        let when: Timestamp = s.fact.recorded_at.parse().ok()?;
+                        if when < cutoff {
+                            return None;
+                        }
+                        Some(TimelineInput {
+                            id: s.fact.id.parse().unwrap_or_else(|_| Uuid::nil()),
+                            kind: s.fact.memory_type.clone(),
+                            when,
+                            snippet: format!(
+                                "{} {} {}",
+                                s.fact.subject, s.fact.predicate, s.fact.object
+                            ),
+                            related_ids: vec![],
+                        })
                     })
                     .collect()
             }

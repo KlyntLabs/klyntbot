@@ -39,19 +39,9 @@ impl TimelineBuilder {
                 id: i.id,
                 kind: i.kind,
                 when: i.when,
-                snippet: truncate(&i.snippet, 240),
+                snippet: common::helpers::truncate_chars(&i.snippet, 240, "…"),
                 related_ids: i.related_ids,
             })
             .collect()
-    }
-}
-
-fn truncate(s: &str, n: usize) -> String {
-    if s.chars().count() <= n {
-        s.to_string()
-    } else {
-        let mut out: String = s.chars().take(n).collect();
-        out.push('…');
-        out
     }
 }

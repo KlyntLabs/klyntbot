@@ -181,8 +181,11 @@ async fn cached_search(
     // Cache miss or expired
     let results = source.search(query, limit).await;
 
-    // Evict expired entries if at capacity (retain only unexpired)
-    if cache.len() >= 200 {
+    // Evict expired entries probabilistically when at capacity to avoid
+    // O(n) scans on every cache miss under pressure.
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static EVICT_COUNTER: AtomicUsize = AtomicUsize::new(0);
+    if cache.len() >= 200 && EVICT_COUNTER.fetch_add(1, Ordering::Relaxed) % 16 == 0 {
         cache.retain(|_, v| v.created_at.elapsed() < ttl);
     }
 

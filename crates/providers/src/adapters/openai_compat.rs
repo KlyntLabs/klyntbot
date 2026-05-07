@@ -14,9 +14,9 @@ use common::{build_http_client, ProviderError, Result};
 
 use crate::registry::ProviderRegistry;
 use crate::types::{
-    ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
-    ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage, Usage,
-    DEFAULT_CONTEXT_WINDOW,
+    CacheAnchor, CacheBreakpoint, ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk,
+    Message, ProviderCapabilities, ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta,
+    ToolCallMessage, Usage, DEFAULT_CONTEXT_WINDOW,
 };
 
 /// OpenAI-compatible provider using direct HTTP
@@ -26,6 +26,8 @@ pub struct OpenAiCompatProvider {
     api_key: String,
     default_model: String,
     extra_headers: Vec<(String, String)>,
+    #[cfg(debug_assertions)]
+    pub(crate) prefix_hashes: dashmap::DashMap<String, u64>,
 }
 
 impl OpenAiCompatProvider {
@@ -43,6 +45,8 @@ impl OpenAiCompatProvider {
             api_key: api_key.into(),
             default_model: default_model.into(),
             extra_headers: Vec::new(),
+            #[cfg(debug_assertions)]
+            prefix_hashes: dashmap::DashMap::new(),
         })
     }
 
@@ -50,6 +54,62 @@ impl OpenAiCompatProvider {
     pub fn with_extra_headers(mut self, headers: Vec<(String, String)>) -> Self {
         self.extra_headers = headers;
         self
+    }
+
+    /// In debug builds only: hash the conversation prefix up to the deepest
+    /// `MessageIndex` breakpoint and compare against the previous hash for
+    /// the same session_key. If different, log a warning — it indicates
+    /// something mutated the prefix (e.g., compression rewrote a message
+    /// in the cache region) which would invalidate server-side prefix cache.
+    #[cfg(debug_assertions)]
+    pub(crate) fn assert_prefix_stable(
+        &self,
+        messages: &[Message],
+        breakpoints: &[CacheBreakpoint],
+        params: &ChatParams,
+    ) {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let Some(session_key) = params.session_key.as_ref() else {
+            return;
+        };
+
+        let frontier = breakpoints
+            .iter()
+            .filter_map(|b| match b.anchor {
+                CacheAnchor::MessageIndex(n) => Some(n),
+                _ => None,
+            })
+            .max();
+        let Some(frontier) = frontier else { return };
+
+        if frontier >= messages.len() {
+            return;
+        }
+
+        let mut hasher = DefaultHasher::new();
+        for msg in &messages[..=frontier] {
+            if let Ok(s) = serde_json::to_string(msg) {
+                s.hash(&mut hasher);
+            }
+        }
+        let new_hash = hasher.finish();
+
+        if let Some(prev) = self.prefix_hashes.insert(session_key.clone(), new_hash) {
+            if prev != new_hash {
+                tracing::warn!(
+                    target: "klynt::providers::openai_compat",
+                    session = %session_key,
+                    prev_hash = format!("{:x}", prev),
+                    new_hash = format!("{:x}", new_hash),
+                    frontier,
+                    "prefix-cache-busting detected: messages[..={}] hash changed. \
+                     Did MidLoopCompressor or another rewrite mutate before the frontier?",
+                    frontier,
+                );
+            }
+        }
     }
 
     /// Look up the context window size for common models.
@@ -350,7 +410,10 @@ impl LlmProvider for OpenAiCompatProvider {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmResponse> {
+        #[cfg(debug_assertions)]
+        self.assert_prefix_stable(messages, cache_breakpoints, params);
         let url = format!("{}/chat/completions", self.api_base);
         let body = self.build_request_body(messages, tools, params, false);
 
@@ -407,7 +470,10 @@ impl LlmProvider for OpenAiCompatProvider {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmStream> {
+        #[cfg(debug_assertions)]
+        self.assert_prefix_stable(messages, cache_breakpoints, params);
         let url = format!("{}/chat/completions", self.api_base);
         let body = self.build_request_body(messages, tools, params, true);
 
@@ -504,6 +570,79 @@ impl LlmProvider for OpenAiCompatProvider {
             Err(e) => Ok(ProviderHealth::Unhealthy(e.to_string())),
         }
     }
+
+    /// Discover models via `GET {api_base}/models`. Parses the standard
+    /// OpenAI shape `{ data: [{ id, ... }, ...] }`. Falls back to the
+    /// configured default model if the endpoint isn't reachable or the
+    /// shape doesn't match — keeps the dropdown populated even when a
+    /// provider is misconfigured. `supports_reasoning` is heuristic on
+    /// the id substring (see `id_implies_reasoning`).
+    async fn list_models(&self) -> Result<Vec<crate::types::ProviderModel>> {
+        let url = format!("{}/models", self.api_base);
+        let mut request = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .timeout(Duration::from_secs(10));
+        for (key, value) in &self.extra_headers {
+            request = request.header(key, value);
+        }
+
+        let response = match request.send().await {
+            Ok(r) => r,
+            Err(e) => {
+                debug!(provider = self.name(), error = %e, "list_models: request failed, falling back to default model");
+                return Ok(vec![crate::types::ProviderModel::from_id_enriched(&self.default_model)]);
+            }
+        };
+
+        if !response.status().is_success() {
+            debug!(
+                provider = self.name(),
+                status = %response.status(),
+                "list_models: non-success status, falling back to default model",
+            );
+            return Ok(vec![crate::types::ProviderModel::from_id(&self.default_model)]);
+        }
+
+        let body: Value = match response.json().await {
+            Ok(b) => b,
+            Err(e) => {
+                debug!(provider = self.name(), error = %e, "list_models: invalid JSON, falling back to default model");
+                return Ok(vec![crate::types::ProviderModel::from_id_enriched(&self.default_model)]);
+            }
+        };
+
+        let mut models = Vec::new();
+        let entries = body
+            .get("data")
+            .and_then(|v| v.as_array())
+            .map(|a| a.as_slice())
+            .unwrap_or(&[]);
+        for entry in entries {
+            let Some(id) = entry.get("id").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let display_name = entry
+                .get("display_name")
+                .or_else(|| entry.get("name"))
+                .and_then(|v| v.as_str())
+                .unwrap_or(id)
+                .to_string();
+            let context_window = entry
+                .get("context_length")
+                .or_else(|| entry.get("context_window"))
+                .and_then(|v| v.as_u64());
+            let mut model = crate::types::ProviderModel::from_id_enriched(id);
+            model.display_name = display_name;
+            model.context_window = context_window;
+            models.push(model);
+        }
+        if models.is_empty() {
+            models.push(crate::types::ProviderModel::from_id(&self.default_model));
+        }
+        Ok(models)
+    }
 }
 
 /// OpenAI API chat completion response
@@ -531,6 +670,7 @@ struct ResponseMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::CacheTtl;
 
     fn test_provider(model: &str) -> OpenAiCompatProvider {
         OpenAiCompatProvider::new("https://api.openai.com/v1", "test-key", model).unwrap()
@@ -747,5 +887,84 @@ mod tests {
         use crate::registry::ProviderRegistry;
         let overrides = ProviderRegistry::get_model_overrides("gpt-4o");
         assert!(overrides.is_empty());
+    }
+
+    #[cfg(debug_assertions)]
+    mod prefix_stability_tests {
+        use super::*;
+
+        fn msgs_v1() -> Vec<Message> {
+            vec![
+                Message::System {
+                    content: "sys".into(),
+                },
+                Message::user("first"),
+                Message::user("second"),
+            ]
+        }
+
+        fn msgs_v2_mutated_middle() -> Vec<Message> {
+            vec![
+                Message::System {
+                    content: "sys".into(),
+                },
+                Message::user("CHANGED"),
+                Message::user("second"),
+            ]
+        }
+
+        #[test]
+        fn first_call_no_warn() {
+            let provider = test_provider("gpt-4o");
+            let messages = msgs_v1();
+            let bps = vec![CacheBreakpoint {
+                anchor: CacheAnchor::MessageIndex(2),
+                ttl: CacheTtl::Ephemeral,
+            }];
+            let params = ChatParams::new("gpt-4o").with_session_key("sess-A");
+            provider.assert_prefix_stable(&messages, &bps, &params);
+        }
+
+        #[test]
+        fn identical_second_call_no_change_in_hash() {
+            let provider = test_provider("gpt-4o");
+            let bps = vec![CacheBreakpoint {
+                anchor: CacheAnchor::MessageIndex(2),
+                ttl: CacheTtl::Ephemeral,
+            }];
+            let params = ChatParams::new("gpt-4o").with_session_key("sess-B");
+            provider.assert_prefix_stable(&msgs_v1(), &bps, &params);
+            let h1 = provider
+                .prefix_hashes
+                .get(&"sess-B".to_string())
+                .map(|v| *v);
+            provider.assert_prefix_stable(&msgs_v1(), &bps, &params);
+            let h2 = provider
+                .prefix_hashes
+                .get(&"sess-B".to_string())
+                .map(|v| *v);
+            assert_eq!(h1, h2);
+        }
+
+        #[test]
+        fn mutated_prefix_changes_hash() {
+            let provider = test_provider("gpt-4o");
+            let bps = vec![CacheBreakpoint {
+                anchor: CacheAnchor::MessageIndex(2),
+                ttl: CacheTtl::Ephemeral,
+            }];
+            let params = ChatParams::new("gpt-4o").with_session_key("sess-C");
+            provider.assert_prefix_stable(&msgs_v1(), &bps, &params);
+            let h1 = provider
+                .prefix_hashes
+                .get(&"sess-C".to_string())
+                .map(|v| *v);
+            provider.assert_prefix_stable(&msgs_v2_mutated_middle(), &bps, &params);
+            let h2 = provider
+                .prefix_hashes
+                .get(&"sess-C".to_string())
+                .map(|v| *v);
+            assert_ne!(h1, h2);
+        }
     }
 }

@@ -471,7 +471,7 @@ mod tests {
                     complexity_signals: serde_json::json!({}),
                     execution_mode: None,
                     retrieved_memory_count: None,
-                    budget_exhausted: false,
+                    safety_cap_hit: false,
                     turns_used: 0,
                     loop_detected: false,
                     loop_tools: None,

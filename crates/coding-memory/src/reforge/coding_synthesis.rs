@@ -111,7 +111,7 @@ async fn fetch_fix_attempts(
         .map(
             |(id, content, importance, recorded_at, scope_repo_id)| SerializableEpisodicMemory {
                 id,
-                kind: "fix_attempt".into(),
+                kind: crate::facts::CodingKind::FixAttempt.as_str().into(),
                 content,
                 importance,
                 recorded_at,
@@ -200,13 +200,21 @@ async fn fetch_repo_context(
                     object,
                     confidence,
                     memory_type,
-                    sensitivity,
+                    sensitivity: parse_sensitivity(&sensitivity),
                     scope_repo_id,
                     valid_from,
                 }
             },
         )
         .collect())
+}
+
+fn parse_sensitivity(s: &str) -> crate::scope::Sensitivity {
+    match s {
+        "high" => crate::scope::Sensitivity::High,
+        "excluded" => crate::scope::Sensitivity::Excluded,
+        _ => crate::scope::Sensitivity::Normal,
+    }
 }
 
 async fn fetch_causal_chain_groups(
@@ -222,13 +230,9 @@ async fn fetch_causal_chain_groups(
         .await?;
     Ok(groups
         .into_iter()
-        .map(|g| {
-            let count = u32::try_from(g.edge_ids.len()).unwrap_or(u32::MAX);
-            CausalChainGroup {
-                problem_hash: g.problem_hash,
-                edge_ids: g.edge_ids,
-                count,
-            }
+        .map(|g| CausalChainGroup {
+            problem_hash: g.problem_hash,
+            edge_ids: g.edge_ids,
         })
         .collect())
 }
@@ -279,13 +283,47 @@ async fn fetch_counterfactuals(
                     object,
                     confidence,
                     memory_type: "counterfactual".into(),
-                    sensitivity,
+                    sensitivity: parse_sensitivity(&sensitivity),
                     scope_repo_id,
                     valid_from,
                 }
             },
         )
         .collect())
+}
+
+struct RuleSpec {
+    rule_text: String,
+    source: &'static str,
+    confidence: f64,
+    scope_type: &'static str,
+    scope_repo_id: Option<String>,
+    stability: f64,
+    metadata: serde_json::Value,
+}
+
+fn make_rule(spec: RuleSpec) -> ProceduralRule {
+    let now = Timestamp::now().to_string();
+    ProceduralRule {
+        id: format!("rule_{}", Uuid::new_v4().simple()),
+        domain: "code".into(),
+        rule_text: spec.rule_text,
+        source: spec.source.into(),
+        confidence: spec.confidence,
+        signal_count: 1,
+        created_at: now.clone(),
+        updated_at: now,
+        active: true,
+        project_id: None,
+        scope_type: spec.scope_type.into(),
+        scope_id: None,
+        effectiveness_score: 0.5,
+        stability: spec.stability,
+        scope_repo_id: spec.scope_repo_id,
+        last_applied: None,
+        application_count: 0,
+        metadata: Some(spec.metadata.to_string()),
+    }
 }
 
 async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>) -> Result<()> {
@@ -296,36 +334,22 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
             confidence,
             supporting,
         } => {
-            let r = ProceduralRule {
-                id: format!("rule_{}", Uuid::new_v4().simple()),
-                domain: "code".into(),
+            let r = make_rule(RuleSpec {
                 rule_text: rule,
-                source: "observed".into(),
+                source: "observed",
                 confidence: confidence as f64,
-                signal_count: 1,
-                created_at: Timestamp::now().to_string(),
-                updated_at: Timestamp::now().to_string(),
-                active: true,
-                project_id: None,
-                scope_type: "code".into(),
-                scope_id: None,
-                effectiveness_score: 0.5,
+                scope_type: "code",
+                scope_repo_id: repo_id,
                 stability: 1.0,
-                scope_repo_id: repo_id.clone(),
-                last_applied: None,
-                application_count: 0,
-                metadata: Some(
-                    json!({
-                        "provenance": {
-                            "source": "reforge.coding_synthesis",
-                            "supporting": supporting,
-                            "supporting_chains": supporting,
-                        },
-                        "kind": "workflow_pattern",
-                    })
-                    .to_string(),
-                ),
-            };
+                metadata: json!({
+                    "provenance": {
+                        "source": "reforge.coding_synthesis",
+                        "supporting": supporting,
+                        "supporting_chains": supporting,
+                    },
+                    "kind": "workflow_pattern",
+                }),
+            });
             handlers.rule_repo.insert(&r).await?;
         }
         PromoteAction::ExtractFailurePattern {
@@ -335,37 +359,22 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
             confidence,
             supporting,
         } => {
-            let combined = format!("{rule}\n\n**Remediation:** {remediation}");
-            let r = ProceduralRule {
-                id: format!("rule_{}", Uuid::new_v4().simple()),
-                domain: "code".into(),
-                rule_text: combined,
-                source: "observed".into(),
+            let r = make_rule(RuleSpec {
+                rule_text: format!("{rule}\n\n**Remediation:** {remediation}"),
+                source: "observed",
                 confidence: confidence as f64,
-                signal_count: 1,
-                created_at: Timestamp::now().to_string(),
-                updated_at: Timestamp::now().to_string(),
-                active: true,
-                project_id: None,
-                scope_type: "code".into(),
-                scope_id: None,
-                effectiveness_score: 0.5,
+                scope_type: "code",
+                scope_repo_id: repo_id,
                 stability: 1.0,
-                scope_repo_id: repo_id.clone(),
-                last_applied: None,
-                application_count: 0,
-                metadata: Some(
-                    json!({
-                        "provenance": {
-                            "source": "reforge.coding_synthesis",
-                            "supporting": supporting,
-                            "supporting_chains": supporting,
-                        },
-                        "kind": "failure_pattern",
-                    })
-                    .to_string(),
-                ),
-            };
+                metadata: json!({
+                    "provenance": {
+                        "source": "reforge.coding_synthesis",
+                        "supporting": supporting,
+                        "supporting_chains": supporting,
+                    },
+                    "kind": "failure_pattern",
+                }),
+            });
             handlers.rule_repo.insert(&r).await?;
         }
         PromoteAction::PromoteToProblemClass {
@@ -396,6 +405,7 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
             if convergence < 0.7 {
                 return Ok(());
             }
+            let now = Timestamp::now().to_string();
             let f = SemanticFact {
                 id: format!("fact_{}", Uuid::new_v4().simple()),
                 subject,
@@ -408,9 +418,9 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
                 scope_type: "code".into(),
                 scope_id: None,
                 scope_repo_id: Some(repo_id),
-                valid_from: Timestamp::now().to_string(),
+                valid_from: now.clone(),
                 valid_until: None,
-                recorded_at: Timestamp::now().to_string(),
+                recorded_at: now,
                 superseded_at: None,
                 superseded_by: None,
                 stability: 2.0,
@@ -437,35 +447,21 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
             confidence,
             witness_repos,
         } => {
-            let r = ProceduralRule {
-                id: format!("rule_{}", Uuid::new_v4().simple()),
-                domain: "code".into(),
+            let r = make_rule(RuleSpec {
                 rule_text: rule,
-                source: "reflected".into(),
+                source: "reflected",
                 confidence: confidence as f64,
-                signal_count: 1,
-                created_at: Timestamp::now().to_string(),
-                updated_at: Timestamp::now().to_string(),
-                active: true,
-                project_id: None,
-                scope_type: "user".into(),
-                scope_id: None,
-                effectiveness_score: 0.5,
-                stability: 1.5,
+                scope_type: "user",
                 scope_repo_id: None,
-                last_applied: None,
-                application_count: 0,
-                metadata: Some(
-                    json!({
-                        "provenance": {
-                            "source": "reforge.coding_synthesis",
-                            "kind": "user_habit",
-                            "witness_repos": witness_repos,
-                        },
-                    })
-                    .to_string(),
-                ),
-            };
+                stability: 1.5,
+                metadata: json!({
+                    "provenance": {
+                        "source": "reforge.coding_synthesis",
+                        "kind": "user_habit",
+                        "witness_repos": witness_repos,
+                    },
+                }),
+            });
             handlers.rule_repo.insert(&r).await?;
         }
         PromoteAction::PromoteToProblemSolutionPattern {
@@ -473,36 +469,22 @@ async fn apply_action(action: PromoteAction, handlers: &CodingPhaseHandlers<'_>)
             solution,
             supporting_edges,
         } => {
-            let r = ProceduralRule {
-                id: format!("rule_{}", Uuid::new_v4().simple()),
-                domain: "code".into(),
+            let r = make_rule(RuleSpec {
                 rule_text: format!("When problem matches `{problem_hash}`: {solution}"),
-                source: "reflected".into(),
-                confidence: 0.8f64,
-                signal_count: 1,
-                created_at: Timestamp::now().to_string(),
-                updated_at: Timestamp::now().to_string(),
-                active: true,
-                project_id: None,
-                scope_type: "code".into(),
-                scope_id: None,
-                effectiveness_score: 0.5,
-                stability: 1.5,
+                source: "reflected",
+                confidence: 0.8,
+                scope_type: "code",
                 scope_repo_id: None,
-                last_applied: None,
-                application_count: 0,
-                metadata: Some(
-                    json!({
-                        "provenance": {
-                            "source": "reforge.coding_synthesis",
-                            "kind": "problem_solution_pattern",
-                            "supporting_edges": supporting_edges,
-                        },
-                        "problem_hash": problem_hash,
-                    })
-                    .to_string(),
-                ),
-            };
+                stability: 1.5,
+                metadata: json!({
+                    "provenance": {
+                        "source": "reforge.coding_synthesis",
+                        "kind": "problem_solution_pattern",
+                        "supporting_edges": supporting_edges,
+                    },
+                    "problem_hash": problem_hash,
+                }),
+            });
             handlers.rule_repo.insert(&r).await?;
         }
     }

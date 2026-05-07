@@ -1,7 +1,5 @@
 use bus::DomainEventBus;
 use common::tool_channel::{Channel, NonUiPolicy};
-use config::schema::CodingPermissions;
-use klynt_core::approval::{Layer1, PendingApprovalsMap};
 use klynt_core::privacy::PrivacyGuard;
 use klynt_core::tools::edit::{run_for_test as edit_run, EditArgs};
 use klynt_execpolicy::Policy;
@@ -13,14 +11,8 @@ use tokio_util::sync::CancellationToken;
 async fn edits_unique_match() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("f.txt"), "alpha\nbeta\ngamma\n").unwrap();
-    let perms = CodingPermissions {
-        allow: vec!["Edit(**)".into()],
-        ..Default::default()
-    };
-    let l1 = Arc::new(Layer1::compile(&perms).unwrap());
     let pol = Arc::new(Policy::empty());
     let pri = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
-    let pen = Arc::new(PendingApprovalsMap::new());
     let bus = Arc::new(DomainEventBus::new(64));
     let (tx, _rx) = mpsc::channel(32);
     edit_run(
@@ -30,10 +22,8 @@ async fn edits_unique_match() {
             new_text: "BETA".into(),
         },
         dir.path().to_path_buf(),
-        l1,
         pol,
         pri,
-        pen,
         Some(tx),
         bus,
         CancellationToken::new(),
@@ -61,14 +51,8 @@ async fn edits_unique_match() {
 async fn rejects_multiple_matches() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("f.txt"), "x\nx\n").unwrap();
-    let perms = CodingPermissions {
-        allow: vec!["Edit(**)".into()],
-        ..Default::default()
-    };
-    let l1 = Arc::new(Layer1::compile(&perms).unwrap());
     let pol = Arc::new(Policy::empty());
     let pri = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
-    let pen = Arc::new(PendingApprovalsMap::new());
     let bus = Arc::new(DomainEventBus::new(64));
     let (tx, _rx) = mpsc::channel(32);
     let r = edit_run(
@@ -78,10 +62,8 @@ async fn rejects_multiple_matches() {
             new_text: "Y".into(),
         },
         dir.path().to_path_buf(),
-        l1,
         pol,
         pri,
-        pen,
         Some(tx),
         bus,
         CancellationToken::new(),
@@ -109,14 +91,8 @@ async fn rejects_multiple_matches() {
 async fn rejects_missing_old_text() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("f.txt"), "abc\n").unwrap();
-    let perms = CodingPermissions {
-        allow: vec!["Edit(**)".into()],
-        ..Default::default()
-    };
-    let l1 = Arc::new(Layer1::compile(&perms).unwrap());
     let pol = Arc::new(Policy::empty());
     let pri = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
-    let pen = Arc::new(PendingApprovalsMap::new());
     let bus = Arc::new(DomainEventBus::new(64));
     let (tx, _rx) = mpsc::channel(32);
     let r = edit_run(
@@ -126,10 +102,8 @@ async fn rejects_missing_old_text() {
             new_text: "x".into(),
         },
         dir.path().to_path_buf(),
-        l1,
         pol,
         pri,
-        pen,
         Some(tx),
         bus,
         CancellationToken::new(),

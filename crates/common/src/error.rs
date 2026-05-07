@@ -50,6 +50,12 @@ pub enum KlyntbotError {
 
     #[error("Timeout: {0}")]
     Timeout(String),
+
+    #[error("Permission denied: {0}")]
+    PermissionDenied(String),
+
+    #[error("Cancelled: {0}")]
+    Cancelled(String),
 }
 
 #[cfg(feature = "sqlx")]

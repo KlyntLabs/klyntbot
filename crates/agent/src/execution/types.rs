@@ -32,10 +32,17 @@ pub struct ExecutionParams {
     pub pause_context_updates: bool,
     /// Hook engine for firing PreCompact / PostCompact lifecycle hooks.
     pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    /// Global kill switch for cache-breakpoint placement.
+    pub cache_enabled: bool,
 }
 
 impl ExecutionParams {
-    pub fn new(model: impl Into<String>) -> Self {
+    /// Construct execution params with a required `context_window` (in tokens).
+    ///
+    /// `context_window` MUST come from the provider's `context_window()` method
+    /// (e.g. `provider.context_window()`). The mid-loop compressor uses this to
+    /// derive its threshold; passing the wrong value silently shrinks context.
+    pub fn new(model: impl Into<String>, context_window: usize) -> Self {
         Self {
             tool_timeout: Duration::from_secs(30),
             chat_params: ChatParams::new(model),
@@ -45,10 +52,11 @@ impl ExecutionParams {
             original_message: String::new(),
             planning_prompt: None,
             pipeline_timeout: None,
-            context_window: 128_000,
+            context_window,
             context_update_queue: None,
             pause_context_updates: false,
             hook_engine: None,
+            cache_enabled: true,
         }
     }
 
@@ -109,6 +117,11 @@ impl ExecutionParams {
         self.hook_engine = Some(engine);
         self
     }
+
+    pub fn with_cache_enabled(mut self, enabled: bool) -> Self {
+        self.cache_enabled = enabled;
+        self
+    }
 }
 
 /// Result of executing a single tool call.
@@ -144,13 +157,49 @@ pub fn accumulate_usage(total: &mut Usage, cycle: &Usage) {
     total.cache_write_tokens += cycle.cache_write_tokens;
 }
 
+/// Why an `execute_loop` invocation terminated.
+///
+/// `Completed` is the success path — the model returned a final response with no tool calls.
+/// `Cancelled` indicates user-initiated abort via `CancellationToken`.
+/// `SafetyTurnLimit` / `TokenLimit` are silent backstops; hitting one is logged at `error!` for
+/// user-facing agents and at `warn!` for subagents (where caps are intentional capability tiers).
+/// `LoopDetected` comes from `LoopDetector::HardStop` — repeated identical tool signatures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LoopFinishReason {
+    Completed,
+    Cancelled,
+    SafetyTurnLimit,
+    TokenLimit,
+    LoopDetected,
+}
+
+impl LoopFinishReason {
+    /// Stable wire string. Kept stable for telemetry consumers (analytics, mirror).
+    pub fn as_wire_str(&self) -> &'static str {
+        match self {
+            Self::Completed => "completed",
+            Self::Cancelled => "cancelled",
+            Self::SafetyTurnLimit => "safety_turn_limit_reached",
+            Self::TokenLimit => "token_limit_reached",
+            Self::LoopDetected => "loop_detected",
+        }
+    }
+}
+
+impl std::fmt::Display for LoopFinishReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_wire_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn execution_params_has_per_request_fields() {
-        let params = ExecutionParams::new("mock")
+        let params = ExecutionParams::new("mock", 128_000)
             .with_max_iterations(5)
             .with_max_fabrication_retries(3)
             .with_original_message("hello".to_string());
@@ -163,13 +212,13 @@ mod tests {
     #[test]
     fn execution_params_with_cancel_token() {
         let token = tokio_util::sync::CancellationToken::new();
-        let params = ExecutionParams::new("mock").with_cancel_token(token.clone());
+        let params = ExecutionParams::new("mock", 128_000).with_cancel_token(token.clone());
         assert!(params.cancel_token.is_some());
     }
 
     #[test]
     fn execution_params_defaults() {
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         assert_eq!(params.max_iterations, 10);
         assert_eq!(params.max_fabrication_retries, 2);
         assert!(params.original_message.is_empty());
@@ -178,13 +227,21 @@ mod tests {
 
     #[test]
     fn execution_params_with_context_window() {
-        let params = ExecutionParams::new("mock").with_context_window(200_000);
+        let params = ExecutionParams::new("mock", 128_000).with_context_window(200_000);
+        assert_eq!(params.context_window, 200_000);
+    }
+
+    #[test]
+    fn execution_params_stores_provider_context_window() {
+        // Regression guard: Anthropic's 200K window must propagate through
+        // construction, not be silently overridden by a default.
+        let params = ExecutionParams::new("claude-3-5-sonnet", 200_000);
         assert_eq!(params.context_window, 200_000);
     }
 
     #[test]
     fn execution_params_with_planning_prompt() {
-        let params = ExecutionParams::new("mock")
+        let params = ExecutionParams::new("mock", 128_000)
             .with_planning_prompt("Create a step-by-step plan.".to_string());
         assert_eq!(
             params.planning_prompt.as_deref(),
@@ -194,26 +251,26 @@ mod tests {
 
     #[test]
     fn execution_params_default_no_planning() {
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         assert!(params.planning_prompt.is_none());
     }
 
     #[test]
     fn execution_params_pipeline_timeout_builder() {
-        let params =
-            ExecutionParams::new("test-model").with_pipeline_timeout(Duration::from_secs(120));
+        let params = ExecutionParams::new("test-model", 128_000)
+            .with_pipeline_timeout(Duration::from_secs(120));
         assert_eq!(params.pipeline_timeout, Some(Duration::from_secs(120)));
     }
 
     #[test]
     fn execution_params_default_no_pipeline_timeout() {
-        let params = ExecutionParams::new("test-model");
+        let params = ExecutionParams::new("test-model", 128_000);
         assert!(params.pipeline_timeout.is_none());
     }
 
     #[test]
     fn execution_params_default_no_context_queue() {
-        let params = ExecutionParams::new("mock");
+        let params = ExecutionParams::new("mock", 128_000);
         assert!(params.context_update_queue.is_none());
         assert!(!params.pause_context_updates);
     }
@@ -221,7 +278,28 @@ mod tests {
     #[test]
     fn execution_params_with_context_queue() {
         let queue = std::sync::Arc::new(bus::ContextUpdateQueue::new());
-        let params = ExecutionParams::new("mock").with_context_update_queue(queue);
+        let params = ExecutionParams::new("mock", 128_000).with_context_update_queue(queue);
         assert!(params.context_update_queue.is_some());
+    }
+
+    #[test]
+    fn finish_reason_wire_strings_are_stable() {
+        assert_eq!(LoopFinishReason::Completed.as_wire_str(), "completed");
+        assert_eq!(LoopFinishReason::Cancelled.as_wire_str(), "cancelled");
+        assert_eq!(
+            LoopFinishReason::SafetyTurnLimit.as_wire_str(),
+            "safety_turn_limit_reached"
+        );
+        assert_eq!(
+            LoopFinishReason::TokenLimit.as_wire_str(),
+            "token_limit_reached"
+        );
+        assert_eq!(LoopFinishReason::LoopDetected.as_wire_str(), "loop_detected");
+    }
+
+    #[test]
+    fn finish_reason_serializes_snake_case() {
+        let json = serde_json::to_string(&LoopFinishReason::SafetyTurnLimit).unwrap();
+        assert_eq!(json, "\"safety_turn_limit\"");
     }
 }

@@ -43,6 +43,27 @@ impl MidLoopCompressor {
             .sum()
     }
 
+    /// Returns the first index of the "always-preserved" recent window in `messages`.
+    ///
+    /// Compression only mutates `messages[system_count..frontier_index]`;
+    /// `messages[frontier_index..]` is preserved verbatim across all
+    /// compression events. A cache marker placed at `frontier_index - 1`
+    /// will checkpoint the largest prefix that's stable between compression
+    /// events.
+    ///
+    /// Returns `system_count` for short conversations (len < MIN_RECENT_MESSAGES).
+    pub fn frontier_index(&self, messages: &[Message]) -> usize {
+        let system_count = Self::count_system_messages(messages);
+        messages
+            .len()
+            .saturating_sub(MIN_RECENT_MESSAGES)
+            .max(system_count)
+    }
+
+    fn count_system_messages(messages: &[Message]) -> usize {
+        messages.iter().take_while(|m| m.is_system()).count()
+    }
+
     /// Compress older tool results if total tokens exceed the threshold.
     ///
     /// Strategy: count tokens, skip if under threshold, then replace older
@@ -67,15 +88,8 @@ impl MidLoopCompressor {
             "mid-loop compression triggered"
         );
 
-        let system_count = messages
-            .iter()
-            .take_while(|m| matches!(m, Message::System { .. }))
-            .count();
-
-        let recent_start = messages
-            .len()
-            .saturating_sub(MIN_RECENT_MESSAGES)
-            .max(system_count);
+        let recent_start = self.frontier_index(messages);
+        let system_count = Self::count_system_messages(messages);
 
         // Accumulate savings inline to avoid a second full scan
         let mut saved_tokens: usize = 0;
@@ -271,5 +285,50 @@ mod tests {
             result.is_none(),
             "should skip when message count is too small"
         );
+    }
+
+    #[test]
+    fn frontier_index_returns_recent_window_start() {
+        let compressor = make_compressor(10_000);
+        let messages = vec![
+            system_msg("sys"),
+            user_msg("u1"),
+            assistant_msg("a1"),
+            tool_msg("1", "t", "r1"),
+            user_msg("u2"),
+            assistant_msg("a2"),
+            tool_msg("2", "t", "r2"),
+            user_msg("u3"),
+            assistant_msg("a3"),
+            tool_msg("3", "t", "r3"),
+            user_msg("u4"),
+            assistant_msg("a4"),
+        ];
+        // len = 12, MIN_RECENT_MESSAGES = 8
+        // frontier_index = max(12 - 8, system_count=1) = max(4, 1) = 4
+        assert_eq!(compressor.frontier_index(&messages), 4);
+    }
+
+    #[test]
+    fn frontier_index_respects_system_count() {
+        let compressor = make_compressor(10_000);
+        let messages = vec![
+            system_msg("s1"),
+            system_msg("s2"),
+            user_msg("u1"),
+            assistant_msg("a1"),
+        ];
+        // len = 4, MIN_RECENT_MESSAGES = 8
+        // saturating_sub: 4 - 8 = 0
+        // max(0, system_count=2) = 2
+        assert_eq!(compressor.frontier_index(&messages), 2);
+    }
+
+    #[test]
+    fn frontier_index_short_conversation_clamps_to_system_count() {
+        let compressor = make_compressor(10_000);
+        let messages = vec![system_msg("sys"), user_msg("u1")];
+        // len = 2, frontier = max(0, 1) = 1
+        assert_eq!(compressor.frontier_index(&messages), 1);
     }
 }

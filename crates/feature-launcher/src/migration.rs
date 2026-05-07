@@ -13,34 +13,62 @@ pub async fn migrate_app_ids_to_bundle_ids(
     pool: &SqlitePool,
     apps: &[AppEntry],
 ) -> Result<u64, sqlx::Error> {
+    let mappings: Vec<(String, String)> = apps
+        .iter()
+        .filter_map(|app| {
+            let bid = app.bundle_id.as_ref()?;
+            let old_id = format!("app:{}", app.path.display());
+            let new_id = format!("app:{bid}");
+            if old_id == new_id {
+                None
+            } else {
+                Some((old_id, new_id))
+            }
+        })
+        .collect();
+
+    if mappings.is_empty() {
+        return Ok(0);
+    }
+
+    // Batch updates via a CTE mapping table to avoid N+1 queries.
     let mut total: u64 = 0;
-    for app in apps {
-        let Some(bid) = &app.bundle_id else { continue };
-        let old_id = format!("app:{}", app.path.display());
-        let new_id = format!("app:{bid}");
-        if old_id == new_id {
-            continue;
+    for chunk in mappings.chunks(400) {
+        let values_sql = chunk
+            .iter()
+            .map(|_| "(?, ?)")
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let pins_sql = format!(
+            "WITH mappings(old_id, new_id) AS (VALUES {})
+             UPDATE launcher_pins SET item_id = (
+                 SELECT new_id FROM mappings WHERE old_id = launcher_pins.item_id
+             )
+             WHERE item_id IN (SELECT old_id FROM mappings)
+               AND kind = 'application'",
+            values_sql
+        );
+        let mut pins_query = sqlx::query(&pins_sql);
+        for (old_id, new_id) in chunk {
+            pins_query = pins_query.bind(old_id).bind(new_id);
         }
+        total += pins_query.execute(pool).await?.rows_affected();
 
-        let pins_result = sqlx::query(
-            "UPDATE launcher_pins SET item_id = ?1 \
-             WHERE item_id = ?2 AND kind = 'application'",
-        )
-        .bind(&new_id)
-        .bind(&old_id)
-        .execute(pool)
-        .await?;
-        total += pins_result.rows_affected();
-
-        let usage_result = sqlx::query(
-            "UPDATE launcher_usage_log SET item_id = ?1 \
-             WHERE item_id = ?2 AND kind = 'application'",
-        )
-        .bind(&new_id)
-        .bind(&old_id)
-        .execute(pool)
-        .await?;
-        total += usage_result.rows_affected();
+        let usage_sql = format!(
+            "WITH mappings(old_id, new_id) AS (VALUES {})
+             UPDATE launcher_usage_log SET item_id = (
+                 SELECT new_id FROM mappings WHERE old_id = launcher_usage_log.item_id
+             )
+             WHERE item_id IN (SELECT old_id FROM mappings)
+               AND kind = 'application'",
+            values_sql
+        );
+        let mut usage_query = sqlx::query(&usage_sql);
+        for (old_id, new_id) in chunk {
+            usage_query = usage_query.bind(old_id).bind(new_id);
+        }
+        total += usage_query.execute(pool).await?.rows_affected();
     }
     Ok(total)
 }

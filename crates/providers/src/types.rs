@@ -100,6 +100,44 @@ pub enum ResponseFormat {
     JsonSchema { name: String, schema: Value },
 }
 
+/// Cache lifetime hint for a [`CacheBreakpoint`]. Picked by the policy
+/// that emits the breakpoint; honored by providers whose `ProviderCapabilities`
+/// have `explicit_cache_markers = true`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CacheTtl {
+    /// ~5 minutes. Anthropic default. Right for transient prefixes
+    /// (e.g. the message-frontier marker that survives one compression
+    /// burst but probably won't be reused tomorrow).
+    #[default]
+    Ephemeral,
+    /// ~1 hour. Anthropic via `extended-cache-ttl-2025-04-11` beta.
+    /// Right for system prompts and tool definitions that are stable
+    /// for the whole session.
+    Persistent,
+}
+
+/// Where to place a cache-control marker.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CacheAnchor {
+    /// On the last `Message::System` block in the messages vec.
+    /// No-op if there are no System messages.
+    LastSystem,
+    /// On the last entry in the tools array.
+    /// No-op if `tools` is None or empty.
+    LastTool,
+    /// On the message at this index in the messages vec.
+    /// Logged + skipped if out-of-range.
+    MessageIndex(usize),
+}
+
+/// One cache-breakpoint instruction for a single LLM call.
+#[derive(Clone, Debug)]
+pub struct CacheBreakpoint {
+    pub anchor: CacheAnchor,
+    pub ttl: CacheTtl,
+}
+
 /// Parameters for chat completion requests
 #[derive(Debug, Clone)]
 pub struct ChatParams {
@@ -109,6 +147,10 @@ pub struct ChatParams {
     pub response_format: Option<ResponseFormat>,
     /// Optional provider role for role-based routing (e.g. Distiller, ReforgeRules).
     pub role: Option<crate::ProviderRole>,
+    /// Opaque session identifier. Used by the OpenAI-compat debug assertion
+    /// to dedupe prefix-stability hashes across calls. Production builds
+    /// don't read it.
+    pub session_key: Option<String>,
 }
 
 impl ChatParams {
@@ -119,6 +161,7 @@ impl ChatParams {
             max_tokens: None,
             response_format: None,
             role: None,
+            session_key: None,
         }
     }
 
@@ -141,6 +184,117 @@ impl ChatParams {
         self.role = Some(role);
         self
     }
+
+    pub fn with_session_key(mut self, key: impl Into<String>) -> Self {
+        self.session_key = Some(key.into());
+        self
+    }
+}
+
+/// A single model advertised by a provider.
+///
+/// Returned by `LlmProvider::list_models()`. Aggregated by the app-core
+/// `ModelDiscovery` service, tagged with the config-provider key, and
+/// surfaced to the FE via the `model_list` IPC.
+///
+/// Field set is modelled on opencode's `Model` struct
+/// (`opencode/internal/llm/models/models.go`) — we carry cost,
+/// context window, default max tokens, attachment support, and the
+/// reasoning bit in one record so both the FE selector and the
+/// downstream chat call can make informed decisions without a second
+/// roundtrip.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderModel {
+    /// Model identifier sent in chat requests (e.g. `kimi-k2.6`,
+    /// `claude-sonnet-4-20250514`, `deepseek-reasoner`).
+    pub id: String,
+    /// Human-friendly label. Defaults to `id` if no display name is
+    /// surfaced by the provider.
+    pub display_name: String,
+    /// Brand tag (e.g. `anthropic`, `openai`, `moonshot`, `deepseek`).
+    /// This is the *brand* — not the configured provider key. The
+    /// app-core discovery layer adds a separate `provider` tag when
+    /// surfacing through the `model_list` IPC.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub brand: Option<String>,
+    /// Whether the model emits `reasoning_content` (extended-thinking
+    /// scratchpad). Heuristic: id substring matches a known marker
+    /// (`reasoner`, `thinking`, `r1`, `qwq`, `glm-zero`) unless the
+    /// catalogue / adapter explicitly tags it.
+    #[serde(default)]
+    pub supports_reasoning: bool,
+    /// Whether the model accepts image / file attachments.
+    #[serde(default)]
+    pub supports_attachments: bool,
+    /// Context window in tokens, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
+    /// Provider-recommended default `max_tokens` for the response.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_max_tokens: Option<u32>,
+    /// USD per 1M input tokens (0 if unknown / free).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_per_1m_in: Option<f64>,
+    /// USD per 1M cached input tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_per_1m_in_cached: Option<f64>,
+    /// USD per 1M output tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_per_1m_out: Option<f64>,
+    /// USD per 1M cached output tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_per_1m_out_cached: Option<f64>,
+}
+
+impl ProviderModel {
+    /// Construct from an id, defaulting display name to id and
+    /// inferring `supports_reasoning` from the id substring. All other
+    /// fields are left unspecified — adapters / catalogues populate
+    /// them.
+    pub fn from_id(id: impl Into<String>) -> Self {
+        let id = id.into();
+        let supports_reasoning = id_implies_reasoning(&id);
+        Self {
+            display_name: id.clone(),
+            id,
+            brand: None,
+            supports_reasoning,
+            supports_attachments: false,
+            context_window: None,
+            default_max_tokens: None,
+            cost_per_1m_in: None,
+            cost_per_1m_in_cached: None,
+            cost_per_1m_out: None,
+            cost_per_1m_out_cached: None,
+        }
+    }
+
+    /// Same as `from_id` but enriched with static catalogue metadata
+    /// (cost, context window, brand, etc.) if a matching entry exists.
+    pub fn from_id_enriched(id: impl Into<String>) -> Self {
+        let mut m = Self::from_id(id);
+        crate::catalogue::enrich(&mut m);
+        m
+    }
+}
+
+/// Heuristic: does a model identifier suggest extended-thinking output?
+/// Lower-cased substring match keeps this cheap and adapter-independent.
+pub fn id_implies_reasoning(id: &str) -> bool {
+    let lower = id.to_lowercase();
+    [
+        "reasoner",
+        "thinking",
+        "-r1",
+        "qwq",
+        "glm-zero",
+        "o1",
+        "o3",
+        "o4",
+    ]
+    .iter()
+    .any(|marker| lower.contains(marker))
 }
 
 /// Health status of an LLM provider.
@@ -165,6 +319,7 @@ pub trait LlmProvider: Send + Sync {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmResponse>;
 
     /// Send a streaming chat completion request
@@ -174,9 +329,12 @@ pub trait LlmProvider: Send + Sync {
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
     ) -> Result<LlmStream> {
         // Default: call chat() and wrap the response as stream chunks.
-        let response = self.chat(messages, tools, params).await?;
+        let response = self
+            .chat(messages, tools, params, cache_breakpoints)
+            .await?;
 
         let mut chunks: Vec<std::result::Result<LlmStreamChunk, common::KlyntbotError>> =
             Vec::with_capacity(response.tool_calls.len() + 1);
@@ -250,6 +408,18 @@ pub trait LlmProvider: Send + Sync {
     fn classifier_provider(&self) -> Option<DynProvider> {
         None
     }
+
+    /// Discover models advertised by this provider.
+    ///
+    /// Default returns just the configured `default_model()`. Adapters that
+    /// know how to query a real `/v1/models` endpoint (or maintain a static
+    /// catalogue) override this to expose every available model. The result
+    /// is consumed by `app-core::models::ModelDiscovery` which aggregates
+    /// across providers, caches, and exposes the union to the FE via the
+    /// `model_list` IPC.
+    async fn list_models(&self) -> Result<Vec<ProviderModel>> {
+        Ok(vec![ProviderModel::from_id(self.default_model())])
+    }
 }
 
 /// Type alias for dynamic provider
@@ -314,6 +484,9 @@ pub struct ProviderCapabilities {
     pub extended_thinking: bool,
     pub structured_outputs: bool,
     pub prompt_caching: bool,
+    /// True if this provider honors explicit `CacheBreakpoint` markers.
+    /// Anthropic: true. OpenAI/Gemini/etc. (auto-prefix-cache only): false.
+    pub explicit_cache_markers: bool,
     pub native_token_counting: bool,
     pub vision: bool,
     pub streaming: bool,
@@ -327,6 +500,7 @@ impl Default for ProviderCapabilities {
             extended_thinking: false,
             structured_outputs: false,
             prompt_caching: false,
+            explicit_cache_markers: false,
             native_token_counting: false,
             vision: true,
             streaming: true,
@@ -484,12 +658,27 @@ impl ToolContent {
 
 pub const DEFAULT_CONTEXT_WINDOW: usize = 128_000;
 
+impl CacheTtl {
+    /// Return the Anthropic `cache_control` JSON object for this TTL variant.
+    pub fn to_cache_control(self) -> serde_json::Value {
+        match self {
+            CacheTtl::Ephemeral => serde_json::json!({"type": "ephemeral"}),
+            CacheTtl::Persistent => serde_json::json!({"type": "ephemeral", "ttl": "1h"}),
+        }
+    }
+}
+
 impl Message {
     /// Create a system message
     pub fn system(content: impl Into<String>) -> Self {
         Self::System {
             content: content.into(),
         }
+    }
+
+    /// True if this message is a system message.
+    pub fn is_system(&self) -> bool {
+        matches!(self, Message::System { .. })
     }
 
     /// Create a user message with text
@@ -515,15 +704,20 @@ impl Message {
         }
     }
 
-    /// Create an assistant message with tool calls and optional text content.
+    /// Create an assistant message with tool calls, optional text content,
+    /// and optional reasoning_content. Reasoning is required when the
+    /// model emitted a thinking block alongside tool calls — Anthropic
+    /// (and compat endpoints like Kimi) reject follow-up requests that
+    /// elide the thinking from the conversation history.
     pub fn assistant_with_content_and_tools(
         content: Option<String>,
         tool_calls: Vec<ToolCallMessage>,
+        reasoning_content: Option<String>,
     ) -> Self {
         Self::Assistant {
             content,
             tool_calls: Some(tool_calls),
-            reasoning_content: None,
+            reasoning_content,
         }
     }
 
@@ -701,5 +895,46 @@ mod tests {
         } else {
             panic!("wrong variant");
         }
+    }
+
+    #[test]
+    fn cache_ttl_serde_roundtrip() {
+        let json = serde_json::to_string(&CacheTtl::Ephemeral).unwrap();
+        assert_eq!(json, "\"ephemeral\"");
+        let json = serde_json::to_string(&CacheTtl::Persistent).unwrap();
+        assert_eq!(json, "\"persistent\"");
+        let parsed: CacheTtl = serde_json::from_str("\"ephemeral\"").unwrap();
+        assert_eq!(parsed, CacheTtl::Ephemeral);
+    }
+
+    #[test]
+    fn cache_ttl_default_is_ephemeral() {
+        assert_eq!(CacheTtl::default(), CacheTtl::Ephemeral);
+    }
+
+    #[test]
+    fn cache_anchor_equality() {
+        assert_eq!(CacheAnchor::LastSystem, CacheAnchor::LastSystem);
+        assert_ne!(CacheAnchor::LastSystem, CacheAnchor::LastTool);
+        assert_eq!(CacheAnchor::MessageIndex(5), CacheAnchor::MessageIndex(5));
+        assert_ne!(CacheAnchor::MessageIndex(5), CacheAnchor::MessageIndex(6));
+    }
+
+    #[test]
+    fn cache_breakpoint_construction() {
+        let bp = CacheBreakpoint {
+            anchor: CacheAnchor::LastSystem,
+            ttl: CacheTtl::Persistent,
+        };
+        assert_eq!(bp.anchor, CacheAnchor::LastSystem);
+        assert_eq!(bp.ttl, CacheTtl::Persistent);
+    }
+
+    #[test]
+    fn provider_capabilities_default_excludes_explicit_markers() {
+        let caps = ProviderCapabilities::default();
+        assert!(!caps.explicit_cache_markers);
+        assert!(caps.streaming);
+        assert!(!caps.prompt_caching);
     }
 }

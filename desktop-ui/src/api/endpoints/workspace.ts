@@ -51,10 +51,20 @@ export async function setWorkspaceRuntimeCodexArgs(
   workspaceId: string,
   codexArgs: string | null,
 ): Promise<{ appliedCodexArgs: string | null; respawned: boolean }> {
-  return invoke("set_workspace_runtime_codex_args", {
-    workspaceId,
-    codexArgs,
-  });
+  try {
+    return await invoke("set_workspace_runtime_codex_args", {
+      workspaceId,
+      codexArgs,
+    });
+  } catch (e) {
+    // Browser dev server doesn't expose this Tauri-only command. Treat as
+    // a no-op so the codex args sync stays best-effort outside the desktop.
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("not supported in browser dev mode")) {
+      return { appliedCodexArgs: codexArgs, respawned: false };
+    }
+    throw e;
+  }
 }
 
 export async function openWorkspaceIn(

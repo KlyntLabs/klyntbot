@@ -12,6 +12,42 @@ pub enum TemplateErr {
 /// - `{{{{inner}}}}` escapes to the literal `{{inner}}`.
 /// - Placeholder names are NOT trimmed; `{{ name }}` looks up ` name `.
 /// - Unclosed `{{...` sequences are passed through literally.
+/// Scan a `{{{{...}}}}` escape sequence and return the inner content.
+/// Returns `None` if the sequence is not a valid 4-brace escape.
+fn scan_escape_sequence(chars: &mut std::iter::Peekable<std::str::Chars>) -> Option<String> {
+    chars.next()?; // third `{`
+    chars.next()?; // fourth `{`
+    let mut inner = String::new();
+    let mut closed = false;
+    while let Some(&c) = chars.peek() {
+        chars.next();
+        if c == '}' && chars.peek().copied() == Some('}') {
+            chars.next(); // second `}`
+            if chars.peek().copied() == Some('}') {
+                chars.next(); // third `}`
+                if chars.peek().copied() == Some('}') {
+                    chars.next(); // fourth `}`
+                    closed = true;
+                    break;
+                }
+                inner.push(c);
+                inner.push('}');
+                inner.push('}');
+            } else {
+                inner.push(c);
+                inner.push('}');
+            }
+        } else {
+            inner.push(c);
+        }
+    }
+    if closed {
+        Some(inner)
+    } else {
+        None
+    }
+}
+
 pub fn substitute(s: &str, args: &HashMap<String, String>) -> Result<String, TemplateErr> {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
@@ -20,42 +56,13 @@ pub fn substitute(s: &str, args: &HashMap<String, String>) -> Result<String, Tem
             chars.next();
             if chars.peek().copied() == Some('{') {
                 // This is `{{{{...}}}}` — scan for the closing `}}}}` and emit `{{...}}`
-                chars.next(); // consume third `{`
-                if chars.peek().copied() == Some('{') {
-                    chars.next(); // consume fourth `{`
-                    let mut inner = String::new();
-                    let mut closed = false;
-                    while let Some(&c) = chars.peek() {
-                        chars.next();
-                        if c == '}' && chars.peek().copied() == Some('}') {
-                            chars.next(); // second `}`
-                            if chars.peek().copied() == Some('}') {
-                                chars.next(); // third `}`
-                                if chars.peek().copied() == Some('}') {
-                                    chars.next(); // fourth `}`
-                                    closed = true;
-                                    break;
-                                }
-                                inner.push(c);
-                                inner.push('}');
-                                inner.push('}');
-                            } else {
-                                inner.push(c);
-                                inner.push('}');
-                            }
-                        } else {
-                            inner.push(c);
-                        }
-                    }
+                if let Some(inner) = scan_escape_sequence(&mut chars) {
                     out.push_str("{{");
                     out.push_str(&inner);
-                    if closed {
-                        out.push_str("}}");
-                    }
+                    out.push_str("}}");
                     continue;
                 }
-                // Only three `{` — treat as unclosed, fall through with name scanning
-                // but we already consumed the third `{`, so just emit `{{{` literally
+                // Only three `{` — treat as unclosed, emit literally
                 out.push_str("{{{");
                 continue;
             }

@@ -30,8 +30,7 @@ fn load_local(registry: &mut ContentRegistry, name: &str, path: &str) -> common:
 
     // Load docs manifest
     let docs_manifest = base.join("docs/manifest.json");
-    if docs_manifest.exists() {
-        let content = std::fs::read_to_string(&docs_manifest)?;
+    if let Ok(content) = std::fs::read_to_string(&docs_manifest) {
         let manifest: serde_json::Value = serde_json::from_str(&content)?;
         if let Some(docs) = manifest.get("docs").and_then(|d| d.as_array()) {
             for doc in docs {
@@ -47,8 +46,7 @@ fn load_local(registry: &mut ContentRegistry, name: &str, path: &str) -> common:
 
     // Load skills manifest
     let skills_manifest = base.join("skills/manifest.json");
-    if skills_manifest.exists() {
-        let content = std::fs::read_to_string(&skills_manifest)?;
+    if let Ok(content) = std::fs::read_to_string(&skills_manifest) {
         let manifest: serde_json::Value = serde_json::from_str(&content)?;
         if let Some(skills) = manifest.get("skills").and_then(|s| s.as_array()) {
             for skill in skills {

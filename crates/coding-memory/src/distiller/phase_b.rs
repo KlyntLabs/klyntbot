@@ -6,7 +6,7 @@
 
 use super::error::DistillerError;
 use super::record_observation::{decode_observations, record_observation_tool_def, Observation};
-use super::{TestOutcome, TurnTrace};
+use super::TurnTrace;
 
 /// Built prompt ready to hand to `ProviderManager::chat`.
 #[derive(Debug, Clone)]
@@ -37,9 +37,12 @@ pub fn build_prompt(
     let mut user = String::new();
     user.push_str(&format!("## Scope\n{scope}\n\n"));
     user.push_str("## User prompt\n");
-    user.push_str(truncate(user_prompt_text, 4_000));
+    user.push_str(common::helpers::truncate_at_boundary(
+        user_prompt_text,
+        4_000,
+    ));
     user.push_str("\n\n## Assistant final message\n");
-    user.push_str(truncate(assistant_text, 4_000));
+    user.push_str(common::helpers::truncate_at_boundary(assistant_text, 4_000));
     user.push_str("\n\n## Turn trace (Phase A)\n");
     user.push_str(&trace_summary);
     user.push_str(
@@ -55,18 +58,6 @@ pub fn build_prompt(
     DistillerPrompt {
         system,
         user_message: user,
-    }
-}
-
-fn truncate(s: &str, max: usize) -> &str {
-    if s.len() > max {
-        let mut end = max;
-        while !s.is_char_boundary(end) {
-            end -= 1;
-        }
-        &s[..end]
-    } else {
-        s
     }
 }
 
@@ -102,12 +93,6 @@ fn summarize_trace(t: &TurnTrace) -> String {
                 t.passed,
                 t.failed
             ));
-            let _ = TestOutcome {
-                command: String::new(),
-                framework: None,
-                passed: 0,
-                failed: 0,
-            };
         }
     }
     if !t.errors_encountered.is_empty() {
@@ -191,6 +176,7 @@ pub async fn invoke_llm(inv: LlmInvocation<'_>) -> Result<Vec<Observation>, Dist
         &messages,
         tools.as_deref(),
         &params,
+        &[],
     );
     let resp = tokio::time::timeout(inv.timeout, fut)
         .await
@@ -201,11 +187,26 @@ pub async fn invoke_llm(inv: LlmInvocation<'_>) -> Result<Vec<Observation>, Dist
             detail: e.to_string(),
         })?;
 
-    let args: Vec<serde_json::Value> = resp
+    let mut args: Vec<serde_json::Value> = resp
         .tool_calls
         .into_iter()
         .filter(|tc| tc.name == super::record_observation::RECORD_OBSERVATION_TOOL_NAME)
         .map(|tc| tc.arguments)
         .collect();
+    // Reasoning models (Mimo, DeepSeek-R1) often skip the function-call
+    // protocol entirely and emit observation JSON inline in `content`.
+    // When tool_calls is empty but content carries a JSON array of
+    // observation-shaped objects, accept it as a fallback. This restores
+    // Phase B coverage that would otherwise be lost as "transient failure".
+    if args.is_empty() {
+        if let Some(content) = resp.content.as_deref() {
+            if let Some(v) = common::helpers::extract_llm_json_value(content) {
+                args = match v {
+                    serde_json::Value::Array(arr) => arr,
+                    other => vec![other],
+                };
+            }
+        }
+    }
     decode_observations(&args)
 }

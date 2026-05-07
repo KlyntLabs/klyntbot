@@ -1,3 +1,4 @@
+use crate::tools::shared::file_edit_event::fan_out_tool_event;
 use crate::tools::shared::hook_emit::{fire_post_tool_use, fire_pre_tool_use};
 use async_trait::async_trait;
 use bus::DomainEventBus;
@@ -152,7 +153,7 @@ pub async fn run_enter_for_test(
         in_plan_mode: true,
         plan_id: Some(session_key.into()),
     };
-    crate::approval::guard::fan_out_tool_event(event_tx.as_ref(), Some(&bus), evt).await;
+    fan_out_tool_event(event_tx.as_ref(), Some(&bus), evt).await;
     Ok("entered plan mode (writes and exec are now denied)".into())
 }
 
@@ -171,6 +172,6 @@ pub async fn run_exit_for_test(
         in_plan_mode: false,
         plan_id: Some(session_key.into()),
     };
-    crate::approval::guard::fan_out_tool_event(event_tx.as_ref(), Some(&bus), evt).await;
+    fan_out_tool_event(event_tx.as_ref(), Some(&bus), evt).await;
     Ok("exited plan mode".into())
 }

@@ -91,6 +91,8 @@ pub struct AgentLoop {
     /// Background session memory service (per-session scratchpad maintenance).
     /// Stored to prevent drop which would cancel the background task.
     pub(crate) _session_memory_service: Option<cognitive::SessionMemoryService>,
+    /// Approval grants repo for purging session-scoped grants.
+    pub(crate) approval_grants_repo: Option<approval::ApprovalGrantsRepo>,
     /// Cancellation token for the work context inference loop.
     pub(crate) _inference_loop_token: Option<CancellationToken>,
     /// Parent cancellation token for all tree builder subscriber tasks.
@@ -585,7 +587,11 @@ impl AgentLoop {
 
         // Track last active channel for notifications
         if let Some(last_active) = &self.last_active_channel {
-            *last_active.write().await = Some((msg.channel.clone(), msg.chat_id.clone()));
+            let new = Some((msg.channel.clone(), msg.chat_id.clone()));
+            let mut guard = last_active.write().await;
+            if *guard != new {
+                *guard = new;
+            }
         }
 
         let preview = preview_text(&msg.content, 80);
@@ -709,7 +715,7 @@ impl AgentLoop {
 
         // Run through pipeline
         let mut routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
-        routing_ctx.session_key = Some(session_key.clone().into());
+        routing_ctx.session_key = Some(session_key.clone());
         routing_ctx.message_id = embed_msg_id.map(|id| id.to_string());
         let response_content = self
             .run_pipeline(&msg.content, history, &routing_ctx, None, None, correction)
@@ -754,6 +760,12 @@ impl AgentLoop {
             let key = msg.chat_id.as_str();
             if let Err(e) = self.session_manager.reset_session(key).await {
                 warn!("Failed to reset session {}: {}", key, e);
+            }
+            // Purge session-scoped approval grants
+            if let Some(ref repo) = self.approval_grants_repo {
+                if let Err(e) = repo.purge_session(key).await {
+                    warn!("Failed to purge approval grants for session {}: {}", key, e);
+                }
             }
             return Ok(());
         }
@@ -932,10 +944,14 @@ impl AgentLoop {
         cancel_token: Option<CancellationToken>,
         _correction: Option<context_engine::CorrectionContext>,
     ) -> Result<String> {
+        tracing::debug!(session = %routing_ctx.chat_id.as_str(), "run_pipeline: entered");
         let history_messages = Self::convert_history(&history);
+        tracing::debug!("run_pipeline: convert_history done");
         let (tool_defs, _tool_names) = self.get_tool_info().await;
+        tracing::debug!(tools = tool_defs.len(), "run_pipeline: get_tool_info done");
         let channel = common::tool_channel::Channel::from_name(routing_ctx.channel.as_str());
         let registry = self.tool_registry.read().await;
+        tracing::debug!("run_pipeline: tool_registry read lock acquired");
         let filtered_defs: Arc<Vec<serde_json::Value>> = Arc::new(
             tool_defs
                 .iter()
@@ -954,6 +970,7 @@ impl AgentLoop {
                 .collect(),
         );
         drop(registry);
+        tracing::debug!(filtered = filtered_defs.len(), "run_pipeline: tool filter done, calling runtime.process_message");
 
         let result = self
             .runtime
@@ -1136,9 +1153,11 @@ impl AgentLoop {
             false
         };
 
+        tracing::debug!(session = %session_key, "process_direct_streaming: before setup_session");
         let (history, user_msg_id) = self
             .setup_session(&content, &session_key, "streaming direct")
             .await?;
+        tracing::debug!(session = %session_key, history_len = history.len(), "process_direct_streaming: after setup_session");
 
         // Create event channel and interaction channel
         let (event_tx, event_rx) = mpsc::channel(64);
@@ -1193,6 +1212,7 @@ impl AgentLoop {
         let sk = session_key.clone();
 
         let handle = tokio::spawn(async move {
+            tracing::debug!(session = %sk, "process_direct_streaming: pipeline task entered");
             let pipeline_event_tx = event_tx.clone();
             let result = match agent
                 .run_pipeline(
@@ -1310,22 +1330,54 @@ fn reaction_to_satisfaction(emoji: &str) -> Option<f32> {
     }
 }
 
+/// Case-insensitive `starts_with` for ASCII prefixes.
+fn istarts_with(s: &str, prefix: &str) -> bool {
+    let mut s_chars = s.chars();
+    for b in prefix.chars() {
+        match s_chars.next() {
+            Some(a) if a.eq_ignore_ascii_case(&b) => {}
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// Case-insensitive `contains` for ASCII needles.
+fn icontains(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    let mut chars = haystack.chars();
+    loop {
+        if chars
+            .clone()
+            .zip(needle.chars())
+            .all(|(a, b)| a.eq_ignore_ascii_case(&b))
+        {
+            return true;
+        }
+        if chars.next().is_none() {
+            break;
+        }
+    }
+    false
+}
+
 /// Detects if a user message starts with a correction phrase.
 /// Returns the correction strength (1.0 for strong, 0.8 for soft) or None.
 fn detect_correction_prefix(message: &str) -> Option<f64> {
-    let lower = message.to_lowercase();
-    let check = &lower[..lower.len().min(80)];
+    let check = &message[..message.len().min(80)];
 
     const STRONG: &[&str] = &["no,", "no ", "wrong", "that's not", "incorrect"];
     const SOFT: &[&str] = &["i meant", "try again", "redo", "not quite", "never mind"];
 
     for prefix in STRONG {
-        if check.starts_with(prefix) {
+        if istarts_with(check, prefix) {
             return Some(1.0);
         }
     }
     for prefix in SOFT {
-        if check.starts_with(prefix) {
+        if istarts_with(check, prefix) {
             return Some(0.8);
         }
     }
@@ -1335,8 +1387,7 @@ fn detect_correction_prefix(message: &str) -> Option<f64> {
 /// Detects if a user message indicates the AI forgot a previously mentioned fact.
 /// Returns true when the user signals a memory retrieval miss.
 fn detect_memory_miss(message: &str) -> bool {
-    let lower = message.to_lowercase();
-    let check = &lower[..lower.len().min(120)];
+    let check = &message[..message.len().min(120)];
 
     const PHRASES: &[&str] = &[
         "i already told you",
@@ -1353,7 +1404,7 @@ fn detect_memory_miss(message: &str) -> bool {
         "i already said",
     ];
 
-    PHRASES.iter().any(|phrase| check.contains(phrase))
+    PHRASES.iter().any(|phrase| icontains(check, phrase))
 }
 
 #[cfg(test)]

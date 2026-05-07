@@ -29,6 +29,20 @@ pub enum CodingKind {
     FailurePattern,
 }
 
+impl CodingKind {
+    /// Canonical snake_case wire representation.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CodingKind::FixAttempt => "fix_attempt",
+            CodingKind::StylePreference => "style_preference",
+            CodingKind::WorkflowPattern => "workflow_pattern",
+            CodingKind::RepoContext => "repo_context",
+            CodingKind::FailurePattern => "failure_pattern",
+        }
+    }
+}
+
 /// Outcome of a fix attempt.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

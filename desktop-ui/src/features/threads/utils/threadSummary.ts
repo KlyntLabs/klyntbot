@@ -30,7 +30,10 @@ export function extractThreadFromResponse(
   const thread =
     (result?.thread as Record<string, unknown> | undefined) ??
     (response.thread as Record<string, unknown> | undefined);
-  return thread ?? null;
+  if (thread) return thread;
+  // Flat shape: backend returns the thread object directly (e.g. coding_thread_start).
+  if (typeof response.id === "string") return response;
+  return null;
 }
 
 export function buildThreadSummaryFromThread({

@@ -1,4 +1,5 @@
 use crate::privacy::PrivacyGuard;
+use common::{KlyntbotError, ToolError};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -10,17 +11,17 @@ pub enum FsResolveError {
     PrivacyDenied { path: PathBuf },
 }
 
-/// Expand `~`, resolve relative paths against cwd, ensure result is inside cwd,
-/// and check it's not in the privacy exclude list.
-pub fn resolve_under_cwd(
-    raw: &str,
-    cwd: &Path,
-    privacy: &PrivacyGuard,
-) -> Result<PathBuf, FsResolveError> {
+fn canonicalize_cwd(cwd: &Path) -> PathBuf {
+    cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf())
+}
+
+/// Expand `~`, resolve relative paths against cwd, and canonicalize
+/// ancestors so symlinked prefixes match (macOS `/tmp` → `/private/tmp`).
+/// Does **not** enforce cwd restriction or privacy checks — use
+/// [`resolve_under_cwd`] for that.
+pub fn resolve_path(raw: &str, cwd: &Path) -> PathBuf {
     let expanded = shellexpand::tilde(raw).into_owned();
-    // Canonicalize cwd up front so symlinked prefixes (macOS /tmp → /private/tmp)
-    // don't cause false `starts_with` mismatches against the resolved candidate.
-    let cwd_canonical = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
+    let cwd_canonical = canonicalize_cwd(cwd);
     let candidate = if Path::new(&expanded).is_absolute() {
         PathBuf::from(&expanded)
     } else {
@@ -28,8 +29,8 @@ pub fn resolve_under_cwd(
     };
     // Try canonicalize; if the file (or any ancestor) doesn't exist, walk up
     // until we find an ancestor that does, then re-append the trailing
-    // components so symlinked prefixes (macOS /tmp → /private/tmp) still match.
-    let resolved = candidate.canonicalize().unwrap_or_else(|_| {
+    // components so symlinked prefixes still match.
+    candidate.canonicalize().unwrap_or_else(|_| {
         let mut suffix: Vec<&std::ffi::OsStr> = Vec::new();
         let mut cursor = candidate.as_path();
         loop {
@@ -48,7 +49,18 @@ pub fn resolve_under_cwd(
                 _ => return candidate.clone(),
             }
         }
-    });
+    })
+}
+
+/// Expand `~`, resolve relative paths against cwd, ensure result is inside cwd,
+/// and check it's not in the privacy exclude list.
+pub fn resolve_under_cwd(
+    raw: &str,
+    cwd: &Path,
+    privacy: &PrivacyGuard,
+) -> Result<PathBuf, FsResolveError> {
+    let resolved = resolve_path(raw, cwd);
+    let cwd_canonical = canonicalize_cwd(cwd);
 
     // cwd-restriction
     if !resolved.starts_with(&cwd_canonical) {
@@ -62,4 +74,21 @@ pub fn resolve_under_cwd(
         return Err(FsResolveError::PrivacyDenied { path: resolved });
     }
     Ok(resolved)
+}
+
+/// Ensure the parent directory of `path` exists, creating it if necessary.
+/// Returns a tool error with a descriptive message on failure.
+pub async fn ensure_parent_dir(path: &Path) -> Result<(), KlyntbotError> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            tokio::fs::create_dir_all(parent).await.map_err(|e| {
+                KlyntbotError::Tool(ToolError::ExecutionFailed(format!(
+                    "failed to create parent directory {}: {}",
+                    parent.display(),
+                    e
+                )))
+            })?;
+        }
+    }
+    Ok(())
 }

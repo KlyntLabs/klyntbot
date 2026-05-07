@@ -5,6 +5,7 @@ pub mod doctor_handler;
 pub mod help_handler;
 pub mod mcp_handler;
 pub mod metadata_handler;
+pub mod model_list_handler;
 pub mod providers_handler;
 pub mod recall_stats_handler;
 pub mod resume_handler;

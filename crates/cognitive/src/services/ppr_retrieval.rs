@@ -91,7 +91,7 @@ pub fn personalized_pagerank(
                 continue;
             }
             for &(t, w) in neighbors {
-                next[t.index() as usize] += (1.0 - cfg.alpha) * mass * w;
+                next[t.index()] += (1.0 - cfg.alpha) * mass * w;
             }
         }
 
@@ -158,12 +158,7 @@ pub async fn build_graph_from_entities(
             Some(i) => *i,
             None => continue,
         };
-        let multiplier = match edge.edge_type.as_str() {
-            "causal" => 1.5,
-            "structural" => 1.2,
-            "temporal" => 1.1,
-            _ => 1.0,
-        };
+        let multiplier = crate::repos::entity::EdgeType::parse(&edge.edge_type).weight() as f32;
         g.add_edge(src, tgt, edge.strength as f32 * multiplier);
         // Add reverse for undirected expansion.
         g.add_edge(tgt, src, edge.strength as f32 * multiplier * 0.5);
@@ -172,15 +167,15 @@ pub async fn build_graph_from_entities(
     Ok((g, name_by_idx))
 }
 
+type PprCacheEntry = (
+    DiGraph<String, f32, u32>,
+    HashMap<String, NodeIndex>,
+    Instant,
+);
+
 pub struct CachedPprGraph {
     repo: crate::repos::EntityRepo,
-    cache: RwLock<
-        Option<(
-            DiGraph<String, f32, u32>,
-            HashMap<String, NodeIndex>,
-            Instant,
-        )>,
-    >,
+    cache: RwLock<Option<PprCacheEntry>>,
     ttl: Duration,
 }
 
@@ -286,7 +281,7 @@ fn extract_entity_names_from_query(query: &str) -> Vec<String> {
     // Heuristic: split on whitespace, keep tokens of length ≥3 that start with letter.
     query
         .split_whitespace()
-        .filter(|t| t.len() >= 3 && t.chars().next().map_or(false, |c| c.is_alphabetic()))
+        .filter(|t| t.len() >= 3 && t.chars().next().is_some_and(|c| c.is_alphabetic()))
         .map(|t| {
             t.trim_matches(|c: char| !c.is_alphanumeric())
                 .to_lowercase()

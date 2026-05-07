@@ -646,7 +646,11 @@ export function useThreads({
     }
     let threadId = activeThreadId;
     if (!threadId) {
-      threadId = await startThreadForWorkspace(activeWorkspace.id);
+      // Activate immediately: without this, the newly-started coding thread
+      // never becomes `activeThreadIdByWorkspace[workspaceId]`, so the next
+      // send re-enters this branch and spawns another thread. That was the
+      // "every prompt creates a new Untitled session" bug.
+      threadId = await startThreadForWorkspace(activeWorkspace.id, { activate: true });
       if (!threadId) {
         return null;
       }

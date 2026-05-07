@@ -30,6 +30,7 @@ members = [
     "crates/feature-insights",
     "crates/app-core",
     "crates/activity-log",
+    "crates/approval",
     "crates/feature-alarms",
     "crates/feature-tasks",
     "crates/feature-focus",
@@ -105,6 +106,7 @@ desktop-shared = { path = "crates/desktop-shared" }
 desktop = { path = "crates/desktop" }
 app-core = { path = "crates/app-core" }
 activity-log = { path = "crates/activity-log" }
+approval = { path = "crates/approval" }
 feature-alarms = { path = "crates/feature-alarms" }
 feature-tasks = { path = "crates/feature-tasks" }
 feature-focus = { path = "crates/feature-focus" }

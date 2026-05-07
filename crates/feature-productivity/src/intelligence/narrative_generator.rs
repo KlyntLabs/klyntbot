@@ -210,7 +210,7 @@ fn next_day(date: &str) -> String {
 mod tests {
     use super::*;
     use crate::repos::IntelligenceSessionRepo;
-    use crate::ProductivityFeature;
+
     use sqlx::SqlitePool;
 
     async fn setup_pool() -> SqlitePool {

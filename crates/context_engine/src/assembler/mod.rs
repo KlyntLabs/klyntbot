@@ -270,7 +270,46 @@ impl ContextEngine {
         // Hash history length + last message content (changes on each user message)
         hasher.update(request.history.len().to_le_bytes());
         if let Some(last) = request.history.last() {
-            hasher.update(format!("{:?}", last).as_bytes());
+            match last {
+                providers::Message::System { content } => {
+                    hasher.update(b"system");
+                    hasher.update(content.as_bytes());
+                }
+                providers::Message::User { content } => {
+                    hasher.update(b"user");
+                    hasher.update(format!("{content:?}").as_bytes());
+                }
+                providers::Message::Assistant {
+                    content,
+                    tool_calls,
+                    ..
+                } => {
+                    hasher.update(b"assistant");
+                    if let Some(c) = content {
+                        hasher.update(c.as_bytes());
+                    }
+                    if let Some(tcs) = tool_calls {
+                        for tc in tcs {
+                            hasher.update(tc.id.as_bytes());
+                        }
+                    }
+                }
+                providers::Message::Tool {
+                    tool_call_id,
+                    name,
+                    content,
+                } => {
+                    hasher.update(b"tool");
+                    hasher.update(tool_call_id.as_bytes());
+                    hasher.update(name.as_bytes());
+                    hasher.update(format!("{content:?}").as_bytes());
+                }
+                providers::Message::ContextUpdate { reason, content } => {
+                    hasher.update(b"context_update");
+                    hasher.update(reason.as_bytes());
+                    hasher.update(content.as_bytes());
+                }
+            }
         }
         // Hash message text (used for memory retrieval)
         hasher.update(request.message_text.as_bytes());

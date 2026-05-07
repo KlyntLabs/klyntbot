@@ -1,3 +1,5 @@
+import { CodingThreadView } from "@/features/coding/components/CodingThreadView";
+import { useCodingThreadStatus } from "@/features/coding/hooks/useCodingThreadStatus";
 import { useAppBootstrapOrchestration } from "@app/bootstrap/useAppBootstrapOrchestration";
 import { MainAppShell } from "@app/components/MainAppShell";
 import { AppView } from "@app/constants/appViews";
@@ -319,23 +321,68 @@ export default function MainApp() {
     selectionKey: threadCodexSelectionKey,
   });
 
-  const { providers } = useProviders();
-  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const { providers, defaultProviderId } = useProviders();
+  // User-driven provider override. Cleared when the user picks a model
+  // directly (the pill should follow the model). The effective
+  // `selectedProviderId` is derived below from this override + the
+  // current model's brand + the configured default — so the pill is
+  // always coherent with what's actually being sent on chat_send.
+  const [providerOverride, setProviderOverride] = useState<string | null>(null);
+
+  // Effective provider id: derived from the currently selected model
+  // unless the user explicitly overrode it AND the override still
+  // matches the model's brand. Deriving keeps the pill in sync when
+  // `useModels` swaps the model on thread open (e.g. it picks
+  // `kimi-k2.6` from `agents.defaults.model`) without needing a
+  // second effect to chase the model state.
+  const selectedProviderId = useMemo(() => {
+    const brandFromModel = selectedModel?.brand ?? selectedModel?.provider ?? null;
+    if (
+      providerOverride &&
+      providers.some((p) => p.id === providerOverride) &&
+      // Only honor the override while it's still consistent with the
+      // model. If the model has a different brand (e.g. user picked a
+      // different model via the model dropdown), the override is
+      // stale — fall through to derive from the model.
+      (!brandFromModel || brandFromModel === providerOverride)
+    ) {
+      return providerOverride;
+    }
+    if (brandFromModel && providers.some((p) => p.id === brandFromModel)) {
+      return brandFromModel;
+    }
+    return defaultProviderId;
+  }, [providerOverride, selectedModel, providers, defaultProviderId]);
 
   const filteredModels = useMemo(() => {
-    if (providers.length > 0 && !selectedProviderId) return [];
-    if (selectedProviderId) return models.filter((model) => model.provider === selectedProviderId);
-    return models;
-  }, [models, providers, selectedProviderId]);
+    if (!selectedProviderId) return models;
+    // selectedProviderId is a *brand* (e.g. `moonshot`), not a config-
+    // provider key. Match models by brand. Falls back to the full list
+    // when the filter would yield nothing — defensive against models
+    // that haven't been brand-tagged yet.
+    const filtered = models.filter(
+      (model) => (model.brand ?? model.provider) === selectedProviderId,
+    );
+    return filtered.length > 0 ? filtered : models;
+  }, [models, selectedProviderId]);
 
   const handleSelectProvider = useCallback(
     (providerId: string | null) => {
-      setSelectedProviderId(providerId);
-      // Clear model selection when provider changes
-      setSelectedModelId(null);
+      setProviderOverride(providerId);
+      // Pick a sensible model for the new brand so the dropdown isn't
+      // left pointing at a model that's been filtered out. Prefer one
+      // marked isDefault, fall back to the first available of the same
+      // brand, then to anything.
+      const matching = providerId
+        ? models.filter((model) => (model.brand ?? model.provider) === providerId)
+        : models;
+      const candidates = matching.length > 0 ? matching : models;
+      const next = candidates.find((m) => m.isDefault) ?? candidates[0] ?? null;
+      setSelectedModelId(next ? next.id : null);
     },
-    [setSelectedModelId],
+    [models, setSelectedModelId],
   );
+
 
   const {
     collaborationModes,
@@ -528,7 +575,7 @@ export default function MainApp() {
     threadsByWorkspace,
     threadParentById,
     isSubagentThread,
-    threadStatusById,
+    threadStatusById: assistantThreadStatusById,
     threadResumeLoadingById,
     threadListLoadingByWorkspace,
     threadListPagingByWorkspace,
@@ -608,6 +655,15 @@ export default function MainApp() {
     threadSortKey: threadListSortKey,
     onThreadCodexMetadataDetected: handleThreadCodexMetadataDetected,
   });
+  // Bridge: legacy `app-server-event` only feeds assistant-mode thread status.
+  // Coding threads emit `agent:thread_event` instead, so we merge that stream
+  // in here. Without this, `isProcessing` for a coding thread never flips back
+  // to false and the composer stays in "queue" mode forever.
+  const codingThreadStatus = useCodingThreadStatus();
+  const threadStatusById = useMemo(
+    () => ({ ...assistantThreadStatusById, ...codingThreadStatus }),
+    [assistantThreadStatusById, codingThreadStatus],
+  );
   const { connectionState: remoteThreadConnectionState } = useRemoteThreadLiveConnection({
     backendMode: appSettings.backendMode,
     activeWorkspace,
@@ -1890,8 +1946,25 @@ export default function MainApp() {
   ) : (
     messagesNode
   );
-  const mainMessagesNode =
-    showWorkspaceHome && appView !== "chat" ? workspaceHomeNode : chatMessagesNode;
+  // Coding mode reuses the polished Messages UI by piping the new
+  // `agent:thread_event` stream through CodingThreadView's adapter. Same
+  // bubbles, markdown, code blocks, copy buttons as assistant mode — only
+  // the event source differs.
+  const codingMessagesNode =
+    mode === "code" && activeThreadId && activeThreadId.startsWith("coding:") ? (
+      <CodingThreadView
+        threadId={activeThreadId}
+        workspaceId={activeWorkspace?.id ?? null}
+        workspacePath={activeWorkspace?.path ?? null}
+        openTargets={appSettings.openAppTargets}
+        selectedOpenAppId={appSettings.selectedOpenAppId}
+      />
+    ) : null;
+  const mainMessagesNode = codingMessagesNode
+    ? codingMessagesNode
+    : showWorkspaceHome && appView !== "chat"
+      ? workspaceHomeNode
+      : chatMessagesNode;
   const compactThreadConnectionState: "live" | "polling" | "disconnected" =
     !activeWorkspace?.connected ? "disconnected" : remoteThreadConnectionState;
   const mainAppShellProps = useMainAppShellProps({

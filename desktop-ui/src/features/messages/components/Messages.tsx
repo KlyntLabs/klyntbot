@@ -1,7 +1,5 @@
 import { PlanReadyFollowupMessage } from "@app/components/PlanReadyFollowupMessage";
 import { RequestUserInputMessage } from "@app/components/RequestUserInputMessage";
-import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
-import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import { memo, useCallback } from "react";
 import { CostCeilingBanner } from "@/features/coding/components/CostCeilingBanner";
 import { DeadEndWarning } from "@/features/coding/components/DeadEndWarning";
@@ -15,7 +13,9 @@ import type {
   RequestUserInputResponse,
 } from "@/types";
 import { useFileLinkOpener } from "../hooks/useFileLinkOpener";
-import { formatCount, parseReasoning } from "../utils/messageRenderUtils";
+import { parseReasoning } from "../utils/messageRenderUtils";
+import { groupBursts } from "../utils/groupBursts";
+import { BurstRow } from "./BurstRow";
 import {
   ApprovalRow,
   DiffRow,
@@ -123,14 +123,12 @@ export const Messages = memo(function Messages({
     requestAutoScroll,
     expandedItems,
     toggleExpanded,
-    collapsedToolGroups,
-    toggleToolGroup,
     copiedMessageId,
     handleCopyMessage,
     handleQuoteMessage,
     reasoningMetaById,
     latestReasoningLabel,
-    groupedItems,
+    visibleItems,
     planFollowup,
     dismissPlanFollowup,
   } = useMessagesViewState({
@@ -178,15 +176,12 @@ export const Messages = memo(function Messages({
       );
     }
     if (item.kind === "reasoning") {
-      const isExpanded = expandedItems.has(item.id);
       const parsed = reasoningMetaById.get(item.id) ?? parseReasoning(item);
       return (
         <ReasoningRow
           key={item.id}
           item={item}
           parsed={parsed}
-          isExpanded={isExpanded}
-          onToggle={toggleExpanded}
           showMessageFilePath={showMessageFilePath}
           workspacePath={workspacePath}
           onOpenFileLink={openFileLink}
@@ -267,46 +262,18 @@ export const Messages = memo(function Messages({
     <div className="messages messages-full" ref={containerRef} onScroll={updateAutoScroll}>
       <div className="messages-inner">
         <CostCeilingBanner sessionKey={threadId ?? ""} />
-        {groupedItems.map((entry) => {
-          if (entry.kind === "toolGroup") {
-            const { group } = entry;
-            const isCollapsed = collapsedToolGroups.has(group.id);
-            const summaryParts = [formatCount(group.toolCount, "tool call", "tool calls")];
-            if (group.messageCount > 0) {
-              summaryParts.push(formatCount(group.messageCount, "message", "messages"));
-            }
-            const summaryText = summaryParts.join(", ");
-            const groupBodyId = `tool-group-${group.id}`;
-            const ChevronIcon = isCollapsed ? ChevronDown : ChevronUp;
+        {groupBursts(visibleItems).map((entry) => {
+          if ("kind" in entry && entry.kind === "burst") {
             return (
-              <div
-                key={`tool-group-${group.id}`}
-                className={`tool-group ${isCollapsed ? "tool-group-collapsed" : ""}`}
-              >
-                <div className="tool-group-header">
-                  <button
-                    type="button"
-                    className="tool-group-toggle"
-                    onClick={() => toggleToolGroup(group.id)}
-                    aria-expanded={!isCollapsed}
-                    aria-controls={groupBodyId}
-                    aria-label={isCollapsed ? "Expand tool calls" : "Collapse tool calls"}
-                  >
-                    <span className="tool-group-chevron" aria-hidden>
-                      <ChevronIcon size={14} />
-                    </span>
-                    <span className="tool-group-summary">{summaryText}</span>
-                  </button>
-                </div>
-                {!isCollapsed && (
-                  <div className="tool-group-body" id={groupBodyId}>
-                    {group.items.map(renderItem)}
-                  </div>
-                )}
-              </div>
+              <BurstRow
+                key={entry.id}
+                group={entry}
+                expandedItems={expandedItems}
+                onToggle={toggleExpanded}
+              />
             );
           }
-          return renderItem(entry.item);
+          return renderItem(entry);
         })}
         {planFollowupNode}
         {userInputNode}

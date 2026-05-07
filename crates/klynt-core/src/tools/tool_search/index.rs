@@ -12,14 +12,29 @@ pub struct SearchHit {
     pub description: String,
 }
 
+struct IndexedMeta {
+    meta: ToolMeta,
+    name_lc: String,
+    desc_lc: String,
+    aliases_lc: Vec<String>,
+}
+
 pub struct ToolIndex {
-    meta: Vec<ToolMeta>,
+    meta: Vec<IndexedMeta>,
 }
 
 impl ToolIndex {
     pub fn build(meta: &[ToolMeta]) -> Self {
         Self {
-            meta: meta.to_vec(),
+            meta: meta
+                .iter()
+                .map(|m| IndexedMeta {
+                    name_lc: m.name.to_lowercase(),
+                    desc_lc: m.description.to_lowercase(),
+                    aliases_lc: m.aliases.iter().map(|a| a.to_lowercase()).collect(),
+                    meta: m.clone(),
+                })
+                .collect(),
         }
     }
 
@@ -40,26 +55,26 @@ impl ToolIndex {
             .map(|m| {
                 let mut score = 0.0_f32;
                 if !q.is_empty() {
-                    if m.name.to_lowercase().contains(&q) {
+                    if m.name_lc.contains(&q) {
                         score += 2.0;
                     }
-                    if m.description.to_lowercase().contains(&q) {
+                    if m.desc_lc.contains(&q) {
                         score += 1.0;
                     }
-                    if m.aliases.iter().any(|a| a.to_lowercase().contains(&q)) {
+                    if m.aliases_lc.iter().any(|a| a.contains(&q)) {
                         score += 1.5;
                     }
                 } else {
                     score = 1.0;
                 }
                 // Mirror effectiveness reranker: boost by per-skill effectiveness score
-                if let Some(eff) = effectiveness.get(&m.name) {
+                if let Some(eff) = effectiveness.get(&m.meta.name) {
                     score *= 1.0 + eff.min(1.0);
                 }
                 SearchHit {
-                    name: m.name.clone(),
+                    name: m.meta.name.clone(),
                     score,
-                    description: m.description.clone(),
+                    description: m.meta.description.clone(),
                 }
             })
             .filter(|h| h.score > 0.0)
