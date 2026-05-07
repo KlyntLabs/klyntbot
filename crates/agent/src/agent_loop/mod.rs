@@ -970,7 +970,10 @@ impl AgentLoop {
                 .collect(),
         );
         drop(registry);
-        tracing::debug!(filtered = filtered_defs.len(), "run_pipeline: tool filter done, calling runtime.process_message");
+        tracing::debug!(
+            filtered = filtered_defs.len(),
+            "run_pipeline: tool filter done, calling runtime.process_message"
+        );
 
         let result = self
             .runtime

@@ -24,7 +24,7 @@ pub mod ws_manager;
 // ── Adapters ──────────────────────────────────────────────
 #[cfg(feature = "email")]
 pub use adapters::EmailChannel;
-pub use adapters::{DiscordChannel, SlackChannel, TelegramChannel, TelegramApprovalChannel};
+pub use adapters::{DiscordChannel, SlackChannel, TelegramApprovalChannel, TelegramChannel};
 
 // ── Manager ───────────────────────────────────────────────
 pub use manager::ChannelManager;

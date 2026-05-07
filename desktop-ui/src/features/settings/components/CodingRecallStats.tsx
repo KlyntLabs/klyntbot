@@ -35,7 +35,9 @@ export function CodingRecallStats({ workspaceId }: Props) {
           <ol className="recall-stats__top">
             {stats.topFacts.map((f) => (
               <li key={f.factId}>
-                <code>{f.subject}.{f.predicate}</code>
+                <code>
+                  {f.subject}.{f.predicate}
+                </code>
                 <span className="count">×{f.recallCount}</span>
               </li>
             ))}

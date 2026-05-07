@@ -13,7 +13,9 @@ use crate::handlers::EmbeddingHandler;
 use crate::types::{Attachment, Task, TimeEntry};
 use common::{Result, ToolError};
 use storage::TaskRepo;
-use tools_core::{approval_class::ApprovalClass, ParamExtractor, ProgressHandler, RoutingContext, Tool};
+use tools_core::{
+    approval_class::ApprovalClass, ParamExtractor, ProgressHandler, RoutingContext, Tool,
+};
 
 /// TaskTool: task CRUD, semantic search, recurrence, focus, and alarms.
 pub struct TaskTool {
@@ -394,7 +396,10 @@ impl Tool for TaskTool {
 
     fn approval_class(&self, args: &Value) -> ApprovalClass {
         match args.get("action").and_then(|v| v.as_str()) {
-            Some("create" | "update" | "complete" | "reopen" | "focus" | "unfocus" | "log_time" | "add_dep" | "remove_dep" | "batch" | "recur" | "list_recurring") => ApprovalClass::Sensitive,
+            Some(
+                "create" | "update" | "complete" | "reopen" | "focus" | "unfocus" | "log_time"
+                | "add_dep" | "remove_dep" | "batch" | "recur" | "list_recurring",
+            ) => ApprovalClass::Sensitive,
             Some("delete" | "delete_recurring") => ApprovalClass::Destructive,
             _ => ApprovalClass::Safe,
         }

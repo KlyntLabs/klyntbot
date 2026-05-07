@@ -1865,8 +1865,7 @@ impl AppCore {
             // this default only matters for non-coding contexts (e.g. the
             // assistant chat shell, MCP server) where an explicit cwd is set
             // at the callsite, or where shell access isn't permitted at all.
-            let cwd =
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
             let non_ui_policy = config_guard.tools.approval_policy.non_ui_channels;
 
             let hook_engine: Option<Arc<klynt_hooks::HookEngine>> = {

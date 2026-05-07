@@ -185,7 +185,7 @@ async fn cached_search(
     // O(n) scans on every cache miss under pressure.
     use std::sync::atomic::{AtomicUsize, Ordering};
     static EVICT_COUNTER: AtomicUsize = AtomicUsize::new(0);
-    if cache.len() >= 200 && EVICT_COUNTER.fetch_add(1, Ordering::Relaxed) % 16 == 0 {
+    if cache.len() >= 200 && (EVICT_COUNTER.fetch_add(1, Ordering::Relaxed)).is_multiple_of(16) {
         cache.retain(|_, v| v.created_at.elapsed() < ttl);
     }
 

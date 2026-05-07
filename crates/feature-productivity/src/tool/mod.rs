@@ -704,7 +704,10 @@ impl Tool for ProductivityTool {
 
     fn approval_class(&self, args: &Value) -> ApprovalClass {
         match args.get("action").and_then(|v| v.as_str()) {
-            Some("focus_start" | "focus_end" | "pomodoro_start" | "set_goal" | "remove_goal" | "log_time" | "set_category") => ApprovalClass::Sensitive,
+            Some(
+                "focus_start" | "focus_end" | "pomodoro_start" | "set_goal" | "remove_goal"
+                | "log_time" | "set_category",
+            ) => ApprovalClass::Sensitive,
             _ => ApprovalClass::Safe,
         }
     }

@@ -13,8 +13,8 @@ import type {
   RequestUserInputResponse,
 } from "@/types";
 import { useFileLinkOpener } from "../hooks/useFileLinkOpener";
-import { parseReasoning } from "../utils/messageRenderUtils";
 import { groupBursts } from "../utils/groupBursts";
+import { parseReasoning } from "../utils/messageRenderUtils";
 import { BurstRow } from "./BurstRow";
 import {
   ApprovalRow,

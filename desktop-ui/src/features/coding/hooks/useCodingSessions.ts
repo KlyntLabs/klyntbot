@@ -21,9 +21,7 @@ export interface UseCodingSessionsOptions {
   enabled?: boolean;
 }
 
-export function useCodingSessions(
-  options: UseCodingSessionsOptions = {},
-): UseCodingSessionsResult {
+export function useCodingSessions(options: UseCodingSessionsOptions = {}): UseCodingSessionsResult {
   const { enabled = true } = options;
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const workspaceIdBySessionKey = useRef<Map<string, string>>(new Map());

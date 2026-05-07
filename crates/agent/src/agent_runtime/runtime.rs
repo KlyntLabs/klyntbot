@@ -432,7 +432,10 @@ impl AgentRuntime {
                 ctx.session_mode,
             )
             .await;
-        tracing::debug!(prompt_len = system_prompt.len(), "runtime.process_message: build_system_prompt done");
+        tracing::debug!(
+            prompt_len = system_prompt.len(),
+            "runtime.process_message: build_system_prompt done"
+        );
 
         let context_request = ContextRequest {
             message_text: message.to_string(),
@@ -451,7 +454,11 @@ impl AgentRuntime {
         let assemble_start = Instant::now();
         let mut assembled = self.context_engine.assemble(context_request).await;
         let assemble_ms = assemble_start.elapsed().as_millis() as u64;
-        tracing::debug!(ms = assemble_ms, tokens = assembled.token_count, "runtime.process_message: assemble done");
+        tracing::debug!(
+            ms = assemble_ms,
+            tokens = assembled.token_count,
+            "runtime.process_message: assemble done"
+        );
 
         let context_fill_tokens = assembled.token_count;
         let context_fill_budget = self.context_window;
@@ -546,7 +553,10 @@ impl AgentRuntime {
             None
         };
 
-        tracing::debug!(safety_timeout_secs, "runtime.process_message: calling execute_loop");
+        tracing::debug!(
+            safety_timeout_secs,
+            "runtime.process_message: calling execute_loop"
+        );
         let mut loop_result = tokio::time::timeout(
             safety_timeout,
             execute_loop(
@@ -707,7 +717,7 @@ impl AgentRuntime {
                     complexity_signals: serde_json::json!({}),
                     execution_mode: Some(mode),
                     retrieved_memory_count: None,
-                    safety_cap_hit: safety_cap_hit,
+                    safety_cap_hit,
                     turns_used: turns as i32,
                     loop_detected: false,
                     loop_tools: None,

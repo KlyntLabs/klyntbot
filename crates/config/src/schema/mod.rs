@@ -406,16 +406,15 @@ mod tests {
         }"#;
 
         let config: Config = serde_json::from_str(json).unwrap();
-        let perms = config.tools.permissions.unwrap();
-        assert_eq!(perms.default_level, "standard");
-        assert_eq!(perms.channels.get("cli").unwrap(), "admin");
-        assert_eq!(perms.channels.get("telegram").unwrap(), "readOnly");
+        let policy = config.tools.approval_policy;
+        assert_eq!(policy.non_ui_channels, common::tool_channel::NonUiPolicy::Allow);
     }
 
     #[test]
     fn test_tools_no_permissions_defaults_to_none() {
         let config = Config::default();
-        assert!(config.tools.permissions.is_none());
+        let policy = config.tools.approval_policy;
+        assert_eq!(policy.non_ui_channels, common::tool_channel::NonUiPolicy::default());
     }
 
     #[test]

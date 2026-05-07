@@ -18,7 +18,9 @@ export function SubagentRow({ row, onCancel }: Props) {
           className="subagent-row__cancel"
           onClick={() => onCancel(row.agentId)}
           title="Cancel subagent"
-        >Cancel</button>
+        >
+          Cancel
+        </button>
       )}
     </li>
   );

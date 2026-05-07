@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationItem } from "@/types";
-import { groupBursts, type BurstGroup } from "./groupBursts";
+import { type BurstGroup, groupBursts } from "./groupBursts";
 
 function tool(
   id: string,
@@ -23,11 +23,7 @@ describe("groupBursts", () => {
   });
 
   it("collapses 3 consecutive same-family same-name reads", () => {
-    const items: ConversationItem[] = [
-      read("a", "x.ts"),
-      read("b", "y.ts"),
-      read("c", "z.ts"),
-    ];
+    const items: ConversationItem[] = [read("a", "x.ts"), read("b", "y.ts"), read("c", "z.ts")];
     const out = groupBursts(items);
     expect(out).toHaveLength(1);
     const burst = out[0] as BurstGroup;

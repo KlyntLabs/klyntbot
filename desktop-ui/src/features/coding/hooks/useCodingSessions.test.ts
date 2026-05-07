@@ -5,9 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (cmd: string) => {
     if (cmd === "coding_thread_list") {
-      return [
-        { id: "coding:abc", title: "Fix bug", updatedAt: 1, workspaceId: "ws1" },
-      ];
+      return [{ id: "coding:abc", title: "Fix bug", updatedAt: 1, workspaceId: "ws1" }];
     }
     return [];
   }),

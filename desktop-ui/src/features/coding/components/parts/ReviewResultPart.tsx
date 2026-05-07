@@ -1,5 +1,5 @@
-import type { ReviewIssue } from "@/bindings";
 import { openWorkspaceIn } from "@/api/endpoints/workspace";
+import type { ReviewIssue } from "@/bindings";
 
 type Props = {
   reviewId: string;
@@ -24,15 +24,24 @@ export function ReviewResultPart({ reviewId, summary, issues }: Props) {
         const items = grouped[sev] ?? [];
         if (items.length === 0) return null;
         return (
-          <section key={sev} className={`review-result-part__group review-result-part__group--${sev}`}>
-            <h4>{labelFor(sev)} <span className="count">{items.length}</span></h4>
+          <section
+            key={sev}
+            className={`review-result-part__group review-result-part__group--${sev}`}
+          >
+            <h4>
+              {labelFor(sev)} <span className="count">{items.length}</span>
+            </h4>
             <ol>
               {items.map((issue, idx) => (
                 <li key={`${sev}-${idx}`}>
                   {issue.file && (
-                    <button type="button" className="review-issue__location"
-                      onClick={() => openFile(issue.file!, issue.line)}>
-                      {issue.file}{issue.line != null ? `:${issue.line}` : ""}
+                    <button
+                      type="button"
+                      className="review-issue__location"
+                      onClick={() => openFile(issue.file!, issue.line)}
+                    >
+                      {issue.file}
+                      {issue.line != null ? `:${issue.line}` : ""}
                     </button>
                   )}
                   <p className="review-issue__description">{issue.description}</p>

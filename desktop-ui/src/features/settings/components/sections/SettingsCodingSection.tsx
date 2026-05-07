@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CodingRecallStats } from "../CodingRecallStats";
 import { GeneralSubsection } from "./coding/GeneralSubsection";
 import { HooksSubsection } from "./coding/HooksSubsection";
 import { PermissionsSubsection } from "./coding/PermissionsSubsection";
@@ -6,9 +7,17 @@ import { SandboxSubsection } from "./coding/SandboxSubsection";
 import { SessionsSubsection } from "./coding/SessionsSubsection";
 import { SkillsSubsection } from "./coding/SkillsSubsection";
 import { ToolsSubsection } from "./coding/ToolsSubsection";
-import { CodingRecallStats } from "../CodingRecallStats";
 
-const TABS = ["General", "Tools", "Permissions", "Sandbox", "Skills", "Sessions", "Hooks", "Recall"] as const;
+const TABS = [
+  "General",
+  "Tools",
+  "Permissions",
+  "Sandbox",
+  "Skills",
+  "Sessions",
+  "Hooks",
+  "Recall",
+] as const;
 type Tab = (typeof TABS)[number];
 
 export function SettingsCodingSection() {

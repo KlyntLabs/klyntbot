@@ -43,16 +43,16 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 let parsed = syn::parse::Parser::parse2(parser, tokens)
                     .expect("Failed to parse #[tool(...)] attributes");
                 /// Extract a string literal from a `Meta::NameValue`.
-    fn expect_str_lit(nv: &syn::MetaNameValue) -> Option<String> {
-        if let syn::Expr::Lit(lit) = &nv.value {
-            if let Lit::Str(s) = &lit.lit {
-                return Some(s.value());
-            }
-        }
-        None
-    }
+                fn expect_str_lit(nv: &syn::MetaNameValue) -> Option<String> {
+                    if let syn::Expr::Lit(lit) = &nv.value {
+                        if let Lit::Str(s) = &lit.lit {
+                            return Some(s.value());
+                        }
+                    }
+                    None
+                }
 
-    for meta in parsed {
+                for meta in parsed {
                     if let Meta::NameValue(nv) = &meta {
                         if nv.path.is_ident("name") {
                             tool_name = expect_str_lit(nv);

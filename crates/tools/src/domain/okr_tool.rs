@@ -519,7 +519,10 @@ impl Tool for OkrTool {
 
     fn approval_class(&self, args: &Value) -> ApprovalClass {
         match args.get("action").and_then(|v| v.as_str()) {
-            Some("objective.create" | "objective.update" | "kr.create" | "kr.update" | "kr.update_metric" | "kr.set_progress") => ApprovalClass::Sensitive,
+            Some(
+                "objective.create" | "objective.update" | "kr.create" | "kr.update"
+                | "kr.update_metric" | "kr.set_progress",
+            ) => ApprovalClass::Sensitive,
             Some("objective.delete" | "kr.delete") => ApprovalClass::Destructive,
             _ => ApprovalClass::Safe,
         }

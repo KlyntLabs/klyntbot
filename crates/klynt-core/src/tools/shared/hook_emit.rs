@@ -52,6 +52,7 @@ pub async fn fire_post_tool_use(
 }
 
 /// Fire PreFileEdit.
+#[allow(clippy::too_many_arguments)]
 pub async fn fire_pre_file_edit(
     engine: Option<&Arc<HookEngine>>,
     session_id: String,

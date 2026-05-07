@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { partitionCodingThreads } from "./partitionCodingThreads";
 import type { ChatThread } from "@/features/chat/types";
+import { partitionCodingThreads } from "./partitionCodingThreads";
 
 function thread(id: string): ChatThread {
   return {
@@ -17,11 +17,7 @@ describe("partitionCodingThreads", () => {
     const running = new Set(["a", "b"]);
     const recent = new Map<string, number>([["c", Date.now()]]);
 
-    const { running: r, recent: rc, chats } = partitionCodingThreads(
-      sessions,
-      running,
-      recent,
-    );
+    const { running: r, recent: rc, chats } = partitionCodingThreads(sessions, running, recent);
 
     expect(r.map((t) => t.sessionKey)).toEqual(["a", "b"]);
     expect(rc.map((t) => t.sessionKey)).toEqual(["c"]);
@@ -33,11 +29,7 @@ describe("partitionCodingThreads", () => {
     const running = new Set(["a"]);
     const recent = new Map<string, number>([["a", Date.now()]]);
 
-    const { running: r, recent: rc, chats } = partitionCodingThreads(
-      sessions,
-      running,
-      recent,
-    );
+    const { running: r, recent: rc, chats } = partitionCodingThreads(sessions, running, recent);
 
     expect(r.map((t) => t.sessionKey)).toEqual(["a"]);
     expect(rc).toEqual([]);
@@ -54,11 +46,7 @@ describe("partitionCodingThreads", () => {
   });
 
   it("empty inputs produce empty groups", () => {
-    const { running, recent, chats } = partitionCodingThreads(
-      [],
-      new Set(),
-      new Map(),
-    );
+    const { running, recent, chats } = partitionCodingThreads([], new Set(), new Map());
     expect(running).toEqual([]);
     expect(recent).toEqual([]);
     expect(chats).toEqual([]);

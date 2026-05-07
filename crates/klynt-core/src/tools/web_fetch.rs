@@ -12,7 +12,6 @@ use tools_core::events::ToolEvent;
 use tools_core::{RoutingContext, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
 pub struct WebFetchArgs {
     /// http(s) URL to fetch.
@@ -111,21 +110,21 @@ impl ToolExecute for WebFetchTool {
 #[allow(clippy::too_many_arguments)]
 pub async fn run_for_test(
     args: WebFetchArgs,
-    policy: Arc<Policy>,
-    privacy: Arc<PrivacyGuard>,
-    event_tx: Option<mpsc::Sender<ToolEvent>>,
-    bus: Arc<DomainEventBus>,
-    cancel: CancellationToken,
+    _policy: Arc<Policy>,
+    _privacy: Arc<PrivacyGuard>,
+    _event_tx: Option<mpsc::Sender<ToolEvent>>,
+    _bus: Arc<DomainEventBus>,
+    _cancel: CancellationToken,
     client: reqwest::Client,
-    channel: common::tool_channel::Channel,
-    non_ui_policy: common::tool_channel::NonUiPolicy,
+    _channel: common::tool_channel::Channel,
+    _non_ui_policy: common::tool_channel::NonUiPolicy,
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     session_id: String,
-    history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
-    mirror_learning_enabled: bool,
-    mirror_min_approvals: u32,
-    mirror_cooldown_seconds: i64,
-    repo_id: String,
+    _history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
+    _mirror_learning_enabled: bool,
+    _mirror_min_approvals: u32,
+    _mirror_cooldown_seconds: i64,
+    _repo_id: String,
 ) -> Result<String> {
     if let Err(reason) = fire_pre_tool_use(
         hook_engine.as_ref(),

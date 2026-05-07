@@ -10,9 +10,9 @@ export function useAgentsMd(threadId: string, initialSources: AgentsMdSource[]) 
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const updated = await invoke<AgentsMdSource[]>(
-        "coding_thread_refresh_agents_md", { threadId },
-      );
+      const updated = await invoke<AgentsMdSource[]>("coding_thread_refresh_agents_md", {
+        threadId,
+      });
       setSources(updated);
       setLastRefreshedAt(new Date());
     } finally {

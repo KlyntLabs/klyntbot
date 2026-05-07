@@ -5,12 +5,9 @@ use desktop_shared::errors::ApiError;
 #[klynt_command]
 pub async fn approval_respond(approval_id: String, decision: ApprovalDecisionDto) -> () {
     let internal = map_decision(decision);
-    app_core::coding::approval_handler::respond_approval(
-        &approval_id,
-        internal,
-    )
-    .await
-    .map_err(|e| ApiError::new("APPROVAL_ERROR", e.to_string()))
+    app_core::coding::approval_handler::respond_approval(&approval_id, internal)
+        .await
+        .map_err(|e| ApiError::new("APPROVAL_ERROR", e.to_string()))
 }
 
 fn map_decision(
@@ -46,11 +43,7 @@ pub(crate) async fn dispatch_dev(
             let approval_id = try_field!(dev::get_str(body, "approvalId"));
             let decision: ApprovalDecisionDto = try_field!(dev::require(body, "decision"));
             let internal = map_decision(decision);
-            match app_core::coding::approval_handler::respond_approval(
-                &approval_id,
-                internal,
-            )
-            .await
+            match app_core::coding::approval_handler::respond_approval(&approval_id, internal).await
             {
                 Ok(()) => Ok(serde_json::json!({})),
                 Err(e) => Err(ApiError::new("APPROVAL_ERROR", e.to_string())),

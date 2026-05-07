@@ -17,7 +17,13 @@ async fn echo_hi_runs_and_emits_sandbox_event() {
     let bus = Arc::new(DomainEventBus::new(64));
     let (tx, mut rx) = mpsc::channel::<tools_core::events::ToolEvent>(32);
 
-    let tool = BashTool::new(std::path::PathBuf::from("/tmp"), policy, privacy, bus, NonUiPolicy::Allow);
+    let tool = BashTool::new(
+        std::path::PathBuf::from("/tmp"),
+        policy,
+        privacy,
+        bus,
+        NonUiPolicy::Allow,
+    );
     let mut ctx = RoutingContext::new(ChannelName::new("coding"), ChatId::new("test"));
     ctx.event_tx = Some(tx.clone());
     let result = tool
@@ -82,7 +88,10 @@ async fn cwd_none_uses_registry_base() {
     // Compare canonicalized to neutralise macOS /private/tmp symlink.
     let expected = std::fs::canonicalize(&base).unwrap();
     let actual = std::fs::canonicalize(out.trim()).unwrap();
-    assert_eq!(actual, expected, "bash with cwd=None must run in registry base");
+    assert_eq!(
+        actual, expected,
+        "bash with cwd=None must run in registry base"
+    );
 }
 
 #[tokio::test]
@@ -136,7 +145,13 @@ async fn denied_command_returns_error_and_does_not_run() {
     let privacy = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
     let bus = Arc::new(DomainEventBus::new(64));
     let (_tx, _rx) = mpsc::channel::<tools_core::events::ToolEvent>(32);
-    let tool = BashTool::new(std::path::PathBuf::from("/tmp"), policy, privacy, bus, NonUiPolicy::Allow);
+    let tool = BashTool::new(
+        std::path::PathBuf::from("/tmp"),
+        policy,
+        privacy,
+        bus,
+        NonUiPolicy::Allow,
+    );
     let r = tool
         .execute(
             klynt_core::tools::bash::BashArgs {

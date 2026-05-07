@@ -874,30 +874,36 @@ impl LlmProvider for AnthropicNativeProvider {
         }
 
         // Diagnostic: dump message variant + length to find empty messages
-        let summary: Vec<String> = messages.iter().enumerate().map(|(i, m)| {
-            use crate::types::Message as M;
-            match m {
-                M::System { content } => format!("[{i}]System len={}", content.len()),
-                M::User { content } => format!("[{i}]User content={:?}", content),
-                M::Assistant { content, tool_calls, .. } => format!(
-                    "[{i}]Assistant content_len={} tools={}",
-                    content.as_deref().map(|s| s.len()).unwrap_or(0),
-                    tool_calls.as_ref().map(|t| t.len()).unwrap_or(0)
-                ),
-                M::Tool { tool_call_id, .. } => format!("[{i}]Tool id={tool_call_id}"),
-                M::ContextUpdate { content, .. } => format!("[{i}]ContextUpdate len={}", content.len()),
-            }
-        }).collect();
+        let summary: Vec<String> = messages
+            .iter()
+            .enumerate()
+            .map(|(i, m)| {
+                use crate::types::Message as M;
+                match m {
+                    M::System { content } => format!("[{i}]System len={}", content.len()),
+                    M::User { content } => format!("[{i}]User content={:?}", content),
+                    M::Assistant {
+                        content,
+                        tool_calls,
+                        ..
+                    } => format!(
+                        "[{i}]Assistant content_len={} tools={}",
+                        content.as_deref().map(|s| s.len()).unwrap_or(0),
+                        tool_calls.as_ref().map(|t| t.len()).unwrap_or(0)
+                    ),
+                    M::Tool { tool_call_id, .. } => format!("[{i}]Tool id={tool_call_id}"),
+                    M::ContextUpdate { content, .. } => {
+                        format!("[{i}]ContextUpdate len={}", content.len())
+                    }
+                }
+            })
+            .collect();
         tracing::info!(messages = ?summary, "anthropic_native chat_stream: message summary");
         tracing::info!("anthropic_native chat_stream: sending HTTP POST");
-        let response = request
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| {
-                tracing::error!(error = %e, "anthropic_native chat_stream: HTTP send failed");
-                ProviderError::Http(e.to_string())
-            })?;
+        let response = request.json(&body).send().await.map_err(|e| {
+            tracing::error!(error = %e, "anthropic_native chat_stream: HTTP send failed");
+            ProviderError::Http(e.to_string())
+        })?;
         tracing::info!(status = %response.status(), "anthropic_native chat_stream: response received");
 
         if !response.status().is_success() {
@@ -1082,7 +1088,9 @@ impl LlmProvider for AnthropicNativeProvider {
                     error = %e,
                     "list_models: request failed, falling back to default model",
                 );
-                return Ok(vec![crate::types::ProviderModel::from_id_enriched(&self.model)]);
+                return Ok(vec![crate::types::ProviderModel::from_id_enriched(
+                    &self.model,
+                )]);
             }
         };
         if !response.status().is_success() {
@@ -1097,7 +1105,9 @@ impl LlmProvider for AnthropicNativeProvider {
             Ok(b) => b,
             Err(e) => {
                 tracing::debug!(provider = self.name(), error = %e, "list_models: invalid JSON");
-                return Ok(vec![crate::types::ProviderModel::from_id_enriched(&self.model)]);
+                return Ok(vec![crate::types::ProviderModel::from_id_enriched(
+                    &self.model,
+                )]);
             }
         };
         let mut models = Vec::new();

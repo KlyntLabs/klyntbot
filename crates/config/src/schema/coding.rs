@@ -70,17 +70,12 @@ pub struct CodingPermissions {
     pub mirror_cooldown_hours: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DefaultPolicy {
     Allow,
+    #[default]
     Ask,
-}
-
-impl Default for DefaultPolicy {
-    fn default() -> Self {
-        Self::Ask
-    }
 }
 
 fn default_match() -> DefaultPolicy {

@@ -119,7 +119,7 @@ impl ToolExecute for GrepTool {
 
                         if let Some(mid) = pending {
                             // Collecting suffix lines after a match
-                            if buf.len() >= mid + ctx_lines + 1 {
+                            if buf.len() > mid + ctx_lines {
                                 let start = mid.saturating_sub(ctx_lines);
                                 let end = (mid + ctx_lines + 1).min(buf.len());
                                 let lo = buf[start].0;

@@ -88,11 +88,12 @@ impl ApprovalGrantsRepo {
     }
 
     pub async fn purge_session(&self, session_id: &str) -> Result<u64> {
-        let res =
-            sqlx::query("DELETE FROM approval_grants WHERE lifetime = 'session' AND session_id = ?")
-                .bind(session_id)
-                .execute(self.pool.inner())
-                .await?;
+        let res = sqlx::query(
+            "DELETE FROM approval_grants WHERE lifetime = 'session' AND session_id = ?",
+        )
+        .bind(session_id)
+        .execute(self.pool.inner())
+        .await?;
         Ok(res.rows_affected())
     }
 }
@@ -118,9 +119,9 @@ fn parse_class(s: &str) -> Result<ApprovalClass> {
         "sensitive" => Ok(ApprovalClass::Sensitive),
         "destructive" => Ok(ApprovalClass::Destructive),
         "admin" => Ok(ApprovalClass::Admin),
-        other => Err(common::ConfigError::Invalid(format!(
-            "unknown approval class: {other}"
-        )).into()),
+        other => {
+            Err(common::ConfigError::Invalid(format!("unknown approval class: {other}")).into())
+        }
     }
 }
 
@@ -129,9 +130,9 @@ fn parse_lifetime(s: &str) -> Result<ApprovalLifetime> {
         "once" => Ok(ApprovalLifetime::Once),
         "session" => Ok(ApprovalLifetime::Session),
         "forever" => Ok(ApprovalLifetime::Forever),
-        other => Err(common::ConfigError::Invalid(format!(
-            "unknown approval lifetime: {other}"
-        )).into()),
+        other => {
+            Err(common::ConfigError::Invalid(format!("unknown approval lifetime: {other}")).into())
+        }
     }
 }
 
@@ -178,7 +179,10 @@ mod tests {
             )
             .await
             .unwrap();
-        assert!(other_session.is_none(), "should not match different session");
+        assert!(
+            other_session.is_none(),
+            "should not match different session"
+        );
     }
 
     #[tokio::test]

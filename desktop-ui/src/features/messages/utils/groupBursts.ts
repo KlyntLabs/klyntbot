@@ -1,5 +1,5 @@
 import type { ConversationItem } from "@/types";
-import { toolRowDescriptor, type ToolFamily } from "./messageRenderUtils";
+import { type ToolFamily, toolRowDescriptor } from "./messageRenderUtils";
 
 export type BurstGroup = {
   id: string;
@@ -39,9 +39,7 @@ export function groupBursts(items: ConversationItem[]): GroupedItem[] {
     }
     const runLength = j - i;
     if (runLength >= MIN_BURST_SIZE) {
-      const groupItems = items.slice(i, j) as Array<
-        Extract<ConversationItem, { kind: "tool" }>
-      >;
+      const groupItems = items.slice(i, j) as Array<Extract<ConversationItem, { kind: "tool" }>>;
       out.push({
         id: `burst-${groupItems[0].id}`,
         kind: "burst",

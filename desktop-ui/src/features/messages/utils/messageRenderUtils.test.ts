@@ -66,10 +66,9 @@ describe("messageRenderUtils", () => {
   });
 });
 
-function toolItem(overrides: Partial<Extract<ConversationItem, { kind: "tool" }>>): Extract<
-  ConversationItem,
-  { kind: "tool" }
-> {
+function toolItem(
+  overrides: Partial<Extract<ConversationItem, { kind: "tool" }>>,
+): Extract<ConversationItem, { kind: "tool" }> {
   return {
     id: "t1",
     kind: "tool",

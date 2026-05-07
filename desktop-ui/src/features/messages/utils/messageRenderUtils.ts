@@ -559,8 +559,7 @@ export function toolRowDescriptor(
     if (change?.diff) {
       const { added, removed } = summarizeDiffStats(change.diff);
       if (name === "Write" && added > 0) meta.push(`+${added}`);
-      else if (name !== "Read" && (added > 0 || removed > 0))
-        meta.push(`+${added} −${removed}`);
+      else if (name !== "Read" && (added > 0 || removed > 0)) meta.push(`+${added} −${removed}`);
     }
     if ((item.changes?.length ?? 0) > 1) {
       meta.push(`${item.changes!.length} files`);
@@ -600,7 +599,9 @@ export function toolRowDescriptor(
       family: "agent",
       name: "Agent",
       arg: item.detail || item.title || "",
-      meta: formatDurationCompact(item.durationMs ?? null) ? [formatDurationCompact(item.durationMs ?? null)!] : [],
+      meta: formatDurationCompact(item.durationMs ?? null)
+        ? [formatDurationCompact(item.durationMs ?? null)!]
+        : [],
     };
   }
   if (item.toolType === "hook") {

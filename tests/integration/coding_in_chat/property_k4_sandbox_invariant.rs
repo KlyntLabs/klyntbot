@@ -22,7 +22,12 @@ async fn k4_sandbox_event_emitted_before_exec() {
         outside.display()
     );
 
-    let tool = BashTool::new(policy, privacy, bus, common::tool_channel::NonUiPolicy::Allow);
+    let tool = BashTool::new(
+        policy,
+        privacy,
+        bus,
+        common::tool_channel::NonUiPolicy::Allow,
+    );
     let mut routing_ctx = tools_core::RoutingContext::new(
         ::common::ChannelName::new("coding"),
         ::common::ChatId::new("test"),

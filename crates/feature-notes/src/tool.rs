@@ -122,8 +122,13 @@ impl Tool for NotesTool {
 
     fn approval_class(&self, args: &Value) -> ApprovalClass {
         match args.get("action").and_then(|v| v.as_str()) {
-            Some("create_note" | "update_note" | "tag_note" | "link_notes" | "create_notebook" | "capture_inbox" | "update_notebook" | "archive_note" | "unarchive_note") => ApprovalClass::Sensitive,
-            Some("delete_note" | "delete_notebook" | "delete_inbox_item") => ApprovalClass::Destructive,
+            Some(
+                "create_note" | "update_note" | "tag_note" | "link_notes" | "create_notebook"
+                | "capture_inbox" | "update_notebook" | "archive_note" | "unarchive_note",
+            ) => ApprovalClass::Sensitive,
+            Some("delete_note" | "delete_notebook" | "delete_inbox_item") => {
+                ApprovalClass::Destructive
+            }
             _ => ApprovalClass::Safe,
         }
     }

@@ -133,10 +133,7 @@ export function markThreadOpened(threadId: string): void {
   notify();
 }
 
-export function subscribeToThread(
-  threadId: string,
-  onEvent: Subscriber,
-): () => void {
+export function subscribeToThread(threadId: string, onEvent: Subscriber): () => void {
   // Drain buffered events synchronously
   const buf = eventsByThread.get(threadId);
   if (buf) {

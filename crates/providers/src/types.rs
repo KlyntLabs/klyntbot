@@ -284,14 +284,7 @@ impl ProviderModel {
 pub fn id_implies_reasoning(id: &str) -> bool {
     let lower = id.to_lowercase();
     [
-        "reasoner",
-        "thinking",
-        "-r1",
-        "qwq",
-        "glm-zero",
-        "o1",
-        "o3",
-        "o4",
+        "reasoner", "thinking", "-r1", "qwq", "glm-zero", "o1", "o3", "o4",
     ]
     .iter()
     .any(|marker| lower.contains(marker))

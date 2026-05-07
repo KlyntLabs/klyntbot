@@ -4,7 +4,9 @@
   padding: var(--space-sm);
   font-size: var(--fs-xs);
 }
-.subagent-tray__header { font-weight: 600; }
+.subagent-tray__header {
+  font-weight: 600;
+}
 .subagent-tray__count {
   background: var(--color-accent-subtle);
   color: var(--color-accent);
@@ -13,7 +15,11 @@
   margin-left: var(--space-xs);
   font-size: var(--fs-2xs);
 }
-.subagent-tray__list { list-style: none; padding: 0; margin-top: var(--space-sm); }
+.subagent-tray__list {
+  list-style: none;
+  padding: 0;
+  margin-top: var(--space-sm);
+}
 .subagent-row {
   display: grid;
   grid-template-columns: 60px 1fr auto auto auto;
@@ -22,9 +28,19 @@
   padding: var(--space-2xs) 0;
   border-top: 1px solid var(--color-border-subtle);
 }
-.subagent-row__profile { font-size: var(--fs-2xs); text-transform: uppercase; color: var(--color-fg-muted); }
-.subagent-row__label { font-family: var(--ff-mono); font-size: var(--fs-2xs); }
-.subagent-row__iteration { font-size: var(--fs-2xs); color: var(--color-fg-muted); }
+.subagent-row__profile {
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+.subagent-row__label {
+  font-family: var(--ff-mono);
+  font-size: var(--fs-2xs);
+}
+.subagent-row__iteration {
+  font-size: var(--fs-2xs);
+  color: var(--color-fg-muted);
+}
 .subagent-row__last-tool {
   font-family: var(--ff-mono);
   font-size: var(--fs-2xs);

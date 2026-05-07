@@ -1,10 +1,10 @@
 /** @vitest-environment jsdom */
-import { renderHook, act } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, renderHook } from "@testing-library/react";
 import { useState } from "react";
+import { afterEach, describe, expect, it } from "vitest";
+import type { AppView } from "../constants/appViews";
 import { __testing as appModeTesting, useAppMode } from "./useAppMode";
 import { useResetAppViewOnModeChange } from "./useResetAppViewOnModeChange";
-import type { AppView } from "../constants/appViews";
 
 afterEach(() => appModeTesting.reset("assistant"));
 

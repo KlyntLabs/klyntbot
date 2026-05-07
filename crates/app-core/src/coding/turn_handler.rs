@@ -47,7 +47,10 @@ impl AppCore {
                 id: user_msg_id.to_string(),
                 session_id: thread_id.to_string(),
                 role: "user".into(),
-                parts: vec![serde_json::to_value(MessagePart::Text { text: text.to_string() }).unwrap()],
+                parts: vec![serde_json::to_value(MessagePart::Text {
+                    text: text.to_string(),
+                })
+                .unwrap()],
                 model: None,
                 turn_id: Some(turn_id.clone()),
                 created_at: started_at,
@@ -312,7 +315,8 @@ impl AppCore {
                                     }
                                     // Kind transition: text → reasoning. Commit the
                                     // text burst before starting the reasoning part.
-                                    if last_kind == Some(PartKind::Text) && !text_buffer.is_empty() {
+                                    if last_kind == Some(PartKind::Text) && !text_buffer.is_empty()
+                                    {
                                         pending_parts.push(MessagePart::Text {
                                             text: std::mem::take(&mut text_buffer),
                                         });
@@ -365,9 +369,7 @@ impl AppCore {
                                             )
                                             .await
                                         {
-                                            tracing::warn!(
-                                                "iteration parts persist failed: {e}"
-                                            );
+                                            tracing::warn!("iteration parts persist failed: {e}");
                                         }
                                         item_started = false;
                                         last_kind = None;
@@ -403,8 +405,7 @@ impl AppCore {
                                     }
                                     // Surface the tool call as its own item so the
                                     // FE renders it inline (transparency for the user).
-                                    let tool_item_id =
-                                        format!("tool-{}", uuid::Uuid::new_v4());
+                                    let tool_item_id = format!("tool-{}", uuid::Uuid::new_v4());
                                     broker.publish(ThreadEvent::ItemStarted {
                                         thread_id: tid.clone(),
                                         turn_id: tuid_bridge.clone(),
@@ -412,15 +413,17 @@ impl AppCore {
                                             id: tool_item_id.clone(),
                                             session_id: tid.clone(),
                                             role: "assistant".into(),
-                                            parts: vec![serde_json::to_value(MessagePart::ToolCall {
-                                                call_id: call_id.clone(),
-                                                name: name.clone(),
-                                                args: args.clone(),
-                                            }).unwrap()],
+                                            parts: vec![serde_json::to_value(
+                                                MessagePart::ToolCall {
+                                                    call_id: call_id.clone(),
+                                                    name: name.clone(),
+                                                    args: args.clone(),
+                                                },
+                                            )
+                                            .unwrap()],
                                             model: None,
                                             turn_id: Some(tuid_bridge.clone()),
-                                            created_at: jiff::Timestamp::now()
-                                                .as_millisecond(),
+                                            created_at: jiff::Timestamp::now().as_millisecond(),
                                             finish_reason: None,
                                         },
                                     });
@@ -474,19 +477,21 @@ impl AppCore {
                                             id: format!("tres-{}", uuid::Uuid::new_v4()),
                                             session_id: tid.clone(),
                                             role: "assistant".into(),
-                                            parts: vec![serde_json::to_value(MessagePart::ToolResult {
-                                                call_id: "unknown".into(),
-                                                output: storage::messages::parts::ToolOutput {
-                                                    text: result_text.clone(),
-                                                    mime: None,
-                                                    truncated: false,
+                                            parts: vec![serde_json::to_value(
+                                                MessagePart::ToolResult {
+                                                    call_id: "unknown".into(),
+                                                    output: storage::messages::parts::ToolOutput {
+                                                        text: result_text.clone(),
+                                                        mime: None,
+                                                        truncated: false,
+                                                    },
+                                                    is_error: !success,
                                                 },
-                                                is_error: !success,
-                                            }).unwrap()],
+                                            )
+                                            .unwrap()],
                                             model: None,
                                             turn_id: Some(tuid_bridge.clone()),
-                                            created_at: jiff::Timestamp::now()
-                                                .as_millisecond(),
+                                            created_at: jiff::Timestamp::now().as_millisecond(),
                                             finish_reason: None,
                                         },
                                     });
@@ -550,9 +555,7 @@ impl AppCore {
                                                 )
                                                 .await
                                             {
-                                                tracing::warn!(
-                                                    "final parts persist failed: {e}"
-                                                );
+                                                tracing::warn!("final parts persist failed: {e}");
                                             }
                                         }
                                         let completed = MessageDto {
@@ -655,11 +658,11 @@ impl AppCore {
                                             role: "assistant".into(),
                                             parts: vec![serde_json::to_value(MessagePart::Text {
                                                 text: format!("⚠️ {message}"),
-                                            }).unwrap()],
+                                            })
+                                            .unwrap()],
                                             model: None,
                                             turn_id: Some(tuid_bridge.clone()),
-                                            created_at: jiff::Timestamp::now()
-                                                .as_millisecond(),
+                                            created_at: jiff::Timestamp::now().as_millisecond(),
                                             finish_reason: None,
                                         },
                                     });
@@ -759,8 +762,12 @@ impl AppCore {
     ///   - the workspace row is missing
     ///   - the agent has no tool kit registered
     async fn rebind_tool_kit_for_thread(&self, thread_id: &str) -> Result<()> {
-        let session =
-            self.repos.sessions.get_session(thread_id).await.map_err(|e| {
+        let session = self
+            .repos
+            .sessions
+            .get_session(thread_id)
+            .await
+            .map_err(|e| {
                 common::KlyntbotError::Storage(format!(
                     "cwd-rebind: get_session({thread_id}) failed: {e}"
                 ))
@@ -775,14 +782,9 @@ impl AppCore {
                 "cwd-rebind: workspaces.get({ws_id}) failed: {e}"
             ))
         })?;
-        let kit = self
-            .tool_kit
-            .lock()
-            .unwrap()
-            .clone()
-            .ok_or_else(|| {
-                common::KlyntbotError::Storage("cwd-rebind: tool_kit is None".to_string())
-            })?;
+        let kit = self.tool_kit.lock().unwrap().clone().ok_or_else(|| {
+            common::KlyntbotError::Storage("cwd-rebind: tool_kit is None".to_string())
+        })?;
         let ws_path = std::path::PathBuf::from(&ws.path);
         let rebound = (*kit).clone().with_cwd(ws_path.clone());
         let reg = self.agent.tool_registry();

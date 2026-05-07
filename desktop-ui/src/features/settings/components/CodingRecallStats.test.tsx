@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { CodingRecallStats } from "./CodingRecallStats";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -8,9 +8,7 @@ vi.mock("@tauri-apps/api/core", () => ({
       return {
         totalInvocations: 42,
         meanLatencyMs: 18.5,
-        topFacts: [
-          { factId: "f1", subject: "logger", predicate: "uses", recallCount: 7 },
-        ],
+        topFacts: [{ factId: "f1", subject: "logger", predicate: "uses", recallCount: 7 }],
         daysWindow: 7,
       };
     }

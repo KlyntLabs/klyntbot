@@ -3,8 +3,15 @@
  * code mode (CodingSidebarThreadsSection). Tokens: ds-tokens.css. */
 
 @keyframes klynt-pulse-dot {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50%      { opacity: 1.00; transform: scale(1.15); }
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
 }
 
 .coding-sidebar-section {

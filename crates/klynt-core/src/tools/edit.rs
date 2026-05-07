@@ -1,5 +1,7 @@
 use crate::privacy::PrivacyGuard;
-use crate::tools::shared::file_edit_event::{emit_file_edit, fan_out_tool_event, unified_diff, FileEditEvent};
+use crate::tools::shared::file_edit_event::{
+    emit_file_edit, unified_diff, FileEditEvent,
+};
 use crate::tools::shared::fs_resolve::resolve_under_cwd;
 use crate::tools::shared::hook_emit::{
     fire_post_file_edit, fire_post_tool_use, fire_pre_file_edit, fire_pre_tool_use,
@@ -16,7 +18,6 @@ use tokio_util::sync::CancellationToken;
 use tools_core::events::ToolEvent;
 use tools_core::{RoutingContext, ToolExecute};
 use tools_core_macros::{Tool as ToolDerive, ToolParams as ToolParamsDerive};
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToolParamsDerive)]
 pub struct EditArgs {
@@ -120,21 +121,21 @@ impl ToolExecute for EditTool {
 pub async fn run_for_test(
     args: EditArgs,
     cwd: PathBuf,
-    policy: Arc<Policy>,
+    _policy: Arc<Policy>,
     privacy: Arc<PrivacyGuard>,
     event_tx: Option<mpsc::Sender<ToolEvent>>,
     bus: Arc<DomainEventBus>,
-    cancel: CancellationToken,
-    channel: common::tool_channel::Channel,
-    non_ui_policy: common::tool_channel::NonUiPolicy,
+    _cancel: CancellationToken,
+    _channel: common::tool_channel::Channel,
+    _non_ui_policy: common::tool_channel::NonUiPolicy,
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     session_id: String,
     snapshot_repo: Option<std::sync::Arc<crate::snapshots::SnapshotRepo>>,
-    history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
-    mirror_learning_enabled: bool,
-    mirror_min_approvals: u32,
-    mirror_cooldown_seconds: i64,
-    repo_id: String,
+    _history_repo: Option<std::sync::Arc<storage::repos::CodingApprovalHistoryRepo>>,
+    _mirror_learning_enabled: bool,
+    _mirror_min_approvals: u32,
+    _mirror_cooldown_seconds: i64,
+    _repo_id: String,
     message_id: Option<String>,
 ) -> Result<String> {
     let resolved = resolve_under_cwd(&args.path, &cwd, &privacy)

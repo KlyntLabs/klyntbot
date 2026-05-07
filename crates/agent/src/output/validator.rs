@@ -66,7 +66,7 @@ const MEMORY_REFUSAL_PATTERNS: &[&str] = &[
 pub fn detect_memory_refusal(content: &str) -> Option<&'static str> {
     MEMORY_REFUSAL_PATTERNS
         .iter()
-        .find(|p| icontains(content, **p))
+        .find(|p| icontains(content, p))
         .copied()
 }
 

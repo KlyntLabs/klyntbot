@@ -294,7 +294,10 @@ mod tests {
             LoopFinishReason::TokenLimit.as_wire_str(),
             "token_limit_reached"
         );
-        assert_eq!(LoopFinishReason::LoopDetected.as_wire_str(), "loop_detected");
+        assert_eq!(
+            LoopFinishReason::LoopDetected.as_wire_str(),
+            "loop_detected"
+        );
     }
 
     #[test]

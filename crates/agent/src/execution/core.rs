@@ -248,7 +248,7 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
     ];
     let field_count = field_patterns
         .iter()
-        .filter(|p| icontains(text, **p))
+        .filter(|p| icontains(text, p))
         .count();
     let has_multiple_fields = field_count >= 2;
 
@@ -284,7 +284,11 @@ async fn call_provider_streaming(
     domain_bus: Option<&Arc<bus::DomainEventBus>>,
     cache_breakpoints: &[providers::CacheBreakpoint],
 ) -> Result<providers::LlmResponse> {
-    tracing::debug!(messages = messages.len(), tools = tools.len(), "call_provider_streaming: about to call provider.chat_stream");
+    tracing::debug!(
+        messages = messages.len(),
+        tools = tools.len(),
+        "call_provider_streaming: about to call provider.chat_stream"
+    );
     let mut stream = provider
         .chat_stream(messages, Some(tools), params, cache_breakpoints)
         .await?;
@@ -768,7 +772,10 @@ impl ExecutionCore {
                             if let Some(ref gate) = approval_gate {
                                 let req = approval::ApprovalRequest {
                                     tool_name: name.clone(),
-                                    action: args.get("action").and_then(|v| v.as_str()).map(String::from),
+                                    action: args
+                                        .get("action")
+                                        .and_then(|v| v.as_str())
+                                        .map(String::from),
                                     args: args.clone(),
                                     class: tool.approval_class(&args),
                                     scope: tool.approval_scope(&args),
@@ -782,15 +789,20 @@ impl ExecutionCore {
                                 match gate.check(req).await? {
                                     approval::GateOutcome::Allow => {}
                                     approval::GateOutcome::Deny { reason } => {
-                                        return Err(common::KlyntbotError::PermissionDenied(reason));
+                                        return Err(common::KlyntbotError::PermissionDenied(
+                                            reason,
+                                        ));
                                     }
                                     approval::GateOutcome::Cancel => {
-                                        return Err(common::KlyntbotError::Cancelled("user cancelled approval".into()));
+                                        return Err(common::KlyntbotError::Cancelled(
+                                            "user cancelled approval".into(),
+                                        ));
                                     }
                                 }
                             }
                             Ok(tool)
-                        }.await;
+                        }
+                        .await;
 
                         let args_snapshot = args.clone();
 
@@ -811,9 +823,12 @@ impl ExecutionCore {
 
                         let start = Instant::now();
                         let exec_result = match preflight {
-                            Ok(tool) => tokio::time::timeout(timeout_dur, async {
-                                tool.execute(args, &ctx).await
-                            }).await,
+                            Ok(tool) => {
+                                tokio::time::timeout(timeout_dur, async {
+                                    tool.execute(args, &ctx).await
+                                })
+                                .await
+                            }
                             Err(e) => Ok(Err(e)),
                         };
                         let duration_ms = start.elapsed().as_millis() as u64;
@@ -962,7 +977,10 @@ impl ExecutionCore {
                     return Ok((CycleOutcome::FabricatedResponse { content }, usage));
                 }
 
-                tracing::debug!(content_len = content.len(), "run_cycle: returning FinalResponse");
+                tracing::debug!(
+                    content_len = content.len(),
+                    "run_cycle: returning FinalResponse"
+                );
                 return Ok((CycleOutcome::FinalResponse { content }, usage));
             }
         }

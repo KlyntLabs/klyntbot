@@ -592,7 +592,9 @@ impl LlmProvider for OpenAiCompatProvider {
             Ok(r) => r,
             Err(e) => {
                 debug!(provider = self.name(), error = %e, "list_models: request failed, falling back to default model");
-                return Ok(vec![crate::types::ProviderModel::from_id_enriched(&self.default_model)]);
+                return Ok(vec![crate::types::ProviderModel::from_id_enriched(
+                    &self.default_model,
+                )]);
             }
         };
 
@@ -602,14 +604,18 @@ impl LlmProvider for OpenAiCompatProvider {
                 status = %response.status(),
                 "list_models: non-success status, falling back to default model",
             );
-            return Ok(vec![crate::types::ProviderModel::from_id(&self.default_model)]);
+            return Ok(vec![crate::types::ProviderModel::from_id(
+                &self.default_model,
+            )]);
         }
 
         let body: Value = match response.json().await {
             Ok(b) => b,
             Err(e) => {
                 debug!(provider = self.name(), error = %e, "list_models: invalid JSON, falling back to default model");
-                return Ok(vec![crate::types::ProviderModel::from_id_enriched(&self.default_model)]);
+                return Ok(vec![crate::types::ProviderModel::from_id_enriched(
+                    &self.default_model,
+                )]);
             }
         };
 

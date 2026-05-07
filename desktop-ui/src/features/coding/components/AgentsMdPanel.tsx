@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useAgentsMd } from "../hooks/useAgentsMd";
-import { formatBytes } from "@/utils/formatting";
 import type { AgentsMdSource } from "@/bindings";
+import { formatBytes } from "@/utils/formatting";
+import { useAgentsMd } from "../hooks/useAgentsMd";
 
 type Props = {
   threadId: string;
@@ -42,11 +42,15 @@ export function AgentsMdPanel({ threadId, initialSources }: Props) {
         <ol className="agents-md-panel__sources">
           {sources.map((src) => (
             <li key={src.path} className="agents-md-panel__source">
-              <span className={`agents-md-panel__origin agents-md-panel__origin--${originKind(src)}`}>
+              <span
+                className={`agents-md-panel__origin agents-md-panel__origin--${originKind(src)}`}
+              >
                 {originLabel(src)}
               </span>
               <code className="agents-md-panel__path">{shortenPath(src.path)}</code>
-              <span className="agents-md-panel__bytes">{formatBytes(byteLength(src.contents))}</span>
+              <span className="agents-md-panel__bytes">
+                {formatBytes(byteLength(src.contents))}
+              </span>
             </li>
           ))}
         </ol>

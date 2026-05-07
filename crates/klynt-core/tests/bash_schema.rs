@@ -12,7 +12,13 @@ fn bash_tool_metadata() {
     let privacy = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
     let bus = Arc::new(DomainEventBus::new(1));
 
-    let t = BashTool::new(std::path::PathBuf::from("/tmp"), policy, privacy, bus, NonUiPolicy::Allow);
+    let t = BashTool::new(
+        std::path::PathBuf::from("/tmp"),
+        policy,
+        privacy,
+        bus,
+        NonUiPolicy::Allow,
+    );
     assert_eq!(t.name(), "bash");
     assert!(!t.description().is_empty());
     let schema = t.parameters();

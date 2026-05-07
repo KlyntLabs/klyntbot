@@ -7,9 +7,12 @@ import Settings from "lucide-react/dist/esm/icons/settings";
 import SquarePen from "lucide-react/dist/esm/icons/square-pen";
 import { memo } from "react";
 import type { ChatThread } from "@/features/chat/types";
-import { useAppMode, type AppMode } from "../hooks/useAppMode";
-import { useRunningCodingIds, useRecentlyCompletedCodingIds } from "@/features/coding/state/ThreadEventBuffer";
 import { CodingSidebarThreadsSection } from "@/features/coding/components/CodingSidebarThreadsSection";
+import {
+  useRecentlyCompletedCodingIds,
+  useRunningCodingIds,
+} from "@/features/coding/state/ThreadEventBuffer";
+import { type AppMode, useAppMode } from "../hooks/useAppMode";
 import { AppModeSwitch } from "./AppModeSwitch";
 
 type SidebarChatLayoutProps = {
@@ -46,7 +49,13 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   const recentlyCompletedCodingIds = useRecentlyCompletedCodingIds();
   const handleSelectCalendar = onSelectCalendar ?? (() => {});
   const allNavItems: NavItem[] = [
-    { id: "new-chat", label: "New chat", icon: <SquarePen aria-hidden />, onClick: onNewChat, modes: ["assistant", "code"] },
+    {
+      id: "new-chat",
+      label: "New chat",
+      icon: <SquarePen aria-hidden />,
+      onClick: onNewChat,
+      modes: ["assistant", "code"],
+    },
     { id: "search", label: "Search", icon: <Search aria-hidden />, modes: ["assistant", "code"] },
     {
       id: "calendar",
@@ -55,9 +64,20 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
       onClick: handleSelectCalendar,
       modes: ["assistant"],
     },
-    { id: "plugins", label: "Plugins", icon: <LayoutGrid aria-hidden />, onClick: onSelectPlugins, modes: ["assistant", "code"] },
+    {
+      id: "plugins",
+      label: "Plugins",
+      icon: <LayoutGrid aria-hidden />,
+      onClick: onSelectPlugins,
+      modes: ["assistant", "code"],
+    },
     { id: "automations", label: "Automations", icon: <Clock aria-hidden />, modes: ["assistant"] },
-    { id: "project", label: "Project", icon: <FolderPlus aria-hidden />, modes: ["assistant", "code"] },
+    {
+      id: "project",
+      label: "Project",
+      icon: <FolderPlus aria-hidden />,
+      modes: ["assistant", "code"],
+    },
   ];
   const navItems = allNavItems.filter((it) => it.modes.includes(mode));
 

@@ -15,13 +15,10 @@ pub struct CodingApprovalPolicy {
 impl CodingApprovalPolicy {
     pub fn compile(permissions: &CodingPermissions) -> Result<Self, String> {
         Ok(Self {
-            allow: CompiledRules::compile(&permissions.allow)
-                .map_err(|e| e.to_string())?,
-            deny: CompiledRules::compile(&permissions.deny)
-                .map_err(|e| e.to_string())?,
-            ask: CompiledRules::compile(&permissions.ask)
-                .map_err(|e| e.to_string())?,
-            default_if_no_match: permissions.default_if_no_match.clone(),
+            allow: CompiledRules::compile(&permissions.allow).map_err(|e| e.to_string())?,
+            deny: CompiledRules::compile(&permissions.deny).map_err(|e| e.to_string())?,
+            ask: CompiledRules::compile(&permissions.ask).map_err(|e| e.to_string())?,
+            default_if_no_match: permissions.default_if_no_match,
         })
     }
 
@@ -113,8 +110,6 @@ impl CompiledRules {
     }
 }
 
-
-
 fn parse_rule(rule: &str) -> Result<(String, String), String> {
     let open = rule
         .find('(')
@@ -146,11 +141,7 @@ mod tests {
         let policy = CodingApprovalPolicy::compile(&perms).unwrap();
 
         // ls should be Safe (allow rule)
-        let class = policy.classify(
-            "bash",
-            None,
-            &serde_json::json!({"command": "ls -la"}),
-        );
+        let class = policy.classify("bash", None, &serde_json::json!({"command": "ls -la"}));
         assert_eq!(class, Some(ApprovalClass::Safe));
 
         // rm should be Destructive (deny rule)
@@ -184,10 +175,7 @@ mod tests {
         let policy = CodingApprovalPolicy::compile(&perms).unwrap();
 
         let scope = policy.scope("bash", None, &serde_json::json!({"command": "ls"}));
-        assert_eq!(
-            scope,
-            Some(ApprovalScope::ToolActionResource("ls".into()))
-        );
+        assert_eq!(scope, Some(ApprovalScope::ToolActionResource("ls".into())));
     }
 
     #[test]

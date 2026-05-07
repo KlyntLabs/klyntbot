@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
-import { subscribeToThread } from "../state/ThreadEventBuffer";
 import type { MessagePart } from "../components/parts/types";
+import { subscribeToThread } from "../state/ThreadEventBuffer";
 
 /// Mirrors `desktop_shared::coding::events::ThreadEvent`. Kept loose (string
 /// kind discriminator) so additions on the Rust side don't immediately fail

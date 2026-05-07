@@ -1338,16 +1338,36 @@
   min-width: 0;
 }
 
-.tool-row--filesystem { --tool-row-bar: var(--tool-family-filesystem); }
-.tool-row--shell      { --tool-row-bar: var(--tool-family-shell); }
-.tool-row--search     { --tool-row-bar: var(--tool-family-search); }
-.tool-row--web        { --tool-row-bar: var(--tool-family-web); }
-.tool-row--domain     { --tool-row-bar: var(--tool-family-domain); }
-.tool-row--agent      { --tool-row-bar: var(--tool-family-agent); }
-.tool-row--mcp        { --tool-row-bar: var(--tool-family-mcp); }
-.tool-row--system     { --tool-row-bar: var(--tool-family-system); }
-.tool-row--approval   { --tool-row-bar: var(--tool-family-approval); }
-.tool-row--failed     { --tool-row-bar: var(--status-error); }
+.tool-row--filesystem {
+  --tool-row-bar: var(--tool-family-filesystem);
+}
+.tool-row--shell {
+  --tool-row-bar: var(--tool-family-shell);
+}
+.tool-row--search {
+  --tool-row-bar: var(--tool-family-search);
+}
+.tool-row--web {
+  --tool-row-bar: var(--tool-family-web);
+}
+.tool-row--domain {
+  --tool-row-bar: var(--tool-family-domain);
+}
+.tool-row--agent {
+  --tool-row-bar: var(--tool-family-agent);
+}
+.tool-row--mcp {
+  --tool-row-bar: var(--tool-family-mcp);
+}
+.tool-row--system {
+  --tool-row-bar: var(--tool-family-system);
+}
+.tool-row--approval {
+  --tool-row-bar: var(--tool-family-approval);
+}
+.tool-row--failed {
+  --tool-row-bar: var(--status-error);
+}
 
 .tool-row__toggle {
   display: flex;
@@ -1441,12 +1461,20 @@
 }
 
 @keyframes tool-row-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes tool-row-pulse-border {
-  0%, 100% { border-left-color: var(--tool-family-approval); }
-  50%      { border-left-color: var(--cm-color-amber-fg); opacity: 0.7; }
+  0%,
+  100% {
+    border-left-color: var(--tool-family-approval);
+  }
+  50% {
+    border-left-color: var(--cm-color-amber-fg);
+    opacity: 0.7;
+  }
 }
 
 .tool-row.is-askuser {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Messages } from "@/features/messages/components/Messages";
 import type { ConversationItem, OpenAppTarget } from "@/types";
-import { useThreadEvents, type MessageDto } from "../hooks/useThreadEvents";
+import { type MessageDto, useThreadEvents } from "../hooks/useThreadEvents";
 import type { MessagePart } from "./parts/types";
 
 type Props = {

@@ -116,10 +116,7 @@ impl AgentLoopBuilder {
         }
     }
 
-    pub fn with_approval_channel(
-        mut self,
-        channel: Arc<dyn approval::ApprovalChannel>,
-    ) -> Self {
+    pub fn with_approval_channel(mut self, channel: Arc<dyn approval::ApprovalChannel>) -> Self {
         self.approval_channel = Some(channel);
         self
     }
@@ -1811,16 +1808,19 @@ impl AgentLoopBuilder {
         // Without an injected channel we use BlockingFallbackChannel — that
         // makes destructive ops fail loudly rather than silently passing.
         if let Some(pool) = &self.pool {
-            let grants_repo =
-                approval::ApprovalGrantsRepo::new(storage::StoragePool::from_existing(pool.clone()));
+            let grants_repo = approval::ApprovalGrantsRepo::new(
+                storage::StoragePool::from_existing(pool.clone()),
+            );
             let channel: Arc<dyn approval::ApprovalChannel> = self
                 .approval_channel
                 .clone()
                 .unwrap_or_else(|| Arc::new(approval::BlockingFallbackChannel::desktop_prompt()));
             let coding_policy = approval::CodingApprovalPolicy::compile(&config.coding.permissions)
-                .map_err(|e| common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
-                    "approval: coding-policy compile failed: {e}"
-                ))))?;
+                .map_err(|e| {
+                    common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+                        "approval: coding-policy compile failed: {e}"
+                    )))
+                })?;
             let gate = approval::ApprovalGate::new(grants_repo, channel)
                 .with_classify_hooks(vec![Arc::new(coding_policy)]);
             execution_core = execution_core.with_approval_gate(Arc::new(gate));
@@ -2032,7 +2032,9 @@ impl AgentLoopBuilder {
             },
             cognitive_bg_service: tokio::sync::Mutex::new(cognitive_bg_service),
             _session_memory_service: session_memory_service,
-            approval_grants_repo: self.pool.as_ref().map(|p| approval::ApprovalGrantsRepo::new(storage::StoragePool::from_existing(p.clone()))),
+            approval_grants_repo: self.pool.as_ref().map(|p| {
+                approval::ApprovalGrantsRepo::new(storage::StoragePool::from_existing(p.clone()))
+            }),
             _inference_loop_token,
             _tree_builder_token: tree_builder_token,
             activity_svc: self.activity_svc,

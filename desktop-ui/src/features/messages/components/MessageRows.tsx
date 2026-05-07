@@ -1,3 +1,4 @@
+import type { ParsedFileLocation } from "@utils/fileLinks";
 import Check from "lucide-react/dist/esm/icons/check";
 import Copy from "lucide-react/dist/esm/icons/copy";
 import Quote from "lucide-react/dist/esm/icons/quote";
@@ -5,7 +6,6 @@ import X from "lucide-react/dist/esm/icons/x";
 import type { MouseEvent } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { ParsedFileLocation } from "@utils/fileLinks";
 import { ApprovalCard } from "@/features/coding/components/ApprovalCard";
 import { DiffPreview } from "@/features/coding/components/DiffPreview";
 import type { ApprovalDecision } from "@/features/coding/hooks/useApprovalQueue";
@@ -14,14 +14,14 @@ import type { ConversationItem } from "@/types";
 import {
   exploreKindLabel,
   formatDurationMs,
-  normalizeMessageImageSrc,
   type MessageImage,
+  normalizeMessageImageSrc,
   type ParsedReasoning,
   toolRowDescriptor,
   toolStatusTone,
 } from "../utils/messageRenderUtils";
-import { isStandaloneMarkdownTable, Markdown } from "./Markdown";
 import { BashTail } from "./BashTail";
+import { isStandaloneMarkdownTable, Markdown } from "./Markdown";
 import { ToolRowBody } from "./ToolRowBody";
 
 type MarkdownFileLinkProps = {

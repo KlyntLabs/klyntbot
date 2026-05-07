@@ -29,9 +29,8 @@ pub fn try_approval_error(reason: &str) -> Option<McpError> {
 /// If the reason matches the approval-required pattern, returns a structured error.
 /// Otherwise returns a generic permission-denied error.
 pub fn deny_to_mcp_error(reason: &str) -> McpError {
-    try_approval_error(reason).unwrap_or_else(|| {
-        McpError::new(ErrorCode::INVALID_REQUEST, reason.to_string(), None)
-    })
+    try_approval_error(reason)
+        .unwrap_or_else(|| McpError::new(ErrorCode::INVALID_REQUEST, reason.to_string(), None))
 }
 
 #[cfg(test)]

@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
+
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
 import type { ChatThread } from "@/features/chat/types";
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -20,7 +21,12 @@ describe("CodingSidebarThreadsSection", () => {
     const { CodingSidebarThreadsSection } = await import("./CodingSidebarThreadsSection");
     render(
       <CodingSidebarThreadsSection
-        sessions={[thread("a", "Refactor"), thread("b", "Build login"), thread("c", "Fix bug"), thread("d", "Idle one")]}
+        sessions={[
+          thread("a", "Refactor"),
+          thread("b", "Build login"),
+          thread("c", "Fix bug"),
+          thread("d", "Idle one"),
+        ]}
         runningIds={new Set(["a", "b"])}
         recentlyCompleted={new Map([["c", Date.now()]])}
         activeThreadId="a"

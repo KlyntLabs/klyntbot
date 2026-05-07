@@ -12,7 +12,6 @@ use std::time::Duration;
 use tools_core::events::ToolEvent;
 use tools_core::{RoutingContext, ToolExecute, ToolParams};
 
-
 #[derive(Debug, Clone, serde::Serialize, ToolParams)]
 pub struct BashArgs {
     /// Shell command to run via /bin/bash -c.
@@ -38,6 +37,7 @@ pub struct BashArgs {
     approval_class = "destructive",
     approval_scope = "command"
 )]
+#[allow(dead_code)]
 pub struct BashTool {
     /// Workspace root that all relative `args.cwd` values resolve against and
     /// that is used as the cwd when `args.cwd` is absent. Symmetric with
@@ -116,7 +116,11 @@ impl ToolExecute for BashTool {
 
             #[cfg(target_os = "macos")]
             {
-                let cwd = args.cwd.as_deref().map(|p| resolve_path(p, &self.cwd)).unwrap_or_else(|| self.cwd.clone());
+                let cwd = args
+                    .cwd
+                    .as_deref()
+                    .map(|p| resolve_path(p, &self.cwd))
+                    .unwrap_or_else(|| self.cwd.clone());
                 let sandbox_policy = klynt_sandbox::SandboxPolicy::cwd_writes_only(cwd.clone());
                 fan_out_tool_event(
                     ctx.event_tx.as_ref(),

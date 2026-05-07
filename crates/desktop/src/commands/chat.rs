@@ -107,16 +107,13 @@ pub async fn chat_respond_approval(
     decision: app_core::coding::approval_handler::AppApprovalDecision,
 ) -> () {
     let _core = app.state::<std::sync::Arc<app_core::AppCore>>();
-    app_core::coding::approval_handler::respond_approval(
-        &request_id,
-        decision,
-    )
-    .await
-    .map_err(
-        |e: app_core::coding::approval_handler::ApprovalHandlerError| {
-            desktop_shared::errors::ApiError::new("NOT_FOUND", e.to_string())
-        },
-    )?;
+    app_core::coding::approval_handler::respond_approval(&request_id, decision)
+        .await
+        .map_err(
+            |e: app_core::coding::approval_handler::ApprovalHandlerError| {
+                desktop_shared::errors::ApiError::new("NOT_FOUND", e.to_string())
+            },
+        )?;
     let _ = session_key; // session_key unused today; Plan 4 persists per-thread rules.
     Ok(())
 }
@@ -204,17 +201,15 @@ pub(crate) async fn dispatch_dev(
             let request_id = try_field!(dev::get_str(body, "requestId"));
             let decision: app_core::coding::approval_handler::AppApprovalDecision =
                 try_field!(dev::require(body, "decision"));
-            let result = app_core::coding::approval_handler::respond_approval(
-                &request_id,
-                decision,
-            )
-            .await
-            .map(|_| serde_json::Value::Null)
-            .map_err(
-                |e: app_core::coding::approval_handler::ApprovalHandlerError| {
-                    desktop_shared::errors::ApiError::new("NOT_FOUND", e.to_string())
-                },
-            );
+            let result =
+                app_core::coding::approval_handler::respond_approval(&request_id, decision)
+                    .await
+                    .map(|_| serde_json::Value::Null)
+                    .map_err(
+                        |e: app_core::coding::approval_handler::ApprovalHandlerError| {
+                            desktop_shared::errors::ApiError::new("NOT_FOUND", e.to_string())
+                        },
+                    );
             dev::val(result)
         }
 

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ConversationItem } from "@/types";
 import type { BurstGroup } from "../utils/groupBursts";
@@ -23,15 +23,19 @@ function makeBurst(): BurstGroup {
     kind: "burst",
     family: "filesystem",
     name: "Read",
-    items: [read("a", "x.ts"), read("b", "y.ts"), read("c", "z.ts"), read("d", "p.ts"), read("e", "q.ts")],
+    items: [
+      read("a", "x.ts"),
+      read("b", "y.ts"),
+      read("c", "z.ts"),
+      read("d", "p.ts"),
+      read("e", "q.ts"),
+    ],
   };
 }
 
 describe("BurstRow", () => {
   it("renders header showing first 3 paths plus +N more", () => {
-    render(
-      <BurstRow group={makeBurst()} expandedItems={new Set()} onToggle={vi.fn()} />,
-    );
+    render(<BurstRow group={makeBurst()} expandedItems={new Set()} onToggle={vi.fn()} />);
     expect(screen.getByText(/Read:/)).toBeInTheDocument();
     expect(screen.getByText(/x\.ts/)).toBeInTheDocument();
     expect(screen.getByText(/\+2 more/)).toBeInTheDocument();

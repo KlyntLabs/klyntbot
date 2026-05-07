@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentsMdPanel } from "./AgentsMdPanel";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -8,9 +8,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 import { invoke } from "@tauri-apps/api/core";
 
-const initial = [
-  { path: "/repo/AGENTS.md", dir: "/repo", contents: "rule one" },
-];
+const initial = [{ path: "/repo/AGENTS.md", dir: "/repo", contents: "rule one" }];
 
 describe("AgentsMdPanel", () => {
   beforeEach(() => vi.mocked(invoke).mockReset());
@@ -33,8 +31,8 @@ describe("AgentsMdPanel", () => {
     ]);
     render(<AgentsMdPanel threadId="t1" initialSources={initial} />);
     fireEvent.click(screen.getByText("Refresh"));
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith(
-      "coding_thread_refresh_agents_md", { threadId: "t1" }
-    ));
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("coding_thread_refresh_agents_md", { threadId: "t1" }),
+    );
   });
 });

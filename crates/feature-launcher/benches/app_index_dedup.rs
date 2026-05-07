@@ -16,6 +16,7 @@ fn synth_apps(n: usize) -> Vec<AppEntry> {
             path: PathBuf::from(format!("/Applications/App{i}.app")),
             bundle_id: Some(SmolStr::new(format!("com.example.App{i}"))),
             icon_path: None,
+            icon_data_url: None,
         })
         .collect()
 }

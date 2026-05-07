@@ -242,7 +242,6 @@ export function useMessagesViewState({
     });
   }, [visibleItems]);
 
-
   const planFollowup = useMemo(() => {
     if (!onPlanAccept || !onPlanSubmitChanges) {
       return { shouldShow: false, planItemId: null };

@@ -37,9 +37,7 @@ describe("ToolRowBody", () => {
     const item = tool({
       toolType: "fileChange",
       title: "File changes",
-      changes: [
-        { path: "a.ts", kind: "edit", diff: "@@ -1 +1 @@\n-a\n+b" },
-      ],
+      changes: [{ path: "a.ts", kind: "edit", diff: "@@ -1 +1 @@\n-a\n+b" }],
     });
     render(<ToolRowBody item={item} />);
     expect(screen.getByText(/a\.ts/)).toBeInTheDocument();

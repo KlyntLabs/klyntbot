@@ -300,7 +300,7 @@ mod tests {
     #[test]
     fn handle_callback_resolves_once() {
         let ch = make_channel();
-        let (tx, rx) = oneshot::channel();
+        let (tx, _rx) = oneshot::channel();
         ch.pending.insert("req-1".into(), tx);
 
         let callback = json!({ "data": "appr:req-1:once" });

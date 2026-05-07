@@ -68,14 +68,19 @@ pub async fn autogenerate_title(
     let response = match tokio::time::timeout(
         std::time::Duration::from_secs(TITLE_TIMEOUT_SECS),
         provider.chat(&messages, None, &params, &[]),
-    ).await {
+    )
+    .await
+    {
         Ok(Ok(resp)) => resp,
         Ok(Err(e)) => {
             tracing::warn!(error = %e, "title autogen: provider error");
             return Ok(());
         }
         Err(_) => {
-            tracing::warn!("title autogen: provider timeout after {}s", TITLE_TIMEOUT_SECS);
+            tracing::warn!(
+                "title autogen: provider timeout after {}s",
+                TITLE_TIMEOUT_SECS
+            );
             return Ok(());
         }
     };
@@ -113,7 +118,7 @@ fn sanitize_title(raw: &str) -> String {
     };
 
     // Drop trailing sentence-end punctuation
-    let trimmed_punct = unquoted.trim_end_matches(|c: char| matches!(c, '.' | '!' | '?'));
+    let trimmed_punct = unquoted.trim_end_matches(['.', '!', '?']);
 
     // Hard-cap length (char-boundary safe)
     let end = trimmed_punct.floor_char_boundary(MAX_TITLE_LEN);
@@ -233,8 +238,7 @@ mod tests {
         insert_session_with_title(&repo, "coding:t2", None).await;
 
         let emitter = Arc::new(RecordingEmitter::new());
-        let provider: DynProvider =
-            Arc::new(CannedProvider("\"Refactor Sidebar Layout.\"".into()));
+        let provider: DynProvider = Arc::new(CannedProvider("\"Refactor Sidebar Layout.\"".into()));
 
         autogenerate_title(
             repo.clone(),

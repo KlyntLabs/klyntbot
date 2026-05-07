@@ -12,6 +12,7 @@ pub enum TemplateErr {
 /// - `{{{{inner}}}}` escapes to the literal `{{inner}}`.
 /// - Placeholder names are NOT trimmed; `{{ name }}` looks up ` name `.
 /// - Unclosed `{{...` sequences are passed through literally.
+///
 /// Scan a `{{{{...}}}}` escape sequence and return the inner content.
 /// Returns `None` if the sequence is not a valid 4-brace escape.
 fn scan_escape_sequence(chars: &mut std::iter::Peekable<std::str::Chars>) -> Option<String> {

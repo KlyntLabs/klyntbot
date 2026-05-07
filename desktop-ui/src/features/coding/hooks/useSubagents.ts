@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { listActiveSubagents, cancelSubagent } from "@/api/endpoints/subagent";
-import type { SubagentEvent, SubagentActiveSummary } from "@/bindings";
+import { useCallback, useEffect, useState } from "react";
+import { cancelSubagent, listActiveSubagents } from "@/api/endpoints/subagent";
+import type { SubagentActiveSummary, SubagentEvent } from "@/bindings";
 
 export function useSubagents(threadId: string) {
   const [active, setActive] = useState<SubagentActiveSummary[]>([]);
@@ -11,18 +11,18 @@ export function useSubagents(threadId: string) {
     // otherwise reject with an unobserved promise on `ws-…` / `chat:…` IDs.
     if (!threadId.startsWith("coding:")) return;
     let cancelled = false;
-    listActiveSubagents(threadId).then((s) => { if (!cancelled) setActive(s); });
+    listActiveSubagents(threadId).then((s) => {
+      if (!cancelled) setActive(s);
+    });
 
     // Spawned events are routed to a thread-specific channel; all other
     // lifecycle events flow through the global channel.
-    const unlistenSpawned = listen<SubagentEvent>(
-      `agent:subagent_event#${threadId}`,
-      (e) => { if (!cancelled) setActive((prev) => applySubagentEvent(prev, e.payload)); },
-    );
-    const unlistenGlobal = listen<SubagentEvent>(
-      "agent:subagent_event",
-      (e) => { if (!cancelled) setActive((prev) => applySubagentEvent(prev, e.payload)); },
-    );
+    const unlistenSpawned = listen<SubagentEvent>(`agent:subagent_event#${threadId}`, (e) => {
+      if (!cancelled) setActive((prev) => applySubagentEvent(prev, e.payload));
+    });
+    const unlistenGlobal = listen<SubagentEvent>("agent:subagent_event", (e) => {
+      if (!cancelled) setActive((prev) => applySubagentEvent(prev, e.payload));
+    });
 
     return () => {
       cancelled = true;
@@ -42,15 +42,25 @@ export function applySubagentEvent(
 ): SubagentActiveSummary[] {
   switch (e.kind) {
     case "spawned":
-      return [...prev, {
-        agentId: e.agent_id, label: e.label, profile: e.profile,
-        iteration: 0, status: "running", startedAt: e.spawned_at,
-        lastTool: null, durationMs: 0,
-      }];
+      return [
+        ...prev,
+        {
+          agentId: e.agent_id,
+          label: e.label,
+          profile: e.profile,
+          iteration: 0,
+          status: "running",
+          startedAt: e.spawned_at,
+          lastTool: null,
+          durationMs: 0,
+        },
+      ];
     case "progress":
-      return prev.map((s) => s.agentId === e.agent_id
-        ? { ...s, iteration: e.iteration, lastTool: e.last_tool ?? null }
-        : s);
+      return prev.map((s) =>
+        s.agentId === e.agent_id
+          ? { ...s, iteration: e.iteration, lastTool: e.last_tool ?? null }
+          : s,
+      );
     case "completed":
     case "cancelled":
       return prev.filter((s) => s.agentId !== e.agent_id);

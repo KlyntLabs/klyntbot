@@ -1,7 +1,7 @@
 import { memo } from "react";
 import type { BurstGroup } from "../utils/groupBursts";
-import { ToolRow } from "./MessageRows";
 import { toolRowDescriptor } from "../utils/messageRenderUtils";
+import { ToolRow } from "./MessageRows";
 
 const PREVIEW_PATHS = 3;
 

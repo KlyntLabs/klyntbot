@@ -34,11 +34,9 @@ export function PartRenderer({ part }: { part: MessagePart }) {
     case "finish":
       return <FinishPart reason={part.reason} />;
     case "review_result":
-      return <ReviewResultPart
-        reviewId={part.review_id}
-        summary={part.summary}
-        issues={part.issues}
-      />;
+      return (
+        <ReviewResultPart reviewId={part.review_id} summary={part.summary} issues={part.issues} />
+      );
     default:
       return null;
   }

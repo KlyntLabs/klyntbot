@@ -9,10 +9,10 @@ import type { useMainAppWorktreeState } from "@app/hooks/useMainAppWorktreeState
 import { REMOTE_THREAD_POLL_INTERVAL_MS } from "@app/hooks/useRemoteThreadRefreshOnFocus";
 import type { WorkspaceLaunchScriptsState } from "@app/hooks/useWorkspaceLaunchScripts";
 import type { RefObject } from "react";
+import { useCodingSessions } from "@/features/coding/hooks/useCodingSessions";
 import type { LayoutNodesOptions } from "@/features/layout/hooks/layoutNodes/types";
 import type { ThreadState } from "@/features/threads/hooks/useThreadsReducer";
 import type { AppSettings, ComposerEditorSettings, WorkspaceInfo } from "@/types";
-import { useCodingSessions } from "@/features/coding/hooks/useCodingSessions";
 
 type ComposerProps = NonNullable<LayoutNodesOptions["primary"]["composerProps"]>;
 type MainHeaderProps = NonNullable<LayoutNodesOptions["primary"]["mainHeaderProps"]>;

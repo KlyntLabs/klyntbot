@@ -1,12 +1,8 @@
-import { CodingThreadView } from "@/features/coding/components/CodingThreadView";
-import { useCodingThreadStatus } from "@/features/coding/hooks/useCodingThreadStatus";
-import { initThreadEventBuffer } from "@/features/coding/state/ThreadEventBuffer";
 import { useAppBootstrapOrchestration } from "@app/bootstrap/useAppBootstrapOrchestration";
 import { MainAppShell } from "@app/components/MainAppShell";
 import { AppView } from "@app/constants/appViews";
-import { useAppMode } from "@app/hooks/useAppMode";
-import { useResetAppViewOnModeChange } from "@app/hooks/useResetAppViewOnModeChange";
 import { useAccountSwitching } from "@app/hooks/useAccountSwitching";
+import { useAppMode } from "@app/hooks/useAppMode";
 import { useArchiveShortcut } from "@app/hooks/useArchiveShortcut";
 import { useHomeAccount } from "@app/hooks/useHomeAccount";
 import { useInterruptShortcut } from "@app/hooks/useInterruptShortcut";
@@ -29,6 +25,7 @@ import { useNewAgentDraft } from "@app/hooks/useNewAgentDraft";
 import { useOpenAppIcons } from "@app/hooks/useOpenAppIcons";
 import { usePlanReadyActions } from "@app/hooks/usePlanReadyActions";
 import { useRemoteThreadLiveConnection } from "@app/hooks/useRemoteThreadLiveConnection";
+import { useResetAppViewOnModeChange } from "@app/hooks/useResetAppViewOnModeChange";
 import { useResponseRequiredNotificationsController } from "@app/hooks/useResponseRequiredNotificationsController";
 import { useSystemNotificationThreadLinks } from "@app/hooks/useSystemNotificationThreadLinks";
 import { useTauriEvent } from "@app/hooks/useTauriEvent";
@@ -63,6 +60,9 @@ import { useApps } from "@/features/apps/hooks/useApps";
 import { ChatErrorBanner } from "@/features/chat/components/ChatErrorBanner";
 import { useChatThreads } from "@/features/chat/hooks/useChatThreads";
 import { useKlyntbotSurfaceProps } from "@/features/chat/hooks/useKlyntbotSurfaceProps";
+import { CodingThreadView } from "@/features/coding/components/CodingThreadView";
+import { useCodingThreadStatus } from "@/features/coding/hooks/useCodingThreadStatus";
+import { initThreadEventBuffer } from "@/features/coding/state/ThreadEventBuffer";
 import { useCollaborationModeSelection } from "@/features/collaboration/hooks/useCollaborationModeSelection";
 import { useCollaborationModes } from "@/features/collaboration/hooks/useCollaborationModes";
 import { useComposerEditorState } from "@/features/composer/hooks/useComposerEditorState";
@@ -383,7 +383,6 @@ export default function MainApp() {
     },
     [models, setSelectedModelId],
   );
-
 
   const {
     collaborationModes,
