@@ -47,9 +47,15 @@ impl ClaudeCodeTracingProvider {
     }
 
     async fn find_session(&self, session_id: &str) -> Result<discovery::DiscoveredSession> {
+        // Frontend sends `${work_dir_hash}/${session_id}`; strip the prefix to
+        // match the bare UUID stored in `DiscoveredSession::session_id`.
+        let bare_id = session_id
+            .rsplit_once('/')
+            .map(|(_, b)| b)
+            .unwrap_or(session_id);
         let all = self.discovered().await?;
         all.into_iter()
-            .find(|d| d.session_id == session_id)
+            .find(|d| d.session_id == bare_id)
             .ok_or_else(|| {
                 KlyntbotError::StorageNotFound(format!("claudeCode session: {session_id}"))
             })
@@ -166,5 +172,44 @@ impl TracingProvider for ClaudeCodeTracingProvider {
         Err(KlyntbotError::NotImplemented(
             "claudeCode does not declare Context tab for subagents".to_string(),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    /// SessionsExplorer sends `${work_dir_hash}/${session_id}`; the provider
+    /// must strip the prefix and match the bare UUID.
+    #[tokio::test]
+    async fn find_session_strips_work_dir_hash_prefix() {
+        let tmp = TempDir::new().unwrap();
+        let claude_root = tmp.path().join("projects");
+        let imported_root = tmp.path().join("imported");
+        let project_dir = claude_root.join("-Users-me-repo");
+        tokio::fs::create_dir_all(&project_dir).await.unwrap();
+        tokio::fs::write(project_dir.join("uuid-1.jsonl"), b"{}\n")
+            .await
+            .unwrap();
+
+        let provider = ClaudeCodeTracingProvider::new(claude_root, imported_root);
+
+        // Path-style ID (what the frontend sends): hash/uuid
+        let detail = provider
+            .find_session("-Users-me-repo/uuid-1")
+            .await
+            .expect("compound id should resolve");
+        assert_eq!(detail.session_id, "uuid-1");
+
+        // Bare UUID (defensive: direct callers may pass this)
+        let detail = provider
+            .find_session("uuid-1")
+            .await
+            .expect("bare id should still resolve");
+        assert_eq!(detail.session_id, "uuid-1");
+
+        // Unknown id stays NotFound
+        assert!(provider.find_session("-Users-me-repo/missing").await.is_err());
     }
 }
