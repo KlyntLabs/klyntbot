@@ -146,4 +146,11 @@
   --tool-family-mcp: var(--cm-color-teal-fg);
   --tool-family-system: var(--text-subtle);
   --tool-family-approval: var(--cm-color-amber-fg);
+
+  /* ── Coding sidebar — running state + recent completion ── */
+  --success-muted: color-mix(in srgb, #22c55e 32%, transparent);
+  --sidebar-row-active-bg: color-mix(in srgb, var(--brand) 10%, transparent);
+  --sidebar-row-active-accent: var(--brand);
+  --sidebar-running-dot: var(--brand);
+  --sidebar-recent-dot: var(--success-muted);
 }

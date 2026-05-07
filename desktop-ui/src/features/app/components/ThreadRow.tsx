@@ -64,6 +64,8 @@ type ThreadRowProps = {
   subagentsExpanded?: boolean;
   onToggleSubagents?: (workspaceId: string, threadId: string) => void;
   showPinnedLabel?: boolean;
+  dataStatus?: "running" | "recent";
+  dataActive?: boolean;
 };
 
 export const ThreadRow = memo(function ThreadRow({
@@ -85,6 +87,8 @@ export const ThreadRow = memo(function ThreadRow({
   subagentsExpanded = true,
   onToggleSubagents,
   showPinnedLabel = true,
+  dataStatus,
+  dataActive,
 }: ThreadRowProps) {
   const relativeTime = getThreadTime(thread);
   const badge = getThreadArgsBadge?.(workspaceId, thread.id) ?? null;
@@ -135,6 +139,8 @@ export const ThreadRow = memo(function ThreadRow({
         depth > 0 ? " is-nested" : ""
       }${isPinned ? " is-pinned" : ""}`}
       style={indentStyle}
+      data-status={dataStatus}
+      data-active={dataActive ? "true" : undefined}
       onClick={() => onSelectThread(workspaceId, thread.id)}
       onContextMenu={(event) => onShowThreadMenu(event, workspaceId, thread.id, canPin)}
       onKeyDown={(event) => {

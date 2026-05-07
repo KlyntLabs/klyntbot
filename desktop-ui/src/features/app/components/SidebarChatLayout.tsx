@@ -8,6 +8,8 @@ import SquarePen from "lucide-react/dist/esm/icons/square-pen";
 import { memo } from "react";
 import type { ChatThread } from "@/features/chat/types";
 import { useAppMode, type AppMode } from "../hooks/useAppMode";
+import { useRunningCodingIds, useRecentlyCompletedCodingIds } from "@/features/coding/state/ThreadEventBuffer";
+import { CodingSidebarThreadsSection } from "@/features/coding/components/CodingSidebarThreadsSection";
 import { AppModeSwitch } from "./AppModeSwitch";
 
 type SidebarChatLayoutProps = {
@@ -40,6 +42,8 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   activeNavId,
 }: SidebarChatLayoutProps) {
   const { mode, setMode } = useAppMode();
+  const runningCodingIds = useRunningCodingIds();
+  const recentlyCompletedCodingIds = useRecentlyCompletedCodingIds();
   const handleSelectCalendar = onSelectCalendar ?? (() => {});
   const allNavItems: NavItem[] = [
     { id: "new-chat", label: "New chat", icon: <SquarePen aria-hidden />, onClick: onNewChat, modes: ["assistant", "code"] },
@@ -80,29 +84,41 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
       </nav>
 
       <div className="sidebar-chat__chats">
-        <div className="sidebar-chat__section-title">Chats</div>
-        {threads.length === 0 ? (
-          <div className="sidebar-chat__chats-empty">No chats</div>
+        {mode === "code" ? (
+          <CodingSidebarThreadsSection
+            sessions={threads}
+            runningIds={runningCodingIds}
+            recentlyCompleted={recentlyCompletedCodingIds}
+            activeThreadId={selectedSessionKey}
+            onSelectThread={onSelectThread}
+          />
         ) : (
-          <ul className="sidebar-chat__thread-list">
-            {threads.map((t) => (
-              <li key={t.sessionKey}>
-                <button
-                  type="button"
-                  className={
-                    "sidebar-chat__thread-item" +
-                    (t.sessionKey === selectedSessionKey
-                      ? " sidebar-chat__thread-item--active"
-                      : "")
-                  }
-                  onClick={() => onSelectThread(t.sessionKey)}
-                  title={t.title}
-                >
-                  {t.title || "Untitled"}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="sidebar-chat__section-title">Chats</div>
+            {threads.length === 0 ? (
+              <div className="sidebar-chat__chats-empty">No chats</div>
+            ) : (
+              <ul className="sidebar-chat__thread-list">
+                {threads.map((t) => (
+                  <li key={t.sessionKey}>
+                    <button
+                      type="button"
+                      className={
+                        "sidebar-chat__thread-item" +
+                        (t.sessionKey === selectedSessionKey
+                          ? " sidebar-chat__thread-item--active"
+                          : "")
+                      }
+                      onClick={() => onSelectThread(t.sessionKey)}
+                      title={t.title}
+                    >
+                      {t.title || "Untitled"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </div>
 

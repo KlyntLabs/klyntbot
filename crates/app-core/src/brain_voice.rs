@@ -512,7 +512,7 @@ pub fn build_debrief_tooltip(msg_count: u32, brain_count: usize, duration: &str)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::events::NoopEmitter;
+    use crate::events::{NoopEmitter, RecordingEmitter};
     use storage::StoragePool;
 
     #[test]
@@ -802,7 +802,7 @@ mod tests {
         );
 
         // Check the emitted event was Badge mode.
-        let events = recording.events.lock().unwrap();
+        let events = recording.events();
         assert_eq!(events.len(), 1);
         let (name, payload) = &events[0];
         assert_eq!(name, BRAIN_AMBIENT_EVENT);
@@ -854,7 +854,7 @@ mod tests {
         )
         .await;
 
-        let events = recording.events.lock().unwrap();
+        let events = recording.events();
         assert_eq!(events.len(), 1);
         let ambient: BrainAmbientEvent = serde_json::from_value(events[0].1.clone()).unwrap();
         assert_eq!(ambient.mode, SignalMode::Merged);
@@ -864,25 +864,5 @@ mod tests {
 
     // ── Test helpers ────────────────────────────────────────────────────
 
-    /// A recording emitter that captures events for test assertions.
-    struct RecordingEmitter {
-        events: std::sync::Mutex<Vec<(String, serde_json::Value)>>,
-    }
 
-    impl RecordingEmitter {
-        fn new() -> Self {
-            Self {
-                events: std::sync::Mutex::new(Vec::new()),
-            }
-        }
-    }
-
-    impl AppEventEmitter for RecordingEmitter {
-        fn emit_event(&self, event_name: &str, payload: serde_json::Value) {
-            self.events
-                .lock()
-                .unwrap()
-                .push((event_name.to_string(), payload));
-        }
-    }
 }

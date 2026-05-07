@@ -326,9 +326,15 @@ impl AppCore {
     }
 
     /// Set the name/title of a coding thread.
+    ///
+    /// Emits `coding:thread_updated` so the sidebar can refetch immediately.
     #[tracing::instrument(skip(self), err)]
     pub async fn coding_thread_set_name(&self, thread_id: &str, name: &str) -> Result<()> {
         self.repos.sessions.rename_session(thread_id, name).await?;
+        self.event_emitter.emit_event(
+            "coding:thread_updated",
+            serde_json::json!({ "thread_id": thread_id }),
+        );
         Ok(())
     }
 

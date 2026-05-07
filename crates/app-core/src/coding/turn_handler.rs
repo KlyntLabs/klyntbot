@@ -77,6 +77,53 @@ impl AppCore {
             started_at,
         });
 
+        // ── Autogenerate title on first user message of an unnamed session ──
+        // Cheap fast-path checks before spawning: skip if cognitive provider
+        // unavailable, skip if session already titled, skip if not first message.
+        if let Some(provider) = self.cognitive_provider.clone() {
+            let title_repo = self.repos.sessions.clone();
+            let emitter = self.event_emitter.clone();
+            let session_key = thread_id.to_string();
+            let first_msg = text.to_string();
+            let title_model = resolved_model.clone();
+            tokio::spawn(async move {
+                // Re-check title and message count from inside the task to avoid
+                // races with concurrent first messages on the same session.
+                let (session_res, msg_count_res) = tokio::join!(
+                    title_repo.get_session(&session_key),
+                    title_repo.count_messages(&session_key),
+                );
+                let session = match session_res {
+                    Ok(s) => s,
+                    Err(_) => return,
+                };
+                let already_titled = session
+                    .metadata
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .map(|s| !s.is_empty())
+                    .unwrap_or(false);
+                if already_titled {
+                    return;
+                }
+                let msg_count = msg_count_res.unwrap_or(i64::MAX);
+                // The user message has not been persisted yet at this point in
+                // coding_message_send; count == 0 (or 1 if a system msg was inserted).
+                if msg_count > 1 {
+                    return;
+                }
+                let _ = crate::coding::title_service::autogenerate_title(
+                    title_repo,
+                    provider,
+                    emitter,
+                    session_key,
+                    first_msg,
+                    title_model,
+                )
+                .await;
+            });
+        }
+
         // 4. Register a steer receiver for this turn and spawn a drain task
         // that persists each pushed steer as a synthetic user message in the
         // session — the next iteration's prompt assembly will pick it up.

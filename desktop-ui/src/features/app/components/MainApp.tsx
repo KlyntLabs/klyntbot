@@ -1,5 +1,6 @@
 import { CodingThreadView } from "@/features/coding/components/CodingThreadView";
 import { useCodingThreadStatus } from "@/features/coding/hooks/useCodingThreadStatus";
+import { initThreadEventBuffer } from "@/features/coding/state/ThreadEventBuffer";
 import { useAppBootstrapOrchestration } from "@app/bootstrap/useAppBootstrapOrchestration";
 import { MainAppShell } from "@app/components/MainAppShell";
 import { AppView } from "@app/constants/appViews";
@@ -407,6 +408,10 @@ export default function MainApp() {
   useEffect(() => {
     setSelectedServiceTier(preferredServiceTier);
   }, [preferredServiceTier]);
+
+  useEffect(() => {
+    return initThreadEventBuffer();
+  }, []);
 
   const [appView, setAppView] = useState<AppView>(AppView.Home);
   const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);

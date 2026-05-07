@@ -77,3 +77,30 @@ impl AppEventEmitter for CompoundEmitter {
         }
     }
 }
+
+#[cfg(test)]
+pub(crate) struct RecordingEmitter {
+    events: std::sync::Mutex<Vec<(String, serde_json::Value)>>,
+}
+
+#[cfg(test)]
+impl RecordingEmitter {
+    pub(crate) fn new() -> Self {
+        Self {
+            events: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+    pub(crate) fn events(&self) -> Vec<(String, serde_json::Value)> {
+        self.events.lock().unwrap().clone()
+    }
+}
+
+#[cfg(test)]
+impl AppEventEmitter for RecordingEmitter {
+    fn emit_event(&self, event_name: &str, payload: serde_json::Value) {
+        self.events
+            .lock()
+            .unwrap()
+            .push((event_name.to_string(), payload));
+    }
+}

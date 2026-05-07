@@ -1,0 +1,61 @@
+/* Coding sidebar — three-group layout, active highlight, running dot.
+ * Activated by data-status / data-active attributes on .thread-row in
+ * code mode (CodingSidebarThreadsSection). Tokens: ds-tokens.css. */
+
+@keyframes klynt-pulse-dot {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1.00; transform: scale(1.15); }
+}
+
+.coding-sidebar-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.coding-sidebar-section + .coding-sidebar-section {
+  margin-top: 12px;
+}
+
+.coding-sidebar-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-subtle);
+}
+
+.coding-sidebar-section-count {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Per-row indicators (data attributes set in CodingSidebarThreadRow) */
+.thread-row[data-status="running"] .thread-status,
+.thread-row[data-status="recent"] .thread-status {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.thread-row[data-status="running"] .thread-status {
+  background: var(--sidebar-running-dot);
+  animation: klynt-pulse-dot 1.4s var(--ds-ease-out) infinite;
+}
+
+.thread-row[data-status="recent"] .thread-status {
+  background: var(--sidebar-recent-dot);
+}
+
+/* Stronger active highlight for code mode */
+.thread-row[data-active="true"] {
+  background: var(--sidebar-row-active-bg);
+  box-shadow: inset 3px 0 0 0 var(--sidebar-row-active-accent);
+}
+
+.thread-row[data-active="true"] .thread-name {
+  font-weight: 600;
+}

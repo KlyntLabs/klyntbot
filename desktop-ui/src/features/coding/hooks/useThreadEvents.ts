@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
+import { subscribeToThread } from "../state/ThreadEventBuffer";
 import type { MessagePart } from "../components/parts/types";
 
 /// Mirrors `desktop_shared::coding::events::ThreadEvent`. Kept loose (string
@@ -243,15 +243,9 @@ export function useThreadEvents(threadId: string | null) {
   useEffect(() => {
     setState(initialState);
     if (!threadId) return;
-    // Track cancellation so a StrictMode double-mount (or stale effect run)
-    // can't both register two listeners and apply every event twice.
     let cancelled = false;
-    let unlisten: (() => void) | null = null;
-    // Seed persisted history before opening the live listener. Without this,
-    // clicking an existing session shows nothing until a new turn fires —
-    // because `agent:thread_event` is live-only, never replayed. Live events
-    // for *this* thread that arrive during the await will land on top via
-    // the reducer once the listener attaches.
+
+    // Seed persisted history from DB (pre-buffer events).
     invoke<{ items?: MessageDto[] }>("coding_thread_resume", {
       threadId,
       includeItems: true,
@@ -262,26 +256,18 @@ export function useThreadEvents(threadId: string | null) {
         if (items.length === 0) return;
         setState((prev) => ({ ...prev, items }));
       })
-      .catch(() => {
-        // Resume can 404 for a brand-new thread that has no DB row yet;
-        // that's expected — the live event stream will fill it.
-      });
-    listen<ThreadEvent>("agent:thread_event", (e) => {
+      .catch(() => {});
+
+    // Subscribe via the global buffer — drains buffered events first,
+    // then receives live ones. Replaces the per-mount listen() call.
+    const unsubscribe = subscribeToThread(threadId, (evt) => {
       if (cancelled) return;
-      const evt = e.payload;
-      const evThreadId = (evt as { thread_id?: string }).thread_id;
-      if (evThreadId && evThreadId !== threadId) return;
       setState((prev) => applyThreadEvent(prev, evt));
-    }).then((un) => {
-      if (cancelled) {
-        un();
-      } else {
-        unlisten = un;
-      }
     });
+
     return () => {
       cancelled = true;
-      unlisten?.();
+      unsubscribe();
     };
   }, [threadId]);
 
