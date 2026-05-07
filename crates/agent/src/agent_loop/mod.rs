@@ -115,7 +115,12 @@ impl AgentLoop {
     }
 
     pub fn runtime(&self) -> Arc<crate::agent_runtime::AgentRuntime> {
-        Arc::clone(&self.runtime)
+        self.runtime.clone()
+    }
+
+    /// Set the approval suggester on the runtime's approval gate.
+    pub fn set_approval_suggester(&self, suggester: Arc<dyn approval::ApprovalSuggester>) {
+        self.runtime.set_approval_suggester(suggester);
     }
 
     /// Public accessor for the subagent manager.

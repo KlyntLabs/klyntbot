@@ -101,6 +101,55 @@ impl CodingApprovalHistoryRepo {
         }?;
         Ok(res.rows_affected())
     }
+
+    /// Return per-args_hash stats for a tool, filtered to entries decided within
+    /// the last `window_days` days. Each row is (args_hash, approval_count, total_count).
+    /// If `args_hash` is provided, only stats for that hash are returned.
+    pub async fn tool_pattern_stats(
+        &self,
+        tool: &str,
+        args_hash: Option<&str>,
+        window_days: i64,
+    ) -> Result<Vec<(String, u32, u32)>, StorageError> {
+        let cutoff = jiff::Timestamp::now().as_second() - (window_days * 86_400);
+        let rows = if let Some(hash) = args_hash {
+            sqlx::query(
+                "SELECT args_hash, \
+                    COALESCE(SUM(CASE WHEN decision = 'allow' THEN 1 ELSE 0 END), 0) AS allow_count, \
+                    COUNT(*) AS total_count \
+                 FROM coding_approval_history \
+                 WHERE tool = ? AND args_hash = ? AND created_at >= ? \
+                 GROUP BY args_hash",
+            )
+            .bind(tool)
+            .bind(hash)
+            .bind(cutoff)
+            .fetch_all(&self.pool)
+            .await?
+        } else {
+            sqlx::query(
+                "SELECT args_hash, \
+                    COALESCE(SUM(CASE WHEN decision = 'allow' THEN 1 ELSE 0 END), 0) AS allow_count, \
+                    COUNT(*) AS total_count \
+                 FROM coding_approval_history \
+                 WHERE tool = ? AND created_at >= ? \
+                 GROUP BY args_hash",
+            )
+            .bind(tool)
+            .bind(cutoff)
+            .fetch_all(&self.pool)
+            .await?
+        };
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+                let hash: String = r.try_get("args_hash").unwrap_or_default();
+                let allow: i64 = r.try_get("allow_count").unwrap_or(0);
+                let total: i64 = r.try_get("total_count").unwrap_or(0);
+                (hash, allow as u32, total as u32)
+            })
+            .collect())
+    }
 }
 
 #[cfg(test)]

@@ -8,12 +8,14 @@ pub mod coding_policy;
 pub mod gate;
 pub mod grants;
 pub mod policy;
+pub mod preview;
 pub mod request;
 
 pub use channel::{ApprovalCapabilities, ApprovalChannel, BlockingFallbackChannel};
 pub use class::{ApprovalClass, ApprovalDecision, ApprovalLifetime, ApprovalScope};
 pub use coding_policy::CodingApprovalPolicy;
-pub use gate::{ApprovalGate, GateOutcome};
+pub use gate::{ApprovalGate, ApprovalSuggester, GateOutcome};
 pub use grants::{ApprovalGrantsRepo, GrantRow};
 pub use policy::ClassifyHook;
+pub use preview::{ApprovalPreview, GrantScope, SuggestedGrant, extract_path_str_from_args};
 pub use request::{ApprovalContext, ApprovalRequest, ChannelKind};

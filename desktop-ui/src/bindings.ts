@@ -71,7 +71,7 @@ async approvalRespond(approvalId: string, decision: ApprovalDecisionDto) : Promi
     else return { status: "error", error: e  as any };
 }
 },
-async approvalChannelRespond(approvalId: string, decision: ApprovalDecisionDto) : Promise<Result<boolean, ApiError>> {
+async approvalChannelRespond(approvalId: string, decision: ApprovalDecisionDto) : Promise<Result<null, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("approval_channel_respond", { approvalId, decision }) };
 } catch (e) {

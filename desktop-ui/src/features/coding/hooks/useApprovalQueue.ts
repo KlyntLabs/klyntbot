@@ -3,6 +3,7 @@ import { useCallback, useEffect } from "react";
 import { invoke } from "@/api/client";
 import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
 import type { ConversationItem } from "@/types";
+import type { ApprovalPreview, SuggestedGrant } from "../components/preview/types";
 
 type ApprovalPayload = {
   request_id: string;
@@ -14,6 +15,8 @@ type ApprovalPayload = {
   layer_reason: string;
   mirror_history?: { approval_count: number; denial_count: number };
   requires_user_input: boolean;
+  preview?: ApprovalPreview | null;
+  suggested_grant?: SuggestedGrant | null;
 };
 
 type ResolvedPayload = {
@@ -47,6 +50,8 @@ function toItem(payload: ApprovalPayload): ApprovalItem {
           denialCount: payload.mirror_history.denial_count,
         }
       : undefined,
+    preview: payload.preview ?? null,
+    suggestedGrant: payload.suggested_grant ?? null,
     status: "pending",
   };
 }

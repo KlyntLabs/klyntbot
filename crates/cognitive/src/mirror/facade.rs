@@ -36,6 +36,7 @@ pub struct MirrorFacade {
     episodic_repo: Option<EpisodicMemoryRepo>,
     rule_repo: Option<crate::repos::ProceduralRuleRepo>,
     text_embedder: Option<Arc<dyn crate::embedder::TextEmbedder>>,
+    approval_history: Option<Arc<crate::mirror::sources::ApprovalHistorySource>>,
 }
 
 impl MirrorFacade {
@@ -51,6 +52,7 @@ impl MirrorFacade {
             episodic_repo: None,
             rule_repo: None,
             text_embedder: None,
+            approval_history: None,
         }
     }
 
@@ -72,6 +74,27 @@ impl MirrorFacade {
     pub fn with_active_timers(mut self, timers: Arc<DashMap<String, JoinHandle<()>>>) -> Self {
         self.active_timers = Some(timers);
         self
+    }
+
+    /// Attach the approval history source for pattern suggestion.
+    pub fn with_approval_history(
+        mut self,
+        source: Arc<crate::mirror::sources::ApprovalHistorySource>,
+    ) -> Self {
+        self.approval_history = Some(source);
+        self
+    }
+
+    /// Suggest a grant pattern for a tool call based on approval history.
+    pub async fn suggest_approval_pattern(
+        &self,
+        tool: &str,
+        args_hash: &str,
+    ) -> Option<crate::mirror::sources::approval_history::SuggestedPattern> {
+        self.approval_history
+            .as_ref()?
+            .suggest_pattern(tool, args_hash)
+            .await
     }
 
     /// Attach an [`EpisodicMemoryRepo`] so that key mirror actions (weekly

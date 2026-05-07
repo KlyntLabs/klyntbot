@@ -78,8 +78,10 @@ impl MirrorEngine {
         register!(task_focus);
         register!(finance_drift);
 
+        let mut ah_source: Option<Arc<ApprovalHistorySource>> = None;
         if let Some(ah_repo) = approval_history_repo {
             let approval_history = Arc::new(ApprovalHistorySource::new(ah_repo));
+            ah_source = Some(approval_history.clone());
             register!(approval_history);
         }
 
@@ -100,6 +102,9 @@ impl MirrorEngine {
         }
         if let Some(r) = rule_repo {
             facade = facade.with_rule_repo(r);
+        }
+        if let Some(ah) = ah_source {
+            facade = facade.with_approval_history(ah);
         }
 
         StartedMirror {

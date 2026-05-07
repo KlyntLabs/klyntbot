@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { ApprovalDecision } from "@/features/coding/hooks/useApprovalQueue";
 import type { ConversationItem } from "@/types";
+import { PreviewRenderer } from "./preview/PreviewRenderer";
+import { SmartAllowAlwaysButton } from "./SmartAllowAlwaysButton";
 import { StarlarkRuleEditor } from "./StarlarkRuleEditor";
 
 type ApprovalItem = Extract<ConversationItem, { kind: "approval" }>;
@@ -43,8 +45,14 @@ export function ApprovalCard({ item, onRespond }: Props) {
       <dl>
         <dt>Tool</dt>
         <dd>{item.tool}</dd>
-        <dt>Args</dt>
-        <dd className="approval-card__args">{summarizeArgs(item.args)}</dd>
+        <dt>Preview</dt>
+        <dd className="approval-card__preview">
+          {item.preview ? (
+            <PreviewRenderer preview={item.preview} />
+          ) : (
+            summarizeArgs(item.args)
+          )}
+        </dd>
         <dt>CWD</dt>
         <dd>{item.cwd}</dd>
         <dt>Sandbox</dt>
@@ -82,14 +90,17 @@ export function ApprovalCard({ item, onRespond }: Props) {
         <button type="button" onClick={() => onRespond(item.requestId, { kind: "allow_once" })}>
           Allow once (a)
         </button>
-        <button type="button" onClick={() => onRespond(item.requestId, { kind: "allow_always" })}>
-          Allow always (s)
-        </button>
+        <SmartAllowAlwaysButton
+          requestId={item.requestId}
+          suggestedGrant={item.suggestedGrant ?? null}
+          onRespond={onRespond}
+          onOpenStarlarkEditor={() => setEditorOpen(true)}
+        />
         <button type="button" onClick={() => onRespond(item.requestId, { kind: "deny" })}>
           Deny (d)
         </button>
         <button type="button" onClick={() => setEditorOpen(true)}>
-          Add rule… (r)
+          Add rule... (r)
         </button>
       </div>
       {editorOpen && (

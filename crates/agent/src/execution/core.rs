@@ -552,6 +552,12 @@ impl ExecutionCore {
         self
     }
 
+    pub fn set_approval_suggester(&self, suggester: Arc<dyn approval::ApprovalSuggester>) {
+        if let Some(ref gate) = self.approval_gate {
+            gate.set_suggester(suggester);
+        }
+    }
+
     /// Run a single LLM-tool cycle:
     /// 1. Call provider.chat() with the current messages and tool definitions
     /// 2. If tool calls returned: execute all in parallel with timeout → ToolsExecuted
@@ -784,7 +790,10 @@ impl ExecutionCore {
                                         channel: approval::ChannelKind::from(ctx.channel.as_str()),
                                         session_id: ctx.chat_id.to_string(),
                                         user_id: None,
+                                        cwd: std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
                                     },
+                                    preview: None,
+                                    suggested_grant: None,
                                 };
                                 match gate.check(req).await? {
                                     approval::GateOutcome::Allow => {}

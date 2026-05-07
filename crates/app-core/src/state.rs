@@ -210,6 +210,11 @@ pub struct AppCore {
     /// the agent runtime. Cloned on demand by handlers that need to construct a
     /// scoped (e.g. read-only) registry — currently `coding_review_start`.
     pub tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
+    /// Desktop approval channel — shared with the agent's ApprovalGate.
+    /// Used by `respond_approval` to resolve pending requests.
+    pub desktop_approval_channel: Option<Arc<crate::desktop_approval_channel::DesktopApprovalChannel>>,
+    /// Approval grants repo — shared with the agent's ApprovalGate.
+    pub approval_grants_repo: Option<Arc<approval::ApprovalGrantsRepo>>,
 }
 
 /// State for an active thread subscription.
@@ -567,6 +572,33 @@ impl AppCore {
             .map_err(common::KlyntbotError::Io)?;
 
         Ok(path.to_string_lossy().into_owned())
+    }
+
+    /// Respond to a pending approval request — resolves the oneshot that the
+    /// agent's tool execution is blocked on.
+    #[tracing::instrument(skip(self), err)]
+    pub async fn respond_approval(
+        &self,
+        request_id: &str,
+        decision: crate::coding::approval_handler::AppApprovalDecision,
+    ) -> common::Result<()> {
+        let channel = self
+            .desktop_approval_channel
+            .as_ref()
+            .ok_or_else(|| common::KlyntbotError::NotImplemented("desktop approval channel not initialized".into()))?;
+        let grants_repo = self
+            .approval_grants_repo
+            .as_ref()
+            .ok_or_else(|| common::KlyntbotError::NotImplemented("approval grants repo not initialized".into()))?;
+        crate::coding::approval_handler::respond_approval(
+            channel.clone(),
+            grants_repo.clone(),
+            self.domain_event_bus.clone(),
+            request_id,
+            decision,
+        )
+        .await
+        .map_err(|e| common::KlyntbotError::NotImplemented(e.to_string()))
     }
 
     #[tracing::instrument(skip(self), err)]

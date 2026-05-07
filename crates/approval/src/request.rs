@@ -42,6 +42,7 @@ pub struct ApprovalContext {
     pub channel: ChannelKind,
     pub session_id: String,
     pub user_id: Option<String>,
+    pub cwd: std::path::PathBuf,
 }
 
 impl ApprovalContext {
@@ -58,6 +59,12 @@ pub struct ApprovalRequest {
     pub class: ApprovalClass,
     pub scope: ApprovalScope,
     pub ctx: ApprovalContext,
+    /// Preview metadata for the approval card. Populated by the channel boundary
+    /// at request emission time. None for internal flows that don't need UI.
+    pub preview: Option<crate::preview::ApprovalPreview>,
+    /// Mirror-suggested grant pattern. None if Mirror has no signal yet
+    /// or no Mirror facade is wired.
+    pub suggested_grant: Option<crate::preview::SuggestedGrant>,
 }
 
 #[cfg(test)]
@@ -71,6 +78,7 @@ mod tests {
             channel: ChannelKind::Desktop,
             session_id: "s1".into(),
             user_id: None,
+            cwd: std::path::PathBuf::from("."),
         };
         assert!(!local.is_remote());
         let remote = ApprovalContext {

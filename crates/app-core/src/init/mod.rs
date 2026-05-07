@@ -89,13 +89,13 @@ impl AppCore {
     /// When `event_emitter` is `Some`, entity update events from MCP tool
     /// mutations are forwarded to the frontend. When `None`, a no-op emitter
     /// is used (CLI / standalone MCP server).
-    #[tracing::instrument(skip(notification_sender, event_emitter, approval_channel), err)]
+    #[tracing::instrument(skip(notification_sender, event_emitter, _approval_channel), err)]
     pub async fn init_with_sender(
         mode: common::AppMode,
         config_override: Option<config::Config>,
         notification_sender: Option<Arc<dyn common::NotificationSender>>,
         event_emitter: Option<Arc<dyn AppEventEmitter>>,
-        approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
+        _approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
     ) -> Result<(Self, EventChannels), String> {
         // ── Phase 1: Storage ─────────────────────────────────────────────
         let storage::StorageResult {
@@ -317,6 +317,15 @@ impl AppCore {
             coding_recall::init_coding_recall(&storage_pool, &domain_event_bus, &causal_edges)
                 .await;
 
+        // ── Phase 2.6: Desktop approval channel + grants repo ─────────────
+        let desktop_approval_channel: Arc<crate::desktop_approval_channel::DesktopApprovalChannel> =
+            Arc::new(crate::desktop_approval_channel::DesktopApprovalChannel::new(
+                event_emitter.clone().unwrap_or_else(|| Arc::new(NoopEmitter)),
+            ));
+        let approval_grants_repo = Arc::new(approval::ApprovalGrantsRepo::new(
+            storage_pool.clone(),
+        ));
+
         // ── Phase 3: Agent ───────────────────────────────────────────────
         let agent::AgentResult {
             cognitive_provider,
@@ -342,7 +351,7 @@ impl AppCore {
             Some(Arc::clone(&context_update_queue)),
             appcore_embedding_engine.clone(),
             recall.clone(),
-            approval_channel,
+            Some(desktop_approval_channel.clone() as Arc<dyn approval::ApprovalChannel>),
         )
         .await?;
 
@@ -613,8 +622,16 @@ impl AppCore {
             let mut all_consumers = started.consumers;
             all_consumers.extend(coding_mirror.consumers);
 
+            let facade = Arc::new(facade);
+
+            // Wire the Mirror facade as the approval gate's suggester via bridge adapter.
+            let suggester = Arc::new(
+                crate::adapters::approval_suggester::MirrorApprovalSuggester::new(facade.clone()),
+            );
+            agent.set_approval_suggester(suggester);
+
             (
-                Some(Arc::new(facade)),
+                Some(facade),
                 all_consumers,
                 all_handles,
                 started.shutdown,
@@ -1283,6 +1300,8 @@ impl AppCore {
             thread_subscriptions: Arc::new(dashmap::DashMap::new()),
             steer_queue: Arc::new(crate::coding::steer_queue::SteerQueue::new()),
             tool_kit: std::sync::Mutex::new(None),
+            desktop_approval_channel: Some(desktop_approval_channel),
+            approval_grants_repo: Some(approval_grants_repo),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────

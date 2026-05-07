@@ -62,7 +62,10 @@ mod tests {
                 channel: ChannelKind::Mcp,
                 session_id: "s1".into(),
                 user_id: None,
+                cwd: std::path::PathBuf::from("."),
             },
+            preview: None,
+            suggested_grant: None,
         };
 
         let decision = chan.request(req).await;

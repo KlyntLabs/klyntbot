@@ -8,6 +8,8 @@ async-trait = { workspace = true }
 globset = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+similar = "2"
+specta = { workspace = true }
 sqlx = { workspace = true, features = ["sqlite", "runtime-tokio"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync", "time"] }
@@ -24,4 +26,5 @@ bus = { path = "../bus" }
 activity-log = { path = "../activity-log" }
 
 [dev-dependencies]
+tempfile = "3"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }

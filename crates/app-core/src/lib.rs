@@ -2,6 +2,7 @@ pub mod adapters;
 pub mod brain_voice;
 pub mod coding;
 pub mod coding_memory;
+pub mod desktop_approval_channel;
 pub mod errors;
 pub mod events;
 pub mod focus;

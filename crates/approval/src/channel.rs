@@ -89,7 +89,10 @@ mod tests {
                 channel: crate::ChannelKind::Telegram,
                 session_id: "s1".into(),
                 user_id: None,
+                cwd: std::path::PathBuf::from("."),
             },
+            preview: None,
+            suggested_grant: None,
         };
         let decision = c.request(req).await;
         match decision {

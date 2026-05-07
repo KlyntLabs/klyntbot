@@ -88,6 +88,7 @@ pub struct AgentLoopBuilder {
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
     coding_recall_service: Option<Arc<coding_memory::recall::CodingRecallService>>,
     approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
+    approval_suggester: Option<Arc<dyn approval::ApprovalSuggester>>,
 }
 
 impl AgentLoopBuilder {
@@ -113,11 +114,16 @@ impl AgentLoopBuilder {
             embedding_engine: None,
             coding_recall_service: None,
             approval_channel: None,
+            approval_suggester: None,
         }
     }
 
     pub fn with_approval_channel(mut self, channel: Arc<dyn approval::ApprovalChannel>) -> Self {
         self.approval_channel = Some(channel);
+        self
+    }
+    pub fn with_approval_suggester(mut self, suggester: Arc<dyn approval::ApprovalSuggester>) -> Self {
+        self.approval_suggester = Some(suggester);
         self
     }
     pub fn with_coding_recall_service(
@@ -1821,8 +1827,11 @@ impl AgentLoopBuilder {
                         "approval: coding-policy compile failed: {e}"
                     )))
                 })?;
-            let gate = approval::ApprovalGate::new(grants_repo, channel)
+            let mut gate = approval::ApprovalGate::new(grants_repo, channel)
                 .with_classify_hooks(vec![Arc::new(coding_policy)]);
+            if let Some(suggester) = self.approval_suggester.take() {
+                gate = gate.with_suggester(suggester);
+            }
             execution_core = execution_core.with_approval_gate(Arc::new(gate));
             info!("approval gate wired into ExecutionCore");
         } else {

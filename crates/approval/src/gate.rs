@@ -2,11 +2,23 @@ use crate::{
     channel::ApprovalChannel,
     class::{ApprovalClass, ApprovalDecision, ApprovalLifetime, ApprovalScope},
     grants::{ApprovalGrantsRepo, GrantRow},
+    preview::SuggestedGrant,
     request::ApprovalRequest,
 };
 use common::Result;
 use jiff::Timestamp;
 use std::sync::Arc;
+
+/// Thin trait for Mirror-driven grant suggestion. The cognitive crate implements
+/// this for `MirrorFacade`; the approval crate stays free of cognitive dependencies.
+#[async_trait::async_trait]
+pub trait ApprovalSuggester: Send + Sync {
+    async fn suggest(
+        &self,
+        tool_name: &str,
+        args_hash: &str,
+    ) -> Option<SuggestedGrant>;
+}
 
 #[derive(Debug, Clone)]
 pub enum GateOutcome {
@@ -19,6 +31,7 @@ pub struct ApprovalGate {
     grants: ApprovalGrantsRepo,
     channel: Arc<dyn ApprovalChannel>,
     hooks: Vec<Arc<dyn crate::policy::ClassifyHook>>,
+    suggester: std::sync::Mutex<Option<Arc<dyn ApprovalSuggester>>>,
 }
 
 impl ApprovalGate {
@@ -27,12 +40,24 @@ impl ApprovalGate {
             grants,
             channel,
             hooks: Vec::new(),
+            suggester: std::sync::Mutex::new(None),
         }
     }
 
     pub fn with_classify_hooks(mut self, hooks: Vec<Arc<dyn crate::policy::ClassifyHook>>) -> Self {
         self.hooks = hooks;
         self
+    }
+
+    pub fn with_suggester(mut self, suggester: Arc<dyn ApprovalSuggester>) -> Self {
+        self.suggester = std::sync::Mutex::new(Some(suggester));
+        self
+    }
+
+    /// Set the suggester after construction (used when the Mirror facade is
+    /// created after the agent loop).
+    pub fn set_suggester(&self, suggester: Arc<dyn ApprovalSuggester>) {
+        *self.suggester.lock().unwrap() = Some(suggester);
     }
 
     /// Purge session-scoped grants for a given session.
@@ -87,6 +112,17 @@ impl ApprovalGate {
             return Ok(GateOutcome::Allow);
         }
 
+        // Consult Mirror suggester for grant pattern (if wired).
+        if req.suggested_grant.is_none() {
+            let suggester = self.suggester.lock().unwrap().clone();
+            if let Some(s) = suggester {
+                let args_hash = compute_args_hash(&req.tool_name, &req.args);
+                if let Some(grant) = s.suggest(&req.tool_name, &args_hash).await {
+                    req.suggested_grant = Some(grant);
+                }
+            }
+        }
+
         // Prompt the channel.
         let decision = self.channel.request(req.clone()).await;
         match decision {
@@ -133,6 +169,19 @@ impl ApprovalGate {
     }
 }
 
+/// Compute a hash of tool_name + args for pattern matching.
+/// Note: serde_json::to_string preserves insertion order, so two logically
+/// identical objects with different field orders will produce different hashes.
+fn compute_args_hash(tool_name: &str, args: &serde_json::Value) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    tool_name.hash(&mut hasher);
+    let json_str = serde_json::to_string(args).unwrap_or_default();
+    json_str.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,6 +225,7 @@ mod tests {
             channel: ChannelKind::Desktop,
             session_id: "sess-1".into(),
             user_id: None,
+            cwd: std::path::PathBuf::from("."),
         }
     }
 
@@ -193,6 +243,8 @@ mod tests {
             class: ApprovalClass::Safe,
             scope: ApprovalScope::ToolAction,
             ctx: ctx(),
+            preview: None,
+            suggested_grant: None,
         };
         let out = gate.check(req).await.unwrap();
         assert!(matches!(out, GateOutcome::Allow));
@@ -217,6 +269,8 @@ mod tests {
             class: ApprovalClass::Destructive,
             scope: ApprovalScope::ToolAction,
             ctx: ctx(),
+            preview: None,
+            suggested_grant: None,
         };
 
         let out1 = gate.check(make_req()).await.unwrap();
@@ -248,6 +302,8 @@ mod tests {
             class: ApprovalClass::Destructive,
             scope: ApprovalScope::ToolAction,
             ctx: ctx(),
+            preview: None,
+            suggested_grant: None,
         };
         let out = gate.check(req).await.unwrap();
         assert!(matches!(out, GateOutcome::Deny { .. }));
@@ -271,6 +327,8 @@ mod tests {
             class: ApprovalClass::Destructive,
             scope: ApprovalScope::ToolAction,
             ctx: ctx(),
+            preview: None,
+            suggested_grant: None,
         };
         let out = gate.check(req).await.unwrap();
         assert!(matches!(out, GateOutcome::Cancel));
@@ -292,6 +350,8 @@ mod tests {
             class: ApprovalClass::Safe,
             scope: ApprovalScope::ToolAction,
             ctx: c,
+            preview: None,
+            suggested_grant: None,
         };
         let out = gate.check(req).await.unwrap();
         assert!(matches!(out, GateOutcome::Allow));

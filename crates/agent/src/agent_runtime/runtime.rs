@@ -128,6 +128,11 @@ impl AgentRuntime {
         }
     }
 
+    /// Set the approval suggester on the execution core's approval gate.
+    pub fn set_approval_suggester(&self, suggester: Arc<dyn approval::ApprovalSuggester>) {
+        self.core.set_approval_suggester(suggester);
+    }
+
     pub fn tool_kit(&self) -> Option<Arc<klynt_core::ToolKitBuilder>> {
         self.tool_kit.lock().unwrap().clone()
     }

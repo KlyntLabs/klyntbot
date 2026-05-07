@@ -4,6 +4,10 @@ use std::sync::Arc;
 use storage::repos::{CodingApprovalHistoryRepo, HistoryEntry};
 use tools_core::events::ToolEvent;
 
+const MIN_APPROVAL_COUNT: u32 = 3;
+const MIN_APPROVAL_RATE: f32 = 0.80;
+const RECENCY_WINDOW_DAYS: i64 = 30;
+
 pub struct ApprovalHistorySource {
     repo: Arc<CodingApprovalHistoryRepo>,
     pending: DashMap<String, PendingReq>,
@@ -14,6 +18,17 @@ struct PendingReq {
     args_hash: String,
     layer: String,
     repo_id: String,
+}
+
+/// A suggested grant pattern derived from approval history.
+#[derive(Debug, Clone)]
+pub struct SuggestedPattern {
+    /// Human-readable label, e.g. "Allow bash with args-hash abc123".
+    pub label: String,
+    /// The args_hash that matched.
+    pub args_hash: String,
+    /// Number of prior approvals matching this pattern.
+    pub approval_count: u32,
 }
 
 impl ApprovalHistorySource {
@@ -59,6 +74,31 @@ impl ApprovalHistorySource {
                 })
                 .await;
         }
+    }
+
+    /// Suggest a grant pattern for a tool call based on approval history.
+    /// Returns `Some(SuggestedPattern)` if the tool has >= 80% approval rate
+    /// across >= 3 prior approvals for the same args_hash within the recency window.
+    pub async fn suggest_pattern(&self, tool: &str, args_hash: &str) -> Option<SuggestedPattern> {
+        let stats = self.repo.tool_pattern_stats(tool, Some(args_hash), RECENCY_WINDOW_DAYS).await.ok()?;
+        for (hash, approvals, total) in &stats {
+            if hash != args_hash {
+                continue;
+            }
+            if *total < MIN_APPROVAL_COUNT {
+                continue;
+            }
+            let rate = *approvals as f32 / *total as f32;
+            if rate < MIN_APPROVAL_RATE {
+                continue;
+            }
+            return Some(SuggestedPattern {
+                label: format!("Allow {} ({} prior approvals)", tool, approvals),
+                args_hash: hash.clone(),
+                approval_count: *approvals,
+            });
+        }
+        None
     }
 
     /// Backward-compatible observer that accepts `ToolEvent` (used in tests).
