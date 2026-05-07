@@ -17,5 +17,5 @@ pub use coding_policy::CodingApprovalPolicy;
 pub use gate::{ApprovalGate, ApprovalSuggester, GateOutcome};
 pub use grants::{ApprovalGrantsRepo, GrantRow};
 pub use policy::ClassifyHook;
-pub use preview::{ApprovalPreview, GrantScope, SuggestedGrant, extract_path_str_from_args};
+pub use preview::{ ApprovalPreview, GrantScope, SuggestedGrant, build_preview, extract_path_str_from_args,};
 pub use request::{ApprovalContext, ApprovalRequest, ChannelKind};

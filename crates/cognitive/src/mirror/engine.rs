@@ -39,6 +39,7 @@ impl MirrorEngine {
         rule_repo: Option<ProceduralRuleRepo>,
         trial_evaluator: Option<Arc<dyn crate::mirror::types::EarlyTrialEvaluator>>,
         approval_history_repo: Option<Arc<storage::repos::CodingApprovalHistoryRepo>>,
+        approval_pattern_repo: Option<Arc<storage::repos::ApprovalPatternHistoryRepo>>,
     ) -> StartedMirror {
         let shutdown = CancellationToken::new();
         let active_timers: Arc<DashMap<String, JoinHandle<()>>> = Arc::new(DashMap::new());
@@ -79,8 +80,8 @@ impl MirrorEngine {
         register!(finance_drift);
 
         let mut ah_source: Option<Arc<ApprovalHistorySource>> = None;
-        if let Some(ah_repo) = approval_history_repo {
-            let approval_history = Arc::new(ApprovalHistorySource::new(ah_repo));
+        if let (Some(ah_repo), Some(ap_repo)) = (approval_history_repo, approval_pattern_repo) {
+            let approval_history = Arc::new(ApprovalHistorySource::new(ap_repo, ah_repo));
             ah_source = Some(approval_history.clone());
             register!(approval_history);
         }
@@ -123,7 +124,7 @@ mod tests {
     #[tokio::test]
     async fn start_produces_seven_consumers() {
         let repo = crate::mirror::test_mirror_repo().await;
-        let built = MirrorEngine::start(repo, None, None, None, None, None, None);
+        let built = MirrorEngine::start(repo, None, None, None, None, None, None, None);
         assert_eq!(
             built.consumers.len(),
             7,

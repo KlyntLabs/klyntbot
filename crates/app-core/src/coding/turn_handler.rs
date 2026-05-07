@@ -1,6 +1,10 @@
 use crate::AppCore;
 use common::Result;
 use desktop_shared::coding::{MessageDto, ThreadEvent};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use storage::messages::parts::MessagePart;
 
 /// Kind discriminator for the bridge loop's dual text/reasoning buffers.
@@ -220,6 +224,12 @@ impl AppCore {
                     // survive a thread reload (without this, only user prompts and
                     // the final assistant text persist; transparency steps vanish).
                     let repos_bridge = repos_for_bridge.clone();
+
+                    // Shared flag set by the bridge when it sees Cancelled so
+                    // the post-join finish_reason computation can emit the right
+                    // kind instead of defaulting to "completed".
+                    let turn_cancelled = Arc::new(AtomicBool::new(false));
+                    let turn_cancelled_bridge = turn_cancelled.clone();
 
                     let bridge_handle = tokio::spawn(async move {
                         let mut item_started = false;
@@ -579,6 +589,22 @@ impl AppCore {
                                 agent::AgentEvent::TurnComplete { .. } => {
                                     // Will be followed by Done — handled there
                                 }
+                                agent::AgentEvent::Cancelled {
+                                    partial_content,
+                                    partial_reasoning,
+                                } => {
+                                    tracing::info!(
+                                        thread = %tid,
+                                        turn = %tuid_bridge,
+                                        content_len = partial_content.len(),
+                                        reasoning_len = partial_reasoning.len(),
+                                        "coding turn: cancelled mid-stream"
+                                    );
+                                    turn_cancelled_bridge.store(true, Ordering::Relaxed);
+                                    // partial_content already arrived via ContentChunk →
+                                    // ItemDelta path; no extra publish needed. The terminal
+                                    // TurnCompleted below will carry finish_reason = cancelled.
+                                }
                                 agent::AgentEvent::FileEditWithSymbols {
                                     path,
                                     op,
@@ -679,12 +705,16 @@ impl AppCore {
 
                     let completed_at = jiff::Timestamp::now().as_millisecond();
                     let duration_ms = (completed_at - started_at) as u64;
-                    let finish = match join_result {
-                        Ok(Ok(_)) => serde_json::json!({"kind": "completed"}),
-                        Ok(Err(_)) => {
-                            serde_json::json!({"kind": "error", "code": "agent_error"})
+                    let finish = if turn_cancelled.load(Ordering::Relaxed) {
+                        serde_json::json!({"kind": "cancelled"})
+                    } else {
+                        match join_result {
+                            Ok(Ok(_)) => serde_json::json!({"kind": "completed"}),
+                            Ok(Err(_)) => {
+                                serde_json::json!({"kind": "error", "code": "agent_error"})
+                            }
+                            Err(_) => serde_json::json!({"kind": "error", "code": "panic"}),
                         }
-                        Err(_) => serde_json::json!({"kind": "error", "code": "panic"}),
                     };
 
                     thread_events.publish(ThreadEvent::TurnCompleted {

@@ -17,7 +17,9 @@ export function PreviewRenderer({ preview }: { preview: ApprovalPreview }) {
       return <McpPreview {...preview} />;
     case "generic":
       return <GenericPreview {...preview} />;
-    default:
-      return <pre>{JSON.stringify(preview, null, 2)}</pre>;
+    default: {
+      const _exhaustive: never = preview;
+      return <pre>{JSON.stringify(_exhaustive, null, 2)}</pre>;
+    }
   }
 }

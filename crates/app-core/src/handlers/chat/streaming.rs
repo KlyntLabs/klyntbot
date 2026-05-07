@@ -443,6 +443,8 @@ pub async fn relay_chat_stream(
     // Pending action names: ToolStart stashes the action extracted from args,
     // ToolEnd pops it to build the qualified name (e.g. "task:list").
     let mut pending_actions: HashMap<String, VecDeque<String>> = HashMap::new();
+    // Pending approvals: request_id -> (tool_name, path) for enriching ApprovalResolved events.
+    let mut pending_approvals: HashMap<String, (String, Option<String>)> = HashMap::new();
     let mut tool_token_sum: u32 = 0;
 
     // Segment accumulation for structured message persistence
@@ -1087,6 +1089,8 @@ pub async fn relay_chat_stream(
                         // Auto-allow / auto-deny / privacy: telemetry only — UI doesn't need them.
                     }
                     AgentEvent::ApprovalRequested { ref request_id, ref tool, ref args_hash, ref layer, ref rule_matched, ref mirror_history, ref sandbox_summary, requires_user_input, ref args, ref cwd, ref layer_reason } => {
+                        let path = args.as_ref().and_then(approval::extract_path_str_from_args);
+                        pending_approvals.insert(request_id.clone(), (tool.clone(), path));
                         if let Some(ref bus) = domain_event_bus {
                             bus.publish(bus::DomainEvent::ApprovalRequested {
                                 request_id: request_id.clone(),
@@ -1122,11 +1126,20 @@ pub async fn relay_chat_stream(
                         }
                     }
                     AgentEvent::ApprovalResolved { ref request_id, ref decision, ref decision_reason, ref latency_ms, ref persisted_rule, ref decided_by } => {
+                        let (tool_name, path) = pending_approvals
+                            .remove(request_id)
+
+                            .unwrap_or_default();
                         if let Some(ref bus) = domain_event_bus {
                             bus.publish(bus::DomainEvent::ApprovalResolved {
                                 request_id: request_id.clone(),
+                                user_id: None,
+                                tool_name,
+                                path,
                                 decision: decision.clone(),
+                                pattern_used: persisted_rule.clone(),
                                 decided_by: decided_by.clone(),
+                                occurred_at: jiff::Timestamp::now().as_second(),
                             });
                         }
                         let payload = serde_json::json!({

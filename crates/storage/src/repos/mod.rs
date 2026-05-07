@@ -2,6 +2,7 @@
 
 pub mod agent_task;
 pub mod area;
+pub mod approval_pattern_history;
 pub mod brain_signal;
 pub mod coaching_intervention_log;
 pub mod coaching_strategy;
@@ -58,6 +59,9 @@ pub use area::AreaRepo;
 pub use brain_signal::{BrainSignalFeedbackRepo, BrainSignalFeedbackRow};
 pub use coaching_intervention_log::{CoachingInterventionLogRepo, InterventionLogRow};
 pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
+pub use approval_pattern_history::{
+    ApprovalPatternHistoryRepo, PatternHistoryEntry,
+};
 pub use coding_approval_history::{
     ApprovalHistorySummary, CodingApprovalHistoryRepo, HistoryEntry,
 };
@@ -170,6 +174,7 @@ pub struct Repos {
     pub skill_version: SkillVersionRepo,
     pub notification_log: NotificationLogRepo,
     pub held_notifications: HeldNotificationsRepo,
+    pub approval_pattern_history: ApprovalPatternHistoryRepo,
     pub coding_approval_history: CodingApprovalHistoryRepo,
     pub coding_reviews: CodingReviewsRepo,
     pub workspaces: WorkspaceRepo,
@@ -211,6 +216,7 @@ impl Repos {
             skill_version: SkillVersionRepo::new(db.clone()),
             notification_log: NotificationLogRepo::new(db.clone()),
             held_notifications: HeldNotificationsRepo::new(db.clone()),
+            approval_pattern_history: ApprovalPatternHistoryRepo::new(db.clone()),
             coding_approval_history: CodingApprovalHistoryRepo::new(db.clone()),
             coding_reviews: CodingReviewsRepo::new(db.clone()),
             workspaces: WorkspaceRepo::new(db.clone()),

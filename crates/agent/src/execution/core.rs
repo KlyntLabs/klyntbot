@@ -53,6 +53,9 @@ pub async fn fan_out_event(
 /// `Some(LONG_RUNNING_TOOL_TIMEOUT)` from `Tool::custom_timeout()`.
 pub const LONG_RUNNING_TOOL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
 
+/// Finish reason emitted when the user cancels a streaming LLM call.
+const FINISH_REASON_CANCELLED: &str = "cancelled";
+
 /// Maximum number of tool calls that can execute concurrently within a single cycle.
 const MAX_CONCURRENT_TOOLS: usize = 10;
 
@@ -275,6 +278,7 @@ struct PartialToolCall {
 ///
 /// Token usage is taken from real provider data when available (via `LlmStreamChunk.usage`).
 /// Falls back to `best_token_counter()` estimation when the provider sends no usage.
+#[allow(clippy::too_many_arguments)]
 async fn call_provider_streaming(
     provider: &dyn providers::LlmProvider,
     messages: &[Message],
@@ -283,6 +287,7 @@ async fn call_provider_streaming(
     event_tx: &tokio::sync::mpsc::Sender<crate::events::AgentEvent>,
     domain_bus: Option<&Arc<bus::DomainEventBus>>,
     cache_breakpoints: &[providers::CacheBreakpoint],
+    cancel_token: &tokio_util::sync::CancellationToken,
 ) -> Result<providers::LlmResponse> {
     tracing::debug!(
         messages = messages.len(),
@@ -301,78 +306,106 @@ async fn call_provider_streaming(
     let mut accumulated_usage = Usage::default();
     let mut has_real_usage = false;
 
-    while let Some(result) = stream.next().await {
-        let chunk = result?;
-
-        // Consume content — avoids cloning on every token chunk.
-        if let Some(text) = chunk.content {
-            if !text.is_empty() {
-                content.push_str(&text);
+    loop {
+        tokio::select! {
+            biased;
+            _ = cancel_token.cancelled() => {
+                tracing::info!(
+                    content_len = content.len(),
+                    reasoning_len = reasoning.len(),
+                    "call_provider_streaming: cancellation observed mid-stream"
+                );
                 fan_out_event(
                     Some(event_tx),
                     domain_bus,
-                    crate::events::AgentEvent::ContentChunk { data: text },
+                    crate::events::AgentEvent::Cancelled {
+                        partial_content: content.clone(),
+                        partial_reasoning: reasoning.clone(),
+                    },
                 )
                 .await;
+                finish_reason = FINISH_REASON_CANCELLED.to_string();
+                break;
             }
-        }
+            maybe_chunk = stream.next() => {
+                match maybe_chunk {
+                    None => break,
+                    Some(result) => {
+                        let chunk = result?;
 
-        if let Some(r) = chunk.reasoning_content {
-            if !r.is_empty() {
-                reasoning.push_str(&r);
-                // Emit reasoning as a first-class event so the bridge can
-                // surface it to the FE as a `PartDelta::Reasoning` (rendered
-                // inline as italic "Thinking:" prose). Previously we silently
-                // buffered reasoning and only fell back to a synthetic
-                // ContentChunk if `content` was empty — meaning models that
-                // emit BOTH a reasoning channel and visible answer (most
-                // extended-thinking models) had their reasoning dropped.
-                fan_out_event(
-                    Some(event_tx),
-                    domain_bus,
-                    crate::events::AgentEvent::ReasoningChunk { data: r },
-                )
-                .await;
-            }
-        }
+                        // Consume content — avoids cloning on every token chunk.
+                        if let Some(text) = chunk.content {
+                            if !text.is_empty() {
+                                content.push_str(&text);
+                                fan_out_event(
+                                    Some(event_tx),
+                                    domain_bus,
+                                    crate::events::AgentEvent::ContentChunk { data: text },
+                                )
+                                .await;
+                            }
+                        }
 
-        if let Some(delta) = chunk.tool_call_delta {
-            while partials.len() <= delta.index {
-                partials.push(PartialToolCall {
-                    id: String::new(),
-                    name: String::new(),
-                    args: String::new(),
-                });
-            }
-            let partial = &mut partials[delta.index];
-            if let Some(id) = delta.id {
-                partial.id = id;
-            }
-            if let Some(name) = delta.name {
-                partial.name.push_str(&name);
-            }
-            if let Some(args) = delta.arguments {
-                partial.args.push_str(&args);
-            }
-        }
+                        if let Some(r) = chunk.reasoning_content {
+                            if !r.is_empty() {
+                                reasoning.push_str(&r);
+                                // Emit reasoning as a first-class event so the bridge can
+                                // surface it to the FE as a `PartDelta::Reasoning` (rendered
+                                // inline as italic "Thinking:" prose). Previously we silently
+                                // buffered reasoning and only fell back to a synthetic
+                                // ContentChunk if `content` was empty — meaning models that
+                                // emit BOTH a reasoning channel and visible answer (most
+                                // extended-thinking models) had their reasoning dropped.
+                                fan_out_event(
+                                    Some(event_tx),
+                                    domain_bus,
+                                    crate::events::AgentEvent::ReasoningChunk { data: r },
+                                )
+                                .await;
+                            }
+                        }
 
-        if let Some(reason) = chunk.finish_reason {
-            finish_reason = reason;
-        }
+                        if let Some(delta) = chunk.tool_call_delta {
+                            while partials.len() <= delta.index {
+                                partials.push(PartialToolCall {
+                                    id: String::new(),
+                                    name: String::new(),
+                                    args: String::new(),
+                                });
+                            }
+                            let partial = &mut partials[delta.index];
+                            if let Some(id) = delta.id {
+                                partial.id = id;
+                            }
+                            if let Some(name) = delta.name {
+                                partial.name.push_str(&name);
+                            }
+                            if let Some(args) = delta.arguments {
+                                partial.args.push_str(&args);
+                            }
+                        }
 
-        if let Some(chunk_usage) = chunk.usage {
-            has_real_usage = true;
-            if chunk_usage.prompt_tokens > 0 {
-                accumulated_usage.prompt_tokens = chunk_usage.prompt_tokens;
-            }
-            if chunk_usage.completion_tokens > 0 {
-                accumulated_usage.completion_tokens = chunk_usage.completion_tokens;
-            }
-            if chunk_usage.cache_read_tokens > 0 {
-                accumulated_usage.cache_read_tokens = chunk_usage.cache_read_tokens;
-            }
-            if chunk_usage.cache_write_tokens > 0 {
-                accumulated_usage.cache_write_tokens = chunk_usage.cache_write_tokens;
+                        if let Some(reason) = chunk.finish_reason {
+                            finish_reason = reason;
+                        }
+
+                        if let Some(chunk_usage) = chunk.usage {
+                            has_real_usage = true;
+                            if chunk_usage.prompt_tokens > 0 {
+                                accumulated_usage.prompt_tokens = chunk_usage.prompt_tokens;
+                            }
+                            if chunk_usage.completion_tokens > 0 {
+                                accumulated_usage.completion_tokens = chunk_usage.completion_tokens;
+                            }
+                            if chunk_usage.cache_read_tokens > 0 {
+                                accumulated_usage.cache_read_tokens = chunk_usage.cache_read_tokens;
+                            }
+                            if chunk_usage.cache_write_tokens > 0 {
+                                accumulated_usage.cache_write_tokens = chunk_usage.cache_write_tokens;
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -582,6 +615,14 @@ impl ExecutionCore {
         // in real-time. Non-streaming providers already have a default
         // `chat_stream()` impl that wraps `chat()` into a single-chunk stream,
         // so this works uniformly for all providers.
+
+        // Build a never-cancelled token if no cancel_token was supplied so
+        // call_provider_streaming always has a valid reference.
+        let cancel_ref = params
+            .cancel_token
+            .clone()
+            .unwrap_or_else(tokio_util::sync::CancellationToken::new);
+
         let response = if let Some(tx) = event_tx {
             call_provider_streaming(
                 &*self.provider,
@@ -591,6 +632,7 @@ impl ExecutionCore {
                 tx,
                 self.domain_event_bus.as_ref(),
                 cache_breakpoints,
+                &cancel_ref,
             )
             .await?
         } else {
@@ -605,6 +647,16 @@ impl ExecutionCore {
         };
 
         let usage = response.usage.clone();
+
+        if response.finish_reason == FINISH_REASON_CANCELLED {
+            return Ok((
+                CycleOutcome::Cancelled {
+                    partial_content: response.content.clone().unwrap_or_default(),
+                    partial_reasoning: response.reasoning_content.clone().unwrap_or_default(),
+                },
+                usage,
+            ));
+        }
 
         if usage.prompt_tokens > 0 {
             let hit_rate = usage.cache_read_tokens as f64 / usage.prompt_tokens as f64;
@@ -795,7 +847,11 @@ impl ExecutionCore {
                                     preview: None,
                                     suggested_grant: None,
                                 };
-                                match gate.check(req).await? {
+                                let approval_cancel_ref = ctx
+                                    .cancel_token
+                                    .clone()
+                                    .unwrap_or_else(tokio_util::sync::CancellationToken::new);
+                                match gate.check(req, &approval_cancel_ref).await? {
                                     approval::GateOutcome::Allow => {}
                                     approval::GateOutcome::Deny { reason } => {
                                         return Err(common::KlyntbotError::PermissionDenied(

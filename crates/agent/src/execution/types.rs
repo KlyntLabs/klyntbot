@@ -146,6 +146,13 @@ pub enum CycleOutcome {
     EmptyResponse,
     /// LLM returned text that looks like a fabricated tool response.
     FabricatedResponse { content: String },
+    /// User cancelled mid-stream. Carries any content/reasoning streamed
+    /// before the cancel was observed. Both fields may be empty if the
+    /// cancel raced the very first chunk.
+    Cancelled {
+        partial_content: String,
+        partial_reasoning: String,
+    },
 }
 
 /// Accumulate token usage from one cycle into a running total.

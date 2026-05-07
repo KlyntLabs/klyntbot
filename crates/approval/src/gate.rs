@@ -16,7 +16,7 @@ pub trait ApprovalSuggester: Send + Sync {
     async fn suggest(
         &self,
         tool_name: &str,
-        args_hash: &str,
+        path: Option<&str>,
     ) -> Option<SuggestedGrant>;
 }
 
@@ -65,7 +65,11 @@ impl ApprovalGate {
         self.grants.purge_session(session_id).await
     }
 
-    pub async fn check(&self, mut req: ApprovalRequest) -> Result<GateOutcome> {
+    pub async fn check(
+        &self,
+        mut req: ApprovalRequest,
+        cancel_token: &tokio_util::sync::CancellationToken,
+    ) -> Result<GateOutcome> {
         // Run classify hooks — last non-None override wins.
         for hook in &self.hooks {
             if let Some(class) = hook.classify(&req.tool_name, req.action.as_deref(), &req.args) {
@@ -116,15 +120,26 @@ impl ApprovalGate {
         if req.suggested_grant.is_none() {
             let suggester = self.suggester.lock().unwrap().clone();
             if let Some(s) = suggester {
-                let args_hash = compute_args_hash(&req.tool_name, &req.args);
-                if let Some(grant) = s.suggest(&req.tool_name, &args_hash).await {
+                let path = crate::extract_path_str_from_args(&req.args);
+                if let Some(grant) = s.suggest(&req.tool_name, path.as_deref()).await {
                     req.suggested_grant = Some(grant);
                 }
             }
         }
 
-        // Prompt the channel.
-        let decision = self.channel.request(req.clone()).await;
+        // Prompt the channel — race against cancellation so a hung approval
+        // modal cannot pin the agent loop forever.
+        let decision = tokio::select! {
+            biased;
+            _ = cancel_token.cancelled() => {
+                tracing::info!(
+                    tool = %req.tool_name,
+                    "approval: cancellation observed while awaiting channel decision"
+                );
+                return Ok(GateOutcome::Cancel);
+            }
+            d = self.channel.request(req.clone()) => d,
+        };
         match decision {
             ApprovalDecision::Once => Ok(GateOutcome::Allow),
             ApprovalDecision::Session => {
@@ -169,19 +184,6 @@ impl ApprovalGate {
     }
 }
 
-/// Compute a hash of tool_name + args for pattern matching.
-/// Note: serde_json::to_string preserves insertion order, so two logically
-/// identical objects with different field orders will produce different hashes.
-fn compute_args_hash(tool_name: &str, args: &serde_json::Value) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let mut hasher = DefaultHasher::new();
-    tool_name.hash(&mut hasher);
-    let json_str = serde_json::to_string(args).unwrap_or_default();
-    json_str.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -190,6 +192,7 @@ mod tests {
     use std::collections::HashSet;
     use std::sync::Mutex;
     use storage::StoragePool;
+    use tokio_util::sync::CancellationToken;
 
     #[derive(Default, Clone)]
     struct StubChannel {
@@ -246,7 +249,8 @@ mod tests {
             preview: None,
             suggested_grant: None,
         };
-        let out = gate.check(req).await.unwrap();
+        let token = tokio_util::sync::CancellationToken::new();
+        let out = gate.check(req, &token).await.unwrap();
         assert!(matches!(out, GateOutcome::Allow));
         assert_eq!(*chan.requested.lock().unwrap(), 0);
     }
@@ -273,11 +277,12 @@ mod tests {
             suggested_grant: None,
         };
 
-        let out1 = gate.check(make_req()).await.unwrap();
+        let token = tokio_util::sync::CancellationToken::new();
+        let out1 = gate.check(make_req(), &token).await.unwrap();
         assert!(matches!(out1, GateOutcome::Allow));
         assert_eq!(*chan.requested.lock().unwrap(), 1);
 
-        let out2 = gate.check(make_req()).await.unwrap();
+        let out2 = gate.check(make_req(), &token).await.unwrap();
         assert!(matches!(out2, GateOutcome::Allow));
         assert_eq!(*chan.requested.lock().unwrap(), 1);
     }
@@ -305,7 +310,8 @@ mod tests {
             preview: None,
             suggested_grant: None,
         };
-        let out = gate.check(req).await.unwrap();
+        let token = tokio_util::sync::CancellationToken::new();
+        let out = gate.check(req, &token).await.unwrap();
         assert!(matches!(out, GateOutcome::Deny { .. }));
     }
 
@@ -330,7 +336,8 @@ mod tests {
             preview: None,
             suggested_grant: None,
         };
-        let out = gate.check(req).await.unwrap();
+        let token = tokio_util::sync::CancellationToken::new();
+        let out = gate.check(req, &token).await.unwrap();
         assert!(matches!(out, GateOutcome::Cancel));
     }
 
@@ -353,8 +360,62 @@ mod tests {
             preview: None,
             suggested_grant: None,
         };
-        let out = gate.check(req).await.unwrap();
+        let token = tokio_util::sync::CancellationToken::new();
+        let out = gate.check(req, &token).await.unwrap();
         assert!(matches!(out, GateOutcome::Allow));
         assert_eq!(*chan.requested.lock().unwrap(), 0);
+    }
+
+    use std::time::Duration;
+
+    /// Channel whose `request` future never resolves until dropped.
+    struct HungChannel;
+
+    #[async_trait::async_trait]
+    impl ApprovalChannel for HungChannel {
+        async fn request(&self, _r: ApprovalRequest) -> ApprovalDecision {
+            std::future::pending().await
+        }
+        fn capabilities(&self) -> ApprovalCapabilities {
+            ApprovalCapabilities {
+                supports_inline: true,
+                supports_classes: HashSet::from([ApprovalClass::Destructive]),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn cancel_during_channel_request_returns_cancel_outcome() {
+        let pool = StoragePool::connect_in_memory().await.unwrap();
+        let repo = ApprovalGrantsRepo::new(pool);
+        let gate = Arc::new(ApprovalGate::new(repo, Arc::new(HungChannel)));
+
+        let token = CancellationToken::new();
+        let token_for_task = token.clone();
+        let gate_for_task = gate.clone();
+
+        let req = ApprovalRequest {
+            tool_name: "bash".into(),
+            action: None,
+            args: serde_json::json!({"cmd":"rm"}),
+            class: ApprovalClass::Destructive,
+            scope: ApprovalScope::ToolAction,
+            ctx: ctx(),
+            preview: None,
+            suggested_grant: None,
+        };
+
+        let handle = tokio::spawn(async move { gate_for_task.check(req, &token_for_task).await });
+
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        token.cancel();
+
+        let outcome = tokio::time::timeout(Duration::from_millis(200), handle)
+            .await
+            .expect("gate.check should return within 200ms of cancel")
+            .expect("task should not panic")
+            .expect("gate.check should return Ok");
+
+        assert!(matches!(outcome, GateOutcome::Cancel));
     }
 }

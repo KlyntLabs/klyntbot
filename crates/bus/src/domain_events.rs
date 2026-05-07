@@ -204,8 +204,13 @@ pub enum DomainEvent {
     },
     ApprovalResolved {
         request_id: String,
+        user_id: Option<String>,
+        tool_name: String,
+        path: Option<String>,
         decision: String,
+        pattern_used: Option<String>,
         decided_by: String,
+        occurred_at: i64,
     },
 
     // -- Cross-domain --

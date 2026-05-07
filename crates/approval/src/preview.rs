@@ -98,7 +98,7 @@ pub fn build_preview(
         PreviewKind::Command => build_command_preview(args, ctx),
         PreviewKind::Url => build_url_preview(args),
         PreviewKind::Mcp => build_mcp_preview(tool_name, args),
-        PreviewKind::Generic => ApprovalPreview::Generic { args: args.clone() },
+        PreviewKind::Generic => build_generic_preview(args),
     }
 }
 
@@ -285,6 +285,10 @@ fn build_url_preview(args: &serde_json::Value) -> ApprovalPreview {
         headers,
         body_preview,
     }
+}
+
+fn build_generic_preview(args: &serde_json::Value) -> ApprovalPreview {
+    ApprovalPreview::Generic { args: args.clone() }
 }
 
 fn build_mcp_preview(tool_name: &str, args: &serde_json::Value) -> ApprovalPreview {
@@ -494,6 +498,95 @@ mod tests {
                 assert_eq!(tool, "create_issue");
             }
             _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn diff_preview_empty_file_becomes_all_additions() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd = dir.path().to_path_buf();
+        let ctx = test_ctx(cwd);
+
+        // Empty existing file
+        std::fs::write(dir.path().join("empty.txt"), "").unwrap();
+        let args = serde_json::json!({
+            "path": "empty.txt",
+            "content": "hello\n",
+        });
+        let result = build_diff_preview(&args, &ctx).expect("preview");
+        match result {
+            ApprovalPreview::Diff { lines_added, lines_removed, .. } => {
+                assert!(lines_added >= 1);
+                assert_eq!(lines_removed, 0);
+            }
+            _ => panic!("expected Diff"),
+        }
+    }
+
+    #[test]
+    fn diff_preview_all_deletions() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd = dir.path().to_path_buf();
+        let ctx = test_ctx(cwd);
+
+        std::fs::write(dir.path().join("delete_me.txt"), "sole line\n").unwrap();
+        let args = serde_json::json!({
+            "path": "delete_me.txt",
+            "content": "",
+        });
+        let result = build_diff_preview(&args, &ctx).expect("preview");
+        match result {
+            ApprovalPreview::Diff { lines_added, lines_removed, .. } => {
+                assert_eq!(lines_added, 0);
+                assert!(lines_removed >= 1);
+            }
+            _ => panic!("expected Diff"),
+        }
+    }
+
+    #[test]
+    fn diff_preview_no_trailing_newline() {
+        let dir = tempfile::tempdir().unwrap();
+        let cwd = dir.path().to_path_buf();
+        let ctx = test_ctx(cwd);
+
+        std::fs::write(dir.path().join("no_nl.txt"), "no newline").unwrap();
+        let args = serde_json::json!({
+            "path": "no_nl.txt",
+            "old_string": "no",
+            "new_string": "yes",
+        });
+        let result = build_diff_preview(&args, &ctx).expect("preview");
+        match result {
+            ApprovalPreview::Diff { lines_added, lines_removed, .. } => {
+                assert_eq!(lines_added, 1);
+                assert_eq!(lines_removed, 1);
+            }
+            _ => panic!("expected Diff"),
+        }
+    }
+
+    #[test]
+    fn url_preview_redacts_sensitive_headers() {
+        let cases = [
+            ("Cookie", "session=abc123"),
+            ("X-API-Key", "supersecret"),
+            ("X-Auth-Token", "tokensecret"),
+            ("Proxy-Authorization", "Basic secret"),
+            ("Set-Cookie", "id=secret; HttpOnly"),
+        ];
+        for (header, value) in cases {
+            let preview = build_url_preview(&serde_json::json!({
+                "url": "https://api.example.com/x",
+                "headers": { header: value },
+            }));
+            match preview {
+                ApprovalPreview::Url { headers, .. } => {
+                    let h = headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(header));
+                    assert_eq!(h.unwrap().1, "<redacted>", "failed for header: {header}");
+                }
+                _ => panic!("expected Url preview for header: {header}"),
+            }
         }
     }
 }

@@ -1,13 +1,14 @@
 use cognitive::mirror::sources::approval_history::ApprovalHistorySource;
-use storage::repos::CodingApprovalHistoryRepo;
+use storage::repos::{ApprovalPatternHistoryRepo, CodingApprovalHistoryRepo};
 use storage::StoragePool;
 use tools_core::events::ToolEvent;
 
 #[tokio::test]
 async fn records_resolved_approval_into_history_repo() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    let repo = std::sync::Arc::new(CodingApprovalHistoryRepo::new(pool.inner().clone()));
-    let source = ApprovalHistorySource::new(repo.clone());
+    let legacy_repo = std::sync::Arc::new(CodingApprovalHistoryRepo::new(pool.inner().clone()));
+    let pattern_repo = std::sync::Arc::new(ApprovalPatternHistoryRepo::new(pool.inner().clone()));
+    let source = ApprovalHistorySource::new(pattern_repo, legacy_repo.clone());
 
     // Synthesize a paired ApprovalRequested + ApprovalResolved as a fake stream
     let req = ToolEvent::ApprovalRequested {

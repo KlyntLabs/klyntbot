@@ -205,6 +205,14 @@ pub enum AgentEvent {
         cancelled_at: i64,
     },
 
+    /// Emitted when the user cancels mid-LLM-stream. Carries whatever
+    /// content/reasoning had been streamed before the cancel was observed.
+    /// Both fields may be empty strings if cancel raced the very first chunk.
+    Cancelled {
+        partial_content: String,
+        partial_reasoning: String,
+    },
+
     /// An agent delegation has started (agent-to-agent handoff).
     DelegationStarted {
         #[serde(rename = "fromAgent")]

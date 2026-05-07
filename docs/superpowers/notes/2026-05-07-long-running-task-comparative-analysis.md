@@ -791,6 +791,32 @@ After this analysis was first written, deeper reading of the existing codebase r
 
 ---
 
+## Update 2026-05-07 (evening) — Phase 0 progress
+
+| Item | Status | Notes |
+|---|---|---|
+| 0.1 Approval handler + diff preview | ✅ **Done** | Per `plans/2026-05-07-coding-approval-handler-and-diff-preview.md`. Coding-mode `approval_handler.rs` delegates to `ApprovalGate`; preview cards + smart pattern picker + mirror-driven suggestions shipped with `bb664ce8c`. Mirror gained `ApprovalHistorySource` + `approval_pattern_history` repo. |
+| 0.2 Auto-title (LLM call) | ✅ **Done** | `title_service.rs::autogenerate_title` makes the real `provider.chat` call (5s timeout, temp 0.2, max 24 tokens), sanitizes, renames the session, and emits `coding:thread_updated`. Wired from `turn_handler.rs:118` with `already_titled` + `msg_count <= 1` guards. Three tests cover skip / happy path / provider-error. |
+| 0.3 Mid-stream cancel + approval-channel leak fix | 🚧 In progress (separate workstream) | Plan: `plans/2026-05-07-mid-stream-cancel-and-approval-cancel-leak.md`. |
+| 0.4 ThreadEventBuffer | ✅ **Done** | Per the same plan as 0.2; buffer + replay-on-subscribe landed in the running-state sidebar work (`useThreadEvents` reducer, ring buffer cap=500). |
+| Phase 1 — KlyntTracingProvider | 🚧 In progress (separate team member) | Plan: `plans/2026-05-07-klynt-tracing-provider.md`. |
+
+**Phase 0 is closed for this workstream.** 0.1, 0.2, 0.4 are done; 0.3 and Phase 1 are in flight elsewhere. The path forward is Phase 2.
+
+**Recommended next move: start Phase 2 in parallel with the in-flight workstreams.** Phase 2 items are independent of 0.3 and Phase 1 (they ride on top of the wire-bus once it lands but don't gate on it for development), and Phase 2 is where the perceived gap vs kimi-cli actually closes.
+
+**Phase 2 ordering (revised, given current state):**
+
+1. **0.2 auto-title** (1 day) — close the last Phase 0 thread before context-switching to Phase 2 features. Avoids leaving "Untitled session" in the sidebar shipping alongside new affordances.
+2. **2.1 TodoWrite** (~3 days). Cheapest, highest-leverage Phase 2 win. Single tool (`coding_todo`), single SQLite table (`coding_todos`), one new sidebar component (`TodoSidebar.tsx`). Pays back immediately on multi-step coding turns and is the affordance kimi-cli leans on hardest. Lands cleanly without depending on Phase 1 — wire-log emission becomes a free downstream consequence once Phase 1 ships.
+3. **2.2 Plan mode** (~3–4 days). Frame as `CodingApprovalPolicy::PlanMode` variant inside the existing approval architecture (the unified-permission-gate spec already anticipates this — half the cost is pre-paid). Adds the dynamic-injection scaffold that 2.4 (hooks) will reuse.
+4. **2.5 /btw side-question** (~1–2 days). Small, self-contained, and pleasant to use. Good "demo win" between heavier features.
+5. **2.3 Background bash** and **2.4 Hooks** — pick whichever the user-facing roadmap prioritizes. Background bash is a week of work but unlocks long compile/test loops; hooks are 3 days but require careful sandbox + interceptor-chain integration.
+
+**Why TodoWrite first over plan mode:** plan mode's value compounds with TodoWrite (the model uses todos *inside* a plan), but TodoWrite stands alone. Building the dependency-free piece first gives you a shippable feature even if plan mode slips.
+
+---
+
 ## Appendix A — Original agent reports
 
 The three deep-dive reports (Klynt internal, kimi-cli, opencode) generated 2026-05-07 are the source-of-truth for the analysis above. They contain file:line citations and verbatim quotes that this synthesis condenses. If discrepancies arise, the agent reports take precedence — they were ground-truth at the time of writing.

@@ -2,7 +2,7 @@ use crate::class::{ApprovalClass, ApprovalScope};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum ChannelKind {
     Desktop,
@@ -36,7 +36,7 @@ impl From<&str> for ChannelKind {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct ApprovalContext {
     pub mode: common::SessionMode,
     pub channel: ChannelKind,
@@ -51,7 +51,7 @@ impl ApprovalContext {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct ApprovalRequest {
     pub tool_name: String,
     pub action: Option<String>,

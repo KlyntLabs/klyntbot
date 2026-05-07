@@ -76,7 +76,21 @@ impl DesktopApprovalChannel {
         })
     }
 
-    #[cfg(test)]
+    /// Build a `GrantRow` from a pending snapshot for Forever-class decisions.
+    pub fn build_grant_row(&self, snapshot: &PendingSnapshot) -> approval::GrantRow {
+        let now = jiff::Timestamp::now().as_second();
+        approval::GrantRow {
+            class: snapshot.class,
+            tool_name: snapshot.tool_name.clone(),
+            action: None,
+            resource_key: approval::extract_path_str_from_args(&snapshot.args),
+            lifetime: approval::ApprovalLifetime::Forever,
+            session_id: None,
+            granted_at: now,
+            expires_at: None,
+        }
+    }
+
     pub fn pending_ids(&self) -> Vec<String> {
         self.pending.iter().map(|e| e.key().clone()).collect()
     }
@@ -108,7 +122,7 @@ impl ApprovalChannel for DesktopApprovalChannel {
             "preview": req.preview,
             "suggested_grant": req.suggested_grant,
         });
-        self.emitter.emit_event("approval:request", payload);
+        self.emitter.emit_event("agent:approval_requested", payload);
 
         match tokio::time::timeout(APPROVAL_TIMEOUT, rx).await {
             Ok(Ok(decision)) => decision,

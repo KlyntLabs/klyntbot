@@ -1,7 +1,7 @@
 //! Approval response handler — routes user decisions back to the gate's
 //! pending-request map so the awaiting tool future resolves.
 
-use approval::{ApprovalDecision, ApprovalGrantsRepo, ApprovalLifetime, GrantRow};
+use approval::{ApprovalDecision, ApprovalGrantsRepo};
 use bus::DomainEvent;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -45,6 +45,10 @@ pub async fn respond_approval(
         AppApprovalDecision::AddRule { .. } => ApprovalDecision::Forever,
     };
 
+    // Capture snapshot BEFORE resolve() so we have the tool/args/cwd data
+    // for persistence and event emission even after the pending entry is removed.
+    let snapshot = channel.peek(request_id);
+
     let result = channel
         .resolve(request_id, core_decision)
         .map_err(|e| match e {
@@ -64,19 +68,8 @@ pub async fn respond_approval(
             AppApprovalDecision::AllowAlways { .. } | AppApprovalDecision::AddRule { .. }
         )
     {
-        if let Some(snapshot) = channel.peek(request_id) {
-            let resource_key = approval::extract_path_str_from_args(&snapshot.args);
-            let now = jiff::Timestamp::now().as_second();
-            let row = GrantRow {
-                class: snapshot.class,
-                tool_name: snapshot.tool_name,
-                action: None,
-                resource_key,
-                lifetime: ApprovalLifetime::Forever,
-                session_id: None,
-                granted_at: now,
-                expires_at: None,
-            };
+        if let Some(ref snap) = snapshot {
+            let row = channel.build_grant_row(snap);
             let _ = grants_repo.insert(&row).await;
         }
     }
@@ -89,10 +82,24 @@ pub async fn respond_approval(
             } else {
                 "allow"
             };
+            let pattern_used = match &decision {
+                AppApprovalDecision::AllowAlways { rule } => rule.clone(),
+                AppApprovalDecision::AddRule { starlark_source } => Some(starlark_source.clone()),
+                _ => None,
+            };
+            let occurred_at = jiff::Timestamp::now().as_second();
+            let path = snapshot
+                .as_ref()
+                .and_then(|s| approval::extract_path_str_from_args(&s.args));
             bus.publish(DomainEvent::ApprovalResolved {
                 request_id: request_id.to_string(),
+                user_id: None,
+                tool_name: snapshot.as_ref().map(|s| s.tool_name.clone()).unwrap_or_default(),
+                path,
                 decision: decision_str.to_string(),
+                pattern_used,
                 decided_by: "user".to_string(),
+                occurred_at,
             });
         }
     }

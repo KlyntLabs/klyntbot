@@ -19,17 +19,33 @@ impl approval::ApprovalSuggester for MirrorApprovalSuggester {
     async fn suggest(
         &self,
         tool_name: &str,
-        args_hash: &str,
+        path: Option<&str>,
     ) -> Option<approval::SuggestedGrant> {
-        let pattern = self.facade.suggest_approval_pattern(tool_name, args_hash).await?;
+        let pattern = self.facade.suggest_approval_pattern(tool_name, path).await?;
         Some(approval::SuggestedGrant {
             pattern: pattern.label.clone(),
-            scope: approval::GrantScope::ToolGlob {
-                tool: tool_name.to_string(),
-                glob: format!("{}*", pattern.args_hash),
+            scope: match &pattern.scope {
+                cognitive::mirror::sources::approval_history::PatternScope::ExactPath(p) => {
+                    approval::GrantScope::ExactToolPath {
+                        tool: tool_name.to_string(),
+                        path: std::path::PathBuf::from(p),
+                    }
+                }
+                cognitive::mirror::sources::approval_history::PatternScope::ParentFolder(p) => {
+                    approval::GrantScope::ToolFolder {
+                        tool: tool_name.to_string(),
+                        folder: std::path::PathBuf::from(p),
+                    }
+                }
+                cognitive::mirror::sources::approval_history::PatternScope::Glob(g) => {
+                    approval::GrantScope::ToolGlob {
+                        tool: tool_name.to_string(),
+                        glob: g.clone(),
+                    }
+                }
             },
             reason: format!(
-                "Mirror: {} prior approvals for this tool configuration",
+                "Mirror: {} prior approvals for this pattern",
                 pattern.approval_count
             ),
         })

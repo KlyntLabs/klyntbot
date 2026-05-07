@@ -15957,6 +15957,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "specta",
  "tokio",
  "tokio-util",
  "tools-core-macros",

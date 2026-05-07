@@ -24,10 +24,21 @@ pub async fn init_coding_subscribers(
     let skill_eff = Arc::new(SkillEffectivenessSignal::new(mirror_repo.clone()));
     let recall_cov = Arc::new(RecallCoverageSignal::new(mirror_repo));
 
+    let pattern_repo = Arc::new(storage::repos::ApprovalPatternHistoryRepo::new(
+        storage_pool.inner().clone(),
+    ));
     let history_repo = Arc::new(storage::repos::CodingApprovalHistoryRepo::new(
         storage_pool.inner().clone(),
     ));
-    let approval_source = Arc::new(ApprovalHistorySource::new(history_repo));
+    let approval_source = Arc::new(ApprovalHistorySource::new(pattern_repo, history_repo));
+
+    // Spawn the approval history source's own bus subscriber (handles both
+    // ApprovalRequested + ApprovalResolved, writing to pattern history).
+    let approval_source_clone = Arc::clone(&approval_source);
+    let bus_clone = Arc::clone(&bus);
+    tokio::spawn(async move {
+        approval_source_clone.run(bus_clone).await;
+    });
 
     let mut rx = bus.subscribe();
     tokio::spawn(async move {
@@ -49,32 +60,8 @@ pub async fn init_coding_subscribers(
                     let coverage = after_score.clamp(0.0, 1.0);
                     let _ = recall_cov.observe_recall_injected(coverage, false).await;
                 }
-                DomainEvent::ApprovalRequested {
-                    request_id,
-                    tool,
-                    args_hash,
-                    layer,
-                    repo_id,
-                } => {
-                    approval_source.observe_request(
-                        &request_id,
-                        &tool,
-                        &args_hash,
-                        &layer,
-                        repo_id.as_deref().unwrap_or(""),
-                    );
-                }
-                DomainEvent::ApprovalResolved {
-                    request_id,
-                    decision,
-                    decided_by,
-                } => {
-                    let _ = approval_source
-                        .observe_resolution(&request_id, &decision, &decided_by)
-                        .await;
-                    // TODO: wire ApprovalHistorySignal::observe_approval_decision once
-                    // ApprovalResolved carries the tool name (needed for 6+ consecutive-allow detection).
-                }
+                // Approval events are handled by ApprovalHistorySource::run above.
+                DomainEvent::ApprovalRequested { .. } | DomainEvent::ApprovalResolved { .. } => {}
                 _ => {}
             }
         }

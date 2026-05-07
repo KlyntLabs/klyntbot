@@ -266,6 +266,22 @@ pub async fn execute_loop(
                     finish_reason: LoopFinishReason::Completed,
                 });
             }
+
+            CycleOutcome::Cancelled { partial_content, .. } => {
+                let content = if partial_content.is_empty() {
+                    std::mem::take(&mut last_content)
+                } else {
+                    partial_content
+                };
+                return Ok(ExecuteLoopResult {
+                    content,
+                    usage: accumulated_usage,
+                    turns: cap.turns_used(),
+                    safety_cap_hit: false,
+                    tool_calls: all_tool_calls,
+                    finish_reason: LoopFinishReason::Cancelled,
+                });
+            }
         }
 
         // ── Mid-loop compression ─────────────────────────────

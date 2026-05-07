@@ -918,3 +918,39 @@ CREATE TABLE IF NOT EXISTS workspaces (
 CREATE INDEX IF NOT EXISTS idx_workspaces_path ON workspaces(path);
 CREATE INDEX IF NOT EXISTS idx_workspaces_project_id ON workspaces(project_id);
 CREATE INDEX IF NOT EXISTS idx_workspaces_parent_id ON workspaces(parent_id);
+
+-- Phase 2: Mirror-learned approval cache (Layer 3)
+-- Append-only log of every ApprovalResolved event keyed by (tool, args_hash, repo_id).
+CREATE TABLE IF NOT EXISTS coding_approval_history (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    tool            TEXT NOT NULL,
+    args_hash       TEXT NOT NULL,
+    repo_id         TEXT NOT NULL DEFAULT '',
+    decision        TEXT NOT NULL,           -- 'allow' | 'deny'
+    decided_by      TEXT NOT NULL,           -- 'user' | 'auto_allow' | 'auto_deny' | 'timeout' | 'cancelled'
+    layer           TEXT NOT NULL,           -- which layer fired
+    created_at      INTEGER NOT NULL DEFAULT (cast(strftime('%s','now') as integer))
+);
+
+CREATE INDEX IF NOT EXISTS idx_coding_approval_history_key
+  ON coding_approval_history(tool, args_hash, repo_id);
+
+CREATE INDEX IF NOT EXISTS idx_coding_approval_history_clear
+  ON coding_approval_history(tool, repo_id);
+
+-- Phase 2: Mirror path-based approval pattern history
+CREATE TABLE IF NOT EXISTS approval_pattern_history (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      TEXT NOT NULL DEFAULT 'default',
+    tool_name    TEXT NOT NULL,
+    path         TEXT,
+    decision     TEXT NOT NULL,           -- 'once' | 'forever' | 'denied'
+    pattern_used TEXT,                    -- the pattern committed (if Forever)
+    occurred_at  INTEGER NOT NULL DEFAULT (cast(strftime('%s','now') as integer))
+);
+
+CREATE INDEX IF NOT EXISTS idx_aph_tool_path
+  ON approval_pattern_history(user_id, tool_name, path);
+
+CREATE INDEX IF NOT EXISTS idx_aph_recency
+  ON approval_pattern_history(user_id, tool_name, occurred_at);

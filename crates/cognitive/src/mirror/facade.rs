@@ -89,11 +89,11 @@ impl MirrorFacade {
     pub async fn suggest_approval_pattern(
         &self,
         tool: &str,
-        args_hash: &str,
+        path: Option<&str>,
     ) -> Option<crate::mirror::sources::approval_history::SuggestedPattern> {
         self.approval_history
             .as_ref()?
-            .suggest_pattern(tool, args_hash)
+            .suggest_pattern(tool, path)
             .await
     }
 
