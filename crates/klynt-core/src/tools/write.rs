@@ -38,7 +38,9 @@ pub struct WriteArgs {
     category = "FileSystem",
     cost = "Free",
     tags = "fs,write,coding",
-    allowed_channels = "coding_only"
+    allowed_channels = "coding_only",
+    approval_class = "destructive",
+    approval_scope = "path"
 )]
 pub struct WriteTool {
     cwd: PathBuf,

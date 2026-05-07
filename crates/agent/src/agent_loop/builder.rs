@@ -87,6 +87,7 @@ pub struct AgentLoopBuilder {
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
     coding_recall_service: Option<Arc<coding_memory::recall::CodingRecallService>>,
+    approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
 }
 
 impl AgentLoopBuilder {
@@ -111,7 +112,16 @@ impl AgentLoopBuilder {
             context_update_queue: None,
             embedding_engine: None,
             coding_recall_service: None,
+            approval_channel: None,
         }
+    }
+
+    pub fn with_approval_channel(
+        mut self,
+        channel: Arc<dyn approval::ApprovalChannel>,
+    ) -> Self {
+        self.approval_channel = Some(channel);
+        self
     }
     pub fn with_coding_recall_service(
         mut self,
@@ -1792,6 +1802,33 @@ impl AgentLoopBuilder {
         if let Some(ref domain_bus) = self.domain_event_bus {
             execution_core = execution_core.with_domain_bus(Arc::clone(domain_bus));
         }
+
+        // Approval gate: built whenever a storage pool is available so that
+        // every tool call passes through ApprovalGate::check before execute.
+        // The classify hook (CodingApprovalPolicy) lets coding-mode bash/edit
+        // be reclassified per-args; tools without runtime classification fall
+        // through to their declarative approval_class.
+        // Without an injected channel we use BlockingFallbackChannel — that
+        // makes destructive ops fail loudly rather than silently passing.
+        if let Some(pool) = &self.pool {
+            let grants_repo =
+                approval::ApprovalGrantsRepo::new(storage::StoragePool::from_existing(pool.clone()));
+            let channel: Arc<dyn approval::ApprovalChannel> = self
+                .approval_channel
+                .clone()
+                .unwrap_or_else(|| Arc::new(approval::BlockingFallbackChannel::desktop_prompt()));
+            let coding_policy = approval::CodingApprovalPolicy::compile(&config.coding.permissions)
+                .map_err(|e| common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+                    "approval: coding-policy compile failed: {e}"
+                ))))?;
+            let gate = approval::ApprovalGate::new(grants_repo, channel)
+                .with_classify_hooks(vec![Arc::new(coding_policy)]);
+            execution_core = execution_core.with_approval_gate(Arc::new(gate));
+            info!("approval gate wired into ExecutionCore");
+        } else {
+            warn!("approval gate NOT wired (no storage pool) — tool calls will not be gated");
+        }
+
         let execution_core = Arc::new(execution_core);
 
         let cost_tracker = Arc::new(

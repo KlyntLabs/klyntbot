@@ -14,6 +14,8 @@ import type {
 } from "@/types";
 import { useFileLinkOpener } from "../hooks/useFileLinkOpener";
 import { parseReasoning } from "../utils/messageRenderUtils";
+import { groupBursts } from "../utils/groupBursts";
+import { BurstRow } from "./BurstRow";
 import {
   ApprovalRow,
   DiffRow,
@@ -260,7 +262,19 @@ export const Messages = memo(function Messages({
     <div className="messages messages-full" ref={containerRef} onScroll={updateAutoScroll}>
       <div className="messages-inner">
         <CostCeilingBanner sessionKey={threadId ?? ""} />
-        {visibleItems.map(renderItem)}
+        {groupBursts(visibleItems).map((entry) => {
+          if ("kind" in entry && entry.kind === "burst") {
+            return (
+              <BurstRow
+                key={entry.id}
+                group={entry}
+                expandedItems={expandedItems}
+                onToggle={toggleExpanded}
+              />
+            );
+          }
+          return renderItem(entry);
+        })}
         {planFollowupNode}
         {userInputNode}
         <WorkingIndicator

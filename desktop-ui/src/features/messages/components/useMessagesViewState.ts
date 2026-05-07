@@ -223,6 +223,25 @@ export function useMessagesViewState({
     }
   }, [visibleItems]);
 
+  // Auto-expand-on-error: when a tool transitions to a failed status, add its
+  // id to expandedItems on first observation. Mirrors the plan-expand effect
+  // above and respects manual user collapse via manuallyToggledExpandedRef.
+  useEffect(() => {
+    setExpandedItems((prev) => {
+      let next: Set<string> | null = null;
+      for (const item of visibleItems) {
+        if (item.kind !== "tool") continue;
+        const status = (item.status ?? "").toLowerCase();
+        if (!/(fail|error)/.test(status)) continue;
+        if (manuallyToggledExpandedRef.current.has(item.id)) continue;
+        if (prev.has(item.id)) continue;
+        if (!next) next = new Set(prev);
+        next.add(item.id);
+      }
+      return next ?? prev;
+    });
+  }, [visibleItems]);
+
 
   const planFollowup = useMemo(() => {
     if (!onPlanAccept || !onPlanSubmitChanges) {

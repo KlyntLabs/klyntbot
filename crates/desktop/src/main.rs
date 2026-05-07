@@ -177,6 +177,7 @@ fn run_mcp_stdio() {
             Some(config),
             None, // notification_sender — not needed for stdio MCP
             Some(event_emitter),
+            None, // approval_channel — stdio MCP defers to BlockingFallback (decline destructive)
         )
         .await
         .expect("init failed");
@@ -279,7 +280,7 @@ fn run_desktop_app() {
         .setup(move |app| {
             specta.mount_events(app);
             let handle = app.handle().clone();
-            let (core_inner, global_event_tx) =
+            let (core_inner, global_event_tx, approval_channel) =
                 tauri::async_runtime::block_on(app_core::init(handle))
                     .expect("failed to initialize app core");
             let core = Arc::new(core_inner);
@@ -401,7 +402,7 @@ fn run_desktop_app() {
             }
 
             app.manage(core);
-            app.manage(Arc::new(desktop::approval::DesktopApprovalChannel::new(app.handle().clone())));
+            app.manage(approval_channel);
             app.manage(Arc::new(focus_timer::FocusTimer::new()));
 
             // No periodic mi_collect timer needed — common::memory::purge_freed_memory()

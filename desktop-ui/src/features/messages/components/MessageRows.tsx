@@ -1,41 +1,28 @@
-import { exportMarkdownFile } from "@services/tauri";
-import { pushErrorToast } from "@services/toasts";
-import type { ParsedFileLocation } from "@utils/fileLinks";
 import Check from "lucide-react/dist/esm/icons/check";
 import Copy from "lucide-react/dist/esm/icons/copy";
-import Diff from "lucide-react/dist/esm/icons/diff";
-import FileDiffIcon from "lucide-react/dist/esm/icons/file-diff";
-import FileText from "lucide-react/dist/esm/icons/file-text";
-import Image from "lucide-react/dist/esm/icons/image";
 import Quote from "lucide-react/dist/esm/icons/quote";
-import Search from "lucide-react/dist/esm/icons/search";
-import Terminal from "lucide-react/dist/esm/icons/terminal";
-import Users from "lucide-react/dist/esm/icons/users";
-import Wrench from "lucide-react/dist/esm/icons/wrench";
 import X from "lucide-react/dist/esm/icons/x";
 import type { MouseEvent } from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { ParsedFileLocation } from "@utils/fileLinks";
 import { ApprovalCard } from "@/features/coding/components/ApprovalCard";
 import { DiffPreview } from "@/features/coding/components/DiffPreview";
 import type { ApprovalDecision } from "@/features/coding/hooks/useApprovalQueue";
 import { PierreDiffBlock } from "@/features/git/components/PierreDiffBlock";
 import type { ConversationItem } from "@/types";
 import {
-  basename,
-  buildToolSummary,
   exploreKindLabel,
   formatDurationMs,
-  formatToolStatusLabel,
-  MAX_COMMAND_OUTPUT_LINES,
-  type MessageImage,
   normalizeMessageImageSrc,
+  type MessageImage,
   type ParsedReasoning,
-  type ToolSummary,
-  toolNameFromTitle,
+  toolRowDescriptor,
   toolStatusTone,
 } from "../utils/messageRenderUtils";
 import { isStandaloneMarkdownTable, Markdown } from "./Markdown";
+import { BashTail } from "./BashTail";
+import { ToolRowBody } from "./ToolRowBody";
 
 type MarkdownFileLinkProps = {
   showMessageFilePath?: boolean;
@@ -96,10 +83,6 @@ type ExploreRowProps = {
 type ApprovalRowProps = {
   item: Extract<ConversationItem, { kind: "approval" }>;
   onRespond: (requestId: string, decision: ApprovalDecision) => void;
-};
-
-type CommandOutputProps = {
-  output: string;
 };
 
 const MessageImageGrid = memo(function MessageImageGrid({
@@ -195,117 +178,6 @@ const ImageLightbox = memo(function ImageLightbox({
     document.body,
   );
 });
-
-const CommandOutput = memo(function CommandOutput({ output }: CommandOutputProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [isPinned, setIsPinned] = useState(true);
-  const lines = useMemo(() => {
-    if (!output) {
-      return [];
-    }
-    return output.split(/\r?\n/);
-  }, [output]);
-  const lineWindow = useMemo(() => {
-    if (lines.length <= MAX_COMMAND_OUTPUT_LINES) {
-      return { offset: 0, lines };
-    }
-    const startIndex = lines.length - MAX_COMMAND_OUTPUT_LINES;
-    return { offset: startIndex, lines: lines.slice(startIndex) };
-  }, [lines]);
-
-  const handleScroll = useCallback(() => {
-    const node = containerRef.current;
-    if (!node) {
-      return;
-    }
-    const threshold = 6;
-    const distanceFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight;
-    setIsPinned(distanceFromBottom <= threshold);
-  }, []);
-
-  useEffect(() => {
-    const node = containerRef.current;
-    if (!node || !isPinned) {
-      return;
-    }
-    node.scrollTop = node.scrollHeight;
-  }, [isPinned]);
-
-  const lineData = useMemo(
-    () =>
-      lineWindow.lines.map((line, index) => ({
-        content: line,
-        lineNumber: lineWindow.offset + index + 1,
-      })),
-    [lineWindow],
-  );
-
-  if (lineWindow.lines.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="tool-inline-terminal" role="log" aria-live="polite">
-      <div className="tool-inline-terminal-lines" ref={containerRef} onScroll={handleScroll}>
-        {lineData.map(({ content, lineNumber }) => (
-          <div key={`line-${lineNumber}`} className="tool-inline-terminal-line">
-            {content || " "}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-});
-
-function toolIconForSummary(
-  item: Extract<ConversationItem, { kind: "tool" }>,
-  summary: ToolSummary,
-) {
-  if (item.toolType === "commandExecution") {
-    return Terminal;
-  }
-  if (item.toolType === "fileChange") {
-    return FileDiffIcon;
-  }
-  if (item.toolType === "webSearch") {
-    return Search;
-  }
-  if (item.toolType === "imageView") {
-    return Image;
-  }
-  if (item.toolType === "collabToolCall") {
-    return Users;
-  }
-
-  const label = summary.label.toLowerCase();
-  if (label === "read") {
-    return FileText;
-  }
-  if (label === "searched" || label === "searching") {
-    return Search;
-  }
-
-  const toolName = toolNameFromTitle(item.title).toLowerCase();
-  const title = item.title.toLowerCase();
-  if (toolName.includes("diff") || title.includes("diff")) {
-    return Diff;
-  }
-
-  return Wrench;
-}
-
-function buildPlanExportFileName(itemId: string) {
-  const normalized = itemId
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
-  if (!normalized) {
-    return "plan.md";
-  }
-  return normalized.startsWith("plan-") ? `${normalized}.md` : `plan-${normalized}.md`;
-}
 
 export const WorkingIndicator = memo(function WorkingIndicator({
   isThinking,
@@ -665,198 +537,104 @@ export const UserInputRow = memo(function UserInputRow({
   );
 });
 
+const ASKUSER_TOOLTYPES = new Set(["mcpToolCall"]);
+
+function isAskUser(item: Extract<ConversationItem, { kind: "tool" }>): boolean {
+  if (!ASKUSER_TOOLTYPES.has(item.toolType)) return false;
+  return /\bask_user\b/i.test(item.title);
+}
+
 export const ToolRow = memo(function ToolRow({
   item,
   isExpanded,
   onToggle,
-  showMessageFilePath,
-  workspacePath,
-  onOpenFileLink,
-  onOpenFileLinkMenu,
-  onOpenThreadLink,
   onRequestAutoScroll,
 }: ToolRowProps) {
-  const isFileChange = item.toolType === "fileChange";
-  const isCommand = item.toolType === "commandExecution";
-  const isPlan = item.toolType === "plan";
-  const commandText = isCommand ? item.title.replace(/^Command:\s*/i, "").trim() : "";
-  const summary = buildToolSummary(item, commandText);
-  const changeNames = (item.changes ?? []).map((change) => basename(change.path)).filter(Boolean);
-  const hasChanges = changeNames.length > 0;
-  const tone = toolStatusTone(item, hasChanges);
-  const ToolIcon = toolIconForSummary(item, summary);
-  const summaryLabel = isFileChange
-    ? changeNames.length > 1
-      ? "files edited"
-      : "file edited"
-    : isCommand
-      ? ""
-      : summary.label;
-  const inlineStatus = formatToolStatusLabel(item);
-  const summaryValue = isFileChange
-    ? changeNames.length > 1
-      ? `${changeNames[0]} +${changeNames.length - 1}`
-      : changeNames[0] || "changes"
-    : summary.value;
-  const shouldFadeCommand = isCommand && !isExpanded && (summaryValue?.length ?? 0) > 80;
-  const showToolOutput = isExpanded && (!isFileChange || !hasChanges);
-  const normalizedStatus = (item.status ?? "").toLowerCase();
-  const isCommandRunning = isCommand && /in[_\s-]*progress|running|started/.test(normalizedStatus);
-  const commandDurationMs = typeof item.durationMs === "number" ? item.durationMs : null;
-  const isLongRunning = commandDurationMs !== null && commandDurationMs >= 1200;
-  const [showLiveOutput, setShowLiveOutput] = useState(false);
-  const [isExportingPlan, setIsExportingPlan] = useState(false);
+  const desc = toolRowDescriptor(item);
+  const tone = toolStatusTone(item, (item.changes?.length ?? 0) > 0);
+  const askUser = isAskUser(item);
+  const isRunning = tone === "processing";
+  const isFailed = tone === "failed";
 
+  // Bash live tail — gated on existing 600ms warm-up + 1.2s long-running.
+  const isCommand = item.toolType === "commandExecution";
+  const durationMs = typeof item.durationMs === "number" ? item.durationMs : null;
+  const isLongRunning = durationMs !== null && durationMs >= 1200;
+  const [tailWarm, setTailWarm] = useState(false);
   useEffect(() => {
-    if (!isCommandRunning) {
-      setShowLiveOutput(false);
+    if (!isRunning || !isCommand) {
+      setTailWarm(false);
       return;
     }
-    const timeoutId = window.setTimeout(() => {
-      setShowLiveOutput(true);
-    }, 600);
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [isCommandRunning]);
+    const handle = window.setTimeout(() => setTailWarm(true), 600);
+    return () => window.clearTimeout(handle);
+  }, [isCommand, isRunning]);
 
-  const showCommandOutput =
+  const showTail =
     isCommand &&
-    summary.output &&
-    (isExpanded || (isCommandRunning && showLiveOutput) || isLongRunning);
+    isRunning &&
+    (item.output ?? "").length > 0 &&
+    (tailWarm || isLongRunning) &&
+    !isExpanded;
 
   useEffect(() => {
-    if (showCommandOutput && isCommandRunning && showLiveOutput) {
-      onRequestAutoScroll?.();
-    }
-  }, [isCommandRunning, onRequestAutoScroll, showCommandOutput, showLiveOutput]);
+    if (showTail) onRequestAutoScroll?.();
+  }, [showTail, onRequestAutoScroll]);
 
-  const handlePlanExport = useCallback(
-    async (event: MouseEvent<HTMLButtonElement>) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const output = (summary.output ?? "").trim();
-      if (!output) {
-        return;
-      }
-      setIsExportingPlan(true);
-      try {
-        await exportMarkdownFile(output, buildPlanExportFileName(item.id));
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unable to export plan.";
-        pushErrorToast({
-          title: "Plan export failed",
-          message,
-        });
-      } finally {
-        setIsExportingPlan(false);
-      }
-    },
-    [item.id, summary.output],
-  );
+  const family = isFailed ? "failed" : desc.family;
+  const className = [
+    "tool-row",
+    `tool-row--${family}`,
+    isExpanded ? "is-expanded" : "",
+    isRunning ? "is-running" : "",
+    askUser ? "is-askuser" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const handleClick = () => {
+    if (askUser || isRunning) return;
+    onToggle(item.id);
+  };
 
   return (
-    <div className={`tool-inline tool-inline-row ${isExpanded ? "tool-inline-expanded" : ""}`}>
-      <button
-        type="button"
-        className="tool-inline-bar-toggle"
-        onClick={() => onToggle(item.id)}
-        aria-expanded={isExpanded}
-        aria-label="Toggle tool details"
-      />
-      <div className="tool-inline-content">
+    <>
+      <div className={className}>
         <button
           type="button"
-          className="tool-inline-summary tool-inline-toggle"
-          onClick={() => onToggle(item.id)}
+          className="tool-row__toggle"
+          aria-label={`Toggle ${desc.name} details`}
           aria-expanded={isExpanded}
+          disabled={askUser || isRunning}
+          onClick={handleClick}
         >
-          <ToolIcon className={`tool-inline-icon ${tone}`} size={14} aria-hidden />
-          {summaryLabel && <span className="tool-inline-label">{summaryLabel}:</span>}
-          {summaryValue && (
-            <span
-              className={`tool-inline-value ${isCommand ? "tool-inline-command" : ""} ${
-                isCommand && isExpanded ? "tool-inline-command-full" : ""
-              }`}
-            >
-              {isCommand ? (
-                <span
-                  className={`tool-inline-command-text ${
-                    shouldFadeCommand ? "tool-inline-command-fade" : ""
-                  }`}
-                >
-                  {summaryValue}
+          <span className="tool-row__icon" aria-hidden>
+            {isRunning ? (
+              <span className="tool-row__spinner" />
+            ) : isFailed ? (
+              <X size={11} aria-hidden />
+            ) : null}
+          </span>
+          <span className="tool-row__name">{desc.name}:</span>
+          {desc.arg && <span className="tool-row__arg">{desc.arg}</span>}
+          {desc.meta.length > 0 && (
+            <span className="tool-row__meta">
+              {desc.meta.map((fragment, idx) => (
+                <span key={`meta-${idx}`}>
+                  {idx > 0 && <span className="tool-row__meta-sep">·</span>}
+                  {fragment}
                 </span>
-              ) : (
-                summaryValue
-              )}
+              ))}
             </span>
           )}
-          {inlineStatus && <span className="tool-inline-status">{inlineStatus}</span>}
+          <span className="tool-row__chevron" aria-hidden>
+            ▸
+          </span>
         </button>
-        {isExpanded && summary.detail && !isFileChange && (
-          <div className="tool-inline-detail">{summary.detail}</div>
-        )}
-        {isExpanded && isCommand && item.detail && (
-          <div className="tool-inline-detail tool-inline-muted">cwd: {item.detail}</div>
-        )}
-        {isExpanded && isFileChange && hasChanges && (
-          <div className="tool-inline-change-list">
-            {item.changes?.map((change) => (
-              <div key={`${change.path}-${change.kind ?? "change"}`} className="tool-inline-change">
-                <div className="tool-inline-change-header">
-                  {change.kind && (
-                    <span className="tool-inline-change-kind">{change.kind.toUpperCase()}</span>
-                  )}
-                  <span className="tool-inline-change-path">{basename(change.path)}</span>
-                </div>
-                {change.diff && (
-                  <div className="diff-viewer-output">
-                    <PierreDiffBlock diff={change.diff} displayPath={change.path} />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-        {isExpanded && isFileChange && !hasChanges && item.detail && (
-          <Markdown
-            value={item.detail}
-            className="item-text markdown"
-            showFilePath={showMessageFilePath}
-            workspacePath={workspacePath}
-            onOpenFileLink={onOpenFileLink}
-            onOpenFileLinkMenu={onOpenFileLinkMenu}
-            onOpenThreadLink={onOpenThreadLink}
-          />
-        )}
-        {showCommandOutput && <CommandOutput output={summary.output ?? ""} />}
-        {showToolOutput && summary.output && !isCommand && (
-          <Markdown
-            value={summary.output}
-            className="tool-inline-output markdown"
-            codeBlock={item.toolType !== "plan"}
-            showFilePath={showMessageFilePath}
-            workspacePath={workspacePath}
-            onOpenFileLink={onOpenFileLink}
-            onOpenFileLinkMenu={onOpenFileLinkMenu}
-            onOpenThreadLink={onOpenThreadLink}
-          />
-        )}
-        {showToolOutput && isPlan && (summary.output ?? "").trim() && (
-          <div className="tool-inline-actions">
-            <button
-              type="button"
-              className="ghost tool-inline-action"
-              onClick={handlePlanExport}
-              disabled={isExportingPlan}
-            >
-              {isExportingPlan ? "Exporting..." : "Export .md"}
-            </button>
-          </div>
-        )}
       </div>
-    </div>
+      {showTail && <BashTail output={item.output ?? ""} />}
+      {isExpanded && <ToolRowBody item={item} />}
+    </>
   );
 });
 
@@ -865,35 +643,25 @@ export const ApprovalRow = memo(function ApprovalRow({ item, onRespond }: Approv
 });
 
 export const ExploreRow = memo(function ExploreRow({ item }: ExploreRowProps) {
-  const title = item.status === "exploring" ? "Exploring" : "Explored";
+  const isProcessing = item.status === "exploring";
   return (
-    <div className="tool-inline explore-inline">
-      <div className="tool-inline-bar-toggle" aria-hidden />
-      <div className="tool-inline-content">
-        <div className="explore-inline-header">
-          <Terminal
-            className={`tool-inline-icon ${
-              item.status === "exploring" ? "processing" : "completed"
-            }`}
-            size={14}
-            aria-hidden
-          />
-          <span className="explore-inline-title">{title}</span>
-        </div>
-        <div className="explore-inline-list">
+    <div className={`tool-row tool-row--search${isProcessing ? " is-running" : ""}`}>
+      <div className="tool-row__toggle" aria-disabled="true">
+        <span className="tool-row__icon" aria-hidden>
+          {isProcessing ? <span className="tool-row__spinner" /> : null}
+        </span>
+        <span className="tool-row__name">{isProcessing ? "Exploring" : "Explored"}:</span>
+        <span className="tool-row__arg tool-row__explore-list">
           {item.entries.map((entry) => (
-            <div
+            <span
               key={`${entry.kind}-${entry.label}-${entry.detail ?? ""}`}
-              className="explore-inline-item"
+              className="tool-row__explore-item"
             >
-              <span className="explore-inline-kind">{exploreKindLabel(entry.kind)}</span>
-              <span className="explore-inline-label">{entry.label}</span>
-              {entry.detail && entry.detail !== entry.label && (
-                <span className="explore-inline-detail">{entry.detail}</span>
-              )}
-            </div>
+              <span className="tool-row__explore-kind">{exploreKindLabel(entry.kind)}</span>
+              <span className="tool-row__explore-label">{entry.label}</span>
+            </span>
           ))}
-        </div>
+        </span>
       </div>
     </div>
   );

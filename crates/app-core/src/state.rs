@@ -829,7 +829,7 @@ impl AppCore {
             config.data_dir = Some(home);
         }
         let (core, _channels) =
-            Self::init_with_sender(common::AppMode::Server, Some(config), None, None).await?;
+            Self::init_with_sender(common::AppMode::Server, Some(config), None, None, None).await?;
         Ok(core)
     }
 }

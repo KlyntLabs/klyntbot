@@ -77,7 +77,7 @@ impl AppCore {
         mode: common::AppMode,
         config_override: Option<config::Config>,
     ) -> Result<(Self, EventChannels), String> {
-        Self::init_with_sender(mode, config_override, None, None).await
+        Self::init_with_sender(mode, config_override, None, None, None).await
     }
 
     /// Initialize with an optional custom notification sender and event emitter.
@@ -89,12 +89,13 @@ impl AppCore {
     /// When `event_emitter` is `Some`, entity update events from MCP tool
     /// mutations are forwarded to the frontend. When `None`, a no-op emitter
     /// is used (CLI / standalone MCP server).
-    #[tracing::instrument(skip(notification_sender, event_emitter), err)]
+    #[tracing::instrument(skip(notification_sender, event_emitter, approval_channel), err)]
     pub async fn init_with_sender(
         mode: common::AppMode,
         config_override: Option<config::Config>,
         notification_sender: Option<Arc<dyn common::NotificationSender>>,
         event_emitter: Option<Arc<dyn AppEventEmitter>>,
+        approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
     ) -> Result<(Self, EventChannels), String> {
         // ── Phase 1: Storage ─────────────────────────────────────────────
         let storage::StorageResult {
@@ -341,6 +342,7 @@ impl AppCore {
             Some(Arc::clone(&context_update_queue)),
             appcore_embedding_engine.clone(),
             recall.clone(),
+            approval_channel,
         )
         .await?;
 

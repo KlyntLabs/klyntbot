@@ -12,6 +12,7 @@ pub mod request;
 
 pub use channel::{ApprovalCapabilities, ApprovalChannel, BlockingFallbackChannel};
 pub use class::{ApprovalClass, ApprovalDecision, ApprovalLifetime, ApprovalScope};
+pub use coding_policy::CodingApprovalPolicy;
 pub use gate::{ApprovalGate, GateOutcome};
 pub use grants::{ApprovalGrantsRepo, GrantRow};
 pub use policy::ClassifyHook;
