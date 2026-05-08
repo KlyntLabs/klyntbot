@@ -79,6 +79,11 @@ pub enum TodoEvent {
         user_removed_count: usize,
         timestamp: jiff::Timestamp,
     },
+    PlanCancelled {
+        thread_id: String,
+        plan_session_id: String,
+        timestamp: jiff::Timestamp,
+    },
 }
 
 /// Events emitted by feature crates for cross-domain communication.
