@@ -1305,6 +1305,8 @@ impl AppCore {
             tool_kit: std::sync::Mutex::new(None),
             desktop_approval_channel: Some(desktop_approval_channel),
             approval_grants_repo: Some(approval_grants_repo),
+            coding_policies: Arc::new(dashmap::DashMap::new()),
+            plan_snapshots: Arc::new(dashmap::DashMap::new()),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────

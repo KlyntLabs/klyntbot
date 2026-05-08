@@ -215,6 +215,12 @@ pub struct AppCore {
     pub desktop_approval_channel: Option<Arc<crate::desktop_approval_channel::DesktopApprovalChannel>>,
     /// Approval grants repo — shared with the agent's ApprovalGate.
     pub approval_grants_repo: Option<Arc<approval::ApprovalGrantsRepo>>,
+    /// Per-coding-thread approval policy. PlanMode variant is set/cleared by
+    /// coding_plan_enter / coding_plan_cancel / coding_plan_ratify.
+    pub coding_policies: Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
+    /// Snapshot of items at the moment plan mode was entered, used to compute
+    /// ratify counts. Keyed by plan_session_id. In-memory only.
+    pub plan_snapshots: Arc<dashmap::DashMap<String, Vec<feature_coding_todo::types::TodoItem>>>,
 }
 
 /// State for an active thread subscription.
