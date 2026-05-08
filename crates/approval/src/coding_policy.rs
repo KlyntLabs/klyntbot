@@ -5,16 +5,31 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde_json::Value;
 use std::collections::HashMap;
 
-pub struct CodingApprovalPolicy {
-    allow: CompiledRules,
-    deny: CompiledRules,
-    ask: CompiledRules,
-    default_if_no_match: DefaultPolicy,
+pub enum CodingApprovalPolicy {
+    Default {
+        allow: CompiledRules,
+        deny: CompiledRules,
+        ask: CompiledRules,
+        default_if_no_match: DefaultPolicy,
+    },
+    PlanMode {
+        plan_session_id: String,
+        plan_file_slug: String,
+        plan_file_path: std::path::PathBuf,
+        allow: CompiledRules,
+        deny: CompiledRules,
+        ask: CompiledRules,
+        default_if_no_match: DefaultPolicy,
+    },
+    YoloMode {
+        until: jiff::Timestamp,
+    },
 }
 
 impl CodingApprovalPolicy {
+    /// Compile permissions into the `Default` variant — production entry point.
     pub fn compile(permissions: &CodingPermissions) -> Result<Self, String> {
-        Ok(Self {
+        Ok(Self::Default {
             allow: CompiledRules::compile(&permissions.allow).map_err(|e| e.to_string())?,
             deny: CompiledRules::compile(&permissions.deny).map_err(|e| e.to_string())?,
             ask: CompiledRules::compile(&permissions.ask).map_err(|e| e.to_string())?,
@@ -22,19 +37,55 @@ impl CodingApprovalPolicy {
         })
     }
 
-    /// Evaluate a tool+payload against the layer1 rules.
-    /// Returns true if allowed, false if should be prompted/denied.
+    pub fn is_plan_mode(&self) -> bool {
+        matches!(self, Self::PlanMode { .. })
+    }
+
+    pub fn plan_session_id(&self) -> Option<&str> {
+        match self {
+            Self::PlanMode { plan_session_id, .. } => Some(plan_session_id.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn plan_file_path(&self) -> Option<&std::path::Path> {
+        match self {
+            Self::PlanMode { plan_file_path, .. } => Some(plan_file_path.as_path()),
+            _ => None,
+        }
+    }
+
+    pub fn plan_file_slug(&self) -> Option<&str> {
+        match self {
+            Self::PlanMode { plan_file_slug, .. } => Some(plan_file_slug.as_str()),
+            _ => None,
+        }
+    }
+
     fn evaluate_layer1(&self, tool: &str, payload: &str) -> bool {
-        if self.deny.find_match(tool, payload).is_some() {
+        let (allow, deny, ask, default_if_no_match) = match self {
+            Self::Default { allow, deny, ask, default_if_no_match }
+            | Self::PlanMode { allow, deny, ask, default_if_no_match, .. } => {
+                (allow, deny, ask, *default_if_no_match)
+            }
+            Self::YoloMode { until } => {
+                if jiff::Timestamp::now() < *until {
+                    return true;
+                }
+                // Yolo expired → fall through to ask, treating as if no allow/deny matched.
+                return matches!(DefaultPolicy::Ask, DefaultPolicy::Allow);
+            }
+        };
+        if deny.find_match(tool, payload).is_some() {
             return false;
         }
-        if self.allow.find_match(tool, payload).is_some() {
+        if allow.find_match(tool, payload).is_some() {
             return true;
         }
-        if self.ask.find_match(tool, payload).is_some() {
+        if ask.find_match(tool, payload).is_some() {
             return false;
         }
-        self.default_if_no_match == DefaultPolicy::Allow
+        default_if_no_match == DefaultPolicy::Allow
     }
 }
 
@@ -67,7 +118,7 @@ impl ClassifyHook for CodingApprovalPolicy {
 
 // ── Matcher (ported from klynt-core/src/approval/matcher.rs) ─────────────
 
-struct CompiledRules {
+pub(crate) struct CompiledRules {
     sets: HashMap<String, (GlobSet, Vec<String>)>,
 }
 
