@@ -20,6 +20,7 @@ bus = { workspace = true }
 cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }
+feature-coding-todo = { workspace = true }
 feature-focus = { workspace = true }
 feature-launcher = { workspace = true }
 klyntbot-server = { workspace = true }

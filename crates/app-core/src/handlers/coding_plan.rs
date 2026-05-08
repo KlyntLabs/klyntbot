@@ -195,9 +195,10 @@ impl AppCore {
             .ok_or_else(|| KlyntbotError::StorageNotFound(format!("no policy for thread {thread_id}")))?
             .clone();
 
-        let plan_session_id = match &*lock.read() {
-            CodingApprovalPolicy::PlanMode { plan_session_id, .. } => plan_session_id.clone(),
-            _ => return self.coding_todo_get(thread_id).await,
+        let plan_session_id = {
+            let policy = lock.read();
+            let p_id = policy.plan_session_id().map(|s| s.to_string());
+            p_id.ok_or_else(|| KlyntbotError::NotImplemented("not in plan mode".into()))?
         };
 
         // Soft-delete plan-tagged rows.
