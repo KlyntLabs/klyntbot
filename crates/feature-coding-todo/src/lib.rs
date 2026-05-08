@@ -6,6 +6,7 @@ pub mod diff;
 pub mod errors;
 pub mod events;
 pub mod id;
+pub mod injector;
 pub mod migrations;
 pub mod plan_mode;
 pub mod render;
@@ -15,6 +16,7 @@ pub mod util;
 pub mod validation;
 
 pub use events::CodingTodoEvent;
+pub use injector::PlanModeInjector;
 
 use std::sync::Arc;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
