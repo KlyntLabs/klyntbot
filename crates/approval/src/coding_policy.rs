@@ -99,13 +99,39 @@ fn extract_resource(tool: &str, args: &Value) -> Option<String> {
     args.get(key)?.as_str().map(str::to_string)
 }
 
+/// Tools that mutate the workspace. `bash` is always a write because shell
+/// commands can mutate anything.
+pub(crate) fn is_write_tool(tool: &str) -> bool {
+    matches!(
+        normalize_tool(tool).as_str(),
+        "edit" | "write" | "multiedit" | "notebookedit" | "applypatch" | "bash" | "codingshell"
+    )
+}
+
+/// Tools that only read state. Anything not in this whitelist is treated
+/// as write-or-unknown by `classify_plan_mode`.
+pub(crate) fn is_read_tool(tool: &str) -> bool {
+    matches!(
+        normalize_tool(tool).as_str(),
+        "read" | "grep" | "glob" | "ls"
+            | "codingtodo"
+            | "websearch" | "webfetch"
+            | "lsp"
+    )
+}
+
 impl ClassifyHook for CodingApprovalPolicy {
     fn classify(&self, tool: &str, _action: Option<&str>, args: &Value) -> Option<ApprovalClass> {
-        let payload = extract_resource(tool, args)?;
-        if self.evaluate_layer1(tool, &payload) {
-            Some(ApprovalClass::Safe)
-        } else {
-            Some(ApprovalClass::Destructive)
+        match self {
+            Self::PlanMode { plan_file_path, .. } => Some(classify_plan_mode(tool, args, plan_file_path)),
+            Self::Default { .. } | Self::YoloMode { .. } => {
+                let payload = extract_resource(tool, args)?;
+                if self.evaluate_layer1(tool, &payload) {
+                    Some(ApprovalClass::Safe)
+                } else {
+                    Some(ApprovalClass::Destructive)
+                }
+            }
         }
     }
 
@@ -116,9 +142,28 @@ impl ClassifyHook for CodingApprovalPolicy {
     }
 }
 
+fn classify_plan_mode(
+    tool: &str,
+    args: &Value,
+    plan_file_path: &std::path::Path,
+) -> ApprovalClass {
+    if is_write_tool(tool) {
+        let target = extract_resource(tool, args).map(std::path::PathBuf::from);
+        match target {
+            Some(p) if p == plan_file_path => ApprovalClass::Safe,
+            _ => ApprovalClass::Destructive,
+        }
+    } else if is_read_tool(tool) {
+        ApprovalClass::Safe
+    } else {
+        // Unknown tools (e.g., MCP destructive) treated as writes.
+        ApprovalClass::Destructive
+    }
+}
+
 // ── Matcher (ported from klynt-core/src/approval/matcher.rs) ─────────────
 
-pub(crate) struct CompiledRules {
+pub struct CompiledRules {
     sets: HashMap<String, (GlobSet, Vec<String>)>,
 }
 
@@ -131,7 +176,7 @@ fn normalize_tool(s: &str) -> String {
 }
 
 impl CompiledRules {
-    fn compile(patterns: &[String]) -> Result<Self, String> {
+    pub fn compile(patterns: &[String]) -> Result<Self, String> {
         let mut buckets: HashMap<String, GlobSetBuilder> = Default::default();
         let mut raws: HashMap<String, Vec<String>> = Default::default();
         for p in patterns {
@@ -244,5 +289,80 @@ mod tests {
 
         let class = policy.classify("notes", Some("read"), &serde_json::json!({}));
         assert_eq!(class, None);
+    }
+
+    #[test]
+    fn is_write_tool_recognizes_known_writes() {
+        for t in ["edit", "write", "multi_edit", "notebook_edit", "bash"] {
+            assert!(super::is_write_tool(t), "{t} should be a write tool");
+        }
+    }
+
+    #[test]
+    fn is_read_tool_recognizes_known_reads() {
+        for t in ["read", "grep", "glob", "coding_todo", "web_fetch", "web_search"] {
+            assert!(super::is_read_tool(t), "{t} should be a read tool");
+        }
+    }
+
+    #[test]
+    fn write_and_read_classifications_are_disjoint() {
+        for t in ["edit", "write", "bash"] {
+            assert!(super::is_write_tool(t));
+            assert!(!super::is_read_tool(t));
+        }
+    }
+
+    #[test]
+    fn plan_mode_allows_edit_to_plan_file_only() {
+        use std::path::PathBuf;
+        let plan_path = PathBuf::from("/tmp/plan.md");
+        let policy = CodingApprovalPolicy::PlanMode {
+            plan_session_id: "p_abc".into(),
+            plan_file_slug: "plan".into(),
+            plan_file_path: plan_path.clone(),
+            allow: CompiledRules::compile(&[]).unwrap(),
+            deny: CompiledRules::compile(&[]).unwrap(),
+            ask: CompiledRules::compile(&[]).unwrap(),
+            default_if_no_match: DefaultPolicy::Ask,
+        };
+
+        // Edit to plan file → Safe
+        let class = policy.classify("edit", None, &serde_json::json!({"file_path": "/tmp/plan.md"}));
+        assert_eq!(class, Some(ApprovalClass::Safe));
+
+        // Edit elsewhere → Destructive
+        let class = policy.classify("edit", None, &serde_json::json!({"file_path": "/tmp/other.rs"}));
+        assert_eq!(class, Some(ApprovalClass::Destructive));
+    }
+
+    #[test]
+    fn plan_mode_allows_reads() {
+        let policy = CodingApprovalPolicy::PlanMode {
+            plan_session_id: "p_abc".into(),
+            plan_file_slug: "plan".into(),
+            plan_file_path: "/tmp/plan.md".into(),
+            allow: CompiledRules::compile(&[]).unwrap(),
+            deny: CompiledRules::compile(&[]).unwrap(),
+            ask: CompiledRules::compile(&[]).unwrap(),
+            default_if_no_match: DefaultPolicy::Ask,
+        };
+        let class = policy.classify("read", None, &serde_json::json!({"file_path": "/tmp/anything.rs"}));
+        assert_eq!(class, Some(ApprovalClass::Safe));
+    }
+
+    #[test]
+    fn plan_mode_rejects_bash() {
+        let policy = CodingApprovalPolicy::PlanMode {
+            plan_session_id: "p_abc".into(),
+            plan_file_slug: "plan".into(),
+            plan_file_path: "/tmp/plan.md".into(),
+            allow: CompiledRules::compile(&[]).unwrap(),
+            deny: CompiledRules::compile(&[]).unwrap(),
+            ask: CompiledRules::compile(&[]).unwrap(),
+            default_if_no_match: DefaultPolicy::Ask,
+        };
+        let class = policy.classify("bash", None, &serde_json::json!({"command": "ls"}));
+        assert_eq!(class, Some(ApprovalClass::Destructive));
     }
 }
