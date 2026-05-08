@@ -14,9 +14,11 @@ pub mod tool;
 pub mod types;
 pub mod util;
 pub mod validation;
+pub mod view;
 
 pub use events::CodingTodoEvent;
 pub use injector::PlanModeInjector;
+pub use view::{CodingTodoView, PlanModeView};
 
 use std::sync::Arc;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
