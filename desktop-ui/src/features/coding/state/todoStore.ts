@@ -10,10 +10,18 @@ export type TodoItem = {
   delegatedTo?: string;
 };
 
+type PlanModeState = {
+  planSessionId: string;
+  planFileSlug: string;
+  planFilePath: string;
+  proposedItemCount: number;
+};
+
 type TodoState = {
   items: TodoItem[];
   planMode: boolean;
   planSessionId?: string;
+  planModeState: PlanModeState | null;
 };
 
 const stores = new Map<string, TodoState>();
@@ -21,7 +29,7 @@ const listeners = new Map<string, Set<() => void>>();
 
 function getStore(threadId: string): TodoState {
   if (!stores.has(threadId)) {
-    stores.set(threadId, { items: [], planMode: false });
+    stores.set(threadId, { items: [], planMode: false, planModeState: null });
   }
   return stores.get(threadId)!;
 }
@@ -30,8 +38,27 @@ function emit(threadId: string) {
   listeners.get(threadId)?.forEach((fn) => fn());
 }
 
+export type { PlanModeState };
+
 export function setTodos(threadId: string, items: TodoItem[], planMode = false) {
-  stores.set(threadId, { items, planMode });
+  stores.set(threadId, { items, planMode, planModeState: null });
+  emit(threadId);
+}
+
+export function setPlanModeState(threadId: string, planModeState: PlanModeState | null) {
+  const prev = getStore(threadId);
+  stores.set(threadId, { ...prev, planMode: !!planModeState, planModeState });
+  emit(threadId);
+}
+
+export function applyView(threadId: string, view: { agents: Record<string, TodoItem[]>; planModeState: any }) {
+  const items = Object.values(view.agents).flat();
+  stores.set(threadId, {
+    items,
+    planMode: !!view.planModeState,
+    planSessionId: view.planModeState?.planSessionId,
+    planModeState: view.planModeState || null,
+  });
   emit(threadId);
 }
 

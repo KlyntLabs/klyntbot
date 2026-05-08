@@ -2,11 +2,28 @@ import type { SlashNode } from "./types";
 
 export const REGISTRY: Record<string, SlashNode> = {
   plan: {
-    kind: "leaf",
-    path: "agent",
+    kind: "branch",
     command: "plan",
-    description: "Enter plan mode (writes/exec denied)",
+    description: "Plan mode control",
     category: "mode",
+    children: {
+      "": {
+        kind: "leaf",
+        path: "direct",
+        command: "plan",
+        tauriCommand: "coding_plan_enter",
+        description: "Enter plan mode (writes/exec denied)",
+        category: "mode",
+      },
+      exit: {
+        kind: "leaf",
+        path: "direct",
+        command: "plan exit",
+        tauriCommand: "coding_plan_cancel",
+        description: "Exit plan mode and discard proposed items",
+        category: "mode",
+      },
+    },
   },
   yolo: {
     kind: "leaf",

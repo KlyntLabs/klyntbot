@@ -1,8 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import type { MessagePart } from "../components/parts/types";
-import { setTodos } from "../state/todoStore";
+import { applyView, setTodos } from "../state/todoStore";
 import { subscribeToThread } from "../state/ThreadEventBuffer";
+import { listen } from "@tauri-apps/api/event";
 
 /// Mirrors `desktop_shared::coding::events::ThreadEvent`. Kept loose (string
 /// kind discriminator) so additions on the Rust side don't immediately fail
@@ -280,6 +281,34 @@ export function useThreadEvents(threadId: string | null) {
     return () => {
       cancelled = true;
       unsubscribe();
+    };
+  }, [threadId]);
+
+  useEffect(() => {
+    if (!threadId) return;
+    
+    const handlers = [
+      listen("coding:todos_updated", (e) => {
+        if ((e.payload as any)?.thread_id === threadId) refresh();
+      }),
+      listen("coding:plan_entered", (e) => {
+        if (e.payload === threadId) refresh();
+      }),
+      listen("coding:plan_updated", (e) => {
+        if (e.payload === threadId) refresh();
+      }),
+      listen("coding:plan_exited", (e) => {
+        if (e.payload === threadId) refresh();
+      }),
+    ];
+    
+    async function refresh() {
+      const view = await invoke("coding_todo_get", { threadId });
+      applyView(threadId, view as any);
+    }
+    
+    return () => {
+      handlers.forEach((h) => h.then((fn) => fn()));
     };
   }, [threadId]);
 

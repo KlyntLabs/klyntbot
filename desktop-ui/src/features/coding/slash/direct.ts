@@ -41,6 +41,10 @@ function buildParams(cmd: string, args: string[], sessionKey: string): Record<st
       return { args: { sessionKey, upToMessage: args[0] ?? null } };
     case "permissions clear-mirror":
       return { args: { tool: args[0] ?? "", repoId: null } };
+    case "plan":
+      return { threadId: sessionKey };
+    case "plan exit":
+      return { threadId: sessionKey };
     default:
       return {};
   }
