@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+bus.workspace = true
 common.workspace = true
 tools-core-macros.workspace = true
 async-trait.workspace = true

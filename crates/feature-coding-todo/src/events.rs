@@ -70,6 +70,17 @@ pub enum CodingTodoEvent {
         user_removed_count: usize,
         timestamp: jiff::Timestamp,
     },
+
+    #[ai(
+        importance = 0.4,
+        salience = "accumulate",
+        observation_template = "Plan cancelled for session {plan_session_id}"
+    )]
+    PlanCancelled {
+        thread_id: String,
+        plan_session_id: String,
+        timestamp: jiff::Timestamp,
+    },
 }
 
 /// Extract a `CodingTodoEvent` from a `DomainEvent::Todo` variant.
@@ -137,6 +148,15 @@ pub fn try_from_domain_event(e: &DomainEvent) -> Option<CodingTodoEvent> {
             ratified_count: *ratified_count,
             user_edited_count: *user_edited_count,
             user_removed_count: *user_removed_count,
+            timestamp: *timestamp,
+        }),
+        DomainEvent::Todo(bus::domain_events::TodoEvent::PlanCancelled {
+            thread_id,
+            plan_session_id,
+            timestamp,
+        }) => Some(CodingTodoEvent::PlanCancelled {
+            thread_id: thread_id.clone(),
+            plan_session_id: plan_session_id.clone(),
             timestamp: *timestamp,
         }),
         _ => None,

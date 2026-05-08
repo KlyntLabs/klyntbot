@@ -47,6 +47,7 @@ tempfile = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 jiff = { workspace = true }
+parking_lot = "0.12"
 uuid = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -397,6 +397,17 @@ impl SessionRepo {
         Ok(result.rows_affected())
     }
 
+    /// Best-effort fetch of the session title from metadata JSON.
+    pub async fn get_title(&self, key: &str) -> Result<Option<String>, StorageError> {
+        let row: Option<(Option<String>,)> = sqlx::query_as(
+            "SELECT json_extract(metadata, '$.title') FROM sessions WHERE key = ?"
+        )
+        .bind(key)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.and_then(|(t,)| t))
+    }
+
     /// Rename a session by updating the title in its metadata JSON.
     pub async fn rename_session(&self, key: &str, new_title: &str) -> Result<bool, StorageError> {
         let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();

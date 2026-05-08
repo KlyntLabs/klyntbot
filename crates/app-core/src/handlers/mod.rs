@@ -2,6 +2,7 @@ pub mod agents;
 pub mod annotations;
 pub mod areas;
 pub mod atoms;
+pub mod coding_plan;
 pub mod coding_todo;
 pub mod autotuner;
 pub mod capture;

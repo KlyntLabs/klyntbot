@@ -51,6 +51,9 @@ impl CodingTodoContextBuilder {
                                     bus::domain_events::TodoEvent::PlanRatified { .. } => {
                                         "plan ratified".to_string()
                                     }
+                                    bus::domain_events::TodoEvent::PlanCancelled { .. } => {
+                                        "plan cancelled".to_string()
+                                    }
                                 };
                                 queue.push(ContextUpdate {
                                     reason,
