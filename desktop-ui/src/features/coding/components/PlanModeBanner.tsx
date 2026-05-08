@@ -16,6 +16,20 @@ function PlanItemRow({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.title);
 
+  const handleBlur = useCallback(() => {
+    setEditing(false);
+    if (draft !== item.title) onTitleEdit(draft);
+  }, [draft, item.title, onTitleEdit]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      (e.target as HTMLInputElement).blur();
+    } else if (e.key === "Escape") {
+      setDraft(item.title);
+      setEditing(false);
+    }
+  }, [item.title]);
+
   return (
     <li className="coding-todo__plan-banner-row">
       {editing ? (
@@ -24,8 +38,8 @@ function PlanItemRow({
           value={draft}
           autoFocus
           onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => { setEditing(false); if (draft !== item.title) onTitleEdit(draft); }}
-          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") { setDraft(item.title); setEditing(false); } }}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
         />
       ) : (
         <span className="coding-todo__plan-banner-title" onClick={() => setEditing(true)}>
@@ -82,6 +96,12 @@ export function PlanModeBanner({ threadId }: { threadId: string }) {
     invoke("coding_plan_open_file", { path: planModeState.planFilePath });
   }, [planModeState]);
 
+  const handleConfirm = useCallback(async () => {
+    if (confirming === "ratify") await ratify();
+    else if (confirming === "cancel") await cancelPlan();
+    setConfirming(null);
+  }, [confirming, ratify, cancelPlan]);
+
   if (!planModeState) return null;
 
   return (
@@ -126,11 +146,7 @@ export function PlanModeBanner({ threadId }: { threadId: string }) {
               ? `Ratify ${items.length} ${items.length === 1 ? "item" : "items"}?`
               : "Cancel plan and discard proposed items?"}
           </span>
-          <button onClick={async () => {
-            if (confirming === "ratify") await ratify();
-            else await cancelPlan();
-            setConfirming(null);
-          }}>Confirm</button>
+          <button onClick={handleConfirm}>Confirm</button>
           <button onClick={() => setConfirming(null)}>Back</button>
         </div>
       )}

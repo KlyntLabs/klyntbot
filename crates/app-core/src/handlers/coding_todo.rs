@@ -11,6 +11,9 @@ use tracing::instrument;
 
 use crate::state::AppCore;
 
+/// Hard-coded agent ID for user-driven plan edits (single-user context).
+const USER_AGENT_ID: &str = "root";
+
 impl AppCore {
     #[instrument(skip(self), err)]
     pub async fn coding_todo_get(&self, thread_id: &str) -> Result<CodingTodoView> {
@@ -24,11 +27,14 @@ impl AppCore {
         let mut agents: HashMap<String, Vec<TodoItem>> = HashMap::new();
         let mut total_proposed = 0usize;
 
-        let plan_session_filter: Option<String> = self
-            .coding_policies
-            .get(thread_id)
+        // Single DashMap lookup — clone the Arc so the shard lock is released.
+        let policy_lock = self.coding_policies.get(thread_id).map(|r| r.clone());
+        let plan_session_filter: Option<String> = policy_lock
+            .as_ref()
             .and_then(|lock| match &*lock.read() {
-                CodingApprovalPolicy::PlanMode { plan_session_id, .. } => Some(plan_session_id.clone()),
+                CodingApprovalPolicy::PlanMode { plan_session_id, .. } => {
+                    Some(plan_session_id.clone())
+                }
                 _ => None,
             });
 
@@ -42,20 +48,20 @@ impl AppCore {
             agents.insert(row.agent_id, parsed);
         }
 
-        let plan_mode_state = self
-            .coding_policies
-            .get(thread_id)
-            .and_then(|lock| match &*lock.read() {
-                CodingApprovalPolicy::PlanMode {
-                    plan_session_id, plan_file_slug, plan_file_path, ..
-                } => Some(PlanModeView {
-                    plan_session_id: plan_session_id.clone(),
-                    plan_file_slug: plan_file_slug.clone(),
-                    plan_file_path: plan_file_path.clone(),
-                    proposed_item_count: total_proposed,
-                }),
-                _ => None,
-            });
+        let plan_mode_state = policy_lock.and_then(|lock| match &*lock.read() {
+            CodingApprovalPolicy::PlanMode {
+                plan_session_id,
+                plan_file_slug,
+                plan_file_path,
+                ..
+            } => Some(PlanModeView {
+                plan_session_id: plan_session_id.clone(),
+                plan_file_slug: plan_file_slug.clone(),
+                plan_file_path: plan_file_path.clone(),
+                proposed_item_count: total_proposed,
+            }),
+            _ => None,
+        });
 
         Ok(CodingTodoView { agents, plan_mode_state })
     }
@@ -111,7 +117,13 @@ impl AppCore {
         self.event_emitter.emit_event("coding:todos_updated", serde_json::json!({ "thread_id": thread_id }));
         self.event_emitter.emit_event("coding:plan_exited", serde_json::json!(thread_id));
 
-        self.coding_todo_get(thread_id).await
+        // 5. Build view from rows already fetched — avoids a second DB round-trip.
+        let mut agents: HashMap<String, Vec<TodoItem>> = HashMap::new();
+        for row in rows {
+            let parsed: Vec<TodoItem> = serde_json::from_str(&row.items_json).unwrap_or_default();
+            agents.insert(row.agent_id, parsed);
+        }
+        Ok(CodingTodoView { agents, plan_mode_state: None })
     }
 
     #[instrument(skip(self), err)]
@@ -128,8 +140,8 @@ impl AppCore {
 
         // Validate via the existing validator with plan_mode_active=true.
         let ctx = ValidationContext {
-            agent_id: "root",
-            agent_profile: "root",
+            agent_id: USER_AGENT_ID,
+            agent_profile: USER_AGENT_ID,
             plan_mode_active: true,
             previous_anti_passivity_violation: false,
             same_turn_user_msg_emitted: true, // user is editing — no anti-passivity nag
@@ -155,7 +167,7 @@ impl AppCore {
         let json = serde_json::to_string(&materialized)
             .map_err(|e| KlyntbotError::Storage(format!("serialize items: {e}")))?;
 
-        self.repos.coding_todo.upsert(thread_id, "root", &json, Some(plan_session_id)).await
+        self.repos.coding_todo.upsert(thread_id, USER_AGENT_ID, &json, Some(plan_session_id)).await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
 
         self.event_emitter.emit_event("coding:todos_updated", serde_json::json!({ "thread_id": thread_id }));
@@ -171,7 +183,7 @@ impl AppCore {
     ) -> Result<CodingTodoView> {
         self.assert_plan_mode(thread_id, plan_session_id)?;
 
-        let row = self.repos.coding_todo.get(thread_id, "root").await
+        let row = self.repos.coding_todo.get(thread_id, USER_AGENT_ID).await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?
             .ok_or_else(|| KlyntbotError::StorageNotFound("no plan items to remove".into()))?;
         let parsed: Vec<TodoItem> = serde_json::from_str(&row.items_json).unwrap_or_default();
@@ -180,7 +192,7 @@ impl AppCore {
             .collect();
         let json = serde_json::to_string(&remaining)
             .map_err(|e| KlyntbotError::Storage(format!("serialize: {e}")))?;
-        self.repos.coding_todo.upsert(thread_id, "root", &json, Some(plan_session_id)).await
+        self.repos.coding_todo.upsert(thread_id, USER_AGENT_ID, &json, Some(plan_session_id)).await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
 
         self.event_emitter.emit_event("coding:todos_updated", serde_json::json!({ "thread_id": thread_id }));
@@ -199,6 +211,7 @@ impl AppCore {
 
     pub(crate) fn default_coding_policy(&self) -> CodingApprovalPolicy {
         // Best-effort default — used when a thread had no entry before /plan.
+        // TODO: cache empty CompiledRules in a static once the type supports it.
         CodingApprovalPolicy::Default {
             allow: approval::coding_policy::CompiledRules::compile(&[]).unwrap(),
             deny: approval::coding_policy::CompiledRules::compile(&[]).unwrap(),

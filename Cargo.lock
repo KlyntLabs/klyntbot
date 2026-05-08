@@ -423,6 +423,7 @@ dependencies = [
  "notifications",
  "notify",
  "notify-debouncer-mini",
+ "parking_lot",
  "platform-macos",
  "proptest",
  "providers",
@@ -4529,6 +4530,7 @@ dependencies = [
  "dashmap",
  "desktop-macros",
  "desktop-shared",
+ "feature-coding-todo",
  "feature-focus",
  "feature-launcher",
  "feature-productivity",
@@ -5369,10 +5371,14 @@ version = "0.1.0"
 dependencies = [
  "ai-core",
  "ai-core-macros",
+ "approval",
  "async-trait",
  "bus",
  "common",
+ "config",
+ "dashmap",
  "jiff",
+ "parking_lot",
  "serde",
  "serde_json",
  "sqlx",
@@ -15976,6 +15982,7 @@ name = "tools-core"
 version = "0.1.1"
 dependencies = [
  "async-trait",
+ "bus",
  "common",
  "klynt-hooks",
  "regex",

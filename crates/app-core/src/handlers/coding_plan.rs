@@ -170,7 +170,6 @@ impl AppCore {
 
         // 8. Spawn untitled-rename watcher if title was empty.
         if title.is_empty() {
-            let plans_dir = self.config.read().await.data_dir_path().join("plans");
             self.spawn_untitled_rename_watcher(thread_id.to_string(), plan_session_id.clone(), plans_dir);
         }
 
@@ -202,7 +201,7 @@ impl AppCore {
         };
 
         // Soft-delete plan-tagged rows.
-        self.repos.coding_todo.soft_delete_plan_session(thread_id, &plan_session_id).await
+        self.repos.coding_todo.delete_plan_session(thread_id, &plan_session_id).await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
 
         // Swap to Default.

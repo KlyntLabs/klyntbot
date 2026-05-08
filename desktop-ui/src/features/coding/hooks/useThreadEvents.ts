@@ -232,16 +232,10 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
       return state;
     case "turn_completed":
       return { ...state, turnState: { kind: "idle", lastFinishReason: event.finish_reason } };
-    case "todos_updated": {
-      setTodos(event.thread_id, event.items.map((i) => ({
-        id: i.id,
-        title: i.title,
-        status: i.status as "pending" | "in_progress" | "done" | "blocked",
-        concurrency: "safe",
-        blockedBy: [],
-      })));
+    case "todos_updated":
+      // Handled by the dedicated todo-refetch effect below,
+      // which fetches full items rather than partial thread-event data.
       return state;
-    }
     default:
       return state;
   }
@@ -286,27 +280,29 @@ export function useThreadEvents(threadId: string | null) {
 
   useEffect(() => {
     if (!threadId) return;
-    
-    const handlers = [
-      listen("coding:todos_updated", (e) => {
-        if ((e.payload as any)?.thread_id === threadId) refresh();
+
+    let refreshing = false;
+
+    const eventNames = ["coding:todos_updated", "coding:plan_entered", "coding:plan_updated", "coding:plan_exited"];
+    const handlers = eventNames.map((name) =>
+      listen(name, (e) => {
+        const payload = e.payload as any;
+        const matches = name === "coding:todos_updated" ? payload?.thread_id === threadId : payload === threadId;
+        if (matches) refresh();
       }),
-      listen("coding:plan_entered", (e) => {
-        if (e.payload === threadId) refresh();
-      }),
-      listen("coding:plan_updated", (e) => {
-        if (e.payload === threadId) refresh();
-      }),
-      listen("coding:plan_exited", (e) => {
-        if (e.payload === threadId) refresh();
-      }),
-    ];
-    
+    );
+
     async function refresh() {
-      const view = await invoke("coding_todo_get", { threadId });
-      applyView(threadId, view as any);
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const view = await invoke("coding_todo_get", { threadId });
+        applyView(threadId, view as any);
+      } finally {
+        refreshing = false;
+      }
     }
-    
+
     return () => {
       handlers.forEach((h) => h.then((fn) => fn()));
     };

@@ -48,67 +48,8 @@ impl LiveContextRefresher {
         messages: &mut Vec<Message>,
         context_window: usize,
     ) -> Vec<ContextReassembledUpdate> {
-        let mut updates = self.queue.drain();
-        if updates.is_empty() {
-            return Vec::new();
-        }
-
-        // Sort by priority (High first)
-        updates.sort_by(|a, b| b.priority.cmp(&a.priority));
-
-        let current_tokens: usize = messages
-            .iter()
-            .map(|m| context_engine::estimate_message_tokens(&*self.token_counter, m))
-            .sum();
-
-        let remaining = context_window.saturating_sub(current_tokens);
-        let standard_budget = remaining * (100 - STANDARD_RESPONSE_RESERVE_PCT) / 100;
-        let high_budget = remaining * (100 - HIGH_PRIORITY_RESPONSE_RESERVE_PCT) / 100;
-
-        let mut used_tokens = 0;
-        let mut injected = Vec::new();
-
-        for update in &updates {
-            let reason_str = update.reason.as_str();
-            let content = update.content.as_deref().unwrap_or(reason_str);
-
-            let msg = Message::context_update(reason_str, content);
-            let tokens = context_engine::estimate_message_tokens(&*self.token_counter, &msg);
-
-            let budget = if update.priority == UpdatePriority::High {
-                high_budget
-            } else {
-                standard_budget
-            };
-
-            if used_tokens + tokens > budget {
-                tracing::warn!(
-                    reason = ?update.reason,
-                    tokens,
-                    remaining_budget = budget.saturating_sub(used_tokens),
-                    "context update dropped — insufficient token budget"
-                );
-                continue;
-            }
-
-            used_tokens += tokens;
-            injected.push(ContextReassembledUpdate {
-                reason: reason_str.to_string(),
-                summary: content.to_string(),
-                tokens,
-            });
-            messages.push(msg);
-        }
-
-        if !injected.is_empty() {
-            info!(
-                count = injected.len(),
-                tokens = used_tokens,
-                "live context updates injected"
-            );
-        }
-
-        injected
+        let updates = self.queue.drain();
+        self.inject_updates(updates, messages, context_window)
     }
 
     /// Same as inject_pending but also drives registered DynamicInjectors
@@ -121,11 +62,20 @@ impl LiveContextRefresher {
     ) -> Vec<ContextReassembledUpdate> {
         let mut updates = self.queue.drain();
         updates.extend(self.injectors.collect_all(ctx));
+        self.inject_updates(updates, messages, context_window)
+    }
 
+    fn inject_updates(
+        &self,
+        mut updates: Vec<bus::ContextUpdate>,
+        messages: &mut Vec<Message>,
+        context_window: usize,
+    ) -> Vec<ContextReassembledUpdate> {
         if updates.is_empty() {
             return Vec::new();
         }
 
+        // Sort by priority (High first)
         updates.sort_by(|a, b| b.priority.cmp(&a.priority));
 
         let current_tokens: usize = messages

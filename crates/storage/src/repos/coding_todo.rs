@@ -106,7 +106,7 @@ impl TodoRepo {
 
     /// Delete all rows in the thread tagged with `plan_session_id`.
     /// Used at cancel time — proposed items had no execution history yet.
-    pub async fn soft_delete_plan_session(
+    pub async fn delete_plan_session(
         &self,
         thread_id: &str,
         plan_session_id: &str,
@@ -240,11 +240,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn soft_delete_plan_session_removes_matching_rows() {
+    async fn delete_plan_session_removes_matching_rows() {
         let repo = setup().await;
         repo.upsert("t1", "root", "[]", Some("p_a")).await.unwrap();
         repo.upsert("t1", "sub", "[]", Some("p_b")).await.unwrap();
-        repo.soft_delete_plan_session("t1", "p_a").await.unwrap();
+        repo.delete_plan_session("t1", "p_a").await.unwrap();
         assert!(repo.get("t1", "root").await.unwrap().is_none());
         assert!(repo.get("t1", "sub").await.unwrap().is_some());
     }

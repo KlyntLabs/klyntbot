@@ -166,6 +166,7 @@ desktop_macros::klynt_collect_commands![
     crate::commands::coding_todo::coding_plan_ratify,
     crate::commands::coding_todo::coding_plan_user_edit,
     crate::commands::coding_todo::coding_plan_user_remove,
+    crate::commands::coding_todo::coding_plan_open_file,
     crate::commands::providers::providers_list,
     crate::commands::providers::provider_status,
     crate::commands::providers::model_list,

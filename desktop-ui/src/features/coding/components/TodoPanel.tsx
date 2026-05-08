@@ -1,7 +1,8 @@
 import { useTodos } from "../state/todoStore";
 
 export function TodoPanel({ threadId }: { threadId: string }) {
-  const { items, planMode } = useTodos(threadId);
+  const { items, planModeState } = useTodos(threadId);
+  const planMode = !!planModeState;
 
   return (
     <div className="flex flex-col gap-2 p-3 text-sm">
