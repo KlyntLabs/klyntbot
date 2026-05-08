@@ -65,6 +65,27 @@ fn status_short(s: TodoStatus) -> &'static str {
     }
 }
 
+/// Per-turn `<system-reminder>` reminding the LLM that plan mode is active.
+pub fn plan_mode_reminder(plan_file_slug: &str, plan_file_path: &std::path::Path) -> String {
+    format!(
+        "<system-reminder>\nPlan mode active. You may only Edit/Write to {}.\nOther write tools are blocked. Use coding_todo to propose pending items for the user to review. The user will ratify or cancel before execution.\n(plan: {})\n</system-reminder>",
+        plan_file_path.display(),
+        plan_file_slug,
+    )
+}
+
+/// Prose returned to the LLM when it tries to write outside the plan file.
+pub fn plan_mode_write_rejection_prose(
+    plan_file_path: &std::path::Path,
+    attempted_target: &std::path::Path,
+) -> String {
+    format!(
+        "Rejected: you are in plan mode. Edits outside the plan file are not allowed.\n  plan file: {}\n  attempted: {}\nUse coding_todo to propose pending items, then ask the user to ratify.",
+        plan_file_path.display(),
+        attempted_target.display(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,5 +148,26 @@ mod tests {
         };
         let s = render_reminder(&[i], &cfg);
         assert!(s.contains("reason=\"waiting on user\""));
+    }
+
+    #[test]
+    fn plan_mode_reminder_includes_slug_and_path() {
+        let s = plan_mode_reminder("2026-05-08-add-grpc", std::path::Path::new("/tmp/plans/2026-05-08-add-grpc.md"));
+        assert!(s.starts_with("<system-reminder>"));
+        assert!(s.ends_with("</system-reminder>"));
+        assert!(s.contains("Plan mode active"));
+        assert!(s.contains("2026-05-08-add-grpc.md"));
+        assert!(s.contains("coding_todo"));
+    }
+
+    #[test]
+    fn plan_mode_write_rejection_names_target() {
+        let s = plan_mode_write_rejection_prose(
+            std::path::Path::new("/tmp/plans/p.md"),
+            std::path::Path::new("/tmp/src/main.rs"),
+        );
+        assert!(s.contains("plan mode"));
+        assert!(s.contains("/tmp/plans/p.md"));
+        assert!(s.contains("/tmp/src/main.rs"));
     }
 }

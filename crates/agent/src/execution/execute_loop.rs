@@ -61,7 +61,7 @@ pub async fn execute_loop(
     let refresher = params
         .context_update_queue
         .as_ref()
-        .map(|queue| LiveContextRefresher::new(core.token_counter().clone(), queue.clone()));
+        .map(|queue| LiveContextRefresher::new(core.token_counter().clone(), queue.clone(), bus::InjectorRegistry::empty()));
 
     loop {
         // ── Cancellation check ───────────────────────────────
@@ -330,7 +330,7 @@ pub async fn execute_loop(
         // ── Live context refresh ─────────────────────────────
         if !params.pause_context_updates {
             if let Some(ref refresher) = refresher {
-                let updates = refresher.inject_pending(&mut messages, params.context_window);
+                let updates = refresher.inject_pending_with_ctx(&mut messages, params.context_window, ctx);
                 if !updates.is_empty() {
                     let tokens_added: usize = updates.iter().map(|u| u.tokens).sum();
                     crate::execution::core::fan_out_event(

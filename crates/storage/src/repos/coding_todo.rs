@@ -85,6 +85,42 @@ impl TodoRepo {
             .await?;
         Ok(())
     }
+
+    /// Clear the `proposed_in_plan_session` tag for all rows in the thread
+    /// whose tag matches `plan_session_id`. Used at ratify time.
+    pub async fn clear_plan_session_tag(
+        &self,
+        thread_id: &str,
+        plan_session_id: &str,
+    ) -> Result<(), StorageError> {
+        sqlx::query(
+            "UPDATE coding_todos SET proposed_in_plan_session = NULL \
+             WHERE thread_id = ? AND proposed_in_plan_session = ?",
+        )
+        .bind(thread_id)
+        .bind(plan_session_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Delete all rows in the thread tagged with `plan_session_id`.
+    /// Used at cancel time — proposed items had no execution history yet.
+    pub async fn soft_delete_plan_session(
+        &self,
+        thread_id: &str,
+        plan_session_id: &str,
+    ) -> Result<(), StorageError> {
+        sqlx::query(
+            "DELETE FROM coding_todos \
+             WHERE thread_id = ? AND proposed_in_plan_session = ?",
+        )
+        .bind(thread_id)
+        .bind(plan_session_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -186,5 +222,30 @@ mod tests {
         repo.upsert("t1", "root", "[]", None).await.unwrap();
         repo.delete_row("t1", "root").await.unwrap();
         assert!(repo.get("t1", "root").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn clear_plan_session_tag_clears_matching_rows_only() {
+        let repo = setup().await;
+        repo.upsert("t1", "root", "[]", Some("p_a")).await.unwrap();
+        repo.upsert("t1", "sub_x", "[]", Some("p_a")).await.unwrap();
+        repo.upsert("t1", "sub_y", "[]", Some("p_b")).await.unwrap();
+        repo.clear_plan_session_tag("t1", "p_a").await.unwrap();
+        let r1 = repo.get("t1", "root").await.unwrap().unwrap();
+        let r2 = repo.get("t1", "sub_x").await.unwrap().unwrap();
+        let r3 = repo.get("t1", "sub_y").await.unwrap().unwrap();
+        assert!(r1.proposed_in_plan_session.is_none());
+        assert!(r2.proposed_in_plan_session.is_none());
+        assert_eq!(r3.proposed_in_plan_session.as_deref(), Some("p_b"));
+    }
+
+    #[tokio::test]
+    async fn soft_delete_plan_session_removes_matching_rows() {
+        let repo = setup().await;
+        repo.upsert("t1", "root", "[]", Some("p_a")).await.unwrap();
+        repo.upsert("t1", "sub", "[]", Some("p_b")).await.unwrap();
+        repo.soft_delete_plan_session("t1", "p_a").await.unwrap();
+        assert!(repo.get("t1", "root").await.unwrap().is_none());
+        assert!(repo.get("t1", "sub").await.unwrap().is_some());
     }
 }
