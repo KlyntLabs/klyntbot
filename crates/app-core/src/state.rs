@@ -711,6 +711,45 @@ impl AppCore {
         })
     }
 
+    // ── Coding Todo (Tasks 45-47 stubs) ──────────────────────────────────
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_todo_get(
+        &self,
+        _thread_id: &str,
+    ) -> common::Result<Vec<serde_json::Value>> {
+        Ok(vec![])
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_plan_ratify(
+        &self,
+        _thread_id: &str,
+        _plan_session_id: &str,
+    ) -> common::Result<bool> {
+        Ok(true)
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_plan_user_edit(
+        &self,
+        _thread_id: &str,
+        _plan_session_id: &str,
+        _items_json: &str,
+    ) -> common::Result<bool> {
+        Ok(true)
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_plan_user_remove(
+        &self,
+        _thread_id: &str,
+        _plan_session_id: &str,
+        _item_ids: &[String],
+    ) -> common::Result<bool> {
+        Ok(true)
+    }
+
     // ── Workspace lifecycle (Cursor/Codex-style "open folder") ────────────
     //
     // Workspaces are registered folders on disk. The `id` UUID flows into

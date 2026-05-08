@@ -24,6 +24,63 @@ pub enum CodingMemoryKind {
     Episode,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TodoStatus {
+    Pending,
+    InProgress,
+    Done,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConcurrencyClass {
+    Safe,
+    Sequential,
+    Exclusive,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum TodoEvent {
+    StateChanged {
+        thread_id: String,
+        agent_id: String,
+        agent_profile: String,
+        item_id: String,
+        from: TodoStatus,
+        to: TodoStatus,
+        concurrency: ConcurrencyClass,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+        timestamp: jiff::Timestamp,
+    },
+    Cancelled {
+        thread_id: String,
+        agent_id: String,
+        agent_profile: String,
+        item_id: String,
+        prior_status: TodoStatus,
+        was_blocked_by: Vec<String>,
+        timestamp: jiff::Timestamp,
+    },
+    PlanProposed {
+        thread_id: String,
+        plan_session_id: String,
+        item_ids: Vec<String>,
+        timestamp: jiff::Timestamp,
+    },
+    PlanRatified {
+        thread_id: String,
+        plan_session_id: String,
+        ratified_count: usize,
+        user_edited_count: usize,
+        user_removed_count: usize,
+        timestamp: jiff::Timestamp,
+    },
+}
+
 /// Events emitted by feature crates for cross-domain communication.
 ///
 /// The cognitive layer subscribes to all events to extract facts,
@@ -647,6 +704,8 @@ pub enum DomainEvent {
         kind: String,
         payload: serde_json::Value,
     },
+
+    Todo(TodoEvent),
 }
 
 impl DomainEvent {
@@ -752,6 +811,7 @@ impl DomainEvent {
             Self::LauncherItemExecuted { .. } => Self::KIND_LAUNCHER_ITEM_EXECUTED,
             Self::DataVersionBumped { .. } => Self::KIND_DATA_VERSION_BUMPED,
             Self::Generic { .. } => "Generic",
+            Self::Todo(_) => "Todo",
         }
     }
 
@@ -1025,6 +1085,8 @@ impl DomainEvent {
             Self::DataVersionBumped { .. } => D::General,
 
             Self::Generic { .. } => D::General,
+
+            Self::Todo(_) => D::CodingMemory,
         }
     }
 }
@@ -1067,6 +1129,10 @@ impl DomainEventBus {
 
     pub fn subscribe(&self) -> broadcast::Receiver<DomainEvent> {
         self.tx.subscribe()
+    }
+
+    pub fn publish_todo(&self, event: TodoEvent) {
+        self.publish(DomainEvent::Todo(event));
     }
 
     /// Number of active subscribers.
@@ -1315,6 +1381,47 @@ mod tests {
         let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
         assert!(matches!(parsed, DomainEvent::RetrievalSkillApplied { .. }));
     }
+    #[test]
+    fn state_changed_roundtrip() {
+        let e = TodoEvent::StateChanged {
+            thread_id: "t1".into(),
+            agent_id: "root".into(),
+            agent_profile: "root".into(),
+            item_id: "i1".into(),
+            from: TodoStatus::Pending,
+            to: TodoStatus::InProgress,
+            concurrency: ConcurrencyClass::Sequential,
+            reason: None,
+            timestamp: jiff::Timestamp::from_second(1_780_000_000).unwrap(),
+        };
+        let s = serde_json::to_string(&e).unwrap();
+        let back: TodoEvent = serde_json::from_str(&s).unwrap();
+        assert_eq!(e, back);
+    }
+
+    #[tokio::test]
+    async fn publish_todo_round_trip() {
+        let bus = DomainEventBus::new(64);
+        let mut rx = bus.subscribe();
+        let evt = TodoEvent::StateChanged {
+            thread_id: "t1".into(),
+            agent_id: "root".into(),
+            agent_profile: "root".into(),
+            item_id: "i1".into(),
+            from: TodoStatus::Pending,
+            to: TodoStatus::Done,
+            concurrency: ConcurrencyClass::Safe,
+            reason: None,
+            timestamp: jiff::Timestamp::from_second(1_780_000_000).unwrap(),
+        };
+        bus.publish_todo(evt.clone());
+        let received = rx.recv().await.unwrap();
+        match received {
+            DomainEvent::Todo(e) => assert_eq!(e, evt),
+            _ => panic!("wrong variant"),
+        }
+    }
+
     #[allow(dead_code)]
     fn autotuner_decision_roundtrip() {
         let event = DomainEvent::AutotunerDecision {

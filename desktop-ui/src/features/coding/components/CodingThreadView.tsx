@@ -3,6 +3,8 @@ import { Messages } from "@/features/messages/components/Messages";
 import type { ConversationItem, OpenAppTarget } from "@/types";
 import { type MessageDto, useThreadEvents } from "../hooks/useThreadEvents";
 import type { MessagePart } from "./parts/types";
+import { PlanModeBanner } from "./PlanModeBanner";
+import { TodoPanel } from "./TodoPanel";
 
 type Props = {
   threadId: string | null;
@@ -47,15 +49,25 @@ export function CodingThreadView({
   if (!threadId) return null;
 
   return (
-    <Messages
-      items={conversationItems}
-      threadId={threadId}
-      workspaceId={workspaceId}
-      workspacePath={workspacePath}
-      openTargets={openTargets}
-      selectedOpenAppId={selectedOpenAppId}
-      isThinking={isThinking}
-    />
+    <div className="flex flex-col h-full">
+      <PlanModeBanner threadId={threadId} />
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex-1 min-w-0">
+          <Messages
+            items={conversationItems}
+            threadId={threadId}
+            workspaceId={workspaceId}
+            workspacePath={workspacePath}
+            openTargets={openTargets}
+            selectedOpenAppId={selectedOpenAppId}
+            isThinking={isThinking}
+          />
+        </div>
+        <div className="w-64 border-l border-border hidden lg:block">
+          <TodoPanel threadId={threadId} />
+        </div>
+      </div>
+    </div>
   );
 }
 

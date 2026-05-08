@@ -1,0 +1,26 @@
+[package]
+name = "feature-coding-todo"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.93"
+
+[dependencies]
+async-trait = { workspace = true }
+ai-core = { workspace = true }
+ai-core-macros = { workspace = true }
+bus = { path = "../bus" }
+common = { path = "../common" }
+jiff = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+storage = { path = "../storage" }
+thiserror = { workspace = true }
+tools-core = { path = "../tools-core" }
+tools-core-macros = { path = "../tools-core-macros" }
+tracing = { workspace = true }
+ulid = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+sqlx = { workspace = true, features = ["sqlite"] }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "test-util"] }

@@ -403,6 +403,7 @@ dependencies = [
  "desktop-shared",
  "dirs",
  "feature-coaching",
+ "feature-coding-todo",
  "feature-finance",
  "feature-focus",
  "feature-insights",
@@ -5359,6 +5360,29 @@ dependencies = [
  "tokio-util",
  "tools-core",
  "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "feature-coding-todo"
+version = "0.1.0"
+dependencies = [
+ "ai-core",
+ "ai-core-macros",
+ "async-trait",
+ "bus",
+ "common",
+ "jiff",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "thiserror 2.0.18",
+ "tokio",
+ "tools-core",
+ "tools-core-macros",
+ "tracing",
+ "ulid",
  "uuid",
 ]
 

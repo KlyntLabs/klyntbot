@@ -117,6 +117,12 @@ impl ToolRegistryBridge {
             session_key: None,
             message_id: None,
             repo_id: String::new(),
+            agent_id: "root".into(),
+            agent_profile: "root".into(),
+            plan_mode_active: false,
+            plan_session_id: None,
+            previous_anti_passivity_violation: false,
+            same_turn_user_msg_emitted: false,
         };
 
         // Acquire read lock, prepare (validate + clone Arc<dyn Tool>), then drop lock

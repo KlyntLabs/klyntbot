@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { ChatThread } from "@/features/chat/types";
 import { partitionCodingThreads } from "../state/partitionCodingThreads";
 import { markThreadOpened } from "../state/ThreadEventBuffer";
+import { TodoSidebarBadge } from "./TodoSidebarBadge";
 
 type Props = {
   sessions: ChatThread[];
@@ -106,6 +107,7 @@ function Section({
             <div className="thread-headline">
               <span className="thread-name">{t.title}</span>
             </div>
+            <TodoSidebarBadge threadId={t.sessionKey} />
           </div>
         </button>
       ))}

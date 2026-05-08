@@ -15,7 +15,8 @@ use tokio_util::sync::CancellationToken;
 use crate::mirror::{
     sources::{
         ApprovalHistorySource, ConfigArchiverSource, CostCeilingSource, FinanceSpendingDriftSource,
-        MetaRuleSignalSource, RoutingSignalSource, TaskFocusPatternSource, TrialPreviewSource,
+        MetaRuleSignalSource, RoutingSignalSource, TaskFocusPatternSource, TodoSignalSource,
+        TrialPreviewSource,
     },
     AutotunerBridge, MirrorFacade, MirrorRepo, NarrativeHandler,
 };
@@ -58,6 +59,7 @@ impl MirrorEngine {
         ));
         let task_focus = Arc::new(TaskFocusPatternSource::new(repo.clone()));
         let finance_drift = Arc::new(FinanceSpendingDriftSource::new(repo.clone()));
+        let todo = Arc::new(TodoSignalSource::new(repo.clone()));
 
         // Wrap each in a runner; spawn flush loops for sources that declare an interval.
         let mut consumers: Vec<Arc<dyn SignalConsumer>> = Vec::new();
@@ -78,6 +80,7 @@ impl MirrorEngine {
         register!(trial);
         register!(task_focus);
         register!(finance_drift);
+        register!(todo);
 
         let mut ah_source: Option<Arc<ApprovalHistorySource>> = None;
         if let (Some(ah_repo), Some(ap_repo)) = (approval_history_repo, approval_pattern_repo) {
@@ -127,8 +130,8 @@ mod tests {
         let built = MirrorEngine::start(repo, None, None, None, None, None, None, None);
         assert_eq!(
             built.consumers.len(),
-            7,
-            "routing + meta_rule + config_archiver + trial + task_focus + finance_drift + cost_ceiling"
+            8,
+            "routing + meta_rule + config_archiver + trial + task_focus + finance_drift + cost_ceiling + todo"
         );
         for h in built.flush_handles.iter() {
             assert!(!h.is_finished());

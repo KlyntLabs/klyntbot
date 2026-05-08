@@ -20,6 +20,7 @@ pub mod coding_skills;
 pub mod coding_status;
 pub mod coding_thread;
 pub mod coding_thread_metadata;
+pub mod coding_todo;
 pub mod coding_turn;
 pub mod coding_window;
 pub mod cognitive;

@@ -12,6 +12,15 @@ pub const PROVIDER_DEGRADED: &str = "provider:degraded";
 pub trait AppEventEmitter: Send + Sync + 'static {
     fn emit_event(&self, event_name: &str, payload: serde_json::Value);
 
+    /// Emit a `coding:todos_updated` event for the given thread.
+    fn emit_todos_updated(&self, thread_id: &str, items: &[serde_json::Value]) {
+        let payload = serde_json::json!({
+            "thread_id": thread_id,
+            "items": items,
+        });
+        self.emit_event("coding:todos_updated", payload);
+    }
+
     /// Emit an `entity:updated` event for the given entity kind and ID.
     fn emit_entity_updated(&self, kind: EntityKind, id: &str) {
         let payload = EntityUpdatedPayload {

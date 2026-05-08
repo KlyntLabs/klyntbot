@@ -18,6 +18,7 @@ pub use sources::{
 pub use types::{
     AutotunerBridge, BrainVersion, CategorySpend, EarlyTrialEvaluator, FeedbackTarget,
     FinanceDriftSnapshot, GeneratedNarrative, MetaRule, MetaRuleAction, MetaRuleSource,
+    TodoSnapshot,
     MetaRuleStatus, MirrorAlert, MirrorAlertSeverity, MirrorAlertType, MirrorResponse, MirrorState,
     NarrativeContext, NarrativeSnippet, PreviewRecommendation, RoutingSnapshot, SkillRouteStats,
     SuggestedAction, TaskFocusSnapshot, TrendDirection, TrendNarrative, TrialEarlySignals,

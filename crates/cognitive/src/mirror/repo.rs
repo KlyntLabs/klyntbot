@@ -935,6 +935,68 @@ impl MirrorRepo {
             per_category,
         }))
     }
+
+    // -----------------------------------------------------------------------
+    // Coding todo snapshots
+    // -----------------------------------------------------------------------
+
+    pub async fn insert_todo_snapshot(&self, snap: &crate::mirror::TodoSnapshot) -> Result<()> {
+        let clusters_json = serde_json::to_string(&snap.blocked_reason_clusters)
+            .map_err(|e| common::KlyntbotError::Storage(format!("serialize clusters: {e}")))?;
+        sqlx::query(
+            "INSERT INTO mirror_todo_snapshots
+             (id, captured_at, window_hours, status_changes, cancellations,
+              plans_proposed, plans_ratified, blocked_reason_clusters_json)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(snap.id.to_string())
+        .bind(snap.captured_at.to_string())
+        .bind(snap.window_hours as i64)
+        .bind(snap.status_changes as i64)
+        .bind(snap.cancellations as i64)
+        .bind(snap.plans_proposed as i64)
+        .bind(snap.plans_ratified as i64)
+        .bind(clusters_json)
+        .execute(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("insert todo snapshot: {e}")))?;
+        Ok(())
+    }
+
+    pub async fn get_latest_todo_snapshot(&self) -> Result<Option<crate::mirror::TodoSnapshot>> {
+        let row = sqlx::query(
+            "SELECT id, captured_at, window_hours, status_changes, cancellations,
+                    plans_proposed, plans_ratified, blocked_reason_clusters_json
+             FROM mirror_todo_snapshots ORDER BY captured_at DESC LIMIT 1",
+        )
+        .fetch_optional(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("latest todo snapshot: {e}")))?;
+        let Some(row) = row else { return Ok(None) };
+        let id: String = row.try_get(0)?;
+        let captured_at: String = row.try_get(1)?;
+        let window_hours: i64 = row.try_get(2)?;
+        let status_changes: i64 = row.try_get(3)?;
+        let cancellations: i64 = row.try_get(4)?;
+        let plans_proposed: i64 = row.try_get(5)?;
+        let plans_ratified: i64 = row.try_get(6)?;
+        let clusters_json: String = row.try_get(7)?;
+        let blocked_reason_clusters: Vec<(String, u32)> = serde_json::from_str(&clusters_json)
+            .map_err(|e| common::KlyntbotError::Storage(format!("deserialize clusters: {e}")))?;
+        Ok(Some(crate::mirror::TodoSnapshot {
+            id: Uuid::parse_str(&id)
+                .map_err(|e| common::KlyntbotError::Storage(format!("uuid: {e}")))?,
+            captured_at: captured_at
+                .parse()
+                .map_err(|e| common::KlyntbotError::Storage(format!("ts: {e}")))?,
+            window_hours: window_hours as u8,
+            status_changes: status_changes as u32,
+            cancellations: cancellations as u32,
+            plans_proposed: plans_proposed as u32,
+            plans_ratified: plans_ratified as u32,
+            blocked_reason_clusters,
+        }))
+    }
 }
 
 // ---------------------------------------------------------------------------

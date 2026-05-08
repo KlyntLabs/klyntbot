@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import type { MessagePart } from "../components/parts/types";
+import { setTodos } from "../state/todoStore";
 import { subscribeToThread } from "../state/ThreadEventBuffer";
 
 /// Mirrors `desktop_shared::coding::events::ThreadEvent`. Kept loose (string
@@ -64,7 +65,8 @@ export type ThreadEvent =
       completed_at: number;
       duration_ms: number;
     }
-  | { kind: "heartbeat"; subscription_id: string; server_time: number };
+  | { kind: "heartbeat"; subscription_id: string; server_time: number }
+  | { kind: "todos_updated"; thread_id: string; items: Array<{ id: string; title: string; status: string }> };
 
 export type PartDelta =
   | { type: "text"; append: string }
@@ -229,6 +231,16 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
       return state;
     case "turn_completed":
       return { ...state, turnState: { kind: "idle", lastFinishReason: event.finish_reason } };
+    case "todos_updated": {
+      setTodos(event.thread_id, event.items.map((i) => ({
+        id: i.id,
+        title: i.title,
+        status: i.status as "pending" | "in_progress" | "done" | "blocked",
+        concurrency: "safe",
+        blockedBy: [],
+      })));
+      return state;
+    }
     default:
       return state;
   }

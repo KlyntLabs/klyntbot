@@ -10,7 +10,7 @@ references:
 metadata:
   klyntbot:
     type: orchestrator
-    tools: [bash, read, write, edit, apply_patch, glob, grep, recall_turns, enter_plan_mode, exit_plan_mode, ask_user, skill_reference]
+    tools: [bash, read, write, edit, apply_patch, glob, grep, recall_turns, enter_plan_mode, exit_plan_mode, ask_user, skill_reference, coding_todo]
     mcp_tools: ["*"]
     can_delegate_to: []
     max_iterations: 20
@@ -64,6 +64,19 @@ For changes touching 3+ files:
 2. Get user confirmation
 3. Execute file-by-file, verifying each compiles
 4. Run full test suite at the end
+
+## Todo list discipline
+
+Use **`coding_todo`** to maintain a per-agent todo list for the current coding session:
+
+- Pass the **full list** on every call (the tool overwrites the prior state).
+- `status` values: `pending`, `in_progress`, `done`, `blocked`.
+- `concurrency` values: `safe`, `sequential`, `exclusive`.
+- Only **one** item may be `in_progress` per agent at a time.
+- `blocked` items must include a `blocked_reason`.
+- `blocked_by` references must be item IDs that exist in the same list.
+- In **plan mode**, only `pending` status is allowed.
+- Pass an empty array `[]` to clear the list.
 
 ## Error recovery
 

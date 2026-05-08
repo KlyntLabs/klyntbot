@@ -38,6 +38,9 @@ pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
     if let Some(e) = feature_language_learning::try_from_domain_event(event) {
         return Some(with_domain(e, RecallDomain::LanguageLearning));
     }
+    if let Some(e) = feature_coding_todo::events::try_from_domain_event(event) {
+        return Some(with_domain(e, RecallDomain::General));
+    }
     if let Some(e) =
         cognitive::services::community_intelligence::events::try_from_domain_event(event)
     {
@@ -171,6 +174,7 @@ pub fn build_metric_registry() -> ai_core::MetricRegistry {
     reg.register_all(feature_productivity::events::ProductivityEvent::FEATURE_METRICS);
     reg.register_all(feature_language_learning::LanguageLearningEvent::FEATURE_METRICS);
     reg.register_all(feature_learning::LearningEvent::FEATURE_METRICS);
+    reg.register_all(feature_coding_todo::CodingTodoEvent::FEATURE_METRICS);
     reg.register_all(
         cognitive::services::community_intelligence::events::CommunityEvent::FEATURE_METRICS,
     );

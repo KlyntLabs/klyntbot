@@ -99,6 +99,18 @@ pub struct RoutingContext {
     pub message_id: Option<String>,
     /// Repo identifier for repo-scoped operations (e.g. Mirror Layer 3 caching).
     pub repo_id: String,
+    /// Agent identifier ("root" for top-level, subagent short-id for delegates).
+    pub agent_id: String,
+    /// Agent profile: "root" | "explore" | "code" | "general".
+    pub agent_profile: String,
+    /// When true, plan-mode validation gates apply (only `pending` status allowed).
+    pub plan_mode_active: bool,
+    /// Plan session id when in plan mode; None otherwise.
+    pub plan_session_id: Option<String>,
+    /// True if the previous coding_todo call had blocked items without a user message.
+    pub previous_anti_passivity_violation: bool,
+    /// True if a user-facing assistant message was emitted in the current turn.
+    pub same_turn_user_msg_emitted: bool,
 }
 
 impl RoutingContext {
@@ -125,6 +137,12 @@ impl RoutingContext {
             session_key: None,
             message_id: None,
             repo_id: String::new(),
+            agent_id: "root".into(),
+            agent_profile: "root".into(),
+            plan_mode_active: false,
+            plan_session_id: None,
+            previous_anti_passivity_violation: false,
+            same_turn_user_msg_emitted: false,
         }
     }
 
@@ -150,6 +168,12 @@ impl RoutingContext {
             session_key: None,
             message_id: None,
             repo_id: String::new(),
+            agent_id: "root".into(),
+            agent_profile: "root".into(),
+            plan_mode_active: false,
+            plan_session_id: None,
+            previous_anti_passivity_violation: false,
+            same_turn_user_msg_emitted: false,
         }
     }
 }

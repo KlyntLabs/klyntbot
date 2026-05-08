@@ -371,3 +371,21 @@ pub struct CategorySpend {
     pub transaction_count: u32,
     pub budget_alerts: u32,
 }
+
+// ---------------------------------------------------------------------------
+// Coding Todo types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TodoSnapshot {
+    pub id: Uuid,
+    #[specta(type = crate::specta_helpers::Timestamp)]
+    pub captured_at: Timestamp,
+    pub window_hours: u8,
+    pub status_changes: u32,
+    pub cancellations: u32,
+    pub plans_proposed: u32,
+    pub plans_ratified: u32,
+    pub blocked_reason_clusters: Vec<(String, u32)>,
+}
