@@ -63,8 +63,11 @@ L4 (NEW)  feature-coding-bash/
 L4 (NEW)  klynt-pty/                      # placeholder crate; non-PTY only in 2.3a
               src/lib.rs                  # ChildHandle::Process variant only
 
-L2  storage/src/repos/coding_background_jobs.rs   # JobRow + repo
-        migrations/NNN_coding_background_jobs.sql
+L2  storage/src/repos/coding_background_jobs.rs   # BashJobRow + BashJobRepo
+        # NO numbered SQL file — feature crates own their migrations via FeatureMigration
+
+L4  feature-coding-bash/src/migrations.rs         # FeatureMigration { feature_name: "feature_coding_bash", version: 1, sql: "CREATE TABLE …" }
+L4  feature-coding-bash/src/view.rs               # BashJobView (specta::Type) — lives in feature crate, not desktop-shared
 
 L1  bus/src/domain_events.rs              # JobStarted/JobCompleted/JobFailed/JobLost variants
 L1  bus/src/context_updates.rs            # ContextUpdateReason::CodingJobsChanged
@@ -318,8 +321,12 @@ pub struct RoutingContext {
     pub workspace_cwd:  Option<PathBuf>,                  // NEW; captured at thread spawn
     pub agent_chain:    Vec<String>,                      // NEW; root → … → self (always non-empty,
                                                           //      [0] = root_agent_id, last = current agent_id)
-    pub job_supervisor: Option<Arc<dyn JobSupervisorHandle>>,   // NEW; injected in app-core init
+    pub job_supervisor: Option<Arc<dyn JobSupervisorHandle>>,   // NEW; injected in app-core init,
+                                                          //      flows through SubagentManager.coding_policies-style sharing
 }
+
+// NOTE: `RoutingContext` already implements `bus::InjectorContext` (routing.rs:181-194).
+// We extend the impl to also expose agent_chain via a new method on the trait if needed.
 
 #[async_trait]
 pub trait JobSupervisorHandle: Send + Sync {
@@ -484,6 +491,8 @@ impl DynamicInjector for BackgroundJobsInjector {
 fn render_active_jobs_reminder(jobs: &[JobView]) -> String { /* see below */ }
 ```
 
+**Note:** the injector is invoked via `LiveContextRefresher::inject_pending_with_ctx` (NOT `inject_pending`) — the `_with_ctx` variant is what calls `InjectorRegistry::collect_all`. Verify the call site in `execute_loop` already uses the `_with_ctx` form (Phase 2.2 should have switched it; if not, that's a prerequisite step in the plan).
+
 Body format (as a `<system-reminder>` block):
 
 ```xml
@@ -626,7 +635,7 @@ finalize_job(live_job, exit_status)
    ├── if !spec.silent_completion:
    │     enqueue ContextUpdate(CodingJobsChanged, body=completion_notification)
    │       body includes: gate result + extracted struct + last 80 lines + read-pointer
-   │       priority = High (so the LLM sees it on the very next iteration even under
+   │       priority = UpdatePriority::High (so the LLM sees it on the very next iteration even under
    │       token-budget pressure)
    └── emit Tauri event "coding:job_event" → frontend updates JobsPanel
 ```
@@ -729,16 +738,33 @@ Three env vars and `Stdio::null()` are the difference between "background bash w
 
 ### 7.2 Sandbox interaction
 
-`MacOsSeatbeltRunner` today builds a `sandbox-exec`-wrapped Command in its `run_command` method. Phase 2.3a refactors this so the policy-assembly logic is reusable:
+`MacOsSeatbeltRunner::run_command` (`crates/klynt-sandbox/src/seatbelt.rs:51-109`) builds a `sandbox-exec`-wrapped Command, awaits completion, and returns a single `CommandOutput { stdout, exit_code }` where stdout and stderr are **merged**. Background bash needs separate streams plus a kept-alive child handle.
+
+Refactor (additive, no breaking change to foreground):
 
 ```rust
 impl MacOsSeatbeltRunner {
-    pub fn build_sandboxed_command(&self, command: &str) -> std::process::Command;     // NEW
-    pub async fn run_command(&self, …) -> CommandOutput { /* now delegates */ }
+    // NEW — reusable command builder. Lines 59-68 of run_command extracted.
+    pub fn build_sandboxed_command(
+        &self,
+        policy: &SandboxPolicy,
+        program: &str,
+        args: &[&str],
+        cwd: Option<&Path>,
+    ) -> Result<tokio::process::Command, SandboxError>;
+
+    // existing run_command unchanged — still merges stdout+stderr, still awaits exit.
 }
 ```
 
-`feature-coding-bash::spawner` calls `build_sandboxed_command` to get a pre-wrapped Command, then sets cwd/env/pre_exec on top. Sandbox policy is unchanged from today.
+`feature-coding-bash::spawner` calls `build_sandboxed_command` to get a Command, then:
+1. Sets `pre_exec` for `setpgid(0, 0)` (Linux: also `PR_SET_PDEATHSIG`)
+2. Adds `GIT_EDITOR=true`, `PAGER=cat`, `TERM=dumb` env vars
+3. Sets `Stdio::null()` for stdin
+4. Spawns and **keeps the `tokio::process::Child` handle**
+5. Reads stdout and stderr separately into the `RingFile` (two reader tasks)
+
+The `CommandOutput` type is **not modified**. Foreground bash continues to use the merged-stream path. Background bash bypasses `CommandOutput` entirely and uses the new `BackgroundCommandHandle { child, stdout: ChildStdout, stderr: ChildStderr, pgid: Option<u32> }` returned by `feature-coding-bash::spawner::spawn_background_command`.
 
 ### 7.3 Cancel propagation
 
