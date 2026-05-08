@@ -20,8 +20,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use providers::{
-    CacheBreakpoint, ChatParams, DynProvider, LlmProvider, LlmResponse, LlmStream,
-    LlmStreamChunk, Message, ProviderCapabilities,
+    CacheBreakpoint, ChatParams, DynProvider, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk,
+    Message, ProviderCapabilities,
 };
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
@@ -71,9 +71,7 @@ impl LlmProvider for HungStreamProvider {
             usage: None,
         };
 
-        let first = futures_util::stream::iter(vec![
-            Ok::<_, common::KlyntbotError>(chunk),
-        ]);
+        let first = futures_util::stream::iter(vec![Ok::<_, common::KlyntbotError>(chunk)]);
         // After the first chunk the stream pends forever — simulating a stalled
         // SSE connection that never emits a `[DONE]` frame.
         let pending = futures_util::stream::pending::<common::Result<LlmStreamChunk>>();
@@ -110,8 +108,8 @@ async fn cancel_during_stream_returns_partial_within_200ms() {
         use std::collections::HashSet;
         use tools::RoutingContext;
 
-        let params = ExecutionParams::new("hung-stream-model", 200_000)
-            .with_cancel_token(token_for_task);
+        let params =
+            ExecutionParams::new("hung-stream-model", 200_000).with_cancel_token(token_for_task);
 
         let (tx, _rx) = tokio::sync::mpsc::channel(64);
         let routing = RoutingContext::new("test".into(), "test".into());
@@ -142,7 +140,10 @@ async fn cancel_during_stream_returns_partial_within_200ms() {
     let (outcome, _usage) = result;
 
     match outcome {
-        CycleOutcome::Cancelled { partial_content, partial_reasoning: _ } => {
+        CycleOutcome::Cancelled {
+            partial_content,
+            partial_reasoning: _,
+        } => {
             assert_eq!(
                 partial_content, "partial-",
                 "partial content streamed before cancel must be preserved"

@@ -109,11 +109,7 @@ pub async fn chat_respond_approval(
     let core = app.state::<std::sync::Arc<app_core::AppCore>>();
     core.respond_approval(&request_id, decision)
         .await
-        .map_err(
-            |e| {
-                desktop_shared::errors::ApiError::new("NOT_FOUND", e.to_string())
-            },
-        )?;
+        .map_err(|e| desktop_shared::errors::ApiError::new("NOT_FOUND", e.to_string()))?;
     let _ = session_key; // session_key unused today; Plan 4 persists per-thread rules.
     Ok(())
 }

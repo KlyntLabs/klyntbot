@@ -12,9 +12,13 @@ pub fn compute_ratify_counts(
     use std::collections::HashMap;
     let snap = snapshot.unwrap_or(&[]);
     let snap_by_id: HashMap<&str, &TodoItem> = snap.iter().map(|i| (i.id.as_str(), i)).collect();
-    let final_by_id: HashMap<&str, &TodoItem> = final_items.iter().map(|i| (i.id.as_str(), i)).collect();
+    let final_by_id: HashMap<&str, &TodoItem> =
+        final_items.iter().map(|i| (i.id.as_str(), i)).collect();
 
-    let removed = snap_by_id.keys().filter(|id| !final_by_id.contains_key(*id)).count();
+    let removed = snap_by_id
+        .keys()
+        .filter(|id| !final_by_id.contains_key(*id))
+        .count();
 
     let mut ratified = 0usize;
     let mut edited = 0usize;
@@ -92,13 +96,28 @@ use crate::state::AppCore;
 use approval::CodingApprovalPolicy;
 use common::{KlyntbotError, Result};
 use feature_coding_todo::util::kebab;
-use feature_coding_todo::view::{CodingTodoView, PlanModeView};
+use feature_coding_todo::view::CodingTodoView;
 use parking_lot::RwLock;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::instrument;
 
 impl AppCore {
+    /// Push a one-shot context update into the agent loop so the LLM sees a
+    /// plan-mode kickoff or ratification message on its next iteration.
+    pub(crate) fn inject_one_shot_reminder(&self, _thread_id: &str, prose: &str) {
+        let Some(ref queue) = self.context_update_queue else {
+            return;
+        };
+        queue.push(bus::ContextUpdate {
+            reason: bus::ContextUpdateReason::Custom("plan_mode_one_shot".into()),
+            content: Some(prose.to_string()),
+            metadata: None,
+            priority: bus::UpdatePriority::High,
+            timestamp: jiff::Timestamp::now(),
+        });
+    }
+
     /// Enter plan mode for `thread_id`. Idempotent: if the thread is already
     /// in plan mode, returns the existing view without changes.
     #[instrument(skip(self), err)]
@@ -138,27 +157,40 @@ impl AppCore {
             .map_err(KlyntbotError::Io)?;
         let plan_file_path: PathBuf = plans_dir.join(format!("{slug}.md"));
 
-        // 4. Create stub if absent.
-        if !plan_file_path.exists() {
-            let stub = format!(
-                "# Plan: {}\n\n**Created:** {}\n**Plan session:** {}\n\n## Goals\n\n## Approach\n\n## Tasks\n",
-                if title.is_empty() { "Untitled" } else { &title },
-                jiff::Timestamp::now()
-                    .to_zoned(jiff::tz::TimeZone::system())
-                    .strftime("%Y-%m-%d %H:%M %Z"),
-                plan_session_id,
-            );
-            tokio::fs::write(&plan_file_path, stub)
-                .await
-                .map_err(KlyntbotError::Io)?;
+        // 4. Create stub if absent (atomic create_new to avoid TOCTOU).
+        let stub = format!(
+            "# Plan: {}\n\n**Created:** {}\n**Plan session:** {}\n\n## Goals\n\n## Approach\n\n## Tasks\n",
+            if title.is_empty() { "Untitled" } else { &title },
+            jiff::Timestamp::now()
+                .to_zoned(jiff::tz::TimeZone::system())
+                .strftime("%Y-%m-%d %H:%M %Z"),
+            plan_session_id,
+        );
+        match tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&plan_file_path)
+            .await
+        {
+            Ok(mut file) => {
+                use tokio::io::AsyncWriteExt;
+                file.write_all(stub.as_bytes())
+                    .await
+                    .map_err(KlyntbotError::Io)?;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(KlyntbotError::Io(e)),
         }
 
         // 5. Build the new policy by cloning rules from the current Default
         //    (or fallback config-derived) policy.
-        let new_policy = self.build_plan_mode_policy(thread_id, &plan_session_id, &slug, &plan_file_path).await?;
+        let new_policy = self
+            .build_plan_mode_policy(thread_id, &plan_session_id, &slug, &plan_file_path)
+            .await?;
 
         // 6. Snapshot empty items (LLM hasn't proposed yet); refresh after first propose.
-        self.plan_snapshots.insert(plan_session_id.clone(), Vec::new());
+        self.plan_snapshots
+            .insert(plan_session_id.clone(), Vec::new());
 
         // 7. Swap policy.
         let lock = self
@@ -168,10 +200,8 @@ impl AppCore {
             .clone();
         *lock.write() = new_policy;
 
-        // 8. Spawn untitled-rename watcher if title was empty.
-        if title.is_empty() {
-            self.spawn_untitled_rename_watcher(thread_id.to_string(), plan_session_id.clone(), plans_dir);
-        }
+        // 8. TODO: Spawn untitled-rename watcher if title was empty.
+        //    (Stub removed — holding Arcs in a no-op task leaks memory.)
 
         // 9. Emit events.
         if let Some(bus) = &self.domain_event_bus {
@@ -183,15 +213,25 @@ impl AppCore {
             });
         }
         // UI event
-        self.event_emitter.emit_event("coding:plan_entered", serde_json::json!(thread_id));
+        self.event_emitter
+            .emit_event("coding:plan_entered", serde_json::json!(thread_id));
+
+        self.inject_one_shot_reminder(
+            thread_id,
+            "Plan mode active. Decompose the task into discrete items and propose them for user review before execution.",
+        );
 
         self.coding_todo_get(thread_id).await
     }
 
     #[instrument(skip(self), err)]
     pub async fn coding_plan_cancel(&self, thread_id: &str) -> Result<CodingTodoView> {
-        let lock = self.coding_policies.get(thread_id)
-            .ok_or_else(|| KlyntbotError::StorageNotFound(format!("no policy for thread {thread_id}")))?
+        let lock = self
+            .coding_policies
+            .get(thread_id)
+            .ok_or_else(|| {
+                KlyntbotError::StorageNotFound(format!("no policy for thread {thread_id}"))
+            })?
             .clone();
 
         let plan_session_id = {
@@ -201,7 +241,10 @@ impl AppCore {
         };
 
         // Soft-delete plan-tagged rows.
-        self.repos.coding_todo.delete_plan_session(thread_id, &plan_session_id).await
+        self.repos
+            .coding_todo
+            .delete_plan_session(thread_id, &plan_session_id)
+            .await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
 
         // Swap to Default.
@@ -218,8 +261,12 @@ impl AppCore {
                 timestamp: jiff::Timestamp::now(),
             });
         }
-        self.event_emitter.emit_event("coding:todos_updated", serde_json::json!({ "thread_id": thread_id }));
-        self.event_emitter.emit_event("coding:plan_exited", serde_json::json!(thread_id));
+        self.event_emitter.emit_event(
+            "coding:todos_updated",
+            serde_json::json!({ "thread_id": thread_id }),
+        );
+        self.event_emitter
+            .emit_event("coding:plan_exited", serde_json::json!(thread_id));
 
         self.coding_todo_get(thread_id).await
     }
@@ -236,27 +283,22 @@ impl AppCore {
         let base = CodingApprovalPolicy::compile(&perms)
             .map_err(|e| KlyntbotError::Config(common::ConfigError::Invalid(e)))?;
         let (allow, deny, ask, default_if_no_match) = match base {
-            CodingApprovalPolicy::Default { allow, deny, ask, default_if_no_match } => {
-                (allow, deny, ask, default_if_no_match)
-            }
+            CodingApprovalPolicy::Default {
+                allow,
+                deny,
+                ask,
+                default_if_no_match,
+            } => (allow, deny, ask, default_if_no_match),
             _ => unreachable!("compile always returns Default"),
         };
         Ok(CodingApprovalPolicy::PlanMode {
             plan_session_id: plan_session_id.into(),
             plan_file_slug: plan_file_slug.into(),
             plan_file_path: plan_file_path.to_path_buf(),
-            allow, deny, ask, default_if_no_match,
+            allow,
+            deny,
+            ask,
+            default_if_no_match,
         })
-    }
-
-    fn spawn_untitled_rename_watcher(&self, thread_id: String, plan_session_id: String, plans_dir: std::path::PathBuf) {
-        let policies = self.coding_policies.clone();
-        let event_emitter = self.event_emitter.clone();
-        let sessions_repo = self.repos.sessions.clone();
-        tokio::spawn(async move {
-            // TODO: subscribe to thread title updates and rename plan file when title arrives.
-            // For now, the watcher is a stub that does nothing.
-            let _ = (thread_id, plan_session_id, plans_dir, policies, event_emitter, sessions_repo);
-        });
     }
 }

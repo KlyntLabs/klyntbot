@@ -68,18 +68,30 @@ impl SubagentProfile {
     /// System prompt role preamble for this profile.
     pub fn role_prompt(&self) -> &'static str {
         match self {
-            Self::ReadOnly => "You are an analyst. Reason about the information provided. You have read-only file access and web fetch tools.",
-            Self::ReadWrite => "You are a research specialist. Focus on finding and synthesizing information from files. You have read and write file access.",
-            Self::Full => "You are a general-purpose subagent. You have full access to filesystem, web, and plan-mode tools.",
+            Self::ReadOnly => {
+                "You are an analyst. Reason about the information provided. You have read-only file access and web fetch tools."
+            }
+            Self::ReadWrite => {
+                "You are a research specialist. Focus on finding and synthesizing information from files. You have read and write file access."
+            }
+            Self::Full => {
+                "You are a general-purpose subagent. You have full access to filesystem, web, and plan-mode tools."
+            }
         }
     }
 
     /// Tool description for the system prompt.
     pub fn tool_description(&self) -> &'static str {
         match self {
-            Self::ReadOnly => "- Read files in the workspace (read-only)\n- Search file contents (grep) and find files by pattern (glob)\n- Fetch web pages",
-            Self::ReadWrite => "- Read and write files in the workspace\n- Search file contents (grep) and find files by pattern (glob)\n- Execute shell commands and apply patches",
-            Self::Full => "- Read and write files in the workspace\n- Search file contents (grep) and find files by pattern (glob)\n- Execute shell commands, apply patches, and manage plan mode",
+            Self::ReadOnly => {
+                "- Read files in the workspace (read-only)\n- Search file contents (grep) and find files by pattern (glob)\n- Fetch web pages"
+            }
+            Self::ReadWrite => {
+                "- Read and write files in the workspace\n- Search file contents (grep) and find files by pattern (glob)\n- Execute shell commands and apply patches"
+            }
+            Self::Full => {
+                "- Read and write files in the workspace\n- Search file contents (grep) and find files by pattern (glob)\n- Execute shell commands, apply patches, and manage plan mode"
+            }
         }
     }
 }
@@ -137,6 +149,10 @@ pub struct SubagentManager {
     /// Live per-agent progress (iteration, last_tool) updated by the forwarder
     /// spawned from `run_subagent_task`. Read by `list_active`.
     progress: Arc<dashmap::DashMap<String, (u32, Option<String>)>>,
+    /// Per-coding-thread approval policies. Inherited by subagents for plan-mode continuity.
+    coding_policies: Option<
+        Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
+    >,
 }
 
 /// Builder for SubagentManager
@@ -152,6 +168,9 @@ pub struct SubagentManagerBuilder {
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     event_sender:
         Option<tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>>,
+    coding_policies: Option<
+        Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
+    >,
 }
 
 impl SubagentManagerBuilder {
@@ -168,7 +187,18 @@ impl SubagentManagerBuilder {
             tool_kit: None,
             hook_engine: None,
             event_sender: None,
+            coding_policies: None,
         }
+    }
+
+    pub fn coding_policies(
+        mut self,
+        policies: Option<
+            Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
+        >,
+    ) -> Self {
+        self.coding_policies = policies;
+        self
     }
 
     pub fn tool_kit(mut self, kit: Arc<klynt_core::ToolKitBuilder>) -> Self {
@@ -221,6 +251,7 @@ impl SubagentManagerBuilder {
             registry_cache: std::sync::Mutex::new(HashMap::new()),
             event_tx: std::sync::Mutex::new(self.event_sender),
             progress: Arc::new(dashmap::DashMap::new()),
+            coding_policies: self.coding_policies,
         }
     }
 }
@@ -395,6 +426,7 @@ impl SubagentManager {
             lock.clone()
         };
         let progress_ref = Arc::clone(&self.progress);
+        let coding_policies = self.coding_policies.clone();
 
         tokio::spawn(async move {
             // Acquire permit before running — limits concurrent subagents.
@@ -414,6 +446,7 @@ impl SubagentManager {
                     &provider, &workspace, &model, &task, config, profile,
                     tool_kit, hook_engine.clone(), origin_key.clone(), base_registry,
                     short_id_clone.clone(), Arc::clone(&progress_ref), event_tx_clone.clone(),
+                    coding_policies.clone(),
                 ) => {
                     r
                 }
@@ -599,6 +632,9 @@ async fn run_subagent_task(
     lifecycle_tx: Option<
         tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>,
     >,
+    coding_policies: Option<
+        Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
+    >,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
     use crate::execution::budget::{DepthMode, SafetyCap};
     use crate::execution::core::ExecutionCore;
@@ -668,7 +704,11 @@ async fn run_subagent_task(
         .with_timeout(std::time::Duration::from_secs(config.task_timeout));
     let mut routing_ctx = RoutingContext::new("subagent".into(), "background".into());
     routing_ctx.hook_engine = hook_engine;
-    routing_ctx.session_key = Some(session_key.into());
+    routing_ctx.session_key = Some(session_key.clone().into());
+    routing_ctx.plan_mode_active = coding_policies
+        .as_ref()
+        .map(|policies| crate::agent_loop::is_plan_mode_for_thread(policies, &session_key))
+        .unwrap_or(false);
 
     // Execute via unified execute loop with a fixed safety cap
     let mut budget = SafetyCap::with_limits(
@@ -926,6 +966,7 @@ mod tests {
             None,
             "agent-1".to_string(),
             Arc::new(dashmap::DashMap::new()),
+            None,
             None,
         )
         .await;

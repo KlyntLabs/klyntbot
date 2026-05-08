@@ -18,7 +18,10 @@ fn coding_permissions_parse() {
     let perms = &cfg.coding.permissions;
     assert_eq!(perms.allow, vec!["Bash(git status*)".to_string()]);
     assert_eq!(perms.deny.len(), 1);
-    assert_eq!(perms.default_if_no_match, config::schema::DefaultPolicy::Ask);
+    assert_eq!(
+        perms.default_if_no_match,
+        config::schema::DefaultPolicy::Ask
+    );
     assert!(!perms.mirror_learning);
     assert!(cfg.coding.sandbox.enforce);
 }

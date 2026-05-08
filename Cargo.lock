@@ -92,6 +92,7 @@ dependencies = [
  "klynt-hooks",
  "klynt-truncation",
  "mcp",
+ "parking_lot",
  "plugin-runtime",
  "proptest",
  "providers",
@@ -1961,6 +1962,7 @@ dependencies = [
  "jiff",
  "serde",
  "serde_json",
+ "specta",
  "tokio",
  "tracing",
 ]
@@ -5381,6 +5383,7 @@ dependencies = [
  "parking_lot",
  "serde",
  "serde_json",
+ "specta",
  "sqlx",
  "storage",
  "thiserror 2.0.18",

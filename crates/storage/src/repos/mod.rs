@@ -1,8 +1,8 @@
 //! Repository modules and aggregate struct.
 
 pub mod agent_task;
-pub mod area;
 pub mod approval_pattern_history;
+pub mod area;
 pub mod brain_signal;
 pub mod coaching_intervention_log;
 pub mod coaching_strategy;
@@ -56,13 +56,11 @@ pub mod usage;
 pub mod workspace;
 
 pub use agent_task::AgentTaskRepo;
+pub use approval_pattern_history::{ApprovalPatternHistoryRepo, PatternHistoryEntry};
 pub use area::AreaRepo;
 pub use brain_signal::{BrainSignalFeedbackRepo, BrainSignalFeedbackRow};
 pub use coaching_intervention_log::{CoachingInterventionLogRepo, InterventionLogRow};
 pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
-pub use approval_pattern_history::{
-    ApprovalPatternHistoryRepo, PatternHistoryEntry,
-};
 pub use coding_approval_history::{
     ApprovalHistorySummary, CodingApprovalHistoryRepo, HistoryEntry,
 };

@@ -42,7 +42,11 @@ impl TodoRepo {
         Ok(())
     }
 
-    pub async fn get(&self, thread_id: &str, agent_id: &str) -> Result<Option<TodoRow>, StorageError> {
+    pub async fn get(
+        &self,
+        thread_id: &str,
+        agent_id: &str,
+    ) -> Result<Option<TodoRow>, StorageError> {
         let row: Option<(String, String, String, Option<String>, String)> = sqlx::query_as(
             r#"
             SELECT thread_id, agent_id, items_json, proposed_in_plan_session, updated_at
@@ -166,7 +170,10 @@ mod tests {
 
     async fn setup() -> TodoRepo {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        sqlx::query(TEST_MIGRATION).execute(pool.inner()).await.unwrap();
+        sqlx::query(TEST_MIGRATION)
+            .execute(pool.inner())
+            .await
+            .unwrap();
         TodoRepo::new(pool.inner().clone())
     }
 
@@ -186,7 +193,9 @@ mod tests {
     #[tokio::test]
     async fn upsert_then_get_returns_row() {
         let repo = setup().await;
-        repo.upsert("t1", "root", r#"[{"id":"a"}]"#, None).await.unwrap();
+        repo.upsert("t1", "root", r#"[{"id":"a"}]"#, None)
+            .await
+            .unwrap();
         let row = repo.get("t1", "root").await.unwrap().unwrap();
         assert_eq!(row.thread_id, "t1");
         assert_eq!(row.agent_id, "root");
@@ -198,7 +207,9 @@ mod tests {
     async fn upsert_replaces_on_conflict() {
         let repo = setup().await;
         repo.upsert("t1", "root", "[]", None).await.unwrap();
-        repo.upsert("t1", "root", r#"[{"id":"new"}]"#, Some("p_xyz")).await.unwrap();
+        repo.upsert("t1", "root", r#"[{"id":"new"}]"#, Some("p_xyz"))
+            .await
+            .unwrap();
         let row = repo.get("t1", "root").await.unwrap().unwrap();
         assert_eq!(row.items_json, r#"[{"id":"new"}]"#);
         assert_eq!(row.proposed_in_plan_session.as_deref(), Some("p_xyz"));

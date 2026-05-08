@@ -36,7 +36,11 @@ pub fn validate_in_progress_per_agent(
 pub fn validate_blocked_has_reason(items: &[TodoItemInput]) -> Result<(), CodingTodoError> {
     for i in items {
         if i.status == TodoStatus::Blocked
-            && i.blocked_reason.as_deref().map(str::trim).unwrap_or("").is_empty()
+            && i.blocked_reason
+                .as_deref()
+                .map(str::trim)
+                .unwrap_or("")
+                .is_empty()
         {
             return Err(CodingTodoError::BlockedItemMissingReason {
                 item_id: item_id(i),
@@ -70,7 +74,10 @@ pub fn validate_blocked_by_no_cycle(items: &[TodoItemInput]) -> Result<(), Codin
     // Build adjacency: id -> list of deps
     let graph: HashMap<&str, Vec<&str>> = items
         .iter()
-        .filter_map(|i| i.id.as_deref().map(|id| (id, i.blocked_by.iter().map(String::as_str).collect())))
+        .filter_map(|i| {
+            i.id.as_deref()
+                .map(|id| (id, i.blocked_by.iter().map(String::as_str).collect()))
+        })
         .collect();
 
     // 0=unvisited, 1=in-stack, 2=done
@@ -87,7 +94,8 @@ pub fn validate_blocked_by_no_cycle(items: &[TodoItemInput]) -> Result<(), Codin
             1 => {
                 // Cycle detected — return path slice from the recurrence
                 let cycle_start = path.iter().position(|p| *p == node).unwrap_or(0);
-                let mut cycle: Vec<String> = path[cycle_start..].iter().map(|s| s.to_string()).collect();
+                let mut cycle: Vec<String> =
+                    path[cycle_start..].iter().map(|s| s.to_string()).collect();
                 cycle.push(node.to_string());
                 return Some(cycle);
             }
@@ -307,7 +315,10 @@ mod tests {
 
     #[test]
     fn in_progress_per_agent_allows_one() {
-        let items = vec![item("a", TodoStatus::Pending), item("b", TodoStatus::InProgress)];
+        let items = vec![
+            item("a", TodoStatus::Pending),
+            item("b", TodoStatus::InProgress),
+        ];
         assert!(validate_in_progress_per_agent("root", &items).is_ok());
     }
 
@@ -344,7 +355,10 @@ mod tests {
         let mut bad = item("a", TodoStatus::Blocked);
         bad.blocked_reason = None;
         let r = validate_blocked_has_reason(&[bad]);
-        assert!(matches!(r, Err(CodingTodoError::BlockedItemMissingReason { .. })));
+        assert!(matches!(
+            r,
+            Err(CodingTodoError::BlockedItemMissingReason { .. })
+        ));
     }
 
     #[test]
@@ -352,7 +366,10 @@ mod tests {
         let mut bad = item("a", TodoStatus::Blocked);
         bad.blocked_reason = Some("   ".into());
         let r = validate_blocked_has_reason(&[bad]);
-        assert!(matches!(r, Err(CodingTodoError::BlockedItemMissingReason { .. })));
+        assert!(matches!(
+            r,
+            Err(CodingTodoError::BlockedItemMissingReason { .. })
+        ));
     }
 
     #[test]
@@ -473,7 +490,10 @@ mod tests {
         let items = vec![ip("a", ConcurrencyClass::Safe)];
         let others = vec![("other".into(), "x".into(), ConcurrencyClass::Exclusive)];
         let r = validate_concurrency_cross_agent(&items, &others);
-        assert!(matches!(r, Err(CodingTodoError::ConcurrencyViolation { .. })));
+        assert!(matches!(
+            r,
+            Err(CodingTodoError::ConcurrencyViolation { .. })
+        ));
     }
 
     #[test]
@@ -488,7 +508,10 @@ mod tests {
         let items = vec![ip("a", ConcurrencyClass::Exclusive)];
         let others = vec![("other".into(), "x".into(), ConcurrencyClass::Safe)];
         let r = validate_concurrency_cross_agent(&items, &others);
-        assert!(matches!(r, Err(CodingTodoError::ConcurrencyViolation { .. })));
+        assert!(matches!(
+            r,
+            Err(CodingTodoError::ConcurrencyViolation { .. })
+        ));
     }
 
     #[test]
@@ -496,7 +519,10 @@ mod tests {
         let items = vec![ip("a", ConcurrencyClass::Sequential)];
         let others = vec![("other".into(), "x".into(), ConcurrencyClass::Sequential)];
         let r = validate_concurrency_cross_agent(&items, &others);
-        assert!(matches!(r, Err(CodingTodoError::ConcurrencyViolation { .. })));
+        assert!(matches!(
+            r,
+            Err(CodingTodoError::ConcurrencyViolation { .. })
+        ));
     }
 
     #[test]
@@ -508,7 +534,10 @@ mod tests {
 
     #[test]
     fn plan_mode_off_allows_anything() {
-        let items = vec![item("a", TodoStatus::InProgress), item("b", TodoStatus::Done)];
+        let items = vec![
+            item("a", TodoStatus::InProgress),
+            item("b", TodoStatus::Done),
+        ];
         assert!(validate_plan_mode_pending_only(false, &items).is_ok());
     }
 
@@ -516,12 +545,18 @@ mod tests {
     fn plan_mode_on_rejects_in_progress() {
         let items = vec![item("a", TodoStatus::InProgress)];
         let r = validate_plan_mode_pending_only(true, &items);
-        assert!(matches!(r, Err(CodingTodoError::PlanModeNonPendingStatus { .. })));
+        assert!(matches!(
+            r,
+            Err(CodingTodoError::PlanModeNonPendingStatus { .. })
+        ));
     }
 
     #[test]
     fn plan_mode_on_allows_pending() {
-        let items = vec![item("a", TodoStatus::Pending), item("b", TodoStatus::Pending)];
+        let items = vec![
+            item("a", TodoStatus::Pending),
+            item("b", TodoStatus::Pending),
+        ];
         assert!(validate_plan_mode_pending_only(true, &items).is_ok());
     }
 
@@ -571,7 +606,10 @@ mod tests {
             other_agents_in_progress: &[],
         };
         let r = validate_anti_passivity(&items, &ctx);
-        assert!(matches!(r, Err(CodingTodoError::BlockedItemMissingUserMessage { .. })));
+        assert!(matches!(
+            r,
+            Err(CodingTodoError::BlockedItemMissingUserMessage { .. })
+        ));
     }
 
     #[test]

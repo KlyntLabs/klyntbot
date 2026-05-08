@@ -152,7 +152,10 @@ mod tests {
 
     #[test]
     fn plan_mode_reminder_includes_slug_and_path() {
-        let s = plan_mode_reminder("2026-05-08-add-grpc", std::path::Path::new("/tmp/plans/2026-05-08-add-grpc.md"));
+        let s = plan_mode_reminder(
+            "2026-05-08-add-grpc",
+            std::path::Path::new("/tmp/plans/2026-05-08-add-grpc.md"),
+        );
         assert!(s.starts_with("<system-reminder>"));
         assert!(s.ends_with("</system-reminder>"));
         assert!(s.contains("Plan mode active"));

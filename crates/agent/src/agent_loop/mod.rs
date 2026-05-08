@@ -36,6 +36,17 @@ fn preview_text(content: &str, max: usize) -> String {
     }
 }
 
+/// Check whether the thread identified by `session_key` is in plan mode.
+pub(crate) fn is_plan_mode_for_thread(
+    policies: &dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>,
+    session_key: &str,
+) -> bool {
+    policies
+        .get(session_key)
+        .map(|lock| lock.read().is_plan_mode())
+        .unwrap_or(false)
+}
+
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
     /// Agent events (content chunks, tool status).
@@ -105,6 +116,10 @@ pub struct AgentLoop {
     pub(crate) hot_config: Arc<RwLock<config::HotConfig>>,
     /// Subagent manager for background task spawning (kept alive for tool_kit injection).
     pub(crate) subagent_manager: Option<Arc<crate::SubagentManager>>,
+    /// Per-coding-thread approval policies. Used to set `plan_mode_active` on RoutingContext.
+    pub(crate) coding_policies: Option<
+        Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
+    >,
 }
 
 impl AgentLoop {
@@ -722,6 +737,11 @@ impl AgentLoop {
         let mut routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
         routing_ctx.session_key = Some(session_key.clone());
         routing_ctx.message_id = embed_msg_id.map(|id| id.to_string());
+        routing_ctx.plan_mode_active = self
+            .coding_policies
+            .as_ref()
+            .map(|policies| is_plan_mode_for_thread(policies, session_key.as_str()))
+            .unwrap_or(false);
         let response_content = self
             .run_pipeline(&msg.content, history, &routing_ctx, None, None, correction)
             .await?;

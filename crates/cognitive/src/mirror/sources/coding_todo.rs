@@ -37,12 +37,7 @@ impl MirrorSignalSource for TodoSignalSource {
     fn spec(&self) -> MirrorSnapshotSpec {
         MirrorSnapshotSpec {
             name: "coding_todo",
-            subscribed_kinds: &[
-                "StateChanged",
-                "Cancelled",
-                "PlanProposed",
-                "PlanRatified",
-            ],
+            subscribed_kinds: &["StateChanged", "Cancelled", "PlanProposed", "PlanRatified"],
             flush_interval_secs: Some(mirror_flush_secs(3600)),
         }
     }
@@ -84,11 +79,7 @@ impl MirrorSignalSource for TodoSignalSource {
         let plans_proposed = self.plans_proposed.load(Ordering::Relaxed);
         let plans_ratified = self.plans_ratified.load(Ordering::Relaxed);
 
-        if status_changes == 0
-            && cancellations == 0
-            && plans_proposed == 0
-            && plans_ratified == 0
-        {
+        if status_changes == 0 && cancellations == 0 && plans_proposed == 0 && plans_ratified == 0 {
             return Ok(());
         }
 
@@ -117,7 +108,6 @@ impl MirrorSignalSource for TodoSignalSource {
         self.cancellations.store(0, Ordering::Relaxed);
         self.plans_proposed.store(0, Ordering::Relaxed);
         self.plans_ratified.store(0, Ordering::Relaxed);
-
 
         Ok(())
     }

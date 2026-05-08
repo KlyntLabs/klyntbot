@@ -94,7 +94,10 @@ pub async fn respond_approval(
             bus.publish(DomainEvent::ApprovalResolved {
                 request_id: request_id.to_string(),
                 user_id: None,
-                tool_name: snapshot.as_ref().map(|s| s.tool_name.clone()).unwrap_or_default(),
+                tool_name: snapshot
+                    .as_ref()
+                    .map(|s| s.tool_name.clone())
+                    .unwrap_or_default(),
                 path,
                 decision: decision_str.to_string(),
                 pattern_used,

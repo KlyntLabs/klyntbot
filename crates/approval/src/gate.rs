@@ -13,11 +13,7 @@ use std::sync::Arc;
 /// this for `MirrorFacade`; the approval crate stays free of cognitive dependencies.
 #[async_trait::async_trait]
 pub trait ApprovalSuggester: Send + Sync {
-    async fn suggest(
-        &self,
-        tool_name: &str,
-        path: Option<&str>,
-    ) -> Option<SuggestedGrant>;
+    async fn suggest(&self, tool_name: &str, path: Option<&str>) -> Option<SuggestedGrant>;
 }
 
 #[derive(Debug, Clone)]

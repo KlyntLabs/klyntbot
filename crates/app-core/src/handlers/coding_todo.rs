@@ -4,8 +4,8 @@ use approval::CodingApprovalPolicy;
 use bus::domain_events::TodoEvent;
 use common::{KlyntbotError, Result};
 use feature_coding_todo::types::{TodoItem, TodoItemInput};
-use feature_coding_todo::view::{CodingTodoView, PlanModeView};
 use feature_coding_todo::validation::{validate_write, ValidationContext};
+use feature_coding_todo::view::{CodingTodoView, PlanModeView};
 use std::collections::HashMap;
 use tracing::instrument;
 
@@ -31,12 +31,7 @@ impl AppCore {
         let policy_lock = self.coding_policies.get(thread_id).map(|r| r.clone());
         let plan_session_filter: Option<String> = policy_lock
             .as_ref()
-            .and_then(|lock| match &*lock.read() {
-                CodingApprovalPolicy::PlanMode { plan_session_id, .. } => {
-                    Some(plan_session_id.clone())
-                }
-                _ => None,
-            });
+            .and_then(|lock| lock.read().plan_session_id().map(|s| s.to_string()));
 
         for row in rows {
             let parsed: Vec<TodoItem> = serde_json::from_str(&row.items_json).unwrap_or_default();
@@ -48,22 +43,23 @@ impl AppCore {
             agents.insert(row.agent_id, parsed);
         }
 
-        let plan_mode_state = policy_lock.and_then(|lock| match &*lock.read() {
-            CodingApprovalPolicy::PlanMode {
-                plan_session_id,
-                plan_file_slug,
-                plan_file_path,
-                ..
-            } => Some(PlanModeView {
-                plan_session_id: plan_session_id.clone(),
-                plan_file_slug: plan_file_slug.clone(),
-                plan_file_path: plan_file_path.clone(),
+        let plan_mode_state = policy_lock.and_then(|lock| {
+            let p = lock.read();
+            let plan_session_id = p.plan_session_id()?;
+            let plan_file_slug = p.plan_file_slug()?;
+            let plan_file_path = p.plan_file_path()?;
+            Some(PlanModeView {
+                plan_session_id: plan_session_id.to_string(),
+                plan_file_slug: plan_file_slug.to_string(),
+                plan_file_path: plan_file_path.to_path_buf(),
                 proposed_item_count: total_proposed,
-            }),
-            _ => None,
+            })
         });
 
-        Ok(CodingTodoView { agents, plan_mode_state })
+        Ok(CodingTodoView {
+            agents,
+            plan_mode_state,
+        })
     }
 
     #[instrument(skip(self), err)]
@@ -73,32 +69,47 @@ impl AppCore {
         plan_session_id: &str,
     ) -> Result<CodingTodoView> {
         // 1. Verify policy.
-        let lock = self.coding_policies.get(thread_id)
+        let lock = self
+            .coding_policies
+            .get(thread_id)
             .ok_or_else(|| KlyntbotError::StorageNotFound(format!("no policy for {thread_id}")))?
             .clone();
         {
             let p = lock.read();
             match &*p {
-                CodingApprovalPolicy::PlanMode { plan_session_id: p_id, .. } if p_id == plan_session_id => {}
-                _ => return Err(KlyntbotError::NotImplemented("plan-session mismatch".into())),
+                CodingApprovalPolicy::PlanMode {
+                    plan_session_id: p_id,
+                    ..
+                } if p_id == plan_session_id => {}
+                _ => {
+                    return Err(KlyntbotError::NotImplemented(
+                        "plan-session mismatch".into(),
+                    ));
+                }
             }
         }
 
         // 2. Diff snapshot vs final.
         let snapshot = self.plan_snapshots.get(plan_session_id).map(|r| r.clone());
-        let rows = self.repos.coding_todo.list_for_thread(thread_id).await
+        let rows = self
+            .repos
+            .coding_todo
+            .list_for_thread(thread_id)
+            .await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
-        let final_items: Vec<TodoItem> = rows.iter()
+        let final_items: Vec<TodoItem> = rows
+            .iter()
             .filter(|r| r.proposed_in_plan_session.as_deref() == Some(plan_session_id))
             .flat_map(|r| serde_json::from_str::<Vec<TodoItem>>(&r.items_json).unwrap_or_default())
             .collect();
-        let (ratified, edited, removed) = super::coding_plan::compute_ratify_counts(
-            snapshot.as_deref(),
-            &final_items,
-        );
+        let (ratified, edited, removed) =
+            super::coding_plan::compute_ratify_counts(snapshot.as_deref(), &final_items);
 
         // 3. Clear tags, swap policy, drop snapshot.
-        self.repos.coding_todo.clear_plan_session_tag(thread_id, plan_session_id).await
+        self.repos
+            .coding_todo
+            .clear_plan_session_tag(thread_id, plan_session_id)
+            .await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
         *lock.write() = self.default_coding_policy();
         self.plan_snapshots.remove(plan_session_id);
@@ -114,8 +125,17 @@ impl AppCore {
                 timestamp: jiff::Timestamp::now(),
             });
         }
-        self.event_emitter.emit_event("coding:todos_updated", serde_json::json!({ "thread_id": thread_id }));
-        self.event_emitter.emit_event("coding:plan_exited", serde_json::json!(thread_id));
+        self.event_emitter.emit_event(
+            "coding:todos_updated",
+            serde_json::json!({ "thread_id": thread_id }),
+        );
+        self.event_emitter
+            .emit_event("coding:plan_exited", serde_json::json!(thread_id));
+
+        self.inject_one_shot_reminder(
+            thread_id,
+            &format!("Plan ratified by user. {ratified} items accepted, {edited} edited, {removed} removed. Executing now."),
+        );
 
         // 5. Build view from rows already fetched — avoids a second DB round-trip.
         let mut agents: HashMap<String, Vec<TodoItem>> = HashMap::new();
@@ -123,7 +143,10 @@ impl AppCore {
             let parsed: Vec<TodoItem> = serde_json::from_str(&row.items_json).unwrap_or_default();
             agents.insert(row.agent_id, parsed);
         }
-        Ok(CodingTodoView { agents, plan_mode_state: None })
+        Ok(CodingTodoView {
+            agents,
+            plan_mode_state: None,
+        })
     }
 
     #[instrument(skip(self), err)]
@@ -152,25 +175,36 @@ impl AppCore {
 
         // Materialize as TodoItem with current timestamps.
         let now = jiff::Timestamp::now();
-        let materialized: Vec<TodoItem> = validated.into_iter().map(|i| TodoItem {
-            id: i.id.unwrap_or_else(|| uuid::Uuid::new_v4().simple().to_string()),
-            title: i.title,
-            status: i.status,
-            concurrency: i.concurrency,
-            blocked_reason: i.blocked_reason,
-            blocked_by: i.blocked_by,
-            delegated_to: i.delegated_to,
-            created_at: now,
-            updated_at: now,
-        }).collect();
+        let materialized: Vec<TodoItem> = validated
+            .into_iter()
+            .map(|i| TodoItem {
+                id: i
+                    .id
+                    .unwrap_or_else(|| uuid::Uuid::new_v4().simple().to_string()),
+                title: i.title,
+                status: i.status,
+                concurrency: i.concurrency,
+                blocked_reason: i.blocked_reason,
+                blocked_by: i.blocked_by,
+                delegated_to: i.delegated_to,
+                created_at: now,
+                updated_at: now,
+            })
+            .collect();
 
         let json = serde_json::to_string(&materialized)
             .map_err(|e| KlyntbotError::Storage(format!("serialize items: {e}")))?;
 
-        self.repos.coding_todo.upsert(thread_id, USER_AGENT_ID, &json, Some(plan_session_id)).await
+        self.repos
+            .coding_todo
+            .upsert(thread_id, USER_AGENT_ID, &json, Some(plan_session_id))
+            .await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
 
-        self.event_emitter.emit_event("coding:todos_updated", serde_json::json!({ "thread_id": thread_id }));
+        self.event_emitter.emit_event(
+            "coding:todos_updated",
+            serde_json::json!({ "thread_id": thread_id }),
+        );
         self.coding_todo_get(thread_id).await
     }
 
@@ -183,29 +217,49 @@ impl AppCore {
     ) -> Result<CodingTodoView> {
         self.assert_plan_mode(thread_id, plan_session_id)?;
 
-        let row = self.repos.coding_todo.get(thread_id, USER_AGENT_ID).await
+        let row = self
+            .repos
+            .coding_todo
+            .get(thread_id, USER_AGENT_ID)
+            .await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?
             .ok_or_else(|| KlyntbotError::StorageNotFound("no plan items to remove".into()))?;
         let parsed: Vec<TodoItem> = serde_json::from_str(&row.items_json).unwrap_or_default();
-        let remaining: Vec<TodoItem> = parsed.into_iter()
-            .filter(|i| !item_ids.contains(&i.id))
+        let item_ids_set: std::collections::HashSet<&str> =
+            item_ids.iter().map(|s| s.as_str()).collect();
+        let remaining: Vec<TodoItem> = parsed
+            .into_iter()
+            .filter(|i| !item_ids_set.contains(i.id.as_str()))
             .collect();
         let json = serde_json::to_string(&remaining)
             .map_err(|e| KlyntbotError::Storage(format!("serialize: {e}")))?;
-        self.repos.coding_todo.upsert(thread_id, USER_AGENT_ID, &json, Some(plan_session_id)).await
+        self.repos
+            .coding_todo
+            .upsert(thread_id, USER_AGENT_ID, &json, Some(plan_session_id))
+            .await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
 
-        self.event_emitter.emit_event("coding:todos_updated", serde_json::json!({ "thread_id": thread_id }));
+        self.event_emitter.emit_event(
+            "coding:todos_updated",
+            serde_json::json!({ "thread_id": thread_id }),
+        );
         self.coding_todo_get(thread_id).await
     }
 
     fn assert_plan_mode(&self, thread_id: &str, plan_session_id: &str) -> Result<()> {
-        let lock = self.coding_policies.get(thread_id)
+        let lock = self
+            .coding_policies
+            .get(thread_id)
             .ok_or_else(|| KlyntbotError::StorageNotFound(format!("no policy for {thread_id}")))?;
         let policy = lock.read();
         match &*policy {
-            CodingApprovalPolicy::PlanMode { plan_session_id: p_id, .. } if p_id == plan_session_id => Ok(()),
-            _ => Err(KlyntbotError::NotImplemented("not in plan mode for this session".into())),
+            CodingApprovalPolicy::PlanMode {
+                plan_session_id: p_id,
+                ..
+            } if p_id == plan_session_id => Ok(()),
+            _ => Err(KlyntbotError::NotImplemented(
+                "not in plan mode for this session".into(),
+            )),
         }
     }
 

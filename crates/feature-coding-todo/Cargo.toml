@@ -17,6 +17,7 @@ jiff = { workspace = true, features = ["serde"] }
 parking_lot = "0.12"
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+specta = { workspace = true }
 storage = { path = "../storage" }
 thiserror = { workspace = true }
 tools-core = { path = "../tools-core" }

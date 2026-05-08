@@ -43,7 +43,9 @@ impl CodingApprovalPolicy {
 
     pub fn plan_session_id(&self) -> Option<&str> {
         match self {
-            Self::PlanMode { plan_session_id, .. } => Some(plan_session_id.as_str()),
+            Self::PlanMode {
+                plan_session_id, ..
+            } => Some(plan_session_id.as_str()),
             _ => None,
         }
     }
@@ -64,10 +66,19 @@ impl CodingApprovalPolicy {
 
     fn evaluate_layer1(&self, tool: &str, payload: &str) -> bool {
         let (allow, deny, ask, default_if_no_match) = match self {
-            Self::Default { allow, deny, ask, default_if_no_match }
-            | Self::PlanMode { allow, deny, ask, default_if_no_match, .. } => {
-                (allow, deny, ask, *default_if_no_match)
+            Self::Default {
+                allow,
+                deny,
+                ask,
+                default_if_no_match,
             }
+            | Self::PlanMode {
+                allow,
+                deny,
+                ask,
+                default_if_no_match,
+                ..
+            } => (allow, deny, ask, *default_if_no_match),
             Self::YoloMode { until } => {
                 if jiff::Timestamp::now() < *until {
                     return true;
@@ -113,17 +124,16 @@ pub(crate) fn is_write_tool(tool: &str) -> bool {
 pub(crate) fn is_read_tool(tool: &str) -> bool {
     matches!(
         normalize_tool(tool).as_str(),
-        "read" | "grep" | "glob" | "ls"
-            | "codingtodo"
-            | "websearch" | "webfetch"
-            | "lsp"
+        "read" | "grep" | "glob" | "ls" | "codingtodo" | "websearch" | "webfetch" | "lsp"
     )
 }
 
 impl ClassifyHook for CodingApprovalPolicy {
     fn classify(&self, tool: &str, _action: Option<&str>, args: &Value) -> Option<ApprovalClass> {
         match self {
-            Self::PlanMode { plan_file_path, .. } => Some(classify_plan_mode(tool, args, plan_file_path)),
+            Self::PlanMode { plan_file_path, .. } => {
+                Some(classify_plan_mode(tool, args, plan_file_path))
+            }
             Self::Default { .. } | Self::YoloMode { .. } => {
                 let payload = extract_resource(tool, args)?;
                 if self.evaluate_layer1(tool, &payload) {
@@ -142,11 +152,7 @@ impl ClassifyHook for CodingApprovalPolicy {
     }
 }
 
-fn classify_plan_mode(
-    tool: &str,
-    args: &Value,
-    plan_file_path: &std::path::Path,
-) -> ApprovalClass {
+fn classify_plan_mode(tool: &str, args: &Value, plan_file_path: &std::path::Path) -> ApprovalClass {
     if is_write_tool(tool) {
         let target = extract_resource(tool, args).map(std::path::PathBuf::from);
         match target {
@@ -300,7 +306,14 @@ mod tests {
 
     #[test]
     fn is_read_tool_recognizes_known_reads() {
-        for t in ["read", "grep", "glob", "coding_todo", "web_fetch", "web_search"] {
+        for t in [
+            "read",
+            "grep",
+            "glob",
+            "coding_todo",
+            "web_fetch",
+            "web_search",
+        ] {
             assert!(super::is_read_tool(t), "{t} should be a read tool");
         }
     }
@@ -328,11 +341,19 @@ mod tests {
         };
 
         // Edit to plan file → Safe
-        let class = policy.classify("edit", None, &serde_json::json!({"file_path": "/tmp/plan.md"}));
+        let class = policy.classify(
+            "edit",
+            None,
+            &serde_json::json!({"file_path": "/tmp/plan.md"}),
+        );
         assert_eq!(class, Some(ApprovalClass::Safe));
 
         // Edit elsewhere → Destructive
-        let class = policy.classify("edit", None, &serde_json::json!({"file_path": "/tmp/other.rs"}));
+        let class = policy.classify(
+            "edit",
+            None,
+            &serde_json::json!({"file_path": "/tmp/other.rs"}),
+        );
         assert_eq!(class, Some(ApprovalClass::Destructive));
     }
 
@@ -347,7 +368,11 @@ mod tests {
             ask: CompiledRules::compile(&[]).unwrap(),
             default_if_no_match: DefaultPolicy::Ask,
         };
-        let class = policy.classify("read", None, &serde_json::json!({"file_path": "/tmp/anything.rs"}));
+        let class = policy.classify(
+            "read",
+            None,
+            &serde_json::json!({"file_path": "/tmp/anything.rs"}),
+        );
         assert_eq!(class, Some(ApprovalClass::Safe));
     }
 

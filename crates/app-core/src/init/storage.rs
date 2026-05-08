@@ -146,7 +146,10 @@ pub(super) async fn init_storage(
     );
 
     // Run coding-todo feature migrations.
-    run_migration!("coding_todo", [feature_coding_todo::migrations::coding_todo_migration()]);
+    run_migration!(
+        "coding_todo",
+        [feature_coding_todo::migrations::coding_todo_migration()]
+    );
 
     // Run cognitive migrations up-front so downstream crates (coding-memory) can
     // ALTER their tables. Cognitive migrations are idempotent; the agent builder

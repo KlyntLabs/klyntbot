@@ -170,7 +170,10 @@ impl ApprovalHistorySource {
             }
 
             let score = approvals as f32 * specificity;
-            if best.as_ref().map_or(true, |(best_score, _)| score > *best_score) {
+            if best
+                .as_ref()
+                .map_or(true, |(best_score, _)| score > *best_score)
+            {
                 best = Some((
                     score,
                     SuggestedPattern {
@@ -297,7 +300,10 @@ fn build_path_candidates(path: &str) -> Vec<(PatternScope, String, f32)> {
     }
 
     // 4. Extension glob
-    if let Some(ext) = std::path::Path::new(path).extension().and_then(|e| e.to_str()) {
+    if let Some(ext) = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+    {
         candidates.push((
             PatternScope::Glob(format!("%.{}", ext)),
             format!("Allow on **/*.{}", ext),

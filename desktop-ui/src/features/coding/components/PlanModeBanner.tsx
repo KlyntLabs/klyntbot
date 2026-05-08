@@ -1,6 +1,12 @@
-import { useState, useCallback } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useTodos, type TodoItem } from "../state/todoStore";
+import {
+  removePlanItems,
+  editPlanItems,
+  ratifyPlan,
+  cancelPlanMode,
+  openPlanFile,
+} from "@/api/endpoints/coding";
 
 type ConfirmAction = null | "ratify" | "cancel";
 
@@ -21,14 +27,17 @@ function PlanItemRow({
     if (draft !== item.title) onTitleEdit(draft);
   }, [draft, item.title, onTitleEdit]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      (e.target as HTMLInputElement).blur();
-    } else if (e.key === "Escape") {
-      setDraft(item.title);
-      setEditing(false);
-    }
-  }, [item.title]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        (e.target as HTMLInputElement).blur();
+      } else if (e.key === "Escape") {
+        setDraft(item.title);
+        setEditing(false);
+      }
+    },
+    [item.title],
+  );
 
   return (
     <li className="coding-todo__plan-banner-row">
@@ -42,16 +51,24 @@ function PlanItemRow({
           onKeyDown={handleKeyDown}
         />
       ) : (
-        <span className="coding-todo__plan-banner-title" onClick={() => setEditing(true)}>
+        <span
+          className="coding-todo__plan-banner-title"
+          onClick={() => setEditing(true)}
+          title="Click to edit"
+        >
           {item.title}
         </span>
       )}
-      <span className="coding-todo__plan-banner-concurrency">{item.concurrency}</span>
+      <span className="coding-todo__plan-banner-concurrency" title="Concurrency class">
+        {item.concurrency}
+      </span>
       <button
         className="coding-todo__plan-banner-remove"
         aria-label={`Remove ${item.title}`}
         onClick={onRemove}
-      >×</button>
+      >
+        ×
+      </button>
     </li>
   );
 }
@@ -59,41 +76,47 @@ function PlanItemRow({
 export function PlanModeBanner({ threadId }: { threadId: string }) {
   const { items, planModeState } = useTodos(threadId);
   const [confirming, setConfirming] = useState<ConfirmAction>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const removeItem = useCallback(async (itemId: string) => {
-    if (!planModeState) return;
-    await invoke("coding_plan_user_remove", {
-      threadId,
-      planSessionId: planModeState.planSessionId,
-      itemIds: [itemId],
-    });
-  }, [threadId, planModeState]);
+  // Clean up debounce on unmount.
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
-  const editTitle = useCallback(async (itemId: string, title: string) => {
-    if (!planModeState) return;
-    const next = items.map((i) => (i.id === itemId ? { ...i, title } : i));
-    await invoke("coding_plan_user_edit", {
-      threadId,
-      planSessionId: planModeState.planSessionId,
-      itemsJson: JSON.stringify(next),
-    });
-  }, [threadId, planModeState, items]);
+  const removeItem = useCallback(
+    async (itemId: string) => {
+      if (!planModeState) return;
+      await removePlanItems(threadId, planModeState.planSessionId, [itemId]);
+    },
+    [threadId, planModeState],
+  );
+
+  const editTitle = useCallback(
+    (itemId: string, title: string) => {
+      if (!planModeState) return;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(async () => {
+        const next = items.map((i) => (i.id === itemId ? { ...i, title } : i));
+        await editPlanItems(threadId, planModeState.planSessionId, JSON.stringify(next));
+      }, 400);
+    },
+    [threadId, planModeState, items],
+  );
 
   const ratify = useCallback(async () => {
     if (!planModeState) return;
-    await invoke("coding_plan_ratify", {
-      threadId,
-      planSessionId: planModeState.planSessionId,
-    });
+    await ratifyPlan(threadId, planModeState.planSessionId);
   }, [threadId, planModeState]);
 
   const cancelPlan = useCallback(async () => {
-    await invoke("coding_plan_cancel", { threadId });
+    await cancelPlanMode(threadId);
   }, [threadId]);
 
-  const openFile = useCallback(() => {
+  const handleOpenFile = useCallback(() => {
     if (!planModeState) return;
-    invoke("coding_plan_open_file", { path: planModeState.planFilePath });
+    openPlanFile(planModeState.planFilePath);
   }, [planModeState]);
 
   const handleConfirm = useCallback(async () => {
@@ -107,14 +130,20 @@ export function PlanModeBanner({ threadId }: { threadId: string }) {
   return (
     <div className="coding-todo__plan-banner">
       <div className="coding-todo__plan-banner-header">
-        <button className="coding-todo__plan-banner-title-link" onClick={openFile} title={planModeState.planFilePath}>
+        <button
+          className="coding-todo__plan-banner-title-link"
+          onClick={handleOpenFile}
+          title={planModeState.planFilePath}
+        >
           Plan mode · {planModeState.planFileSlug}.md
         </button>
         <button
           className="coding-todo__plan-banner-close"
           aria-label="Close plan mode"
           onClick={() => setConfirming("cancel")}
-        >×</button>
+        >
+          ×
+        </button>
       </div>
       <div className="coding-todo__plan-banner-summary">
         Reviewing {items.length} proposed {items.length === 1 ? "item" : "items"}
@@ -131,10 +160,16 @@ export function PlanModeBanner({ threadId }: { threadId: string }) {
       </ul>
       {confirming === null && (
         <div className="coding-todo__plan-banner-actions">
-          <button className="coding-todo__plan-banner-primary" onClick={() => setConfirming("ratify")}>
+          <button
+            className="coding-todo__plan-banner-primary"
+            onClick={() => setConfirming("ratify")}
+          >
             Ratify & Execute
           </button>
-          <button className="coding-todo__plan-banner-danger" onClick={() => setConfirming("cancel")}>
+          <button
+            className="coding-todo__plan-banner-danger"
+            onClick={() => setConfirming("cancel")}
+          >
             Cancel Plan
           </button>
         </div>

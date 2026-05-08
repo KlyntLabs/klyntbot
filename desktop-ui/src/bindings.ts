@@ -918,6 +918,83 @@ async codingThreadMetadataGenerate(workspaceId: string, prompt: string) : Promis
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Get the current agent's todo list for a thread.
+ */
+async codingTodoGet(threadId: string) : Promise<Result<CodingTodoView, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_todo_get", { threadId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Enter plan mode for a thread.
+ */
+async codingPlanEnter(threadId: string) : Promise<Result<CodingTodoView, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_plan_enter", { threadId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Cancel plan mode for a thread.
+ */
+async codingPlanCancel(threadId: string) : Promise<Result<CodingTodoView, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_plan_cancel", { threadId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Ratify a proposed plan.
+ */
+async codingPlanRatify(threadId: string, planSessionId: string) : Promise<Result<CodingTodoView, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_plan_ratify", { threadId, planSessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * User edited items in a proposed plan.
+ */
+async codingPlanUserEdit(threadId: string, planSessionId: string, itemsJson: string) : Promise<Result<CodingTodoView, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_plan_user_edit", { threadId, planSessionId, itemsJson }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * User removed items from a proposed plan.
+ */
+async codingPlanUserRemove(threadId: string, planSessionId: string, itemIds: string[]) : Promise<Result<CodingTodoView, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_plan_user_remove", { threadId, planSessionId, itemIds }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Open a plan file in the system default editor.
+ */
+async codingPlanOpenFile(path: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_plan_open_file", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async providersList() : Promise<Result<JsonValue, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("providers_list") };
@@ -4662,6 +4739,15 @@ export type ClipboardContentType = "text" | "image" | "file"
 export type ClipboardEntry = { id: number; content: string; content_type: string; source_app: string | null; preview: string | null; file_path: string | null; pinned: boolean; created_at: string }
 export type CodingMemoryStatusResponse = { daemonAlive: boolean; bufferedEventCount: number; unprocessedEventCount: number; socketPath: string }
 export type CodingStatus = { mode: string; profile: string; sandbox: string; total_cost_usd: number; total_tokens: number; active_skills: string[] }
+export type CodingTodoView = { 
+/**
+ * Map of agent_id → that agent's items.
+ */
+agents: Partial<{ [key in string]: TodoItem[] }>; 
+/**
+ * Plan-mode state if the thread is currently in plan mode; `None` otherwise.
+ */
+planModeState: PlanModeView | null }
 export type CognitiveCommunity = { id: string; name: string; color: string; memberTopicIds: string[] }
 export type CognitiveGraphData = { topics: TopicNode[]; edges: TopicEdge[]; communities: CognitiveCommunity[]; rules: RuleNode[]; stats: GraphStats }
 export type ColumnCreateParams = { projectId: string; name: string; columnType: string; options: string[] | null; width: number | null }
@@ -4670,6 +4756,7 @@ export type ColumnUpdateParams = { id: string; name: string | null; options: str
 export type ColumnValueSetParams = { taskId: string; columnId: string; value: unknown }
 export type CompactionResultResponse = { archivedCount: number; deletedEpisodic: number; rulesDeactivated: number }
 export type ComponentStatusResponse = { name: string; status: string; handlerType: string; notes: string }
+export type ConcurrencyClass = "safe" | "sequential" | "exclusive"
 export type ConfidenceAssessedPayload = { sessionKey: string; score: number; action: string }
 export type ConfusableResponse = { hasConfusable: boolean; confusableWord: string | null; confusableMeaning: string | null; explanation: string | null }
 export type ContentChunkPayload = { sessionKey: string; data: string }
@@ -5168,6 +5255,7 @@ export type Pin = { item_id: string; kind: string; position: number }
 export type PipelineEventRow = { id: string; event_kind: string; observation: string | null; facts_extracted: number | null; operation: string | null; fact_triple: string | null; timestamp: string }
 export type PipelineStartedPayload = { sessionKey: string }
 export type PlanGeneratedPayload = { sessionKey: string; steps: string[]; rawPlan: string }
+export type PlanModeView = { planSessionId: string; planFileSlug: string; planFilePath: string; proposedItemCount: number }
 export type PlanStepCompletedPayload = { sessionKey: string; stepIndex: number; description: string; toolName: string }
 export type PracticeCompleteParams = { sessionId: string; saveToSr: boolean }
 export type PracticeCompleteResponse = { averageScore: number; weakUnitCount: number; flashcardsCreated: number }
@@ -5487,6 +5575,8 @@ export type TimelineResponse = { entries: TimelineEntry[]; summary: TimelineSumm
 export type TimelineSource = "productivity" | "focus" | "task" | "todo" | "note" | "finance" | "system" | "calendar"
 export type TimelineSummary = { totalTrackedSecs: number; focusSecs: number; tasksCompleted: number; tasksCreated: number; notesTouched: number; transactionsCount: number; topApps: TopAppSummary[]; sourceBreakdown: SourceBreakdown[] }
 export type TodayTaskResponse = { id: string; title: string; priority: string | null; status: string; completed: boolean; isOverdue: boolean; isDueToday: boolean; dueDisplay: string | null }
+export type TodoItem = { id: string; title: string; status: TodoStatus; concurrency: ConcurrencyClass; blocked_reason?: string | null; blocked_by: string[]; delegated_to?: string | null; created_at: string; updated_at: string }
+export type TodoStatus = "pending" | "in_progress" | "done" | "blocked"
 export type TokenSeriesPoint = { 
 /**
  * Day key in `YYYY-MM-DD`.

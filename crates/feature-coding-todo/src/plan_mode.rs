@@ -4,8 +4,8 @@
 //! (validated separately) and the row is tagged with `proposed_in_plan_session`.
 //! Ratification clears the tag without mutating items.
 
-use bus::domain_events::TodoEvent;
 use crate::types::TodoItemInput;
+use bus::domain_events::TodoEvent;
 
 /// Generate a fresh plan session id (32-char hex, no dashes).
 pub fn new_plan_session_id() -> String {

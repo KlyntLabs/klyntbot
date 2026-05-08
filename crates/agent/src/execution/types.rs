@@ -34,6 +34,8 @@ pub struct ExecutionParams {
     pub hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     /// Global kill switch for cache-breakpoint placement.
     pub cache_enabled: bool,
+    /// Dynamic injectors (e.g. PlanModeInjector) evaluated at each iteration boundary.
+    pub injector_registry: bus::InjectorRegistry,
 }
 
 impl ExecutionParams {
@@ -57,6 +59,7 @@ impl ExecutionParams {
             pause_context_updates: false,
             hook_engine: None,
             cache_enabled: true,
+            injector_registry: bus::InjectorRegistry::empty(),
         }
     }
 
@@ -120,6 +123,11 @@ impl ExecutionParams {
 
     pub fn with_cache_enabled(mut self, enabled: bool) -> Self {
         self.cache_enabled = enabled;
+        self
+    }
+
+    pub fn with_injector_registry(mut self, registry: bus::InjectorRegistry) -> Self {
+        self.injector_registry = registry;
         self
     }
 }

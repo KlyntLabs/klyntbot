@@ -21,7 +21,10 @@ impl approval::ApprovalSuggester for MirrorApprovalSuggester {
         tool_name: &str,
         path: Option<&str>,
     ) -> Option<approval::SuggestedGrant> {
-        let pattern = self.facade.suggest_approval_pattern(tool_name, path).await?;
+        let pattern = self
+            .facade
+            .suggest_approval_pattern(tool_name, path)
+            .await?;
         Some(approval::SuggestedGrant {
             pattern: pattern.label.clone(),
             scope: match &pattern.scope {

@@ -1,6 +1,9 @@
 use app_core::coding::approval_handler::{respond_approval, AppApprovalDecision};
 use app_core::desktop_approval_channel::DesktopApprovalChannel;
-use approval::{ApprovalChannel, ApprovalClass, ApprovalContext, ApprovalDecision, ApprovalGrantsRepo, ApprovalRequest, ApprovalScope, ChannelKind};
+use approval::{
+    ApprovalChannel, ApprovalClass, ApprovalContext, ApprovalDecision, ApprovalGrantsRepo,
+    ApprovalRequest, ApprovalScope, ChannelKind,
+};
 use std::sync::Arc;
 use storage::StoragePool;
 
@@ -31,7 +34,9 @@ fn make_req(tool_name: &str, args: serde_json::Value) -> ApprovalRequest {
 async fn approve_once_unblocks_tool() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
     let grants_repo = Arc::new(ApprovalGrantsRepo::new(pool));
-    let channel = Arc::new(DesktopApprovalChannel::new(Arc::new(app_core::events::NoopEmitter)));
+    let channel = Arc::new(DesktopApprovalChannel::new(Arc::new(
+        app_core::events::NoopEmitter,
+    )));
 
     // Start an approval request on the channel
     let chan_clone = channel.clone();
@@ -71,10 +76,15 @@ async fn approve_once_unblocks_tool() {
 async fn approve_always_persists_grant() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
     let grants_repo = Arc::new(ApprovalGrantsRepo::new(pool));
-    let channel = Arc::new(DesktopApprovalChannel::new(Arc::new(app_core::events::NoopEmitter)));
+    let channel = Arc::new(DesktopApprovalChannel::new(Arc::new(
+        app_core::events::NoopEmitter,
+    )));
 
     let chan_clone = channel.clone();
-    let req = make_req("edit", serde_json::json!({"path": "src/main.rs", "content": "fn main() {}"}));
+    let req = make_req(
+        "edit",
+        serde_json::json!({"path": "src/main.rs", "content": "fn main() {}"}),
+    );
     let fut = tokio::spawn(async move { chan_clone.request(req).await });
 
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
@@ -98,21 +108,32 @@ async fn approve_always_persists_grant() {
 
     // A Forever grant should have been persisted
     let grant = grants_repo
-        .find(ApprovalClass::Destructive, "edit", None, Some("src/main.rs"), None)
+        .find(
+            ApprovalClass::Destructive,
+            "edit",
+            None,
+            Some("src/main.rs"),
+            None,
+        )
         .await
         .unwrap();
     assert!(grant.is_some());
     let grant = grant.unwrap();
     assert_eq!(grant.tool_name, "edit");
     assert_eq!(grant.resource_key.as_deref(), Some("src/main.rs"));
-    assert!(matches!(grant.lifetime, approval::ApprovalLifetime::Forever));
+    assert!(matches!(
+        grant.lifetime,
+        approval::ApprovalLifetime::Forever
+    ));
 }
 
 #[tokio::test]
 async fn deny_returns_decline() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
     let grants_repo = Arc::new(ApprovalGrantsRepo::new(pool));
-    let channel = Arc::new(DesktopApprovalChannel::new(Arc::new(app_core::events::NoopEmitter)));
+    let channel = Arc::new(DesktopApprovalChannel::new(Arc::new(
+        app_core::events::NoopEmitter,
+    )));
 
     let chan_clone = channel.clone();
     let req = make_req("bash", serde_json::json!({"command": "rm -rf /"}));

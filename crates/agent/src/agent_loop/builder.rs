@@ -89,6 +89,10 @@ pub struct AgentLoopBuilder {
     coding_recall_service: Option<Arc<coding_memory::recall::CodingRecallService>>,
     approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
     approval_suggester: Option<Arc<dyn approval::ApprovalSuggester>>,
+    coding_policies: Option<
+        Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
+    >,
+    injector_registry: Option<bus::InjectorRegistry>,
 }
 
 impl AgentLoopBuilder {
@@ -115,6 +119,8 @@ impl AgentLoopBuilder {
             coding_recall_service: None,
             approval_channel: None,
             approval_suggester: None,
+            coding_policies: None,
+            injector_registry: None,
         }
     }
 
@@ -122,8 +128,24 @@ impl AgentLoopBuilder {
         self.approval_channel = Some(channel);
         self
     }
-    pub fn with_approval_suggester(mut self, suggester: Arc<dyn approval::ApprovalSuggester>) -> Self {
+    pub fn with_approval_suggester(
+        mut self,
+        suggester: Arc<dyn approval::ApprovalSuggester>,
+    ) -> Self {
         self.approval_suggester = Some(suggester);
+        self
+    }
+    pub fn with_coding_policies(
+        mut self,
+        policies: Arc<
+            dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>,
+        >,
+    ) -> Self {
+        self.coding_policies = Some(policies);
+        self
+    }
+    pub fn with_injector_registry(mut self, registry: bus::InjectorRegistry) -> Self {
+        self.injector_registry = Some(registry);
         self
     }
     pub fn with_coding_recall_service(
@@ -635,6 +657,7 @@ impl AgentLoopBuilder {
                 .model(config.agents.defaults.model.clone())
                 .max_concurrent_subagents(config.agents.defaults.max_concurrent_subagents)
                 .agent_task_repo(repos.agent_tasks.clone())
+                .coding_policies(self.coding_policies.clone())
                 .build(),
         );
 
@@ -1992,6 +2015,9 @@ impl AgentLoopBuilder {
         if let Some(ref queue) = self.context_update_queue {
             runtime = runtime.with_context_update_queue(Arc::clone(queue));
         }
+        if let Some(ref registry) = self.injector_registry {
+            runtime = runtime.with_injector_registry(registry.clone());
+        }
 
         // Wire retrieval feedback recording
         if let Some(ref mem_svc) = memory_service_for_shadow {
@@ -2050,6 +2076,7 @@ impl AgentLoopBuilder {
             skill_store,
             hot_config,
             subagent_manager: Some(subagent_manager),
+            coding_policies: self.coding_policies.clone(),
         })
     }
 }

@@ -63,6 +63,7 @@ pub struct AgentRuntime {
     active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
     hot_config: Arc<RwLock<config::HotConfig>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
+    injector_registry: bus::InjectorRegistry,
     memory_service: Option<Arc<cognitive::UnifiedMemoryService>>,
     feedback_repo: Option<storage::RetrievalFeedbackRepo>,
     strategy_repo: Option<storage::StrategyRepo>,
@@ -111,6 +112,7 @@ impl AgentRuntime {
             active_view: None,
             hot_config,
             context_update_queue: None,
+            injector_registry: bus::InjectorRegistry::empty(),
             memory_service: None,
             feedback_repo: None,
             strategy_repo: None,
@@ -200,6 +202,11 @@ impl AgentRuntime {
 
     pub fn with_context_update_queue(mut self, queue: Arc<bus::ContextUpdateQueue>) -> Self {
         self.context_update_queue = Some(queue);
+        self
+    }
+
+    pub fn with_injector_registry(mut self, registry: bus::InjectorRegistry) -> Self {
+        self.injector_registry = registry;
         self
     }
 
@@ -525,6 +532,7 @@ impl AgentRuntime {
         if let Some(ref engine) = self.hook_engine() {
             params = params.with_hook_engine(Arc::clone(engine));
         }
+        params = params.with_injector_registry(self.injector_registry.clone());
 
         // ── Phase 2: Execute ─────────────────────────────────────
         let safety_timeout = Duration::from_secs(safety_timeout_secs.max(1));

@@ -4,7 +4,7 @@ pub use bus::domain_events::{ConcurrencyClass, TodoStatus};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct TodoItem {
     pub id: String,
     pub title: String,
@@ -16,7 +16,9 @@ pub struct TodoItem {
     pub blocked_by: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delegated_to: Option<String>,
+    #[specta(type = String)]
     pub created_at: jiff::Timestamp,
+    #[specta(type = String)]
     pub updated_at: jiff::Timestamp,
 }
 
@@ -57,10 +59,22 @@ mod tests {
 
     #[test]
     fn todo_status_serializes_snake_case() {
-        assert_eq!(serde_json::to_string(&TodoStatus::InProgress).unwrap(), "\"in_progress\"");
-        assert_eq!(serde_json::to_string(&TodoStatus::Pending).unwrap(), "\"pending\"");
-        assert_eq!(serde_json::to_string(&TodoStatus::Done).unwrap(), "\"done\"");
-        assert_eq!(serde_json::to_string(&TodoStatus::Blocked).unwrap(), "\"blocked\"");
+        assert_eq!(
+            serde_json::to_string(&TodoStatus::InProgress).unwrap(),
+            "\"in_progress\""
+        );
+        assert_eq!(
+            serde_json::to_string(&TodoStatus::Pending).unwrap(),
+            "\"pending\""
+        );
+        assert_eq!(
+            serde_json::to_string(&TodoStatus::Done).unwrap(),
+            "\"done\""
+        );
+        assert_eq!(
+            serde_json::to_string(&TodoStatus::Blocked).unwrap(),
+            "\"blocked\""
+        );
     }
 
     #[test]
@@ -77,9 +91,18 @@ mod tests {
 
     #[test]
     fn concurrency_class_serializes_snake_case() {
-        assert_eq!(serde_json::to_string(&ConcurrencyClass::Safe).unwrap(), "\"safe\"");
-        assert_eq!(serde_json::to_string(&ConcurrencyClass::Sequential).unwrap(), "\"sequential\"");
-        assert_eq!(serde_json::to_string(&ConcurrencyClass::Exclusive).unwrap(), "\"exclusive\"");
+        assert_eq!(
+            serde_json::to_string(&ConcurrencyClass::Safe).unwrap(),
+            "\"safe\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ConcurrencyClass::Sequential).unwrap(),
+            "\"sequential\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ConcurrencyClass::Exclusive).unwrap(),
+            "\"exclusive\""
+        );
     }
 
     #[test]

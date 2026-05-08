@@ -249,10 +249,7 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
         "tags:",
         "estimated time:",
     ];
-    let field_count = field_patterns
-        .iter()
-        .filter(|p| icontains(text, p))
-        .count();
+    let field_count = field_patterns.iter().filter(|p| icontains(text, p)).count();
     let has_multiple_fields = field_count >= 2;
 
     // Pattern 4: Search with numbered list — requires fake ID for corroboration
@@ -842,7 +839,8 @@ impl ExecutionCore {
                                         channel: approval::ChannelKind::from(ctx.channel.as_str()),
                                         session_id: ctx.chat_id.to_string(),
                                         user_id: None,
-                                        cwd: std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
+                                        cwd: std::env::current_dir()
+                                            .unwrap_or_else(|_| std::path::PathBuf::from(".")),
                                     },
                                     preview: None,
                                     suggested_grant: None,

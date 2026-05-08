@@ -1,9 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import type { MessagePart } from "../components/parts/types";
-import { applyView, setTodos } from "../state/todoStore";
+import { applyView } from "../state/todoStore";
 import { subscribeToThread } from "../state/ThreadEventBuffer";
 import { listen } from "@tauri-apps/api/event";
+import { fetchCodingTodos } from "@/api/endpoints/coding";
 
 /// Mirrors `desktop_shared::coding::events::ThreadEvent`. Kept loose (string
 /// kind discriminator) so additions on the Rust side don't immediately fail
@@ -257,7 +258,7 @@ export function useThreadEvents(threadId: string | null) {
       threadId,
       includeItems: true,
     })
-      .then((thread) => {
+      .then((thread: { items?: MessageDto[] }) => {
         if (cancelled) return;
         const items = thread?.items ?? [];
         if (items.length === 0) return;
@@ -296,8 +297,8 @@ export function useThreadEvents(threadId: string | null) {
       if (refreshing) return;
       refreshing = true;
       try {
-        const view = await invoke("coding_todo_get", { threadId });
-        applyView(threadId, view as any);
+        const view = await fetchCodingTodos(threadId!);
+        applyView(threadId!, view as any);
       } finally {
         refreshing = false;
       }

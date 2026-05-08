@@ -58,10 +58,13 @@ pub async fn execute_loop(
     let mut last_content = String::new();
     let mut loop_detector = LoopDetector::new();
     let compressor = MidLoopCompressor::new(core.token_counter().clone(), params.context_window);
-    let refresher = params
-        .context_update_queue
-        .as_ref()
-        .map(|queue| LiveContextRefresher::new(core.token_counter().clone(), queue.clone(), bus::InjectorRegistry::empty()));
+    let refresher = params.context_update_queue.as_ref().map(|queue| {
+        LiveContextRefresher::new(
+            core.token_counter().clone(),
+            queue.clone(),
+            params.injector_registry.clone(),
+        )
+    });
 
     loop {
         // ── Cancellation check ───────────────────────────────
@@ -267,7 +270,9 @@ pub async fn execute_loop(
                 });
             }
 
-            CycleOutcome::Cancelled { partial_content, .. } => {
+            CycleOutcome::Cancelled {
+                partial_content, ..
+            } => {
                 let content = if partial_content.is_empty() {
                     std::mem::take(&mut last_content)
                 } else {
@@ -330,7 +335,8 @@ pub async fn execute_loop(
         // ── Live context refresh ─────────────────────────────
         if !params.pause_context_updates {
             if let Some(ref refresher) = refresher {
-                let updates = refresher.inject_pending_with_ctx(&mut messages, params.context_window, ctx);
+                let updates =
+                    refresher.inject_pending_with_ctx(&mut messages, params.context_window, ctx);
                 if !updates.is_empty() {
                     let tokens_added: usize = updates.iter().map(|u| u.tokens).sum();
                     crate::execution::core::fan_out_event(

@@ -845,6 +845,41 @@ TodoWrite spec §8 already defines the integration; landing 2.2 unhides the plan
 
 ---
 
+## Update 2026-05-08 (later same day) — Phase 2.2 (Plan mode) shipped
+
+| Item | Status | Notes |
+|---|---|---|
+| 2.2 Plan mode | ✅ **Done** | Backend: `5de2375c7 feat: coding plan mode (Phase 2.2 backend) (#55)`. Frontend: `025fe15dd feat(frontend): PlanModeBanner + slash commands + todoStore plan mode state`. Code-review polish: `36415a6d8 refactor: address code-review issues from plan-mode PR`. Plan: `plans/2026-05-08-coding-plan-mode.md`. Spec: `specs/2026-05-08-coding-plan-mode-design.md`. Shipped: `CodingApprovalPolicy` struct→enum (`Default` / `PlanMode` / `YoloMode`) with plan-file write whitelist + read passthrough; `DynamicInjector` trait + `InjectorRegistry` in `crates/bus/src/injection.rs` (reusable for 2.4 hooks); `PlanModeInjector` pushes per-turn `<system-reminder>` while active; four real handlers (`coding_todo_get`, `coding_plan_ratify`, `coding_plan_user_edit`, `coding_plan_user_remove`) returning `CodingTodoView`; new commands `coding_plan_enter` / `coding_plan_cancel` / `coding_plan_open_file`; `SubagentManager` carries `plan_policy_snapshot` so spawned subagents inherit plan-mode write restrictions; live `PlanModeBanner.tsx` with inline edits; `/plan` and `/plan-exit` slash commands intercepted in `ComposerInput`; `TodoEvent::PlanCancelled` + `clear_plan_session_tag` + `soft_delete_plan_session` repo methods; e2e tests for happy path / edit / remove / cancel / subagent inheritance / untitled fallback / idempotent `/plan`. |
+| 0.3 Mid-stream cancel + approval-cancel leak | 🚧 Still in flight | Independent workstream. |
+| Phase 1 KlyntTracingProvider | 🚧 Still in flight | Independent workstream. Wire-log surface for `TodoEvent::PlanCancelled` and the new plan-mode lifecycle events lights up automatically when this lands. |
+
+### Next move: **Phase 2.5 — `/btw` side-question** (~1–2 days)
+
+With the dynamic-injection scaffold now in tree (`InjectorRegistry` + `LiveContextRefresher` integration) and TodoWrite + plan mode both shipped, the cheapest next win is `/btw`. It is small, self-contained, demo-friendly, and exercises the same "frozen-context single-turn" pattern that the plan-mode injector primed.
+
+**Implementation outline:**
+1. New slash command `/btw <question>` intercepted in `ComposerInput` (mirror the `/plan` interceptor pattern from this PR).
+2. New Tauri command `coding_btw_ask` → app-core handler that runs a one-shot `AgentRuntime::process` with `pause_context_updates: true` and a `DenyAllToolset` (no tool calls; pure cache-hit answer).
+3. Render the answer as a transient inline thread item (not persisted as a turn — or persist with a `kind=side_question` tag so the reducer can style it).
+4. Token-budget guard: if the answer would push the next real turn past 90% of context, emit a `<system-reminder>` warning and skip cache write.
+5. Tests: prompt-cache hit, no tool invocation possible, no `ContextUpdateQueue` drain, frozen system prompt.
+
+**Then pick between (user-facing priority call):**
+
+- **2.4 Hooks** (~3 days). Reuses the `DynamicInjector` trait shipped in 2.2 verbatim — `HookInjector` becomes a sibling to `PlanModeInjector` in the same registry. Lowest marginal cost given the scaffold is already proven.
+- **2.3 Background bash** (~1 week). Higher absolute value (unlocks long compile/test loops) but more surface area: process supervisor, output ring buffer, `bash_status` / `bash_kill` tools, sidebar surface for running jobs.
+
+**Recommendation:** **2.4 hooks before 2.3 background bash.** Hooks ride the scaffold we just built (every day post-2.2 that hooks aren't shipped is wasted scaffolding amortization), they're a third the effort, and they're a prerequisite for the kind of "guardrail" UX a serious coding mode wants (auto-format on save, lint before commit, secret scanning). Background bash is bigger and stands alone — it can wait a week without losing leverage.
+
+**Cumulative roadmap state after 2.2:**
+- ✅ Phase 0 (0.1, 0.2, 0.4) closed; 0.3 in flight
+- 🚧 Phase 1 (KlyntTracingProvider) in flight
+- ✅ Phase 2.1 (TodoWrite), ✅ Phase 2.2 (Plan mode)
+- ⏭️ Phase 2.5 → 2.4 → 2.3 (recommended order)
+- ⏳ Phase 3 (UX polish) and Phase 4 (research-grade) untouched
+
+---
+
 ## Appendix A — Original agent reports
 
 The three deep-dive reports (Klynt internal, kimi-cli, opencode) generated 2026-05-07 are the source-of-truth for the analysis above. They contain file:line citations and verbatim quotes that this synthesis condenses. If discrepancies arise, the agent reports take precedence — they were ground-truth at the time of writing.

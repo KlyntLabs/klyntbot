@@ -7,7 +7,7 @@
   border-radius: 8px;
   padding: 12px 16px;
   margin: 8px 0;
-  font-size: 14px;
+  font-size: var(--fs-sm, 14px);
 }
 
 .coding-todo__plan-banner-header {
@@ -20,7 +20,7 @@
   background: none;
   border: none;
   font: inherit;
-  font-size: 16px;
+  font-size: var(--fs-lg, 16px);
   font-weight: 600;
   color: var(--fg, #111);
   cursor: pointer;
@@ -34,7 +34,7 @@
 .coding-todo__plan-banner-close {
   background: none;
   border: none;
-  font-size: 20px;
+  font-size: var(--fs-xl, 20px);
   cursor: pointer;
   padding: 0 4px;
   line-height: 1;
@@ -77,7 +77,7 @@
 }
 
 .coding-todo__plan-banner-concurrency {
-  font-size: 11px;
+  font-size: var(--fs-xs, 11px);
   color: var(--fg-muted, #666);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -89,7 +89,7 @@
   cursor: pointer;
   padding: 0 4px;
   opacity: 0.6;
-  font-size: 18px;
+  font-size: var(--fs-lg, 18px);
   line-height: 1;
 }
 
@@ -110,12 +110,12 @@
   border-radius: 6px;
   cursor: pointer;
   font: inherit;
-  font-size: 14px;
+  font-size: var(--fs-sm, 14px);
 }
 
 .coding-todo__plan-banner-primary {
   background: var(--accent-primary, #2563eb);
-  color: white;
+  color: var(--fg-inverse, white);
 }
 
 .coding-todo__plan-banner-danger {
@@ -143,6 +143,6 @@
 
 .coding-todo__plan-banner-confirm button:first-of-type {
   background: var(--accent-primary, #2563eb);
-  color: white;
+  color: var(--fg-inverse, white);
   border-color: var(--accent-primary, #2563eb);
 }

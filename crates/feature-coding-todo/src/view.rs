@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use crate::types::TodoItem;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CodingTodoView {
     /// Map of agent_id → that agent's items.
@@ -15,11 +15,12 @@ pub struct CodingTodoView {
     pub plan_mode_state: Option<PlanModeView>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanModeView {
     pub plan_session_id: String,
     pub plan_file_slug: String,
+    #[specta(type = String)]
     pub plan_file_path: PathBuf,
     pub proposed_item_count: usize,
 }

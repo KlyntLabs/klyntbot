@@ -210,6 +210,9 @@ mod tests {
         assert_eq!(detail.session_id, "uuid-1");
 
         // Unknown id stays NotFound
-        assert!(provider.find_session("-Users-me-repo/missing").await.is_err());
+        assert!(provider
+            .find_session("-Users-me-repo/missing")
+            .await
+            .is_err());
     }
 }

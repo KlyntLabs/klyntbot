@@ -1,20 +1,27 @@
 //! End-to-end test: instantiate the tool, call execute(), assert side effects.
 
-use bus::domain_events::{DomainEvent, TodoEvent, TodoStatus};
 use bus::DomainEventBus;
-use common::{ChatId, ChannelName};
+use bus::domain_events::{DomainEvent, TodoEvent, TodoStatus};
+use common::{ChannelName, ChatId};
 use feature_coding_todo::tool::{CodingTodoParams, CodingTodoTool};
 use std::sync::Arc;
-use storage::repos::TodoRepo;
 use storage::StoragePool;
+use storage::repos::TodoRepo;
 use tools_core::{RoutingContext, ToolExecute};
 
-async fn setup() -> (CodingTodoTool, tokio::sync::broadcast::Receiver<DomainEvent>) {
+async fn setup() -> (
+    CodingTodoTool,
+    tokio::sync::broadcast::Receiver<DomainEvent>,
+) {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    sqlx::query(feature_coding_todo::migrations::coding_todo_migration().sql.as_str())
-        .execute(pool.inner())
-        .await
-        .unwrap();
+    sqlx::query(
+        feature_coding_todo::migrations::coding_todo_migration()
+            .sql
+            .as_str(),
+    )
+    .execute(pool.inner())
+    .await
+    .unwrap();
     let repo = TodoRepo::new(pool.inner().clone());
     let bus = Arc::new(DomainEventBus::new(64));
     let rx = bus.subscribe();
@@ -23,10 +30,7 @@ async fn setup() -> (CodingTodoTool, tokio::sync::broadcast::Receiver<DomainEven
 }
 
 fn ctx(thread_id: &str) -> RoutingContext {
-    let mut ctx = RoutingContext::new(
-        ChannelName::from("coding"),
-        ChatId::from(thread_id),
-    );
+    let mut ctx = RoutingContext::new(ChannelName::from("coding"), ChatId::from(thread_id));
     ctx.agent_id = "root".into();
     ctx.agent_profile = "root".into();
     ctx.plan_mode_active = false;
@@ -60,7 +64,11 @@ async fn execute_inserts_new_list_and_publishes_events() {
             event_count += 1;
         }
     }
-    assert!(event_count >= 2, "expected ≥2 todo events, got {}", event_count);
+    assert!(
+        event_count >= 2,
+        "expected ≥2 todo events, got {}",
+        event_count
+    );
 }
 
 #[tokio::test]
@@ -119,7 +127,10 @@ async fn execute_publishes_status_change_event() {
             }
         }
     }
-    assert!(found_status_change, "expected StateChanged event Pending->InProgress");
+    assert!(
+        found_status_change,
+        "expected StateChanged event Pending->InProgress"
+    );
 }
 
 #[tokio::test]

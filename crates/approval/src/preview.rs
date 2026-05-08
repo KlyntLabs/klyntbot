@@ -78,9 +78,17 @@ fn classify_preview_kind(tool_name: &str) -> PreviewKind {
         return PreviewKind::Mcp;
     }
     match tool_name {
-        "edit" | "write" | "multi_edit" | "multiedit" | "notebook_edit"
-        | "apply_patch" | "str_replace_file" | "str_replace_based_edit_tool"
-        | "create_file" | "write_file" | "edit_file" => PreviewKind::Diff,
+        "edit"
+        | "write"
+        | "multi_edit"
+        | "multiedit"
+        | "notebook_edit"
+        | "apply_patch"
+        | "str_replace_file"
+        | "str_replace_based_edit_tool"
+        | "create_file"
+        | "write_file"
+        | "edit_file" => PreviewKind::Diff,
         "bash" | "shell" | "run_command" | "execute_command" => PreviewKind::Command,
         "web_fetch" | "http_get" | "http_post" | "web_search" | "fetch" => PreviewKind::Url,
         _ => PreviewKind::Generic,
@@ -155,7 +163,10 @@ fn build_diff_preview(
     let mut unified = diff
         .unified_diff()
         .context_radius(3)
-        .header(&format!("a/{}", path.display()), &format!("b/{}", path.display()))
+        .header(
+            &format!("a/{}", path.display()),
+            &format!("b/{}", path.display()),
+        )
         .to_string();
 
     let mut is_truncated = false;
@@ -235,7 +246,10 @@ const SENSITIVE_HEADERS: &[&str] = &[
 ];
 
 fn redact_header_value(name: &str, value: &str) -> String {
-    if SENSITIVE_HEADERS.iter().any(|h| h.eq_ignore_ascii_case(name)) {
+    if SENSITIVE_HEADERS
+        .iter()
+        .any(|h| h.eq_ignore_ascii_case(name))
+    {
         "<redacted>".to_string()
     } else {
         value.to_string()
@@ -293,9 +307,7 @@ fn build_generic_preview(args: &serde_json::Value) -> ApprovalPreview {
 
 fn build_mcp_preview(tool_name: &str, args: &serde_json::Value) -> ApprovalPreview {
     let after_prefix = tool_name.trim_start_matches("mcp_");
-    let (server, tool) = after_prefix
-        .split_once('_')
-        .unwrap_or((after_prefix, ""));
+    let (server, tool) = after_prefix.split_once('_').unwrap_or((after_prefix, ""));
 
     ApprovalPreview::Mcp {
         server: server.to_string(),
@@ -312,31 +324,58 @@ mod tests {
     #[test]
     fn classifies_known_edit_tools() {
         assert!(matches!(classify_preview_kind("edit"), PreviewKind::Diff));
-        assert!(matches!(classify_preview_kind("str_replace_file"), PreviewKind::Diff));
-        assert!(matches!(classify_preview_kind("apply_patch"), PreviewKind::Diff));
-        assert!(matches!(classify_preview_kind("write_file"), PreviewKind::Diff));
+        assert!(matches!(
+            classify_preview_kind("str_replace_file"),
+            PreviewKind::Diff
+        ));
+        assert!(matches!(
+            classify_preview_kind("apply_patch"),
+            PreviewKind::Diff
+        ));
+        assert!(matches!(
+            classify_preview_kind("write_file"),
+            PreviewKind::Diff
+        ));
     }
 
     #[test]
     fn classifies_shell_tools() {
-        assert!(matches!(classify_preview_kind("bash"), PreviewKind::Command));
-        assert!(matches!(classify_preview_kind("execute_command"), PreviewKind::Command));
+        assert!(matches!(
+            classify_preview_kind("bash"),
+            PreviewKind::Command
+        ));
+        assert!(matches!(
+            classify_preview_kind("execute_command"),
+            PreviewKind::Command
+        ));
     }
 
     #[test]
     fn classifies_url_tools() {
-        assert!(matches!(classify_preview_kind("web_fetch"), PreviewKind::Url));
-        assert!(matches!(classify_preview_kind("http_post"), PreviewKind::Url));
+        assert!(matches!(
+            classify_preview_kind("web_fetch"),
+            PreviewKind::Url
+        ));
+        assert!(matches!(
+            classify_preview_kind("http_post"),
+            PreviewKind::Url
+        ));
     }
 
     #[test]
     fn classifies_mcp_prefix() {
-        assert!(matches!(classify_preview_kind("mcp_linear_create_issue"), PreviewKind::Mcp));
+        assert!(matches!(
+            classify_preview_kind("mcp_linear_create_issue"),
+            PreviewKind::Mcp
+        ));
     }
 
     #[test]
     fn classifies_unknown_to_generic() {
-        assert!(matches!(classify_preview_kind("custom_tool"), PreviewKind::Generic));
+        assert!(matches!(
+            classify_preview_kind("custom_tool"),
+            PreviewKind::Generic
+        ));
     }
 
     fn test_ctx(cwd: PathBuf) -> crate::request::ApprovalContext {
@@ -361,7 +400,11 @@ mod tests {
         });
         let result = build_diff_preview(&args, &ctx).expect("preview");
         match result {
-            ApprovalPreview::Diff { is_new_file, lines_added, .. } => {
+            ApprovalPreview::Diff {
+                is_new_file,
+                lines_added,
+                ..
+            } => {
                 assert!(is_new_file);
                 assert!(lines_added >= 2);
             }
@@ -383,7 +426,11 @@ mod tests {
         });
         let result = build_diff_preview(&args, &ctx).expect("preview");
         match result {
-            ApprovalPreview::Diff { lines_added, lines_removed, .. } => {
+            ApprovalPreview::Diff {
+                lines_added,
+                lines_removed,
+                ..
+            } => {
                 assert_eq!(lines_added, 1);
                 assert_eq!(lines_removed, 1);
             }
@@ -394,12 +441,14 @@ mod tests {
     #[test]
     fn command_preview_flags_rm_rf() {
         let ctx = test_ctx(PathBuf::from("."));
-        let preview = build_command_preview(
-            &serde_json::json!({"command": "rm -rf /tmp/foo"}),
-            &ctx,
-        );
+        let preview =
+            build_command_preview(&serde_json::json!({"command": "rm -rf /tmp/foo"}), &ctx);
         match preview {
-            ApprovalPreview::Command { is_dangerous, risk_hits, .. } => {
+            ApprovalPreview::Command {
+                is_dangerous,
+                risk_hits,
+                ..
+            } => {
                 assert!(is_dangerous);
                 assert!(risk_hits.iter().any(|s| s.contains("recursive delete")));
             }
@@ -415,7 +464,11 @@ mod tests {
             &ctx,
         );
         match preview {
-            ApprovalPreview::Command { is_dangerous, risk_hits, .. } => {
+            ApprovalPreview::Command {
+                is_dangerous,
+                risk_hits,
+                ..
+            } => {
                 assert!(is_dangerous);
                 assert!(risk_hits.iter().any(|s| s.contains("piped to shell")));
             }
@@ -427,10 +480,7 @@ mod tests {
     fn command_preview_truncates_long_command() {
         let ctx = test_ctx(PathBuf::from("."));
         let big = "a".repeat(MAX_COMMAND_CHARS + 1000);
-        let preview = build_command_preview(
-            &serde_json::json!({"command": big}),
-            &ctx,
-        );
+        let preview = build_command_preview(&serde_json::json!({"command": big}), &ctx);
         match preview {
             ApprovalPreview::Command { command, .. } => {
                 assert!(command.contains("...(truncated)"));
@@ -449,7 +499,9 @@ mod tests {
         }));
         match preview {
             ApprovalPreview::Url { headers, .. } => {
-                let auth = headers.iter().find(|(k, _)| k.eq_ignore_ascii_case("authorization"));
+                let auth = headers
+                    .iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case("authorization"));
                 assert_eq!(auth.unwrap().1, "<redacted>");
             }
             _ => panic!(),
@@ -464,7 +516,9 @@ mod tests {
         }));
         match preview {
             ApprovalPreview::Url { headers, .. } => {
-                let ua = headers.iter().find(|(k, _)| k.eq_ignore_ascii_case("user-agent"));
+                let ua = headers
+                    .iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case("user-agent"));
                 assert_eq!(ua.unwrap().1, "Klynt/1.0");
             }
             _ => panic!(),
@@ -515,7 +569,11 @@ mod tests {
         });
         let result = build_diff_preview(&args, &ctx).expect("preview");
         match result {
-            ApprovalPreview::Diff { lines_added, lines_removed, .. } => {
+            ApprovalPreview::Diff {
+                lines_added,
+                lines_removed,
+                ..
+            } => {
                 assert!(lines_added >= 1);
                 assert_eq!(lines_removed, 0);
             }
@@ -536,7 +594,11 @@ mod tests {
         });
         let result = build_diff_preview(&args, &ctx).expect("preview");
         match result {
-            ApprovalPreview::Diff { lines_added, lines_removed, .. } => {
+            ApprovalPreview::Diff {
+                lines_added,
+                lines_removed,
+                ..
+            } => {
                 assert_eq!(lines_added, 0);
                 assert!(lines_removed >= 1);
             }
@@ -558,7 +620,11 @@ mod tests {
         });
         let result = build_diff_preview(&args, &ctx).expect("preview");
         match result {
-            ApprovalPreview::Diff { lines_added, lines_removed, .. } => {
+            ApprovalPreview::Diff {
+                lines_added,
+                lines_removed,
+                ..
+            } => {
                 assert_eq!(lines_added, 1);
                 assert_eq!(lines_removed, 1);
             }

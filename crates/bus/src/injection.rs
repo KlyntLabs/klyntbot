@@ -33,13 +33,25 @@ pub struct InjectorRegistry {
     injectors: Arc<Vec<Arc<dyn DynamicInjector>>>,
 }
 
+impl std::fmt::Debug for InjectorRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InjectorRegistry")
+            .field("names", &self.names())
+            .finish()
+    }
+}
+
 impl InjectorRegistry {
     pub fn new(injectors: Vec<Arc<dyn DynamicInjector>>) -> Self {
-        Self { injectors: Arc::new(injectors) }
+        Self {
+            injectors: Arc::new(injectors),
+        }
     }
 
     pub fn empty() -> Self {
-        Self { injectors: Arc::new(Vec::new()) }
+        Self {
+            injectors: Arc::new(Vec::new()),
+        }
     }
 
     /// Drive every registered injector and concatenate their updates.
@@ -58,17 +70,33 @@ mod tests {
     use crate::context_updates::{ContextUpdate, ContextUpdateReason, UpdatePriority};
     use jiff::Timestamp;
 
-    struct FakeCtx { plan: bool }
+    struct FakeCtx {
+        plan: bool,
+    }
     impl InjectorContext for FakeCtx {
-        fn thread_id(&self) -> &str { "t1" }
-        fn agent_id(&self) -> &str { "root" }
-        fn plan_mode_active(&self) -> bool { self.plan }
-        fn plan_session_id(&self) -> Option<&str> { if self.plan { Some("p_abc") } else { None } }
+        fn thread_id(&self) -> &str {
+            "t1"
+        }
+        fn agent_id(&self) -> &str {
+            "root"
+        }
+        fn plan_mode_active(&self) -> bool {
+            self.plan
+        }
+        fn plan_session_id(&self) -> Option<&str> {
+            if self.plan {
+                Some("p_abc")
+            } else {
+                None
+            }
+        }
     }
 
     struct AlwaysOne;
     impl DynamicInjector for AlwaysOne {
-        fn name(&self) -> &str { "always_one" }
+        fn name(&self) -> &str {
+            "always_one"
+        }
         fn collect(&self, _ctx: &dyn InjectorContext) -> Vec<ContextUpdate> {
             vec![ContextUpdate {
                 reason: ContextUpdateReason::Custom("test".into()),

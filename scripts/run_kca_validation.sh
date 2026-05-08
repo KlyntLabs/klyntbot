@@ -26,7 +26,10 @@ cargo nextest run -p kca-e2e --test full_pipeline
 echo "===== Step 4: KCA Benchmark build check ====="
 cargo check -p kca-bench
 
-echo "===== Step 5: KCA Benchmark — real LoCoMo (Letta-comparable) ====="
+echo "===== Step 5: Plan-mode E2E regression ====="
+cargo nextest run -p app-core --test plan_mode_e2e
+
+echo "===== Step 6: KCA Benchmark — real LoCoMo (Letta-comparable) ====="
 mkdir -p docs/architecture
 # Default: 2 conversations × 10 QA = ~20 questions, ~3 min. Override with
 # KCA_LOCOMO_LIMIT / KCA_LOCOMO_QA_LIMIT for fuller runs (full = 10 × ~150 ≈ 1500).

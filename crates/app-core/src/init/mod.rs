@@ -155,6 +155,18 @@ impl AppCore {
         // Context update queue for live context refresher (shared between agent + background services).
         let context_update_queue = Arc::new(bus::ContextUpdateQueue::new());
 
+        // Per-coding-thread approval policies and plan snapshots.
+        let coding_policies: Arc<
+            dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>,
+        > = Arc::new(dashmap::DashMap::new());
+
+        // Build injector registry with PlanModeInjector so the agent loop injects plan-mode reminders.
+        let plan_mode_injector = Arc::new(feature_coding_todo::PlanModeInjector::new(Arc::clone(
+            &coding_policies,
+        )));
+        let injector_registry =
+            bus::InjectorRegistry::new(vec![plan_mode_injector as Arc<dyn bus::DynamicInjector>]);
+
         // ── Startup recovery — DND crash safety net ──────────────────────
         if let Ok(Some(dnd_row)) = repos.dnd_override.get().await {
             tracing::warn!(
@@ -319,12 +331,15 @@ impl AppCore {
 
         // ── Phase 2.6: Desktop approval channel + grants repo ─────────────
         let desktop_approval_channel: Arc<crate::desktop_approval_channel::DesktopApprovalChannel> =
-            Arc::new(crate::desktop_approval_channel::DesktopApprovalChannel::new(
-                event_emitter.clone().unwrap_or_else(|| Arc::new(NoopEmitter)),
-            ));
-        let approval_grants_repo = Arc::new(approval::ApprovalGrantsRepo::new(
-            storage_pool.clone(),
-        ));
+            Arc::new(
+                crate::desktop_approval_channel::DesktopApprovalChannel::new(
+                    event_emitter
+                        .clone()
+                        .unwrap_or_else(|| Arc::new(NoopEmitter)),
+                ),
+            );
+        let approval_grants_repo =
+            Arc::new(approval::ApprovalGrantsRepo::new(storage_pool.clone()));
 
         // ── Phase 3: Agent ───────────────────────────────────────────────
         let agent::AgentResult {
@@ -352,6 +367,8 @@ impl AppCore {
             appcore_embedding_engine.clone(),
             recall.clone(),
             Some(desktop_approval_channel.clone() as Arc<dyn approval::ApprovalChannel>),
+            Some(Arc::clone(&coding_policies)),
+            Some(injector_registry.clone()),
         )
         .await?;
 
@@ -633,12 +650,7 @@ impl AppCore {
             );
             agent.set_approval_suggester(suggester);
 
-            (
-                Some(facade),
-                all_consumers,
-                all_handles,
-                started.shutdown,
-            )
+            (Some(facade), all_consumers, all_handles, started.shutdown)
         };
 
         // ── Phase 9: AI Pipeline — SignalRouter + all consumers ───────────
@@ -1305,8 +1317,9 @@ impl AppCore {
             tool_kit: std::sync::Mutex::new(None),
             desktop_approval_channel: Some(desktop_approval_channel),
             approval_grants_repo: Some(approval_grants_repo),
-            coding_policies: Arc::new(dashmap::DashMap::new()),
+            coding_policies: Arc::clone(&coding_policies),
             plan_snapshots: Arc::new(dashmap::DashMap::new()),
+            context_update_queue: Some(Arc::clone(&context_update_queue)),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────

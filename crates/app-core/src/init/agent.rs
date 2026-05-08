@@ -41,6 +41,10 @@ pub(super) async fn init_agent(
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
     coding_recall: Option<Arc<coding_memory::recall::CodingRecallService>>,
     approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
+    coding_policies: Option<
+        Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
+    >,
+    injector_registry: Option<bus::InjectorRegistry>,
 ) -> Result<AgentResult, String> {
     // Run activity-log migrations (unified activity log).
     StoragePool::run_feature_migrations(
@@ -101,6 +105,12 @@ pub(super) async fn init_agent(
 
     if let Some(channel) = approval_channel {
         builder = builder.with_approval_channel(channel);
+    }
+    if let Some(policies) = coding_policies {
+        builder = builder.with_coding_policies(policies);
+    }
+    if let Some(registry) = injector_registry {
+        builder = builder.with_injector_registry(registry);
     }
 
     let mut agent_loop_raw = builder

@@ -1,14 +1,14 @@
 //! CodingTodoTool — the LLM-facing tool registration.
 
-use crate::diff::{compute_diff, diff_to_events, EventMeta};
+use crate::diff::{EventMeta, compute_diff, diff_to_events};
 use crate::errors::CodingTodoError;
 use crate::id::assign_missing_ids;
 use crate::plan_mode;
 use crate::types::{TodoItem, TodoItemInput};
-use crate::validation::{validate_write, ValidationContext};
+use crate::validation::{ValidationContext, validate_write};
 use async_trait::async_trait;
-use bus::domain_events::{ConcurrencyClass, TodoStatus};
 use bus::DomainEventBus;
+use bus::domain_events::{ConcurrencyClass, TodoStatus};
 use common::Result;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -52,42 +52,42 @@ impl ToolExecute for CodingTodoTool {
         let agent_id = ctx.agent_id.clone();
         let agent_profile = ctx.agent_profile.clone();
 
-        let inputs: Vec<TodoItemInput> = serde_json::from_str(&params.items_json)
-            .map_err(CodingTodoError::InvalidItemShape)?;
+        let inputs: Vec<TodoItemInput> =
+            serde_json::from_str(&params.items_json).map_err(CodingTodoError::InvalidItemShape)?;
 
         let inputs = assign_missing_ids(inputs);
 
         // Fetch all rows for the thread in one query; partition into current vs others.
         let all_rows = self.repo.list_for_thread(&thread_id).await?;
         let (prior_row, other_rows): (Option<_>, Vec<_>) = {
-            let (mine, others): (Vec<_>, Vec<_>) = all_rows
-                .into_iter()
-                .partition(|r| r.agent_id == agent_id);
+            let (mine, others): (Vec<_>, Vec<_>) =
+                all_rows.into_iter().partition(|r| r.agent_id == agent_id);
             (mine.into_iter().next(), others)
         };
 
-        let (prior_items, prior_created_ats): (Vec<TodoItemInput>, HashMap<String, jiff::Timestamp>) =
-            match &prior_row {
-                Some(row) => {
-                    let parsed: Vec<TodoItem> =
-                        serde_json::from_str(&row.items_json).map_err(|e| {
-                            CodingTodoError::CorruptedDbData {
-                                reason: format!(
-                                    "failed to parse items_json for agent {}: {}",
-                                    row.agent_id, e
-                                ),
-                            }
-                        })?;
-                    let created_ats: HashMap<String, jiff::Timestamp> = parsed
-                        .iter()
-                        .map(|i| (i.id.clone(), i.created_at))
-                        .collect();
-                    let inputs: Vec<TodoItemInput> =
-                        parsed.into_iter().map(TodoItemInput::from).collect();
-                    (inputs, created_ats)
-                }
-                None => (Vec::new(), HashMap::new()),
-            };
+        let (prior_items, prior_created_ats): (
+            Vec<TodoItemInput>,
+            HashMap<String, jiff::Timestamp>,
+        ) = match &prior_row {
+            Some(row) => {
+                let parsed: Vec<TodoItem> = serde_json::from_str(&row.items_json).map_err(|e| {
+                    CodingTodoError::CorruptedDbData {
+                        reason: format!(
+                            "failed to parse items_json for agent {}: {}",
+                            row.agent_id, e
+                        ),
+                    }
+                })?;
+                let created_ats: HashMap<String, jiff::Timestamp> = parsed
+                    .iter()
+                    .map(|i| (i.id.clone(), i.created_at))
+                    .collect();
+                let inputs: Vec<TodoItemInput> =
+                    parsed.into_iter().map(TodoItemInput::from).collect();
+                (inputs, created_ats)
+            }
+            None => (Vec::new(), HashMap::new()),
+        };
 
         let plan_mode_active = ctx.plan_mode_active;
         let plan_session_id_opt = ctx.plan_session_id.clone();
@@ -97,13 +97,16 @@ impl ToolExecute for CodingTodoTool {
             .flat_map(|row| {
                 let parsed = serde_json::from_str::<Vec<TodoItem>>(&row.items_json);
                 match parsed {
-                    Ok(items) => items.into_iter().filter_map(move |i| {
-                        if matches!(i.status, TodoStatus::InProgress) {
-                            Some((row.agent_id.clone(), i.id, i.concurrency))
-                        } else {
-                            None
-                        }
-                    }).collect::<Vec<_>>(),
+                    Ok(items) => items
+                        .into_iter()
+                        .filter_map(move |i| {
+                            if matches!(i.status, TodoStatus::InProgress) {
+                                Some((row.agent_id.clone(), i.id, i.concurrency))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>(),
                     Err(_) => Vec::new(), // skip corrupted rows for cross-agent checks
                 }
             })
@@ -241,11 +244,15 @@ trait StatusAccessor {
 }
 
 impl StatusAccessor for TodoItem {
-    fn status(&self) -> TodoStatus { self.status }
+    fn status(&self) -> TodoStatus {
+        self.status
+    }
 }
 
 impl StatusAccessor for TodoItemInput {
-    fn status(&self) -> TodoStatus { self.status }
+    fn status(&self) -> TodoStatus {
+        self.status
+    }
 }
 
 fn build_summary(
@@ -260,8 +267,16 @@ fn build_summary(
 ) -> String {
     format!(
         "Updated coding_todo for agent {} in thread {}.\n  {} items: {} pending, {} in_progress, {} done, {} blocked\n  Diff vs prior: +{} added, +{} status_changed, +{} cancelled",
-        agent_id, thread_id, total, pending, in_progress, done, blocked,
-        diff.added.len(), diff.status_changed.len(), diff.cancelled.len(),
+        agent_id,
+        thread_id,
+        total,
+        pending,
+        in_progress,
+        done,
+        blocked,
+        diff.added.len(),
+        diff.status_changed.len(),
+        diff.cancelled.len(),
     )
 }
 
@@ -378,10 +393,9 @@ mod tests {
     #[tokio::test]
     async fn test_missing_required_field_rejected() {
         let tool = setup().await;
-        let items_json = serde_json::json!([{"status": "pending", "concurrency": "safe"}]).to_string();
-        let result = tool
-            .execute(CodingTodoParams { items_json }, &ctx())
-            .await;
+        let items_json =
+            serde_json::json!([{"status": "pending", "concurrency": "safe"}]).to_string();
+        let result = tool.execute(CodingTodoParams { items_json }, &ctx()).await;
         assert!(result.is_err());
     }
 
@@ -394,18 +408,33 @@ mod tests {
             {"id": "t1", "title": "Task 1", "status": "pending", "concurrency": "safe"}
         ])
         .to_string();
-        tool.execute(CodingTodoParams { items_json: items_json.clone() }, &ctx)
-            .await
-            .unwrap();
+        tool.execute(
+            CodingTodoParams {
+                items_json: items_json.clone(),
+            },
+            &ctx,
+        )
+        .await
+        .unwrap();
 
-        let row_before = tool.repo.get("test-thread", "test-agent").await.unwrap().unwrap();
+        let row_before = tool
+            .repo
+            .get("test-thread", "test-agent")
+            .await
+            .unwrap()
+            .unwrap();
 
         // Submit identical list — should short-circuit without rewriting the row.
         tool.execute(CodingTodoParams { items_json }, &ctx)
             .await
             .unwrap();
 
-        let row_after = tool.repo.get("test-thread", "test-agent").await.unwrap().unwrap();
+        let row_after = tool
+            .repo
+            .get("test-thread", "test-agent")
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(row_before.updated_at, row_after.updated_at);
     }
 
@@ -422,7 +451,12 @@ mod tests {
             .await
             .unwrap();
 
-        let row = tool.repo.get("test-thread", "test-agent").await.unwrap().unwrap();
+        let row = tool
+            .repo
+            .get("test-thread", "test-agent")
+            .await
+            .unwrap()
+            .unwrap();
         let first_items: Vec<TodoItem> = serde_json::from_str(&row.items_json).unwrap();
         let first_created = first_items[0].created_at;
 
@@ -435,7 +469,12 @@ mod tests {
             .await
             .unwrap();
 
-        let row = tool.repo.get("test-thread", "test-agent").await.unwrap().unwrap();
+        let row = tool
+            .repo
+            .get("test-thread", "test-agent")
+            .await
+            .unwrap()
+            .unwrap();
         let second_items: Vec<TodoItem> = serde_json::from_str(&row.items_json).unwrap();
         let second_created = second_items[0].created_at;
 

@@ -39,22 +39,31 @@ function emit(threadId: string) {
 export type { PlanModeState };
 
 export function setTodos(threadId: string, items: TodoItem[]) {
-  stores.set(threadId, { items, planModeState: null });
+  const prev = getStore(threadId);
+  if (prev.items === items && prev.planModeState === null) return;
+  stores.set(threadId, { ...prev, items });
   emit(threadId);
 }
 
 export function setPlanModeState(threadId: string, planModeState: PlanModeState | null) {
   const prev = getStore(threadId);
+  if (prev.planModeState === planModeState) return;
   stores.set(threadId, { ...prev, planModeState });
   emit(threadId);
 }
 
-export function applyView(threadId: string, view: { agents: Record<string, TodoItem[]>; planModeState: any }) {
+export function applyView(
+  threadId: string,
+  view: { agents: Record<string, TodoItem[]>; planModeState: PlanModeState | null }
+) {
+  const prev = getStore(threadId);
   const items = Object.values(view.agents).flat();
-  stores.set(threadId, {
-    items,
-    planModeState: view.planModeState || null,
-  });
+  const planModeState = view.planModeState ?? null;
+  // Quick path: skip emit if counts and plan state haven't changed.
+  if (prev.items.length === items.length && prev.planModeState === planModeState) {
+    return;
+  }
+  stores.set(threadId, { items, planModeState });
   emit(threadId);
 }
 
@@ -69,7 +78,10 @@ export function useTodos(threadId: string): TodoState {
     (cb) => {
       if (!listeners.has(threadId)) listeners.set(threadId, new Set());
       listeners.get(threadId)!.add(cb);
-      return () => listeners.get(threadId)!.delete(cb);
+      return () => {
+        const set = listeners.get(threadId);
+        if (set) set.delete(cb);
+      };
     },
     () => getStore(threadId),
     () => getStore(threadId),

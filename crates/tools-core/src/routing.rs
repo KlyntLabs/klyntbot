@@ -179,8 +179,16 @@ impl RoutingContext {
 }
 
 impl bus::InjectorContext for RoutingContext {
-    fn thread_id(&self) -> &str { self.chat_id.as_str() }
-    fn agent_id(&self) -> &str { &self.agent_id }
-    fn plan_mode_active(&self) -> bool { self.plan_mode_active }
-    fn plan_session_id(&self) -> Option<&str> { self.plan_session_id.as_deref() }
+    fn thread_id(&self) -> &str {
+        self.chat_id.as_str()
+    }
+    fn agent_id(&self) -> &str {
+        &self.agent_id
+    }
+    fn plan_mode_active(&self) -> bool {
+        self.plan_mode_active
+    }
+    fn plan_session_id(&self) -> Option<&str> {
+        self.plan_session_id.as_deref()
+    }
 }

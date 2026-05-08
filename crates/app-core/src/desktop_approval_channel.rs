@@ -58,12 +58,19 @@ impl DesktopApprovalChannel {
     /// Wake the awaiting `request()` future for `request_id` with `decision`.
     /// Returns NotFound if no pending entry exists (timed out, cancelled, or
     /// already resolved).
-    pub fn resolve(&self, request_id: &str, decision: ApprovalDecision) -> Result<(), ResolveError> {
+    pub fn resolve(
+        &self,
+        request_id: &str,
+        decision: ApprovalDecision,
+    ) -> Result<(), ResolveError> {
         let (_id, entry) = self
             .pending
             .remove(request_id)
             .ok_or_else(|| ResolveError::NotFound(request_id.to_string()))?;
-        entry.sender.send(decision).map_err(|_| ResolveError::SendFailed)
+        entry
+            .sender
+            .send(decision)
+            .map_err(|_| ResolveError::SendFailed)
     }
 
     /// Read-only snapshot of a pending entry (used for emitting ApprovalResolved events).

@@ -407,14 +407,20 @@ mod tests {
 
         let config: Config = serde_json::from_str(json).unwrap();
         let policy = config.tools.approval_policy;
-        assert_eq!(policy.non_ui_channels, common::tool_channel::NonUiPolicy::Allow);
+        assert_eq!(
+            policy.non_ui_channels,
+            common::tool_channel::NonUiPolicy::Allow
+        );
     }
 
     #[test]
     fn test_tools_no_permissions_defaults_to_none() {
         let config = Config::default();
         let policy = config.tools.approval_policy;
-        assert_eq!(policy.non_ui_channels, common::tool_channel::NonUiPolicy::default());
+        assert_eq!(
+            policy.non_ui_channels,
+            common::tool_channel::NonUiPolicy::default()
+        );
     }
 
     #[test]

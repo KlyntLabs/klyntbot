@@ -212,15 +212,19 @@ pub struct AppCore {
     pub tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
     /// Desktop approval channel — shared with the agent's ApprovalGate.
     /// Used by `respond_approval` to resolve pending requests.
-    pub desktop_approval_channel: Option<Arc<crate::desktop_approval_channel::DesktopApprovalChannel>>,
+    pub desktop_approval_channel:
+        Option<Arc<crate::desktop_approval_channel::DesktopApprovalChannel>>,
     /// Approval grants repo — shared with the agent's ApprovalGate.
     pub approval_grants_repo: Option<Arc<approval::ApprovalGrantsRepo>>,
     /// Per-coding-thread approval policy. PlanMode variant is set/cleared by
     /// coding_plan_enter / coding_plan_cancel / coding_plan_ratify.
-    pub coding_policies: Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
+    pub coding_policies:
+        Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
     /// Snapshot of items at the moment plan mode was entered, used to compute
     /// ratify counts. Keyed by plan_session_id. In-memory only.
     pub plan_snapshots: Arc<dashmap::DashMap<String, Vec<feature_coding_todo::types::TodoItem>>>,
+    /// Shared context update queue for injecting one-shot reminders into the agent loop.
+    pub context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
 }
 
 /// State for an active thread subscription.
@@ -588,14 +592,12 @@ impl AppCore {
         request_id: &str,
         decision: crate::coding::approval_handler::AppApprovalDecision,
     ) -> common::Result<()> {
-        let channel = self
-            .desktop_approval_channel
-            .as_ref()
-            .ok_or_else(|| common::KlyntbotError::NotImplemented("desktop approval channel not initialized".into()))?;
-        let grants_repo = self
-            .approval_grants_repo
-            .as_ref()
-            .ok_or_else(|| common::KlyntbotError::NotImplemented("approval grants repo not initialized".into()))?;
+        let channel = self.desktop_approval_channel.as_ref().ok_or_else(|| {
+            common::KlyntbotError::NotImplemented("desktop approval channel not initialized".into())
+        })?;
+        let grants_repo = self.approval_grants_repo.as_ref().ok_or_else(|| {
+            common::KlyntbotError::NotImplemented("approval grants repo not initialized".into())
+        })?;
         crate::coding::approval_handler::respond_approval(
             channel.clone(),
             grants_repo.clone(),

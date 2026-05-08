@@ -1,7 +1,7 @@
 //! Diff prior vs new item lists to produce events.
 
-use bus::domain_events::TodoEvent;
 use crate::types::{TodoItemInput, TodoStatus};
+use bus::domain_events::TodoEvent;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiffSummary {
@@ -191,7 +191,10 @@ mod tests {
 
     #[test]
     fn dropped_item_is_cancelled() {
-        let prior = vec![it("a", TodoStatus::Pending), it("b", TodoStatus::InProgress)];
+        let prior = vec![
+            it("a", TodoStatus::Pending),
+            it("b", TodoStatus::InProgress),
+        ];
         let new = vec![it("a", TodoStatus::Pending)];
         let d = compute_diff(&prior, &new);
         assert_eq!(d.cancelled.len(), 1);
@@ -244,7 +247,11 @@ mod tests {
         let evts = diff_to_events(&diff, &new, &meta);
         assert_eq!(evts.len(), 1);
         match &evts[0] {
-            TodoEvent::Cancelled { item_id, prior_status, .. } => {
+            TodoEvent::Cancelled {
+                item_id,
+                prior_status,
+                ..
+            } => {
                 assert_eq!(item_id, "a");
                 assert_eq!(*prior_status, TodoStatus::InProgress);
             }
