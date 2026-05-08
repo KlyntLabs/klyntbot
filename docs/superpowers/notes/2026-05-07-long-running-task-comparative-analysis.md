@@ -817,6 +817,34 @@ After this analysis was first written, deeper reading of the existing codebase r
 
 ---
 
+## Update 2026-05-08 — Phase 2.1 (TodoWrite) shipped
+
+| Item | Status | Notes |
+|---|---|---|
+| 2.1 TodoWrite | ✅ **Done** | Commit `4de92d1ab feat: per-agent coding todo lists with concurrency validation, mirror integration, and frontend UI`. Spec: `specs/2026-05-07-coding-todowrite-design.md`. Per-agent rows, ≤1 InProgress invariant, `Safe`/`Sequential`/`Exclusive` concurrency classes, `blocked_by` graph + cycle detection, diff-based `TodoCancelled` events, `TodoSignalSource` (7th mirror source), 5 React components (sidebar badge, inline card, status bar, panel, plan-mode banner), anti-abuse prose in `KLYNTBOT-coding.md`. Plan-mode hooks stubbed to `Default` policy pending 2.2. |
+| 0.3 Mid-stream cancel + approval-cancel leak | 🚧 Still in flight | Independent workstream. |
+| Phase 1 KlyntTracingProvider | 🚧 Still in flight | Independent workstream. Wire-log surface for TodoEvents lights up automatically when this lands. |
+
+### Next move: **Phase 2.2 — Plan mode** (~3–4 days)
+
+TodoWrite spec §8 already defines the integration; landing 2.2 unhides the plan-mode affordances (forced-pending status, `proposed_in_plan_session` row tag, `PlanModeBanner` UI, `coding_plan_ratify` / `coding_plan_user_edit` Tauri commands).
+
+**Implementation outline:**
+1. Add `CodingApprovalPolicy::PlanMode { plan_session_id, plan_file_slug }` variant in `crates/approval/src/lib.rs`.
+2. Hook `interceptor_chain` in `execution/core.rs`: while `PlanMode` active, restrict `Edit`/`Write` to `plan_file_slug.md`; reject other write tools with `<system-reminder>` injection.
+3. `EnterPlanMode` / `ExitPlanMode` tools (or slash command `/plan` — pick one; spec leaves both flows valid).
+4. Dynamic-injection scaffold (à la kimi-cli's `dynamic_injection.py`) — prepends a `<system-reminder>` user message during plan mode. **Reusable for 2.4 hooks.**
+5. `coding_plan_ratify` Tauri command: strips `proposed_in_plan_session`, transitions policy to `Default`, emits `TodoPlanRatified`.
+6. Unhide `PlanModeBanner` and the sidebar edit/remove affordances (already coded as part of 2.1, currently dead).
+
+**After 2.2:**
+- **2.5 /btw side-question** (~1–2 days). Small, self-contained, pleasant demo. `DenyAllToolset` + cache-hit single iteration, no context mutation.
+- **2.3 background bash** (~1 week) OR **2.4 hooks** (~3 days) — pick by user priority. Background bash unlocks long compile/test loops; hooks need careful sandbox + interceptor-chain integration but reuses the dynamic-injection scaffold from 2.2.
+
+**Rationale for 2.2 next over 2.5:** plan mode's value compounds with the TodoWrite system that just shipped (the model uses todos *inside* a plan, and the user ratifies the plan). Shipping 2.2 immediately is the highest-leverage single move now that 2.1 is in.
+
+---
+
 ## Appendix A — Original agent reports
 
 The three deep-dive reports (Klynt internal, kimi-cli, opencode) generated 2026-05-07 are the source-of-truth for the analysis above. They contain file:line citations and verbatim quotes that this synthesis condenses. If discrepancies arise, the agent reports take precedence — they were ground-truth at the time of writing.
