@@ -13,7 +13,8 @@ pub mod typed_broker;
 
 pub use context_updates::{ContextUpdate, ContextUpdateQueue, ContextUpdateReason, UpdatePriority};
 pub use domain_events::{
-    CodingMemoryKind, CorrectionKind, DomainEvent, DomainEventBus, FeedbackResponse,
+    BashJobEvent, CodingMemoryKind, ConcurrencyClass, CorrectionKind, DomainEvent,
+    DomainEventBus, FeedbackResponse, TodoEvent, TodoStatus,
 };
 pub use event_domain::EventDomain;
 pub use events::{InboundMessage, MessageKind, OutboundMessage};

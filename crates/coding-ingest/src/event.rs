@@ -325,4 +325,77 @@ pub enum EventKind {
         /// Files changed in this commit (relative to `repo_root`).
         changed_files: Vec<PathBuf>,
     },
+
+    /// Background bash job lifecycle event (Phase 2.3a).
+    /// Klynt-only: this kind never appears in claude-code/codex/kimi/opencode streams.
+    BackgroundJobLifecycle {
+        /// Stable job id.
+        job_id: String,
+        /// Lifecycle phase.
+        phase: BackgroundJobPhase,
+        /// Exit code when terminal.
+        exit_code: Option<i32>,
+        /// Failure kind classification when terminal.
+        failure_kind: Option<String>,
+        /// Human-readable gate summary.
+        gate_summary: Option<String>,
+    },
+
+    /// Emitted when a job's ring-buffer output file is bisected due to overflow.
+    BackgroundJobOutputBisect {
+        /// Stable job id.
+        job_id: String,
+        /// Monotonic bisect generation counter.
+        bisect_gen: u64,
+        /// Bytes dropped from the middle.
+        dropped_bytes: u64,
+    },
+}
+
+/// Phase of a background bash job lifecycle.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BackgroundJobPhase {
+    /// Job started.
+    Started,
+    /// Job was explicitly stopped.
+    Stopped,
+    /// Job finished successfully.
+    Completed,
+    /// Job finished with a non-zero exit code.
+    Failed,
+    /// Job was lost due to klynt restart.
+    Lost,
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn background_job_lifecycle_round_trips() {
+        let kind = EventKind::BackgroundJobLifecycle {
+            job_id: "bash-aB3kF7c2qR".into(),
+            phase: BackgroundJobPhase::Completed,
+            exit_code: Some(0),
+            failure_kind: None,
+            gate_summary: None,
+        };
+        let s = serde_json::to_string(&kind).unwrap();
+        let back: EventKind = serde_json::from_str(&s).unwrap();
+        assert_eq!(kind, back);
+    }
+
+    #[test]
+    fn background_job_output_bisect_round_trips() {
+        let kind = EventKind::BackgroundJobOutputBisect {
+            job_id: "bash-aB3kF7c2qR".into(),
+            bisect_gen: 1,
+            dropped_bytes: 1_500_000,
+        };
+        let s = serde_json::to_string(&kind).unwrap();
+        let back: EventKind = serde_json::from_str(&s).unwrap();
+        assert_eq!(kind, back);
+    }
 }

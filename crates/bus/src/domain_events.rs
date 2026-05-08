@@ -43,6 +43,45 @@ pub enum ConcurrencyClass {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+pub enum BashJobEvent {
+    Started {
+        job_id: String,
+        thread_id: String,
+        agent_id: String,
+        command: String,
+        description: String,
+        started_at: jiff::Timestamp,
+    },
+    Completed {
+        job_id: String,
+        thread_id: String,
+        agent_id: String,
+        exit_code: i32,
+        duration_ms: u64,
+    },
+    Failed {
+        job_id: String,
+        thread_id: String,
+        agent_id: String,
+        exit_code: Option<i32>,
+        failure_kind: String,
+        failure_detail: String,
+    },
+    Cancelled {
+        job_id: String,
+        thread_id: String,
+        agent_id: String,
+        reason: String,
+    },
+    Lost {
+        job_id: String,
+        thread_id: String,
+        agent_id: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TodoEvent {
     StateChanged {
         thread_id: String,
@@ -711,6 +750,7 @@ pub enum DomainEvent {
     },
 
     Todo(TodoEvent),
+    BashJob(BashJobEvent),
 }
 
 impl DomainEvent {
@@ -817,6 +857,13 @@ impl DomainEvent {
             Self::DataVersionBumped { .. } => Self::KIND_DATA_VERSION_BUMPED,
             Self::Generic { .. } => "Generic",
             Self::Todo(_) => "Todo",
+            Self::BashJob(inner) => match inner {
+                BashJobEvent::Started { .. } => "BashJob.Started",
+                BashJobEvent::Completed { .. } => "BashJob.Completed",
+                BashJobEvent::Failed { .. } => "BashJob.Failed",
+                BashJobEvent::Cancelled { .. } => "BashJob.Cancelled",
+                BashJobEvent::Lost { .. } => "BashJob.Lost",
+            },
         }
     }
 
@@ -972,6 +1019,12 @@ impl DomainEvent {
     /// `event_type` value for [`DomainEvent::DataVersionBumped`].
     pub const KIND_DATA_VERSION_BUMPED: &'static str = "DataVersionBumped";
 
+    pub const KIND_BASH_JOB_STARTED: &str = "BashJob.Started";
+    pub const KIND_BASH_JOB_COMPLETED: &str = "BashJob.Completed";
+    pub const KIND_BASH_JOB_FAILED: &str = "BashJob.Failed";
+    pub const KIND_BASH_JOB_CANCELLED: &str = "BashJob.Cancelled";
+    pub const KIND_BASH_JOB_LOST: &str = "BashJob.Lost";
+
     /// Map this event to its domain category.
     ///
     /// Used by the cognitive pipeline, debug dashboard, and SSE streams.
@@ -1092,6 +1145,7 @@ impl DomainEvent {
             Self::Generic { .. } => D::General,
 
             Self::Todo(_) => D::CodingMemory,
+            Self::BashJob(_) => D::CodingMemory,
         }
     }
 }
@@ -1138,6 +1192,10 @@ impl DomainEventBus {
 
     pub fn publish_todo(&self, event: TodoEvent) {
         self.publish(DomainEvent::Todo(event));
+    }
+
+    pub fn publish_bash_job(&self, event: BashJobEvent) {
+        self.publish(DomainEvent::BashJob(event));
     }
 
     /// Number of active subscribers.
@@ -1425,6 +1483,20 @@ mod tests {
             DomainEvent::Todo(e) => assert_eq!(e, evt),
             _ => panic!("wrong variant"),
         }
+    }
+
+    #[test]
+    fn bash_job_started_variant_name() {
+        let evt = DomainEvent::BashJob(BashJobEvent::Started {
+            job_id: "bash-aB3kF7c2qR".into(),
+            thread_id: "session-1".into(),
+            agent_id: "root".into(),
+            command: "cargo test".into(),
+            description: "run tests".into(),
+            started_at: jiff::Timestamp::now(),
+        });
+        assert_eq!(evt.variant_name(), "BashJob.Started");
+        assert_eq!(evt.domain(), crate::EventDomain::CodingMemory);
     }
 
     #[allow(dead_code)]
