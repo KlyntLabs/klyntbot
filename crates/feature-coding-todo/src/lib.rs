@@ -11,6 +11,7 @@ pub mod plan_mode;
 pub mod render;
 pub mod tool;
 pub mod types;
+pub mod util;
 pub mod validation;
 
 pub use events::CodingTodoEvent;
