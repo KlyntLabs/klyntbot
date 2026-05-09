@@ -20,6 +20,7 @@ use scheduling::temporal::cron_executor::CronExecutor;
 use storage::{repos::cron::CronRepo, Repos, StoragePool, VectorStore};
 use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
+use tools_core::JobSupervisorHandle;
 use tracing::{error, info};
 use voice_engine::VoiceService;
 
@@ -225,6 +226,8 @@ pub struct AppCore {
     pub plan_snapshots: Arc<dashmap::DashMap<String, Vec<feature_coding_todo::types::TodoItem>>>,
     /// Shared context update queue for injecting one-shot reminders into the agent loop.
     pub context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
+    /// Background bash job supervisor — stores live jobs + reconciles on startup.
+    pub job_supervisor: Option<Arc<feature_coding_bash::JobSupervisor>>,
 }
 
 /// State for an active thread subscription.
@@ -806,6 +809,83 @@ impl AppCore {
     pub async fn connect_workspace(&self, id: String) -> common::Result<()> {
         self.repos.workspaces.set_connected(&id, true).await?;
         Ok(())
+    }
+
+    // ── Background bash jobs (coding background tasks) ─────────────────
+
+    fn require_supervisor(&self) -> Result<&Arc<feature_coding_bash::JobSupervisor>, ApiError> {
+        self.job_supervisor.as_ref().ok_or_else(|| {
+            ApiError::new("FEATURE_DISABLED", "background bash jobs not initialized")
+        })
+    }
+
+    fn parse_job_id(job_id: &str) -> Result<tools_core::JobId, ApiError> {
+        tools_core::JobId::from_str(job_id)
+            .map_err(|e| ApiError::new("INVALID_JOB_ID", e.to_string()))
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_job_list(
+        &self,
+        thread_id: &str,
+        active_only: bool,
+    ) -> Result<Vec<feature_coding_bash::BashJobView>, ApiError> {
+        let views = self.require_supervisor()?.list_for_thread(thread_id, active_only).await;
+        Ok(views.into_iter().map(feature_coding_bash::BashJobView::from_job_view).collect())
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_job_output(
+        &self,
+        job_id: &str,
+        since: u64,
+    ) -> Result<JobOutputView, ApiError> {
+        let id = Self::parse_job_id(job_id)?;
+        let read = self
+            .require_supervisor()?
+            .output_delta(&id, since, false, 0)
+            .await
+            .map_err(|e| ApiError::new("JOB_ERROR", e.to_string()))?;
+        Ok(JobOutputView::from(read))
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_job_stop(&self, job_id: &str) -> Result<feature_coding_bash::BashJobView, ApiError> {
+        let id = Self::parse_job_id(job_id)?;
+        let view = self
+            .require_supervisor()?
+            .stop(&id, "user requested")
+            .await
+            .map_err(|e| ApiError::new("JOB_ERROR", e.to_string()))?;
+        Ok(feature_coding_bash::BashJobView::from_job_view(view))
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub fn coding_job_log_path(&self, job_id: &str) -> Result<std::path::PathBuf, ApiError> {
+        let id = Self::parse_job_id(job_id)?;
+        Ok(self.require_supervisor()?.log_path(&id))
+    }
+}
+
+#[derive(serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct JobOutputView {
+    pub bytes: String,
+    pub new_offset: u64,
+    pub bisect_generation: u64,
+    pub bisect_occurred_since: bool,
+    pub total_bytes_emitted: u64,
+}
+
+impl From<tools_core::RingRead> for JobOutputView {
+    fn from(read: tools_core::RingRead) -> Self {
+        Self {
+            bytes: String::from_utf8_lossy(&read.bytes).into_owned(),
+            new_offset: read.new_offset,
+            bisect_generation: read.bisect_generation,
+            bisect_occurred_since: read.bisect_occurred_since,
+            total_bytes_emitted: read.total_bytes_emitted,
+        }
     }
 }
 

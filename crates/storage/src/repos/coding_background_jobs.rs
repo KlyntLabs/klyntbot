@@ -188,6 +188,28 @@ impl BashJobRepo {
         rows.iter().map(Self::map_row).collect()
     }
 
+    pub async fn list_all_for_session(
+        &self,
+        session_id: &str,
+        active_only: bool,
+    ) -> Result<Vec<BashJobRow>, StorageError> {
+        let mut qb = sqlx::QueryBuilder::new(
+            "SELECT id, session_id, agent_id, description, command, cwd, \
+             timeout_ms, silent_completion, status, exit_code, \
+             failure_kind, failure_detail, failure_extracted, \
+             started_at, finished_at, total_bytes_emitted, bisect_count, \
+             log_path, final_path, last_polled_at, last_seen_offset \
+             FROM coding_background_jobs WHERE session_id = ",
+        );
+        qb.push_bind(session_id);
+        if active_only {
+            qb.push(" AND status IN ('Starting','Running')");
+        }
+        qb.push(" ORDER BY started_at DESC LIMIT 20");
+        let rows = qb.build().fetch_all(&self.pool).await?;
+        rows.iter().map(Self::map_row).collect()
+    }
+
     pub async fn count_active_for_chain(
         &self,
         session_id: &str,

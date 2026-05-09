@@ -120,7 +120,7 @@ impl JobSupervisor {
         self.data_dir.join("jobs")
     }
 
-    fn log_path(&self, id: &JobId) -> PathBuf {
+    pub fn log_path(&self, id: &JobId) -> PathBuf {
         self.jobs_dir().join(format!("{}.log", id.as_str()))
     }
     fn final_path(&self, id: &JobId) -> PathBuf {
@@ -141,6 +141,26 @@ impl JobSupervisor {
             }
         }
         Ok(n)
+    }
+
+    pub async fn list_for_thread(
+        &self,
+        session_id: &str,
+        active_only: bool,
+    ) -> Vec<JobView> {
+        let rows = match self.repo.list_all_for_session(session_id, active_only).await {
+            Ok(rows) => rows,
+            Err(e) => {
+                tracing::warn!(session_id, "list_all_for_session failed: {e}");
+                return vec![];
+            }
+        };
+        rows.into_iter().map(view_from_row).collect()
+    }
+
+    /// Borrow the underlying repo (cheap clone — wraps an Arc<Pool>).
+    pub fn repo(&self) -> &BashJobRepo {
+        &self.repo
     }
 
     pub async fn reconcile_on_startup(&self) -> Result<usize, JobError> {

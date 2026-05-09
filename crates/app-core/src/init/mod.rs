@@ -164,8 +164,29 @@ impl AppCore {
         let plan_mode_injector = Arc::new(feature_coding_todo::PlanModeInjector::new(Arc::clone(
             &coding_policies,
         )));
-        let injector_registry =
-            bus::InjectorRegistry::new(vec![plan_mode_injector as Arc<dyn bus::DynamicInjector>]);
+
+        // ── Background bash job supervisor (coding background tasks) ─────
+        let bash_job_repo = ::storage::BashJobRepo::new(storage_pool.inner().clone());
+        let job_supervisor = Arc::new(feature_coding_bash::JobSupervisor::new(
+            bash_job_repo,
+            Arc::clone(&domain_event_bus),
+            Arc::clone(&context_update_queue),
+            config.data_dir_path(),
+            Arc::new(klynt_sandbox::MacOsSeatbeltRunner::new()),
+        ));
+        match job_supervisor.reconcile_on_startup().await {
+            Ok(n) if n > 0 => tracing::info!(count = n, "background jobs reconciled on startup"),
+            Ok(_) => {}
+            Err(e) => tracing::warn!("background job startup reconciliation failed: {e}"),
+        }
+        let job_supervisor_for_agent: tools_core::DynJobSupervisor = job_supervisor.clone();
+        let background_jobs_injector = Arc::new(feature_coding_bash::BackgroundJobsInjector::new(
+            Arc::clone(&job_supervisor),
+        ));
+        let injector_registry = bus::InjectorRegistry::new(vec![
+            plan_mode_injector as Arc<dyn bus::DynamicInjector>,
+            background_jobs_injector as Arc<dyn bus::DynamicInjector>,
+        ]);
 
         // ── Startup recovery — DND crash safety net ──────────────────────
         if let Ok(Some(dnd_row)) = repos.dnd_override.get().await {
@@ -369,6 +390,7 @@ impl AppCore {
             Some(desktop_approval_channel.clone() as Arc<dyn approval::ApprovalChannel>),
             Some(Arc::clone(&coding_policies)),
             Some(injector_registry.clone()),
+            Some(job_supervisor_for_agent),
         )
         .await?;
 
@@ -1320,6 +1342,7 @@ impl AppCore {
             coding_policies: Arc::clone(&coding_policies),
             plan_snapshots: Arc::new(dashmap::DashMap::new()),
             context_update_queue: Some(Arc::clone(&context_update_queue)),
+            job_supervisor: Some(job_supervisor),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────
@@ -2043,6 +2066,26 @@ impl AppCore {
             let mut registry = reg.write().await;
             registry.register(tools::TemporalTool::new(temporal_service));
             info!("Temporal tool registered");
+        }
+
+        // ── Register CodingBashFeature tools in agent's tool registry (post-init) ─
+        if let Some(ref supervisor) = core.job_supervisor {
+            use tools_core::FeaturePackage;
+            let reg = core.agent.tool_registry();
+            let mut registry = reg.write().await;
+            let event_bus = core
+                .domain_event_bus
+                .clone()
+                .expect("domain_event_bus initialized before tool registration");
+            let bash_feature = feature_coding_bash::CodingBashFeature::new(
+                Arc::clone(supervisor),
+                supervisor.repo().clone(),
+                event_bus,
+            );
+            for tool in bash_feature.tools() {
+                registry.register_dyn(tool);
+            }
+            info!("Coding bash tools registered");
         }
 
         // ── Background note embedding catch-up ────────────────────────────
