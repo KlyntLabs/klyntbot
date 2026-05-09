@@ -14,6 +14,7 @@ pub mod tools;
 pub mod view;
 
 pub use injector::BackgroundJobsInjector;
+pub use intelligence::ExecutionIntelligenceInjector;
 pub use supervisor::JobSupervisor;
 pub use view::{BashJobView, BashJobsPanelView};
 

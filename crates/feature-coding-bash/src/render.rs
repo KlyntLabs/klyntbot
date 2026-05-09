@@ -141,6 +141,49 @@ fn format_elapsed_delta(ms: i64) -> String {
     }
 }
 
+use crate::intelligence::VerificationVerb;
+
+pub struct VerificationAffordance<'a> {
+    pub todo_id: &'a str,
+    pub title:   &'a str,
+    pub verb:    VerificationVerb,
+}
+
+pub fn verification_affordance_reminder(items: &[VerificationAffordance<'_>]) -> String {
+    let mut s = String::new();
+    s.push_str("<system-reminder>\n");
+    s.push_str("Plan mode active — the following pending TodoItems look like background-bash candidates after `/plan-exit`:\n");
+    for item in items {
+        s.push_str(&format!(
+            "- \"{title}\" → bash(command=…, run_in_background=true) [verb: {verb}]\n",
+            title = item.title,
+            verb = item.verb.as_str(),
+        ));
+    }
+    s.push_str("Background jobs cannot be spawned while plan mode is active. After ratification, you may launch these as background jobs.\n");
+    s.push_str("</system-reminder>\n");
+    s
+}
+
+#[cfg(test)]
+mod verification_affordance_tests {
+    use super::*;
+
+    #[test]
+    fn renders_each_item() {
+        let items = [
+            VerificationAffordance { todo_id: "t1", title: "Run integration tests", verb: VerificationVerb::Run },
+            VerificationAffordance { todo_id: "t2", title: "Verify migration safety", verb: VerificationVerb::Verify },
+        ];
+        let body = verification_affordance_reminder(&items);
+        assert!(body.contains("Plan mode active"));
+        assert!(body.contains("Run integration tests"));
+        assert!(body.contains("[verb: Run]"));
+        assert!(body.contains("Verify migration safety"));
+        assert!(body.contains("[verb: Verify]"));
+    }
+}
+
 /// Format byte count into human-readable string (e.g. "1.5 MB").
 pub fn human_bytes(n: u64) -> String {
     if n < 1024 {
