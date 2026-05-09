@@ -18,9 +18,10 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct JobId(pub String);
 
+const JOB_ID_ALPHABET: &[u8] = b"0123456789abcdefghjkmnpqrstvwxyz";
+
 impl JobId {
     pub fn new() -> Self {
-        const ALPHABET: &[u8] = b"0123456789abcdefghjkmnpqrstvwxyz";
         let mut bytes = [0u8; 7];
         rand::rng().fill(&mut bytes);
         let mut bits = 0u64;
@@ -28,26 +29,26 @@ impl JobId {
             bits = (bits << 8) | (*b as u64);
         }
         let mut buf = [0u8; 10];
-        for i in 0..10 {
+        for (i, slot) in buf.iter_mut().enumerate() {
             let shift = 51 - i * 5;
             let idx = ((bits >> shift) & 0x1f) as usize;
-            buf[i] = ALPHABET[idx];
+            *slot = JOB_ID_ALPHABET[idx];
         }
-        Self(format!("bash-{}", String::from_utf8(buf.to_vec()).unwrap()))
+        Self(format!("bash-{}", std::str::from_utf8(&buf).unwrap()))
     }
 
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: impl Into<String>) -> Result<Self, JobError> {
         let s: String = s.into();
         if !s.starts_with("bash-") || s.len() != "bash-".len() + 10 {
             return Err(JobError::InvalidJobId(s));
         }
         let suffix = &s["bash-".len()..];
-        const ALPHABET: &[u8] = b"0123456789abcdefghjkmnpqrstvwxyz";
-        if !suffix.bytes().all(|b| ALPHABET.contains(&b)) {
+        if !suffix.bytes().all(|b| JOB_ID_ALPHABET.contains(&b)) {
             return Err(JobError::InvalidJobId(s));
         }
         Ok(Self(s))
@@ -81,6 +82,18 @@ impl JobStatus {
             Self::Cancelled => "Cancelled",
             Self::Lost => "Lost",
         }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "Starting" => Self::Starting,
+            "Running" => Self::Running,
+            "Completed" => Self::Completed,
+            "Failed" => Self::Failed,
+            "Cancelled" => Self::Cancelled,
+            "Lost" => Self::Lost,
+            _ => return None,
+        })
     }
 
     pub fn is_terminal(self) -> bool {
@@ -133,6 +146,7 @@ pub enum GateResult {
 pub struct JobSpec {
     pub session_id: String,
     pub agent_id: String,
+    pub agent_chain: Vec<String>,
     pub description: String,
     pub command: String,
     pub cwd: PathBuf,

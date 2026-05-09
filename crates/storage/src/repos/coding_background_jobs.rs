@@ -228,6 +228,14 @@ impl BashJobRepo {
         rows.iter().map(Self::map_row).collect()
     }
 
+    pub async fn delete(&self, id: &str) -> Result<(), StorageError> {
+        sqlx::query("DELETE FROM coding_background_jobs WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     fn map_row(row: &sqlx::sqlite::SqliteRow) -> Result<BashJobRow, StorageError> {
         use sqlx::Row;
         let started_at: String = row.try_get("started_at")?;

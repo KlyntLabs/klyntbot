@@ -111,6 +111,12 @@ pub struct RoutingContext {
     pub previous_anti_passivity_violation: bool,
     /// True if a user-facing assistant message was emitted in the current turn.
     pub same_turn_user_msg_emitted: bool,
+    /// Phase 2.3a — workspace root for cwd resolution.
+    pub workspace_cwd: Option<std::path::PathBuf>,
+    /// Phase 2.3a — agent delegation chain (root → … → self).
+    pub agent_chain: Vec<String>,
+    /// Phase 2.3a — background job supervisor handle.
+    pub job_supervisor: Option<crate::DynJobSupervisor>,
 }
 
 impl RoutingContext {
@@ -143,6 +149,9 @@ impl RoutingContext {
             plan_session_id: None,
             previous_anti_passivity_violation: false,
             same_turn_user_msg_emitted: false,
+            workspace_cwd: None,
+            agent_chain: vec!["root".into()],
+            job_supervisor: None,
         }
     }
 
@@ -174,6 +183,9 @@ impl RoutingContext {
             plan_session_id: None,
             previous_anti_passivity_violation: false,
             same_turn_user_msg_emitted: false,
+            workspace_cwd: None,
+            agent_chain: vec!["root".into()],
+            job_supervisor: None,
         }
     }
 }
@@ -190,5 +202,8 @@ impl bus::InjectorContext for RoutingContext {
     }
     fn plan_session_id(&self) -> Option<&str> {
         self.plan_session_id.as_deref()
+    }
+    fn agent_chain(&self) -> &[String] {
+        &self.agent_chain
     }
 }

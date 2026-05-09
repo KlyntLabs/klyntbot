@@ -4,7 +4,7 @@ use crate::runner::{CommandOutput, SandboxRunner};
 use async_trait::async_trait;
 use std::path::Path;
 use std::time::Duration;
-use tokio::process::Command;
+
 
 const TEMPLATE: &str = include_str!("seatbelt_template.sbpl");
 
@@ -44,6 +44,22 @@ impl MacOsSeatbeltRunner {
             .replace("{{EXTRA_WRITES}}", &extra)
             .replace("{{NETWORK}}", &net))
     }
+
+    /// Build a fully-configured Command (sandbox-exec wrapper) without spawning.
+    /// Used by both run_command (foreground) and feature-coding-bash (background).
+    /// Caller is responsible for setting cwd, stdin, stdout, stderr, env, pre_exec.
+    pub fn build_sandboxed_command(
+        &self,
+        policy: &SandboxPolicy,
+        program: &str,
+        args: &[&str],
+    ) -> Result<tokio::process::Command, SandboxError> {
+        let policy_str = Self::render_policy(policy)?;
+        let mut cmd = tokio::process::Command::new("/usr/bin/sandbox-exec");
+        cmd.arg("-p").arg(&policy_str);
+        cmd.arg(program).args(args);
+        Ok(cmd)
+    }
 }
 
 #[async_trait]
@@ -56,10 +72,7 @@ impl SandboxRunner for MacOsSeatbeltRunner {
         cwd: Option<&Path>,
         timeout: Duration,
     ) -> Result<CommandOutput, SandboxError> {
-        let policy_str = Self::render_policy(policy)?;
-        let mut cmd = Command::new("/usr/bin/sandbox-exec");
-        cmd.arg("-p").arg(&policy_str);
-        cmd.arg(program).args(args);
+        let mut cmd = self.build_sandboxed_command(policy, program, args)?;
         if let Some(d) = cwd {
             cmd.current_dir(d);
         }
