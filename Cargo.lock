@@ -80,6 +80,7 @@ dependencies = [
  "dashmap",
  "feature-alarms",
  "feature-coaching",
+ "feature-coding-bash",
  "feature-finance",
  "feature-language-learning",
  "feature-notes",
@@ -404,6 +405,7 @@ dependencies = [
  "desktop-shared",
  "dirs",
  "feature-coaching",
+ "feature-coding-bash",
  "feature-coding-todo",
  "feature-finance",
  "feature-focus",
@@ -421,6 +423,7 @@ dependencies = [
  "klynt-execpolicy",
  "klynt-git-utils",
  "klynt-hooks",
+ "klynt-sandbox",
  "klynt-skill-loader",
  "notifications",
  "notify",
@@ -4533,6 +4536,7 @@ dependencies = [
  "dashmap",
  "desktop-macros",
  "desktop-shared",
+ "feature-coding-bash",
  "feature-coding-todo",
  "feature-focus",
  "feature-launcher",
@@ -5367,6 +5371,36 @@ dependencies = [
  "tools-core",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "feature-coding-bash"
+version = "0.1.1"
+dependencies = [
+ "approval",
+ "async-trait",
+ "bus",
+ "common",
+ "config",
+ "dashmap",
+ "jiff",
+ "klynt-pty",
+ "klynt-sandbox",
+ "libc",
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_json",
+ "specta",
+ "sqlx",
+ "storage",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tools-core",
+ "tools-core-macros",
+ "tracing",
 ]
 
 [[package]]
@@ -8185,6 +8219,17 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "klynt-pty"
+version = "0.1.1"
+dependencies = [
+ "async-trait",
+ "libc",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -15991,11 +16036,14 @@ dependencies = [
  "async-trait",
  "bus",
  "common",
+ "jiff",
  "klynt-hooks",
+ "rand 0.9.4",
  "regex",
  "serde",
  "serde_json",
  "specta",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-util",
  "tools-core-macros",

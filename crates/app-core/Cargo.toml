@@ -10,6 +10,7 @@ desktop-shared = { workspace = true }
 klynt-core = { workspace = true }
 klynt-execpolicy = { workspace = true }
 klynt-hooks = { workspace = true }
+klynt-sandbox = { workspace = true }
 klynt-skill-loader = { path = "../klynt-skill-loader" }
 agent = { workspace = true }
 autotuner = { workspace = true }
@@ -24,6 +25,7 @@ common = { workspace = true }
 config = { workspace = true }
 context_engine = { workspace = true }
 feature-coaching = { workspace = true }
+feature-coding-bash = { path = "../feature-coding-bash" }
 feature-coding-todo = { workspace = true }
 feature-finance = { workspace = true }
 feature-focus = { path = "../feature-focus" }

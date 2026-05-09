@@ -25,6 +25,15 @@ pub trait InjectorContext: Send + Sync {
     fn agent_id(&self) -> &str;
     fn plan_mode_active(&self) -> bool;
     fn plan_session_id(&self) -> Option<&str>;
+
+    /// Agent chain root → … → self. Last element == agent_id() when non-empty.
+    /// Default impl returns an empty slice for backward compatibility.
+    fn agent_chain(&self) -> &[String] {
+        // Default fallback: callers without a chain will get an empty slice and
+        // the `BackgroundJobsInjector` will degrade to "no jobs visible".
+        // Concrete impls (RoutingContext) override this.
+        &[]
+    }
 }
 
 /// Holds the set of registered injectors. Cheap to clone (Arc-wrapped Vec).

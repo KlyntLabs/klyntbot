@@ -1,7 +1,7 @@
 import { commands } from "@/bindings";
-import type { CodingTodoView, PlanModeView, TodoItem } from "@/bindings";
+import type { BashJobView, BashJobsPanelView, CodingTodoView, JobOutputView, PlanModeView, TodoItem } from "@/bindings";
 
-export type { CodingTodoView, PlanModeView, TodoItem };
+export type { BashJobView, BashJobsPanelView, CodingTodoView, JobOutputView, PlanModeView, TodoItem };
 
 export async function fetchCodingTodos(threadId: string): Promise<CodingTodoView> {
   const r = await commands.codingTodoGet(threadId);
@@ -53,4 +53,33 @@ export async function removePlanItems(
 export async function openPlanFile(path: string): Promise<void> {
   const r = await commands.codingPlanOpenFile(path);
   if (r.status !== "ok") throw new Error(r.error.message ?? "coding_plan_open_file failed");
+}
+
+// ── Background bash jobs (Phase 2.3a) ───────────────────────────────
+
+export async function fetchCodingJobs(
+  threadId: string,
+  agentChain: string[] = ["root"],
+  activeOnly = false,
+): Promise<BashJobsPanelView> {
+  const r = await commands.codingJobList(threadId, agentChain, activeOnly);
+  if (r.status !== "ok") throw new Error(r.error.message ?? "coding_job_list failed");
+  return r.data;
+}
+
+export async function fetchCodingJobOutput(jobId: string, since = 0): Promise<JobOutputView> {
+  const r = await commands.codingJobOutput(jobId, since);
+  if (r.status !== "ok") throw new Error(r.error.message ?? "coding_job_output failed");
+  return r.data;
+}
+
+export async function stopCodingJob(jobId: string): Promise<BashJobView> {
+  const r = await commands.codingJobStop(jobId);
+  if (r.status !== "ok") throw new Error(r.error.message ?? "coding_job_stop failed");
+  return r.data;
+}
+
+export async function openCodingJobLog(jobId: string): Promise<void> {
+  const r = await commands.codingJobOpenLog(jobId);
+  if (r.status !== "ok") throw new Error(r.error.message ?? "coding_job_open_log failed");
 }

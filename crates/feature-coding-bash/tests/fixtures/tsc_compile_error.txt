@@ -1,0 +1,6 @@
+src/components/Foo.tsx:23:5 - error TS2322: Type 'string' is not assignable to type 'number'.
+
+23     onClick={value}
+       ~~~~~~~
+
+Found 1 error in src/components/Foo.tsx:23

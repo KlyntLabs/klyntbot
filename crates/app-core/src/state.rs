@@ -225,6 +225,8 @@ pub struct AppCore {
     pub plan_snapshots: Arc<dashmap::DashMap<String, Vec<feature_coding_todo::types::TodoItem>>>,
     /// Shared context update queue for injecting one-shot reminders into the agent loop.
     pub context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
+    /// Background bash job supervisor — stores live jobs + reconciles on startup.
+    pub job_supervisor: Option<Arc<feature_coding_bash::JobSupervisor>>,
 }
 
 /// State for an active thread subscription.
@@ -806,6 +808,37 @@ impl AppCore {
     pub async fn connect_workspace(&self, id: String) -> common::Result<()> {
         self.repos.workspaces.set_connected(&id, true).await?;
         Ok(())
+    }
+
+    // ── Background bash jobs (coding background tasks) ─────────────────
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_job_list(
+        &self,
+        thread_id: &str,
+        agent_chain: &[String],
+        active_only: bool,
+    ) -> Result<Vec<feature_coding_bash::BashJobView>, ApiError> {
+        crate::handlers::coding_jobs::coding_jobs_list(self, thread_id, agent_chain, active_only).await
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_job_output(
+        &self,
+        job_id: &str,
+        since: u64,
+    ) -> Result<crate::handlers::coding_jobs::JobOutputView, ApiError> {
+        crate::handlers::coding_jobs::coding_jobs_output(self, job_id, since).await
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_job_stop(&self, job_id: &str) -> Result<feature_coding_bash::BashJobView, ApiError> {
+        crate::handlers::coding_jobs::coding_jobs_stop(self, job_id).await
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub fn coding_job_log_path(&self, job_id: &str) -> Result<std::path::PathBuf, ApiError> {
+        crate::handlers::coding_jobs::coding_jobs_log_path(self, job_id)
     }
 }
 

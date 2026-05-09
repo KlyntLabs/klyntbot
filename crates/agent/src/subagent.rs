@@ -153,6 +153,8 @@ pub struct SubagentManager {
     coding_policies: Option<
         Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
     >,
+    /// Optional because headless test environments do not spawn background jobs.
+    job_supervisor: Option<tools_core::DynJobSupervisor>,
 }
 
 /// Builder for SubagentManager
@@ -171,6 +173,7 @@ pub struct SubagentManagerBuilder {
     coding_policies: Option<
         Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
     >,
+    job_supervisor: Option<tools_core::DynJobSupervisor>,
 }
 
 impl SubagentManagerBuilder {
@@ -188,6 +191,7 @@ impl SubagentManagerBuilder {
             hook_engine: None,
             event_sender: None,
             coding_policies: None,
+            job_supervisor: None,
         }
     }
 
@@ -198,6 +202,11 @@ impl SubagentManagerBuilder {
         >,
     ) -> Self {
         self.coding_policies = policies;
+        self
+    }
+
+    pub fn job_supervisor(mut self, supervisor: Option<tools_core::DynJobSupervisor>) -> Self {
+        self.job_supervisor = supervisor;
         self
     }
 
@@ -252,6 +261,7 @@ impl SubagentManagerBuilder {
             event_tx: std::sync::Mutex::new(self.event_sender),
             progress: Arc::new(dashmap::DashMap::new()),
             coding_policies: self.coding_policies,
+            job_supervisor: self.job_supervisor,
         }
     }
 }
@@ -427,6 +437,7 @@ impl SubagentManager {
         };
         let progress_ref = Arc::clone(&self.progress);
         let coding_policies = self.coding_policies.clone();
+        let job_supervisor = self.job_supervisor.clone();
 
         tokio::spawn(async move {
             // Acquire permit before running — limits concurrent subagents.
@@ -446,7 +457,7 @@ impl SubagentManager {
                     &provider, &workspace, &model, &task, config, profile,
                     tool_kit, hook_engine.clone(), origin_key.clone(), base_registry,
                     short_id_clone.clone(), Arc::clone(&progress_ref), event_tx_clone.clone(),
-                    coding_policies.clone(),
+                    coding_policies.clone(), job_supervisor.clone(),
                 ) => {
                     r
                 }
@@ -635,6 +646,7 @@ async fn run_subagent_task(
     coding_policies: Option<
         Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
     >,
+    job_supervisor: Option<tools_core::DynJobSupervisor>,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
     use crate::execution::budget::{DepthMode, SafetyCap};
     use crate::execution::core::ExecutionCore;
@@ -705,6 +717,8 @@ async fn run_subagent_task(
     let mut routing_ctx = RoutingContext::new("subagent".into(), "background".into());
     routing_ctx.hook_engine = hook_engine;
     routing_ctx.session_key = Some(session_key.clone().into());
+    routing_ctx.agent_chain = vec![agent_id.clone()];
+    routing_ctx.job_supervisor = job_supervisor;
     routing_ctx.plan_mode_active = coding_policies
         .as_ref()
         .map(|policies| crate::agent_loop::is_plan_mode_for_thread(policies, &session_key))
@@ -879,6 +893,7 @@ mod tests {
             _messages: &[Message],
             _tools: Option<&[serde_json::Value]>,
             _params: &ChatParams,
+            _breakpoints: &[providers::CacheBreakpoint],
         ) -> Result<LlmResponse> {
             Ok(LlmResponse {
                 content: Some("ok".to_string()),
@@ -966,6 +981,7 @@ mod tests {
             None,
             "agent-1".to_string(),
             Arc::new(dashmap::DashMap::new()),
+            None,
             None,
             None,
         )

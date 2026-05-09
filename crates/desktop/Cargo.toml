@@ -21,6 +21,7 @@ cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }
 feature-coding-todo = { workspace = true }
+feature-coding-bash = { path = "../feature-coding-bash" }
 feature-focus = { workspace = true }
 feature-launcher = { workspace = true }
 klyntbot-server = { workspace = true }

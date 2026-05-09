@@ -120,6 +120,8 @@ pub struct AgentLoop {
     pub(crate) coding_policies: Option<
         Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
     >,
+    /// Optional because headless test environments do not spawn background jobs.
+    pub(crate) job_supervisor: Option<tools_core::DynJobSupervisor>,
 }
 
 impl AgentLoop {
@@ -737,6 +739,7 @@ impl AgentLoop {
         let mut routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
         routing_ctx.session_key = Some(session_key.clone());
         routing_ctx.message_id = embed_msg_id.map(|id| id.to_string());
+        routing_ctx.job_supervisor = self.job_supervisor.clone();
         routing_ctx.plan_mode_active = self
             .coding_policies
             .as_ref()
@@ -821,7 +824,8 @@ impl AgentLoop {
         };
 
         // Run through pipeline
-        let routing_ctx = RoutingContext::new(origin_channel.into(), origin_chat_id.into());
+        let mut routing_ctx = RoutingContext::new(origin_channel.into(), origin_chat_id.into());
+        routing_ctx.job_supervisor = self.job_supervisor.clone();
         let response_content = self
             .run_pipeline(&system_msg_content, history, &routing_ctx, None, None, None)
             .await?;
@@ -1072,6 +1076,7 @@ impl AgentLoop {
         let mut routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
         routing_ctx.session_key = Some(session_key.clone().into());
         routing_ctx.message_id = user_msg_id;
+        routing_ctx.job_supervisor = self.job_supervisor.clone();
         let response_content = self
             .run_pipeline(&content, history, &routing_ctx, None, None, None)
             .await?;

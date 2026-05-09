@@ -93,6 +93,7 @@ pub struct AgentLoopBuilder {
         Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
     >,
     injector_registry: Option<bus::InjectorRegistry>,
+    job_supervisor: Option<tools_core::DynJobSupervisor>,
 }
 
 impl AgentLoopBuilder {
@@ -121,6 +122,7 @@ impl AgentLoopBuilder {
             approval_suggester: None,
             coding_policies: None,
             injector_registry: None,
+            job_supervisor: None,
         }
     }
 
@@ -146,6 +148,10 @@ impl AgentLoopBuilder {
     }
     pub fn with_injector_registry(mut self, registry: bus::InjectorRegistry) -> Self {
         self.injector_registry = Some(registry);
+        self
+    }
+    pub fn with_job_supervisor(mut self, supervisor: tools_core::DynJobSupervisor) -> Self {
+        self.job_supervisor = Some(supervisor);
         self
     }
     pub fn with_coding_recall_service(
@@ -658,6 +664,7 @@ impl AgentLoopBuilder {
                 .max_concurrent_subagents(config.agents.defaults.max_concurrent_subagents)
                 .agent_task_repo(repos.agent_tasks.clone())
                 .coding_policies(self.coding_policies.clone())
+                .job_supervisor(self.job_supervisor.clone())
                 .build(),
         );
 
@@ -2077,6 +2084,7 @@ impl AgentLoopBuilder {
             hot_config,
             subagent_manager: Some(subagent_manager),
             coding_policies: self.coding_policies.clone(),
+            job_supervisor: self.job_supervisor.clone(),
         })
     }
 }

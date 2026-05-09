@@ -11,6 +11,7 @@ pub mod config_persistence;
 pub mod events;
 pub mod feature;
 pub mod interceptor;
+pub mod job_supervisor;
 pub mod metadata;
 pub mod pagination;
 pub mod params;
@@ -33,6 +34,10 @@ pub use metadata::{CostHint, ToolCategory, ToolMetadata, ToolSource};
 pub use pagination::Page;
 pub use params::ParamExtractor;
 pub use registry::ToolRegistry;
+pub use job_supervisor::{
+    DynJobSupervisor, FailureKind, GateResult, JobError, JobId, JobSpec, JobStatus,
+    JobSupervisorHandle, JobView, RingRead,
+};
 pub use routing::{InteractionBundle, InteractionChannel, ProgressHandler, RoutingContext};
 pub use search::{rrf_merge, rrf_merge_triple, Searchable};
 

@@ -245,6 +245,7 @@ mod tests {
             _messages: &[Message],
             _tools: Option<&[Value]>,
             _params: &ChatParams,
+            _breakpoints: &[providers::CacheBreakpoint],
         ) -> common::Result<LlmResponse> {
             panic!("LLM should not be called in shadow mode");
         }

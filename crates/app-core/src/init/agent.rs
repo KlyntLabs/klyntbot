@@ -45,6 +45,7 @@ pub(super) async fn init_agent(
         Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
     >,
     injector_registry: Option<bus::InjectorRegistry>,
+    job_supervisor: Option<tools_core::DynJobSupervisor>,
 ) -> Result<AgentResult, String> {
     // Run activity-log migrations (unified activity log).
     StoragePool::run_feature_migrations(
@@ -111,6 +112,9 @@ pub(super) async fn init_agent(
     }
     if let Some(registry) = injector_registry {
         builder = builder.with_injector_registry(registry);
+    }
+    if let Some(supervisor) = job_supervisor {
+        builder = builder.with_job_supervisor(supervisor);
     }
 
     let mut agent_loop_raw = builder

@@ -298,6 +298,8 @@ fn event_kind_tag(kind: &EventKind) -> &'static str {
         EventKind::MirrorAlert { .. } => "mirrorAlert",
         EventKind::SkillRoutingTrace { .. } => "skillRoutingTrace",
         EventKind::GitCommit { .. } => "gitCommit",
+        EventKind::BackgroundJobLifecycle { .. } => "backgroundJobLifecycle",
+        EventKind::BackgroundJobOutputBisect { .. } => "backgroundJobOutputBisect",
     }
 }
 

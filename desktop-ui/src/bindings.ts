@@ -623,6 +623,38 @@ async codingMemorySessionReplayRecallOverlay(args: SessionRecallOverlayArgs) : P
     else return { status: "error", error: e  as any };
 }
 },
+async codingJobList(threadId: string, agentChain: string[], activeOnly: boolean | null) : Promise<Result<BashJobsPanelView, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_job_list", { threadId, agentChain, activeOnly }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingJobOutput(jobId: string, since: number | null) : Promise<Result<JobOutputView, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_job_output", { jobId, since }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingJobStop(jobId: string) : Promise<Result<BashJobView, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_job_stop", { jobId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async codingJobOpenLog(jobId: string) : Promise<Result<OpenLogResult, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("coding_job_open_log", { jobId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async codingSkillsList() : Promise<Result<SkillListItem[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_skills_list") };
@@ -4873,6 +4905,8 @@ export type AutoFocusPayload = { startedAt: string; endedAt: string; durationMin
 export type AutoTunerStatus = { champion: ChampionSummary; activeExperiment: ExperimentSummary | null; paused: boolean; brainGrowth: BrainGrowth | null; metricsHealth: MetricsHealth | null; experimentPace: string | null }
 export type BacklinkResponse = { note: NoteResponse; context: string | null }
 export type BadgeKind = "success" | "warn" | "error" | "info"
+export type BashJobView = { id: string; session_id: string; agent_id: string; description: string; command: string; cwd: string; status: string; started_at: string; finished_at: string | null; exit_code: number | null; failure_kind: string | null; failure_detail: string | null; failure_extracted: JsonValue | null; total_bytes_emitted: number; last_polled_at: string | null; last_seen_offset: number }
+export type BashJobsPanelView = { jobs: BashJobView[] }
 export type BrainGrowth = { correctionsCaptured7D: number; trialsEvaluated7D: number; promotedThisWeek: number; status: string }
 export type BrainVersion = { version: number; trialId: string | null; promotedAt: string; params: unknown; reason: string; parentVersion: number | null; metricsAtPromotion: unknown; reverted: boolean }
 export type BranchInfo = { name: string; 
@@ -5257,6 +5291,7 @@ export type InteractionRequestPayload = { sessionKey: string; requestId: string;
 export type InterventionLogResponse = { id: string; interventionType: string; message: string; triggerName: string; feedback: string | null; deliveredAt: string; feedbackAt: string | null }
 export type InterventionPayload = { appName: string; windowTitle: string | null; sessionId: string; needsLlm: boolean; heuristicVerdict: string }
 export type IterationStartPayload = { sessionKey: string; iteration: number; maxIterations: number }
+export type JobOutputView = { bytes: string; newOffset: number; bisectGeneration: number; bisectOccurredSince: boolean; totalBytesEmitted: number }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type KeyResultCreateParams = { objectiveId: string; title: string; targetValue: number | null; unit: string | null; trackingMode: string | null }
 export type KeyResultResponse = { id: string; title: string; progress: number; current: number; target: number; unit: string }
@@ -5445,6 +5480,7 @@ export type ObjectiveCreateParams = { title: string; projectId: string; descript
 export type ObjectiveResponse = { id: string; title: string; status: string; progress: number; projectId: string; keyResults: KeyResultResponse[] | null }
 export type ObjectiveSummaryResponse = { id: string; title: string; progress: number; status: string }
 export type ObjectiveUpdateParams = { id: string; title: string | null; description: string | null; status: string | null; priority: number | null; dueDate: string | null }
+export type OpenLogResult = { opened: boolean }
 export type PendingMemoryResponse = { id: string; fact: unknown; reason: string; createdAt: string }
 export type Pin = { item_id: string; kind: string; position: number }
 /**

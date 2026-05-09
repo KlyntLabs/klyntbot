@@ -9,6 +9,7 @@ pub mod capture;
 pub mod chat;
 pub mod coding_doctor;
 pub mod coding_help;
+pub mod coding_jobs;
 pub mod coding_mcp;
 pub mod coding_memory;
 pub mod coding_recall_stats;

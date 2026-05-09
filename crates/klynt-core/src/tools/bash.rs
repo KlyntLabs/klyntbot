@@ -23,6 +23,15 @@ pub struct BashArgs {
 
     /// Optional timeout in milliseconds; defaults to 60_000.
     pub timeout_ms: Option<u64>,
+
+    /// When true, returns immediately with a job_id; output read via coding_task_output.
+    pub run_in_background: Option<bool>,
+
+    /// Required when run_in_background=true. Short human-readable label.
+    pub description: Option<String>,
+
+    /// When true, skip the auto-injected completion notification.
+    pub silent_completion: Option<bool>,
 }
 
 #[derive(tools_core::Tool)]
@@ -107,52 +116,10 @@ impl ToolExecute for BashTool {
         let start = std::time::Instant::now();
 
         let result: common::Result<String> = (async {
-            #[cfg(not(target_os = "macos"))]
-            {
-                return Err(common::KlyntbotError::NotImplemented(
-                    "bash on non-macOS lands in Plan 3".into(),
-                ));
+            if args.run_in_background.unwrap_or(false) {
+                return self.execute_background(args, ctx).await;
             }
-
-            #[cfg(target_os = "macos")]
-            {
-                let cwd = args
-                    .cwd
-                    .as_deref()
-                    .map(|p| resolve_path(p, &self.cwd))
-                    .unwrap_or_else(|| self.cwd.clone());
-                let sandbox_policy = klynt_sandbox::SandboxPolicy::cwd_writes_only(cwd.clone());
-                fan_out_tool_event(
-                    ctx.event_tx.as_ref(),
-                    Some(&self.bus),
-                    ToolEvent::SandboxPolicyApplied {
-                        tool: "bash".into(),
-                        policy_summary: sandbox_policy.summary(),
-                        policy_hash: sandbox_policy.policy_hash(),
-                        fallback_unsandboxed: false,
-                        fs_constraints: vec![format!("{:?}", sandbox_policy.fs)],
-                        network_constraints: vec![format!("{:?}", sandbox_policy.network)],
-                    },
-                )
-                .await;
-                let runner = klynt_sandbox::MacOsSeatbeltRunner::new();
-                let timeout = Duration::from_millis(args.timeout_ms.unwrap_or(60_000));
-                let out = runner
-                    .run_command(
-                        &sandbox_policy,
-                        "/bin/bash",
-                        &["-c", &args.command],
-                        Some(&cwd),
-                        timeout,
-                    )
-                    .await
-                    .map_err(|e| {
-                        common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
-                            e.to_string(),
-                        ))
-                    })?;
-                Ok(out.stdout)
-            }
+            self.execute_foreground(args, ctx).await
         })
         .await;
         fire_post_tool_use(
@@ -164,5 +131,111 @@ impl ToolExecute for BashTool {
         )
         .await;
         result
+    }
+}
+
+impl BashTool {
+    async fn execute_background(
+        &self,
+        args: BashArgs,
+        ctx: &RoutingContext,
+    ) -> common::Result<String> {
+        let supervisor = ctx.job_supervisor.as_ref().ok_or_else(|| {
+            common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+                "background jobs disabled".into(),
+            ))
+        })?;
+        let description = args.description.clone().ok_or_else(|| {
+            common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+                "description required when run_in_background=true".into(),
+            ))
+        })?;
+        if description.is_empty() || description.len() > 120 {
+            return Err(common::KlyntbotError::Tool(
+                common::ToolError::ExecutionFailed(
+                    "description must be 1-120 chars".into(),
+                ),
+            ));
+        }
+        let cwd = args
+            .cwd
+            .as_deref()
+            .map(|p| resolve_path(p, &self.cwd))
+            .unwrap_or_else(|| self.cwd.clone());
+        let spec = tools_core::JobSpec {
+            session_id: ctx.chat_id.as_str().to_string(),
+            agent_id: ctx.agent_id.clone(),
+            agent_chain: ctx.agent_chain.clone(),
+            description,
+            command: args.command,
+            cwd,
+            timeout_ms: args.timeout_ms.unwrap_or(600_000),
+            silent_completion: args.silent_completion.unwrap_or(false),
+        };
+        let view = supervisor
+            .spawn(spec)
+            .await
+            .map_err(|e| {
+                common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
+                    "spawn failed: {e}"
+                )))
+            })?;
+        Ok(format!(
+            "Started background job {}.\nDescription: {}\nInspect:    coding_task_output(\"{}\")\nCancel:     coding_task_stop(\"{}\")\n\nThis job will auto-notify on completion.",
+            view.id.as_str(), view.description, view.id.as_str(), view.id.as_str(),
+        ))
+    }
+
+    async fn execute_foreground(
+        &self,
+        args: BashArgs,
+        ctx: &RoutingContext,
+    ) -> common::Result<String> {
+        #[cfg(not(target_os = "macos"))]
+        {
+            return Err(common::KlyntbotError::NotImplemented(
+                "bash on non-macOS lands in Plan 3".into(),
+            ));
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            let cwd = args
+                .cwd
+                .as_deref()
+                .map(|p| resolve_path(p, &self.cwd))
+                .unwrap_or_else(|| self.cwd.clone());
+            let sandbox_policy = klynt_sandbox::SandboxPolicy::cwd_writes_only(cwd.clone());
+            fan_out_tool_event(
+                ctx.event_tx.as_ref(),
+                Some(&self.bus),
+                ToolEvent::SandboxPolicyApplied {
+                    tool: "bash".into(),
+                    policy_summary: sandbox_policy.summary(),
+                    policy_hash: sandbox_policy.policy_hash(),
+                    fallback_unsandboxed: false,
+                    fs_constraints: vec![format!("{:?}", sandbox_policy.fs)],
+                    network_constraints: vec![format!("{:?}", sandbox_policy.network)],
+                },
+            )
+            .await;
+            let runner = klynt_sandbox::MacOsSeatbeltRunner::new();
+            let timeout = Duration::from_millis(args.timeout_ms.unwrap_or(60_000));
+            let out = runner
+                .run_command(
+                    &sandbox_policy,
+                    "/bin/bash",
+                    &["-c", &args.command],
+                    Some(&cwd),
+                    timeout,
+                )
+                .await
+                .map_err(|e| {
+                    common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+                        e.to_string(),
+                    ))
+                })?;
+            Ok(out.stdout)
+        }
     }
 }

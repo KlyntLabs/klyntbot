@@ -1001,6 +1001,7 @@ mod tests {
             _messages: &[providers::Message],
             _tools: Option<&[serde_json::Value]>,
             _params: &providers::ChatParams,
+            _breakpoints: &[providers::CacheBreakpoint],
         ) -> common::Result<providers::LlmResponse> {
             if self.delay_ms > 0 {
                 tokio::time::sleep(std::time::Duration::from_millis(self.delay_ms)).await;
