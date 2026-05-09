@@ -2,14 +2,14 @@
 
 use std::sync::Arc;
 
-use bus::DomainEventBus;
 use bus::context_updates::ContextUpdateQueue;
+use bus::DomainEventBus;
 use feature_coding_bash::JobSupervisor;
 use klynt_sandbox::MacOsSeatbeltRunner;
-use storage::StoragePool;
 use storage::repos::BashJobRepo;
+use storage::StoragePool;
 use tempfile::tempdir;
-use tools_core::{JobSpec, JobSupervisorHandle, JobStatus};
+use tools_core::{JobSpec, JobStatus, JobSupervisorHandle};
 
 #[tokio::test]
 #[cfg_attr(not(target_os = "macos"), ignore)]
@@ -78,5 +78,8 @@ async fn happy_path() {
         .await;
     assert_eq!(listed.len(), 1);
     let job = &listed[0];
-    assert!(matches!(job.status, JobStatus::Completed | JobStatus::Running));
+    assert!(matches!(
+        job.status,
+        JobStatus::Completed | JobStatus::Running
+    ));
 }

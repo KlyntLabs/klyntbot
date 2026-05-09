@@ -17,7 +17,7 @@ pub struct CodingTaskOutputArgs {
     description = "Read new output bytes from a background bash job since the given cursor offset.",
     params = "CodingTaskOutputArgs",
     allowed_channels = "coding_only",
-    approval_class = "safe",
+    approval_class = "safe"
 )]
 pub struct CodingTaskOutputTool;
 
@@ -31,15 +31,22 @@ impl tools_core::ToolExecute for CodingTaskOutputTool {
                 "background jobs disabled".into(),
             ))
         })?;
-        let id = JobId::from_str(args.task_id)
-            .map_err(|e| common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!("invalid task_id: {e}"))))?;
+        let id = JobId::from_str(args.task_id).map_err(|e| {
+            common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
+                "invalid task_id: {e}"
+            )))
+        })?;
         let since = args.since_offset.unwrap_or(0);
         let block = args.block.unwrap_or(false);
         let timeout = args.timeout_ms.unwrap_or(30_000);
         let rd = sup
             .output_delta(&id, since, block, timeout)
             .await
-            .map_err(|e| common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!("output_delta: {e}"))))?;
+            .map_err(|e| {
+                common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
+                    "output_delta: {e}"
+                )))
+            })?;
         let body = String::from_utf8_lossy(&rd.bytes);
         let trailer = serde_json::json!({
             "task_id": id.as_str(),

@@ -7,8 +7,8 @@ pub mod brain_signal;
 pub mod coaching_intervention_log;
 pub mod coaching_strategy;
 pub mod coding_approval_history;
-pub mod coding_reviews;
 pub mod coding_background_jobs;
+pub mod coding_reviews;
 pub mod coding_todo;
 pub mod cron;
 pub mod custom_column;
@@ -65,8 +65,8 @@ pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoa
 pub use coding_approval_history::{
     ApprovalHistorySummary, CodingApprovalHistoryRepo, HistoryEntry,
 };
-pub use coding_reviews::{CodingReviewRow, CodingReviewsRepo};
 pub use coding_background_jobs::{BashJobRepo, BashJobRow};
+pub use coding_reviews::{CodingReviewRow, CodingReviewsRepo};
 pub use coding_todo::{TodoRepo, TodoRow};
 pub use cron::CronRepo;
 pub use custom_column::CustomColumnRepo;

@@ -13,14 +13,17 @@ async fn pool_with_table() -> StoragePool {
     let pool = StoragePool::connect_in_memory().await.unwrap();
     // Apply just the bash jobs migration manually.
     let migration = feature_coding_bash::migrations::coding_background_jobs_migration();
-    sqlx::query(&migration.sql).execute(pool.inner()).await.unwrap();
+    sqlx::query(&migration.sql)
+        .execute(pool.inner())
+        .await
+        .unwrap();
     pool
 }
 
 fn spec(command: &str) -> JobSpec {
     JobSpec {
         session_id: "s1".into(),
-        agent_id:   "a1".into(),
+        agent_id: "a1".into(),
         agent_chain: vec!["a1".into()],
         description: "desc".into(),
         command: command.into(),
@@ -56,7 +59,8 @@ async fn second_run_of_same_command_has_diff_section() {
 
     // Drain the queue and find the second completion notification.
     let updates: Vec<_> = queue.drain();
-    let body_v2 = updates.iter()
+    let body_v2 = updates
+        .iter()
         .filter_map(|u| u.content.as_ref())
         .find(|s: &&String| s.contains(v2.id.as_str()))
         .expect("expected completion body for v2");
@@ -69,8 +73,11 @@ async fn second_run_of_same_command_has_diff_section() {
 
 async fn wait_for_terminal(supervisor: &JobSupervisor, id: &tools_core::JobId) {
     for _ in 0..50 {
-        if !supervisor.list("s1", &["a1".into()], true).await
-            .iter().any(|j| &j.id == id)
+        if !supervisor
+            .list("s1", &["a1".into()], true)
+            .await
+            .iter()
+            .any(|j| &j.id == id)
         {
             return;
         }

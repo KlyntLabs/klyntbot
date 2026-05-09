@@ -12,47 +12,47 @@ use tools_core::FailureKind;
 #[derive(Debug, Clone, PartialEq)]
 pub struct JobDiff {
     pub kind_transition: KindTransition,
-    pub extracted_diff:  ExtractedDiff,
-    pub elapsed_delta_ms: i64,    // signed: negative = faster than prior
+    pub extracted_diff: ExtractedDiff,
+    pub elapsed_delta_ms: i64, // signed: negative = faster than prior
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum KindTransition {
     StillPassing,
-    StillFailing { kind: String },                  // kind name (FailureKind variant)
-    Regressed   { from: String, to: String },       // None or different failure
-    Recovered   { prior_kind: String },
-    Changed     { from: String, to: String },       // both failed, different kinds
+    StillFailing { kind: String }, // kind name (FailureKind variant)
+    Regressed { from: String, to: String }, // None or different failure
+    Recovered { prior_kind: String },
+    Changed { from: String, to: String }, // both failed, different kinds
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExtractedDiff {
     None,
     TestSet {
-        new_failures:  Vec<String>,
+        new_failures: Vec<String>,
         still_failing: Vec<String>,
-        resolved:      Vec<String>,
+        resolved: Vec<String>,
     },
     Compile {
         same_location: bool,
         prior_loc: Option<Location>,
-        curr_loc:  Option<Location>,
+        curr_loc: Option<Location>,
     },
     Bind {
         same_port: bool,
         prior_port: Option<u64>,
-        curr_port:  Option<u64>,
+        curr_port: Option<u64>,
     },
     Lint {
         delta_n_errors: i64,
     },
     Timeout {
         prior_ms: u64,
-        curr_ms:  u64,
+        curr_ms: u64,
     },
     OtherExitTransition {
         from: Option<i32>,
-        to:   Option<i32>,
+        to: Option<i32>,
     },
 }
 
@@ -69,7 +69,8 @@ pub fn diff_against_prior(prior: &BashJobRow, curr: &BashJobRow) -> JobDiff {
         parse_extracted(curr.failure_extracted.as_deref()),
     ) {
         (Some(p), Some(c)) => diff_extracted(
-            &p, &c,
+            &p,
+            &c,
             prior.failure_kind.as_deref(),
             curr.failure_kind.as_deref(),
         ),
@@ -77,7 +78,11 @@ pub fn diff_against_prior(prior: &BashJobRow, curr: &BashJobRow) -> JobDiff {
     };
     let elapsed_delta_ms = elapsed_ms(curr) as i64 - elapsed_ms(prior) as i64;
 
-    JobDiff { kind_transition, extracted_diff, elapsed_delta_ms }
+    JobDiff {
+        kind_transition,
+        extracted_diff,
+        elapsed_delta_ms,
+    }
 }
 
 fn elapsed_ms(row: &BashJobRow) -> u64 {
@@ -105,7 +110,7 @@ fn classify_transition(prior: &BashJobRow, curr: &BashJobRow) -> KindTransition 
         },
         (false, true) => KindTransition::Regressed {
             from: "Passed".to_string(),
-            to:   curr.failure_kind.clone().unwrap_or_default(),
+            to: curr.failure_kind.clone().unwrap_or_default(),
         },
         (true, true) => {
             let p = prior.failure_kind.clone().unwrap_or_default();
@@ -121,19 +126,23 @@ fn classify_transition(prior: &BashJobRow, curr: &BashJobRow) -> KindTransition 
 
 fn diff_extracted(
     prior: &serde_json::Value,
-    curr:  &serde_json::Value,
+    curr: &serde_json::Value,
     prior_kind: Option<&str>,
-    curr_kind:  Option<&str>,
+    curr_kind: Option<&str>,
 ) -> ExtractedDiff {
     use ExtractedDiff::*;
 
     if prior_kind == Some("TestFailure") && curr_kind == Some("TestFailure") {
         let p_set = string_array_set(prior, "failed_test_names");
         let c_set = string_array_set(curr, "failed_test_names");
-        let new_failures:  Vec<String> = c_set.difference(&p_set).cloned().collect();
+        let new_failures: Vec<String> = c_set.difference(&p_set).cloned().collect();
         let still_failing: Vec<String> = c_set.intersection(&p_set).cloned().collect();
-        let resolved:      Vec<String> = p_set.difference(&c_set).cloned().collect();
-        return TestSet { new_failures, still_failing, resolved };
+        let resolved: Vec<String> = p_set.difference(&c_set).cloned().collect();
+        return TestSet {
+            new_failures,
+            still_failing,
+            resolved,
+        };
     }
 
     if prior_kind == Some("CompileError") && curr_kind == Some("CompileError") {
@@ -142,7 +151,7 @@ fn diff_extracted(
         return Compile {
             same_location: pl.is_some() && pl == cl,
             prior_loc: pl,
-            curr_loc:  cl,
+            curr_loc: cl,
         };
     }
 
@@ -152,20 +161,28 @@ fn diff_extracted(
         return Bind {
             same_port: pp.is_some() && pp == cp,
             prior_port: pp,
-            curr_port:  cp,
+            curr_port: cp,
         };
     }
 
     if prior_kind == Some("LintFailure") && curr_kind == Some("LintFailure") {
         let pe = prior.get("n_errors").and_then(|v| v.as_i64()).unwrap_or(0);
         let ce = curr.get("n_errors").and_then(|v| v.as_i64()).unwrap_or(0);
-        return Lint { delta_n_errors: ce - pe };
+        return Lint {
+            delta_n_errors: ce - pe,
+        };
     }
 
     if prior_kind == Some("Timeout") && curr_kind == Some("Timeout") {
-        let pm = prior.get("elapsed_ms").and_then(|v| v.as_u64()).unwrap_or(0);
+        let pm = prior
+            .get("elapsed_ms")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
         let cm = curr.get("elapsed_ms").and_then(|v| v.as_u64()).unwrap_or(0);
-        return Timeout { prior_ms: pm, curr_ms: cm };
+        return Timeout {
+            prior_ms: pm,
+            curr_ms: cm,
+        };
     }
 
     if prior_kind.is_none() && curr_kind.is_none() {
@@ -173,15 +190,25 @@ fn diff_extracted(
     }
 
     OtherExitTransition {
-        from: prior.get("exit_code").and_then(|v| v.as_i64()).map(|v| v as i32),
-        to:   curr.get("exit_code").and_then(|v| v.as_i64()).map(|v| v as i32),
+        from: prior
+            .get("exit_code")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32),
+        to: curr
+            .get("exit_code")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32),
     }
 }
 
 fn string_array_set(v: &serde_json::Value, key: &str) -> BTreeSet<String> {
     v.get(key)
         .and_then(|x| x.as_array())
-        .map(|arr| arr.iter().filter_map(|el| el.as_str().map(String::from)).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|el| el.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -213,7 +240,12 @@ mod tests {
             cwd: "/".into(),
             timeout_ms: 60_000,
             silent_completion: false,
-            status: if kind.is_some() { "Failed" } else { "Completed" }.into(),
+            status: if kind.is_some() {
+                "Failed"
+            } else {
+                "Completed"
+            }
+            .into(),
             exit_code: Some(if kind.is_some() { 1 } else { 0 }),
             failure_kind: kind.map(String::from),
             failure_detail: None,
@@ -241,45 +273,112 @@ mod tests {
 
     #[test]
     fn recovered() {
-        let p = row(Some("TestFailure"), Some(serde_json::json!({"failed_test_names":["a"]})), 0, 1000);
+        let p = row(
+            Some("TestFailure"),
+            Some(serde_json::json!({"failed_test_names":["a"]})),
+            0,
+            1000,
+        );
         let c = row(None, None, 0, 800);
         let d = diff_against_prior(&p, &c);
-        assert_eq!(d.kind_transition, KindTransition::Recovered { prior_kind: "TestFailure".into() });
+        assert_eq!(
+            d.kind_transition,
+            KindTransition::Recovered {
+                prior_kind: "TestFailure".into()
+            }
+        );
     }
 
     #[test]
     fn regressed_from_pass() {
         let p = row(None, None, 0, 1000);
-        let c = row(Some("CompileError"), Some(serde_json::json!({"file":"src/lib.rs","line":42})), 0, 1500);
+        let c = row(
+            Some("CompileError"),
+            Some(serde_json::json!({"file":"src/lib.rs","line":42})),
+            0,
+            1500,
+        );
         let d = diff_against_prior(&p, &c);
-        assert_eq!(d.kind_transition, KindTransition::Regressed { from: "Passed".into(), to: "CompileError".into() });
+        assert_eq!(
+            d.kind_transition,
+            KindTransition::Regressed {
+                from: "Passed".into(),
+                to: "CompileError".into()
+            }
+        );
     }
 
     #[test]
     fn still_failing_same_kind() {
-        let p = row(Some("TestFailure"), Some(serde_json::json!({"failed_test_names":["a"]})), 0, 1000);
-        let c = row(Some("TestFailure"), Some(serde_json::json!({"failed_test_names":["a"]})), 0, 1100);
+        let p = row(
+            Some("TestFailure"),
+            Some(serde_json::json!({"failed_test_names":["a"]})),
+            0,
+            1000,
+        );
+        let c = row(
+            Some("TestFailure"),
+            Some(serde_json::json!({"failed_test_names":["a"]})),
+            0,
+            1100,
+        );
         let d = diff_against_prior(&p, &c);
-        assert_eq!(d.kind_transition, KindTransition::StillFailing { kind: "TestFailure".into() });
+        assert_eq!(
+            d.kind_transition,
+            KindTransition::StillFailing {
+                kind: "TestFailure".into()
+            }
+        );
     }
 
     #[test]
     fn changed_kind() {
-        let p = row(Some("TestFailure"), Some(serde_json::json!({"failed_test_names":["a"]})), 0, 1000);
-        let c = row(Some("CompileError"), Some(serde_json::json!({"file":"x","line":1})), 0, 1100);
+        let p = row(
+            Some("TestFailure"),
+            Some(serde_json::json!({"failed_test_names":["a"]})),
+            0,
+            1000,
+        );
+        let c = row(
+            Some("CompileError"),
+            Some(serde_json::json!({"file":"x","line":1})),
+            0,
+            1100,
+        );
         let d = diff_against_prior(&p, &c);
-        assert_eq!(d.kind_transition, KindTransition::Changed { from: "TestFailure".into(), to: "CompileError".into() });
+        assert_eq!(
+            d.kind_transition,
+            KindTransition::Changed {
+                from: "TestFailure".into(),
+                to: "CompileError".into()
+            }
+        );
     }
 
     #[test]
     fn test_set_diff_overlapping() {
-        let p = row(Some("TestFailure"), Some(serde_json::json!({"failed_test_names":["a","b","c"]})), 0, 1000);
-        let c = row(Some("TestFailure"), Some(serde_json::json!({"failed_test_names":["b","c","d"]})), 0, 1000);
+        let p = row(
+            Some("TestFailure"),
+            Some(serde_json::json!({"failed_test_names":["a","b","c"]})),
+            0,
+            1000,
+        );
+        let c = row(
+            Some("TestFailure"),
+            Some(serde_json::json!({"failed_test_names":["b","c","d"]})),
+            0,
+            1000,
+        );
         let d = diff_against_prior(&p, &c);
         match d.extracted_diff {
-            ExtractedDiff::TestSet { new_failures, still_failing, resolved } => {
+            ExtractedDiff::TestSet {
+                new_failures,
+                still_failing,
+                resolved,
+            } => {
                 assert_eq!(new_failures, vec!["d".to_string()]);
-                let mut still = still_failing.clone(); still.sort();
+                let mut still = still_failing.clone();
+                still.sort();
                 assert_eq!(still, vec!["b".to_string(), "c".to_string()]);
                 assert_eq!(resolved, vec!["a".to_string()]);
             }
@@ -289,11 +388,25 @@ mod tests {
 
     #[test]
     fn test_set_diff_disjoint() {
-        let p = row(Some("TestFailure"), Some(serde_json::json!({"failed_test_names":["a"]})), 0, 1000);
-        let c = row(Some("TestFailure"), Some(serde_json::json!({"failed_test_names":["b"]})), 0, 1000);
+        let p = row(
+            Some("TestFailure"),
+            Some(serde_json::json!({"failed_test_names":["a"]})),
+            0,
+            1000,
+        );
+        let c = row(
+            Some("TestFailure"),
+            Some(serde_json::json!({"failed_test_names":["b"]})),
+            0,
+            1000,
+        );
         let d = diff_against_prior(&p, &c);
         match d.extracted_diff {
-            ExtractedDiff::TestSet { new_failures, still_failing, resolved } => {
+            ExtractedDiff::TestSet {
+                new_failures,
+                still_failing,
+                resolved,
+            } => {
                 assert_eq!(new_failures, vec!["b".to_string()]);
                 assert!(still_failing.is_empty());
                 assert_eq!(resolved, vec!["a".to_string()]);
@@ -304,31 +417,89 @@ mod tests {
 
     #[test]
     fn compile_same_location() {
-        let p = row(Some("CompileError"), Some(serde_json::json!({"file":"a.rs","line":10})), 0, 1000);
-        let c = row(Some("CompileError"), Some(serde_json::json!({"file":"a.rs","line":10})), 0, 1100);
+        let p = row(
+            Some("CompileError"),
+            Some(serde_json::json!({"file":"a.rs","line":10})),
+            0,
+            1000,
+        );
+        let c = row(
+            Some("CompileError"),
+            Some(serde_json::json!({"file":"a.rs","line":10})),
+            0,
+            1100,
+        );
         let d = diff_against_prior(&p, &c);
-        assert!(matches!(d.extracted_diff, ExtractedDiff::Compile { same_location: true, .. }));
+        assert!(matches!(
+            d.extracted_diff,
+            ExtractedDiff::Compile {
+                same_location: true,
+                ..
+            }
+        ));
     }
 
     #[test]
     fn compile_different_location() {
-        let p = row(Some("CompileError"), Some(serde_json::json!({"file":"a.rs","line":10})), 0, 1000);
-        let c = row(Some("CompileError"), Some(serde_json::json!({"file":"a.rs","line":11})), 0, 1100);
+        let p = row(
+            Some("CompileError"),
+            Some(serde_json::json!({"file":"a.rs","line":10})),
+            0,
+            1000,
+        );
+        let c = row(
+            Some("CompileError"),
+            Some(serde_json::json!({"file":"a.rs","line":11})),
+            0,
+            1100,
+        );
         let d = diff_against_prior(&p, &c);
-        assert!(matches!(d.extracted_diff, ExtractedDiff::Compile { same_location: false, .. }));
+        assert!(matches!(
+            d.extracted_diff,
+            ExtractedDiff::Compile {
+                same_location: false,
+                ..
+            }
+        ));
     }
 
     #[test]
     fn bind_port_diff() {
-        let p = row(Some("NetworkBindFailure"), Some(serde_json::json!({"port":3000})), 0, 1000);
-        let c = row(Some("NetworkBindFailure"), Some(serde_json::json!({"port":3000})), 0, 1000);
-        assert!(matches!(diff_against_prior(&p, &c).extracted_diff, ExtractedDiff::Bind { same_port: true, .. }));
+        let p = row(
+            Some("NetworkBindFailure"),
+            Some(serde_json::json!({"port":3000})),
+            0,
+            1000,
+        );
+        let c = row(
+            Some("NetworkBindFailure"),
+            Some(serde_json::json!({"port":3000})),
+            0,
+            1000,
+        );
+        assert!(matches!(
+            diff_against_prior(&p, &c).extracted_diff,
+            ExtractedDiff::Bind {
+                same_port: true,
+                ..
+            }
+        ));
     }
 
     #[test]
     fn lint_delta() {
-        let p = row(Some("LintFailure"), Some(serde_json::json!({"n_errors":5})), 0, 1000);
-        let c = row(Some("LintFailure"), Some(serde_json::json!({"n_errors":3})), 0, 1000);
+        let p = row(
+            Some("LintFailure"),
+            Some(serde_json::json!({"n_errors":5})),
+            0,
+            1000,
+        );
+        let c = row(
+            Some("LintFailure"),
+            Some(serde_json::json!({"n_errors":3})),
+            0,
+            1000,
+        );
         assert_eq!(
             diff_against_prior(&p, &c).extracted_diff,
             ExtractedDiff::Lint { delta_n_errors: -2 },
@@ -337,11 +508,24 @@ mod tests {
 
     #[test]
     fn timeout_delta() {
-        let p = row(Some("Timeout"), Some(serde_json::json!({"elapsed_ms":600_000})), 0, 1000);
-        let c = row(Some("Timeout"), Some(serde_json::json!({"elapsed_ms":700_000})), 0, 1000);
+        let p = row(
+            Some("Timeout"),
+            Some(serde_json::json!({"elapsed_ms":600_000})),
+            0,
+            1000,
+        );
+        let c = row(
+            Some("Timeout"),
+            Some(serde_json::json!({"elapsed_ms":700_000})),
+            0,
+            1000,
+        );
         assert_eq!(
             diff_against_prior(&p, &c).extracted_diff,
-            ExtractedDiff::Timeout { prior_ms: 600_000, curr_ms: 700_000 },
+            ExtractedDiff::Timeout {
+                prior_ms: 600_000,
+                curr_ms: 700_000
+            },
         );
     }
 

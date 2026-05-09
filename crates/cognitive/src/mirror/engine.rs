@@ -15,8 +15,8 @@ use tokio_util::sync::CancellationToken;
 use crate::mirror::{
     sources::{
         ApprovalHistorySource, BackgroundJobSignalSource, ConfigArchiverSource, CostCeilingSource,
-        FinanceSpendingDriftSource, MetaRuleSignalSource, RoutingSignalSource, TaskFocusPatternSource,
-        TodoSignalSource, TrialPreviewSource,
+        FinanceSpendingDriftSource, MetaRuleSignalSource, RoutingSignalSource,
+        TaskFocusPatternSource, TodoSignalSource, TrialPreviewSource,
     },
     AutotunerBridge, MirrorFacade, MirrorRepo, NarrativeHandler,
 };
@@ -94,9 +94,7 @@ impl MirrorEngine {
         register!(cost_ceiling);
 
         if let (Some(ep), Some(br)) = (&episodic_repo, &bash_repo) {
-            let bg_job_source = Arc::new(
-                BackgroundJobSignalSource::new(ep.clone(), br.clone())
-            );
+            let bg_job_source = Arc::new(BackgroundJobSignalSource::new(ep.clone(), br.clone()));
             register!(bg_job_source);
         }
 

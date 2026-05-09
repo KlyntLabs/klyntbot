@@ -13,7 +13,7 @@ pub struct CodingTaskListArgs {
     description = "List background bash jobs in the current thread.",
     params = "CodingTaskListArgs",
     allowed_channels = "coding_only",
-    approval_class = "safe",
+    approval_class = "safe"
 )]
 pub struct CodingTaskListTool;
 
@@ -49,8 +49,7 @@ impl tools_core::ToolExecute for CodingTaskListTool {
             ));
             lines.push(format!(
                 "  ({} bytes, last_seen_offset={})",
-                j.total_bytes_emitted,
-                j.last_seen_offset,
+                j.total_bytes_emitted, j.last_seen_offset,
             ));
         }
         Ok(lines.join("\n"))

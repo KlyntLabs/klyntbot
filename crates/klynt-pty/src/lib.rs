@@ -22,9 +22,7 @@ pub enum PtyError {
 /// lifetime of the child.
 pub enum ChildHandle {
     /// Plain child process (no TTY). The default in 2.3a.
-    Process {
-        child: Child,
-    },
+    Process { child: Child },
     // 2.3c will add: Pty { master: Box<dyn MasterPty + Send>, child: Box<dyn ChildKiller + Send> }
 }
 
@@ -68,7 +66,9 @@ pub fn spawn_with_pgrp(
     }
 
     let mut child = cmd.spawn()?;
-    let stdout = child.stdout.take()
+    let stdout = child
+        .stdout
+        .take()
         .ok_or_else(|| PtyError::PgrpCapture("stdout pipe missing".into()))?;
     let stderr = child.stderr.take();
     let stdin = child.stdin.take();
@@ -78,10 +78,17 @@ pub fn spawn_with_pgrp(
         #[cfg(unix)]
         unsafe {
             let pgid = libc::getpgid(pid as i32);
-            if pgid < 0 { None } else { Some(pgid as u32) }
+            if pgid < 0 {
+                None
+            } else {
+                Some(pgid as u32)
+            }
         }
         #[cfg(not(unix))]
-        { let _ = pid; None }
+        {
+            let _ = pid;
+            None
+        }
     });
 
     Ok(BackgroundCommandHandle {

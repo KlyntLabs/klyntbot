@@ -819,7 +819,8 @@ impl AppCore {
         agent_chain: &[String],
         active_only: bool,
     ) -> Result<Vec<feature_coding_bash::BashJobView>, ApiError> {
-        crate::handlers::coding_jobs::coding_jobs_list(self, thread_id, agent_chain, active_only).await
+        crate::handlers::coding_jobs::coding_jobs_list(self, thread_id, agent_chain, active_only)
+            .await
     }
 
     #[tracing::instrument(skip(self), err)]
@@ -832,7 +833,10 @@ impl AppCore {
     }
 
     #[tracing::instrument(skip(self), err)]
-    pub async fn coding_job_stop(&self, job_id: &str) -> Result<feature_coding_bash::BashJobView, ApiError> {
+    pub async fn coding_job_stop(
+        &self,
+        job_id: &str,
+    ) -> Result<feature_coding_bash::BashJobView, ApiError> {
         crate::handlers::coding_jobs::coding_jobs_stop(self, job_id).await
     }
 

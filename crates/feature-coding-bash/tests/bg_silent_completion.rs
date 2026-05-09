@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use bus::context_updates::ContextUpdateReason;
 use feature_coding_bash::JobSupervisor;
-use storage::StoragePool;
 use storage::repos::BashJobRepo;
+use storage::StoragePool;
 use tempfile::tempdir;
 use tools_core::{JobSpec, JobSupervisorHandle};
 
@@ -55,8 +55,13 @@ async fn silent_completion_skips_push() {
     let updates = queue.drain();
     // Should NOT contain a Failed/Completed update
     assert!(
-        !updates.iter().any(|u| u.reason == ContextUpdateReason::CodingJobsChanged
-            && u.content.as_deref().map(|c| c.contains("Failed") || c.contains("Completed")).unwrap_or(false)),
+        !updates
+            .iter()
+            .any(|u| u.reason == ContextUpdateReason::CodingJobsChanged
+                && u.content
+                    .as_deref()
+                    .map(|c| c.contains("Failed") || c.contains("Completed"))
+                    .unwrap_or(false)),
         "expected NO Failed/Completed CodingJobsChanged update, got: {:?}",
         updates
     );

@@ -2,7 +2,10 @@
 
 use feature_coding_bash::intelligence::{diff_against_prior, KindTransition};
 use jiff::Timestamp;
-use storage::{repos::{BashJobRepo, BashJobRow}, StoragePool};
+use storage::{
+    repos::{BashJobRepo, BashJobRow},
+    StoragePool,
+};
 
 fn passed_row(id: &str) -> BashJobRow {
     BashJobRow {
@@ -52,11 +55,17 @@ async fn recovered_transition_when_prior_failed() {
     let curr = passed_row("b");
     repo.insert(&curr).await.unwrap();
 
-    let prior = repo.find_prior_by_command_key("s1", "k", "b").await.unwrap().unwrap();
+    let prior = repo
+        .find_prior_by_command_key("s1", "k", "b")
+        .await
+        .unwrap()
+        .unwrap();
     let diff = diff_against_prior(&prior, &curr);
 
     assert_eq!(
         diff.kind_transition,
-        KindTransition::Recovered { prior_kind: "TestFailure".into() }
+        KindTransition::Recovered {
+            prior_kind: "TestFailure".into()
+        }
     );
 }

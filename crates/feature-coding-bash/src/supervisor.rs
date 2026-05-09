@@ -17,8 +17,8 @@ use klynt_sandbox::MacOsSeatbeltRunner;
 use storage::repos::{BashJobRepo, BashJobRow};
 use tokio_util::sync::CancellationToken;
 use tools_core::{
-    FailureKind, GateResult, JobError, JobId, JobSpec, JobStatus,
-    JobSupervisorHandle, JobView, RingRead,
+    FailureKind, GateResult, JobError, JobId, JobSpec, JobStatus, JobSupervisorHandle, JobView,
+    RingRead,
 };
 use tracing;
 
@@ -150,7 +150,11 @@ impl JobSupervisor {
         agent_chain: &[String],
         active_only: bool,
     ) -> Vec<JobView> {
-        let rows = match self.repo.list_for_session(session_id, agent_chain, active_only).await {
+        let rows = match self
+            .repo
+            .list_for_session(session_id, agent_chain, active_only)
+            .await
+        {
             Ok(rows) => rows,
             Err(e) => {
                 tracing::warn!(session_id, "list_for_session failed: {e}");
@@ -254,7 +258,11 @@ impl JobSupervisor {
             };
             if name.ends_with(".log.tmp") {
                 if let Err(e) = tokio::fs::remove_file(entry.path()).await {
-                    tracing::debug!("failed to remove tmp file {}: {}", entry.path().display(), e);
+                    tracing::debug!(
+                        "failed to remove tmp file {}: {}",
+                        entry.path().display(),
+                        e
+                    );
                 }
                 continue;
             }
@@ -270,18 +278,18 @@ impl JobSupervisor {
                 .unwrap_or(false);
             if !exists_in_db {
                 if let Err(e) = tokio::fs::remove_file(entry.path()).await {
-                    tracing::debug!("failed to remove orphan file {}: {}", entry.path().display(), e);
+                    tracing::debug!(
+                        "failed to remove orphan file {}: {}",
+                        entry.path().display(),
+                        e
+                    );
                 }
             }
         }
         Ok(())
     }
 
-    async fn handle_exit(
-        &self,
-        id: &JobId,
-        exit: std::io::Result<std::process::ExitStatus>,
-    ) {
+    async fn handle_exit(&self, id: &JobId, exit: std::io::Result<std::process::ExitStatus>) {
         let live = match self.jobs.get(id).map(|e| e.value().clone()) {
             Some(l) => l,
             None => return,
@@ -428,7 +436,11 @@ impl JobSupervisor {
 
         if !live.spec.silent_completion {
             let body = crate::render::completion_notification(
-                id, &live.spec, &result, &final_str, diff.as_ref()
+                id,
+                &live.spec,
+                &result,
+                &final_str,
+                diff.as_ref(),
             );
             self.queue.push(ContextUpdate {
                 reason: ContextUpdateReason::CodingJobsChanged,
@@ -473,7 +485,9 @@ impl JobSupervisorHandle for JobSupervisor {
     async fn spawn(&self, spec: JobSpec) -> Result<JobView, JobError> {
         let chain = &spec.agent_chain;
         let active = Self::storage_err(
-            self.repo.count_active_for_chain(&spec.session_id, chain).await,
+            self.repo
+                .count_active_for_chain(&spec.session_id, chain)
+                .await,
         )?;
         if active >= CAP_PER_CHAIN as i64 {
             return Err(JobError::CapReached {
@@ -537,7 +551,9 @@ impl JobSupervisorHandle for JobSupervisor {
         if let Some(mut stderr) = handle.stderr {
             let stderr_ring = ring.clone();
             let stderr_cancel = cancel.clone();
-            tokio::spawn(async move { drain_reader(&mut stderr, stderr_ring, stderr_cancel).await });
+            tokio::spawn(
+                async move { drain_reader(&mut stderr, stderr_ring, stderr_cancel).await },
+            );
         }
 
         let live = Arc::new(LiveJob {
@@ -624,8 +640,7 @@ impl JobSupervisorHandle for JobSupervisor {
         if let Some(live) = self.jobs.get(id) {
             let ring = live.ring.clone();
             let mut rd = ring.read_delta(since).await?;
-            if block && rd.bytes.is_empty() && live.state.load(Ordering::Acquire) == STATE_RUNNING
-            {
+            if block && rd.bytes.is_empty() && live.state.load(Ordering::Acquire) == STATE_RUNNING {
                 ring.wait_for_change(std::time::Duration::from_millis(timeout_ms))
                     .await;
                 rd = ring.read_delta(since).await?;
@@ -730,7 +745,9 @@ fn view_from_row(row: BashJobRow) -> JobView {
     let gate_result = if status == JobStatus::Completed && row.exit_code == Some(0) {
         Some(GateResult::Passed)
     } else if status.is_terminal() {
-        let kind = failure_kind.clone().unwrap_or_else(|| FailureKind::Other("unknown".into()));
+        let kind = failure_kind
+            .clone()
+            .unwrap_or_else(|| FailureKind::Other("unknown".into()));
         let detail = row.failure_detail.clone().unwrap_or_default();
         Some(GateResult::Failed {
             kind,

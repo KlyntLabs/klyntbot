@@ -3,10 +3,10 @@
 use std::sync::Arc;
 
 use feature_coding_bash::JobSupervisor;
-use storage::StoragePool;
 use storage::repos::BashJobRepo;
+use storage::StoragePool;
 use tempfile::tempdir;
-use tools_core::{JobSpec, JobSupervisorHandle, JobStatus};
+use tools_core::{JobSpec, JobStatus, JobSupervisorHandle};
 
 #[tokio::test]
 #[cfg_attr(not(target_os = "macos"), ignore)]
@@ -46,7 +46,10 @@ async fn stop_escalates_to_sigkill() {
         .expect("spawn");
 
     // Immediately stop
-    let stopped = supervisor.stop(&view.id, "test cancel").await.expect("stop");
+    let stopped = supervisor
+        .stop(&view.id, "test cancel")
+        .await
+        .expect("stop");
     assert_eq!(stopped.status, JobStatus::Cancelled);
 
     // Wait for SIGTERM→SIGKILL escalation (2s grace + a bit)

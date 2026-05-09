@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use feature_coding_bash::JobSupervisor;
-use storage::StoragePool;
 use storage::repos::BashJobRepo;
+use storage::StoragePool;
 use tempfile::tempdir;
 use tools_core::{JobSpec, JobSupervisorHandle};
 

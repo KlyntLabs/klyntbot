@@ -184,12 +184,11 @@ impl AppCore {
         let background_jobs_injector = Arc::new(feature_coding_bash::BackgroundJobsInjector::new(
             Arc::clone(&job_supervisor),
         ));
-        let exec_intel_injector: Arc<dyn bus::injection::DynamicInjector> = Arc::new(
-            feature_coding_bash::ExecutionIntelligenceInjector::new(
+        let exec_intel_injector: Arc<dyn bus::injection::DynamicInjector> =
+            Arc::new(feature_coding_bash::ExecutionIntelligenceInjector::new(
                 repos.coding_todo.clone(),
                 Arc::clone(&job_supervisor) as Arc<dyn tools_core::JobSupervisorHandle>,
-            )
-        );
+            ));
         let injector_registry = bus::InjectorRegistry::new(vec![
             plan_mode_injector as Arc<dyn bus::DynamicInjector>,
             background_jobs_injector as Arc<dyn bus::DynamicInjector>,
@@ -1984,7 +1983,8 @@ impl AppCore {
                 kit.register_all(&mut registry);
                 // Phase 2.3a — register background bash companion tools
                 registry.register(feature_coding_bash::tools::coding_task_list::CodingTaskListTool);
-                registry.register(feature_coding_bash::tools::coding_task_output::CodingTaskOutputTool);
+                registry
+                    .register(feature_coding_bash::tools::coding_task_output::CodingTaskOutputTool);
                 registry.register(feature_coding_bash::tools::coding_task_stop::CodingTaskStopTool);
                 info!("Coding tool kit registered (13 tools + 3 background bash companions)");
             }

@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use feature_coding_bash::JobSupervisor;
-use storage::StoragePool;
 use storage::repos::BashJobRepo;
+use storage::StoragePool;
 use tempfile::tempdir;
 use tools_core::{JobError, JobSpec, JobSupervisorHandle};
 
@@ -44,7 +44,10 @@ async fn cap_rejected_at_seven() {
 
     // 6 should succeed
     for i in 0..6 {
-        supervisor.spawn(mk(i)).await.expect("first 6 should succeed");
+        supervisor
+            .spawn(mk(i))
+            .await
+            .expect("first 6 should succeed");
     }
     // 7th rejected
     let err = supervisor.spawn(mk(6)).await.expect_err("7th should fail");

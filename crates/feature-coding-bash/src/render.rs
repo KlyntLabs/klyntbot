@@ -64,7 +64,10 @@ pub fn completion_notification(
         s.push_str("\nCompared to last run of this command:\n");
         s.push_str(&format_kind_transition(&d.kind_transition));
         s.push_str(&format_extracted_diff(&d.extracted_diff));
-        s.push_str(&format!("  Wall-clock: {}\n", format_elapsed_delta(d.elapsed_delta_ms)));
+        s.push_str(&format!(
+            "  Wall-clock: {}\n",
+            format_elapsed_delta(d.elapsed_delta_ms)
+        ));
     }
 
     let tail_start = final_summary.floor_char_boundary(final_summary.len().saturating_sub(8000));
@@ -78,8 +81,12 @@ fn format_kind_transition(t: &KindTransition) -> String {
     match t {
         KindTransition::StillPassing => "  Transition: StillPassing\n".into(),
         KindTransition::StillFailing { kind } => format!("  Transition: StillFailing ({kind})\n"),
-        KindTransition::Regressed { from, to } => format!("  Transition: Regressed ({from} → {to})\n"),
-        KindTransition::Recovered { prior_kind } => format!("  Transition: Recovered ({prior_kind} → Passed)\n"),
+        KindTransition::Regressed { from, to } => {
+            format!("  Transition: Regressed ({from} → {to})\n")
+        }
+        KindTransition::Recovered { prior_kind } => {
+            format!("  Transition: Recovered ({prior_kind} → Passed)\n")
+        }
         KindTransition::Changed { from, to } => format!("  Transition: Changed ({from} → {to})\n"),
     }
 }
@@ -87,21 +94,39 @@ fn format_kind_transition(t: &KindTransition) -> String {
 fn format_extracted_diff(d: &ExtractedDiff) -> String {
     match d {
         ExtractedDiff::None => String::new(),
-        ExtractedDiff::TestSet { new_failures, still_failing, resolved } => {
+        ExtractedDiff::TestSet {
+            new_failures,
+            still_failing,
+            resolved,
+        } => {
             let mut s = String::from("  Test diff:\n");
             s.push_str(&format!("    new failures:  {}\n", trim_set(new_failures)));
             s.push_str(&format!("    still failing: {}\n", trim_set(still_failing)));
             s.push_str(&format!("    resolved:      {}\n", trim_set(resolved)));
             s
         }
-        ExtractedDiff::Compile { same_location, prior_loc, curr_loc } => {
-            let same = if *same_location { "same location" } else { "different location" };
-            format!(
-                "  Compile diff: {same} (prior: {prior_loc:?}, curr: {curr_loc:?})\n"
-            )
+        ExtractedDiff::Compile {
+            same_location,
+            prior_loc,
+            curr_loc,
+        } => {
+            let same = if *same_location {
+                "same location"
+            } else {
+                "different location"
+            };
+            format!("  Compile diff: {same} (prior: {prior_loc:?}, curr: {curr_loc:?})\n")
         }
-        ExtractedDiff::Bind { same_port, prior_port, curr_port } => {
-            let same = if *same_port { "same port" } else { "different port" };
+        ExtractedDiff::Bind {
+            same_port,
+            prior_port,
+            curr_port,
+        } => {
+            let same = if *same_port {
+                "same port"
+            } else {
+                "different port"
+            };
             format!("  Bind diff: {same} (prior: {prior_port:?}, curr: {curr_port:?})\n")
         }
         ExtractedDiff::Lint { delta_n_errors } => {
@@ -145,8 +170,8 @@ use crate::intelligence::VerificationVerb;
 
 pub struct VerificationAffordance<'a> {
     pub todo_id: &'a str,
-    pub title:   &'a str,
-    pub verb:    VerificationVerb,
+    pub title: &'a str,
+    pub verb: VerificationVerb,
 }
 
 pub fn verification_affordance_reminder(items: &[VerificationAffordance<'_>]) -> String {
@@ -172,8 +197,16 @@ mod verification_affordance_tests {
     #[test]
     fn renders_each_item() {
         let items = [
-            VerificationAffordance { todo_id: "t1", title: "Run integration tests", verb: VerificationVerb::Run },
-            VerificationAffordance { todo_id: "t2", title: "Verify migration safety", verb: VerificationVerb::Verify },
+            VerificationAffordance {
+                todo_id: "t1",
+                title: "Run integration tests",
+                verb: VerificationVerb::Run,
+            },
+            VerificationAffordance {
+                todo_id: "t2",
+                title: "Verify migration safety",
+                verb: VerificationVerb::Verify,
+            },
         ];
         let body = verification_affordance_reminder(&items);
         assert!(body.contains("Plan mode active"));

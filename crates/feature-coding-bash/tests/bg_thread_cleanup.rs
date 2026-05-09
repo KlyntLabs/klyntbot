@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use feature_coding_bash::JobSupervisor;
-use storage::StoragePool;
 use storage::repos::BashJobRepo;
+use storage::StoragePool;
 use tempfile::tempdir;
 use tools_core::{JobSpec, JobSupervisorHandle};
 
@@ -55,10 +55,7 @@ async fn reap_kills_jobs_leaves_rows() {
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
     // Rows should still exist (cascade-delete is by FK; reap doesn't delete rows)
-    let all = repo
-        .list_all_for_session("session-a", false)
-        .await
-        .unwrap();
+    let all = repo.list_all_for_session("session-a", false).await.unwrap();
     assert_eq!(all.len(), 2);
 
     // Both should be terminal

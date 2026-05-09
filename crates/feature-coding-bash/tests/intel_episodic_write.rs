@@ -19,12 +19,24 @@ async fn pool_with_tables() -> StoragePool {
     sqlx::query(&m1.sql).execute(pool.inner()).await.unwrap();
 
     // cognitive episodic_memories table + extensions
-    sqlx::query(include_str!("../../cognitive/migrations/001_cognitive_tables.sql"))
-        .execute(pool.inner()).await.unwrap();
-    sqlx::query(include_str!("../../cognitive/migrations/014_hierarchical_episodics.sql"))
-        .execute(pool.inner()).await.unwrap();
-    sqlx::query(include_str!("../../cognitive/migrations/016_episodic_actor_id.sql"))
-        .execute(pool.inner()).await.unwrap();
+    sqlx::query(include_str!(
+        "../../cognitive/migrations/001_cognitive_tables.sql"
+    ))
+    .execute(pool.inner())
+    .await
+    .unwrap();
+    sqlx::query(include_str!(
+        "../../cognitive/migrations/014_hierarchical_episodics.sql"
+    ))
+    .execute(pool.inner())
+    .await
+    .unwrap();
+    sqlx::query(include_str!(
+        "../../cognitive/migrations/016_episodic_actor_id.sql"
+    ))
+    .execute(pool.inner())
+    .await
+    .unwrap();
 
     pool
 }
@@ -38,7 +50,10 @@ async fn failed_job_writes_episodic_memory() {
     let ep_repo = EpisodicMemoryRepo::new(pool.inner().clone());
 
     // Set up the signal source manually (skip the full MirrorEngine).
-    let source = Arc::new(BackgroundJobSignalSource::new(ep_repo.clone(), bash_repo_arc.clone()));
+    let source = Arc::new(BackgroundJobSignalSource::new(
+        ep_repo.clone(),
+        bash_repo_arc.clone(),
+    ));
 
     // Set up supervisor and spawn a failing job.
     let bus = Arc::new(DomainEventBus::new(64));
@@ -53,24 +68,34 @@ async fn failed_job_writes_episodic_memory() {
         Arc::new(klynt_sandbox::MacOsSeatbeltRunner::new()),
     ));
 
-    let v: tools_core::JobView = supervisor.spawn(JobSpec {
-        session_id: "s1".into(),
-        agent_id:   "a1".into(),
-        agent_chain: vec!["a1".into()],
-        description: "test failure".into(),
-        command: "false".into(),
-        cwd: std::env::temp_dir(),
-        timeout_ms: 30_000,
-        silent_completion: false,
-    }).await.unwrap();
+    let v: tools_core::JobView = supervisor
+        .spawn(JobSpec {
+            session_id: "s1".into(),
+            agent_id: "a1".into(),
+            agent_chain: vec!["a1".into()],
+            description: "test failure".into(),
+            command: "false".into(),
+            cwd: std::env::temp_dir(),
+            timeout_ms: 30_000,
+            silent_completion: false,
+        })
+        .await
+        .unwrap();
 
     // Wait for completion.
     tokio::time::sleep(Duration::from_secs(3)).await;
 
     // Fetch the row from the repo and manually trigger the source.
     let row = bash_repo_arc.get(v.id.as_str()).await.unwrap().unwrap();
-    eprintln!("DEBUG: job status = {:?}, exit_code = {:?}", row.status, row.exit_code);
-    assert_eq!(row.status, "Failed", "expected job to fail, got status: {}", row.status);
+    eprintln!(
+        "DEBUG: job status = {:?}, exit_code = {:?}",
+        row.status, row.exit_code
+    );
+    assert_eq!(
+        row.status, "Failed",
+        "expected job to fail, got status: {}",
+        row.status
+    );
     let event = DomainEvent::BashJob(bus::BashJobEvent::Failed {
         job_id: row.id.clone(),
         thread_id: row.session_id.clone(),
@@ -100,10 +125,14 @@ async fn failed_job_writes_episodic_memory() {
     let mem = cognitive::mirror::sources::coding_bash::build_episodic_memory(&row);
     ep_repo.insert(&mem).await.unwrap();
 
-    let row_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM episodic_memories WHERE kind = 'bash_job'"
-    )
-    .fetch_one(pool.inner()).await.unwrap();
+    let row_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM episodic_memories WHERE kind = 'bash_job'")
+            .fetch_one(pool.inner())
+            .await
+            .unwrap();
 
-    assert!(row_count >= 1, "expected ≥1 bash_job episode, got {row_count}");
+    assert!(
+        row_count >= 1,
+        "expected ≥1 bash_job episode, got {row_count}"
+    );
 }

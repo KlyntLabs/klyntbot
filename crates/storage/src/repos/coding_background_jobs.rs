@@ -513,7 +513,10 @@ mod tests {
         r2.finished_at = Some(t2);
         repo.insert(&r2).await.unwrap();
 
-        let prior = repo.find_prior_by_command_key("s1", "k1", "bash-x").await.unwrap();
+        let prior = repo
+            .find_prior_by_command_key("s1", "k1", "bash-x")
+            .await
+            .unwrap();
         assert_eq!(prior.unwrap().id, "bash-b");
     }
 
@@ -526,7 +529,11 @@ mod tests {
         r1.status = "Completed".into();
         repo.insert(&r1).await.unwrap();
 
-        assert!(repo.find_prior_by_command_key("s1", "k1", "bash-a").await.unwrap().is_none());
+        assert!(repo
+            .find_prior_by_command_key("s1", "k1", "bash-a")
+            .await
+            .unwrap()
+            .is_none());
     }
 
     #[tokio::test]
@@ -538,14 +545,22 @@ mod tests {
         r1.status = "Lost".into();
         repo.insert(&r1).await.unwrap();
 
-        assert!(repo.find_prior_by_command_key("s1", "k1", "bash-x").await.unwrap().is_none());
+        assert!(repo
+            .find_prior_by_command_key("s1", "k1", "bash-x")
+            .await
+            .unwrap()
+            .is_none());
     }
 
     #[tokio::test]
     async fn find_prior_returns_none_when_no_prior() {
         let pool = setup().await;
         let repo = BashJobRepo::new(pool);
-        assert!(repo.find_prior_by_command_key("s1", "k1", "bash-x").await.unwrap().is_none());
+        assert!(repo
+            .find_prior_by_command_key("s1", "k1", "bash-x")
+            .await
+            .unwrap()
+            .is_none());
     }
 
     #[tokio::test]
@@ -557,6 +572,10 @@ mod tests {
         r1.status = "Completed".into();
         repo.insert(&r1).await.unwrap();
 
-        assert!(repo.find_prior_by_command_key("s2", "k1", "bash-x").await.unwrap().is_none());
+        assert!(repo
+            .find_prior_by_command_key("s2", "k1", "bash-x")
+            .await
+            .unwrap()
+            .is_none());
     }
 }

@@ -9,16 +9,15 @@ use tools_core::JobSupervisorHandle;
 use crate::state::AppCore;
 
 fn parse_job_id(job_id: &str) -> Result<tools_core::JobId, ApiError> {
-    tools_core::JobId::from_str(job_id)
-        .map_err(|e| ApiError::new("INVALID_JOB_ID", e.to_string()))
+    tools_core::JobId::from_str(job_id).map_err(|e| ApiError::new("INVALID_JOB_ID", e.to_string()))
 }
 
 fn require_supervisor(
     core: &AppCore,
 ) -> Result<&Arc<feature_coding_bash::JobSupervisor>, ApiError> {
-    core.job_supervisor.as_ref().ok_or_else(|| {
-        ApiError::new("FEATURE_DISABLED", "background bash jobs not initialized")
-    })
+    core.job_supervisor
+        .as_ref()
+        .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "background bash jobs not initialized"))
 }
 
 #[tracing::instrument(skip(core), err)]
@@ -71,10 +70,7 @@ pub async fn coding_jobs_output(
 }
 
 #[tracing::instrument(skip(core), err)]
-pub async fn coding_jobs_stop(
-    core: &AppCore,
-    job_id: &str,
-) -> Result<BashJobView, ApiError> {
+pub async fn coding_jobs_stop(core: &AppCore, job_id: &str) -> Result<BashJobView, ApiError> {
     let id = parse_job_id(job_id)?;
     let view = require_supervisor(core)?
         .stop(&id, "user requested")
@@ -84,10 +80,7 @@ pub async fn coding_jobs_stop(
 }
 
 #[tracing::instrument(skip(core), err)]
-pub fn coding_jobs_log_path(
-    core: &AppCore,
-    job_id: &str,
-) -> Result<std::path::PathBuf, ApiError> {
+pub fn coding_jobs_log_path(core: &AppCore, job_id: &str) -> Result<std::path::PathBuf, ApiError> {
     let id = parse_job_id(job_id)?;
     Ok(require_supervisor(core)?.log_path(&id))
 }

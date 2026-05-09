@@ -15,12 +15,24 @@ async fn pool_with_tables() -> StoragePool {
     let pool = StoragePool::connect_in_memory().await.unwrap();
     let m1 = feature_coding_bash::migrations::coding_background_jobs_migration();
     sqlx::query(&m1.sql).execute(pool.inner()).await.unwrap();
-    sqlx::query(include_str!("../../cognitive/migrations/001_cognitive_tables.sql"))
-        .execute(pool.inner()).await.unwrap();
-    sqlx::query(include_str!("../../cognitive/migrations/014_hierarchical_episodics.sql"))
-        .execute(pool.inner()).await.unwrap();
-    sqlx::query(include_str!("../../cognitive/migrations/016_episodic_actor_id.sql"))
-        .execute(pool.inner()).await.unwrap();
+    sqlx::query(include_str!(
+        "../../cognitive/migrations/001_cognitive_tables.sql"
+    ))
+    .execute(pool.inner())
+    .await
+    .unwrap();
+    sqlx::query(include_str!(
+        "../../cognitive/migrations/014_hierarchical_episodics.sql"
+    ))
+    .execute(pool.inner())
+    .await
+    .unwrap();
+    sqlx::query(include_str!(
+        "../../cognitive/migrations/016_episodic_actor_id.sql"
+    ))
+    .execute(pool.inner())
+    .await
+    .unwrap();
     pool
 }
 
@@ -33,7 +45,10 @@ async fn passed_job_writes_episode_with_importance_0_3() {
     let ep_repo = EpisodicMemoryRepo::new(pool.inner().clone());
     let ep_repo_clone = ep_repo.clone();
 
-    let source = Arc::new(BackgroundJobSignalSource::new(ep_repo, bash_repo_arc.clone()));
+    let source = Arc::new(BackgroundJobSignalSource::new(
+        ep_repo,
+        bash_repo_arc.clone(),
+    ));
 
     let bus = Arc::new(DomainEventBus::new(64));
     let queue = Arc::new(bus::context_updates::ContextUpdateQueue::new());
@@ -47,16 +62,19 @@ async fn passed_job_writes_episode_with_importance_0_3() {
         Arc::new(klynt_sandbox::MacOsSeatbeltRunner::new()),
     ));
 
-    let v: tools_core::JobView = supervisor.spawn(JobSpec {
-        session_id: "s1".into(),
-        agent_id:   "a1".into(),
-        agent_chain: vec!["a1".into()],
-        description: "test pass".into(),
-        command: "true".into(),
-        cwd: std::env::temp_dir(),
-        timeout_ms: 30_000,
-        silent_completion: false,
-    }).await.unwrap();
+    let v: tools_core::JobView = supervisor
+        .spawn(JobSpec {
+            session_id: "s1".into(),
+            agent_id: "a1".into(),
+            agent_chain: vec!["a1".into()],
+            description: "test pass".into(),
+            command: "true".into(),
+            cwd: std::env::temp_dir(),
+            timeout_ms: 30_000,
+            silent_completion: false,
+        })
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_secs(2)).await;
 
@@ -87,8 +105,10 @@ async fn passed_job_writes_episode_with_importance_0_3() {
     source.accumulate(&signal).await.unwrap();
 
     let importance: f64 = sqlx::query_scalar(
-        "SELECT importance FROM episodic_memories WHERE kind = 'bash_job' LIMIT 1"
+        "SELECT importance FROM episodic_memories WHERE kind = 'bash_job' LIMIT 1",
     )
-    .fetch_one(pool.inner()).await.unwrap();
+    .fetch_one(pool.inner())
+    .await
+    .unwrap();
     assert!((importance - 0.3).abs() < 0.01, "got {importance}");
 }

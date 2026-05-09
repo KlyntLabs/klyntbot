@@ -3,10 +3,9 @@
 use std::sync::Arc;
 
 use feature_coding_bash::JobSupervisor;
-use storage::StoragePool;
 use storage::repos::{BashJobRepo, BashJobRow};
+use storage::StoragePool;
 use tempfile::tempdir;
-
 
 #[tokio::test]
 async fn marks_orphan_lost_and_preserves_log() {

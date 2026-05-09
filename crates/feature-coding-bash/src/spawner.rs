@@ -48,14 +48,14 @@ mod tests {
     async fn spawned_child_inherits_env() {
         let sandbox = MacOsSeatbeltRunner::new();
         let dir = tempfile::tempdir().unwrap();
-        let mut handle = spawn_background_command(
-            &sandbox,
-            "echo $GIT_EDITOR",
-            dir.path(),
-        ).expect("spawn");
+        let mut handle =
+            spawn_background_command(&sandbox, "echo $GIT_EDITOR", dir.path()).expect("spawn");
         let mut buf = Vec::new();
         handle.stdout.read_to_end(&mut buf).await.unwrap();
         let s = String::from_utf8_lossy(&buf);
-        assert!(s.contains("true"), "GIT_EDITOR=true should be set, got: {s:?}");
+        assert!(
+            s.contains("true"),
+            "GIT_EDITOR=true should be set, got: {s:?}"
+        );
     }
 }

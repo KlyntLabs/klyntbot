@@ -30,14 +30,14 @@ pub use config_persistence::ConfigPersistence;
 pub use events::ToolEvent;
 pub use feature::{FeatureMigration, FeaturePackage, HealthStatus};
 pub use interceptor::{InterceptorChain, ToolCallInterceptor};
-pub use metadata::{CostHint, ToolCategory, ToolMetadata, ToolSource};
-pub use pagination::Page;
-pub use params::ParamExtractor;
-pub use registry::ToolRegistry;
 pub use job_supervisor::{
     DynJobSupervisor, FailureKind, GateResult, JobError, JobId, JobSpec, JobStatus,
     JobSupervisorHandle, JobView, RingRead,
 };
+pub use metadata::{CostHint, ToolCategory, ToolMetadata, ToolSource};
+pub use pagination::Page;
+pub use params::ParamExtractor;
+pub use registry::ToolRegistry;
 pub use routing::{InteractionBundle, InteractionChannel, ProgressHandler, RoutingContext};
 pub use search::{rrf_merge, rrf_merge_triple, Searchable};
 

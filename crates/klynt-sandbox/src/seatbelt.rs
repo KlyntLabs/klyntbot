@@ -5,7 +5,6 @@ use async_trait::async_trait;
 use std::path::Path;
 use std::time::Duration;
 
-
 const TEMPLATE: &str = include_str!("seatbelt_template.sbpl");
 
 pub struct MacOsSeatbeltRunner;

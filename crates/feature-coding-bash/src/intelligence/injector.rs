@@ -16,13 +16,16 @@ use crate::intelligence::{classify_verification, VerificationVerb};
 use crate::render::{verification_affordance_reminder, VerificationAffordance};
 
 pub struct ExecutionIntelligenceInjector {
-    todo_repo:  TodoRepo,
+    todo_repo: TodoRepo,
     supervisor: Arc<dyn JobSupervisorHandle>,
 }
 
 impl ExecutionIntelligenceInjector {
     pub fn new(todo_repo: TodoRepo, supervisor: Arc<dyn JobSupervisorHandle>) -> Self {
-        Self { todo_repo, supervisor }
+        Self {
+            todo_repo,
+            supervisor,
+        }
     }
 }
 
@@ -43,9 +46,8 @@ impl DynamicInjector for ExecutionIntelligenceInjector {
         // Block on async TodoRepo + JobSupervisor reads. The injector trait
         // is synchronous; we mirror PlanModeInjector's pattern.
         let todos = match tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(
-                self.todo_repo.list_for_thread(ctx.thread_id())
-            )
+            tokio::runtime::Handle::current()
+                .block_on(self.todo_repo.list_for_thread(ctx.thread_id()))
         }) {
             Ok(items) => items,
             Err(e) => {
@@ -55,9 +57,11 @@ impl DynamicInjector for ExecutionIntelligenceInjector {
         };
 
         let active_jobs = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(
-                self.supervisor.list(ctx.thread_id(), chain, true)
-            )
+            tokio::runtime::Handle::current().block_on(self.supervisor.list(
+                ctx.thread_id(),
+                chain,
+                true,
+            ))
         });
 
         // Filter: pending or in-progress todos whose title classifies, and which
@@ -74,16 +78,24 @@ impl DynamicInjector for ExecutionIntelligenceInjector {
             };
 
             for item in items {
-                let Some(title) = item.get("title").and_then(|v| v.as_str()) else { continue };
+                let Some(title) = item.get("title").and_then(|v| v.as_str()) else {
+                    continue;
+                };
                 let status = item.get("status").and_then(|v| v.as_str()).unwrap_or("");
                 if !is_pending_or_in_progress(status) {
                     continue;
                 }
-                let Some(verb) = classify_verification(title) else { continue };
+                let Some(verb) = classify_verification(title) else {
+                    continue;
+                };
                 if active_jobs.iter().any(|j| j.description.contains(title)) {
                     continue;
                 }
-                let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let id = item
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 affordances.push((id, title.to_string(), verb));
             }
         }
@@ -96,15 +108,15 @@ impl DynamicInjector for ExecutionIntelligenceInjector {
             .iter()
             .map(|(id, title, verb)| VerificationAffordance {
                 todo_id: id.as_str(),
-                title:   title.as_str(),
-                verb:    *verb,
+                title: title.as_str(),
+                verb: *verb,
             })
             .collect();
 
         let body = verification_affordance_reminder(&view);
         vec![ContextUpdate {
-            reason:   ContextUpdateReason::CodingJobsChanged,
-            content:  Some(body),
+            reason: ContextUpdateReason::CodingJobsChanged,
+            content: Some(body),
             metadata: None,
             priority: UpdatePriority::Normal,
             timestamp: Timestamp::now(),

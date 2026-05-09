@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use bus::context_updates::ContextUpdateReason;
 use feature_coding_bash::JobSupervisor;
-use storage::StoragePool;
 use storage::repos::BashJobRepo;
+use storage::StoragePool;
 use tempfile::tempdir;
 use tools_core::{JobSpec, JobSupervisorHandle};
 
@@ -51,8 +51,13 @@ async fn failed_job_pushes_context_update() {
 
     let updates = queue.drain();
     assert!(
-        updates.iter().any(|u| u.reason == ContextUpdateReason::CodingJobsChanged
-            && u.content.as_deref().map(|c| c.contains("Failed")).unwrap_or(false)),
+        updates
+            .iter()
+            .any(|u| u.reason == ContextUpdateReason::CodingJobsChanged
+                && u.content
+                    .as_deref()
+                    .map(|c| c.contains("Failed"))
+                    .unwrap_or(false)),
         "expected CodingJobsChanged update with 'Failed', got: {:?}",
         updates
     );

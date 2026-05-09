@@ -152,9 +152,7 @@ impl BashTool {
         })?;
         if description.is_empty() || description.len() > 120 {
             return Err(common::KlyntbotError::Tool(
-                common::ToolError::ExecutionFailed(
-                    "description must be 1-120 chars".into(),
-                ),
+                common::ToolError::ExecutionFailed("description must be 1-120 chars".into()),
             ));
         }
         let cwd = args
@@ -172,14 +170,11 @@ impl BashTool {
             timeout_ms: args.timeout_ms.unwrap_or(600_000),
             silent_completion: args.silent_completion.unwrap_or(false),
         };
-        let view = supervisor
-            .spawn(spec)
-            .await
-            .map_err(|e| {
-                common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
-                    "spawn failed: {e}"
-                )))
-            })?;
+        let view = supervisor.spawn(spec).await.map_err(|e| {
+            common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
+                "spawn failed: {e}"
+            )))
+        })?;
         Ok(format!(
             "Started background job {}.\nDescription: {}\nInspect:    coding_task_output(\"{}\")\nCancel:     coding_task_stop(\"{}\")\n\nThis job will auto-notify on completion.",
             view.id.as_str(), view.description, view.id.as_str(), view.id.as_str(),
@@ -231,9 +226,7 @@ impl BashTool {
                 )
                 .await
                 .map_err(|e| {
-                    common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
-                        e.to_string(),
-                    ))
+                    common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(e.to_string()))
                 })?;
             Ok(out.stdout)
         }

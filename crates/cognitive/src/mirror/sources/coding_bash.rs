@@ -24,12 +24,15 @@ const SUBSCRIBED_KINDS: &[&str] = &[
 
 pub struct BackgroundJobSignalSource {
     episodic_repo: EpisodicMemoryRepo,
-    bash_repo:     Arc<BashJobRepo>,
+    bash_repo: Arc<BashJobRepo>,
 }
 
 impl BackgroundJobSignalSource {
     pub fn new(episodic_repo: EpisodicMemoryRepo, bash_repo: Arc<BashJobRepo>) -> Self {
-        Self { episodic_repo, bash_repo }
+        Self {
+            episodic_repo,
+            bash_repo,
+        }
     }
 }
 
@@ -72,16 +75,18 @@ impl MirrorSignalSource for BackgroundJobSignalSource {
         Ok(())
     }
 
-    async fn flush(&self) -> common::Result<()> { Ok(()) }
+    async fn flush(&self) -> common::Result<()> {
+        Ok(())
+    }
 }
 
 pub fn build_episodic_memory(row: &BashJobRow) -> EpisodicMemory {
     let importance = match row.status.as_str() {
-        "Failed"    => 0.7,
-        "Lost"      => 0.6,
+        "Failed" => 0.7,
+        "Lost" => 0.6,
         "Cancelled" => 0.5,
         "Completed" => 0.3,
-        _           => 0.3,
+        _ => 0.3,
     };
     let elapsed_ms = match row.finished_at {
         Some(end) => {
@@ -107,17 +112,22 @@ pub fn build_episodic_memory(row: &BashJobRow) -> EpisodicMemory {
         "elapsed_ms":        elapsed_ms,
         "failure_kind":      row.failure_kind,
         "failure_extracted": extracted,
-    }).to_string();
+    })
+    .to_string();
 
     let summary = render_episode_summary(row, elapsed_ms);
 
     let metadata = serde_json::json!({
         "agent_id":  row.agent_id,
         "thread_id": row.session_id,
-    }).to_string();
+    })
+    .to_string();
 
     let now = Timestamp::now().to_string();
-    let occurred_at = row.finished_at.map(|t| t.to_string()).unwrap_or_else(|| now.clone());
+    let occurred_at = row
+        .finished_at
+        .map(|t| t.to_string())
+        .unwrap_or_else(|| now.clone());
 
     EpisodicMemory {
         id: Uuid::new_v4().to_string(),
@@ -153,7 +163,10 @@ fn render_episode_summary(row: &BashJobRow, elapsed_ms: u64) -> String {
             truncate(&row.command, 60),
             secs
         ),
-        ("Lost", _) => format!("Lost `{}` (Klynt restarted mid-run)", truncate(&row.command, 60)),
+        ("Lost", _) => format!(
+            "Lost `{}` (Klynt restarted mid-run)",
+            truncate(&row.command, 60)
+        ),
         ("Failed", Some(kind)) => format!(
             "{} in `{}` after {:.1}s",
             kind,
@@ -242,7 +255,8 @@ mod tests {
 
     #[test]
     fn spec_returns_4_kinds() {
-        let pool = futures::executor::block_on(async {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let pool = rt.block_on(async {
             storage::StoragePool::connect_in_memory().await.unwrap()
         });
         let bash_repo = Arc::new(BashJobRepo::new(pool.inner().clone()));

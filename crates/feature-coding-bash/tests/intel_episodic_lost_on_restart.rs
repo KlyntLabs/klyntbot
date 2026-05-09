@@ -9,18 +9,33 @@ use cognitive::mirror::sources::BackgroundJobSignalSource;
 use cognitive::repos::EpisodicMemoryRepo;
 use feature_coding_bash::JobSupervisor;
 use jiff::Timestamp;
-use storage::{repos::{BashJobRepo, BashJobRow}, StoragePool};
+use storage::{
+    repos::{BashJobRepo, BashJobRow},
+    StoragePool,
+};
 
 async fn pool_with_tables() -> StoragePool {
     let pool = StoragePool::connect_in_memory().await.unwrap();
     let m1 = feature_coding_bash::migrations::coding_background_jobs_migration();
     sqlx::query(&m1.sql).execute(pool.inner()).await.unwrap();
-    sqlx::query(include_str!("../../cognitive/migrations/001_cognitive_tables.sql"))
-        .execute(pool.inner()).await.unwrap();
-    sqlx::query(include_str!("../../cognitive/migrations/014_hierarchical_episodics.sql"))
-        .execute(pool.inner()).await.unwrap();
-    sqlx::query(include_str!("../../cognitive/migrations/016_episodic_actor_id.sql"))
-        .execute(pool.inner()).await.unwrap();
+    sqlx::query(include_str!(
+        "../../cognitive/migrations/001_cognitive_tables.sql"
+    ))
+    .execute(pool.inner())
+    .await
+    .unwrap();
+    sqlx::query(include_str!(
+        "../../cognitive/migrations/014_hierarchical_episodics.sql"
+    ))
+    .execute(pool.inner())
+    .await
+    .unwrap();
+    sqlx::query(include_str!(
+        "../../cognitive/migrations/016_episodic_actor_id.sql"
+    ))
+    .execute(pool.inner())
+    .await
+    .unwrap();
     pool
 }
 
@@ -32,7 +47,10 @@ async fn lost_episode_written_on_reconcile() {
     let bash_repo_arc = Arc::new(bash_repo.clone());
     let ep_repo = EpisodicMemoryRepo::new(pool.inner().clone());
 
-    let source = Arc::new(BackgroundJobSignalSource::new(ep_repo.clone(), bash_repo_arc.clone()));
+    let source = Arc::new(BackgroundJobSignalSource::new(
+        ep_repo.clone(),
+        bash_repo_arc.clone(),
+    ));
 
     let bus = Arc::new(DomainEventBus::new(64));
     let queue = Arc::new(bus::context_updates::ContextUpdateQueue::new());
@@ -105,8 +123,10 @@ async fn lost_episode_written_on_reconcile() {
     source.accumulate(&signal).await.unwrap();
 
     let importance: f64 = sqlx::query_scalar(
-        "SELECT importance FROM episodic_memories WHERE kind = 'bash_job' LIMIT 1"
+        "SELECT importance FROM episodic_memories WHERE kind = 'bash_job' LIMIT 1",
     )
-    .fetch_one(pool.inner()).await.unwrap();
+    .fetch_one(pool.inner())
+    .await
+    .unwrap();
     assert!((importance - 0.6).abs() < 0.01, "got {importance}");
 }

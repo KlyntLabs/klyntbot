@@ -3,12 +3,16 @@
 use std::sync::Arc;
 
 use feature_coding_bash::JobSupervisor;
-use storage::StoragePool;
 use storage::repos::BashJobRepo;
+use storage::StoragePool;
 use tempfile::tempdir;
 use tools_core::{JobSpec, JobSupervisorHandle};
 
-async fn run_script(supervisor: &JobSupervisor, description: &str, script: &str) -> tools_core::JobView {
+async fn run_script(
+    supervisor: &JobSupervisor,
+    description: &str,
+    script: &str,
+) -> tools_core::JobView {
     let dir = std::env::temp_dir();
     supervisor
         .spawn(JobSpec {

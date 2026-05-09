@@ -13,11 +13,18 @@ struct StubSupervisor;
 
 #[async_trait::async_trait]
 impl JobSupervisorHandle for StubSupervisor {
-    async fn spawn(&self, _: JobSpec) -> Result<JobView, JobError> { unimplemented!() }
-    async fn output_delta(&self, _: &JobId, _: u64, _: bool, _: u64
-    ) -> Result<RingRead, JobError> { unimplemented!() }
-    async fn stop(&self, _: &JobId, _: &str) -> Result<JobView, JobError> { unimplemented!() }
-    async fn list(&self, _: &str, _: &[String], _: bool) -> Vec<JobView> { vec![] }
+    async fn spawn(&self, _: JobSpec) -> Result<JobView, JobError> {
+        unimplemented!()
+    }
+    async fn output_delta(&self, _: &JobId, _: u64, _: bool, _: u64) -> Result<RingRead, JobError> {
+        unimplemented!()
+    }
+    async fn stop(&self, _: &JobId, _: &str) -> Result<JobView, JobError> {
+        unimplemented!()
+    }
+    async fn list(&self, _: &str, _: &[String], _: bool) -> Vec<JobView> {
+        vec![]
+    }
 }
 
 struct PlanCtx {
@@ -28,18 +35,29 @@ struct PlanCtx {
 }
 
 impl InjectorContext for PlanCtx {
-    fn thread_id(&self) -> &str { &self.thread_id }
-    fn agent_id(&self) -> &str { &self.agent_id }
-    fn plan_mode_active(&self) -> bool { self.plan_active }
-    fn plan_session_id(&self) -> Option<&str> { None }
-    fn agent_chain(&self) -> &[String] { &self.chain }
+    fn thread_id(&self) -> &str {
+        &self.thread_id
+    }
+    fn agent_id(&self) -> &str {
+        &self.agent_id
+    }
+    fn plan_mode_active(&self) -> bool {
+        self.plan_active
+    }
+    fn plan_session_id(&self) -> Option<&str> {
+        None
+    }
+    fn agent_chain(&self) -> &[String] {
+        &self.chain
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn renders_affordance_for_verification_verb_todos() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
     // Apply todo migration manually:
-    sqlx::query(r#"
+    sqlx::query(
+        r#"
         CREATE TABLE IF NOT EXISTS coding_todos (
             thread_id TEXT NOT NULL,
             agent_id TEXT NOT NULL,
@@ -48,7 +66,11 @@ async fn renders_affordance_for_verification_verb_todos() {
             updated_at TEXT NOT NULL,
             PRIMARY KEY (thread_id, agent_id)
         );
-    "#).execute(pool.inner()).await.unwrap();
+    "#,
+    )
+    .execute(pool.inner())
+    .await
+    .unwrap();
 
     let todo_repo = TodoRepo::new(pool.inner().clone());
     // Insert two todos: one Run, one Refactor.
@@ -65,8 +87,8 @@ async fn renders_affordance_for_verification_verb_todos() {
 
     let ctx = PlanCtx {
         thread_id: "t1".into(),
-        agent_id:  "a1".into(),
-        chain:     vec!["a1".into()],
+        agent_id: "a1".into(),
+        chain: vec!["a1".into()],
         plan_active: true,
     };
 
@@ -86,8 +108,8 @@ async fn no_affordance_when_plan_mode_inactive() {
 
     let ctx = PlanCtx {
         thread_id: "t1".into(),
-        agent_id:  "a1".into(),
-        chain:     vec!["a1".into()],
+        agent_id: "a1".into(),
+        chain: vec!["a1".into()],
         plan_active: false,
     };
 

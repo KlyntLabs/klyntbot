@@ -215,9 +215,13 @@ impl AppCore {
         // Phase 2.3a — reap any live background bash jobs before deleting the thread
         if let Some(ref supervisor) = self.job_supervisor {
             match supervisor.reap_session(&session_key).await {
-                Ok(n) if n > 0 => tracing::info!(session = %session_key, count = n, "reaped background jobs on thread delete"),
+                Ok(n) if n > 0 => {
+                    tracing::info!(session = %session_key, count = n, "reaped background jobs on thread delete")
+                }
                 Ok(_) => {}
-                Err(e) => tracing::warn!(session = %session_key, "failed to reap background jobs: {e}"),
+                Err(e) => {
+                    tracing::warn!(session = %session_key, "failed to reap background jobs: {e}")
+                }
             }
         }
         chat_delete_thread(

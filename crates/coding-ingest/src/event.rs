@@ -368,7 +368,6 @@ pub enum BackgroundJobPhase {
     Lost,
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -5377,12 +5377,15 @@ dependencies = [
 name = "feature-coding-bash"
 version = "0.1.1"
 dependencies = [
+ "ai-core",
  "approval",
  "async-trait",
  "bus",
+ "cognitive",
  "common",
  "config",
  "dashmap",
+ "hex",
  "jiff",
  "klynt-pty",
  "klynt-sandbox",
@@ -5391,6 +5394,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "specta",
  "sqlx",
  "storage",

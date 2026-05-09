@@ -60,14 +60,16 @@ pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
 }
 
 fn translate_bash_job(event: &bus::DomainEvent) -> Option<AiSignal> {
-    let bus::DomainEvent::BashJob(inner) = event else { return None };
+    let bus::DomainEvent::BashJob(inner) = event else {
+        return None;
+    };
 
     let kind = match inner {
-        bus::BashJobEvent::Started   { .. } => "BashJob.Started",
+        bus::BashJobEvent::Started { .. } => "BashJob.Started",
         bus::BashJobEvent::Completed { .. } => "BashJob.Completed",
-        bus::BashJobEvent::Failed    { .. } => "BashJob.Failed",
+        bus::BashJobEvent::Failed { .. } => "BashJob.Failed",
         bus::BashJobEvent::Cancelled { .. } => "BashJob.Cancelled",
-        bus::BashJobEvent::Lost      { .. } => "BashJob.Lost",
+        bus::BashJobEvent::Lost { .. } => "BashJob.Lost",
     };
 
     Some(AiSignal {
@@ -94,11 +96,11 @@ fn translate_bash_job(event: &bus::DomainEvent) -> Option<AiSignal> {
 
 fn importance_for_bash_event(e: &bus::BashJobEvent) -> f64 {
     match e {
-        bus::BashJobEvent::Failed { .. }    => 0.7,
-        bus::BashJobEvent::Lost { .. }      => 0.6,
+        bus::BashJobEvent::Failed { .. } => 0.7,
+        bus::BashJobEvent::Lost { .. } => 0.6,
         bus::BashJobEvent::Cancelled { .. } => 0.5,
         bus::BashJobEvent::Completed { .. } => 0.3,
-        bus::BashJobEvent::Started { .. }   => 0.2,
+        bus::BashJobEvent::Started { .. } => 0.2,
     }
 }
 

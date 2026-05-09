@@ -83,31 +83,31 @@ pub enum BashJobEvent {
 impl BashJobEvent {
     pub fn job_id(&self) -> &str {
         match self {
-            Self::Started   { job_id, .. } => job_id,
+            Self::Started { job_id, .. } => job_id,
             Self::Completed { job_id, .. } => job_id,
-            Self::Failed    { job_id, .. } => job_id,
+            Self::Failed { job_id, .. } => job_id,
             Self::Cancelled { job_id, .. } => job_id,
-            Self::Lost      { job_id, .. } => job_id,
+            Self::Lost { job_id, .. } => job_id,
         }
     }
 
     pub fn thread_id(&self) -> &str {
         match self {
-            Self::Started   { thread_id, .. } => thread_id,
+            Self::Started { thread_id, .. } => thread_id,
             Self::Completed { thread_id, .. } => thread_id,
-            Self::Failed    { thread_id, .. } => thread_id,
+            Self::Failed { thread_id, .. } => thread_id,
             Self::Cancelled { thread_id, .. } => thread_id,
-            Self::Lost      { thread_id, .. } => thread_id,
+            Self::Lost { thread_id, .. } => thread_id,
         }
     }
 
     pub fn agent_id(&self) -> &str {
         match self {
-            Self::Started   { agent_id, .. } => agent_id,
+            Self::Started { agent_id, .. } => agent_id,
             Self::Completed { agent_id, .. } => agent_id,
-            Self::Failed    { agent_id, .. } => agent_id,
+            Self::Failed { agent_id, .. } => agent_id,
             Self::Cancelled { agent_id, .. } => agent_id,
-            Self::Lost      { agent_id, .. } => agent_id,
+            Self::Lost { agent_id, .. } => agent_id,
         }
     }
 }

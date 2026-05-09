@@ -258,7 +258,13 @@ mod tests {
 
     #[test]
     fn failure_kind_db_str() {
-        assert_eq!(FailureKind::CompileError.as_db_str().as_ref(), "CompileError");
-        assert_eq!(FailureKind::Other("oom".into()).as_db_str().as_ref(), "Other:oom");
+        assert_eq!(
+            FailureKind::CompileError.as_db_str().as_ref(),
+            "CompileError"
+        );
+        assert_eq!(
+            FailureKind::Other("oom".into()).as_db_str().as_ref(),
+            "Other:oom"
+        );
     }
 }

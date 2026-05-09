@@ -24,15 +24,15 @@ const FINAL_TAIL_BYTES: usize = 128;
 const READ_DELTA_CAP: usize = 1_024;
 
 #[cfg(not(test))]
-const HEAD_KEEP_BYTES: usize = 1_500_000;       // 1.5 MB
+const HEAD_KEEP_BYTES: usize = 1_500_000; // 1.5 MB
 #[cfg(not(test))]
-const TAIL_KEEP_BYTES: usize = 2_500_000;       // 2.5 MB
+const TAIL_KEEP_BYTES: usize = 2_500_000; // 2.5 MB
 #[cfg(not(test))]
-const FINAL_HEAD_BYTES: usize = 96 * 1024;      // 96 KB
+const FINAL_HEAD_BYTES: usize = 96 * 1024; // 96 KB
 #[cfg(not(test))]
-const FINAL_TAIL_BYTES: usize = 160 * 1024;     // 160 KB
+const FINAL_TAIL_BYTES: usize = 160 * 1024; // 160 KB
 #[cfg(not(test))]
-const READ_DELTA_CAP: usize = 50 * 1024;        // 50 KB per poll
+const READ_DELTA_CAP: usize = 50 * 1024; // 50 KB per poll
 
 #[derive(Debug)]
 pub struct RingFile {
@@ -68,19 +68,31 @@ impl RingFile {
         }))
     }
 
-    pub fn path(&self) -> &Path { &self.path }
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
 
-    pub fn total_bytes_emitted(&self) -> u64 { self.bytes_written.load(Ordering::Acquire) }
+    pub fn total_bytes_emitted(&self) -> u64 {
+        self.bytes_written.load(Ordering::Acquire)
+    }
 
-    pub fn bisect_generation(&self) -> u64 { self.bisect_generation.load(Ordering::Acquire) }
+    pub fn bisect_generation(&self) -> u64 {
+        self.bisect_generation.load(Ordering::Acquire)
+    }
 
-    pub fn bisect_count(&self) -> u64 { self.bisect_generation.load(Ordering::Acquire) }
+    pub fn bisect_count(&self) -> u64 {
+        self.bisect_generation.load(Ordering::Acquire)
+    }
 
     pub async fn append(&self, bytes: &[u8]) -> std::io::Result<()> {
-        if bytes.is_empty() { return Ok(()); }
+        if bytes.is_empty() {
+            return Ok(());
+        }
         let mut writer = self.writer.lock().await;
         writer.write_all(bytes).await?;
-        let new_total = self.bytes_written.fetch_add(bytes.len() as u64, Ordering::AcqRel)
+        let new_total = self
+            .bytes_written
+            .fetch_add(bytes.len() as u64, Ordering::AcqRel)
             + bytes.len() as u64;
 
         // Check overflow against current low_water.
@@ -92,7 +104,9 @@ impl RingFile {
         Ok(())
     }
 
-    pub fn notify_waiters(&self) { self.notify.notify_waiters(); }
+    pub fn notify_waiters(&self) {
+        self.notify.notify_waiters();
+    }
 
     pub async fn wait_for_change(&self, timeout: std::time::Duration) {
         let _ = tokio::time::timeout(timeout, self.notify.notified()).await;
@@ -117,7 +131,8 @@ impl RingFile {
 
         let tail_to_read = TAIL_KEEP_BYTES.min(on_disk_size as usize - head_to_read);
         let tail_start = on_disk_size as i64 - tail_to_read as i64;
-        file.seek(std::io::SeekFrom::Start(tail_start.max(0) as u64)).await?;
+        file.seek(std::io::SeekFrom::Start(tail_start.max(0) as u64))
+            .await?;
         let mut tail = vec![0u8; tail_to_read];
         file.read_exact(&mut tail).await?;
 
@@ -146,11 +161,16 @@ impl RingFile {
         tokio::fs::rename(&tmp_path, &self.path).await?;
 
         // Reopen the writer in append mode.
-        let new_file = OpenOptions::new().write(true).append(true).open(&self.path).await?;
+        let new_file = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open(&self.path)
+            .await?;
         *writer = BufWriter::new(new_file);
 
         let new_low_water = current_total - (head_to_read + marker.len() + tail_to_read) as u64;
-        self.bisect_low_water.store(new_low_water, Ordering::Release);
+        self.bisect_low_water
+            .store(new_low_water, Ordering::Release);
         self.bisect_generation.fetch_add(1, Ordering::AcqRel);
         Ok(())
     }
@@ -167,7 +187,11 @@ impl RingFile {
         let gen = self.bisect_generation.load(Ordering::Acquire);
 
         let bisect_occurred = since_offset < low_water;
-        let effective_since = if bisect_occurred { low_water } else { since_offset };
+        let effective_since = if bisect_occurred {
+            low_water
+        } else {
+            since_offset
+        };
 
         // Map cumulative offset → on-disk byte position.
         // After bisect: file = head + marker + tail. cumulative offsets [low_water .. total)
@@ -184,7 +208,8 @@ impl RingFile {
                 total_bytes_emitted: total,
             });
         }
-        file.seek(std::io::SeekFrom::Start(on_disk_offset as u64)).await?;
+        file.seek(std::io::SeekFrom::Start(on_disk_offset as u64))
+            .await?;
         let to_read = (on_disk_size - on_disk_offset as u64).min(READ_DELTA_CAP as u64) as usize;
         let mut buf = vec![0u8; to_read];
         let mut reader = BufReader::new(file);
@@ -216,7 +241,7 @@ impl RingFile {
             let dropped = on_disk_size as usize - head_to_read - tail_to_read;
             if dropped > 0 {
                 final_bytes.extend_from_slice(
-                    format!("\n[--- final summary: {dropped} bytes truncated ---]\n").as_bytes()
+                    format!("\n[--- final summary: {dropped} bytes truncated ---]\n").as_bytes(),
                 );
             }
             let mut tail = vec![0u8; tail_to_read];
@@ -288,7 +313,9 @@ mod tests {
         let ring = RingFile::create(&path, cap).await.unwrap();
         // Append enough to exceed cap.
         for i in 0..200 {
-            ring.append(format!("line {i:04}\n").as_bytes()).await.unwrap();
+            ring.append(format!("line {i:04}\n").as_bytes())
+                .await
+                .unwrap();
         }
         // bisect_generation should have ticked.
         assert!(ring.bisect_generation() > 0, "bisect should have fired");
@@ -303,11 +330,16 @@ mod tests {
         let cap = 1_000;
         let ring = RingFile::create(&path, cap).await.unwrap();
         for i in 0..200 {
-            ring.append(format!("line {i:04}\n").as_bytes()).await.unwrap();
+            ring.append(format!("line {i:04}\n").as_bytes())
+                .await
+                .unwrap();
         }
         // Cursor at 0 is now below low_water.
         let rd = ring.read_delta(0).await.unwrap();
-        assert!(rd.bisect_occurred_since, "should flag bisect_occurred_since");
+        assert!(
+            rd.bisect_occurred_since,
+            "should flag bisect_occurred_since"
+        );
         // Returned bytes still represent forward-progress content.
         assert!(!rd.bytes.is_empty());
     }

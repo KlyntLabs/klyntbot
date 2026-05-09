@@ -2,7 +2,10 @@
 
 use feature_coding_bash::intelligence::{diff_against_prior, ExtractedDiff};
 use jiff::Timestamp;
-use storage::{repos::{BashJobRepo, BashJobRow}, StoragePool};
+use storage::{
+    repos::{BashJobRepo, BashJobRow},
+    StoragePool,
+};
 
 fn row(id: &str, kind: &str, names: &[&str]) -> BashJobRow {
     BashJobRow {
@@ -19,12 +22,15 @@ fn row(id: &str, kind: &str, names: &[&str]) -> BashJobRow {
         exit_code: Some(101),
         failure_kind: Some(kind.into()),
         failure_detail: None,
-        failure_extracted: Some(serde_json::json!({
-            "failed_test_names": names,
-            "n_failed": names.len(),
-            "n_passed": 5,
-            "n_ignored": 0,
-        }).to_string()),
+        failure_extracted: Some(
+            serde_json::json!({
+                "failed_test_names": names,
+                "n_failed": names.len(),
+                "n_passed": 5,
+                "n_ignored": 0,
+            })
+            .to_string(),
+        ),
         started_at: Timestamp::from_millisecond(1_700_000_000_000).unwrap(),
         finished_at: Some(Timestamp::from_millisecond(1_700_000_001_000).unwrap()),
         total_bytes_emitted: 0,
@@ -44,16 +50,25 @@ async fn test_set_diff_via_repo_round_trip() {
     let repo = BashJobRepo::new(pool.inner().clone());
 
     let prior = row("a", "TestFailure", &["A", "B"]);
-    let curr  = row("b", "TestFailure", &["B", "C"]);
+    let curr = row("b", "TestFailure", &["B", "C"]);
     repo.insert(&prior).await.unwrap();
     repo.insert(&curr).await.unwrap();
 
-    let prior_back = repo.find_prior_by_command_key("s1", "k", "b").await.unwrap().unwrap();
+    let prior_back = repo
+        .find_prior_by_command_key("s1", "k", "b")
+        .await
+        .unwrap()
+        .unwrap();
     let diff = diff_against_prior(&prior_back, &curr);
 
     match diff.extracted_diff {
-        ExtractedDiff::TestSet { new_failures, still_failing, resolved } => {
-            let mut new_f = new_failures.clone(); new_f.sort();
+        ExtractedDiff::TestSet {
+            new_failures,
+            still_failing,
+            resolved,
+        } => {
+            let mut new_f = new_failures.clone();
+            new_f.sort();
             assert_eq!(new_f, vec!["C".to_string()]);
             assert_eq!(still_failing, vec!["B".to_string()]);
             assert_eq!(resolved, vec!["A".to_string()]);
