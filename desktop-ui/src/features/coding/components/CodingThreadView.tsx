@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef } from "react";
 import { Messages } from "@/features/messages/components/Messages";
 import type { ConversationItem, OpenAppTarget } from "@/types";
 import { type MessageDto, useThreadEvents } from "../hooks/useThreadEvents";
-import type { MessagePart } from "./parts/types";
 import { PlanModeBanner } from "./PlanModeBanner";
+import type { MessagePart } from "./parts/types";
 import { TodoPanel } from "./TodoPanel";
 
 type Props = {
@@ -120,8 +120,21 @@ function dedupePrefixDuplicates(items: MessageDto[]): MessageDto[] {
   return out;
 }
 
+/// The AGENTS.md bundle is persisted as a synthetic user message at thread
+/// start (see `coding-agents-md::WorkspaceAgentsSource`). The LLM still needs
+/// it as context, so the row stays in the DB — but it's noisy as a chat
+/// bubble. Surface it through the prompts sidebar instead.
+function isAgentsMdSyntheticMessage(item: MessageDto): boolean {
+  if (item.role !== "user") return false;
+  if (item.parts.length !== 1) return false;
+  const only = item.parts[0] as MessagePart;
+  return only.kind === "text" && only.text.startsWith("# AGENTS.md instructions for ");
+}
+
 function adaptItems(rawItems: MessageDto[]): ConversationItem[] {
-  const items = dedupePrefixDuplicates(rawItems);
+  const items = dedupePrefixDuplicates(rawItems).filter(
+    (item) => !isAgentsMdSyntheticMessage(item),
+  );
   const out: ConversationItem[] = [];
   for (const item of items) {
     // Buffers accumulate consecutive same-kind parts, then flush in-order

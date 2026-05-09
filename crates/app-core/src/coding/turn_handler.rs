@@ -53,8 +53,10 @@ async fn persist_or_coalesce_assistant_text(
 
     // Query the DB for the latest assistant row in this turn — the source
     // of truth, regardless of how many bridge tasks happen to be running.
-    if let Some((prev_id, prev_text)) =
-        repos.sessions.latest_assistant_text_in_turn(thread_id, turn_id).await?
+    if let Some((prev_id, prev_text)) = repos
+        .sessions
+        .latest_assistant_text_in_turn(thread_id, turn_id)
+        .await?
     {
         let a = prev_text.trim();
         let b = new_text.trim();

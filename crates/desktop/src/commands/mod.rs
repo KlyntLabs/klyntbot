@@ -32,6 +32,7 @@ pub mod entity_links;
 pub mod fabric;
 pub mod finance;
 pub mod focus;
+pub mod git;
 pub mod groups;
 pub mod integrations;
 pub mod journey;

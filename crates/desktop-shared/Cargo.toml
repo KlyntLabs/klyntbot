@@ -7,6 +7,7 @@ edition.workspace = true
 common = { workspace = true }
 bus = { workspace = true }
 activity-log = { workspace = true }
+klynt-git-utils = { path = "../klynt-git-utils" }
 voice-engine = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

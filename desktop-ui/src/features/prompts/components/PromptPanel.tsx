@@ -1,7 +1,9 @@
+import { invoke } from "@tauri-apps/api/core";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { expandCustomPromptText, getPromptArgumentHint } from "@utils/customPrompts";
+import FileText from "lucide-react/dist/esm/icons/file-text";
 import MoreHorizontal from "lucide-react/dist/esm/icons/more-horizontal";
 import Plus from "lucide-react/dist/esm/icons/plus";
 import ScrollText from "lucide-react/dist/esm/icons/scroll-text";
@@ -41,6 +43,9 @@ type PromptPanelProps = {
   onRevealWorkspacePrompts: () => void | Promise<void>;
   onRevealGeneralPrompts: () => void | Promise<void>;
   canRevealGeneralPrompts: boolean;
+  /// Auto-loaded context files (e.g. AGENTS.md) shown as read-only entries
+  /// above the prompt sections. Section is hidden when the array is empty.
+  loadedContextFiles?: Array<{ label: string; path: string }>;
 };
 
 const PROMPTS_PREFIX = "prompts:";
@@ -78,6 +83,7 @@ export function PromptPanel({
   onRevealWorkspacePrompts,
   onRevealGeneralPrompts,
   canRevealGeneralPrompts,
+  loadedContextFiles = [],
 }: PromptPanelProps) {
   useEffect(() => {
     import("@/styles/prompts.css");
@@ -430,6 +436,35 @@ export function PromptPanel({
       }
     >
       <div className="prompt-panel-scroll">
+        {loadedContextFiles.length > 0 && (
+          <div className="prompt-section">
+            <div className="prompt-section-header">
+              <div className="prompt-section-title">Loaded context</div>
+            </div>
+            <div className="prompt-list">
+              {loadedContextFiles.map((file) => (
+                <button
+                  key={file.path}
+                  type="button"
+                  className="prompt-row prompt-row--file"
+                  onClick={() => {
+                    void invoke("plugin:opener|open_path", { path: file.path }).catch(
+                      (error) =>
+                        window.alert(error instanceof Error ? error.message : String(error)),
+                    );
+                  }}
+                  title={`Open ${file.path}`}
+                >
+                  <FileText className="prompt-row__file-icon" aria-hidden />
+                  <div className="prompt-row-header">
+                    <div className="prompt-name">{file.label}</div>
+                    <div className="prompt-description">{file.path}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {editor && (
           <div className="prompt-editor">
             <div className="prompt-editor-row">
