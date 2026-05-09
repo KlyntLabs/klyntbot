@@ -34,7 +34,7 @@ async fn records_resolved_approval_into_history_repo() {
     };
     source.observe(&req, "test-repo").await;
     source.observe(&res, "test-repo").await;
-    let s = repo
+    let s = legacy_repo
         .summary("bash", "hash-of-bash-args", "test-repo")
         .await
         .unwrap();
