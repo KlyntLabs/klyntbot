@@ -6,6 +6,7 @@ pub mod autotuner;
 pub mod capture;
 pub mod chat;
 pub mod coaching;
+pub mod coding_jobs;
 pub mod coding_plan;
 pub mod coding_todo;
 pub mod cognitive;

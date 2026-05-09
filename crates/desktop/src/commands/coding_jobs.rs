@@ -23,7 +23,7 @@ pub async fn coding_job_list(
 pub async fn coding_job_output(
     job_id: String,
     since: Option<u64>,
-) -> app_core::state::JobOutputView {
+) -> app_core::handlers::coding_jobs::JobOutputView {
     state
         .coding_job_output(&job_id, since.unwrap_or(0))
         .await

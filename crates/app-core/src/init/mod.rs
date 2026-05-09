@@ -1973,7 +1973,11 @@ impl AppCore {
                 let reg = core.agent.tool_registry();
                 let mut registry = reg.write().await;
                 kit.register_all(&mut registry);
-                info!("Coding tool kit registered (13 tools)");
+                // Phase 2.3a — register background bash companion tools
+                registry.register(feature_coding_bash::tools::coding_task_list::CodingTaskListTool);
+                registry.register(feature_coding_bash::tools::coding_task_output::CodingTaskOutputTool);
+                registry.register(feature_coding_bash::tools::coding_task_stop::CodingTaskStopTool);
+                info!("Coding tool kit registered (13 tools + 3 background bash companions)");
             }
             let kit_arc = Arc::new(kit);
             core.agent.runtime().set_tool_kit(Arc::clone(&kit_arc));
