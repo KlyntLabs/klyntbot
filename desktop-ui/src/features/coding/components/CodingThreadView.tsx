@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef } from "react";
 import { Messages } from "@/features/messages/components/Messages";
 import type { ConversationItem, OpenAppTarget } from "@/types";
 import { type MessageDto, useThreadEvents } from "../hooks/useThreadEvents";
-import type { MessagePart } from "./parts/types";
 import { PlanModeBanner } from "./PlanModeBanner";
+import type { MessagePart } from "./parts/types";
 import { TodoPanel } from "./TodoPanel";
 import { JobsPanel } from "./JobsPanel";
 
@@ -50,10 +50,10 @@ export function CodingThreadView({
   if (!threadId) return null;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="coding-thread-view">
       <PlanModeBanner threadId={threadId} />
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 min-w-0">
+      <div className="coding-thread-view__body">
+        <div className="coding-thread-view__main">
           <Messages
             items={conversationItems}
             threadId={threadId}
@@ -77,7 +77,66 @@ export function CodingThreadView({
 /// `ConversationItem` shape. We collapse `text`/`reasoning` parts into a
 /// single message bubble, surface tool calls + results as their own items,
 /// and emit diff/command items for file/command parts.
-function adaptItems(items: MessageDto[]): ConversationItem[] {
+function flattenAssistantText(item: MessageDto): string | null {
+  if (item.role !== "assistant") return null;
+  let only: string | null = null;
+  for (const raw of item.parts) {
+    const p = raw as MessagePart;
+    if (p.kind === "text") {
+      only = (only ?? "") + p.text;
+    } else if (p.kind !== "reasoning") {
+      // Has non-text payload (tool/diff/etc) — not a pure-text row.
+      return null;
+    }
+  }
+  return only;
+}
+
+/// Drop consecutive same-role assistant rows whose Text content is a
+/// substring/superset of the next — symptom of streaming snapshot + final
+/// flush both being persisted as separate rows in turn_handler.
+function dedupePrefixDuplicates(items: MessageDto[]): MessageDto[] {
+  const out: MessageDto[] = [];
+  let skipNext = false;
+  for (let i = 0; i < items.length; i += 1) {
+    if (skipNext) {
+      skipNext = false;
+      continue;
+    }
+    const cur = items[i];
+    const next = items[i + 1];
+    const curText = flattenAssistantText(cur);
+    const nextText = next && next.role === cur.role ? flattenAssistantText(next) : null;
+    if (curText !== null && nextText !== null) {
+      const a = curText.trim();
+      const b = nextText.trim();
+      if (a === b || a.includes(b) || b.includes(a)) {
+        // Keep the longer (it's a superset of the shorter).
+        out.push(curText.length >= nextText.length ? cur : next);
+        skipNext = true;
+        continue;
+      }
+    }
+    out.push(cur);
+  }
+  return out;
+}
+
+/// The AGENTS.md bundle is persisted as a synthetic user message at thread
+/// start (see `coding-agents-md::WorkspaceAgentsSource`). The LLM still needs
+/// it as context, so the row stays in the DB — but it's noisy as a chat
+/// bubble. Surface it through the prompts sidebar instead.
+function isAgentsMdSyntheticMessage(item: MessageDto): boolean {
+  if (item.role !== "user") return false;
+  if (item.parts.length !== 1) return false;
+  const only = item.parts[0] as MessagePart;
+  return only.kind === "text" && only.text.startsWith("# AGENTS.md instructions for ");
+}
+
+function adaptItems(rawItems: MessageDto[]): ConversationItem[] {
+  const items = dedupePrefixDuplicates(rawItems).filter(
+    (item) => !isAgentsMdSyntheticMessage(item),
+  );
   const out: ConversationItem[] = [];
   for (const item of items) {
     // Buffers accumulate consecutive same-kind parts, then flush in-order

@@ -459,8 +459,11 @@ export function useWorkspaceHome({
             if (!activeWorkspace.connected) {
               await connectWorkspace(activeWorkspace);
             }
+            // Activate so the user sees the thread they just kicked off.
+            // Without this, project-landing send appears to do nothing —
+            // the conversation runs only as a Run card on the project home.
             const threadId = await startThreadForWorkspace(activeWorkspace.id, {
-              activate: false,
+              activate: true,
             });
             if (!threadId) {
               throw new Error("Failed to start a local thread.");

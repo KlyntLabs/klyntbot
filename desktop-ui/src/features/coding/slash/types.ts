@@ -9,7 +9,7 @@ export type SlashLeaf = {
   argHint?: string;
   tauriCommand?: string;
   requiresConfirmation?: boolean;
-  agentTransform?: () => string;
+  agentTransform?: (rest?: string) => string;
 };
 
 export type SlashBranch = {

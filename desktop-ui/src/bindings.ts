@@ -2030,6 +2030,182 @@ async focusShortcutsInstalled() : Promise<Result<boolean, ApiError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async getGitStatus(workspaceId: string) : Promise<Result<GitStatusSummary, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_git_status", { workspaceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getGitDiffs(workspaceId: string) : Promise<Result<GitFileDiff[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_git_diffs", { workspaceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getGitCommitDiff(workspaceId: string, sha: string) : Promise<Result<GitCommitDiff[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_git_commit_diff", { workspaceId, sha }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getGitLog(workspaceId: string, limit: number) : Promise<Result<GitLogResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_git_log", { workspaceId, limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getGitRemote(workspaceId: string) : Promise<Result<string | null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_git_remote", { workspaceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listGitBranches(workspaceId: string) : Promise<Result<BranchInfo[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_git_branches", { workspaceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async checkoutGitBranch(workspaceId: string, name: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("checkout_git_branch", { workspaceId, name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async createGitBranch(workspaceId: string, name: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_git_branch", { workspaceId, name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listGitRoots(workspaceId: string, depth: number) : Promise<Result<string[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_git_roots", { workspaceId, depth }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async initGitRepo(workspaceId: string, branch: string, force: boolean) : Promise<Result<InitGitRepoResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("init_git_repo", { workspaceId, branch, force }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async stageGitFile(workspaceId: string, path: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stage_git_file", { workspaceId, path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async stageGitAll(workspaceId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stage_git_all", { workspaceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async unstageGitFile(workspaceId: string, path: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("unstage_git_file", { workspaceId, path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async revertGitFile(workspaceId: string, path: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("revert_git_file", { workspaceId, path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async revertGitAll(workspaceId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("revert_git_all", { workspaceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async commitGit(workspaceId: string, message: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("commit_git", { workspaceId, message }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async pushGit(workspaceId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("push_git", { workspaceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async pullGit(workspaceId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("pull_git", { workspaceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async fetchGit(workspaceId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("fetch_git", { workspaceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async syncGit(workspaceId: string) : Promise<Result<null, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("sync_git", { workspaceId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async generateCommitMessage(workspaceId: string, commitMessageModelId: string | null) : Promise<Result<string, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("generate_commit_message", { workspaceId, commitMessageModelId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async createGithubRepo(workspaceId: string, repo: string, visibility: string, branch: string | null) : Promise<Result<CreateGitHubRepoResponse, ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_github_repo", { workspaceId, repo, visibility, branch }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async groupList(projectId: string | null) : Promise<Result<TaskGroupResponse[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("group_list", { projectId }) };
@@ -4733,6 +4909,11 @@ export type BashJobView = { id: string; session_id: string; agent_id: string; de
 export type BashJobsPanelView = { jobs: BashJobView[] }
 export type BrainGrowth = { correctionsCaptured7D: number; trialsEvaluated7D: number; promotedThisWeek: number; status: string }
 export type BrainVersion = { version: number; trialId: string | null; promotedAt: string; params: unknown; reason: string; parentVersion: number | null; metricsAtPromotion: unknown; reverted: boolean }
+export type BranchInfo = { name: string; 
+/**
+ * Last commit timestamp on this branch (seconds since Unix epoch).
+ */
+lastCommit: number }
 export type BucketPayload = { bucketStart: string; productiveSecs: number; distractingSecs: number; dominantApp: string | null }
 /**
  * Result of the `budget_usage` join query: all budget fields plus the
@@ -4856,6 +5037,7 @@ source: string;
  * Number of assistant messages (only meaningful for `source = "hooks"`).
  */
 requests: number; inputTokens: number; outputTokens: number; cachedTokens: number; inputCostUsd: number; outputCostUsd: number; totalCostUsd: number }
+export type CreateGitHubRepoResponse = { status: "ok"; repo: string; remoteUrl?: string | null } | { status: "partial"; repo: string; remoteUrl?: string | null; pushError?: string | null; defaultBranchError?: string | null }
 export type CronJobCreateParams = { name: string; schedule: unknown; message: string; deliver?: boolean; channel: string | null; to: string | null; deleteAfterRun?: boolean }
 export type CronJobResponse = { id: string; name: string; enabled: boolean; origin: string; schedule: unknown; payload: CronPayloadResponse; state: CronJobStateResponse; createdAtMs: number; updatedAtMs: number; deleteAfterRun: boolean }
 export type CronJobStateResponse = { nextRunAtMs?: number | null; lastRunAtMs?: number | null; lastStatus?: string | null; lastError?: string | null }
@@ -5060,6 +5242,16 @@ export type FocusStatePayload = { state: string; since: string }
 export type FocusSyncPayload = { phase: string; remainingSecs: number; totalSecs: number; cyclePosition: number; longBreakAfter: number; paused: boolean; actionTitle: string | null; dndActive: boolean }
 export type FocusWarningPayload = { phase: string; remainingSecs: number }
 export type GeneratedCardPreview = { front: string; back: string; cardType: string; tags: string[]; sourceContext: string | null; clozeData: unknown | null; vocabData: unknown | null; difficultyEstimate: number | null; prerequisiteConcepts: string[] | null }
+export type GitCommitDiff = { path: string; status: string; diff: string; oldLines?: string[] | null; newLines?: string[] | null; isBinary?: boolean | null; isImage?: boolean | null; oldImageData?: string | null; newImageData?: string | null; oldImageMime?: string | null; newImageMime?: string | null }
+export type GitFileDiff = { path: string; diff: string; oldLines?: string[] | null; newLines?: string[] | null; isBinary?: boolean | null; isImage?: boolean | null; oldImageData?: string | null; newImageData?: string | null; oldImageMime?: string | null; newImageMime?: string | null }
+export type GitFileStatus = { path: string; status: string; additions: number; deletions: number }
+export type GitLogEntry = { sha: string; summary: string; author: string; 
+/**
+ * Author timestamp in seconds since the Unix epoch.
+ */
+timestamp: number }
+export type GitLogResponse = { total: number; entries: GitLogEntry[]; ahead: number; behind: number; aheadEntries: GitLogEntry[]; behindEntries: GitLogEntry[]; upstream: string | null }
+export type GitStatusSummary = { branchName: string; files: GitFileStatus[]; stagedFiles: GitFileStatus[]; unstagedFiles: GitFileStatus[]; totalAdditions: number; totalDeletions: number }
 export type GoalProgressResponse = { id: number; goalType: string; metric: string; targetValue: number; currentValue: number; met: boolean; projectId: string | null }
 export type GradeResultResponse = { score: number | null; suggestedRating: string; gradingMethod: string; explanation: string | null; diffHighlights: DiffSegmentResponse[]; expectedAnswer: string; coachingNudge: string | null; socraticSuggestion: string | null; keyConceptsPresent: string[]; keyConceptsMissing: string[] }
 export type GrammarPattern = { pattern: string; explanation: string; patternType: string | null }
@@ -5075,6 +5267,12 @@ export type InboxCreateParams = { content: string }
 export type InboxItemResponse = { id: string; content: string; status: string; createdAt: string }
 export type InferenceConfigUpdate = { assignmentThreshold: number | null; mergeThreshold: number | null; semanticWeight: number | null; temporalWeight: number | null; resourceWeight: number | null; inferenceIntervalMins: number | null; maxDormancyDays: number | null; maxActiveContexts: number | null }
 export type InferenceStatsResponse = { activeContextCount: number; archivedContextCount: number; eventsLastHour: number; eventsLast24H: number; assignmentRate: number; avgConfidence: number; mergesLast24H: number; lastRunAt: string | null }
+/**
+ * Tagged-union response for `init_git_repo`. The `tag = "status"` + per-variant
+ * renames produce the discriminator the frontend's `InitGitRepoResponse` union
+ * expects.
+ */
+export type InitGitRepoResponse = { status: "initialized"; commitError?: string | null } | { status: "already_initialized" } | { status: "needs_confirmation"; entryCount: number }
 export type InsightCardResponse = { id: string; insightType: string; title: string; body: string; sentiment: string; metricValue: number | null; baselineValue: number | null; date: string; dismissed: boolean; generatedAt: string }
 export type InsightChatParams = { noteId: string; tabName: string; userMessage: string; sessionKey: string }
 export type InsightChatStarted = { sessionKey: string; messageId: string }

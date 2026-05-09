@@ -7,6 +7,20 @@ use crate::error::{OptionExt, StorageError};
 use crate::messages::parts::{FinishReason, MessagePart};
 use crate::rows::session::{SessionListRow, SessionMessageRow, SessionRow};
 
+/// Concatenate Text parts with newline separators for the legacy `content`
+/// column. Anthropic-spec providers reject rows whose `content` is empty,
+/// so we keep this mirror in sync with `parts` on every write.
+fn parts_to_content_text(parts: &[MessagePart]) -> String {
+    parts
+        .iter()
+        .filter_map(|p| match p {
+            MessagePart::Text { text } => Some(text.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Deserialize an optional JSON column, treating NULL or empty string as `None`.
 fn parse_json_column<T: serde::de::DeserializeOwned>(
     col: &Option<String>,
@@ -348,6 +362,86 @@ impl SessionRepo {
                 .fetch_one(&self.pool)
                 .await?;
         Ok(row.0)
+    }
+
+    pub async fn count_user_messages(&self, session_key: &str) -> Result<i64, StorageError> {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM session_messages WHERE session_key = ?1 AND role = 'user'",
+        )
+        .bind(session_key)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
+    /// Fetch the most recent assistant message in a given turn (by
+    /// turn_id), returning its id and the concatenated Text content. Used
+    /// by the coding bridge to coalesce streaming-snapshot + final-flush
+    /// duplicates even when persistence happens from separate bridge
+    /// tasks (each with its own in-process tracker).
+    pub async fn latest_assistant_text_in_turn(
+        &self,
+        session_key: &str,
+        turn_id: &str,
+    ) -> Result<Option<(uuid::Uuid, String)>, StorageError> {
+        let row: Option<SessionMessageRow> = sqlx::query_as(
+            "SELECT * FROM session_messages \
+             WHERE session_key = ?1 AND turn_id = ?2 AND role = 'assistant' \
+             ORDER BY timestamp DESC, id DESC LIMIT 1",
+        )
+        .bind(session_key)
+        .bind(turn_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        let Some(r) = row else {
+            return Ok(None);
+        };
+        // Only consider rows whose payload is purely text — mixed payloads
+        // (tool_call / tool_result / file_change) must never be coalesced
+        // away.
+        let parts: Option<Vec<MessagePart>> = parse_json_column(&r.parts)?;
+        let text = match parts {
+            Some(parts) => {
+                let mut out = String::new();
+                for p in parts {
+                    match p {
+                        MessagePart::Text { text } => out.push_str(&text),
+                        MessagePart::Reasoning { .. } => {}
+                        _ => return Ok(None),
+                    }
+                }
+                out
+            }
+            None => r.content.clone(),
+        };
+        Ok(Some((r.id, text)))
+    }
+
+    /// Replace a message's `parts` (and the legacy `content` mirror) by id.
+    ///
+    /// Used by the coding turn-handler bridge to coalesce streaming-snapshot
+    /// + final-flush duplicates: when a later flush's text is a superset of
+    /// the earlier persisted row, we update that row in place rather than
+    /// inserting a duplicate. Returns `true` when a row was actually
+    /// updated.
+    pub async fn update_message_parts(
+        &self,
+        message_id: uuid::Uuid,
+        parts: &[MessagePart],
+    ) -> Result<bool, StorageError> {
+        let parts_json = serde_json::to_string(parts).map_err(StorageError::serialization)?;
+        let content_text = parts_to_content_text(parts);
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
+        let result = sqlx::query(
+            "UPDATE session_messages SET content = ?1, parts = ?2, timestamp = ?3 WHERE id = ?4",
+        )
+        .bind(&content_text)
+        .bind(&parts_json)
+        .bind(now)
+        .bind(message_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
     }
 
     /// Update the synthetic AGENTS.md message for a session.
@@ -833,6 +927,9 @@ impl SessionRepo {
             .map(serde_json::to_string)
             .transpose()
             .map_err(StorageError::serialization)?;
+        // Mirror Text parts into the legacy `content` column — Anthropic-
+        // spec providers 400 on empty content for non-tool messages.
+        let content_text = parts_to_content_text(parts);
 
         // Touch session updated_at
         sqlx::query("UPDATE sessions SET updated_at = ?1 WHERE key = ?2")
@@ -844,11 +941,12 @@ impl SessionRepo {
         sqlx::query(
             "INSERT INTO session_messages \
              (id, session_key, role, content, parts, turn_id, finish_reason, timestamp) \
-             VALUES (?1, ?2, ?3, '', ?4, ?5, ?6, ?7)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         )
         .bind(message_id)
         .bind(session_key)
         .bind(role)
+        .bind(&content_text)
         .bind(&parts_json)
         .bind(turn_id)
         .bind(finish_json)

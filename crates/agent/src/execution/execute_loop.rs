@@ -256,10 +256,22 @@ pub async fn execute_loop(
 
             CycleOutcome::EmptyResponse => {
                 // Model returned no text and no tool calls — treat as self-stop.
+                // Emit TurnComplete so downstream bridges (coding turn_handler,
+                // assistant streaming) finalise the UI; the FinalResponse /
+                // FabricatedResponse branches do the same.
                 debug!(
                     turn = cap.turns_used(),
                     "Empty response from LLM — treating as model self-stop"
                 );
+                crate::execution::core::fan_out_event(
+                    event_tx.as_ref(),
+                    core.domain_event_bus.as_ref(),
+                    AgentEvent::TurnComplete {
+                        turn: cap.turns_used(),
+                        budget_remaining_pct: remaining_pct(cap),
+                    },
+                )
+                .await;
                 return Ok(ExecuteLoopResult {
                     content: std::mem::take(&mut last_content),
                     usage: accumulated_usage,

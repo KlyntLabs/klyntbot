@@ -20,7 +20,12 @@ export function resolveLeaf(input: string): SlashLeaf | null {
     if (!next) break;
     node = next;
   }
-  return node.kind === "leaf" ? node : null;
+  if (node.kind === "leaf") return node;
+  // Branch fall-through: a `""` child is the branch's default leaf, used when
+  // the user typed the branch alone (e.g. `/plan`) or with non-matching args
+  // (e.g. `/plan refactor`). Branches without a `""` child stay null.
+  const fallback = node.children[""];
+  return fallback && fallback.kind === "leaf" ? fallback : null;
 }
 
 /**

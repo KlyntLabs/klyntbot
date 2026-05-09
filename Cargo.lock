@@ -421,6 +421,7 @@ dependencies = [
  "jiff",
  "klynt-core",
  "klynt-execpolicy",
+ "klynt-git-utils",
  "klynt-hooks",
  "klynt-sandbox",
  "klynt-skill-loader",
@@ -4596,6 +4597,7 @@ dependencies = [
  "common",
  "core-foundation 0.10.1",
  "jiff",
+ "klynt-git-utils",
  "serde",
  "serde_json",
  "specta",
@@ -8165,11 +8167,13 @@ dependencies = [
 name = "klynt-git-utils"
 version = "0.1.1"
 dependencies = [
+ "base64 0.22.1",
  "common",
  "once_cell",
  "pretty_assertions",
  "serde",
  "serde_json",
+ "specta",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",

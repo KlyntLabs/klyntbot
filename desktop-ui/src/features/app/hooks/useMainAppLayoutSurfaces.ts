@@ -11,6 +11,7 @@ import type { WorkspaceLaunchScriptsState } from "@app/hooks/useWorkspaceLaunchS
 import type { RefObject } from "react";
 import { useCodingSessions } from "@/features/coding/hooks/useCodingSessions";
 import type { LayoutNodesOptions } from "@/features/layout/hooks/layoutNodes/types";
+import { useLoadedContextFiles } from "@/features/prompts/hooks/useLoadedContextFiles";
 import type { ThreadState } from "@/features/threads/hooks/useThreadsReducer";
 import type { AppSettings, ComposerEditorSettings, WorkspaceInfo } from "@/types";
 
@@ -242,7 +243,9 @@ type UseMainAppLayoutSurfacesArgs = {
   };
 };
 
-type MainAppLayoutSurfacesContext = UseMainAppLayoutSurfacesArgs;
+type MainAppLayoutSurfacesContext = UseMainAppLayoutSurfacesArgs & {
+  loadedContextFiles: Array<{ label: string; path: string }>;
+};
 
 function buildPrimarySurface({
   appSettings,
@@ -635,6 +638,7 @@ function buildGitSurface({
   startUncommittedReview,
   handleSelectOpenAppId,
   prompts,
+  loadedContextFiles,
 }: MainAppLayoutSurfacesContext): LayoutNodesOptions["git"] {
   return {
     filePanelMode: gitState.filePanelMode,
@@ -674,6 +678,7 @@ function buildGitSurface({
       onRevealWorkspacePrompts: promptActions.handleRevealWorkspacePrompts,
       onRevealGeneralPrompts: promptActions.handleRevealGeneralPrompts,
       canRevealGeneralPrompts: Boolean(activeWorkspace),
+      loadedContextFiles,
     },
     gitDiffPanelProps: {
       workspaceId: activeWorkspace?.id ?? null,
@@ -1033,7 +1038,13 @@ export function useMainAppLayoutSurfaces({
     chatView.onSelectThread(sessionKey);
   };
 
+  const loadedContextFiles = useLoadedContextFiles(
+    activeWorkspace?.id ?? null,
+    activeWorkspace?.path ?? null,
+  );
+
   const context: MainAppLayoutSurfacesContext = {
+    loadedContextFiles,
     appSettings,
     workspaces,
     groupedWorkspaces,

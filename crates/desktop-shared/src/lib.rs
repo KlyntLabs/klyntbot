@@ -4,6 +4,7 @@ pub mod commands;
 pub mod entity_link_types;
 pub mod errors;
 pub mod events;
+pub mod git;
 pub mod permissions;
 pub mod specta_helpers;
 pub mod types;

@@ -1,5 +1,8 @@
-//! Git ghost-commit snapshots for code-session rewind.
-//! Ported from codex `git-utils/src/ghost_commits.rs`.
+//! Git ghost-commit snapshots for code-session rewind plus the desktop
+//! UI's git-panel ops (status, diff, log, branches, index, commit, sync,
+//! init). Everything shells out via `tokio::process::Command::new("git")`
+//! so the user's installed git, credential helpers, SSH agent, and GPG
+//! signing all behave consistently with the CLI.
 
 mod errors;
 pub use errors::GitToolingError;
@@ -9,6 +12,18 @@ pub use ghost_commits::{create_ghost_commit, restore_ghost_commit, GhostSnapshot
 
 mod repo;
 pub use repo::{get_git_repo_root, is_inside_git_repo};
+
+pub mod branches;
+pub mod cmd;
+pub mod commit;
+pub mod diff;
+pub mod index;
+pub mod init;
+pub mod log;
+pub mod remote;
+pub mod status;
+pub mod sync;
+pub mod types;
 
 use std::fmt;
 use std::path::PathBuf;
