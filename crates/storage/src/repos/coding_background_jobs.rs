@@ -155,6 +155,41 @@ impl BashJobRepo {
         row.map(|r| Self::map_row(&r)).transpose()
     }
 
+    /// Most recent terminal-state job in this session with the same command_key,
+    /// excluding `exclude_id`. Returns None if no prior run exists. Excludes Lost
+    /// status — Lost runs lack reliable final output to diff against.
+    pub async fn find_prior_by_command_key(
+        &self,
+        session_id: &str,
+        command_key: &str,
+        exclude_id: &str,
+    ) -> Result<Option<BashJobRow>, StorageError> {
+        let row_opt = sqlx::query(
+            r#"
+            SELECT id, session_id, agent_id, description, command, command_key, cwd,
+                   timeout_ms, silent_completion, status, exit_code,
+                   failure_kind, failure_detail, failure_extracted,
+                   started_at, finished_at, total_bytes_emitted, bisect_count,
+                   log_path, final_path, last_polled_at, last_seen_offset
+            FROM coding_background_jobs
+            WHERE session_id = ?1
+              AND command_key = ?2
+              AND id != ?3
+              AND status IN ('Completed','Failed','Cancelled')
+            ORDER BY started_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(session_id)
+        .bind(command_key)
+        .bind(exclude_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(StorageError::from)?;
+
+        row_opt.as_ref().map(Self::map_row).transpose()
+    }
+
     pub async fn list_for_session(
         &self,
         session_id: &str,
@@ -456,5 +491,72 @@ mod tests {
         let orphans = repo.list_orphans().await.unwrap();
         assert_eq!(orphans.len(), 1);
         assert_eq!(orphans[0].id, "bash-aaaaaaaa01");
+    }
+
+    #[tokio::test]
+    async fn find_prior_returns_most_recent_terminal() {
+        let pool = setup().await;
+        let repo = BashJobRepo::new(pool);
+        let t1 = jiff::Timestamp::from_millisecond(1_700_000_000_000).unwrap();
+        let t2 = jiff::Timestamp::from_millisecond(1_700_000_010_000).unwrap();
+        let mut r1 = fixture_row("bash-a", "s1", "root");
+        r1.command_key = "k1".into();
+        r1.status = "Completed".into();
+        r1.started_at = t1;
+        r1.finished_at = Some(t1);
+        repo.insert(&r1).await.unwrap();
+
+        let mut r2 = fixture_row("bash-b", "s1", "root");
+        r2.command_key = "k1".into();
+        r2.status = "Failed".into();
+        r2.started_at = t2;
+        r2.finished_at = Some(t2);
+        repo.insert(&r2).await.unwrap();
+
+        let prior = repo.find_prior_by_command_key("s1", "k1", "bash-x").await.unwrap();
+        assert_eq!(prior.unwrap().id, "bash-b");
+    }
+
+    #[tokio::test]
+    async fn find_prior_excludes_self_id() {
+        let pool = setup().await;
+        let repo = BashJobRepo::new(pool);
+        let mut r1 = fixture_row("bash-a", "s1", "root");
+        r1.command_key = "k1".into();
+        r1.status = "Completed".into();
+        repo.insert(&r1).await.unwrap();
+
+        assert!(repo.find_prior_by_command_key("s1", "k1", "bash-a").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn find_prior_excludes_lost_status() {
+        let pool = setup().await;
+        let repo = BashJobRepo::new(pool);
+        let mut r1 = fixture_row("bash-a", "s1", "root");
+        r1.command_key = "k1".into();
+        r1.status = "Lost".into();
+        repo.insert(&r1).await.unwrap();
+
+        assert!(repo.find_prior_by_command_key("s1", "k1", "bash-x").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn find_prior_returns_none_when_no_prior() {
+        let pool = setup().await;
+        let repo = BashJobRepo::new(pool);
+        assert!(repo.find_prior_by_command_key("s1", "k1", "bash-x").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn find_prior_scoped_by_session() {
+        let pool = setup().await;
+        let repo = BashJobRepo::new(pool);
+        let mut r1 = fixture_row("bash-a", "s1", "root");
+        r1.command_key = "k1".into();
+        r1.status = "Completed".into();
+        repo.insert(&r1).await.unwrap();
+
+        assert!(repo.find_prior_by_command_key("s2", "k1", "bash-x").await.unwrap().is_none());
     }
 }

@@ -80,6 +80,38 @@ pub enum BashJobEvent {
     },
 }
 
+impl BashJobEvent {
+    pub fn job_id(&self) -> &str {
+        match self {
+            Self::Started   { job_id, .. } => job_id,
+            Self::Completed { job_id, .. } => job_id,
+            Self::Failed    { job_id, .. } => job_id,
+            Self::Cancelled { job_id, .. } => job_id,
+            Self::Lost      { job_id, .. } => job_id,
+        }
+    }
+
+    pub fn thread_id(&self) -> &str {
+        match self {
+            Self::Started   { thread_id, .. } => thread_id,
+            Self::Completed { thread_id, .. } => thread_id,
+            Self::Failed    { thread_id, .. } => thread_id,
+            Self::Cancelled { thread_id, .. } => thread_id,
+            Self::Lost      { thread_id, .. } => thread_id,
+        }
+    }
+
+    pub fn agent_id(&self) -> &str {
+        match self {
+            Self::Started   { agent_id, .. } => agent_id,
+            Self::Completed { agent_id, .. } => agent_id,
+            Self::Failed    { agent_id, .. } => agent_id,
+            Self::Cancelled { agent_id, .. } => agent_id,
+            Self::Lost      { agent_id, .. } => agent_id,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TodoEvent {
@@ -1575,5 +1607,35 @@ mod phase4_event_tests {
         assert_eq!(evt.variant_name(), "DataVersionBumped");
         // No specific subsystem owns it; goes to General.
         assert_eq!(evt.domain().as_str(), "general");
+    }
+}
+
+#[cfg(test)]
+mod bash_job_event_accessor_tests {
+    use super::*;
+    use jiff::Timestamp;
+
+    #[test]
+    fn accessors_return_inner_fields() {
+        let started = BashJobEvent::Started {
+            job_id: "bash-x".into(),
+            thread_id: "t1".into(),
+            agent_id: "a1".into(),
+            command: "c".into(),
+            description: "d".into(),
+            started_at: Timestamp::now(),
+        };
+        assert_eq!(started.job_id(), "bash-x");
+        assert_eq!(started.thread_id(), "t1");
+        assert_eq!(started.agent_id(), "a1");
+
+        let lost = BashJobEvent::Lost {
+            job_id: "bash-y".into(),
+            thread_id: "t2".into(),
+            agent_id: "a2".into(),
+        };
+        assert_eq!(lost.job_id(), "bash-y");
+        assert_eq!(lost.thread_id(), "t2");
+        assert_eq!(lost.agent_id(), "a2");
     }
 }
