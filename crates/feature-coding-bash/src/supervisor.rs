@@ -331,15 +331,20 @@ impl JobSupervisor {
             elapsed_ms,
         );
         let (status_str, kind_str, detail_str, extracted_str) = match &result {
-            GateResult::Passed => (JobStatus::Completed.as_str(), None, None, None),
+            GateResult::Passed => (JobStatus::Completed.as_str().to_string(), None, None, None),
             GateResult::Failed {
                 kind,
                 detail,
                 extracted,
             } => {
                 let k = kind.as_db_str();
+                let status_owned = if matches!(kind, FailureKind::Cancelled | FailureKind::Lost) {
+                    k.as_ref().to_string()
+                } else {
+                    JobStatus::Failed.as_str().to_string()
+                };
                 (
-                    JobStatus::Failed.as_str(),
+                    status_owned,
                     Some(k.as_ref().to_string()),
                     Some(detail.clone()),
                     Some(extracted.to_string()),
@@ -351,7 +356,7 @@ impl JobSupervisor {
             .repo
             .update_status(
                 &id.0,
-                status_str,
+                &status_str,
                 Some(exit_code),
                 kind_str.as_deref(),
                 detail_str.as_deref(),

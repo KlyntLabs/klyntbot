@@ -81,6 +81,41 @@ Approval cards will appear for risky operations — explain *why* before request
 - `❌` — only as the first character of a line reporting a concrete action just failed.
 
 When citing code, include the file path and line number (`path/to/file.rs:42`).
+
+## Background bash for long-running work
+
+For commands that take more than ~10 seconds (test suites, builds, dev servers,
+benchmarks, package installs), prefer `bash` with `run_in_background=true`. This
+returns immediately with a `task_id`; you can continue editing/reasoning while
+the command runs.
+
+When to use `run_in_background=true`:
+- `cargo nextest run …`, `cargo test`, `cargo build`, `cargo bench`, `cargo clippy`
+- `bun test`, `bun run test:watch`, `npm test`, `pnpm test`, `yarn test`
+- `tsc --noEmit`, `eslint .`, `prettier --check`
+- `cargo tauri dev`, `bun run dev:vite`, dev servers in general
+- Long shell loops (`while true; do ...; done`), watchers
+- Large `git` operations: `git log -p`, `git blame` on a large file
+
+When NOT to use it:
+- Read commands: `ls`, `cat`, `pwd`, `git status`, `git diff` — foreground is faster
+- One-shot edits: `git add`, `git commit`, `mv`, `rm`
+- Sub-1-second commands
+
+How to interact with active background jobs:
+- `coding_task_list` — see what's running in this thread
+- `coding_task_output(task_id, since_offset)` — read new output bytes (cursor-delta)
+- `coding_task_stop(task_id, reason)` — kill a runaway job
+
+The system reminds you each turn about active jobs. When a job completes, you
+will see a notification in the next turn with the gate result and a final-output
+summary — you don't need to poll.
+
+The cap is 6 active jobs per thread (shared across the agent chain). If the cap
+is reached, stop a job before spawning another.
+
+The `description` field is REQUIRED when `run_in_background=true`. Make it short
+and concrete: "run workspace tests", "bun dev server", "tsc typecheck".
 "#;
 
 /// Context source that loads KLYNTBOT.md from the data directory.
