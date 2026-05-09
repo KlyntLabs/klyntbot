@@ -41,6 +41,9 @@ pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
     if let Some(e) = feature_coding_todo::events::try_from_domain_event(event) {
         return Some(with_domain(e, RecallDomain::General));
     }
+    if let Some(s) = translate_bash_job(event) {
+        return Some(s);
+    }
     if let Some(e) =
         cognitive::services::community_intelligence::events::try_from_domain_event(event)
     {
@@ -54,6 +57,49 @@ pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
         return Some(with_domain(e, RecallDomain::General));
     }
     translate_system_event(event)
+}
+
+fn translate_bash_job(event: &bus::DomainEvent) -> Option<AiSignal> {
+    let bus::DomainEvent::BashJob(inner) = event else { return None };
+
+    let kind = match inner {
+        bus::BashJobEvent::Started   { .. } => "BashJob.Started",
+        bus::BashJobEvent::Completed { .. } => "BashJob.Completed",
+        bus::BashJobEvent::Failed    { .. } => "BashJob.Failed",
+        bus::BashJobEvent::Cancelled { .. } => "BashJob.Cancelled",
+        bus::BashJobEvent::Lost      { .. } => "BashJob.Lost",
+    };
+
+    Some(AiSignal {
+        domain: RecallDomain::General,
+        event_kind: kind,
+        importance: importance_for_bash_event(inner),
+        salience: SalienceVerdict::Accumulate,
+        content: format!(
+            "bash job {} ({}/{}/{})",
+            inner.job_id(),
+            kind,
+            inner.thread_id(),
+            inner.agent_id(),
+        ),
+        entity: None,
+        timestamp: jiff::Timestamp::now(),
+        raw_event: Some(event.clone()),
+        metrics: AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
+        metric_samples: vec![],
+    })
+}
+
+fn importance_for_bash_event(e: &bus::BashJobEvent) -> f64 {
+    match e {
+        bus::BashJobEvent::Failed { .. }    => 0.7,
+        bus::BashJobEvent::Lost { .. }      => 0.6,
+        bus::BashJobEvent::Cancelled { .. } => 0.5,
+        bus::BashJobEvent::Completed { .. } => 0.3,
+        bus::BashJobEvent::Started { .. }   => 0.2,
+    }
 }
 
 fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
@@ -184,6 +230,52 @@ pub fn build_metric_registry() -> ai_core::MetricRegistry {
 
 pub fn start(bus: Arc<DomainEventBus>, consumers: Vec<Arc<dyn SignalConsumer>>) -> SignalRouter {
     SignalRouter::start(bus, consumers, translate)
+}
+
+#[cfg(test)]
+mod bash_job_translate_tests {
+    use super::*;
+    use jiff::Timestamp;
+
+    #[test]
+    fn translates_failed() {
+        let event = bus::DomainEvent::BashJob(bus::BashJobEvent::Failed {
+            job_id: "bash-x".into(),
+            thread_id: "t".into(),
+            agent_id: "a".into(),
+            exit_code: Some(1),
+            failure_kind: "TestFailure".into(),
+            failure_detail: "...".into(),
+        });
+        let signal = translate_bash_job(&event).unwrap();
+        assert_eq!(signal.event_kind, "BashJob.Failed");
+        assert!((signal.importance - 0.7).abs() < 1e-9);
+    }
+
+    #[test]
+    fn translates_completed_lower_importance() {
+        let event = bus::DomainEvent::BashJob(bus::BashJobEvent::Completed {
+            job_id: "bash-x".into(),
+            thread_id: "t".into(),
+            agent_id: "a".into(),
+            exit_code: 0,
+            duration_ms: 1000,
+        });
+        let signal = translate_bash_job(&event).unwrap();
+        assert!((signal.importance - 0.3).abs() < 1e-9);
+    }
+
+    #[test]
+    fn returns_none_for_non_bash_event() {
+        let event = bus::DomainEvent::SkillRouted {
+            skill_name: "test".into(),
+            confidence: 0.5,
+            source: "keyword".into(),
+            trigger_phrases: vec![],
+            session_key: "s".into(),
+        };
+        assert!(translate_bash_job(&event).is_none());
+    }
 }
 
 #[cfg(test)]
