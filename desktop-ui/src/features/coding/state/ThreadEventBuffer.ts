@@ -3,6 +3,11 @@ import type { ThreadEvent } from "../hooks/useThreadEvents";
 
 const RING_BUFFER_CAP = 500;
 const RECENT_WINDOW_MS = 30 * 60 * 1000;
+// If a thread has been "running" but no event arrives for this long,
+// treat it as silently dead so the composer's isProcessing flag doesn't
+// trap sends in queue/steer mode forever (e.g. after a backend crash or
+// a turn that never emitted TurnCompleted).
+const RUNNING_HEARTBEAT_MS = 90 * 1000;
 
 type RecentEntry = {
   finishedAt: number;
@@ -13,8 +18,28 @@ type Subscriber = (event: ThreadEvent) => void;
 
 const eventsByThread = new Map<string, ThreadEvent[]>();
 const runningIds = new Set<string>();
+const runningHeartbeats = new Map<string, ReturnType<typeof setTimeout>>();
 const recentlyCompleted = new Map<string, RecentEntry>();
 const threadSubscribers = new Map<string, Set<Subscriber>>();
+
+function clearHeartbeat(threadId: string): void {
+  const t = runningHeartbeats.get(threadId);
+  if (t) {
+    clearTimeout(t);
+    runningHeartbeats.delete(threadId);
+  }
+}
+
+function armHeartbeat(threadId: string): void {
+  clearHeartbeat(threadId);
+  const timer = setTimeout(() => {
+    runningHeartbeats.delete(threadId);
+    if (runningIds.delete(threadId)) {
+      notify();
+    }
+  }, RUNNING_HEARTBEAT_MS);
+  runningHeartbeats.set(threadId, timer);
+}
 
 const storeListeners = new Set<() => void>();
 let runningSnapshot: ReadonlySet<string> = new Set();
@@ -88,6 +113,7 @@ function applyEvent(event: ThreadEvent): void {
       runningIds.add(threadId);
       stateChanged = true;
     }
+    armHeartbeat(threadId);
     const prev = recentlyCompleted.get(threadId);
     if (prev) {
       if (prev.timer) clearTimeout(prev.timer);
@@ -95,6 +121,7 @@ function applyEvent(event: ThreadEvent): void {
       stateChanged = true;
     }
   } else if (event.kind === "turn_completed") {
+    clearHeartbeat(threadId);
     if (runningIds.has(threadId)) {
       runningIds.delete(threadId);
       stateChanged = true;
@@ -111,6 +138,13 @@ function applyEvent(event: ThreadEvent): void {
       timer,
     });
     stateChanged = true;
+  }
+
+  // Any event for a running thread proves the loop is alive — rearm the
+  // heartbeat so a single quiet stretch doesn't kick a busy thread out of
+  // the running set.
+  if (runningIds.has(threadId) && event.kind !== "turn_completed") {
+    armHeartbeat(threadId);
   }
 
   // Fan-out to per-thread subscribers
@@ -161,6 +195,8 @@ export const __testing = {
   reset(): void {
     eventsByThread.clear();
     runningIds.clear();
+    for (const t of runningHeartbeats.values()) clearTimeout(t);
+    runningHeartbeats.clear();
     for (const entry of recentlyCompleted.values()) {
       if (entry.timer) clearTimeout(entry.timer);
     }

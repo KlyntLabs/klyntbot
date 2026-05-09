@@ -1238,6 +1238,9 @@ impl AgentLoop {
         // Clone Arcs for the spawned task
         let agent = Arc::clone(self);
         let sk = session_key.clone();
+        // Coding mode persists via the turn-handler bridge; skip the
+        // Done-time save_to_session to avoid a duplicate assistant row.
+        let is_coding_mode = matches!(session_mode, common::SessionMode::Coding);
 
         let handle = tokio::spawn(async move {
             tracing::debug!(session = %sk, "process_direct_streaming: pipeline task entered");
@@ -1261,10 +1264,13 @@ impl AgentLoop {
                         response
                     };
 
-                    // Save to session BEFORE emitting Done so the message ID
-                    // is available and the DB row exists when the streaming
-                    // relay tries to update metadata.
-                    let message_id = agent.save_to_session(&sk, &response).await;
+                    // Save BEFORE emitting Done so the row exists when the
+                    // streaming relay updates metadata.
+                    let message_id = if is_coding_mode {
+                        None
+                    } else {
+                        agent.save_to_session(&sk, &response).await
+                    };
                     let _ = event_tx
                         .send(AgentEvent::Done {
                             content: response.clone(),

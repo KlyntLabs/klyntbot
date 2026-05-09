@@ -9,7 +9,8 @@ export function transformAgentRouted(input: string): DispatchResult {
   }
 
   if (leaf.agentTransform) {
-    return { kind: "passthrough", text: leaf.agentTransform() };
+    const rest = remainderAfterCommand(input, leaf.command);
+    return { kind: "passthrough", text: leaf.agentTransform(rest) };
   }
 
   // Fallback for legacy commands that don't declare agentTransform
@@ -33,4 +34,11 @@ export function transformAgentRouted(input: string): DispatchResult {
   }
 
   return { kind: "error", message: `unknown agent-routed command: ${input}` };
+}
+
+function remainderAfterCommand(input: string, command: string): string {
+  const trimmed = input.trim();
+  const head = `/${command}`;
+  if (!trimmed.startsWith(head)) return "";
+  return trimmed.slice(head.length).trim();
 }

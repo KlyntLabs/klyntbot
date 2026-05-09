@@ -9,11 +9,12 @@ export const REGISTRY: Record<string, SlashNode> = {
     children: {
       "": {
         kind: "leaf",
-        path: "direct",
+        path: "agent",
         command: "plan",
-        tauriCommand: "coding_plan_enter",
         description: "Enter plan mode (writes/exec denied)",
         category: "mode",
+        agentTransform: (rest) =>
+          rest ? `[system: enter plan mode] ${rest}` : "[system: enter plan mode]",
       },
       exit: {
         kind: "leaf",

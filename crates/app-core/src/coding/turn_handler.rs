@@ -14,6 +14,71 @@ enum PartKind {
     Reasoning,
 }
 
+/// Concatenate Text parts in order. Returns `None` if any non-text/non-
+/// reasoning part is present (mixed payload — never dedupe).
+fn flatten_assistant_text(parts: &[MessagePart]) -> Option<String> {
+    let mut out = String::new();
+    for p in parts {
+        match p {
+            MessagePart::Text { text } => out.push_str(text),
+            MessagePart::Reasoning { .. } => {} // ignored for dedupe key
+            _ => return None,
+        }
+    }
+    Some(out)
+}
+
+/// Insert a new assistant row OR — if its text is a superset/equal to the
+/// previously-flushed text row in the same turn — update that row in
+/// place. Coalesces streaming-snapshot + final-flush duplicates that the
+/// turn handler's two flush sites (ToolStart, Done) would otherwise
+/// persist as two rows.
+async fn persist_or_coalesce_assistant_text(
+    repos: &storage::Repos,
+    thread_id: &str,
+    turn_id: &str,
+    parts: &[MessagePart],
+) -> std::result::Result<(), storage::StorageError> {
+    let new_text = match flatten_assistant_text(parts) {
+        Some(t) => t,
+        None => {
+            // Mixed payload (tool/file/etc.) — never coalesce.
+            let row_id = uuid::Uuid::new_v4();
+            return repos
+                .sessions
+                .add_message_with_parts(thread_id, row_id, "assistant", parts, Some(turn_id), None)
+                .await;
+        }
+    };
+
+    // Query the DB for the latest assistant row in this turn — the source
+    // of truth, regardless of how many bridge tasks happen to be running.
+    if let Some((prev_id, prev_text)) =
+        repos.sessions.latest_assistant_text_in_turn(thread_id, turn_id).await?
+    {
+        let a = prev_text.trim();
+        let b = new_text.trim();
+        if a == b || a.contains(b) {
+            // Existing row already a superset of (or equal to) the new
+            // flush — skip the duplicate insert entirely.
+            return Ok(());
+        }
+        if b.contains(a) {
+            // New flush is a superset — replace the existing row in place.
+            repos.sessions.update_message_parts(prev_id, parts).await?;
+            return Ok(());
+        }
+    }
+
+    // Distinct prose — fresh row.
+    let row_id = uuid::Uuid::new_v4();
+    repos
+        .sessions
+        .add_message_with_parts(thread_id, row_id, "assistant", parts, Some(turn_id), None)
+        .await?;
+    Ok(())
+}
+
 /// Response returned synchronously from `coding_message_send`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,7 +163,7 @@ impl AppCore {
                 // races with concurrent first messages on the same session.
                 let (session_res, msg_count_res) = tokio::join!(
                     title_repo.get_session(&session_key),
-                    title_repo.count_messages(&session_key),
+                    title_repo.count_user_messages(&session_key),
                 );
                 let session = match session_res {
                     Ok(s) => s,
@@ -113,10 +178,8 @@ impl AppCore {
                 if already_titled {
                     return;
                 }
-                let msg_count = msg_count_res.unwrap_or(i64::MAX);
-                // The user message has not been persisted yet at this point in
-                // coding_message_send; count == 0 (or 1 if a system msg was inserted).
-                if msg_count > 1 {
+                let user_msg_count = msg_count_res.unwrap_or(i64::MAX);
+                if user_msg_count > 1 {
                     return;
                 }
                 let _ = crate::coding::title_service::autogenerate_title(
@@ -366,18 +429,13 @@ impl AppCore {
                                     }
                                     if !pending_parts.is_empty() {
                                         let parts = std::mem::take(&mut pending_parts);
-                                        let row_id = uuid::Uuid::new_v4();
-                                        if let Err(e) = repos_bridge
-                                            .sessions
-                                            .add_message_with_parts(
-                                                &tid,
-                                                row_id,
-                                                "assistant",
-                                                &parts,
-                                                Some(&tuid_bridge),
-                                                None,
-                                            )
-                                            .await
+                                        if let Err(e) = persist_or_coalesce_assistant_text(
+                                            &repos_bridge,
+                                            &tid,
+                                            &tuid_bridge,
+                                            &parts,
+                                        )
+                                        .await
                                         {
                                             tracing::warn!("iteration parts persist failed: {e}");
                                         }
@@ -552,18 +610,13 @@ impl AppCore {
                                         }
                                         if !pending_parts.is_empty() {
                                             let parts = std::mem::take(&mut pending_parts);
-                                            let row_id = uuid::Uuid::new_v4();
-                                            if let Err(e) = repos_bridge
-                                                .sessions
-                                                .add_message_with_parts(
-                                                    &tid,
-                                                    row_id,
-                                                    "assistant",
-                                                    &parts,
-                                                    Some(&tuid_bridge),
-                                                    None,
-                                                )
-                                                .await
+                                            if let Err(e) = persist_or_coalesce_assistant_text(
+                                                &repos_bridge,
+                                                &tid,
+                                                &tuid_bridge,
+                                                &parts,
+                                            )
+                                            .await
                                             {
                                                 tracing::warn!("final parts persist failed: {e}");
                                             }
