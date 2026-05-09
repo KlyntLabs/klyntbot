@@ -1,0 +1,24 @@
+running 21 tests
+test tests::session_persistence::reload_active_thread ... FAILED
+test tests::session_persistence::reload_orphan ... FAILED
+test tests::concurrent_writes::write_then_read ... FAILED
+test tests::config_loader::loads_default ... ok
+test tests::ulid_gen::roundtrip ... ok
+
+failures:
+
+---- tests::session_persistence::reload_active_thread stdout ----
+thread 'tests::session_persistence::reload_active_thread' panicked at 'assertion failed'
+
+---- tests::session_persistence::reload_orphan stdout ----
+thread 'tests::session_persistence::reload_orphan' panicked at 'assertion failed'
+
+---- tests::concurrent_writes::write_then_read stdout ----
+thread 'tests::concurrent_writes::write_then_read' panicked at 'unexpected None'
+
+failures:
+    tests::concurrent_writes::write_then_read
+    tests::session_persistence::reload_active_thread
+    tests::session_persistence::reload_orphan
+
+test result: FAILED. 17 passed; 3 failed; 1 ignored; 0 measured; 0 filtered out

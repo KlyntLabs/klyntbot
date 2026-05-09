@@ -21,8 +21,11 @@ static RUST_TEST_RE: Lazy<Regex> = Lazy::new(|| {
 static VITEST_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"Tests\s+(\d+) failed\s*\|\s*(\d+) passed").unwrap()
 });
-static FIRST_FAILED_TEST_RE: Lazy<Regex> = Lazy::new(|| {
+static FAILED_TEST_NAME_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"test ([\w:]+) \.\.\. FAILED").unwrap()
+});
+static VITEST_FAILURE_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r" FAIL  [^>]+>\s+(.+)$").unwrap()
 });
 static CLIPPY_ABORT_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"error: aborting due to (\d+) previous error").unwrap()
@@ -136,13 +139,15 @@ fn detect_test_failure(stdout: &str, stderr: &str) -> Option<GateResult> {
     if let Some(c) = RUST_TEST_RE.captures(stdout).or_else(|| RUST_TEST_RE.captures(stderr)) {
         let n_passed: u32 = c[1].parse().unwrap_or(0);
         let n_failed: u32 = c[2].parse().unwrap_or(0);
-        let test_name = first_failed_rust_test(stdout)
-            .or_else(|| first_failed_rust_test(stderr));
+        let failed_test_names = all_failed_rust_tests(stdout)
+            .into_iter()
+            .chain(all_failed_rust_tests(stderr).into_iter())
+            .collect::<Vec<_>>();
         return Some(GateResult::Failed {
             kind: FailureKind::TestFailure,
             detail: format!("{n_failed} failed; {n_passed} passed"),
             extracted: json!({
-                "test_name": test_name,
+                "failed_test_names": failed_test_names,
                 "n_failed": n_failed,
                 "n_passed": n_passed,
                 "n_ignored": 0,
@@ -150,10 +155,13 @@ fn detect_test_failure(stdout: &str, stderr: &str) -> Option<GateResult> {
         });
     }
     if let Some(c) = VITEST_RE.captures(stdout).or_else(|| VITEST_RE.captures(stderr)) {
+        let combined = format!("{} {}", stdout, stderr);
+        let failed_test_names = all_failed_vitest_tests(&combined);
         return Some(GateResult::Failed {
             kind: FailureKind::TestFailure,
             detail: format!("{} failed; {} passed", &c[1], &c[2]),
             extracted: json!({
+                "failed_test_names": failed_test_names,
                 "n_failed": c[1].parse::<u32>().unwrap_or(0),
                 "n_passed": c[2].parse::<u32>().unwrap_or(0),
             }),
@@ -162,8 +170,21 @@ fn detect_test_failure(stdout: &str, stderr: &str) -> Option<GateResult> {
     None
 }
 
-fn first_failed_rust_test(text: &str) -> Option<String> {
-    FIRST_FAILED_TEST_RE.captures(text).map(|c| c[1].to_string())
+fn all_failed_rust_tests(text: &str) -> Vec<String> {
+    FAILED_TEST_NAME_RE
+        .captures_iter(text)
+        .map(|c| c[1].to_string())
+        .take(50)
+        .collect()
+}
+
+fn all_failed_vitest_tests(text: &str) -> Vec<String> {
+    text.lines()
+        .filter_map(|line| {
+            VITEST_FAILURE_RE.captures(line).map(|c| c[1].trim().to_string())
+        })
+        .take(50)
+        .collect()
 }
 
 fn detect_lint_failure(stdout: &str, stderr: &str, _command: &str) -> Option<GateResult> {
@@ -254,7 +275,11 @@ mod tests {
             assert!(matches!(kind, FailureKind::TestFailure));
             assert_eq!(extracted["n_failed"], 3);
             assert_eq!(extracted["n_passed"], 1);
-            assert!(extracted["test_name"].is_string());
+            let names = extracted["failed_test_names"]
+                .as_array().unwrap().iter()
+                .map(|v| v.as_str().unwrap().to_string())
+                .collect::<Vec<_>>();
+            assert!(!names.is_empty());
         } else { panic!("expected Failed") }
     }
 
@@ -317,5 +342,56 @@ mod tests {
             assert!(matches!(kind, FailureKind::Other(_)));
             assert_eq!(extracted["signal_hint"], "SIGKILL (likely OOM)");
         } else { panic!("expected Failed") }
+    }
+
+    #[test]
+    fn cargo_extracts_all_failed_test_names() {
+        let fixture = include_str!("../tests/fixtures/cargo_multi_test_failure.txt");
+        let result = GateClassifier::classify(fixture, "", 101, "cargo nextest run", false, false, false, 0);
+        if let GateResult::Failed { kind, extracted, .. } = result {
+            assert_eq!(format!("{kind:?}"), "TestFailure");
+            let names = extracted["failed_test_names"]
+                .as_array().unwrap().iter()
+                .map(|v| v.as_str().unwrap().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(names.len(), 3);
+            assert!(names.iter().any(|n| n.contains("reload_active_thread")));
+            assert!(names.iter().any(|n| n.contains("reload_orphan")));
+            assert!(names.iter().any(|n| n.contains("concurrent_writes")));
+            assert_eq!(extracted["n_failed"], 3);
+            assert_eq!(extracted["n_passed"], 17);
+        } else {
+            panic!("expected Failed");
+        }
+    }
+
+    #[test]
+    fn vitest_extracts_all_failed_test_names() {
+        let fixture = include_str!("../tests/fixtures/vitest_multi_failure.txt");
+        let result = GateClassifier::classify(fixture, "", 1, "bun run test", false, false, false, 0);
+        if let GateResult::Failed { kind, extracted, .. } = result {
+            assert_eq!(format!("{kind:?}"), "TestFailure");
+            let names = extracted["failed_test_names"]
+                .as_array().unwrap().iter()
+                .map(|v| v.as_str().unwrap().to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(names.len(), 2);
+            assert!(names.iter().any(|n| n.contains("renders 6 jobs")));
+            assert!(names.iter().any(|n| n.contains("updates row on tauri event")));
+        } else {
+            panic!("expected Failed");
+        }
+    }
+
+    #[test]
+    fn cap_at_50_names() {
+        let mut text = String::from("test result: FAILED. 0 passed; 60 failed\n");
+        for i in 0..60 {
+            text.push_str(&format!("test t::{} ... FAILED\n", i));
+        }
+        let result = GateClassifier::classify(&text, "", 101, "cargo test", false, false, false, 0);
+        if let GateResult::Failed { extracted, .. } = result {
+            assert_eq!(extracted["failed_test_names"].as_array().unwrap().len(), 50);
+        }
     }
 }
