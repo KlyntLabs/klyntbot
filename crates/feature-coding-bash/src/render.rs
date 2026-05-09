@@ -1,5 +1,6 @@
 //! Rendered prose for `<system-reminder>` blocks.
 
+use crate::intelligence::{ExtractedDiff, JobDiff, KindTransition};
 use jiff::Timestamp;
 use tools_core::{GateResult, JobId, JobSpec, JobView};
 
@@ -35,6 +36,7 @@ pub fn completion_notification(
     spec: &JobSpec,
     result: &GateResult,
     final_summary: &str,
+    diff: Option<&JobDiff>,
 ) -> String {
     let mut s = String::from("<system-reminder>\n");
     s.push_str(&format!("Background job {} completed.\n", id.as_str()));
@@ -57,11 +59,86 @@ pub fn completion_notification(
             }
         }
     }
+
+    if let Some(d) = diff {
+        s.push_str("\nCompared to last run of this command:\n");
+        s.push_str(&format_kind_transition(&d.kind_transition));
+        s.push_str(&format_extracted_diff(&d.extracted_diff));
+        s.push_str(&format!("  Wall-clock: {}\n", format_elapsed_delta(d.elapsed_delta_ms)));
+    }
+
     let tail_start = final_summary.floor_char_boundary(final_summary.len().saturating_sub(8000));
     s.push_str("\nLast portion of output:\n");
     s.push_str(&final_summary[tail_start..]);
     s.push_str("\n</system-reminder>");
     s
+}
+
+fn format_kind_transition(t: &KindTransition) -> String {
+    match t {
+        KindTransition::StillPassing => "  Transition: StillPassing\n".into(),
+        KindTransition::StillFailing { kind } => format!("  Transition: StillFailing ({kind})\n"),
+        KindTransition::Regressed { from, to } => format!("  Transition: Regressed ({from} → {to})\n"),
+        KindTransition::Recovered { prior_kind } => format!("  Transition: Recovered ({prior_kind} → Passed)\n"),
+        KindTransition::Changed { from, to } => format!("  Transition: Changed ({from} → {to})\n"),
+    }
+}
+
+fn format_extracted_diff(d: &ExtractedDiff) -> String {
+    match d {
+        ExtractedDiff::None => String::new(),
+        ExtractedDiff::TestSet { new_failures, still_failing, resolved } => {
+            let mut s = String::from("  Test diff:\n");
+            s.push_str(&format!("    new failures:  {}\n", trim_set(new_failures)));
+            s.push_str(&format!("    still failing: {}\n", trim_set(still_failing)));
+            s.push_str(&format!("    resolved:      {}\n", trim_set(resolved)));
+            s
+        }
+        ExtractedDiff::Compile { same_location, prior_loc, curr_loc } => {
+            let same = if *same_location { "same location" } else { "different location" };
+            format!(
+                "  Compile diff: {same} (prior: {prior_loc:?}, curr: {curr_loc:?})\n"
+            )
+        }
+        ExtractedDiff::Bind { same_port, prior_port, curr_port } => {
+            let same = if *same_port { "same port" } else { "different port" };
+            format!("  Bind diff: {same} (prior: {prior_port:?}, curr: {curr_port:?})\n")
+        }
+        ExtractedDiff::Lint { delta_n_errors } => {
+            format!("  Lint diff: error count Δ {delta_n_errors:+}\n")
+        }
+        ExtractedDiff::Timeout { prior_ms, curr_ms } => {
+            format!("  Timeout diff: prior {prior_ms} ms, curr {curr_ms} ms\n")
+        }
+        ExtractedDiff::OtherExitTransition { from, to } => {
+            format!("  Exit code transition: {from:?} → {to:?}\n")
+        }
+    }
+}
+
+fn trim_set(v: &[String]) -> String {
+    if v.is_empty() {
+        return "(none)".into();
+    }
+    let mut sorted: Vec<&str> = v.iter().map(|s| s.as_str()).collect();
+    sorted.sort();
+    if sorted.len() <= 50 {
+        sorted.join(", ")
+    } else {
+        let head = sorted[..50].join(", ");
+        format!("{head}, + {} more", sorted.len() - 50)
+    }
+}
+
+fn format_elapsed_delta(ms: i64) -> String {
+    let secs = ms.abs() as f64 / 1000.0;
+    if ms > 0 {
+        format!("+{secs:.1}s (slower)")
+    } else if ms < 0 {
+        format!("-{secs:.1}s (faster)")
+    } else {
+        "+0.0s".into()
+    }
 }
 
 /// Format byte count into human-readable string (e.g. "1.5 MB").

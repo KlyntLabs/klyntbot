@@ -373,6 +373,28 @@ impl JobSupervisor {
             tracing::error!(job_id=%id.0, "update_status failed: {}", e);
         }
 
+        // 2.3b: query prior run + compute diff for the completion notification.
+        let curr_command_key = command_key(&live.spec.command);
+        let prior = match self
+            .repo
+            .find_prior_by_command_key(&live.spec.session_id, &curr_command_key, id.as_str())
+            .await
+        {
+            Ok(opt) => opt,
+            Err(e) => {
+                tracing::warn!(error = ?e, "prior lookup failed; skipping diff");
+                None
+            }
+        };
+        let curr_row = match self.repo.get(id.as_str()).await {
+            Ok(Some(r)) => Some(r),
+            _ => None,
+        };
+        let diff = match (prior, curr_row) {
+            (Some(p), Some(c)) => Some(crate::intelligence::diff_against_prior(&p, &c)),
+            _ => None,
+        };
+
         match &result {
             GateResult::Passed => {
                 self.bus.publish_bash_job(BashJobEvent::Completed {
@@ -405,7 +427,9 @@ impl JobSupervisor {
         }
 
         if !live.spec.silent_completion {
-            let body = crate::render::completion_notification(id, &live.spec, &result, &final_str);
+            let body = crate::render::completion_notification(
+                id, &live.spec, &result, &final_str, diff.as_ref()
+            );
             self.queue.push(ContextUpdate {
                 reason: ContextUpdateReason::CodingJobsChanged,
                 content: Some(body),
