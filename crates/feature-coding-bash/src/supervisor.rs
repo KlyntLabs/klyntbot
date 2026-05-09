@@ -23,6 +23,7 @@ use tools_core::{
 use tracing;
 
 use crate::gate::GateClassifier;
+use crate::intelligence::command_key;
 use crate::ring::RingFile;
 use crate::spawner::spawn_background_command;
 
@@ -467,6 +468,7 @@ impl JobSupervisorHandle for JobSupervisor {
             agent_id: spec.agent_id.clone(),
             description: spec.description.clone(),
             command: spec.command.clone(),
+            command_key: command_key(&spec.command),
             cwd: cwd_str.clone(),
             timeout_ms: spec.timeout_ms as i64,
             silent_completion: spec.silent_completion,

@@ -3,8 +3,8 @@ use tools_core::FeatureMigration;
 pub fn coding_background_jobs_migration() -> FeatureMigration {
     FeatureMigration {
         feature_name: "feature_coding_bash".into(),
-        version: 1,
-        description: "Create coding_background_jobs table".into(),
+        version: 2,
+        description: "Create coding_background_jobs table with command_key for diff lookup".into(),
         sql: r#"
             CREATE TABLE IF NOT EXISTS coding_background_jobs (
                 id                    TEXT PRIMARY KEY,
@@ -12,6 +12,7 @@ pub fn coding_background_jobs_migration() -> FeatureMigration {
                 agent_id              TEXT NOT NULL,
                 description           TEXT NOT NULL,
                 command               TEXT NOT NULL,
+                command_key           TEXT NOT NULL,
                 cwd                   TEXT NOT NULL,
                 timeout_ms            INTEGER NOT NULL,
                 silent_completion     INTEGER NOT NULL DEFAULT 0,
@@ -33,6 +34,7 @@ pub fn coding_background_jobs_migration() -> FeatureMigration {
             );
             CREATE INDEX IF NOT EXISTS idx_cbj_session_status ON coding_background_jobs(session_id, status);
             CREATE INDEX IF NOT EXISTS idx_cbj_active ON coding_background_jobs(status) WHERE status IN ('Starting','Running');
+            CREATE INDEX IF NOT EXISTS idx_cbj_session_command_key ON coding_background_jobs(session_id, command_key, started_at DESC);
         "#
         .into(),
     }

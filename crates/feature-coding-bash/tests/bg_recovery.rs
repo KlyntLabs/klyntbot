@@ -36,6 +36,7 @@ async fn marks_orphan_lost_and_preserves_log() {
         agent_id: "root".into(),
         description: "orphan".into(),
         command: "sleep 999".into(),
+        command_key: "sleep_999".into(),
         cwd: dir.path().to_string_lossy().to_string(),
         timeout_ms: 600_000,
         silent_completion: false,

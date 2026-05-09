@@ -4,6 +4,7 @@
 
 pub mod gate;
 pub mod injector;
+pub mod intelligence;
 pub mod migrations;
 pub mod render;
 pub mod ring;

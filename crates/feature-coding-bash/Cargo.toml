@@ -19,6 +19,8 @@ once_cell = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+sha2 = "0.10"
+hex = "0.4"
 specta = { workspace = true }
 sqlx = { workspace = true, features = ["sqlite", "runtime-tokio"] }
 storage = { path = "../storage" }

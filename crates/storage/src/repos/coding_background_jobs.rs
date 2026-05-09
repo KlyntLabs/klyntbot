@@ -14,6 +14,7 @@ pub struct BashJobRow {
     pub agent_id: String,
     pub description: String,
     pub command: String,
+    pub command_key: String,
     pub cwd: String,
     pub timeout_ms: i64,
     pub silent_completion: bool,
@@ -46,12 +47,12 @@ impl BashJobRepo {
         sqlx::query(
             r#"
             INSERT INTO coding_background_jobs (
-                id, session_id, agent_id, description, command, cwd,
+                id, session_id, agent_id, description, command, command_key, cwd,
                 timeout_ms, silent_completion, status, exit_code,
                 failure_kind, failure_detail, failure_extracted,
                 started_at, finished_at, total_bytes_emitted, bisect_count,
                 log_path, final_path, last_polled_at, last_seen_offset
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&row.id)
@@ -59,6 +60,7 @@ impl BashJobRepo {
         .bind(&row.agent_id)
         .bind(&row.description)
         .bind(&row.command)
+        .bind(&row.command_key)
         .bind(&row.cwd)
         .bind(row.timeout_ms)
         .bind(row.silent_completion as i64)
@@ -140,7 +142,7 @@ impl BashJobRepo {
 
     pub async fn get(&self, id: &str) -> Result<Option<BashJobRow>, StorageError> {
         let row = sqlx::query(
-            r#"SELECT id, session_id, agent_id, description, command, cwd,
+            r#"SELECT id, session_id, agent_id, description, command, command_key, cwd,
                       timeout_ms, silent_completion, status, exit_code,
                       failure_kind, failure_detail, failure_extracted,
                       started_at, finished_at, total_bytes_emitted, bisect_count,
@@ -171,7 +173,7 @@ impl BashJobRepo {
             ""
         };
         let sql = format!(
-            r#"SELECT id, session_id, agent_id, description, command, cwd,
+            r#"SELECT id, session_id, agent_id, description, command, command_key, cwd,
                       timeout_ms, silent_completion, status, exit_code,
                       failure_kind, failure_detail, failure_extracted,
                       started_at, finished_at, total_bytes_emitted, bisect_count,
@@ -194,7 +196,7 @@ impl BashJobRepo {
         active_only: bool,
     ) -> Result<Vec<BashJobRow>, StorageError> {
         let mut qb = sqlx::QueryBuilder::new(
-            "SELECT id, session_id, agent_id, description, command, cwd, \
+            "SELECT id, session_id, agent_id, description, command, command_key, cwd, \
              timeout_ms, silent_completion, status, exit_code, \
              failure_kind, failure_detail, failure_extracted, \
              started_at, finished_at, total_bytes_emitted, bisect_count, \
@@ -236,7 +238,7 @@ impl BashJobRepo {
 
     pub async fn list_orphans(&self) -> Result<Vec<BashJobRow>, StorageError> {
         let rows = sqlx::query(
-            r#"SELECT id, session_id, agent_id, description, command, cwd,
+            r#"SELECT id, session_id, agent_id, description, command, command_key, cwd,
                       timeout_ms, silent_completion, status, exit_code,
                       failure_kind, failure_detail, failure_extracted,
                       started_at, finished_at, total_bytes_emitted, bisect_count,
@@ -280,6 +282,7 @@ impl BashJobRepo {
             agent_id: row.try_get("agent_id")?,
             description: row.try_get("description")?,
             command: row.try_get("command")?,
+            command_key: row.try_get("command_key")?,
             cwd: row.try_get("cwd")?,
             timeout_ms: row.try_get("timeout_ms")?,
             silent_completion: row.try_get::<i64, _>("silent_completion")? != 0,
@@ -312,6 +315,7 @@ mod tests {
             agent_id              TEXT NOT NULL,
             description           TEXT NOT NULL,
             command               TEXT NOT NULL,
+            command_key           TEXT NOT NULL,
             cwd                   TEXT NOT NULL,
             timeout_ms            INTEGER NOT NULL,
             silent_completion     INTEGER NOT NULL DEFAULT 0,
@@ -345,6 +349,7 @@ mod tests {
             agent_id: agent.into(),
             description: "test".into(),
             command: "echo hi".into(),
+            command_key: "echo_hi".into(),
             cwd: "/tmp".into(),
             timeout_ms: 600_000,
             silent_completion: false,
