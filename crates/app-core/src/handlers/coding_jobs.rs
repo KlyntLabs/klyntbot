@@ -25,10 +25,11 @@ fn require_supervisor(
 pub async fn coding_jobs_list(
     core: &AppCore,
     thread_id: &str,
+    agent_chain: &[String],
     active_only: bool,
 ) -> Result<Vec<BashJobView>, ApiError> {
     let views = require_supervisor(core)?
-        .list_for_thread(thread_id, active_only)
+        .list_for_thread(thread_id, agent_chain, active_only)
         .await;
     Ok(views.into_iter().map(BashJobView::from_job_view).collect())
 }

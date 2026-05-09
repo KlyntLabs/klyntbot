@@ -623,9 +623,9 @@ async codingMemorySessionReplayRecallOverlay(args: SessionRecallOverlayArgs) : P
     else return { status: "error", error: e  as any };
 }
 },
-async codingJobList(threadId: string, activeOnly: boolean | null) : Promise<Result<BashJobsPanelView, ApiError>> {
+async codingJobList(threadId: string, agentChain: string[], activeOnly: boolean | null) : Promise<Result<BashJobsPanelView, ApiError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("coding_job_list", { threadId, activeOnly }) };
+    return { status: "ok", data: await TAURI_INVOKE("coding_job_list", { threadId, agentChain, activeOnly }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

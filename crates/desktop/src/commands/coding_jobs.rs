@@ -10,10 +10,11 @@ pub struct OpenLogResult {
 #[klynt_command]
 pub async fn coding_job_list(
     thread_id: String,
+    agent_chain: Vec<String>,
     active_only: Option<bool>,
 ) -> BashJobsPanelView {
     let jobs = state
-        .coding_job_list(&thread_id, active_only.unwrap_or(false))
+        .coding_job_list(&thread_id, &agent_chain, active_only.unwrap_or(false))
         .await
         .map_err(ApiError::from)?;
     Ok(BashJobsPanelView { jobs })
@@ -61,9 +62,13 @@ pub(crate) async fn dispatch_dev(
     Some(match cmd {
         "coding_job_list" => {
             let thread_id = try_field!(dev::get_str(body, "threadId"));
+            let agent_chain = body.get("agentChain")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .unwrap_or_else(|| vec!["root".into()]);
             let active_only = body.get("activeOnly").and_then(|v| v.as_bool()).unwrap_or(false);
             dev::val(
-                core.coding_job_list(&thread_id, active_only)
+                core.coding_job_list(&thread_id, &agent_chain, active_only)
                     .await
                     .map(|jobs| serde_json::json!({ "jobs": jobs }))
                     .map_err(ApiError::from),

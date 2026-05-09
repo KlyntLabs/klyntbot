@@ -59,9 +59,10 @@ export async function openPlanFile(path: string): Promise<void> {
 
 export async function fetchCodingJobs(
   threadId: string,
+  agentChain: string[] = ["root"],
   activeOnly = false,
 ): Promise<BashJobsPanelView> {
-  const r = await commands.codingJobList(threadId, activeOnly);
+  const r = await commands.codingJobList(threadId, agentChain, activeOnly);
   if (r.status !== "ok") throw new Error(r.error.message ?? "coding_job_list failed");
   return r.data;
 }

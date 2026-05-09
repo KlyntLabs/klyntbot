@@ -816,9 +816,10 @@ impl AppCore {
     pub async fn coding_job_list(
         &self,
         thread_id: &str,
+        agent_chain: &[String],
         active_only: bool,
     ) -> Result<Vec<feature_coding_bash::BashJobView>, ApiError> {
-        crate::handlers::coding_jobs::coding_jobs_list(self, thread_id, active_only).await
+        crate::handlers::coding_jobs::coding_jobs_list(self, thread_id, agent_chain, active_only).await
     }
 
     #[tracing::instrument(skip(self), err)]
