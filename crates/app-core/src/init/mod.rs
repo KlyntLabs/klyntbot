@@ -167,6 +167,7 @@ impl AppCore {
 
         // ── Background bash job supervisor (coding background tasks) ─────
         let bash_job_repo = ::storage::BashJobRepo::new(storage_pool.inner().clone());
+        let bash_job_repo_for_mirror = bash_job_repo.clone();
         let job_supervisor = Arc::new(feature_coding_bash::JobSupervisor::new(
             bash_job_repo,
             Arc::clone(&domain_event_bus),
@@ -624,6 +625,7 @@ impl AppCore {
                 trial_evaluator,
                 Some(Arc::new(coding_approval_history_repo.clone())),
                 Some(Arc::new(approval_pattern_history_repo.clone())),
+                Some(Arc::new(bash_job_repo_for_mirror)),
             );
 
             // Phase-5 coding mirror sources — pattern effectiveness, stale-memory,

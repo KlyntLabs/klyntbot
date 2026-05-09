@@ -14,9 +14,9 @@ use tokio_util::sync::CancellationToken;
 
 use crate::mirror::{
     sources::{
-        ApprovalHistorySource, ConfigArchiverSource, CostCeilingSource, FinanceSpendingDriftSource,
-        MetaRuleSignalSource, RoutingSignalSource, TaskFocusPatternSource, TodoSignalSource,
-        TrialPreviewSource,
+        ApprovalHistorySource, BackgroundJobSignalSource, ConfigArchiverSource, CostCeilingSource,
+        FinanceSpendingDriftSource, MetaRuleSignalSource, RoutingSignalSource, TaskFocusPatternSource,
+        TodoSignalSource, TrialPreviewSource,
     },
     AutotunerBridge, MirrorFacade, MirrorRepo, NarrativeHandler,
 };
@@ -41,6 +41,7 @@ impl MirrorEngine {
         trial_evaluator: Option<Arc<dyn crate::mirror::types::EarlyTrialEvaluator>>,
         approval_history_repo: Option<Arc<storage::repos::CodingApprovalHistoryRepo>>,
         approval_pattern_repo: Option<Arc<storage::repos::ApprovalPatternHistoryRepo>>,
+        bash_repo: Option<Arc<storage::repos::BashJobRepo>>,
     ) -> StartedMirror {
         let shutdown = CancellationToken::new();
         let active_timers: Arc<DashMap<String, JoinHandle<()>>> = Arc::new(DashMap::new());
@@ -92,6 +93,13 @@ impl MirrorEngine {
         let cost_ceiling = Arc::new(CostCeilingSource::new(repo.clone()));
         register!(cost_ceiling);
 
+        if let (Some(ep), Some(br)) = (&episodic_repo, &bash_repo) {
+            let bg_job_source = Arc::new(
+                BackgroundJobSignalSource::new(ep.clone(), br.clone())
+            );
+            register!(bg_job_source);
+        }
+
         // Build the facade (unchanged API; drop the now-unused domain_event_bus).
         let mut facade = MirrorFacade::new(repo);
         facade = facade.with_active_timers(active_timers);
@@ -125,9 +133,9 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn start_produces_seven_consumers() {
+    async fn start_produces_eight_consumers() {
         let repo = crate::mirror::test_mirror_repo().await;
-        let built = MirrorEngine::start(repo, None, None, None, None, None, None, None);
+        let built = MirrorEngine::start(repo, None, None, None, None, None, None, None, None);
         assert_eq!(
             built.consumers.len(),
             8,
