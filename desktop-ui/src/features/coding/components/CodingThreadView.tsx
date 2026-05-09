@@ -5,6 +5,7 @@ import { type MessageDto, useThreadEvents } from "../hooks/useThreadEvents";
 import type { MessagePart } from "./parts/types";
 import { PlanModeBanner } from "./PlanModeBanner";
 import { TodoPanel } from "./TodoPanel";
+import { JobsPanel } from "./JobsPanel";
 
 type Props = {
   threadId: string | null;
@@ -63,8 +64,9 @@ export function CodingThreadView({
             isThinking={isThinking}
           />
         </div>
-        <div className="w-64 border-l border-border hidden lg:block">
+        <div className="w-64 border-l border-border hidden lg:block flex flex-col">
           <TodoPanel threadId={threadId} />
+          <JobsPanel threadId={threadId} />
         </div>
       </div>
     </div>
