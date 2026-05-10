@@ -8,7 +8,7 @@ import { apiCache } from "./cache";
 // apps (KimiTracingApp / ClaudeCodeTracingApp) at the parent level
 // (CodingMemoryPlugin), and each hard-codes its own provider id when
 // calling these helpers — so a chip→provider mapper is no longer needed.
-export type TracingProviderId = "kimi" | "claudeCode";
+export type TracingProviderId = "kimi" | "claudeCode" | "klynt";
 
 // ── Upstream-shaped types the ported components import ───────────────
 
