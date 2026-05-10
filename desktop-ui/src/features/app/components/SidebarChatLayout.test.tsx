@@ -21,6 +21,8 @@ const baseProps = {
   selectedSessionKey: null,
   onSelectThread: vi.fn(),
   activeNavId: null,
+  workspaces: [],
+  codingWorkspaceIdByThread: new Map<string, string>(),
 };
 
 describe("SidebarChatLayout — mode-aware nav", () => {

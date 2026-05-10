@@ -245,11 +245,13 @@ type UseMainAppLayoutSurfacesArgs = {
 
 type MainAppLayoutSurfacesContext = UseMainAppLayoutSurfacesArgs & {
   loadedContextFiles: Array<{ label: string; path: string }>;
+  codingWorkspaceIdByThread: Map<string, string>;
 };
 
 function buildPrimarySurface({
   appSettings,
   workspaces,
+  codingWorkspaceIdByThread,
   threadsByWorkspace,
   threadStatusById,
   threadResumeLoadingById,
@@ -373,6 +375,8 @@ function buildPrimarySurface({
       threads: chatView.chatThreads,
       selectedSessionKey: chatView.selectedSessionKey,
       onSelectThread: chatView.onSelectThread,
+      workspaces,
+      codingWorkspaceIdByThread,
     },
     chatViewProps: {
       active: chatView.appView === "chat",
@@ -1045,6 +1049,7 @@ export function useMainAppLayoutSurfaces({
 
   const context: MainAppLayoutSurfacesContext = {
     loadedContextFiles,
+    codingWorkspaceIdByThread: codingSessions.workspaceIdBySessionKey,
     appSettings,
     workspaces,
     groupedWorkspaces,

@@ -37,6 +37,8 @@ export function buildPrimaryNodes(options: PrimaryLayoutNodesOptions): PrimaryLa
       threads={options.sidebarProps.threads}
       selectedSessionKey={options.sidebarProps.selectedSessionKey}
       onSelectThread={options.sidebarProps.onSelectThread}
+      workspaces={options.sidebarProps.workspaces}
+      codingWorkspaceIdByThread={options.sidebarProps.codingWorkspaceIdByThread}
     />
   );
 

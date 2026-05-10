@@ -1,6 +1,12 @@
-import { useMemo } from "react";
+import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
+import Folder from "lucide-react/dist/esm/icons/folder";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatThread } from "@/features/chat/types";
-import { partitionCodingThreads } from "../state/partitionCodingThreads";
+import type { WorkspaceInfo } from "@/types";
+import {
+  groupCodingThreadsByProject,
+  type ProjectThreadGroup,
+} from "../state/groupCodingThreadsByProject";
 import { markThreadOpened } from "../state/ThreadEventBuffer";
 import { TodoSidebarBadge } from "./TodoSidebarBadge";
 
@@ -10,16 +16,42 @@ type Props = {
   recentlyCompleted: ReadonlyMap<string, number>;
   activeThreadId: string | null;
   onSelectThread: (sessionKey: string) => void;
+  workspaces: ReadonlyArray<WorkspaceInfo>;
+  workspaceIdByThread: ReadonlyMap<string, string>;
 };
 
+const COLLAPSED_KEY = "klynt:coding-sidebar:collapsed-projects";
+
+function loadCollapsed(): Set<string> {
+  if (typeof localStorage === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(COLLAPSED_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr)
+      ? new Set(arr.filter((x): x is string => typeof x === "string"))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function statusFor(
+  sessionKey: string,
+  runningIds: ReadonlySet<string>,
+  recent: ReadonlyMap<string, number>,
+): "running" | "recent" | undefined {
+  if (runningIds.has(sessionKey)) return "running";
+  if (recent.has(sessionKey)) return "recent";
+  return undefined;
+}
+
 /**
- * Coding-mode sidebar threads section. Renders three groups (Running /
- * Recently completed / Chats), collapsing any group whose count is zero.
+ * Coding-mode sidebar: project-grouped layout.
  *
- * Uses a minimal local row component instead of the assistant-mode
- * `ThreadRow` because coding rows have no workspace, no subagent tree,
- * no pinning, and no `threadStatusById` pipeline — just title + dot +
- * active highlight.
+ * Sessions are grouped by their workspace ("project"). Each project header is
+ * collapsible; collapsed state persists in localStorage. Per-row dot indicates
+ * running/recently-completed status.
  */
 export function CodingSidebarThreadsSection({
   sessions,
@@ -27,90 +59,148 @@ export function CodingSidebarThreadsSection({
   recentlyCompleted,
   activeThreadId,
   onSelectThread,
+  workspaces,
+  workspaceIdByThread,
 }: Props) {
-  const { running, recent, chats } = useMemo(
-    () => partitionCodingThreads(sessions, runningIds, recentlyCompleted),
-    [sessions, runningIds, recentlyCompleted],
+  const groups = useMemo(
+    () => groupCodingThreadsByProject(sessions, workspaceIdByThread, workspaces),
+    [sessions, workspaceIdByThread, workspaces],
   );
 
-  const handleSelect = (sessionKey: string) => {
-    markThreadOpened(sessionKey);
-    onSelectThread(sessionKey);
-  };
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => loadCollapsed());
+
+  useEffect(() => {
+    if (typeof localStorage === "undefined") return;
+    try {
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(Array.from(collapsed)));
+    } catch {
+      // ignore quota / disabled storage
+    }
+  }, [collapsed]);
+
+  const toggleCollapsed = useCallback((key: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const handleSelect = useCallback(
+    (sessionKey: string) => {
+      markThreadOpened(sessionKey);
+      onSelectThread(sessionKey);
+    },
+    [onSelectThread],
+  );
+
+  if (groups.length === 0) {
+    return (
+      <>
+        <div className="coding-sidebar-section-header coding-sidebar-section-header--top">
+          <span>Projects</span>
+        </div>
+        <div className="coding-sidebar-empty">No projects yet</div>
+      </>
+    );
+  }
 
   return (
     <>
-      {running.length > 0 && (
-        <Section
-          title="Running"
-          count={running.length}
-          rows={running}
-          status="running"
-          activeThreadId={activeThreadId}
-          onSelect={handleSelect}
-        />
-      )}
-      {recent.length > 0 && (
-        <Section
-          title="Recently completed"
-          count={recent.length}
-          rows={recent}
-          status="recent"
-          activeThreadId={activeThreadId}
-          onSelect={handleSelect}
-        />
-      )}
-      <Section
-        title="Chats"
-        count={chats.length}
-        rows={chats}
-        status={undefined}
-        activeThreadId={activeThreadId}
-        onSelect={handleSelect}
-      />
+      <div className="coding-sidebar-section-header coding-sidebar-section-header--top">
+        <span>Projects</span>
+      </div>
+      {groups.map((group) => {
+        const key = group.workspaceId ?? "__no_project__";
+        const isCollapsed = collapsed.has(key);
+        return (
+          <ProjectGroup
+            key={key}
+            group={group}
+            collapsed={isCollapsed}
+            onToggle={() => toggleCollapsed(key)}
+            runningIds={runningIds}
+            recentlyCompleted={recentlyCompleted}
+            activeThreadId={activeThreadId}
+            onSelect={handleSelect}
+          />
+        );
+      })}
     </>
   );
 }
 
-function Section({
-  title,
-  count,
-  rows,
-  status,
+function ProjectGroup({
+  group,
+  collapsed,
+  onToggle,
+  runningIds,
+  recentlyCompleted,
   activeThreadId,
   onSelect,
 }: {
-  title: string;
-  count: number;
-  rows: ChatThread[];
-  status: "running" | "recent" | undefined;
+  group: ProjectThreadGroup;
+  collapsed: boolean;
+  onToggle: () => void;
+  runningIds: ReadonlySet<string>;
+  recentlyCompleted: ReadonlyMap<string, number>;
   activeThreadId: string | null;
   onSelect: (sessionKey: string) => void;
 }) {
+  const groupId = `coding-sidebar-project-${group.workspaceId ?? "no-project"}`;
   return (
-    <div className="coding-sidebar-section">
-      <div className="coding-sidebar-section-header">
-        <span>{title}</span>
-        <span className="coding-sidebar-section-count">{count}</span>
-      </div>
-      {rows.map((t) => (
-        <button
-          type="button"
-          key={t.sessionKey}
-          className={`thread-row${activeThreadId === t.sessionKey ? " active" : ""}`}
-          data-status={status}
-          data-active={activeThreadId === t.sessionKey ? "true" : undefined}
-          onClick={() => onSelect(t.sessionKey)}
+    <div className="coding-sidebar-section coding-sidebar-project">
+      <button
+        type="button"
+        className="coding-sidebar-project-header"
+        aria-expanded={!collapsed}
+        aria-controls={groupId}
+        onClick={onToggle}
+        title={group.path ?? group.name}
+      >
+        <span
+          className={`coding-sidebar-project-chevron${collapsed ? "" : " is-open"}`}
+          aria-hidden
         >
-          <span className="thread-status" aria-hidden />
-          <div className="thread-content">
-            <div className="thread-headline">
-              <span className="thread-name">{t.title}</span>
-            </div>
-            <TodoSidebarBadge threadId={t.sessionKey} />
-          </div>
-        </button>
-      ))}
+          <ChevronRight />
+        </span>
+        <span className="coding-sidebar-project-icon" aria-hidden>
+          <Folder />
+        </span>
+        <span className="coding-sidebar-project-name">{group.name}</span>
+        <span className="coding-sidebar-project-count">{group.threads.length}</span>
+      </button>
+      {!collapsed && (
+        <div id={groupId} className="coding-sidebar-project-body">
+          {group.threads.length === 0 ? (
+            <div className="coding-sidebar-empty coding-sidebar-empty--nested">No chats</div>
+          ) : (
+            group.threads.map((t) => {
+              const status = statusFor(t.sessionKey, runningIds, recentlyCompleted);
+              const isActive = activeThreadId === t.sessionKey;
+              return (
+                <button
+                  type="button"
+                  key={t.sessionKey}
+                  className={`thread-row coding-sidebar-thread${isActive ? " active" : ""}`}
+                  data-status={status}
+                  data-active={isActive ? "true" : undefined}
+                  onClick={() => onSelect(t.sessionKey)}
+                >
+                  <span className="thread-status" aria-hidden />
+                  <div className="thread-content">
+                    <div className="thread-headline">
+                      <span className="thread-name">{t.title}</span>
+                    </div>
+                    <TodoSidebarBadge threadId={t.sessionKey} />
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 }

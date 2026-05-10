@@ -12,6 +12,7 @@ import {
   useRecentlyCompletedCodingIds,
   useRunningCodingIds,
 } from "@/features/coding/state/ThreadEventBuffer";
+import type { WorkspaceInfo } from "@/types";
 import { type AppMode, useAppMode } from "../hooks/useAppMode";
 import { AppModeSwitch } from "./AppModeSwitch";
 
@@ -24,6 +25,8 @@ type SidebarChatLayoutProps = {
   selectedSessionKey: string | null;
   onSelectThread: (sessionKey: string) => void;
   activeNavId?: string | null;
+  workspaces: WorkspaceInfo[];
+  codingWorkspaceIdByThread: Map<string, string>;
 };
 
 type NavItem = {
@@ -43,6 +46,8 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   selectedSessionKey,
   onSelectThread,
   activeNavId,
+  workspaces,
+  codingWorkspaceIdByThread,
 }: SidebarChatLayoutProps) {
   const { mode, setMode } = useAppMode();
   const runningCodingIds = useRunningCodingIds();
@@ -111,6 +116,8 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
             recentlyCompleted={recentlyCompletedCodingIds}
             activeThreadId={selectedSessionKey}
             onSelectThread={onSelectThread}
+            workspaces={workspaces}
+            workspaceIdByThread={codingWorkspaceIdByThread}
           />
         ) : (
           <>

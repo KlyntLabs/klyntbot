@@ -50,6 +50,8 @@ export type SidebarChatProps = {
   selectedSessionKey: string | null;
   onSelectThread: (sessionKey: string) => void;
   activeNavId?: string | null;
+  workspaces: import("@/types").WorkspaceInfo[];
+  codingWorkspaceIdByThread: Map<string, string>;
 };
 
 export type LayoutPrimarySurface = {

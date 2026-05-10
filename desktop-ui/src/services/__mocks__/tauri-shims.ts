@@ -137,24 +137,69 @@ export function getCurrentWindow() {
 }
 
 // ---- @tauri-apps/plugin-dialog ----
-export async function open(_opts?: unknown): Promise<string | string[] | null> {
-  // TODO(klynt-integration): wire to native file picker.
-  console.debug("[mock dialog.open]", _opts);
-  return null;
+//
+// Browser-mode fallback: in dev mode there's no native picker (Chrome's
+// File System Access API can't return absolute paths, which the Rust backend
+// requires). We fall back to `window.prompt`/`confirm`/`alert` so the
+// workspace lifecycle is still drivable end-to-end. Real Tauri builds replace
+// these via the vite alias being stripped at build time.
+type DialogOpenOptions = {
+  directory?: boolean;
+  multiple?: boolean;
+  title?: string;
+  defaultPath?: string;
+};
+type DialogSaveOptions = {
+  title?: string;
+  defaultPath?: string;
+};
+type DialogPromptOptions = {
+  title?: string;
+  kind?: "info" | "warning" | "error";
+  okLabel?: string;
+  cancelLabel?: string;
+};
+
+export async function open(opts: DialogOpenOptions = {}): Promise<string | string[] | null> {
+  if (typeof window === "undefined") return null;
+  const directory = Boolean(opts.directory);
+  const multiple = Boolean(opts.multiple);
+  const title = opts.title ?? (directory ? "Select folder" : "Select file");
+  const placeholder = directory ? "/path/to/folder" : "/path/to/file";
+  const hint = multiple
+    ? `${title}\nEnter one or more absolute ${directory ? "folders" : "files"} (comma-separated).`
+    : `${title}\n${placeholder}`;
+  const raw = window.prompt(hint, opts.defaultPath ?? "");
+  if (raw == null) return null;
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  if (!multiple) return trimmed;
+  const parts = trimmed
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  return parts.length === 0 ? null : parts;
 }
 
-export async function save(_opts?: unknown): Promise<string | null> {
-  console.debug("[mock dialog.save]", _opts);
-  return null;
+export async function save(opts: DialogSaveOptions = {}): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  const title = opts.title ?? "Save file";
+  const raw = window.prompt(`${title}\n/path/to/file`, opts.defaultPath ?? "");
+  if (raw == null) return null;
+  const trimmed = raw.trim();
+  return trimmed === "" ? null : trimmed;
 }
 
-export async function ask(message: string, _opts?: unknown): Promise<boolean> {
-  console.debug("[mock dialog.ask]", message);
-  return false;
+export async function ask(question: string, opts?: DialogPromptOptions): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  const title = opts?.title ?? "Confirm";
+  return window.confirm(`${title}\n\n${question}`);
 }
 
-export async function message(msg: string, _opts?: unknown): Promise<void> {
-  console.debug("[mock dialog.message]", msg);
+export async function message(msg: string, opts?: DialogPromptOptions): Promise<void> {
+  if (typeof window === "undefined") return;
+  const title = opts?.title ?? "Notice";
+  window.alert(`${title}\n\n${msg}`);
 }
 
 // ---- @tauri-apps/plugin-notification ----

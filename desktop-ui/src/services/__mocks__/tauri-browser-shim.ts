@@ -65,19 +65,52 @@ if (typeof window !== "undefined" && !window.__TAURI_INTERNALS__) {
       if (event) window.dispatchEvent(new CustomEvent(event, { detail: payload }));
       return undefined;
     }
-    // Browser-mode fallback for the native folder picker. Real Tauri uses
-    // `plugin:dialog|open`; in Chrome we surface a `prompt()` so the
-    // workspace lifecycle is still exercisable end-to-end.
+    // Browser-mode fallbacks for the @tauri-apps/plugin-dialog commands.
+    // Real Tauri handles these natively; in Chrome we surface
+    // prompt/confirm/alert so the workspace + git lifecycles stay exercisable
+    // end-to-end without the native runtime.
     if (cmd === "plugin:dialog|open") {
       const opts = (args?.options ?? args ?? {}) as Record<string, unknown>;
       const directory = Boolean(opts.directory);
       const multiple = Boolean(opts.multiple);
       const title = typeof opts.title === "string" ? opts.title : "Select";
       const placeholder = directory ? "/path/to/folder" : "/path/to/file";
-      const v = window.prompt(`${title} (${placeholder})`, "");
-      if (v == null || v.trim() === "") return null;
-      const value = v.trim();
-      return multiple ? [value] : value;
+      const hint = multiple
+        ? `${title}\nEnter one or more absolute ${directory ? "folders" : "files"} (comma-separated).`
+        : `${title}\n${placeholder}`;
+      const defaultPath = typeof opts.defaultPath === "string" ? opts.defaultPath : "";
+      const raw = window.prompt(hint, defaultPath);
+      if (raw == null) return null;
+      const trimmed = raw.trim();
+      if (trimmed === "") return null;
+      if (!multiple) return trimmed;
+      const parts = trimmed
+        .split(",")
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
+      return parts.length === 0 ? null : parts;
+    }
+    if (cmd === "plugin:dialog|save") {
+      const opts = (args?.options ?? args ?? {}) as Record<string, unknown>;
+      const title = typeof opts.title === "string" ? opts.title : "Save file";
+      const defaultPath = typeof opts.defaultPath === "string" ? opts.defaultPath : "";
+      const raw = window.prompt(`${title}\n/path/to/file`, defaultPath);
+      if (raw == null) return null;
+      const trimmed = raw.trim();
+      return trimmed === "" ? null : trimmed;
+    }
+    if (cmd === "plugin:dialog|ask") {
+      const msg = typeof args?.message === "string" ? args.message : "Confirm?";
+      const opts = (args?.options ?? {}) as Record<string, unknown>;
+      const title = typeof opts.title === "string" ? opts.title : "Confirm";
+      return window.confirm(`${title}\n\n${msg}`);
+    }
+    if (cmd === "plugin:dialog|message") {
+      const msg = typeof args?.message === "string" ? args.message : "";
+      const opts = (args?.options ?? {}) as Record<string, unknown>;
+      const title = typeof opts.title === "string" ? opts.title : "Notice";
+      window.alert(`${title}\n\n${msg}`);
+      return undefined;
     }
     // Window/menu/etc. plugins — silently no-op so the UI doesn't crash.
     return undefined;

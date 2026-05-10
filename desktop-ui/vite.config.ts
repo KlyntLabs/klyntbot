@@ -134,12 +134,10 @@ export default defineConfig({
           new URL("./src/services/__mocks__/tauri-shims.ts", import.meta.url),
         ),
       },
-      {
-        find: /^@tauri-apps\/plugin-dialog$/,
-        replacement: fileURLToPath(
-          new URL("./src/services/__mocks__/tauri-shims.ts", import.meta.url),
-        ),
-      },
+      // `@tauri-apps/plugin-dialog` is intentionally NOT aliased: under the
+      // real Tauri runtime the native macOS picker is the desired UX, and the
+      // browser-only dev shim handles `plugin:dialog|open` via `prompt()` in
+      // `services/__mocks__/tauri-browser-shim.ts`.
       {
         find: /^@tauri-apps\/plugin-notification$/,
         replacement: fileURLToPath(

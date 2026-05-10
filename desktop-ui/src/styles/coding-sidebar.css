@@ -1,6 +1,11 @@
-/* Coding sidebar — three-group layout, active highlight, running dot.
- * Activated by data-status / data-active attributes on .thread-row in
- * code mode (CodingSidebarThreadsSection). Tokens: ds-tokens.css. */
+/* Coding sidebar — project-grouped layout (Codex-style).
+ *
+ * Sessions are grouped by workspace ("Project"). Each project is collapsible.
+ * Per-row dot (.thread-status) is set via the `data-status` attribute. The
+ * default `.thread-row` style (sidebar.css) renders a boxed pill; in coding
+ * mode we strip that decoration so rows look like plain list items, matching
+ * Codex. The active row keeps the highlight via `data-active="true"`.
+ */
 
 @keyframes klynt-pulse-dot {
   0%,
@@ -20,7 +25,7 @@
 }
 
 .coding-sidebar-section + .coding-sidebar-section {
-  margin-top: 12px;
+  margin-top: 4px;
 }
 
 .coding-sidebar-section-header {
@@ -34,35 +39,177 @@
   color: var(--text-subtle);
 }
 
+.coding-sidebar-section-header--top {
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+
 .coding-sidebar-section-count {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
 
-/* Per-row indicators (data attributes set in CodingSidebarThreadRow) */
-.thread-row[data-status="running"] .thread-status,
-.thread-row[data-status="recent"] .thread-status {
+.coding-sidebar-empty {
+  font-size: var(--fs-xs);
+  color: var(--text-faint, var(--text-muted));
+  padding: 6px 12px;
+  opacity: 0.7;
+}
+
+.coding-sidebar-empty--nested {
+  padding: 4px 12px 4px 28px;
+}
+
+/* Project header (collapsible) */
+.coding-sidebar-project-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: var(--fs-base);
+  font-weight: 450;
+  text-align: left;
+  transition: background 120ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.coding-sidebar-project-header:hover {
+  background: var(--surface-hover);
+}
+
+.coding-sidebar-project-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  color: var(--text-muted);
+  transition: transform 120ms ease;
+  flex: 0 0 12px;
+}
+
+.coding-sidebar-project-chevron svg {
+  width: 12px;
+  height: 12px;
+}
+
+.coding-sidebar-project-chevron.is-open {
+  transform: rotate(90deg);
+}
+
+.coding-sidebar-project-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  flex: 0 0 14px;
+}
+
+.coding-sidebar-project-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.coding-sidebar-project-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coding-sidebar-project-count {
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.coding-sidebar-project-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0 2px 0;
+}
+
+/* Coding-mode thread rows: strip the default boxed look from sidebar.css.
+ * Background, border, radius, and shadow are reset to a plain text row.
+ * Only the active row paints a highlight (handled below). */
+.coding-sidebar-thread {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
+  padding: 5px 8px 5px 28px;
+  gap: 8px;
+  font-size: var(--fs-xs);
+  color: var(--text-quiet);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.coding-sidebar-thread::before {
+  content: none;
+}
+
+.coding-sidebar-thread:hover {
+  background: var(--surface-hover);
+  border: 0;
+  box-shadow: none;
+  color: var(--text-strong);
+  transform: none;
+}
+
+.coding-sidebar-thread .thread-content {
+  gap: 2px;
+}
+
+.coding-sidebar-thread .thread-name {
+  font-size: var(--fs-xs);
+  font-weight: 450;
+}
+
+/* Per-row dot indicators */
+.coding-sidebar-thread[data-status="running"] .thread-status,
+.coding-sidebar-thread[data-status="recent"] .thread-status {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.thread-row[data-status="running"] .thread-status {
+.coding-sidebar-thread[data-status="running"] .thread-status {
   background: var(--sidebar-running-dot);
   animation: klynt-pulse-dot 1.4s var(--ds-ease-out) infinite;
 }
 
-.thread-row[data-status="recent"] .thread-status {
+.coding-sidebar-thread[data-status="recent"] .thread-status {
   background: var(--sidebar-recent-dot);
 }
 
-/* Stronger active highlight for code mode */
-.thread-row[data-active="true"] {
-  background: var(--sidebar-row-active-bg);
-  box-shadow: inset 3px 0 0 0 var(--sidebar-row-active-accent);
+/* Idle rows: hide the status pill so the row is pure text. */
+.coding-sidebar-thread:not([data-status]) .thread-status {
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
 }
 
-.thread-row[data-active="true"] .thread-name {
+/* Active row: this is the only state that paints a box. */
+.coding-sidebar-thread[data-active="true"] {
+  background: var(--sidebar-row-active-bg);
+  box-shadow: inset 3px 0 0 0 var(--sidebar-row-active-accent);
+  color: var(--text-strong);
+}
+
+.coding-sidebar-thread[data-active="true"] .thread-name {
   font-weight: 600;
 }
