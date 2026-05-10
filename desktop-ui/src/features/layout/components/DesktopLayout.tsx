@@ -180,16 +180,19 @@ export function DesktopLayout({
                       isActive: chatLayerActive,
                     })}
                     ref={chatLayerRef}
+                    style={chatLayerActive ? { left: 0, right: 0, borderRight: "none" } : undefined}
                   >
                     {chatPaneNode}
                   </div>
-                  <hr
-                    className="content-split-resizer"
-                    aria-orientation="vertical"
-                    aria-label="Resize chat/diff split"
-                    tabIndex={0}
-                    onMouseDown={onChatDiffSplitPositionResizeStart}
-                  />
+                  {diffLayerActive && (
+                    <hr
+                      className="content-split-resizer"
+                      aria-orientation="vertical"
+                      aria-label="Resize chat/diff split"
+                      tabIndex={0}
+                      onMouseDown={onChatDiffSplitPositionResizeStart}
+                    />
+                  )}
                   <div
                     className={layerClassName({
                       splitChatDiffView,
@@ -197,6 +200,7 @@ export function DesktopLayout({
                       isActive: diffLayerActive,
                     })}
                     ref={diffLayerRef}
+                    style={!diffLayerActive ? { display: "none" } : undefined}
                   >
                     {showDiffViewer ? gitDiffViewerNode : null}
                   </div>

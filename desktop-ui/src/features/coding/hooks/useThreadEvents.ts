@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchCodingTodos } from "@/api/endpoints/coding";
 import type { MessagePart } from "../components/parts/types";
 import { subscribeToThread } from "../state/ThreadEventBuffer";
@@ -266,14 +266,32 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
 /// between subscription registration and the backend's `ItemStarted` echo.
 export function useThreadEvents(threadId: string | null, seedThreadPrompt?: string | null) {
   const [state, setState] = useState<State>(initialState);
+  const seedAppliedRef = useRef<Record<string, boolean>>({});
+
+  // Inject optimistic user message when seedThreadPrompt arrives.
+  // Runs independently of the subscription effect so a late-arriving
+  // draftPrompt (common after thread-start + setState batching races)
+  // still gets rendered.
+  useEffect(() => {
+    if (!seedThreadPrompt || !threadId) return;
+    if (seedAppliedRef.current[threadId]) return;
+    seedAppliedRef.current[threadId] = true;
+    setState((prev) => {
+      const exists = prev.items.some(
+        (m) =>
+          m.id.startsWith(OPTIMISTIC_USER_PREFIX) &&
+          m.parts.some((p) => p.kind === "text" && p.text === seedThreadPrompt),
+      );
+      if (exists) return prev;
+      return { ...prev, items: [...prev.items, makeOptimisticUserMessage(threadId, seedThreadPrompt)] };
+    });
+  }, [threadId, seedThreadPrompt]);
 
   useEffect(() => {
-    setState(
-      seedThreadPrompt && threadId
-        ? { ...initialState, items: [makeOptimisticUserMessage(threadId, seedThreadPrompt)] }
-        : initialState,
-    );
-    if (!threadId) return;
+    if (!threadId) {
+      setState(initialState);
+      return;
+    }
     let cancelled = false;
 
     invoke<{ items?: MessageDto[] }>("coding_thread_resume", {
@@ -306,6 +324,14 @@ export function useThreadEvents(threadId: string | null, seedThreadPrompt?: stri
     return () => {
       cancelled = true;
       unsubscribe();
+    };
+  }, [threadId]);
+
+  // Clean up seed tracking for unmounted threads to avoid unbounded growth.
+  useEffect(() => {
+    if (!threadId) return;
+    return () => {
+      delete seedAppliedRef.current[threadId];
     };
   }, [threadId]);
 

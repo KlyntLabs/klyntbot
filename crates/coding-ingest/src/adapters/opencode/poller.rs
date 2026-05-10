@@ -44,29 +44,69 @@ impl OpencodePoller {
     /// Spawn the polling loop as a detached tokio task.
     pub fn spawn(self) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
+            if let Err(e) = Self::ensure_indexes(&self.db_path).await {
+                tracing::warn!(error = %e, "opencode ensure_indexes failed");
+            }
+
+            let opts = sqlx::sqlite::SqliteConnectOptions::new()
+                .filename(&self.db_path)
+                .read_only(true);
+            let pool = match sqlx::sqlite::SqlitePoolOptions::new()
+                .max_connections(1)
+                .acquire_timeout(std::time::Duration::from_secs(2))
+                .connect_with(opts)
+                .await
+            {
+                Ok(p) => p,
+                Err(e) => {
+                    tracing::warn!(error = %e, "opencode pool connect failed, poller exiting");
+                    return;
+                }
+            };
+
             let mut interval = tokio::time::interval(self.interval);
             loop {
                 interval.tick().await;
-                if let Err(e) = self.poll_once().await {
+                if let Err(e) = self.poll_once(&pool).await {
                     tracing::warn!(error = %e, "opencode poll failed");
                 }
             }
         })
     }
 
-    async fn poll_once(&self) -> common::Result<()> {
-        if !self.db_path.exists() {
+    /// Create indexes on the external opencode DB if they don't exist.
+    /// Uses a brief writable connection; the indexes are harmless and
+    /// idempotent, but they eliminate full-table scans when polling.
+    async fn ensure_indexes(db_path: &PathBuf) -> common::Result<()> {
+        if !db_path.exists() {
             return Ok(());
         }
         let opts = sqlx::sqlite::SqliteConnectOptions::new()
-            .filename(&self.db_path)
-            .read_only(true);
+            .filename(db_path)
+            .create_if_missing(false);
         let pool = sqlx::sqlite::SqlitePoolOptions::new()
             .max_connections(1)
             .acquire_timeout(std::time::Duration::from_secs(2))
             .connect_with(opts)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(format!("opencode connect: {e}")))?;
+            .map_err(|e| common::KlyntbotError::Storage(format!("opencode ensure_indexes connect: {e}")))?;
+
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_message_time_created ON message(time_created)")
+            .execute(&pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("opencode create idx_message_time_created: {e}")))?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_part_message_id ON part(message_id)")
+            .execute(&pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("opencode create idx_part_message_id: {e}")))?;
+        pool.close().await;
+        Ok(())
+    }
+
+    async fn poll_once(&self, pool: &sqlx::SqlitePool) -> common::Result<()> {
+        if !self.db_path.exists() {
+            return Ok(());
+        }
 
         let last = self.last_seen_ms.load(Ordering::SeqCst);
 
@@ -76,7 +116,7 @@ impl OpencodePoller {
              FROM message WHERE time_created > ?1 ORDER BY time_created ASC",
         )
         .bind(last)
-        .fetch_all(&pool)
+        .fetch_all(pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(format!("opencode message query: {e}")))?;
 
@@ -96,7 +136,7 @@ impl OpencodePoller {
             q = q.bind(id);
         }
         let parts = q
-            .fetch_all(&pool)
+            .fetch_all(pool)
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("opencode part query: {e}")))?;
 

@@ -52,7 +52,7 @@ describe("useWorkspaceHome", () => {
     const addWorktreeAgent = vi.fn().mockResolvedValue(worktreeWorkspace);
     const connectWorkspace = vi.fn().mockResolvedValue(undefined);
     const startThreadForWorkspace = vi.fn().mockResolvedValue("thread-1");
-    const sendUserMessageToThread = vi.fn().mockResolvedValue(undefined);
+    const sendUserMessageToThread = vi.fn().mockResolvedValue({ status: "sent" });
     const seedThreadCodexParams = vi.fn();
     vi.mocked(generateRunMetadata).mockResolvedValue({
       title: "Test run",
@@ -100,7 +100,7 @@ describe("useWorkspaceHome", () => {
     const addWorktreeAgent = vi.fn();
     const connectWorkspace = vi.fn().mockResolvedValue(undefined);
     const startThreadForWorkspace = vi.fn().mockResolvedValue("thread-1");
-    const sendUserMessageToThread = vi.fn().mockResolvedValue(undefined);
+    const sendUserMessageToThread = vi.fn().mockResolvedValue({ status: "sent" });
     const seedThreadCodexParams = vi.fn();
     vi.mocked(generateRunMetadata).mockResolvedValue({
       title: "Image run",
@@ -183,7 +183,7 @@ describe("useWorkspaceHome", () => {
       .mockResolvedValueOnce(null);
     const connectWorkspace = vi.fn().mockResolvedValue(undefined);
     const startThreadForWorkspace = vi.fn().mockResolvedValue("thread-1");
-    const sendUserMessageToThread = vi.fn().mockResolvedValue(undefined);
+    const sendUserMessageToThread = vi.fn().mockResolvedValue({ status: "sent" });
     vi.mocked(generateRunMetadata).mockResolvedValue({
       title: "Partial",
       worktreeName: "feat/partial",
@@ -220,7 +220,7 @@ describe("useWorkspaceHome", () => {
     const addWorktreeAgent = vi.fn();
     const connectWorkspace = vi.fn().mockResolvedValue(undefined);
     const startThreadForWorkspace = vi.fn().mockResolvedValue("thread-1");
-    const sendUserMessageToThread = vi.fn().mockResolvedValue(undefined);
+    const sendUserMessageToThread = vi.fn().mockResolvedValue({ status: "sent" });
     let resolveMetadata: (value: { title: string; worktreeName: string }) => void = () => {};
     vi.mocked(generateRunMetadata).mockReturnValue(
       new Promise((resolve) => {

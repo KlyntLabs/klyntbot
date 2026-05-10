@@ -261,6 +261,8 @@ export type FollowUpMessageBehavior = "queue" | "steer";
 export type ComposerSendIntent = "default" | "queue" | "steer";
 export type SendMessageResult = {
   status: "sent" | "blocked" | "steer_failed";
+  /** Human-readable error message when status is not "sent". */
+  error?: string;
 };
 
 export type ComposerEditorPreset = "default" | "helpful" | "smart";

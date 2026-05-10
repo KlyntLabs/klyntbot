@@ -15,6 +15,7 @@ import {
   parseReviewTarget,
 } from "@threads/utils/threadNormalize";
 import { expandCustomPromptText } from "@utils/customPrompts";
+import { buildErrorDebugEntry } from "@utils/debugEntries";
 import type { Dispatch, MutableRefObject } from "react";
 import { useCallback } from "react";
 import type {
@@ -127,7 +128,7 @@ export function useThreadMessaging({
     ): Promise<SendMessageResult> => {
       const messageText = text.trim();
       if (!messageText && images.length === 0) {
-        return { status: "blocked" };
+        return { status: "blocked", error: "Message is empty." };
       }
       let finalText = messageText;
       if (!options?.skipPromptExpansion) {
@@ -135,7 +136,7 @@ export function useThreadMessaging({
         if (promptExpansion && "error" in promptExpansion) {
           pushThreadErrorMessage(threadId, promptExpansion.error);
           safeMessageActivity();
-          return { status: "blocked" };
+          return { status: "blocked", error: promptExpansion.error };
         }
         finalText = promptExpansion?.expanded ?? messageText;
       }
@@ -211,7 +212,16 @@ export function useThreadMessaging({
         const shouldPreflightRuntimeCodexArgs =
           shouldPreflightRuntimeCodexArgsForSend?.(workspace.id, threadId) ?? true;
         if (!shouldSteer && shouldPreflightRuntimeCodexArgs && ensureWorkspaceRuntimeCodexArgs) {
-          await ensureWorkspaceRuntimeCodexArgs(workspace.id, threadId);
+          try {
+            await ensureWorkspaceRuntimeCodexArgs(workspace.id, threadId);
+          } catch (preflightError) {
+            onDebug?.(
+              buildErrorDebugEntry("thread/runtime-codex-args sync error", preflightError),
+            );
+            // Best-effort: if the preflight command is missing (e.g.
+            // set_workspace_runtime_codex_args not registered), don't block
+            // the send — the args were already set at thread-start time.
+          }
         }
         const response: Record<string, unknown> = shouldSteer
           ? ((await (appMentions.length > 0
@@ -260,7 +270,7 @@ export function useThreadMessaging({
             setActiveTurnId(threadId, null);
             pushThreadErrorMessage(threadId, `Turn failed to start: ${rpcError}`);
             safeMessageActivity();
-            return { status: "blocked" };
+            return { status: "blocked", error: `Turn failed to start: ${rpcError}` };
           }
           if (isStaleSteerTurnError(rpcError)) {
             markProcessing(threadId, false);
@@ -268,7 +278,7 @@ export function useThreadMessaging({
           }
           pushThreadErrorMessage(threadId, `Turn steer failed: ${rpcError}`);
           safeMessageActivity();
-          return { status: "steer_failed" };
+          return { status: "steer_failed", error: `Turn steer failed: ${rpcError}` };
         }
         if (requestMode === "steer") {
           const result = (response?.result ?? response) as Record<string, unknown>;
@@ -292,9 +302,9 @@ export function useThreadMessaging({
         if (!turnId) {
           markProcessing(threadId, false);
           setActiveTurnId(threadId, null);
-          pushThreadErrorMessage(threadId, "Turn failed to start.");
+          pushThreadErrorMessage(threadId, "Turn failed to start: missing turnId in response.");
           safeMessageActivity();
-          return { status: "blocked" };
+          return { status: "blocked", error: "Turn failed to start: missing turnId in response." };
         }
         setActiveTurnId(threadId, turnId);
         return { status: "sent" };
@@ -307,19 +317,21 @@ export function useThreadMessaging({
           markProcessing(threadId, false);
           setActiveTurnId(threadId, null);
         }
-        onDebug?.({
-          id: `${Date.now()}-${requestMode === "steer" ? "client-turn-steer-error" : "client-turn-start-error"}`,
-          timestamp: Date.now(),
-          source: "error",
-          label: requestMode === "steer" ? "turn/steer error" : "turn/start error",
-          payload: errorMessage,
-        });
+        onDebug?.(
+          buildErrorDebugEntry(
+            requestMode === "steer" ? "turn/steer error" : "turn/start error",
+            errorMessage,
+          ),
+        );
         pushThreadErrorMessage(
           threadId,
           requestMode === "steer" ? `Turn steer failed: ${errorMessage}` : errorMessage,
         );
         safeMessageActivity();
-        return { status: requestMode === "steer" ? "steer_failed" : "blocked" };
+        return {
+          status: requestMode === "steer" ? "steer_failed" : "blocked",
+          error: requestMode === "steer" ? `Turn steer failed: ${errorMessage}` : errorMessage,
+        };
       }
     },
     [
@@ -353,11 +365,11 @@ export function useThreadMessaging({
       options?: { sendIntent?: ComposerSendIntent },
     ): Promise<SendMessageResult> => {
       if (!activeWorkspace) {
-        return { status: "blocked" };
+        return { status: "blocked", error: "No active workspace." };
       }
       const messageText = text.trim();
       if (!messageText && images.length === 0) {
-        return { status: "blocked" };
+        return { status: "blocked", error: "Message is empty." };
       }
       const promptExpansion = expandCustomPromptText(messageText, customPrompts);
       if (promptExpansion && "error" in promptExpansion) {
@@ -365,20 +377,14 @@ export function useThreadMessaging({
           pushThreadErrorMessage(activeThreadId, promptExpansion.error);
           safeMessageActivity();
         } else {
-          onDebug?.({
-            id: `${Date.now()}-client-prompt-expand-error`,
-            timestamp: Date.now(),
-            source: "error",
-            label: "prompt/expand error",
-            payload: promptExpansion.error,
-          });
+          onDebug?.(buildErrorDebugEntry("prompt/expand error", promptExpansion.error));
         }
-        return { status: "blocked" };
+        return { status: "blocked", error: promptExpansion.error };
       }
       const finalText = promptExpansion?.expanded ?? messageText;
       const threadId = await ensureThreadForActiveWorkspace();
       if (!threadId) {
-        return { status: "blocked" };
+        return { status: "blocked", error: "Failed to ensure thread for active workspace." };
       }
       return sendMessageToThread(activeWorkspace, threadId, finalText, images, {
         skipPromptExpansion: true,
@@ -449,13 +455,7 @@ export function useThreadMessaging({
         payload: response,
       });
     } catch (error) {
-      onDebug?.({
-        id: `${Date.now()}-client-turn-interrupt-error`,
-        timestamp: Date.now(),
-        source: "error",
-        label: "turn/interrupt error",
-        payload: error instanceof Error ? error.message : String(error),
-      });
+      onDebug?.(buildErrorDebugEntry("turn/interrupt error", error));
     }
   }, [
     activeThreadId,
@@ -540,13 +540,7 @@ export function useThreadMessaging({
           markProcessing(threadId, false);
           markReviewing(threadId, false);
         }
-        onDebug?.({
-          id: `${Date.now()}-client-review-start-error`,
-          timestamp: Date.now(),
-          source: "error",
-          label: "review/start error",
-          payload: error instanceof Error ? error.message : String(error),
-        });
+        onDebug?.(buildErrorDebugEntry("review/start error", error));
         pushThreadErrorMessage(threadId, error instanceof Error ? error.message : String(error));
         safeMessageActivity();
         return false;

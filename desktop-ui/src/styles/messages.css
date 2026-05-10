@@ -19,9 +19,9 @@
 }
 
 .messages-inner {
-  width: min(100%, var(--conversation-column-width, 900px));
-  margin: 0 auto;
-  padding: clamp(8px, 1.6vw, 18px) 0 28px;
+  width: 100%;
+  margin: 0;
+  padding: clamp(8px, 1.6vw, 18px) var(--main-panel-padding) 28px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -160,7 +160,8 @@
 }
 
 .message.user {
-  justify-content: flex-end;
+  display: grid;
+  justify-items: end;
 }
 
 .bubble {
@@ -300,12 +301,14 @@
 
 .message.user .bubble {
   max-width: min(72%, 560px);
+  width: fit-content;
+  margin-left: auto;
   background: var(--surface-right-panel);
   border-color: color-mix(in srgb, var(--text-primary) 14%, transparent);
 }
 
 .message.assistant .bubble {
-  max-width: 100%;
+  max-width: min(100%, 900px);
   width: 100%;
   padding: 4px 0;
   background: transparent;

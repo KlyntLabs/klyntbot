@@ -5,6 +5,8 @@ import { type MessageDto, useThreadEvents } from "../hooks/useThreadEvents";
 import { PlanModeBanner } from "./PlanModeBanner";
 import type { MessagePart } from "./parts/types";
 
+const EMPTY_ITEMS: ConversationItem[] = [];
+
 type Props = {
   threadId: string | null;
   workspaceId?: string | null;
@@ -31,24 +33,40 @@ export function CodingThreadView({
   draftPrompt,
   onDraftConsumed,
 }: Props) {
-  // Pin the seed per-threadId so onDraftConsumed clearing the parent's
-  // map doesn't retroactively wipe the optimistic message in useThreadEvents.
-  const seededThreadRef = useRef<string | null>(null);
-  const seededPromptRef = useRef<string | null>(null);
-  if (threadId && seededThreadRef.current !== threadId) {
-    seededThreadRef.current = threadId;
-    seededPromptRef.current = draftPrompt ?? null;
-  }
-  const { items, turnState } = useThreadEvents(threadId, seededPromptRef.current);
+  const { items, turnState } = useThreadEvents(threadId, draftPrompt ?? null);
 
+  const consumedRef = useRef(false);
   useEffect(() => {
-    if (!draftPrompt || !threadId) return;
-    if (seededPromptRef.current !== draftPrompt) return;
+    if (!draftPrompt || !threadId || consumedRef.current) return;
+    consumedRef.current = true;
     onDraftConsumed?.();
   }, [draftPrompt, threadId, onDraftConsumed]);
 
   const conversationItems = useMemo(() => adaptItems(items), [items]);
   const isThinking = turnState.kind !== "idle";
+
+  // Surface hard backend errors (e.g. cwd-rebind failure) as a synthetic
+  // assistant error bubble so the thread doesn't appear empty.
+  const errorItems = useMemo<ConversationItem[]>(() => {
+    if (turnState.kind !== "idle") return EMPTY_ITEMS;
+    const reason = turnState.lastFinishReason;
+    if (!reason || typeof reason !== "object") return EMPTY_ITEMS;
+    const errorText = (reason as Record<string, unknown>).error;
+    if (typeof errorText !== "string" || !errorText) return EMPTY_ITEMS;
+    return [
+      {
+        id: `${threadId}-turn-error`,
+        kind: "message" as const,
+        role: "assistant" as const,
+        text: `⚠️ Turn failed: ${errorText}`,
+      },
+    ];
+  }, [turnState, threadId]);
+
+  const allItems = useMemo(
+    () => [...conversationItems, ...errorItems],
+    [conversationItems, errorItems],
+  );
 
   if (!threadId) return null;
 
@@ -58,7 +76,7 @@ export function CodingThreadView({
       <div className="coding-thread-view__body">
         <div className="coding-thread-view__main">
           <Messages
-            items={conversationItems}
+            items={allItems}
             threadId={threadId}
             workspaceId={workspaceId}
             workspacePath={workspacePath}
