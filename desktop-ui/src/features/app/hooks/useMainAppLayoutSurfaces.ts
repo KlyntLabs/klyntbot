@@ -632,6 +632,7 @@ function buildPrimarySurface({
 function buildGitSurface({
   appSettings,
   activeWorkspace,
+  activeThreadId,
   gitState,
   composerWorkspaceState,
   promptActions,
@@ -683,6 +684,11 @@ function buildGitSurface({
       onRevealGeneralPrompts: promptActions.handleRevealGeneralPrompts,
       canRevealGeneralPrompts: Boolean(activeWorkspace),
       loadedContextFiles,
+    },
+    activityPanelProps: {
+      threadId: activeThreadId,
+      filePanelMode: gitState.filePanelMode,
+      onFilePanelModeChange: gitState.setFilePanelMode,
     },
     gitDiffPanelProps: {
       workspaceId: activeWorkspace?.id ?? null,

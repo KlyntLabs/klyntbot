@@ -1304,6 +1304,8 @@ export default function MainApp() {
     clearDraftForThread,
     workspaceHomeState,
     agentMdState,
+    pendingPromptForActiveThread,
+    consumeThreadPrompt,
   } = composerWorkspaceState;
   const {
     runs: workspaceRuns,
@@ -1973,6 +1975,8 @@ export default function MainApp() {
         workspacePath={activeWorkspace?.path ?? null}
         openTargets={appSettings.openAppTargets}
         selectedOpenAppId={appSettings.selectedOpenAppId}
+        draftPrompt={pendingPromptForActiveThread}
+        onDraftConsumed={activeThreadId ? () => consumeThreadPrompt(activeThreadId) : undefined}
       />
     ) : null;
   const mainMessagesNode = codingMessagesNode

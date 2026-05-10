@@ -1,7 +1,7 @@
 import { useComposerController } from "@app/hooks/useComposerController";
 import { useComposerInsert } from "@app/hooks/useComposerInsert";
 import { useWorkspaceFileListing } from "@app/hooks/useWorkspaceFileListing";
-import { type RefObject, useMemo } from "react";
+import { type RefObject, useCallback, useMemo, useState } from "react";
 import { computePlanFollowupState } from "@/features/messages/utils/messageRenderUtils";
 import { useWorkspaceAgentMd } from "@/features/workspaces/hooks/useWorkspaceAgentMd";
 import { useWorkspaceHome } from "@/features/workspaces/hooks/useWorkspaceHome";
@@ -25,7 +25,7 @@ type UseMainAppComposerWorkspaceStateArgs = {
     isTablet: boolean;
     activeTab: "home" | "projects" | "codex" | "git" | "log";
     tabletTab: "codex" | "git" | "log";
-    filePanelMode: "git" | "files" | "prompts";
+    filePanelMode: "activity" | "git" | "files" | "prompts";
     rightPanelCollapsed: boolean;
   };
   workspace: {
@@ -242,6 +242,24 @@ export function useMainAppComposerWorkspaceState({
     startStatus,
   });
 
+  // Per-thread prompt seeded at thread-start; CodingThreadView reads it to
+  // render the user message before the backend's SSE echo arrives.
+  const [pendingPromptByThread, setPendingPromptByThread] = useState<Record<string, string>>({});
+  const seedThreadPrompt = useCallback((_workspaceId: string, threadId: string, prompt: string) => {
+    setPendingPromptByThread((prev) => ({ ...prev, [threadId]: prompt }));
+  }, []);
+  const consumeThreadPrompt = useCallback((threadId: string) => {
+    setPendingPromptByThread((prev) => {
+      if (!(threadId in prev)) return prev;
+      const next = { ...prev };
+      delete next[threadId];
+      return next;
+    });
+  }, []);
+  const pendingPromptForActiveThread = activeThreadId
+    ? (pendingPromptByThread[activeThreadId] ?? null)
+    : null;
+
   const workspaceHomeState = useWorkspaceHome({
     activeWorkspace,
     models: modelOptions,
@@ -250,6 +268,7 @@ export function useMainAppComposerWorkspaceState({
     serviceTier: selectedServiceTier,
     collaborationMode: collaborationModePayload,
     seedThreadCodexParams,
+    seedThreadPrompt,
     addWorktreeAgent,
     connectWorkspace,
     startThreadForWorkspace,
@@ -320,6 +339,8 @@ export function useMainAppComposerWorkspaceState({
     recentThreadsUpdatedAt,
     workspaceHomeState,
     agentMdState,
+    pendingPromptForActiveThread,
+    consumeThreadPrompt,
     ...composerState,
   };
 }

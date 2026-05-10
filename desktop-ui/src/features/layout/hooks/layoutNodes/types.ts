@@ -1,6 +1,7 @@
 import type { ApprovalToasts } from "@app/components/ApprovalToasts";
 import type { MainHeader } from "@app/components/MainHeader";
 import type { ComponentProps, ReactNode } from "react";
+import type { ActivityPanel } from "@/features/coding/components/ActivityPanel";
 import type { CodeLanding } from "@/features/coding/components/CodeLanding";
 import type { Composer } from "@/features/composer/components/Composer";
 import type { DebugPanel } from "@/features/debug/components/DebugPanel";
@@ -75,6 +76,7 @@ export type LayoutGitSurface = {
   filePanelMode: ComponentProps<typeof GitDiffPanel>["filePanelMode"];
   fileTreeProps: ComponentProps<typeof FileTreePanel> | null;
   promptPanelProps: ComponentProps<typeof PromptPanel>;
+  activityPanelProps: ComponentProps<typeof ActivityPanel>;
   gitDiffPanelProps: ComponentProps<typeof GitDiffPanel>;
   gitDiffViewerProps: ComponentProps<typeof GitDiffViewer>;
   diffViewProps: {

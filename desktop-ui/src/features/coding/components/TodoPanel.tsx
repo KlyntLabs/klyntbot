@@ -1,27 +1,40 @@
-import { useTodos } from "../state/todoStore";
+import { countBlocked, countInProgress, countPending, useTodos } from "../state/todoStore";
 
 export function TodoPanel({ threadId }: { threadId: string }) {
   const { items, planModeState } = useTodos(threadId);
   const planMode = !!planModeState;
 
+  const summary =
+    items.length === 0
+      ? null
+      : `${countInProgress(items)} in progress · ${countPending(items)} pending · ${countBlocked(
+          items,
+        )} blocked`;
+
   return (
-    <div className="flex flex-col gap-2 p-3 text-sm">
-      <div className="font-medium text-foreground">
-        Todo List {planMode && <span className="text-amber-500">(Plan Mode)</span>}
+    <div className="coding-todo-panel">
+      <div className="coding-todo-panel__header">
+        <h3>
+          Todo List
+          {planMode && <span className="coding-todo-panel__plan-tag">Plan Mode</span>}
+        </h3>
+        {summary && <span className="coding-todo-panel__summary">{summary}</span>}
       </div>
       {items.length === 0 ? (
-        <div className="text-muted-foreground">No items yet.</div>
+        <p className="coding-todo-panel__empty">No items yet.</p>
       ) : (
-        <ul className="flex flex-col gap-1">
+        <ul className="coding-todo-panel__list">
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex items-center gap-2 rounded px-2 py-1 hover:bg-muted/50"
+              className={`coding-todo-panel__row coding-todo-panel__row--${item.status}`}
             >
               <StatusDot status={item.status} />
-              <span className="flex-1 truncate">{item.title}</span>
+              <span className="coding-todo-panel__title" title={item.title}>
+                {item.title}
+              </span>
               {item.blockedReason && (
-                <span className="text-xs text-amber-500 truncate max-w-[120px]">
+                <span className="coding-todo-panel__blocked" title={item.blockedReason}>
                   {item.blockedReason}
                 </span>
               )}
@@ -34,13 +47,5 @@ export function TodoPanel({ threadId }: { threadId: string }) {
 }
 
 function StatusDot({ status }: { status: string }) {
-  const color =
-    status === "done"
-      ? "bg-green-500"
-      : status === "in_progress"
-        ? "bg-blue-500"
-        : status === "blocked"
-          ? "bg-red-500"
-          : "bg-gray-400";
-  return <span className={`inline-block w-2 h-2 rounded-full ${color}`} />;
+  return <span className={`coding-todo-panel__dot coding-todo-panel__dot--${status}`} />;
 }

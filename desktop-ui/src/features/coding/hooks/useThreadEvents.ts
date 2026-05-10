@@ -1,10 +1,25 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useState } from "react";
-import type { MessagePart } from "../components/parts/types";
-import { applyView } from "../state/todoStore";
-import { subscribeToThread } from "../state/ThreadEventBuffer";
 import { listen } from "@tauri-apps/api/event";
+import { useEffect, useState } from "react";
 import { fetchCodingTodos } from "@/api/endpoints/coding";
+import type { MessagePart } from "../components/parts/types";
+import { subscribeToThread } from "../state/ThreadEventBuffer";
+import { applyView } from "../state/todoStore";
+
+const OPTIMISTIC_USER_PREFIX = "local-user-";
+
+function makeOptimisticUserMessage(threadId: string, text: string): MessageDto {
+  return {
+    id: `${OPTIMISTIC_USER_PREFIX}${Date.now()}`,
+    session_id: threadId,
+    role: "user",
+    parts: [{ kind: "text", text }],
+    model: null,
+    turn_id: null,
+    created_at: Date.now(),
+    finish_reason: null,
+  };
+}
 
 /// Mirrors `desktop_shared::coding::events::ThreadEvent`. Kept loose (string
 /// kind discriminator) so additions on the Rust side don't immediately fail
@@ -68,7 +83,11 @@ export type ThreadEvent =
       duration_ms: number;
     }
   | { kind: "heartbeat"; subscription_id: string; server_time: number }
-  | { kind: "todos_updated"; thread_id: string; items: Array<{ id: string; title: string; status: string }> };
+  | {
+      kind: "todos_updated";
+      thread_id: string;
+      items: Array<{ id: string; title: string; status: string }>;
+    };
 
 export type PartDelta =
   | { type: "text"; append: string }
@@ -242,18 +261,21 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
   }
 }
 
-/// Subscribe to `agent:thread_event` and apply the reducer. Returns the
-/// latest items + turnState. Filters by `threadId` so multiple coding tabs
-/// don't bleed into one another.
-export function useThreadEvents(threadId: string | null) {
+/// `seedThreadPrompt` is consumed exactly once per threadId change: it injects
+/// the user's first message into initial state, sidestepping the SSE race
+/// between subscription registration and the backend's `ItemStarted` echo.
+export function useThreadEvents(threadId: string | null, seedThreadPrompt?: string | null) {
   const [state, setState] = useState<State>(initialState);
 
   useEffect(() => {
-    setState(initialState);
+    setState(
+      seedThreadPrompt && threadId
+        ? { ...initialState, items: [makeOptimisticUserMessage(threadId, seedThreadPrompt)] }
+        : initialState,
+    );
     if (!threadId) return;
     let cancelled = false;
 
-    // Seed persisted history from DB (pre-buffer events).
     invoke<{ items?: MessageDto[] }>("coding_thread_resume", {
       threadId,
       includeItems: true,
@@ -262,7 +284,15 @@ export function useThreadEvents(threadId: string | null) {
         if (cancelled) return;
         const items = thread?.items ?? [];
         if (items.length === 0) return;
-        setState((prev) => ({ ...prev, items }));
+        setState((prev) => {
+          const hasOptimistic = prev.items.some((it) => it.id.startsWith(OPTIMISTIC_USER_PREFIX));
+          if (!hasOptimistic) return { ...prev, items };
+          const serverIds = new Set(items.map((it) => it.id));
+          const localOnly = prev.items.filter(
+            (it) => it.id.startsWith(OPTIMISTIC_USER_PREFIX) && !serverIds.has(it.id),
+          );
+          return { ...prev, items: [...items, ...localOnly] };
+        });
       })
       .catch(() => {});
 
@@ -283,12 +313,20 @@ export function useThreadEvents(threadId: string | null) {
     if (!threadId) return;
 
     let refreshing = false;
+    let cancelled = false;
 
-    const eventNames = ["coding:todos_updated", "coding:plan_entered", "coding:plan_updated", "coding:plan_exited"];
+    const eventNames = [
+      "coding:todos_updated",
+      "coding:plan_entered",
+      "coding:plan_updated",
+      "coding:plan_exited",
+    ];
     const handlers = eventNames.map((name) =>
       listen(name, (e) => {
+        if (cancelled) return;
         const payload = e.payload as any;
-        const matches = name === "coding:todos_updated" ? payload?.thread_id === threadId : payload === threadId;
+        const matches =
+          name === "coding:todos_updated" ? payload?.thread_id === threadId : payload === threadId;
         if (matches) refresh();
       }),
     );
@@ -305,31 +343,12 @@ export function useThreadEvents(threadId: string | null) {
     }
 
     return () => {
-      handlers.forEach((h) => h.then((fn) => fn()));
+      cancelled = true;
+      // listen() returns a Promise<UnlistenFn>; settle each before invoking
+      // so listeners that register after unmount still get torn down.
+      for (const h of handlers) h.then((fn) => fn());
     };
   }, [threadId]);
 
-  /// Optimistically render a user message before the backend's echo arrives.
-  /// Avoids the listener-registration race where the FE-published `ItemStarted`
-  /// for the user's own turn would otherwise be dropped.
-  const pushUserMessage = useCallback((text: string) => {
-    setState((prev) => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        {
-          id: `local-user-${Date.now()}`,
-          session_id: "",
-          role: "user",
-          parts: [{ kind: "text", text }],
-          model: null,
-          turn_id: null,
-          created_at: Date.now(),
-          finish_reason: null,
-        },
-      ],
-    }));
-  }, []);
-
-  return { ...state, pushUserMessage };
+  return state;
 }

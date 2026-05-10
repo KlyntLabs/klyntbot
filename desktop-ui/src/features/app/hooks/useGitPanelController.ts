@@ -47,7 +47,9 @@ export function useGitPanelController({
   const pendingDiffScrollRef = useRef(false);
   const [gitPanelMode, setGitPanelMode] = useState<GitPanelMode>("diff");
   const [gitDiffViewStyle, setGitDiffViewStyle] = useState<"split" | "unified">("split");
-  const [filePanelMode, setFilePanelMode] = useState<"git" | "files" | "prompts">("git");
+  const [filePanelMode, setFilePanelMode] = useState<"activity" | "git" | "files" | "prompts">(
+    "activity",
+  );
   const [selectedPullRequest, setSelectedPullRequest] = useState<GitHubPullRequest | null>(null);
   const [selectedCommitSha, setSelectedCommitSha] = useState<string | null>(null);
   const [diffSource, setDiffSource] = useState<GitDiffSource>("local");

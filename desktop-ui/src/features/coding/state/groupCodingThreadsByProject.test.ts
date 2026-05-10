@@ -55,7 +55,15 @@ describe("groupCodingThreadsByProject", () => {
     expect(result[0].name).toBe("test-complex-session");
   });
 
-  it("returns an empty array when no sessions exist", () => {
+  it("returns an empty array when no sessions and no workspaces exist", () => {
     expect(groupCodingThreadsByProject([], new Map(), [])).toEqual([]);
+  });
+
+  it("seeds a bucket for every workspace even when no threads exist yet", () => {
+    const ws = [workspace("a", "Alpha"), workspace("b", "Beta")];
+    const result = groupCodingThreadsByProject([], new Map(), ws);
+    expect(result.map((g) => g.workspaceId)).toEqual(["a", "b"]);
+    expect(result.every((g) => g.threads.length === 0)).toBe(true);
+    expect(result[0].name).toBe("Alpha");
   });
 });

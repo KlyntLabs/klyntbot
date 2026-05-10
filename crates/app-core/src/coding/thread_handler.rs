@@ -97,6 +97,10 @@ impl AppCore {
 
         let now = jiff::Timestamp::now().as_millisecond();
 
+        // Make the thread visible to the sidebar before the first user
+        // message — the title-service event only fires post-send.
+        self.emit_thread_updated(&session_key);
+
         // 7. Build Thread DTO
         Ok(Thread {
             id: session_key,
@@ -331,11 +335,15 @@ impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub async fn coding_thread_set_name(&self, thread_id: &str, name: &str) -> Result<()> {
         self.repos.sessions.rename_session(thread_id, name).await?;
+        self.emit_thread_updated(thread_id);
+        Ok(())
+    }
+
+    fn emit_thread_updated(&self, thread_id: &str) {
         self.event_emitter.emit_event(
             "coding:thread_updated",
             serde_json::json!({ "thread_id": thread_id }),
         );
-        Ok(())
     }
 
     /// Refresh AGENTS.md synthetic message for a thread.

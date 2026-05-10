@@ -166,6 +166,13 @@ impl AppCore {
         )));
 
         // ── Background bash job supervisor (coding background tasks) ─────
+        ::storage::StoragePool::run_feature_migrations(
+            storage_pool.inner(),
+            &[feature_coding_bash::migrations::coding_background_jobs_migration()],
+        )
+        .await
+        .map_err(|e| format!("coding_bash migration failed: {e}"))?;
+
         let bash_job_repo = ::storage::BashJobRepo::new(storage_pool.inner().clone());
         let bash_job_repo_for_mirror = bash_job_repo.clone();
         let job_supervisor = Arc::new(feature_coding_bash::JobSupervisor::new(

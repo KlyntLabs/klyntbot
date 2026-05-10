@@ -65,6 +65,10 @@ type UseWorkspaceHomeOptions = {
     },
   ) => Promise<undefined | SendMessageResult>;
   onWorktreeCreated?: (worktree: WorkspaceInfo, parent: WorkspaceInfo) => Promise<void> | void;
+  // Renders the prompt optimistically in CodingThreadView; the backend's SSE
+  // echo for the user's own turn races with subscription registration and is
+  // otherwise dropped.
+  seedThreadPrompt?: (workspaceId: string, threadId: string, prompt: string) => void;
 };
 
 type WorkspaceHomeState = {
@@ -182,6 +186,7 @@ export function useWorkspaceHome({
   startThreadForWorkspace,
   sendUserMessageToThread,
   onWorktreeCreated,
+  seedThreadPrompt,
 }: UseWorkspaceHomeOptions) {
   const [state, setState] = useState<WorkspaceHomeState>({
     runsByWorkspace: {},
@@ -473,6 +478,9 @@ export function useWorkspaceHome({
               effort,
               serviceTier,
             });
+            if (prompt) {
+              seedThreadPrompt?.(activeWorkspace.id, threadId, prompt);
+            }
             const localModel = selectedModelId
               ? (modelLookup.get(selectedModelId)?.model ?? null)
               : null;
@@ -536,6 +544,9 @@ export function useWorkspaceHome({
                   effort,
                   serviceTier,
                 });
+                if (prompt) {
+                  seedThreadPrompt?.(worktreeWorkspace.id, threadId, prompt);
+                }
                 await sendUserMessageToThread(worktreeWorkspace, threadId, prompt, images, {
                   model: selection.model?.model ?? selection.modelId,
                   effort,
@@ -601,6 +612,7 @@ export function useWorkspaceHome({
       updateRunState,
       runMode,
       seedThreadCodexParams,
+      seedThreadPrompt,
       selectedModelId,
       serviceTier,
       sendUserMessageToThread,

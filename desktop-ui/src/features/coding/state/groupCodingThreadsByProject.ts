@@ -29,6 +29,17 @@ export function groupCodingThreadsByProject(
   const wsById = new Map(workspaces.map((w) => [w.id, w] as const));
   const buckets = new Map<string, ProjectThreadGroup>();
 
+  // Pre-seed a bucket for every known workspace so empty projects still show
+  // (matches Codex's "<project> — No chats" pattern).
+  for (const ws of workspaces) {
+    buckets.set(ws.id, {
+      workspaceId: ws.id,
+      name: workspaceLabel(ws),
+      path: ws.path,
+      threads: [],
+    });
+  }
+
   for (const t of sessions) {
     const wsId = workspaceIdByThread.get(t.sessionKey);
     const ws = wsId ? wsById.get(wsId) : undefined;

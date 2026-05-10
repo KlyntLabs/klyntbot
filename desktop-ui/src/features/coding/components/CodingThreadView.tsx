@@ -4,8 +4,6 @@ import type { ConversationItem, OpenAppTarget } from "@/types";
 import { type MessageDto, useThreadEvents } from "../hooks/useThreadEvents";
 import { PlanModeBanner } from "./PlanModeBanner";
 import type { MessagePart } from "./parts/types";
-import { TodoPanel } from "./TodoPanel";
-import { JobsPanel } from "./JobsPanel";
 
 type Props = {
   threadId: string | null;
@@ -33,16 +31,21 @@ export function CodingThreadView({
   draftPrompt,
   onDraftConsumed,
 }: Props) {
-  const { items, turnState, pushUserMessage } = useThreadEvents(threadId);
-  const lastDraftRef = useRef<string | null>(null);
+  // Pin the seed per-threadId so onDraftConsumed clearing the parent's
+  // map doesn't retroactively wipe the optimistic message in useThreadEvents.
+  const seededThreadRef = useRef<string | null>(null);
+  const seededPromptRef = useRef<string | null>(null);
+  if (threadId && seededThreadRef.current !== threadId) {
+    seededThreadRef.current = threadId;
+    seededPromptRef.current = draftPrompt ?? null;
+  }
+  const { items, turnState } = useThreadEvents(threadId, seededPromptRef.current);
 
   useEffect(() => {
     if (!draftPrompt || !threadId) return;
-    if (lastDraftRef.current === draftPrompt) return;
-    lastDraftRef.current = draftPrompt;
-    pushUserMessage(draftPrompt);
+    if (seededPromptRef.current !== draftPrompt) return;
     onDraftConsumed?.();
-  }, [draftPrompt, threadId, pushUserMessage, onDraftConsumed]);
+  }, [draftPrompt, threadId, onDraftConsumed]);
 
   const conversationItems = useMemo(() => adaptItems(items), [items]);
   const isThinking = turnState.kind !== "idle";
@@ -63,10 +66,6 @@ export function CodingThreadView({
             selectedOpenAppId={selectedOpenAppId}
             isThinking={isThinking}
           />
-        </div>
-        <div className="w-64 border-l border-border hidden lg:block flex flex-col">
-          <TodoPanel threadId={threadId} />
-          <JobsPanel threadId={threadId} />
         </div>
       </div>
     </div>
