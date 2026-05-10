@@ -1197,6 +1197,12 @@ impl AppCore {
                     imported_claude_root,
                 ),
             ));
+            registry.register(Arc::new(
+                crate::tracing::providers::klynt::KlyntTracingProvider::new(
+                    repos.clone(),
+                    data_dir.clone(),
+                ),
+            ));
             Arc::new(registry)
         };
 

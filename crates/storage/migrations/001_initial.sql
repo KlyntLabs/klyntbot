@@ -155,6 +155,7 @@ CREATE TABLE sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_workspace_archived ON sessions(workspace_id, archived_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_mode ON sessions(mode);
+CREATE INDEX IF NOT EXISTS idx_sessions_mode_updated_at ON sessions(mode, updated_at DESC);
 
 -- ============================================================
 -- Session Messages
