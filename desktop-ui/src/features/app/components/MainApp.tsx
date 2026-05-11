@@ -1954,6 +1954,12 @@ export default function MainApp() {
 
   const klyntbotSurface = useKlyntbotSurfaceProps(appView === "chat" ? selectedSessionKey : null);
 
+  const status = activeThreadId ? threadStatusById[activeThreadId] : null;
+  const { isStuck, stuckDurationMs } = useStuckThreadDetector(
+    status?.isProcessing ?? false,
+    status?.processingStartedAt ?? null,
+  );
+
   const finalLayoutSurfaces = klyntbotSurface
     ? {
         ...layoutSurfaces,
@@ -1967,6 +1973,7 @@ export default function MainApp() {
             ? {
                 ...layoutSurfaces.primary.composerProps,
                 ...klyntbotSurface.composerProps,
+                isStuck,
               }
             : layoutSurfaces.primary.composerProps,
         },
@@ -1989,12 +1996,6 @@ export default function MainApp() {
     debugPanelNode,
     terminalDockNode,
   } = useMainAppLayoutNodes(finalLayoutSurfaces);
-
-  const status = activeThreadId ? threadStatusById[activeThreadId] : null;
-  const { isStuck, stuckDurationMs } = useStuckThreadDetector(
-    status?.isProcessing ?? false,
-    status?.processingStartedAt ?? null,
-  );
 
   const chatMessagesNode = klyntbotSurface ? (
     <>

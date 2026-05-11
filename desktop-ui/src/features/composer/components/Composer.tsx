@@ -50,6 +50,7 @@ type ComposerProps = {
   onStop: () => void;
   canStop: boolean;
   disabled?: boolean;
+  isStuck?: boolean;
   appsEnabled: boolean;
   isProcessing: boolean;
   steerAvailable: boolean;
@@ -162,6 +163,7 @@ export const Composer = memo(function Composer({
   onStop,
   canStop,
   disabled = false,
+  isStuck = false,
   appsEnabled,
   isProcessing,
   steerAvailable,
@@ -260,9 +262,8 @@ export const Composer = memo(function Composer({
   const oppositeFollowUpIntent: ComposerSendIntent =
     effectiveFollowUpBehavior === "queue" ? "steer" : "queue";
   const oppositeFallsBackToQueue = oppositeFollowUpIntent === "steer" && !steerAvailable;
-  const defaultSubmitIntent: ComposerSendIntent = isProcessing
-    ? effectiveFollowUpBehavior
-    : "default";
+  const defaultSubmitIntent: ComposerSendIntent =
+    isStuck ? "default" : isProcessing ? effectiveFollowUpBehavior : "default";
   const oppositeSubmitIntent: ComposerSendIntent = isProcessing
     ? oppositeFollowUpIntent
     : "default";
