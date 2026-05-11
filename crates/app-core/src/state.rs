@@ -923,14 +923,8 @@ impl AppCore {
         emitter: std::sync::Arc<dyn crate::events::AppEventEmitter>,
     ) -> Result<Self, String> {
         let mut config = config::Config::default();
-        let tmp = std::env::temp_dir().join(format!(
-            "klyntbot-test-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis()
-        ));
-        config.data_dir = Some(tmp.to_string_lossy().into_owned());
+        let tmp = tempfile::tempdir().map_err(|e| e.to_string())?;
+        config.data_dir = Some(tmp.path().to_string_lossy().into_owned());
         let (core, _channels) = Self::init_with_sender(
             common::AppMode::Server,
             Some(config),

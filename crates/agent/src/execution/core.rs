@@ -161,13 +161,17 @@ fn ifind(haystack: &str, needle: &str) -> Option<usize> {
     if needle.is_empty() {
         return Some(0);
     }
+    let needle_chars: Vec<char> = needle.chars().collect();
+    let needle_len = needle_chars.len();
     let mut offset = 0;
     let mut chars = haystack.chars();
     loop {
-        if chars
-            .clone()
-            .zip(needle.chars())
-            .all(|(a, b)| a.eq_ignore_ascii_case(&b))
+        let remaining: Vec<char> = chars.clone().collect();
+        if remaining.len() >= needle_len
+            && remaining
+                .iter()
+                .zip(&needle_chars)
+                .all(|(a, b)| a.eq_ignore_ascii_case(b))
         {
             return Some(offset);
         }

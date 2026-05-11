@@ -539,737 +539,785 @@ pub async fn relay_chat_stream(
         });
     }
 
+    let mut interaction_closed = false;
     loop {
         tokio::select! {
             biased;
-            Some(bundle) = interaction_rx.recv() => {
-                let request_id = uuid::Uuid::new_v4().to_string();
-                emit!(
-                    AGENT_INTERACTION_REQUEST,
-                    InteractionRequestPayload {
-                        session_key: sk.clone(),
-                        request_id: request_id.clone(),
-                        request: bundle.request,
+            bundle = interaction_rx.recv(), if !interaction_closed => {
+                match bundle {
+                    Some(bundle) => {
+                        let request_id = uuid::Uuid::new_v4().to_string();
+                        emit!(
+                            AGENT_INTERACTION_REQUEST,
+                            InteractionRequestPayload {
+                                session_key: sk.clone(),
+                                request_id: request_id.clone(),
+                                request: bundle.request,
+                            }
+                        );
+                        pending_interactions.insert(sk.clone(), (request_id, bundle.response_tx));
                     }
-                );
-                pending_interactions.insert(sk.clone(), (request_id, bundle.response_tx));
+                    None => {
+                        // Agent task is done but merged_rx may still have buffered
+                        // terminal events (Done, Error). Disable this branch so
+                        // select! falls through to merged_rx until it also closes.
+                        interaction_closed = true;
+                    }
+                }
             }
-            Some(event) = merged_rx.recv() => {
+            event = merged_rx.recv() => {
                 match event {
-                    AgentEvent::ContentChunk { data } => {
-                        current_text.push_str(&data);
-                        emit!(
-                            AGENT_CONTENT_CHUNK,
-                            ContentChunkPayload {
-                                session_key: sk.clone(),
-                                data,
-                            }
-                        );
-                    }
-                    AgentEvent::ToolStart { name, args, agent, .. } => {
-                        flush_text(&mut current_text, &mut segments);
-                        tool_names.push(name.clone());
-                        let action = args.get("action").and_then(|v| v.as_str()).map(String::from);
-                        if let Some(ref a) = action {
-                            pending_actions.entry(name.clone()).or_default().push_back(a.clone());
+                    Some(event) => match event {
+                        AgentEvent::ContentChunk { data } => {
+                            current_text.push_str(&data);
+                            emit!(
+                                AGENT_CONTENT_CHUNK,
+                                ContentChunkPayload {
+                                    session_key: sk.clone(),
+                                    data,
+                                }
+                            );
                         }
-                        emit!(
-                            AGENT_TOOL_START,
-                            ToolStartPayload {
-                                session_key: sk.clone(),
-                                name,
-                                action,
-                                agent,
+                        AgentEvent::ToolStart { name, args, agent, .. } => {
+                            flush_text(&mut current_text, &mut segments);
+                            tool_names.push(name.clone());
+                            let action = args.get("action").and_then(|v| v.as_str()).map(String::from);
+                            if let Some(ref a) = action {
+                                pending_actions.entry(name.clone()).or_default().push_back(a.clone());
                             }
-                        );
-                    }
-                    AgentEvent::ToolEnd { name, success, duration_ms, result, agent, .. } => {
-                        // Pop the stashed action from ToolStart (FIFO per tool name)
-                        let action = match pending_actions.entry(name.clone()) {
-                            std::collections::hash_map::Entry::Occupied(mut e) => {
-                                let a = e.get_mut().pop_front();
-                                if e.get().is_empty() { e.remove(); }
-                                a
+                            emit!(
+                                AGENT_TOOL_START,
+                                ToolStartPayload {
+                                    session_key: sk.clone(),
+                                    name,
+                                    action,
+                                    agent,
+                                }
+                            );
+                        }
+                        AgentEvent::ToolEnd { name, success, duration_ms, result, agent, .. } => {
+                            // Pop the stashed action from ToolStart (FIFO per tool name)
+                            let action = match pending_actions.entry(name.clone()) {
+                                std::collections::hash_map::Entry::Occupied(mut e) => {
+                                    let a = e.get_mut().pop_front();
+                                    if e.get().is_empty() { e.remove(); }
+                                    a
+                                }
+                                std::collections::hash_map::Entry::Vacant(_) => None,
+                            };
+                            // Estimate tokens from result length (~4 chars per token)
+                            let estimated_tokens = result.as_ref().map(|r| (r.len() as u32).saturating_add(3) / 4);
+                            if let Some(t) = estimated_tokens { tool_token_sum += t; }
+                            segments.push(events::MessageSegment::Tool {
+                                name: name.clone(),
+                                action: action.clone(),
+                                success,
+                                duration_ms,
+                                result: result.clone(),
+                                estimated_tokens,
+                                agent: agent.clone(),
+                            });
+                            transparency.tools.push(TransparencyTool {
+                                name: name.clone(),
+                                action: action.clone(),
+                                success,
+                                duration_ms,
+                                estimated_tokens,
+                                agent: agent.clone(),
+                            });
+                            // Emit entity:updated so the UI refreshes affected lists
+                            if success && is_mutating_action(action.as_deref()) {
+                                if let Some(kind) = entity_kind_for_tool(&name) {
+                                    let payload = serde_json::json!({
+                                        "entityKind": kind,
+                                        "id": ""
+                                    });
+                                    emitter.emit_event(ENTITY_UPDATED, payload);
+                                }
                             }
-                            std::collections::hash_map::Entry::Vacant(_) => None,
-                        };
-                        // Estimate tokens from result length (~4 chars per token)
-                        let estimated_tokens = result.as_ref().map(|r| (r.len() as u32).saturating_add(3) / 4);
-                        if let Some(t) = estimated_tokens { tool_token_sum += t; }
-                        segments.push(events::MessageSegment::Tool {
-                            name: name.clone(),
-                            action: action.clone(),
-                            success,
-                            duration_ms,
-                            result: result.clone(),
-                            estimated_tokens,
-                            agent: agent.clone(),
-                        });
-                        transparency.tools.push(TransparencyTool {
-                            name: name.clone(),
-                            action: action.clone(),
-                            success,
-                            duration_ms,
-                            estimated_tokens,
-                            agent: agent.clone(),
-                        });
-                        // Emit entity:updated so the UI refreshes affected lists
-                        if success && is_mutating_action(action.as_deref()) {
-                            if let Some(kind) = entity_kind_for_tool(&name) {
+                            emit!(
+                                AGENT_TOOL_END,
+                                ToolEndPayload {
+                                    session_key: sk.clone(),
+                                    name,
+                                    action,
+                                    success,
+                                    duration_ms,
+                                    result,
+                                    estimated_tokens,
+                                    agent,
+                                }
+                            );
+                        }
+                        AgentEvent::EntityCreated(card) => {
+                            emit!(
+                                AGENT_ENTITY_CREATED,
+                                EntityCreatedPayload {
+                                    session_key: sk.clone(),
+                                    entity_type: card.entity_type.clone(),
+                                    entity_id: card.entity_id.clone(),
+                                }
+                            );
+                            if let Some(kind) = desktop_shared::types::EntityKind::parse(&card.entity_type)
+                            {
                                 let payload = serde_json::json!({
                                     "entityKind": kind,
-                                    "id": ""
+                                    "id": card.entity_id
                                 });
                                 emitter.emit_event(ENTITY_UPDATED, payload);
                             }
+                            entity_cards.push(card);
                         }
-                        emit!(
-                            AGENT_TOOL_END,
-                            ToolEndPayload {
-                                session_key: sk.clone(),
-                                name,
-                                action,
-                                success,
-                                duration_ms,
-                                result,
-                                estimated_tokens,
-                                agent,
+                        AgentEvent::Done { content, message_id } => {
+                            flush_text(&mut current_text, &mut segments);
+                            if tool_token_sum > 0 {
+                                transparency.tool_tokens_total = Some(tool_token_sum);
                             }
-                        );
-                    }
-                    AgentEvent::EntityCreated(card) => {
-                        emit!(
-                            AGENT_ENTITY_CREATED,
-                            EntityCreatedPayload {
-                                session_key: sk.clone(),
-                                entity_type: card.entity_type.clone(),
-                                entity_id: card.entity_id.clone(),
+                            // Persist segments + transparency to the assistant message metadata.
+                            // Use targeted update by message ID when available to avoid
+                            // overwriting the wrong message in multi-turn conversations.
+                            let mut meta = serde_json::Map::new();
+                            if !segments.is_empty() {
+                                meta.insert(
+                                    "segments".to_string(),
+                                    serde_json::to_value(&segments).unwrap_or_default(),
+                                );
                             }
-                        );
-                        if let Some(kind) = desktop_shared::types::EntityKind::parse(&card.entity_type)
-                        {
-                            let payload = serde_json::json!({
-                                "entityKind": kind,
-                                "id": card.entity_id
-                            });
-                            emitter.emit_event(ENTITY_UPDATED, payload);
-                        }
-                        entity_cards.push(card);
-                    }
-                    AgentEvent::Done { content, message_id } => {
-                        flush_text(&mut current_text, &mut segments);
-                        if tool_token_sum > 0 {
-                            transparency.tool_tokens_total = Some(tool_token_sum);
-                        }
-                        // Persist segments + transparency to the assistant message metadata.
-                        // Use targeted update by message ID when available to avoid
-                        // overwriting the wrong message in multi-turn conversations.
-                        let mut meta = serde_json::Map::new();
-                        if !segments.is_empty() {
                             meta.insert(
-                                "segments".to_string(),
-                                serde_json::to_value(&segments).unwrap_or_default(),
+                                "transparency".to_string(),
+                                serde_json::to_value(&transparency).unwrap_or_default(),
                             );
-                        }
-                        meta.insert(
-                            "transparency".to_string(),
-                            serde_json::to_value(&transparency).unwrap_or_default(),
-                        );
-                        let meta_value = serde_json::Value::Object(meta);
-                        let persist_outcome = if let Some(ref mid) = message_id {
-                            repos.sessions
-                                .update_assistant_metadata_by_id(mid, None, Some(&meta_value))
-                                .await
-                        } else {
-                            repos.sessions
-                                .update_last_assistant_metadata(sk, None, Some(&meta_value))
-                                .await
-                        };
-                        if let Err(e) = &persist_outcome {
-                            tracing::warn!("metadata persist sync failed for {sk}: {e}");
-                        }
-                        // If the call returned Ok(false) (no row), spawn a detached retry.
-                        // We DO NOT block the relay on this.
-                        if matches!(persist_outcome, Ok(false)) {
-                            let repos_clone = repos.clone();
-                            let sk_owned = sk.to_string();
-                            let meta_clone = meta_value.clone();
-                            tokio::spawn(async move {
-                                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                                match repos_clone
-                                    .sessions
-                                    .update_last_assistant_metadata(&sk_owned, None, Some(&meta_clone))
+                            let meta_value = serde_json::Value::Object(meta);
+                            let persist_outcome = if let Some(ref mid) = message_id {
+                                repos.sessions
+                                    .update_assistant_metadata_by_id(mid, None, Some(&meta_value))
+                                    .await
+                            } else {
+                                repos.sessions
+                                    .update_last_assistant_metadata(sk, None, Some(&meta_value))
+                                    .await
+                            };
+                            if let Err(e) = &persist_outcome {
+                                tracing::warn!("metadata persist sync failed for {sk}: {e}");
+                            }
+                            // If the call returned Ok(false) (no row), spawn a detached retry.
+                            // We DO NOT block the relay on this.
+                            if matches!(persist_outcome, Ok(false)) {
+                                let repos_clone = repos.clone();
+                                let sk_owned = sk.to_string();
+                                let meta_clone = meta_value.clone();
+                                tokio::spawn(async move {
+                                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                                    match repos_clone
+                                        .sessions
+                                        .update_last_assistant_metadata(&sk_owned, None, Some(&meta_clone))
+                                        .await
+                                    {
+                                        Ok(true) => {}
+                                        Ok(false) => tracing::warn!("metadata persist retry: no row {sk_owned}"),
+                                        Err(e) => tracing::warn!("metadata persist retry failed {sk_owned}: {e}"),
+                                    }
+                                });
+                            }
+                            // Publish ChatTurnCompleted AFTER response is saved to session
+                            if let Some(ref bus) = domain_event_bus {
+                                bus.publish(bus::DomainEvent::ChatTurnCompleted {
+                                    session_key: sk.to_string(),
+                                    user_message: user_message.clone(),
+                                });
+                            }
+                            // Wire: FirstChatResponse journey milestone
+                            if let Some(ref tracker) = journey_tracker {
+                                if !tracker
+                                    .is_complete(crate::journey::Milestone::FirstChatResponse)
                                     .await
                                 {
-                                    Ok(true) => {}
-                                    Ok(false) => tracing::warn!("metadata persist retry: no row {sk_owned}"),
-                                    Err(e) => tracing::warn!("metadata persist retry failed {sk_owned}: {e}"),
+                                    tracker
+                                        .mark_complete(
+                                            crate::journey::Milestone::FirstChatResponse,
+                                        )
+                                        .await;
                                 }
-                            });
-                        }
-                        // Publish ChatTurnCompleted AFTER response is saved to session
-                        if let Some(ref bus) = domain_event_bus {
-                            bus.publish(bus::DomainEvent::ChatTurnCompleted {
-                                session_key: sk.to_string(),
-                                user_message: user_message.clone(),
-                            });
-                        }
-                        // Wire: FirstChatResponse journey milestone
-                        if let Some(ref tracker) = journey_tracker {
-                            if !tracker
-                                .is_complete(crate::journey::Milestone::FirstChatResponse)
-                                .await
-                            {
-                                tracker
-                                    .mark_complete(
-                                        crate::journey::Milestone::FirstChatResponse,
-                                    )
-                                    .await;
                             }
-                        }
 
-                        emit!(
-                            AGENT_DONE,
-                            DonePayload {
-                                session_key: sk.clone(),
-                                content,
-                            }
-                        );
-                        emit!(
-                            CHAT_MESSAGE_ADDED,
-                            ChatMessagePayload {
-                                session_key: sk.clone(),
-                                source: "chat".to_string(),
-                            }
-                        );
-                        if let Some(ref engine) = hook_engine {
-                            if !session_end_fired.contains_key(sk.as_str()) {
-                                session_end_fired.insert(sk.clone(), ());
-                                session_start_fired.remove(sk.as_str());
-                                let input = SessionEndInput {
-                                    session_id: sk.clone(),
-                                    reason: "complete".to_string(),
-                                    duration_ms: 0,
-                                    base: Default::default(),
-                                };
-                                let _ = engine.fire(HookFireInput::SessionEnd(input)).await;
-                                // Now that the hook has fired exactly once, drop the marker
-                                // so the next turn on this session can fire SessionStart cleanly.
-                                session_end_fired.remove(sk.as_str());
-                            }
-                        }
-                        break;
-                    }
-                    AgentEvent::Error { message } => {
-                        emit!(
-                            AGENT_ERROR,
-                            AgentErrorPayload {
-                                session_key: sk.clone(),
-                                message: message.clone(),
-                            }
-                        );
-                        // ALSO emit chat:message_added so the FE re-reads the session.
-                        // Without this, FE consumers that gate on chat:message_added to refresh
-                        // history will never see the error message even though it's persisted.
-                        emit!(
-                            CHAT_MESSAGE_ADDED,
-                            ChatMessagePayload {
-                                session_key: sk.clone(),
-                                source: "agent_error".to_string(),
-                            }
-                        );
-                        break;
-                    }
-                    AgentEvent::Cancelled { partial_content, partial_reasoning } => {
-                        emit!(
-                            AGENT_CANCELLED,
-                            CancelledPayload {
-                                session_key: sk.clone(),
-                                partial_content,
-                                partial_reasoning,
-                            }
-                        );
-                        // Cancellation is terminal — drop the stream guard by breaking.
-                        break;
-                    }
-                    AgentEvent::ExecutionStarted { engine, max_iterations } => {
-                        transparency.execution = Some(TransparencyExecution {
-                            engine: engine.clone(),
-                            iterations: 0,
-                            max_iterations: max_iterations as u32,
-                            escalations: 0,
-                        });
-                        emit!(
-                            AGENT_EXECUTION_STARTED,
-                            ExecutionStartedPayload {
-                                session_key: sk.clone(),
-                                engine,
-                                max_iterations,
-                            }
-                        );
-                    }
-                    AgentEvent::PipelineStarted => {
-                        emit!(
-                            AGENT_PIPELINE_STARTED,
-                            PipelineStartedPayload {
-                                session_key: sk.clone(),
-                            }
-                        );
-                    }
-                    AgentEvent::ContextAssembled { total_tokens, budget: _, duration_ms } => {
-                        transparency.timing.get_or_insert_with(Default::default).context_assembly_ms = Some(duration_ms);
-                        emit!(
-                            AGENT_CONTEXT_ASSEMBLED,
-                            ContextAssembledPayload {
-                                session_key: sk.clone(),
-                                total_tokens,
-                                duration_ms,
-                            }
-                        );
-                    }
-                    AgentEvent::RetrievalEnhanced { stages, total_latency_ms, total_llm_calls } => {
-                        let stage_payloads: Vec<events::EnhancementStagePayload> = stages
-                            .iter()
-                            .map(|s| {
-                                let (status, detail) = s.status.to_parts();
-                                events::EnhancementStagePayload {
-                                    name: s.name.to_string(),
-                                    status: status.to_string(),
-                                    status_detail: detail.map(String::from),
-                                    latency_ms: s.latency_ms,
-                                    llm_calls: s.llm_calls,
-                                    output_summary: s.output_summary.clone(),
+                            // Eagerly remove the active_streams entry BEFORE emitting terminal
+                            // events. This eliminates the race where a fast consumer sees
+                            // agent:done and immediately calls chat_send before StreamGuard drops.
+                            if let Some(entry) = active_streams.get(sk) {
+                                if entry.guard_id == guard_id {
+                                    drop(entry);
+                                    active_streams.remove(sk);
                                 }
-                            })
-                            .collect();
-                        transparency.enhancement = Some(events::TransparencyEnhancement {
-                            stages: stage_payloads.clone(),
-                            total_latency_ms,
-                            total_llm_calls,
-                        });
-                        emit!(
-                            events::AGENT_RETRIEVAL_ENHANCED,
-                            events::RetrievalEnhancedPayload {
-                                session_key: sk.clone(),
-                                stages: stage_payloads,
+                            }
+
+                            emit!(
+                                AGENT_DONE,
+                                DonePayload {
+                                    session_key: sk.clone(),
+                                    content,
+                                }
+                            );
+                            emit!(
+                                CHAT_MESSAGE_ADDED,
+                                ChatMessagePayload {
+                                    session_key: sk.clone(),
+                                    source: "chat".to_string(),
+                                }
+                            );
+                            if let Some(ref engine) = hook_engine {
+                                if !session_end_fired.contains_key(sk.as_str()) {
+                                    session_end_fired.insert(sk.clone(), ());
+                                    session_start_fired.remove(sk.as_str());
+                                    let input = SessionEndInput {
+                                        session_id: sk.clone(),
+                                        reason: "complete".to_string(),
+                                        duration_ms: 0,
+                                        base: Default::default(),
+                                    };
+                                    let _ = engine.fire(HookFireInput::SessionEnd(input)).await;
+                                    // Now that the hook has fired exactly once, drop the marker
+                                    // so the next turn on this session can fire SessionStart cleanly.
+                                    session_end_fired.remove(sk.as_str());
+                                }
+                            }
+                            break;
+                        }
+                        AgentEvent::Error { message } => {
+                            // Eager cleanup: remove active_streams entry before emitting
+                            // terminal events so consumers can retry immediately.
+                            if let Some(entry) = active_streams.get(sk) {
+                                if entry.guard_id == guard_id {
+                                    drop(entry);
+                                    active_streams.remove(sk);
+                                }
+                            }
+                            emit!(
+                                AGENT_ERROR,
+                                AgentErrorPayload {
+                                    session_key: sk.clone(),
+                                    message: message.clone(),
+                                }
+                            );
+                            // ALSO emit chat:message_added so the FE re-reads the session.
+                            // Without this, FE consumers that gate on chat:message_added to refresh
+                            // history will never see the error message even though it's persisted.
+                            emit!(
+                                CHAT_MESSAGE_ADDED,
+                                ChatMessagePayload {
+                                    session_key: sk.clone(),
+                                    source: "agent_error".to_string(),
+                                }
+                            );
+                            break;
+                        }
+                        AgentEvent::Cancelled { partial_content, partial_reasoning } => {
+                            // Eager cleanup before emitting terminal event.
+                            if let Some(entry) = active_streams.get(sk) {
+                                if entry.guard_id == guard_id {
+                                    drop(entry);
+                                    active_streams.remove(sk);
+                                }
+                            }
+                            emit!(
+                                AGENT_CANCELLED,
+                                CancelledPayload {
+                                    session_key: sk.clone(),
+                                    partial_content,
+                                    partial_reasoning,
+                                }
+                            );
+                            // Cancellation is terminal — break so StreamGuard drops.
+                            break;
+                        }
+                        AgentEvent::ExecutionStarted { engine, max_iterations } => {
+                            transparency.execution = Some(TransparencyExecution {
+                                engine: engine.clone(),
+                                iterations: 0,
+                                max_iterations: max_iterations as u32,
+                                escalations: 0,
+                            });
+                            emit!(
+                                AGENT_EXECUTION_STARTED,
+                                ExecutionStartedPayload {
+                                    session_key: sk.clone(),
+                                    engine,
+                                    max_iterations,
+                                }
+                            );
+                        }
+                        AgentEvent::PipelineStarted => {
+                            emit!(
+                                AGENT_PIPELINE_STARTED,
+                                PipelineStartedPayload {
+                                    session_key: sk.clone(),
+                                }
+                            );
+                        }
+                        AgentEvent::ContextAssembled { total_tokens, budget: _, duration_ms } => {
+                            transparency.timing.get_or_insert_with(Default::default).context_assembly_ms = Some(duration_ms);
+                            emit!(
+                                AGENT_CONTEXT_ASSEMBLED,
+                                ContextAssembledPayload {
+                                    session_key: sk.clone(),
+                                    total_tokens,
+                                    duration_ms,
+                                }
+                            );
+                        }
+                        AgentEvent::RetrievalEnhanced { stages, total_latency_ms, total_llm_calls } => {
+                            let stage_payloads: Vec<events::EnhancementStagePayload> = stages
+                                .iter()
+                                .map(|s| {
+                                    let (status, detail) = s.status.to_parts();
+                                    events::EnhancementStagePayload {
+                                        name: s.name.to_string(),
+                                        status: status.to_string(),
+                                        status_detail: detail.map(String::from),
+                                        latency_ms: s.latency_ms,
+                                        llm_calls: s.llm_calls,
+                                        output_summary: s.output_summary.clone(),
+                                    }
+                                })
+                                .collect();
+                            transparency.enhancement = Some(events::TransparencyEnhancement {
+                                stages: stage_payloads.clone(),
                                 total_latency_ms,
                                 total_llm_calls,
-                            }
-                        );
-                    }
-                    AgentEvent::IterationStart { iteration, max } => {
-                        if let Some(ref mut exec) = transparency.execution {
-                            exec.iterations = iteration as u32;
+                            });
+                            emit!(
+                                events::AGENT_RETRIEVAL_ENHANCED,
+                                events::RetrievalEnhancedPayload {
+                                    session_key: sk.clone(),
+                                    stages: stage_payloads,
+                                    total_latency_ms,
+                                    total_llm_calls,
+                                }
+                            );
                         }
-                        emit!(
-                            events::AGENT_ITERATION_START,
-                            events::IterationStartPayload {
-                                session_key: sk.clone(),
-                                iteration,
-                                max_iterations: max,
+                        AgentEvent::IterationStart { iteration, max } => {
+                            if let Some(ref mut exec) = transparency.execution {
+                                exec.iterations = iteration as u32;
                             }
-                        );
-                    }
-                    AgentEvent::ConfidenceAssessed { score, action } => {
-                        emit!(
-                            events::AGENT_CONFIDENCE_ASSESSED,
-                            events::ConfidenceAssessedPayload {
-                                session_key: sk.clone(),
-                                score,
-                                action,
-                            }
-                        );
-                    }
-                    AgentEvent::UsageReport {
-                        prompt_tokens, completion_tokens,
-                        cache_read_tokens, cache_write_tokens,
-                        estimated_cost_usd, model, response_time_ms,
-                        ..
-                    } => {
-                        transparency.usage = Some(TransparencyUsage {
-                            prompt_tokens,
-                            completion_tokens,
-                            cache_read_tokens,
-                            cache_write_tokens,
-                        });
-                        transparency.cost = Some(TransparencyCost {
-                            estimated_usd: estimated_cost_usd,
-                            model: model.clone(),
-                        });
-                        transparency.timing.get_or_insert_with(Default::default).total_ms = response_time_ms;
-                        emit!(
-                            events::AGENT_USAGE_REPORT,
-                            events::UsageReportPayload {
-                                session_key: sk.clone(),
+                            emit!(
+                                events::AGENT_ITERATION_START,
+                                events::IterationStartPayload {
+                                    session_key: sk.clone(),
+                                    iteration,
+                                    max_iterations: max,
+                                }
+                            );
+                        }
+                        AgentEvent::ConfidenceAssessed { score, action } => {
+                            emit!(
+                                events::AGENT_CONFIDENCE_ASSESSED,
+                                events::ConfidenceAssessedPayload {
+                                    session_key: sk.clone(),
+                                    score,
+                                    action,
+                                }
+                            );
+                        }
+                        AgentEvent::UsageReport {
+                            prompt_tokens, completion_tokens,
+                            cache_read_tokens, cache_write_tokens,
+                            estimated_cost_usd, model, response_time_ms,
+                            ..
+                        } => {
+                            transparency.usage = Some(TransparencyUsage {
                                 prompt_tokens,
                                 completion_tokens,
                                 cache_read_tokens,
                                 cache_write_tokens,
-                                estimated_cost_usd,
-                                model,
-                                response_time_ms,
-                            }
-                        );
-                    }
-                    AgentEvent::MemoryAccess { action, query, results_count } => {
-                        transparency.memory_accesses.push(TransparencyMemoryAccess {
-                            action: action.clone(),
-                            query: query.clone(),
-                            results_count,
-                        });
-                        emit!(
-                            events::AGENT_MEMORY_ACCESS,
-                            events::MemoryAccessPayload {
-                                session_key: sk.clone(),
-                                action,
-                                query,
+                            });
+                            transparency.cost = Some(TransparencyCost {
+                                estimated_usd: estimated_cost_usd,
+                                model: model.clone(),
+                            });
+                            transparency.timing.get_or_insert_with(Default::default).total_ms = response_time_ms;
+                            emit!(
+                                events::AGENT_USAGE_REPORT,
+                                events::UsageReportPayload {
+                                    session_key: sk.clone(),
+                                    prompt_tokens,
+                                    completion_tokens,
+                                    cache_read_tokens,
+                                    cache_write_tokens,
+                                    estimated_cost_usd,
+                                    model,
+                                    response_time_ms,
+                                }
+                            );
+                        }
+                        AgentEvent::MemoryAccess { action, query, results_count } => {
+                            transparency.memory_accesses.push(TransparencyMemoryAccess {
+                                action: action.clone(),
+                                query: query.clone(),
                                 results_count,
-                            }
-                        );
-                    }
-                    AgentEvent::SkillLoaded { name, trigger, agent } => {
-                        transparency.skills.push(TransparencySkill {
-                            name: name.clone(),
-                            trigger: trigger.clone(),
-                            agent: agent.clone(),
-                        });
-                        emit!(
-                            events::AGENT_SKILL_LOADED,
-                            events::SkillLoadedPayload {
-                                session_key: sk.clone(),
-                                name,
-                                trigger,
-                                agent,
-                            }
-                        );
-                    }
-                    AgentEvent::LearningEvent { event_type, detail } => {
-                        transparency.learning.push(TransparencyLearning {
-                            event_type: event_type.clone(),
-                            detail: detail.clone(),
-                        });
-                        emit!(
-                            events::AGENT_LEARNING_EVENT,
-                            events::LearningEventPayload {
-                                session_key: sk.clone(),
-                                event_type,
-                                detail,
-                            }
-                        );
-                    }
-                    AgentEvent::AgentSelected { name, description } => {
-                        transparency.agent_selected = Some(TransparencyAgentSelected {
-                            name: name.clone(),
-                            description: description.clone(),
-                        });
-                        emit!(
-                            events::AGENT_SELECTED,
-                            events::AgentSelectedPayload {
-                                session_key: sk.clone(),
-                                name,
-                                description,
-                            }
-                        );
-                    }
-                    AgentEvent::SubagentSpawned { label, profile, .. } => {
-                        transparency.subagents.push(TransparencySubagent {
-                            label: label.clone(),
-                            profile: profile.clone(),
-                        });
-                        emit!(
-                            events::AGENT_SUBAGENT_SPAWNED,
-                            events::SubagentSpawnedPayload {
-                                session_key: sk.clone(),
-                                label,
-                                profile,
-                            }
-                        );
-                    }
-                    AgentEvent::DelegationStarted { from_agent, to_agent, query, depth } => {
-                        transparency.delegations.push(TransparencyDelegation {
-                            from_agent: from_agent.clone(),
-                            to_agent: to_agent.clone(),
-                            query: query.clone(),
-                            depth,
-                            status: "active".to_string(),
-                            duration_ms: None,
-                        });
-                        emit!(
-                            events::AGENT_DELEGATION_STARTED,
-                            events::DelegationStartedPayload {
-                                session_key: sk.clone(),
-                                from_agent,
-                                to_agent,
-                                query,
+                            });
+                            emit!(
+                                events::AGENT_MEMORY_ACCESS,
+                                events::MemoryAccessPayload {
+                                    session_key: sk.clone(),
+                                    action,
+                                    query,
+                                    results_count,
+                                }
+                            );
+                        }
+                        AgentEvent::SkillLoaded { name, trigger, agent } => {
+                            transparency.skills.push(TransparencySkill {
+                                name: name.clone(),
+                                trigger: trigger.clone(),
+                                agent: agent.clone(),
+                            });
+                            emit!(
+                                events::AGENT_SKILL_LOADED,
+                                events::SkillLoadedPayload {
+                                    session_key: sk.clone(),
+                                    name,
+                                    trigger,
+                                    agent,
+                                }
+                            );
+                        }
+                        AgentEvent::LearningEvent { event_type, detail } => {
+                            transparency.learning.push(TransparencyLearning {
+                                event_type: event_type.clone(),
+                                detail: detail.clone(),
+                            });
+                            emit!(
+                                events::AGENT_LEARNING_EVENT,
+                                events::LearningEventPayload {
+                                    session_key: sk.clone(),
+                                    event_type,
+                                    detail,
+                                }
+                            );
+                        }
+                        AgentEvent::AgentSelected { name, description } => {
+                            transparency.agent_selected = Some(TransparencyAgentSelected {
+                                name: name.clone(),
+                                description: description.clone(),
+                            });
+                            emit!(
+                                events::AGENT_SELECTED,
+                                events::AgentSelectedPayload {
+                                    session_key: sk.clone(),
+                                    name,
+                                    description,
+                                }
+                            );
+                        }
+                        AgentEvent::SubagentSpawned { label, profile, .. } => {
+                            transparency.subagents.push(TransparencySubagent {
+                                label: label.clone(),
+                                profile: profile.clone(),
+                            });
+                            emit!(
+                                events::AGENT_SUBAGENT_SPAWNED,
+                                events::SubagentSpawnedPayload {
+                                    session_key: sk.clone(),
+                                    label,
+                                    profile,
+                                }
+                            );
+                        }
+                        AgentEvent::DelegationStarted { from_agent, to_agent, query, depth } => {
+                            transparency.delegations.push(TransparencyDelegation {
+                                from_agent: from_agent.clone(),
+                                to_agent: to_agent.clone(),
+                                query: query.clone(),
                                 depth,
-                            }
-                        );
-                    }
-                    AgentEvent::DelegationCompleted { from_agent, to_agent, success, duration_ms } => {
-                        // Update the matching delegation entry
-                        if let Some(d) = transparency.delegations.iter_mut().find(|d| d.to_agent == to_agent && d.status == "active") {
-                            d.status = if success { "completed".to_string() } else { "failed".to_string() };
-                            d.duration_ms = Some(duration_ms);
-                        }
-                        emit!(
-                            events::AGENT_DELEGATION_COMPLETED,
-                            events::DelegationCompletedPayload {
-                                session_key: sk.clone(),
-                                from_agent,
-                                to_agent,
-                                success,
-                                duration_ms,
-                            }
-                        );
-                    }
-                    AgentEvent::McpServerStatus { server_name, status, tool_count, error } => {
-                        emit!(
-                            events::MCP_SERVER_STATUS,
-                            events::McpServerStatusPayload {
-                                server_name,
-                                status,
-                                tool_count,
-                                error,
-                            }
-                        );
-                    }
-                    AgentEvent::McpStartupComplete { ready, failed, skipped } => {
-                        emit!(
-                            events::MCP_STARTUP_COMPLETE,
-                            events::McpStartupCompletePayload {
-                                ready,
-                                failed,
-                                skipped,
-                            }
-                        );
-                    }
-                    AgentEvent::PlanningStarted { .. } => {}
-                    AgentEvent::PlanGenerated { steps, raw_plan } => {
-                        transparency.plan = Some(events::TransparencyPlan {
-                            steps: steps.clone(),
-                            completed_steps: Vec::new(),
-                        });
-                        emit!(
-                            events::AGENT_PLAN_GENERATED,
-                            events::PlanGeneratedPayload {
-                                session_key: sk.to_string(),
-                                steps,
-                                raw_plan,
-                            }
-                        );
-                    }
-                    AgentEvent::PlanStepCompleted { step_index, description, tool_name } => {
-                        if let Some(ref mut plan) = transparency.plan {
-                            plan.completed_steps.push(step_index);
-                        }
-                        emit!(
-                            events::AGENT_PLAN_STEP_COMPLETED,
-                            events::PlanStepCompletedPayload {
-                                session_key: sk.to_string(),
-                                step_index,
-                                description,
-                                tool_name,
-                            }
-                        );
-                    }
-                    AgentEvent::BudgetWarning { monthly_spend_usd, monthly_budget_usd, usage_percent } => {
-                        emit!(
-                            events::AGENT_BUDGET_WARNING,
-                            events::BudgetWarningPayload {
-                                session_key: sk.to_string(),
-                                monthly_spend_usd,
-                                monthly_budget_usd,
-                                usage_percent,
-                            }
-                        );
-                    }
-
-                    AgentEvent::MemoryPromoted { fact_id, from_scope, to_scope, subject, predicate } => {
-                        emit!(
-                            events::AGENT_MEMORY_PROMOTED,
-                            events::MemoryPromotedPayload {
-                                session_key: sk.to_string(),
-                                fact_id,
-                                from_scope,
-                                to_scope,
-                                subject,
-                                predicate,
-                            }
-                        );
-                    }
-                    // AutoTuner events — forwarded to the UI for toast notifications and panel updates.
-                    AgentEvent::AutoTunerReport(report) => {
-                        emit!(events::AUTOTUNER_REPORT, report);
-                    }
-                    AgentEvent::AutoTunerPromotion(promotion) => {
-                        emit!(events::AUTOTUNER_PROMOTION, promotion);
-                    }
-                    AgentEvent::AutoTunerRollback(rollback) => {
-                        emit!(events::AUTOTUNER_ROLLBACK, rollback);
-                    }
-                    AgentEvent::ContextCompressed { before_tokens, after_tokens, iteration } => {
-                        tracing::info!(
-                            before_tokens,
-                            after_tokens,
-                            iteration,
-                            "mid-loop context compression applied"
-                        );
-                    }
-                    AgentEvent::ContextTieredCompressed { tier0_kept, tier1_tokens, tier2_tokens, cognitive_scoring_used, delta_only } => {
-                        tracing::info!(
-                            tier0_kept,
-                            tier1_tokens,
-                            tier2_tokens,
-                            cognitive_scoring_used,
-                            delta_only,
-                            "tiered history compression applied"
-                        );
-                    }
-                    AgentEvent::LoopDetected { iteration, tools_summary, suggestion } => {
-                        tracing::info!(
-                            iteration,
-                            tools_summary = %tools_summary,
-                            suggestion = %suggestion,
-                            "loop detected: repeating tool pattern"
-                        );
-                    }
-                    AgentEvent::LoopHardStop { iteration, tools_summary } => {
-                        tracing::warn!(
-                            iteration,
-                            tools_summary = %tools_summary,
-                            "loop hard-stop: forcing synthesis"
-                        );
-                    }
-                    AgentEvent::ContextReassembled { updates, tokens_added } => {
-                        tracing::info!(
-                            updates_count = updates.len(),
-                            tokens_added,
-                            "live context reassembled during execution"
-                        );
-                    }
-                    // Budget-bounded execution events — logged for now, UI integration later.
-                    AgentEvent::BudgetUpdate { .. }
-                    | AgentEvent::DepthSuggestion { .. }
-                    | AgentEvent::EnrichmentStarted { .. }
-                    | AgentEvent::EnrichmentComplete { .. }
-                    | AgentEvent::TurnComplete { .. } => {}
-                    AgentEvent::ApprovalRequested { requires_user_input, .. } if !requires_user_input => {
-                        // Auto-allow / auto-deny / privacy: telemetry only — UI doesn't need them.
-                    }
-                    AgentEvent::ApprovalRequested { ref request_id, ref tool, ref args_hash, ref layer, ref rule_matched, ref mirror_history, ref sandbox_summary, requires_user_input, ref args, ref cwd, ref layer_reason } => {
-                        let path = args.as_ref().and_then(approval::extract_path_str_from_args);
-                        pending_approvals.insert(request_id.clone(), (tool.clone(), path));
-                        if let Some(ref bus) = domain_event_bus {
-                            bus.publish(bus::DomainEvent::ApprovalRequested {
-                                request_id: request_id.clone(),
-                                tool: tool.clone(),
-                                args_hash: args_hash.clone(),
-                                layer: layer.clone(),
-                                repo_id: None,
+                                status: "active".to_string(),
+                                duration_ms: None,
                             });
+                            emit!(
+                                events::AGENT_DELEGATION_STARTED,
+                                events::DelegationStartedPayload {
+                                    session_key: sk.clone(),
+                                    from_agent,
+                                    to_agent,
+                                    query,
+                                    depth,
+                                }
+                            );
                         }
-                        let payload = serde_json::json!({
-                            "request_id": request_id,
-                            "tool": tool,
-                            "args_hash": args_hash,
-                            "layer": layer,
-                            "rule_matched": rule_matched,
-                            "mirror_history": mirror_history,
-                            "sandbox_summary": sandbox_summary,
-                            "requires_user_input": requires_user_input,
-                            "args": args,
-                            "cwd": cwd,
-                            "layer_reason": layer_reason,
-                        });
-                        emitter.emit_event("agent:approval_requested", payload);
-                        if let Some(ref engine) = hook_engine {
-                            let input = NotificationInput {
-                                session_id: sk.clone(),
-                                kind: "approval_card_opened".to_string(),
-                                message: format!("Approval requested for {} (layer: {})", tool, layer),
-                                tool: Some(tool.clone()),
-                                base: Default::default(),
-                            };
-                            let _ = engine.fire(HookFireInput::Notification(input)).await;
+                        AgentEvent::DelegationCompleted { from_agent, to_agent, success, duration_ms } => {
+                            // Update the matching delegation entry
+                            if let Some(d) = transparency.delegations.iter_mut().find(|d| d.to_agent == to_agent && d.status == "active") {
+                                d.status = if success { "completed".to_string() } else { "failed".to_string() };
+                                d.duration_ms = Some(duration_ms);
+                            }
+                            emit!(
+                                events::AGENT_DELEGATION_COMPLETED,
+                                events::DelegationCompletedPayload {
+                                    session_key: sk.clone(),
+                                    from_agent,
+                                    to_agent,
+                                    success,
+                                    duration_ms,
+                                }
+                            );
                         }
-                    }
-                    AgentEvent::ApprovalResolved { ref request_id, ref decision, ref decision_reason, ref latency_ms, ref persisted_rule, ref decided_by } => {
-                        let (tool_name, path) = pending_approvals
-                            .remove(request_id)
-
-                            .unwrap_or_default();
-                        if let Some(ref bus) = domain_event_bus {
-                            bus.publish(bus::DomainEvent::ApprovalResolved {
-                                request_id: request_id.clone(),
-                                user_id: None,
-                                tool_name,
-                                path,
-                                decision: decision.clone(),
-                                pattern_used: persisted_rule.clone(),
-                                decided_by: decided_by.clone(),
-                                occurred_at: jiff::Timestamp::now().as_second(),
+                        AgentEvent::McpServerStatus { server_name, status, tool_count, error } => {
+                            emit!(
+                                events::MCP_SERVER_STATUS,
+                                events::McpServerStatusPayload {
+                                    server_name,
+                                    status,
+                                    tool_count,
+                                    error,
+                                }
+                            );
+                        }
+                        AgentEvent::McpStartupComplete { ready, failed, skipped } => {
+                            emit!(
+                                events::MCP_STARTUP_COMPLETE,
+                                events::McpStartupCompletePayload {
+                                    ready,
+                                    failed,
+                                    skipped,
+                                }
+                            );
+                        }
+                        AgentEvent::PlanningStarted { .. } => {}
+                        AgentEvent::PlanGenerated { steps, raw_plan } => {
+                            transparency.plan = Some(events::TransparencyPlan {
+                                steps: steps.clone(),
+                                completed_steps: Vec::new(),
                             });
+                            emit!(
+                                events::AGENT_PLAN_GENERATED,
+                                events::PlanGeneratedPayload {
+                                    session_key: sk.to_string(),
+                                    steps,
+                                    raw_plan,
+                                }
+                            );
                         }
-                        let payload = serde_json::json!({
-                            "request_id": request_id,
-                            "decision": decision,
-                            "decision_reason": decision_reason,
-                            "latency_ms": latency_ms,
-                            "persisted_rule": persisted_rule,
-                            "decided_by": decided_by,
-                        });
-                        emitter.emit_event("agent:approval_resolved", payload);
+                        AgentEvent::PlanStepCompleted { step_index, description, tool_name } => {
+                            if let Some(ref mut plan) = transparency.plan {
+                                plan.completed_steps.push(step_index);
+                            }
+                            emit!(
+                                events::AGENT_PLAN_STEP_COMPLETED,
+                                events::PlanStepCompletedPayload {
+                                    session_key: sk.to_string(),
+                                    step_index,
+                                    description,
+                                    tool_name,
+                                }
+                            );
+                        }
+                        AgentEvent::BudgetWarning { monthly_spend_usd, monthly_budget_usd, usage_percent } => {
+                            emit!(
+                                events::AGENT_BUDGET_WARNING,
+                                events::BudgetWarningPayload {
+                                    session_key: sk.to_string(),
+                                    monthly_spend_usd,
+                                    monthly_budget_usd,
+                                    usage_percent,
+                                }
+                            );
+                        }
+
+                        AgentEvent::MemoryPromoted { fact_id, from_scope, to_scope, subject, predicate } => {
+                            emit!(
+                                events::AGENT_MEMORY_PROMOTED,
+                                events::MemoryPromotedPayload {
+                                    session_key: sk.to_string(),
+                                    fact_id,
+                                    from_scope,
+                                    to_scope,
+                                    subject,
+                                    predicate,
+                                }
+                            );
+                        }
+                        // AutoTuner events — forwarded to the UI for toast notifications and panel updates.
+                        AgentEvent::AutoTunerReport(report) => {
+                            emit!(events::AUTOTUNER_REPORT, report);
+                        }
+                        AgentEvent::AutoTunerPromotion(promotion) => {
+                            emit!(events::AUTOTUNER_PROMOTION, promotion);
+                        }
+                        AgentEvent::AutoTunerRollback(rollback) => {
+                            emit!(events::AUTOTUNER_ROLLBACK, rollback);
+                        }
+                        AgentEvent::ContextCompressed { before_tokens, after_tokens, iteration } => {
+                            tracing::info!(
+                                before_tokens,
+                                after_tokens,
+                                iteration,
+                                "mid-loop context compression applied"
+                            );
+                        }
+                        AgentEvent::ContextTieredCompressed { tier0_kept, tier1_tokens, tier2_tokens, cognitive_scoring_used, delta_only } => {
+                            tracing::info!(
+                                tier0_kept,
+                                tier1_tokens,
+                                tier2_tokens,
+                                cognitive_scoring_used,
+                                delta_only,
+                                "tiered history compression applied"
+                            );
+                        }
+                        AgentEvent::LoopDetected { iteration, tools_summary, suggestion } => {
+                            tracing::info!(
+                                iteration,
+                                tools_summary = %tools_summary,
+                                suggestion = %suggestion,
+                                "loop detected: repeating tool pattern"
+                            );
+                        }
+                        AgentEvent::LoopHardStop { iteration, tools_summary } => {
+                            tracing::warn!(
+                                iteration,
+                                tools_summary = %tools_summary,
+                                "loop hard-stop: forcing synthesis"
+                            );
+                        }
+                        AgentEvent::ContextReassembled { updates, tokens_added } => {
+                            tracing::info!(
+                                updates_count = updates.len(),
+                                tokens_added,
+                                "live context reassembled during execution"
+                            );
+                        }
+                        // Budget-bounded execution events — logged for now, UI integration later.
+                        AgentEvent::BudgetUpdate { .. }
+                        | AgentEvent::DepthSuggestion { .. }
+                        | AgentEvent::EnrichmentStarted { .. }
+                        | AgentEvent::EnrichmentComplete { .. }
+                        | AgentEvent::TurnComplete { .. } => {}
+                        AgentEvent::ApprovalRequested { requires_user_input, .. } if !requires_user_input => {
+                            // Auto-allow / auto-deny / privacy: telemetry only — UI doesn't need them.
+                        }
+                        AgentEvent::ApprovalRequested { ref request_id, ref tool, ref args_hash, ref layer, ref rule_matched, ref mirror_history, ref sandbox_summary, requires_user_input, ref args, ref cwd, ref layer_reason } => {
+                            let path = args.as_ref().and_then(approval::extract_path_str_from_args);
+                            pending_approvals.insert(request_id.clone(), (tool.clone(), path));
+                            if let Some(ref bus) = domain_event_bus {
+                                bus.publish(bus::DomainEvent::ApprovalRequested {
+                                    request_id: request_id.clone(),
+                                    tool: tool.clone(),
+                                    args_hash: args_hash.clone(),
+                                    layer: layer.clone(),
+                                    repo_id: None,
+                                });
+                            }
+                            let payload = serde_json::json!({
+                                "request_id": request_id,
+                                "tool": tool,
+                                "args_hash": args_hash,
+                                "layer": layer,
+                                "rule_matched": rule_matched,
+                                "mirror_history": mirror_history,
+                                "sandbox_summary": sandbox_summary,
+                                "requires_user_input": requires_user_input,
+                                "args": args,
+                                "cwd": cwd,
+                                "layer_reason": layer_reason,
+                            });
+                            emitter.emit_event("agent:approval_requested", payload);
+                            if let Some(ref engine) = hook_engine {
+                                let input = NotificationInput {
+                                    session_id: sk.clone(),
+                                    kind: "approval_card_opened".to_string(),
+                                    message: format!("Approval requested for {} (layer: {})", tool, layer),
+                                    tool: Some(tool.clone()),
+                                    base: Default::default(),
+                                };
+                                let _ = engine.fire(HookFireInput::Notification(input)).await;
+                            }
+                        }
+                        AgentEvent::ApprovalResolved { ref request_id, ref decision, ref decision_reason, ref latency_ms, ref persisted_rule, ref decided_by } => {
+                            let (tool_name, path) = pending_approvals
+                                .remove(request_id)
+
+                                .unwrap_or_default();
+                            if let Some(ref bus) = domain_event_bus {
+                                bus.publish(bus::DomainEvent::ApprovalResolved {
+                                    request_id: request_id.clone(),
+                                    user_id: None,
+                                    tool_name,
+                                    path,
+                                    decision: decision.clone(),
+                                    pattern_used: persisted_rule.clone(),
+                                    decided_by: decided_by.clone(),
+                                    occurred_at: jiff::Timestamp::now().as_second(),
+                                });
+                            }
+                            let payload = serde_json::json!({
+                                "request_id": request_id,
+                                "decision": decision,
+                                "decision_reason": decision_reason,
+                                "latency_ms": latency_ms,
+                                "persisted_rule": persisted_rule,
+                                "decided_by": decided_by,
+                            });
+                            emitter.emit_event("agent:approval_resolved", payload);
+                        }
+                        AgentEvent::SandboxPolicyApplied { ref tool, ref policy_summary, ref policy_hash, fallback_unsandboxed, ref fs_constraints, ref network_constraints } => {
+                            let payload = serde_json::json!({
+                                "tool": tool,
+                                "policy_summary": policy_summary,
+                                "policy_hash": policy_hash,
+                                "fallback_unsandboxed": fallback_unsandboxed,
+                                "fs_constraints": fs_constraints,
+                                "network_constraints": network_constraints,
+                            });
+                            emitter.emit_event("agent:sandbox_policy_applied", payload);
+                        }
+                        AgentEvent::FileEditWithSymbols { ref path, ref op, bytes, ref diff_full, .. } => {
+                            let payload = serde_json::json!({
+                                "path": path,
+                                "op": op,
+                                "bytes": bytes,
+                                "diff": diff_full,
+                            });
+                            emitter.emit_event("agent:file_edit_with_symbols", payload);
+                        }
+                        AgentEvent::RecallInjected { ref memory_ids, coverage_score, ref escalation_chain, dead_end_warning, budget_used_tokens, budget_limit_tokens } => {
+                            let payload = serde_json::json!({
+                                "session_key": sk.clone(),
+                                "memory_ids": memory_ids,
+                                "coverage_score": coverage_score,
+                                "escalation_chain": escalation_chain,
+                                "dead_end_warning": dead_end_warning,
+                                "budget_used_tokens": budget_used_tokens,
+                                "budget_limit_tokens": budget_limit_tokens,
+                            });
+                            emitter.emit_event("agent:recall_injected", payload);
+                        }
+                        AgentEvent::DeadEndWarningSurfaced { ref approach_summary, ref prior_attempt_id, confidence } => {
+                            let payload = serde_json::json!({
+                                "session_key": sk.clone(),
+                                "approach_summary": approach_summary,
+                                "prior_attempt_id": prior_attempt_id,
+                                "confidence": confidence,
+                            });
+                            emitter.emit_event("agent:dead_end_warning_surfaced", payload);
+                        }
+                        AgentEvent::PlanModeChanged { ref session_key, active, ref requested_by } => {
+                            let payload = serde_json::json!({
+                                "session_key": session_key, "active": active, "requested_by": requested_by,
+                            });
+                            emitter.emit_event("agent:plan_mode_changed", payload);
+                        }
+                        // Coding-in-chat additive variants ignored here;
+                        // chat-channel handlers will subscribe explicitly in later plans.
+                        _ => {}
+                    },
+                    None => {
+                        // Event stream closed — agent task finished or panicked.
+                        if let Some(entry) = active_streams.get(sk) {
+                            if entry.guard_id == guard_id {
+                                drop(entry);
+                                active_streams.remove(sk);
+                            }
+                        }
+                        break;
                     }
-                    AgentEvent::SandboxPolicyApplied { ref tool, ref policy_summary, ref policy_hash, fallback_unsandboxed, ref fs_constraints, ref network_constraints } => {
-                        let payload = serde_json::json!({
-                            "tool": tool,
-                            "policy_summary": policy_summary,
-                            "policy_hash": policy_hash,
-                            "fallback_unsandboxed": fallback_unsandboxed,
-                            "fs_constraints": fs_constraints,
-                            "network_constraints": network_constraints,
-                        });
-                        emitter.emit_event("agent:sandbox_policy_applied", payload);
-                    }
-                    AgentEvent::FileEditWithSymbols { ref path, ref op, bytes, ref diff_full, .. } => {
-                        let payload = serde_json::json!({
-                            "path": path,
-                            "op": op,
-                            "bytes": bytes,
-                            "diff": diff_full,
-                        });
-                        emitter.emit_event("agent:file_edit_with_symbols", payload);
-                    }
-                    AgentEvent::RecallInjected { ref memory_ids, coverage_score, ref escalation_chain, dead_end_warning, budget_used_tokens, budget_limit_tokens } => {
-                        let payload = serde_json::json!({
-                            "session_key": sk.clone(),
-                            "memory_ids": memory_ids,
-                            "coverage_score": coverage_score,
-                            "escalation_chain": escalation_chain,
-                            "dead_end_warning": dead_end_warning,
-                            "budget_used_tokens": budget_used_tokens,
-                            "budget_limit_tokens": budget_limit_tokens,
-                        });
-                        emitter.emit_event("agent:recall_injected", payload);
-                    }
-                    AgentEvent::DeadEndWarningSurfaced { ref approach_summary, ref prior_attempt_id, confidence } => {
-                        let payload = serde_json::json!({
-                            "session_key": sk.clone(),
-                            "approach_summary": approach_summary,
-                            "prior_attempt_id": prior_attempt_id,
-                            "confidence": confidence,
-                        });
-                        emitter.emit_event("agent:dead_end_warning_surfaced", payload);
-                    }
-                    AgentEvent::PlanModeChanged { ref session_key, active, ref requested_by } => {
-                        let payload = serde_json::json!({
-                            "session_key": session_key, "active": active, "requested_by": requested_by,
-                        });
-                        emitter.emit_event("agent:plan_mode_changed", payload);
-                    }
-                    // Coding-in-chat additive variants ignored here;
-                    // chat-channel handlers will subscribe explicitly in later plans.
-                    _ => {}
                 }
             }
             else => break,

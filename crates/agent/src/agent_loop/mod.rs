@@ -1274,7 +1274,8 @@ impl AgentLoop {
                     let message_id = if is_coding_mode {
                         None
                     } else {
-                        agent.save_to_session(&sk, &response).await
+                        let mid = agent.save_to_session(&sk, &response).await;
+                        mid
                     };
                     let _ = event_tx
                         .send(AgentEvent::Done {
