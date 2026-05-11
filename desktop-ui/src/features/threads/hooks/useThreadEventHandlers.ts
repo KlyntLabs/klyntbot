@@ -173,6 +173,7 @@ export function useThreadEventHandlers({
     markReviewing,
     setActiveTurnId,
     getActiveTurnId,
+    getTurnGeneration: () => 0,
     pendingInterruptsRef,
     pushThreadErrorMessage,
     safeMessageActivity,

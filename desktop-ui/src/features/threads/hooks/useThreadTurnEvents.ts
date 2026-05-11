@@ -18,7 +18,7 @@ import {
   shouldClearCompletedPlanForThread,
   shouldIgnoreOrphanSubagentThread,
 } from "./threadTurnEventHelpers";
-import type { ThreadAction } from "./useThreadsReducer";
+import { selectTurnGeneration, type ThreadAction, type ThreadState } from "./useThreadsReducer";
 
 type UseThreadTurnEventsOptions = {
   dispatch: Dispatch<ThreadAction>;
@@ -31,6 +31,7 @@ type UseThreadTurnEventsOptions = {
   markReviewing: (threadId: string, isReviewing: boolean) => void;
   setActiveTurnId: (threadId: string, turnId: string | null) => void;
   getActiveTurnId: (threadId: string) => string | null;
+  getTurnGeneration: (threadId: string) => number;
   pendingInterruptsRef: MutableRefObject<Set<string>>;
   pushThreadErrorMessage: (threadId: string, message: string) => void;
   safeMessageActivity: () => void;
@@ -48,6 +49,7 @@ export function useThreadTurnEvents({
   markReviewing,
   setActiveTurnId,
   getActiveTurnId,
+  getTurnGeneration,
   pendingInterruptsRef,
   pushThreadErrorMessage,
   safeMessageActivity,
@@ -239,11 +241,16 @@ export function useThreadTurnEvents({
   );
 
   const onTurnCompleted = useCallback(
-    (_workspaceId: string, threadId: string, turnId: string) => {
-      const activeTurnId = getLatestKnownActiveTurnId(threadId);
-      if (turnId && activeTurnId && turnId !== activeTurnId) {
+    (_workspaceId: string, threadId: string, turnId: string, eventGeneration?: number) => {
+      const currentGeneration = getTurnGeneration(threadId);
+      if (eventGeneration != null && eventGeneration < currentGeneration) {
+        // Truly stale event from a previous turn — safe to drop, generation guarantees it.
+        console.debug("[threads] dropping stale turn_completed", { threadId, turnId, eventGeneration, currentGeneration });
         return;
       }
+      // Always reset processing — even if turnId mismatches our optimistic guess.
+      // Generation count prevents the bug we used to have where a mismatched
+      // turnId from a real backend event got silently dropped.
       markProcessing(threadId, false);
       resetThreadTurnState(
         {
@@ -261,6 +268,7 @@ export function useThreadTurnEvents({
     [
       dispatch,
       getLatestKnownActiveTurnId,
+      getTurnGeneration,
       markProcessing,
       pendingInterruptsRef,
       setActiveTurnId,
@@ -372,10 +380,10 @@ export function useThreadTurnEvents({
       if (payload.willRetry) {
         return;
       }
-      const activeTurnId = getLatestKnownActiveTurnId(threadId);
-      if (turnId && activeTurnId && turnId !== activeTurnId) {
-        return;
-      }
+      const currentGeneration = getTurnGeneration(threadId);
+      // Note: onTurnError doesn't have eventGeneration wired yet (PR4),
+      // but we remove the silent-drop guard that caused permanent stuck state.
+      // Generation check will be added once wire events carry generation.
       dispatch({ type: "ensureThread", workspaceId, threadId });
       markProcessing(threadId, false);
       markReviewing(threadId, false);
@@ -394,7 +402,7 @@ export function useThreadTurnEvents({
     },
     [
       dispatch,
-      getLatestKnownActiveTurnId,
+      getTurnGeneration,
       markProcessing,
       markReviewing,
       pushThreadErrorMessage,

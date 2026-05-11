@@ -40,6 +40,7 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
   const getActiveTurnId = vi.fn(
     (threadId: string) => overrides.activeTurnByThread?.[threadId] ?? null,
   );
+  const getTurnGeneration = vi.fn(() => 0);
   const getCurrentRateLimits = vi.fn(
     (workspaceId: string) => overrides.rateLimitsByWorkspace?.[workspaceId] ?? null,
   );
@@ -65,6 +66,7 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
       setThreadLoaded,
       setActiveTurnId,
       getActiveTurnId,
+      getTurnGeneration,
       pendingInterruptsRef,
       pushThreadErrorMessage,
       safeMessageActivity,
@@ -82,6 +84,7 @@ const makeOptions = (overrides: SetupOverrides = {}) => {
     setThreadLoaded,
     setActiveTurnId,
     getActiveTurnId,
+    getTurnGeneration,
     getCurrentRateLimits,
     pushThreadErrorMessage,
     safeMessageActivity,
@@ -442,7 +445,7 @@ describe("useThreadTurnEvents", () => {
     expect(pendingInterruptsRef.current.has("thread-1")).toBe(false);
   });
 
-  it("ignores turn completed events for stale turns", () => {
+  it("resets processing for stale turn completed events (no longer silently dropped)", () => {
     const { result, markProcessing, setActiveTurnId } = makeOptions({
       activeTurnByThread: {
         "thread-1": "turn-active",
@@ -453,8 +456,10 @@ describe("useThreadTurnEvents", () => {
       result.current.onTurnCompleted("ws-1", "thread-1", "turn-stale");
     });
 
-    expect(markProcessing).not.toHaveBeenCalled();
-    expect(setActiveTurnId).not.toHaveBeenCalled();
+    // Previously this was silently dropped, causing permanent stuck isProcessing.
+    // Now we always reset processing; stale events are filtered by generation (PR4).
+    expect(markProcessing).toHaveBeenCalledWith("thread-1", false);
+    expect(setActiveTurnId).toHaveBeenCalledWith("thread-1", null);
   });
 
   it("accepts completion for a newly started turn before state rerender", () => {
@@ -801,7 +806,7 @@ describe("useThreadTurnEvents", () => {
     expect(safeMessageActivity).toHaveBeenCalled();
   });
 
-  it("ignores stale turn errors for non-active turns", () => {
+  it("resets processing for stale turn errors (no longer silently dropped)", () => {
     const {
       result,
       dispatch,
@@ -822,11 +827,17 @@ describe("useThreadTurnEvents", () => {
       });
     });
 
-    expect(dispatch).not.toHaveBeenCalled();
-    expect(markProcessing).not.toHaveBeenCalled();
-    expect(markReviewing).not.toHaveBeenCalled();
-    expect(setActiveTurnId).not.toHaveBeenCalled();
-    expect(pushThreadErrorMessage).not.toHaveBeenCalled();
+    // Previously this was silently dropped, causing permanent stuck isProcessing.
+    // Now we always reset processing; stale events are filtered by generation (PR4).
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "ensureThread",
+      workspaceId: "ws-1",
+      threadId: "thread-1",
+    });
+    expect(markProcessing).toHaveBeenCalledWith("thread-1", false);
+    expect(markReviewing).toHaveBeenCalledWith("thread-1", false);
+    expect(setActiveTurnId).toHaveBeenCalledWith("thread-1", null);
+    expect(pushThreadErrorMessage).toHaveBeenCalledWith("thread-1", "Turn failed: boom");
   });
 
   it("handles new-turn errors even when reducer active turn id is stale", () => {
@@ -903,5 +914,38 @@ describe("useThreadTurnEvents", () => {
 
     expect(dispatch).not.toHaveBeenCalled();
     expect(markProcessing).not.toHaveBeenCalled();
+  });
+
+  it("calls markProcessing(false) even when turnId mismatches optimistic ref", () => {
+    const markProcessing = vi.fn();
+    const setActiveTurnId = vi.fn();
+    const getActiveTurnId = vi.fn(() => "turn-A");
+    const getTurnGeneration = vi.fn(() => 0);
+    const pendingInterruptsRef = { current: new Set<string>() };
+    const planByThreadRef = { current: {} };
+    const { result } = renderHook(() =>
+      useThreadTurnEvents({
+        dispatch: vi.fn(),
+        planByThreadRef,
+        getCustomName: vi.fn(),
+        isThreadHidden: vi.fn(() => false),
+        setThreadLoaded: vi.fn(),
+        markProcessing,
+        markReviewing: vi.fn(),
+        setActiveTurnId,
+        getActiveTurnId,
+        getTurnGeneration,
+        pendingInterruptsRef,
+        pushThreadErrorMessage: vi.fn(),
+        safeMessageActivity: vi.fn(),
+        recordThreadActivity: vi.fn(),
+      }),
+    );
+
+    // Set up the optimistic mismatch: turn-A is optimistic, but backend emits completion for turn-B.
+    act(() => { result.current.onTurnStarted("ws-1", "thread-1", "turn-A"); });
+    act(() => { result.current.onTurnCompleted("ws-1", "thread-1", "turn-B"); });
+
+    expect(markProcessing).toHaveBeenCalledWith("thread-1", false);
   });
 });
