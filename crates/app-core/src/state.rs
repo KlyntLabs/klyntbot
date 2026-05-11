@@ -57,6 +57,10 @@ pub struct AppCore {
     pub shutdown_token: CancellationToken,
     /// Active streaming cancellation tokens keyed by session_key.
     pub active_streams: Arc<crate::handlers::chat::ActiveStreams>,
+    /// Assistant-mode thread runtime (lazily initialized).
+    pub assistant_runtime: std::sync::OnceLock<Arc<dyn crate::runtime::ThreadRuntime>>,
+    /// Coding-mode thread runtime (lazily initialized).
+    pub coding_runtime: std::sync::OnceLock<Arc<dyn crate::runtime::ThreadRuntime>>,
     /// Pending ask_user interaction oneshot senders keyed by session_key.
     /// Value is (request_id, sender). Only one interaction can be pending per session
     /// because the ask_user tool blocks the agent loop until answered.
@@ -843,6 +847,22 @@ impl AppCore {
     #[tracing::instrument(skip(self), err)]
     pub fn coding_job_log_path(&self, job_id: &str) -> Result<std::path::PathBuf, ApiError> {
         crate::handlers::coding_jobs::coding_jobs_log_path(self, job_id)
+    }
+
+    /// Return the assistant-mode thread runtime, constructing it on first call.
+    pub fn assistant_runtime(self: Arc<Self>) -> Arc<dyn crate::runtime::ThreadRuntime> {
+        let core = Arc::clone(&self);
+        self.assistant_runtime
+            .get_or_init(|| Arc::new(crate::runtime::assistant::AssistantThreadRuntime::new(core)))
+            .clone()
+    }
+
+    /// Return the coding-mode thread runtime, constructing it on first call.
+    pub fn coding_runtime(self: Arc<Self>) -> Arc<dyn crate::runtime::ThreadRuntime> {
+        let core = Arc::clone(&self);
+        self.coding_runtime
+            .get_or_init(|| Arc::new(crate::runtime::coding::CodingThreadRuntime::new(core)))
+            .clone()
     }
 }
 

@@ -1,5 +1,6 @@
 use desktop_macros::klynt_command;
 use desktop_shared::errors::ApiError;
+use std::sync::Arc;
 
 #[klynt_command]
 pub async fn coding_message_send(
@@ -7,19 +8,27 @@ pub async fn coding_message_send(
     text: String,
     model: Option<String>,
 ) -> serde_json::Value {
-    state
-        .coding_message_send(&thread_id, &text, model)
-        .await
-        .map(|resp| serde_json::to_value(resp).unwrap_or_default())
-        .map_err(ApiError::from)
+    let runtime = Arc::clone(&state).coding_runtime();
+    let outcome = runtime
+        .start_turn(::app_core::runtime::StartTurnRequest {
+            thread_id,
+            content: text,
+            context: None,
+            mode: Some("coding".to_string()),
+            model,
+        })
+        .await?;
+
+    let resp = outcome
+        .coding_response
+        .expect("coding mode returns coding_response");
+    Ok(serde_json::to_value(resp).unwrap_or_default())
 }
 
 #[klynt_command]
-pub async fn coding_turn_interrupt(thread_id: String, turn_id: String) -> () {
-    state
-        .coding_turn_interrupt(&thread_id, &turn_id)
-        .await
-        .map_err(ApiError::from)
+pub async fn coding_turn_interrupt(_thread_id: String, turn_id: String) -> () {
+    let runtime = Arc::clone(&state).coding_runtime();
+    runtime.cancel_turn(&turn_id).await
 }
 
 #[klynt_command]

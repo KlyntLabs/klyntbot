@@ -1375,6 +1375,8 @@ impl AppCore {
             plan_snapshots: Arc::new(dashmap::DashMap::new()),
             context_update_queue: Some(Arc::clone(&context_update_queue)),
             job_supervisor: Some(job_supervisor),
+            assistant_runtime: std::sync::OnceLock::new(),
+            coding_runtime: std::sync::OnceLock::new(),
         };
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────

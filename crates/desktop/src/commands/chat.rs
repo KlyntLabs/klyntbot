@@ -41,11 +41,22 @@ pub async fn chat_send(
     context: Option<SessionContextInput>,
     mode: Option<String>,
 ) -> ChatMessageResponse {
-    let (user_msg, stream_info) = state.chat_send(content, session_key, context, mode).await?;
+    let runtime = Arc::clone(&state).assistant_runtime();
+    let outcome = runtime
+        .start_turn(::app_core::runtime::StartTurnRequest {
+            thread_id: session_key,
+            content,
+            context,
+            mode,
+            model: None,
+        })
+        .await?;
+
+    let user_msg = outcome.user_message.expect("assistant mode returns user_message");
+    let stream_info = outcome.stream_info.expect("assistant mode returns stream_info");
 
     // Spawn background task to relay streaming events via Tauri emitter
     let emitter: Arc<dyn ::app_core::events::AppEventEmitter> = Arc::new(TauriEmitter(app));
-
     state.spawn_chat_relay(stream_info, emitter);
 
     Ok(user_msg)
@@ -96,7 +107,8 @@ pub async fn chat_delete_stale_sessions(before_days: u32) -> u64 {
 
 #[klynt_command]
 pub async fn chat_cancel(session_key: String) -> () {
-    state.chat_cancel(session_key).await
+    let runtime = Arc::clone(&state).assistant_runtime();
+    runtime.cancel_turn(&session_key).await
 }
 
 #[klynt_command]

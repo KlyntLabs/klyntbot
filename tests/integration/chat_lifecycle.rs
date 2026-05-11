@@ -1,6 +1,7 @@
 //! Lifecycle invariants for the chat/thread system.
 
 use crate::common::chat_harness::ChatTestHarness;
+use app_core::runtime::StartTurnRequest;
 
 /// REGRESSION: after a turn reaches Done, a subsequent chat_send must succeed.
 #[tokio::test]
@@ -110,4 +111,80 @@ async fn wait_for_new_event(
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
     false
+}
+
+// ── PR5: ThreadRuntime trait tests ───────────────────────────────────────────
+
+/// Both runtimes share the same underlying active_turns map.
+#[tokio::test]
+async fn both_runtimes_share_active_turns_map() {
+    let (core, _emitter) = ChatTestHarness::new_real().await;
+    let assistant = std::sync::Arc::clone(&core).assistant_runtime();
+    let coding = std::sync::Arc::clone(&core).coding_runtime();
+
+    assert!(std::ptr::eq(
+        std::sync::Arc::as_ptr(assistant.active_turns()),
+        std::sync::Arc::as_ptr(coding.active_turns()),
+    ));
+}
+
+/// Assistant runtime `start_turn` returns the expected outcome shape.
+#[tokio::test]
+async fn assistant_runtime_start_turn_returns_outcome() {
+    let (core, _emitter) = ChatTestHarness::new_real().await;
+    let runtime = std::sync::Arc::clone(&core).assistant_runtime();
+
+    let outcome = runtime
+        .start_turn(StartTurnRequest {
+            thread_id: "test:assistant-runtime".to_string(),
+            content: "hello".into(),
+            context: None,
+            mode: None,
+            model: None,
+        })
+        .await
+        .expect("start_turn");
+
+    assert_eq!(outcome.handle.thread_id, "test:assistant-runtime");
+    assert!(outcome.user_message.is_some(), "assistant mode returns user_message");
+    assert!(outcome.stream_info.is_some(), "assistant mode returns stream_info");
+    assert!(outcome.coding_response.is_none(), "assistant mode does not return coding_response");
+}
+
+/// Coding runtime exists and shares the same active_turns map.
+#[tokio::test]
+async fn coding_runtime_is_wired() {
+    let (core, _emitter) = ChatTestHarness::new_real().await;
+    let runtime = std::sync::Arc::clone(&core).coding_runtime();
+
+    // The runtime should see the same active_turns as the assistant runtime
+    assert_eq!(runtime.active_turns().len(), 0, "no active turns in fresh harness");
+}
+
+/// Assistant runtime `cancel_turn` removes the turn from active_turns.
+#[tokio::test]
+async fn assistant_runtime_cancel_turn_clears_active() {
+    let (core, _emitter) = ChatTestHarness::new_real().await;
+    let runtime = std::sync::Arc::clone(&core).assistant_runtime();
+    let sk = "test:assistant-cancel".to_string();
+
+    let outcome = runtime
+        .start_turn(StartTurnRequest {
+            thread_id: sk.clone(),
+            content: "hello".into(),
+            context: None,
+            mode: None,
+            model: None,
+        })
+        .await
+        .expect("start_turn");
+
+    assert!(runtime.is_active(&outcome.handle.turn_id));
+
+    runtime
+        .cancel_turn(&outcome.handle.turn_id)
+        .await
+        .expect("cancel_turn");
+
+    assert!(!runtime.is_active(&outcome.handle.turn_id));
 }
