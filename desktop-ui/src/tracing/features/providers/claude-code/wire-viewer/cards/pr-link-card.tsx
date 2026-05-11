@@ -1,3 +1,4 @@
+import { GitPullRequest } from "lucide-react";
 import type { WireEvent } from "@/tracing/lib/api";
 
 interface Props {
@@ -12,15 +13,22 @@ export function PrLinkCard({ event }: Props) {
   };
   return (
     <div className="cc-card cc-card--pr-link">
-      <span className="cc-card__chip">PR</span>
-      <span>{p.prRepository ?? ""}</span>
-      {p.prUrl ? (
-        <a href={p.prUrl} target="_blank" rel="noopener noreferrer">
-          #{p.prNumber}
-        </a>
-      ) : (
-        <span>#{p.prNumber}</span>
-      )}
+      <div className="cc-card__header">
+        <span className="cc-card__role cc-card__role--pr">
+          <GitPullRequest size={11} aria-hidden />
+          PR
+        </span>
+        <span className="cc-card__tool-name">{p.prRepository ?? ""}</span>
+        <span className="cc-card__meta">
+          {p.prUrl ? (
+            <a href={p.prUrl} target="_blank" rel="noopener noreferrer">
+              #{p.prNumber}
+            </a>
+          ) : (
+            <span>#{p.prNumber}</span>
+          )}
+        </span>
+      </div>
     </div>
   );
 }

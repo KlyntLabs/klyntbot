@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import type { WireEvent } from "@/tracing/lib/api";
 
@@ -13,13 +14,19 @@ export function ThinkingCard({ event, defaultExpanded = false }: Props) {
     <div className="cc-card cc-card--thinking">
       <button
         type="button"
-        className="cc-card__toggle"
+        className="cc-card__header cc-card__header--button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        Thinking ({text.length} chars)
+        <span className="cc-card__role cc-card__role--thinking">Thinking</span>
+        <span className="cc-card__meta">{text.length.toLocaleString()} chars</span>
+        {open ? (
+          <ChevronDown size={14} className="cc-card__chevron" />
+        ) : (
+          <ChevronRight size={14} className="cc-card__chevron" />
+        )}
       </button>
-      {open && <pre className="cc-card__body">{text}</pre>}
+      {open && <pre className="cc-card__code">{text}</pre>}
     </div>
   );
 }

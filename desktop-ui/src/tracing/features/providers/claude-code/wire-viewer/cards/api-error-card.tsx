@@ -1,3 +1,4 @@
+import { AlertTriangle } from "lucide-react";
 import type { WireEvent } from "@/tracing/lib/api";
 
 interface Props {
@@ -13,12 +14,17 @@ export function ApiErrorCard({ event }: Props) {
   };
   return (
     <div className="cc-card cc-card--api-error">
-      <strong>API error</strong>
-      <span>
-        retry {p.retryAttempt ?? 0}/{p.maxRetries ?? 0}
-      </span>
-      {p.retryInMs != null && <span>in {Math.round(p.retryInMs)} ms</span>}
-      {p.error?.type && <span className="cc-card__chip">{p.error.type}</span>}
+      <div className="cc-card__header">
+        <span className="cc-card__role cc-card__role--error">
+          <AlertTriangle size={11} aria-hidden />
+          API error
+        </span>
+        {p.error?.type && <span className="cc-card__chip">{p.error.type}</span>}
+        <span className="cc-card__meta">
+          retry {p.retryAttempt ?? 0}/{p.maxRetries ?? 0}
+          {p.retryInMs != null && ` · in ${Math.round(p.retryInMs)} ms`}
+        </span>
+      </div>
     </div>
   );
 }

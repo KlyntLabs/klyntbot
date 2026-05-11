@@ -56,7 +56,8 @@ function pickCard(e: WireEvent, showOther: boolean): React.ReactNode {
   if (t === "pr-link") return <PrLinkCard event={e} />;
   if (t === "synthetic.TurnBegin") {
     const idx = (e.payload as { turnIndex?: number }).turnIndex;
-    return <div className="cc-turn-divider">Turn {idx ?? "?"}</div>;
+    if (idx == null) return null;
+    return <div className="cc-turn-divider">Turn {idx}</div>;
   }
   if (showOther) return <OtherCard event={e} />;
   return null;

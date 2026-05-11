@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import type { WireEvent } from "@/tracing/lib/api";
 
@@ -11,11 +12,21 @@ export function StatusUpdateCard({ event }: Props) {
   const summary = renderSummary(subtype, event.payload);
   return (
     <div className="cc-card cc-card--status">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="cc-card__toggle">
-        <span className="cc-card__chip">{subtype}</span>
-        <span>{summary}</span>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="cc-card__header cc-card__header--button"
+        aria-expanded={open}
+      >
+        <span className="cc-card__role cc-card__role--system">{subtype}</span>
+        {summary && <span className="cc-card__meta">{summary}</span>}
+        {open ? (
+          <ChevronDown size={14} className="cc-card__chevron" />
+        ) : (
+          <ChevronRight size={14} className="cc-card__chevron" />
+        )}
       </button>
-      {open && <pre className="cc-card__body">{JSON.stringify(event.payload, null, 2)}</pre>}
+      {open && <pre className="cc-card__code">{JSON.stringify(event.payload, null, 2)}</pre>}
     </div>
   );
 }
