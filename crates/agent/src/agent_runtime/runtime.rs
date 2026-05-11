@@ -402,13 +402,15 @@ impl AgentRuntime {
         ctx.hook_engine = self.hook_engine();
         let ctx = &ctx;
         let pipeline_start = Instant::now();
-        let (ttft_tx, mut ttft_rx) = tokio::sync::mpsc::channel::<AgentEvent>(256);
-        let first_chunk_instant = Arc::new(std::sync::Mutex::new(None));
-        let first_chunk_clone = Arc::clone(&first_chunk_instant);
-
-        let forwarder = if let Some(ref tx) = event_tx {
+        // Intercept the first ContentChunk to compute TTFT.
+        // Only created when event_tx is Some; otherwise we pass None to
+        // execute_loop and ttft_ms stays None.
+        let (ttft_tx_opt, first_chunk_instant, forwarder) = if let Some(ref tx) = event_tx {
+            let (ttft_tx, mut ttft_rx) = tokio::sync::mpsc::channel::<AgentEvent>(256);
+            let first_chunk_instant = Arc::new(std::sync::Mutex::new(None));
+            let first_chunk_clone = Arc::clone(&first_chunk_instant);
             let tx = tx.clone();
-            Some(tokio::spawn(async move {
+            let forwarder = tokio::spawn(async move {
                 while let Some(ev) = ttft_rx.recv().await {
                     if matches!(ev, AgentEvent::ContentChunk { .. }) {
                         let mut g = first_chunk_clone.lock().unwrap();
@@ -418,9 +420,10 @@ impl AgentRuntime {
                     }
                     let _ = tx.send(ev).await;
                 }
-            }))
+            });
+            (Some(ttft_tx), Some(first_chunk_instant), Some(forwarder))
         } else {
-            None
+            (None, None, None)
         };
 
         tracing::debug!("AgentRuntime::process_message: about to acquire hot_config read lock");
@@ -600,7 +603,7 @@ impl AgentRuntime {
                 &params,
                 &mut budget,
                 ctx,
-                Some(ttft_tx.clone()),
+                ttft_tx_opt.clone(),
             ),
         )
         .await
@@ -647,7 +650,7 @@ impl AgentRuntime {
                         &params,
                         &mut retry_budget,
                         ctx,
-                        Some(ttft_tx.clone()),
+                        ttft_tx_opt.clone(),
                     ),
                 )
                 .await;
@@ -662,7 +665,7 @@ impl AgentRuntime {
             }
         }
 
-        drop(ttft_tx);
+        drop(ttft_tx_opt);
         if let Some(h) = forwarder {
             let _ = h.await;
         }
@@ -672,9 +675,7 @@ impl AgentRuntime {
         let mut validation = self.validator.validate(&loop_result.content);
         let pipeline_elapsed_ms = pipeline_start.elapsed().as_millis() as u64;
         let ttft_ms = first_chunk_instant
-            .lock()
-            .unwrap()
-            .map(|i| i.duration_since(pipeline_start).as_millis() as u64);
+            .and_then(|inst| inst.lock().unwrap().map(|i| i.duration_since(pipeline_start).as_millis() as u64));
 
         // Record usage
         self.record_usage(
