@@ -56,7 +56,7 @@ pub struct AppCore {
     pub cron_bridge: Arc<CronBridge>,
     pub shutdown_token: CancellationToken,
     /// Active streaming cancellation tokens keyed by session_key.
-    pub active_streams: Arc<dashmap::DashMap<String, CancellationToken>>,
+    pub active_streams: Arc<crate::handlers::chat::ActiveStreams>,
     /// Pending ask_user interaction oneshot senders keyed by session_key.
     /// Value is (request_id, sender). Only one interaction can be pending per session
     /// because the ask_user tool blocks the agent loop until answered.
@@ -911,7 +911,6 @@ impl AppCore {
     }
 
     /// Test AppCore with a custom LLM provider and event emitter.
-    #[cfg(any(test, feature = "test-helpers"))]
     pub async fn for_tests(
         provider: providers::DynProvider,
         emitter: std::sync::Arc<dyn crate::events::AppEventEmitter>,

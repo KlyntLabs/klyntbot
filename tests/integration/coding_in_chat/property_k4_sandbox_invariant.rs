@@ -23,6 +23,7 @@ async fn k4_sandbox_event_emitted_before_exec() {
     );
 
     let tool = BashTool::new(
+        std::path::PathBuf::from("/tmp"),
         policy,
         privacy,
         bus,
@@ -39,6 +40,9 @@ async fn k4_sandbox_event_emitted_before_exec() {
             command: cmd.clone(),
             cwd: Some(cwd.path().to_string_lossy().into()),
             timeout_ms: Some(5000),
+            run_in_background: None,
+            description: None,
+            silent_completion: None,
         },
         &routing_ctx,
     )

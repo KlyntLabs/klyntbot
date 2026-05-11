@@ -10,7 +10,7 @@ use desktop_shared::errors::ApiError;
 use desktop_shared::events::{self, *};
 use storage::{Repos, SessionContextParams};
 use tokio::sync::mpsc;
-use tokio_util::sync::CancellationToken;
+
 
 use klynt_hooks::engine::HookFireInput;
 use klynt_hooks::events::{
@@ -22,9 +22,22 @@ use crate::errors::map_storage_err;
 use crate::state::AppCore;
 
 /// Type aliases for the DashMap types used across both AppCore variants.
-pub(super) type ActiveStreams = dashmap::DashMap<String, CancellationToken>;
+pub type ActiveStreams = dashmap::DashMap<String, ActiveStreamEntry>;
 pub(super) type PendingInteractions =
     dashmap::DashMap<String, (String, tokio::sync::oneshot::Sender<common::FormResponse>)>;
+
+#[derive(Clone)]
+pub struct ActiveStreamEntry {
+    pub guard_id: u64,
+    pub cancel: tokio_util::sync::CancellationToken,
+}
+
+static STREAM_GUARD_COUNTER: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+fn next_guard_id() -> u64 {
+    STREAM_GUARD_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
 
 // ── ChatStreamInfo ──────────────────────────────────────────────────────
 
@@ -40,6 +53,9 @@ pub struct ChatStreamInfo {
     /// The user message text, forwarded to `relay_chat_stream` so it can publish
     /// `ChatTurnCompleted` after the assistant response is persisted.
     pub user_message: Option<String>,
+    /// Value-identity guard for this stream so StreamGuard::drop only removes
+    /// entries that still belong to us (not overwritten by a later send).
+    pub guard_id: u64,
 }
 
 // ── Helper functions (private) ──────────────────────────────────────────
@@ -279,8 +295,15 @@ pub async fn chat_send(
         .await
         .map_err(ApiError::from)?;
 
-    // 5. Track the cancel token
-    active_streams.insert(session_key.clone(), streaming_handle.cancel_token);
+    // 5. Track the cancel token with value-identity guard
+    let guard_id = next_guard_id();
+    active_streams.insert(
+        session_key.clone(),
+        ActiveStreamEntry {
+            guard_id,
+            cancel: streaming_handle.cancel_token.clone(),
+        },
+    );
 
     // 6. Build the user message response
     let user_msg = ChatMessageResponse {
@@ -300,6 +323,7 @@ pub async fn chat_send(
         has_context,
         is_new_session,
         user_message: Some(user_message),
+        guard_id,
     };
 
     Ok((user_msg, stream_info))
@@ -312,8 +336,8 @@ pub async fn chat_cancel(
     session_key: String,
 ) -> Result<(), ApiError> {
     // Cancel stream
-    if let Some((_, token)) = active_streams.remove(&session_key) {
-        token.cancel();
+    if let Some((_, entry)) = active_streams.remove(&session_key) {
+        entry.cancel.cancel();
     }
     // Cancel any pending interaction
     if let Some((_, (_, tx))) = pending_interactions.remove(&session_key) {
@@ -415,21 +439,33 @@ pub async fn relay_chat_stream(
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     session_start_fired: Arc<dashmap::DashMap<String, ()>>,
     session_end_fired: Arc<dashmap::DashMap<String, ()>>,
+    guard_id: u64,
 ) {
     // Guard ensures active_streams + pending_interactions cleanup even on panic
     struct StreamGuard {
         key: String,
+        guard_id: u64,
         streams: Arc<ActiveStreams>,
         pending: Arc<PendingInteractions>,
     }
     impl Drop for StreamGuard {
         fn drop(&mut self) {
-            self.streams.remove(&self.key);
+            // Value-identity removal: only delete the entry if it still belongs to us.
+            // If a later send overwrote the slot, we leave the new entry alone.
+            if let Some(entry) = self.streams.get(&self.key) {
+                if entry.guard_id == self.guard_id {
+                    drop(entry); // release the read lock before write
+                    self.streams.remove(&self.key);
+                }
+            }
+            // Same idea for pending_interactions — remove by key for now
+            // (interactions don't have the same overwrite race).
             self.pending.remove(&self.key);
         }
     }
     let _guard = StreamGuard {
         key: session_key.clone(),
+        guard_id,
         streams: Arc::clone(&active_streams),
         pending: Arc::clone(&pending_interactions),
     };
@@ -640,30 +676,36 @@ pub async fn relay_chat_stream(
                             serde_json::to_value(&transparency).unwrap_or_default(),
                         );
                         let meta_value = serde_json::Value::Object(meta);
-                        if let Some(ref mid) = message_id {
-                            if let Err(e) = repos.sessions.update_assistant_metadata_by_id(
-                                mid, None, Some(&meta_value),
-                            ).await {
-                                tracing::warn!("metadata persist by id failed for {sk}/{mid}: {e}");
-                            }
+                        let persist_outcome = if let Some(ref mid) = message_id {
+                            repos.sessions
+                                .update_assistant_metadata_by_id(mid, None, Some(&meta_value))
+                                .await
                         } else {
-                            // Fallback: legacy path for messages without ID
-                            match repos.sessions.update_last_assistant_metadata(
-                                sk, None, Some(&meta_value),
-                            ).await {
-                                Ok(true) => {}
-                                Ok(false) => {
-                                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                                    match repos.sessions.update_last_assistant_metadata(
-                                        sk, None, Some(&meta_value),
-                                    ).await {
-                                        Ok(false) => tracing::warn!("metadata persist: no assistant message found for {sk}"),
-                                        Err(e) => tracing::warn!("metadata persist retry failed for {sk}: {e}"),
-                                        _ => {}
-                                    }
+                            repos.sessions
+                                .update_last_assistant_metadata(sk, None, Some(&meta_value))
+                                .await
+                        };
+                        if let Err(e) = &persist_outcome {
+                            tracing::warn!("metadata persist sync failed for {sk}: {e}");
+                        }
+                        // If the call returned Ok(false) (no row), spawn a detached retry.
+                        // We DO NOT block the relay on this.
+                        if matches!(persist_outcome, Ok(false)) {
+                            let repos_clone = repos.clone();
+                            let sk_owned = sk.to_string();
+                            let meta_clone = meta_value.clone();
+                            tokio::spawn(async move {
+                                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                                match repos_clone
+                                    .sessions
+                                    .update_last_assistant_metadata(&sk_owned, None, Some(&meta_clone))
+                                    .await
+                                {
+                                    Ok(true) => {}
+                                    Ok(false) => tracing::warn!("metadata persist retry: no row {sk_owned}"),
+                                    Err(e) => tracing::warn!("metadata persist retry failed {sk_owned}: {e}"),
                                 }
-                                Err(e) => tracing::warn!("metadata persist failed for {sk}: {e}"),
-                            }
+                            });
                         }
                         // Publish ChatTurnCompleted AFTER response is saved to session
                         if let Some(ref bus) = domain_event_bus {
@@ -1359,10 +1401,10 @@ impl AppCore {
             hook_engine,
             Arc::clone(&self.session_start_fired),
             Arc::clone(&self.session_end_fired),
+            stream_info.guard_id,
         ));
     }
 
-    #[cfg(any(test, feature = "test-helpers"))]
     pub fn active_streams_len(&self) -> usize {
         self.active_streams.len()
     }

@@ -15,6 +15,7 @@ async fn bash_happy_path() {
     let (tx, mut rx) = mpsc::channel(256);
 
     let tool = BashTool::new(
+        std::path::PathBuf::from("/tmp"),
         policy,
         privacy,
         bus,
@@ -31,6 +32,9 @@ async fn bash_happy_path() {
             command: "echo hi".into(),
             cwd: Some("/tmp".into()),
             timeout_ms: Some(5000),
+            run_in_background: None,
+            description: None,
+            silent_completion: None,
         },
         &routing_ctx,
     )

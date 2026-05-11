@@ -4,7 +4,7 @@
 //! `chat_send` → first `ContentChunk` path without spinning up a full Tauri
 //! window or a real LLM provider.
 
-use crate::common::{test_pool, test_provider};
+use crate::common::test_provider;
 use app_core::events::AppEventEmitter;
 use std::sync::{Arc, Mutex};
 
@@ -36,10 +36,12 @@ impl ChatTestHarness {
     pub async fn new_real() -> (Arc<app_core::AppCore>, Arc<RecordingEmitter>) {
         let emitter = Arc::new(RecordingEmitter::default());
         let provider: providers::DynProvider = Arc::new(test_provider("hello world"));
-        let core = app_core::AppCore::for_tests(provider, Arc::clone(&emitter) as _)
+        let emitter_clone = Arc::clone(&emitter);
+        let emitter_dyn: std::sync::Arc<dyn app_core::events::AppEventEmitter> = emitter;
+        let core = app_core::AppCore::for_tests(provider, emitter_dyn)
             .await
             .expect("test AppCore should build");
-        (Arc::new(core), emitter)
+        (Arc::new(core), emitter_clone)
     }
 
     pub fn event_names(&self) -> Vec<String> {

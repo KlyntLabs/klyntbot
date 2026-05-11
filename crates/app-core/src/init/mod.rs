@@ -89,7 +89,7 @@ impl AppCore {
     /// When `event_emitter` is `Some`, entity update events from MCP tool
     /// mutations are forwarded to the frontend. When `None`, a no-op emitter
     /// is used (CLI / standalone MCP server).
-    #[tracing::instrument(skip(notification_sender, event_emitter, _approval_channel), err)]
+    #[tracing::instrument(skip(notification_sender, event_emitter, _approval_channel, provider_override), err)]
     pub async fn init_with_sender(
         mode: common::AppMode,
         config_override: Option<config::Config>,

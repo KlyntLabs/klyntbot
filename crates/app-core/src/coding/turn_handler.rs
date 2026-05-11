@@ -291,7 +291,13 @@ impl AppCore {
                     // Store cancel token keyed by turn_id so concurrent turns on the
                     // same thread don't overwrite each other.
                     let cancel = handle.cancel_token.clone();
-                    active_streams.insert(turn_id_clone.clone(), cancel);
+                    active_streams.insert(
+                        turn_id_clone.clone(),
+                        crate::handlers::chat::ActiveStreamEntry {
+                            guard_id: 0,
+                            cancel,
+                        },
+                    );
 
                     // Bridge AgentEvent → ThreadEvent
                     let mut event_rx = handle.event_rx;
@@ -849,8 +855,8 @@ impl AppCore {
     /// Interrupt an active coding turn.
     #[tracing::instrument(skip(self), err)]
     pub async fn coding_turn_interrupt(&self, _thread_id: &str, turn_id: &str) -> Result<()> {
-        if let Some((_, token)) = self.active_streams.remove(turn_id) {
-            token.cancel();
+        if let Some((_, entry)) = self.active_streams.remove(turn_id) {
+            entry.cancel.cancel();
             Ok(())
         } else {
             Err(common::KlyntbotError::StorageNotFound(format!(

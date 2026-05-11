@@ -160,8 +160,8 @@ pub async fn chat_delete_thread(
     session_key: String,
 ) -> Result<(), ApiError> {
     // Cancel any in-flight stream before deleting to avoid dangling writes
-    if let Some((_, token)) = active_streams.remove(&session_key) {
-        token.cancel();
+    if let Some((_, entry)) = active_streams.remove(&session_key) {
+        entry.cancel.cancel();
     }
     // Cancel any pending interaction to avoid leaking the oneshot
     if let Some((_, (_, tx))) = pending_interactions.remove(&session_key) {
