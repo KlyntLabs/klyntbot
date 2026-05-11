@@ -34,6 +34,8 @@ import { useThreadListSortKey } from "@app/hooks/useThreadListSortKey";
 import { useThreadRows } from "@app/hooks/useThreadRows";
 import { useTrayRecentThreads } from "@app/hooks/useTrayRecentThreads";
 import { useThreadWatchdog } from "@threads/hooks/useThreadWatchdog";
+import { StuckThreadBanner } from "@threads/components/StuckThreadBanner";
+import { useStuckThreadDetector } from "@threads/hooks/useStuckThreadDetector";
 import { useTraySessionUsage } from "@app/hooks/useTraySessionUsage";
 import { useUpdaterController } from "@app/hooks/useUpdaterController";
 import { useWorkspaceController } from "@app/hooks/useWorkspaceController";
@@ -1988,13 +1990,37 @@ export default function MainApp() {
     terminalDockNode,
   } = useMainAppLayoutNodes(finalLayoutSurfaces);
 
+  const status = activeThreadId ? threadStatusById[activeThreadId] : null;
+  const { isStuck, stuckDurationMs } = useStuckThreadDetector(
+    status?.isProcessing ?? false,
+    status?.processingStartedAt ?? null,
+  );
+
   const chatMessagesNode = klyntbotSurface ? (
     <>
       <ChatErrorBanner error={klyntbotSurface.error} onDismiss={klyntbotSurface.onDismissError} />
+      {activeThreadId && isStuck && (
+        <StuckThreadBanner
+          durationMs={stuckDurationMs}
+          onReset={() => {
+            markProcessing(activeThreadId, false);
+          }}
+        />
+      )}
       {messagesNode}
     </>
   ) : (
-    messagesNode
+    <>
+      {activeThreadId && isStuck && (
+        <StuckThreadBanner
+          durationMs={stuckDurationMs}
+          onReset={() => {
+            markProcessing(activeThreadId, false);
+          }}
+        />
+      )}
+      {messagesNode}
+    </>
   );
   // Coding mode reuses the polished Messages UI by piping the new
   // `agent:thread_event` stream through CodingThreadView's adapter. Same
