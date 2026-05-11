@@ -1,0 +1,25 @@
+.stuck-thread-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  margin: 8px 16px;
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: 8px;
+  font-size: var(--fs-xs);
+  color: var(--color-warning-fg);
+}
+
+.stuck-thread-banner__msg { flex: 1; }
+
+.stuck-thread-banner__btn {
+  padding: 4px 10px;
+  background: var(--color-warning-fg);
+  color: var(--color-bg);
+  border: none;
+  border-radius: 4px;
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
