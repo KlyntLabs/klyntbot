@@ -15,6 +15,7 @@ import {
 } from "@/tracing/components/ui/tooltip";
 import { ClaudeCodeAgentsPanel } from "@/tracing/features/providers/claude-code/agents-panel/claude-code-agents-panel";
 import { ClaudeCodeWireViewer } from "@/tracing/features/providers/claude-code/wire-viewer/claude-code-wire-viewer";
+import { ProjectGroup } from "@/tracing/features/sessions-explorer/project-group";
 import { useTheme } from "@/tracing/hooks/use-theme";
 import {
   fetchHeaderLayout,
@@ -133,7 +134,7 @@ export function ClaudeCodeTracingApp() {
 
   return (
     <TooltipProvider>
-      <div className="cc-app">
+      <div className="cc-app tracing-root flex h-full min-h-0 flex-1 flex-col">
         <header className="cc-app__header">
           <h1
             className={`cc-app__title${sessionId ? " cc-app__title--clickable" : ""}`}
@@ -433,15 +434,6 @@ function formatDuration(sec: number): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-function formatRelativeTime(unixSec: number): string {
-  const now = Date.now() / 1000;
-  const diff = now - unixSec;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
 // ── Session list view ─────────────────────────────────────────────────
 
 function SessionListView({
@@ -455,11 +447,14 @@ function SessionListView({
     const map = new Map<string, SessionInfo[]>();
     for (const s of sessions) {
       const key = s.imported ? "Imported" : (s.work_dir ?? "Unknown");
-      const list = map.get(key) ?? [];
-      list.push(s);
-      map.set(key, list);
+      const list = map.get(key);
+      if (list) list.push(s);
+      else map.set(key, [s]);
     }
-    return Array.from(map.entries()).map(([dir, items]) => ({ dir, items }));
+    return Array.from(map.entries()).map(([workDir, items]) => ({
+      workDir,
+      sessions: items,
+    }));
   }, [sessions]);
 
   if (sessions.length === 0) {
@@ -474,41 +469,15 @@ function SessionListView({
   }
 
   return (
-    <div className="cc-app__list">
+    <div className="flex-1 overflow-auto p-4">
       {groups.map((g) => (
-        <section key={g.dir} className="cc-app__group">
-          <header className="cc-app__group-header">
-            <span className="cc-app__group-name">{g.dir}</span>
-            <span className="cc-app__group-count">
-              {g.items.length} session{g.items.length === 1 ? "" : "s"}
-            </span>
-          </header>
-          <ul className="cc-app__rows">
-            {g.items.map((s) => (
-              <li key={`${s.session_id}-${s.work_dir_hash}`}>
-                <button
-                  type="button"
-                  className="cc-app__row"
-                  onClick={() => onSelect(`${s.work_dir_hash}/${s.session_id}`)}
-                >
-                  <span className="cc-app__row-id">{s.session_id.slice(0, 8)}</span>
-                  <span className="cc-app__row-title">{s.title || "(untitled)"}</span>
-                  <span className="cc-app__row-meta">
-                    <span>{s.turns} turns</span>
-                    {(s.subagent_count ?? 0) > 0 && (
-                      <>
-                        <span>·</span>
-                        <span>{s.subagent_count} agents</span>
-                      </>
-                    )}
-                    <span>·</span>
-                    <span>{formatRelativeTime(s.last_updated)}</span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <ProjectGroup
+          key={g.workDir}
+          workDir={g.workDir}
+          sessions={g.sessions}
+          onSelectSession={onSelect}
+          providerId={PROVIDER_ID}
+        />
       ))}
     </div>
   );
