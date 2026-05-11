@@ -1270,6 +1270,15 @@ impl AppCore {
         context: Option<SessionContextInput>,
         mode: Option<String>,
     ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
+        // Reject double-send while a stream is already active for this session.
+        if let Some(entry) = self.active_streams.get(&session_key) {
+            if !entry.cancel.is_cancelled() {
+                return Err(ApiError::from(common::KlyntbotError::SessionAlreadyStreaming(
+                    session_key.clone(),
+                )));
+            }
+        }
+
         // Fire SessionStart hook once per session on first coding-mode message.
         if mode.as_deref() == Some("coding") && !self.session_start_fired.contains_key(&session_key)
         {

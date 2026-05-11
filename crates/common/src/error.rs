@@ -56,6 +56,9 @@ pub enum KlyntbotError {
 
     #[error("Cancelled: {0}")]
     Cancelled(String),
+
+    #[error("session {0} is already streaming; cancel before retrying")]
+    SessionAlreadyStreaming(String),
 }
 
 #[cfg(feature = "sqlx")]

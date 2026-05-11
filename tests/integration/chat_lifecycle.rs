@@ -30,6 +30,22 @@ async fn back_to_back_send_succeeds() {
     assert_eq!(core.active_streams_len(), 0, "active_streams must drain");
 }
 
+#[tokio::test]
+async fn double_send_is_rejected() {
+    let (core, emitter) = ChatTestHarness::new_real().await;
+    let sk = "test:double-send".to_string();
+
+    let (_, info) = core
+        .chat_send("first".into(), sk.clone(), None, None)
+        .await
+        .expect("first send");
+    core.spawn_chat_relay(info, emitter.clone());
+
+    // Immediately fire a second send while the first is still in flight.
+    let result = core.chat_send("second".into(), sk.clone(), None, None).await;
+    assert!(result.is_err(), "second send should be rejected");
+}
+
 async fn wait_for_event(
     emitter: &std::sync::Arc<crate::common::chat_harness::RecordingEmitter>,
     name: &str,
