@@ -4664,6 +4664,7 @@ retrievalEnhancedPayload: RetrievalEnhancedPayload,
 scoreUpdated: ScorePayload,
 skillLoadedPayload: SkillLoadedPayload,
 subagentSpawnedPayload: SubagentSpawnedPayload,
+threadEvent: ThreadEvent,
 toolEndPayload: ToolEndPayload,
 toolStartPayload: ToolStartPayload,
 transparencyAgentSelected: TransparencyAgentSelected,
@@ -4730,6 +4731,7 @@ retrievalEnhancedPayload: "retrieval-enhanced-payload",
 scoreUpdated: "score:updated",
 skillLoadedPayload: "skill-loaded-payload",
 subagentSpawnedPayload: "subagent-spawned-payload",
+threadEvent: "thread:event",
 toolEndPayload: "tool-end-payload",
 toolStartPayload: "tool-start-payload",
 transparencyAgentSelected: "transparency-agent-selected",
@@ -5800,7 +5802,22 @@ export type TaskResponse = { id: string; title: string; completed: boolean; prio
  */
 export type TaskTimeEntryRow = { id: string; taskId: string; source: string; startedAt: string; endedAt: string | null; durationSecs: number | null; note: string | null; energyLevel: string | null }
 export type TaskUpdateParams = { id: string; title: string | null; description: string | null; priority: number | null; status: string | null; dueDate: string | null; projectId: string | null; areaId: string | null; tags: string[] | null; keyResultId: string | null; statusLabelId: string | null; position: number | null; groupId: string | null; taskType: string | null; energyLevel: string | null; estimatedMinutes: number | null; scheduledStart: string | null; scheduledEnd: string | null }
+/**
+ * Terminal sub-variants — one of these is always present when a turn ends.
+ */
+export type TerminalKind = { kind: "done"; content: string; message_id?: string | null } | { kind: "error"; message: string } | { kind: "cancelled"; partial_content: string; partial_reasoning: string }
 export type Thread = { id: string; workspaceId: string; cwd: string; model: string | null; approvalPolicy: ApprovalPolicy; sandbox: SandboxKind; instructionSources: InstructionSource[]; createdAt: number; updatedAt: number; title: string | null; starred: boolean; archivedAt: number | null; ephemeral: boolean; forkedFromId: string | null; summaryMessageId: string | null; totalCostUsd: number; totalTokens: number; items: MessageDto[] }
+/**
+ * Unified thread event v2 — replaces the 50+ stringly-typed `agent:*` events.
+ * 
+ * Every variant carries a `generation` so the frontend can distinguish
+ * events belonging to the current turn from events delayed by a race.
+ * 
+ * The `Terminal` variant is guaranteed to fire on *every* exit path
+ * (Done, Error, Cancelled) so consumers always have a single hook point
+ * for cleanup.
+ */
+export type ThreadEvent = { event: "content_chunk"; generation: number; session_key: string; data: string } | { event: "tool_start"; generation: number; session_key: string; name: string; action?: string | null; agent?: string | null } | { event: "tool_end"; generation: number; session_key: string; name: string; action?: string | null; success: boolean; duration_ms: number; result?: string | null; estimated_tokens?: number | null; agent?: string | null } | { event: "entity_created"; generation: number; session_key: string; entity_type: string; entity_id: string } | { event: "memory_access"; generation: number; session_key: string; action: string; query?: string | null; results_count: number } | { event: "memory_promoted"; generation: number; session_key: string; fact_id: string; from_scope: string; to_scope: string; subject: string; predicate: string } | { event: "pipeline_started"; generation: number; session_key: string } | { event: "execution_started"; generation: number; session_key: string; engine: string; max_iterations: number } | { event: "context_assembled"; generation: number; session_key: string; total_tokens: number; duration_ms: number } | { event: "retrieval_enhanced"; generation: number; session_key: string; stages: EnhancementStagePayload[]; total_latency_ms: number; total_llm_calls: number } | { event: "iteration_start"; generation: number; session_key: string; iteration: number; max_iterations: number } | { event: "classification_complete"; generation: number; session_key: string; strategy: string; confidence: number; source: string } | { event: "agent_selected"; generation: number; session_key: string; name: string; description: string } | { event: "skill_loaded"; generation: number; session_key: string; name: string; trigger: string; agent?: string | null } | { event: "learning_event"; generation: number; session_key: string; event_type: string; detail: string } | { event: "subagent_spawned"; generation: number; session_key: string; label: string; profile: string } | { event: "delegation_started"; generation: number; session_key: string; from_agent: string; to_agent: string; query: string; depth: number } | { event: "delegation_completed"; generation: number; session_key: string; from_agent: string; to_agent: string; success: boolean; duration_ms: number } | { event: "plan_generated"; generation: number; session_key: string; steps: string[]; raw_plan: string } | { event: "plan_step_completed"; generation: number; session_key: string; step_index: number; description: string; tool_name: string } | { event: "usage_report"; generation: number; session_key: string; prompt_tokens: number; completion_tokens: number; cache_read_tokens: number; cache_write_tokens: number; estimated_cost_usd: number; model: string; response_time_ms: number } | { event: "confidence_assessed"; generation: number; session_key: string; score: number; action: string } | { event: "budget_warning"; generation: number; session_key: string; monthly_spend_usd: number; monthly_budget_usd: number; usage_percent: number } | { event: "interaction_request"; generation: number; session_key: string; request_id: string; request: unknown } | { event: "terminal"; generation: number; session_key: string; kind: TerminalKind; transparency?: TransparencyData | null }
 export type ThreadSummary = { id: string; title: string | null; workspaceId: string; messageCount: number; totalCostUsd: number; createdAt: number; updatedAt: number; archivedAt: number | null }
 export type TimeEntryResponse = { id: number; description: string; categoryId: string | null; projectId: string | null; startedAt: string; durationSecs: number; source: string }
 export type TimelineEntry = { id: string; source: TimelineSource; entryType: TimelineEntryType; title: string; description: string | null; startedAt: string; endedAt: string | null; durationSecs: number | null; entityId: string | null; entityRoute: string | null; color: string; metadata: unknown | null }

@@ -686,6 +686,7 @@ desktop_macros::klynt_collect_events![
     desktop_shared::events::TransparencyUsage,
     desktop_shared::events::UsageReportPayload,
     desktop_shared::events::VerdictPayload,
+    desktop_shared::thread_event_v2::ThreadEvent,
 ];
 
 pub fn build_specta() -> Builder<tauri::Wry> {

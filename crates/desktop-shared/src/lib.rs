@@ -7,6 +7,7 @@ pub mod events;
 pub mod git;
 pub mod permissions;
 pub mod specta_helpers;
+pub mod thread_event_v2;
 pub mod types;
 
 pub use entity_link_types::*;

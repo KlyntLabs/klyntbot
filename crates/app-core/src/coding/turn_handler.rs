@@ -295,6 +295,7 @@ impl AppCore {
                         turn_id_clone.clone(),
                         crate::handlers::chat::ActiveStreamEntry {
                             guard_id: 0,
+                            generation: 0,
                             cancel,
                         },
                     );

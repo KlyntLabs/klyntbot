@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Created by the `ask_user` tool from LLM-provided JSON arguments.
 /// Rendered by the CLI (tabbed UI) or channel-specific renderers.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct InteractionRequest {
     /// Overall title for the interaction (displayed above the tabbed UI).
     pub title: String,
@@ -18,7 +18,7 @@ pub struct InteractionRequest {
 }
 
 /// A single question with typed answer options.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct Question {
     /// Machine-readable ID, used to correlate with Answer.question_id.
     /// Example: "auth_method", "priority"
@@ -32,7 +32,7 @@ pub struct Question {
 }
 
 /// The kind of answer a question expects.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AnswerType {
     /// User selects exactly one option.
@@ -46,7 +46,7 @@ pub enum AnswerType {
 }
 
 /// A selectable option for SingleSelect and MultiSelect questions.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct AnswerOption {
     /// Machine-readable value returned in the answer. Example: "oauth2"
     pub value: String,
@@ -57,7 +57,7 @@ pub struct AnswerOption {
 }
 
 /// A single answer to a question.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct Answer {
     /// Matches Question.id.
     pub question_id: String,
@@ -66,7 +66,7 @@ pub struct Answer {
 }
 
 /// The concrete answer value.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AnswerValue {
     /// User chose one option (value field from AnswerOption).
@@ -82,7 +82,7 @@ pub enum AnswerValue {
 }
 
 /// The user's response to an entire InteractionRequest.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub enum FormResponse {
     /// User completed the form with answers for each question.
     Completed(Vec<Answer>),

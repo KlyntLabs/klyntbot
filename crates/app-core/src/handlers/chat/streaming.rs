@@ -28,6 +28,7 @@ pub(super) type PendingInteractions =
 #[derive(Clone)]
 pub struct ActiveStreamEntry {
     pub guard_id: u64,
+    pub generation: u32,
     pub cancel: tokio_util::sync::CancellationToken,
 }
 
@@ -299,6 +300,7 @@ pub async fn chat_send(
         session_key.clone(),
         ActiveStreamEntry {
             guard_id,
+            generation: 0,
             cancel: streaming_handle.cancel_token.clone(),
         },
     );
@@ -469,6 +471,10 @@ pub async fn relay_chat_stream(
     };
 
     let sk = &session_key;
+    let generation = active_streams
+        .get(sk)
+        .map(|e| e.generation)
+        .unwrap_or(0);
 
     // Collect signals for auto-detection
     let mut tool_names: Vec<String> = Vec::with_capacity(4);
@@ -567,7 +573,16 @@ pub async fn relay_chat_stream(
             }
             event = merged_rx.recv() => {
                 match event {
-                    Some(event) => match event {
+                    Some(event) => {
+                        // Emit v2 event (parallel with v1 during migration window)
+                        if let Some(te) = super::thread_event_v2_translator::agent_event_to_thread_event(
+                            event.clone(), sk.clone(), generation
+                        ) {
+                            if let Ok(val) = serde_json::to_value(&te) {
+                                emitter.emit_event("thread:event", val);
+                            }
+                        }
+                        match event {
                         AgentEvent::ContentChunk { data } => {
                             current_text.push_str(&data);
                             emit!(
@@ -1307,7 +1322,8 @@ pub async fn relay_chat_stream(
                         // Coding-in-chat additive variants ignored here;
                         // chat-channel handlers will subscribe explicitly in later plans.
                         _ => {}
-                    },
+                        }
+                    }
                     None => {
                         // Event stream closed — agent task finished or panicked.
                         if let Some(entry) = active_streams.get(sk) {
