@@ -817,6 +817,7 @@ pub async fn relay_chat_stream(
                         prompt_tokens, completion_tokens,
                         cache_read_tokens, cache_write_tokens,
                         estimated_cost_usd, model, response_time_ms,
+                        ..
                     } => {
                         transparency.usage = Some(TransparencyUsage {
                             prompt_tokens,

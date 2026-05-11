@@ -134,6 +134,10 @@ pub enum AgentEvent {
         model: String,
         #[serde(rename = "responseTimeMs")]
         response_time_ms: u64,
+        /// Time from `chat_send` invoke to first `ContentChunk` emitted.
+        /// None if no chunks were emitted (tool-only or error path).
+        #[serde(default, rename = "ttftMs", skip_serializing_if = "Option::is_none")]
+        ttft_ms: Option<u64>,
     },
 
     /// Monthly LLM cost budget warning (emitted at 80% and 100%).

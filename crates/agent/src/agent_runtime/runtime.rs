@@ -402,6 +402,27 @@ impl AgentRuntime {
         ctx.hook_engine = self.hook_engine();
         let ctx = &ctx;
         let pipeline_start = Instant::now();
+        let (ttft_tx, mut ttft_rx) = tokio::sync::mpsc::channel::<AgentEvent>(256);
+        let first_chunk_instant = Arc::new(std::sync::Mutex::new(None));
+        let first_chunk_clone = Arc::clone(&first_chunk_instant);
+
+        let forwarder = if let Some(ref tx) = event_tx {
+            let tx = tx.clone();
+            Some(tokio::spawn(async move {
+                while let Some(ev) = ttft_rx.recv().await {
+                    if matches!(ev, AgentEvent::ContentChunk { .. }) {
+                        let mut g = first_chunk_clone.lock().unwrap();
+                        if g.is_none() {
+                            *g = Some(Instant::now());
+                        }
+                    }
+                    let _ = tx.send(ev).await;
+                }
+            }))
+        } else {
+            None
+        };
+
         tracing::debug!("AgentRuntime::process_message: about to acquire hot_config read lock");
         let hot = self.hot_config.read().await;
         tracing::debug!("AgentRuntime::process_message: hot_config lock acquired");
@@ -579,7 +600,7 @@ impl AgentRuntime {
                 &params,
                 &mut budget,
                 ctx,
-                event_tx.clone(),
+                Some(ttft_tx.clone()),
             ),
         )
         .await
@@ -626,7 +647,7 @@ impl AgentRuntime {
                         &params,
                         &mut retry_budget,
                         ctx,
-                        event_tx.clone(),
+                        Some(ttft_tx.clone()),
                     ),
                 )
                 .await;
@@ -641,10 +662,19 @@ impl AgentRuntime {
             }
         }
 
+        drop(ttft_tx);
+        if let Some(h) = forwarder {
+            let _ = h.await;
+        }
+
         // ── Phase 3: Record ──────────────────────────────────────
         let mode_name = depth.to_string();
         let mut validation = self.validator.validate(&loop_result.content);
         let pipeline_elapsed_ms = pipeline_start.elapsed().as_millis() as u64;
+        let ttft_ms = first_chunk_instant
+            .lock()
+            .unwrap()
+            .map(|i| i.duration_since(pipeline_start).as_millis() as u64);
 
         // Record usage
         self.record_usage(
@@ -653,6 +683,7 @@ impl AgentRuntime {
             ctx,
             &event_tx,
             pipeline_elapsed_ms,
+            ttft_ms,
         )
         .await;
 
@@ -950,6 +981,7 @@ impl AgentRuntime {
         ctx: &RoutingContext,
         event_tx: &Option<tokio::sync::mpsc::Sender<AgentEvent>>,
         pipeline_elapsed_ms: u64,
+        ttft_ms: Option<u64>,
     ) {
         let cost = crate::output::cost_tracker::estimate_cost(usage, &self.execution_model);
 
@@ -1013,6 +1045,7 @@ impl AgentRuntime {
                     estimated_cost_usd: cost,
                     model: self.execution_model.clone(),
                     response_time_ms: pipeline_elapsed_ms,
+                    ttft_ms,
                 })
                 .await;
 
