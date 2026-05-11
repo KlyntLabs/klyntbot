@@ -1803,9 +1803,9 @@ impl AgentLoopBuilder {
         });
 
         // ── MCP health check (auto-reconnect downed servers) ─────────────
-        let mcp_manager_arc = Arc::new(tokio::sync::Mutex::new(mcp_manager));
+        let mcp_manager_arc = Arc::new(tokio::sync::RwLock::new(mcp_manager));
         let mcp_health_check_token = {
-            let mgr_guard = mcp_manager_arc.lock().await;
+            let mgr_guard = mcp_manager_arc.read().await;
             if mgr_guard.is_some() {
                 drop(mgr_guard);
                 Some(CancellationToken::new())

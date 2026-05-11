@@ -235,13 +235,14 @@ impl SessionRepo {
         tool_calls: Option<&serde_json::Value>,
         metadata: Option<&serde_json::Value>,
     ) -> Result<SessionMessageRow, StorageError> {
+        let mut tx = self.pool.begin().await?;
         let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
 
         // Touch session updated_at
         sqlx::query("UPDATE sessions SET updated_at = ?1 WHERE key = ?2")
             .bind(now)
             .bind(session_key)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
 
         // Insert the message
@@ -259,8 +260,10 @@ impl SessionRepo {
         .bind(request_id)
         .bind(tool_calls)
         .bind(metadata)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
+
+        tx.commit().await?;
         Ok(row)
     }
 

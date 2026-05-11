@@ -10,6 +10,7 @@ use desktop_shared::errors::ApiError;
 use desktop_shared::events::{self, *};
 use storage::{Repos, SessionContextParams};
 use tokio::sync::mpsc;
+use tracing::Instrument;
 
 use klynt_hooks::engine::HookFireInput;
 use klynt_hooks::events::{
@@ -520,29 +521,35 @@ pub async fn relay_chat_stream(
     let (merged_tx, mut merged_rx) = mpsc::channel::<AgentEvent>(256);
     let merged_tx2 = merged_tx.clone();
 
-    tokio::spawn(async move {
-        while let Some(evt) = event_rx.recv().await {
-            if merged_tx.send(evt).await.is_err() {
-                break;
+    tokio::spawn(
+        async move {
+            while let Some(evt) = event_rx.recv().await {
+                if merged_tx.send(evt).await.is_err() {
+                    break;
+                }
             }
         }
-    });
+        .in_current_span(),
+    );
 
     if let Some(ref bus) = domain_event_bus {
         let mut rx = bus.subscribe();
-        tokio::spawn(async move {
-            while let Ok(evt) = rx.recv().await {
-                if let bus::DomainEvent::Generic { kind, payload } = evt {
-                    if kind == "agent_event" {
-                        if let Ok(agent_evt) = serde_json::from_value::<AgentEvent>(payload) {
-                            if merged_tx2.send(agent_evt).await.is_err() {
-                                break;
+        tokio::spawn(
+            async move {
+                while let Ok(evt) = rx.recv().await {
+                    if let bus::DomainEvent::Generic { kind, payload } = evt {
+                        if kind == "agent_event" {
+                            if let Ok(agent_evt) = serde_json::from_value::<AgentEvent>(payload) {
+                                if merged_tx2.send(agent_evt).await.is_err() {
+                                    break;
+                                }
                             }
                         }
                     }
                 }
             }
-        });
+            .in_current_span(),
+        );
     }
 
     let mut interaction_closed = false;
@@ -721,18 +728,21 @@ pub async fn relay_chat_stream(
                                 let repos_clone = repos.clone();
                                 let sk_owned = sk.to_string();
                                 let meta_clone = meta_value.clone();
-                                tokio::spawn(async move {
-                                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                                    match repos_clone
-                                        .sessions
-                                        .update_last_assistant_metadata(&sk_owned, None, Some(&meta_clone))
-                                        .await
-                                    {
-                                        Ok(true) => {}
-                                        Ok(false) => tracing::warn!("metadata persist retry: no row {sk_owned}"),
-                                        Err(e) => tracing::warn!("metadata persist retry failed {sk_owned}: {e}"),
+                                tokio::spawn(
+                                    async move {
+                                        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                                        match repos_clone
+                                            .sessions
+                                            .update_last_assistant_metadata(&sk_owned, None, Some(&meta_clone))
+                                            .await
+                                        {
+                                            Ok(true) => {}
+                                            Ok(false) => tracing::warn!("metadata persist retry: no row {sk_owned}"),
+                                            Err(e) => tracing::warn!("metadata persist retry failed {sk_owned}: {e}"),
+                                        }
                                     }
-                                });
+                                    .in_current_span(),
+                                );
                             }
                             // Publish ChatTurnCompleted AFTER response is saved to session
                             if let Some(ref bus) = domain_event_bus {
@@ -1319,9 +1329,30 @@ pub async fn relay_chat_stream(
                             });
                             emitter.emit_event("agent:plan_mode_changed", payload);
                         }
-                        // Coding-in-chat additive variants ignored here;
-                        // chat-channel handlers will subscribe explicitly in later plans.
-                        _ => {}
+                        // Telemetry / internal events — intentionally not relayed to FE.
+                        // Telemetry / internal events — intentionally not relayed to FE.
+                        AgentEvent::ReasoningChunk { .. }
+                        | AgentEvent::SubagentProgress { .. }
+                        | AgentEvent::SubagentCompleted { .. }
+                        | AgentEvent::SubagentCancelled { .. }
+                        | AgentEvent::SkillActivationConsidered { .. }
+                        | AgentEvent::SkillActivated { .. }
+                        | AgentEvent::SkillReferenceLoaded { .. }
+                        | AgentEvent::ContextEngineDecision { .. }
+                        | AgentEvent::ToolCallStreamChunk { .. }
+                        | AgentEvent::MCPSubcallTrace { .. }
+                        | AgentEvent::ProviderRequest { .. }
+                        | AgentEvent::ProviderResponse { .. }
+                        | AgentEvent::MidLoopCompressionTriggered { .. }
+                        | AgentEvent::TestRunDetailed { .. }
+                        | AgentEvent::PowerModeToggled { .. }
+                        | AgentEvent::TurnInterrupted { .. } => {
+                            tracing::debug!(event_type = ?event, "chat relay: dropped event (no v1 FE relay)");
+                        }
+                        // Safety net for future AgentEvent variants added without updating this match.
+                        _ => {
+                            tracing::warn!(event_type = ?event, "chat relay: unknown event variant dropped");
+                        }
                         }
                     }
                     None => {
@@ -1484,23 +1515,26 @@ impl AppCore {
         let domain_event_bus = self.domain_event_bus.clone();
         let hook_engine = self.agent.runtime().hook_engine();
 
-        tokio::spawn(relay_chat_stream(
-            repos,
-            stream_info.session_key,
-            active_streams,
-            pending_interactions,
-            stream_info.event_rx,
-            stream_info.interaction_rx,
-            emitter,
-            stream_info.has_context,
-            journey_tracker,
-            domain_event_bus,
-            stream_info.user_message,
-            hook_engine,
-            Arc::clone(&self.session_start_fired),
-            Arc::clone(&self.session_end_fired),
-            stream_info.guard_id,
-        ));
+        tokio::spawn(
+            relay_chat_stream(
+                repos,
+                stream_info.session_key,
+                active_streams,
+                pending_interactions,
+                stream_info.event_rx,
+                stream_info.interaction_rx,
+                emitter,
+                stream_info.has_context,
+                journey_tracker,
+                domain_event_bus,
+                stream_info.user_message,
+                hook_engine,
+                Arc::clone(&self.session_start_fired),
+                Arc::clone(&self.session_end_fired),
+                stream_info.guard_id,
+            )
+            .in_current_span(),
+        );
     }
 
     pub fn active_streams_len(&self) -> usize {
