@@ -318,6 +318,21 @@ impl AppCore {
                     let turn_cancelled_bridge = turn_cancelled.clone();
 
                     let bridge_handle = tokio::spawn(async move {
+                        // Heartbeat task — keeps the FE watchdog alive during long turns.
+                        let hb_broker = broker.clone();
+                        let hb_tid = tid.clone();
+                        let _hb_handle = tokio::spawn(async move {
+                            let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+                            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                            loop {
+                                interval.tick().await;
+                                hb_broker.publish(desktop_shared::coding::events::ThreadEvent::Heartbeat {
+                                    subscription_id: hb_tid.clone(),
+                                    server_time: jiff::Timestamp::now().as_millisecond(),
+                                });
+                            }
+                        });
+
                         let mut item_started = false;
                         let mut item_id = String::new();
                         // Two parallel buffers — one per stream channel — and a

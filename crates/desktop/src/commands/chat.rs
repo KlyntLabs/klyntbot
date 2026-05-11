@@ -112,6 +112,16 @@ pub async fn chat_cancel(session_key: String) -> () {
 }
 
 #[klynt_command]
+pub async fn chat_zombie_check(threshold_ms: i64) -> Vec<storage::SessionRow> {
+    state.detect_zombie_sessions(threshold_ms).await
+}
+
+#[klynt_command]
+pub async fn chat_force_reset(session_key: String) -> () {
+    state.chat_force_reset(session_key).await
+}
+
+#[klynt_command]
 pub async fn chat_respond_approval(
     app: tauri::AppHandle,
     session_key: String,
@@ -195,6 +205,14 @@ pub(crate) async fn dispatch_dev(
         "chat_cancel" => {
             let session_key = try_field!(dev::get_str(body, "sessionKey"));
             dev::val(core.chat_cancel(session_key).await)
+        }
+        "chat_zombie_check" => {
+            let threshold_ms: i64 = try_field!(dev::require(body, "thresholdMs"));
+            dev::val(core.detect_zombie_sessions(threshold_ms).await)
+        }
+        "chat_force_reset" => {
+            let session_key = try_field!(dev::get_str(body, "sessionKey"));
+            dev::val(core.chat_force_reset(session_key).await)
         }
         "chat_respond_interaction" => {
             let session_key = try_field!(dev::get_str(body, "sessionKey"));

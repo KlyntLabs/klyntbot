@@ -552,10 +552,24 @@ pub async fn relay_chat_stream(
         );
     }
 
+    // Heartbeat: emit every 30s so the frontend knows the turn is still alive.
+    let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(30));
+    heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
     let mut interaction_closed = false;
     loop {
         tokio::select! {
             biased;
+            _ = heartbeat.tick() => {
+                let hb = desktop_shared::thread_event_v2::ThreadEvent::Heartbeat {
+                    generation,
+                    session_key: sk.clone(),
+                    server_time: jiff::Timestamp::now().as_millisecond(),
+                };
+                if let Ok(val) = serde_json::to_value(&hb) {
+                    emitter.emit_event("thread:event", val);
+                }
+            }
             bundle = interaction_rx.recv(), if !interaction_closed => {
                 match bundle {
                     Some(bundle) => {
@@ -1539,5 +1553,51 @@ impl AppCore {
 
     pub fn active_streams_len(&self) -> usize {
         self.active_streams.len()
+    }
+
+    /// Detect zombie sessions: sessions whose last message is from the user
+    /// and whose updated_at is older than the threshold.
+    pub async fn detect_zombie_sessions(
+        &self,
+        threshold_ms: i64,
+    ) -> Result<Vec<storage::SessionRow>, ApiError> {
+        self.repos
+            .sessions
+            .detect_zombie_sessions(threshold_ms)
+            .await
+            .map_err(|e| ApiError::new("STORAGE_ERROR", e.to_string()))
+    }
+
+    /// Force-reset a stuck session: clear active_streams entry and emit a
+    /// synthetic Terminal event so the frontend can recover.
+    pub async fn chat_force_reset(&self, session_key: String) -> Result<(), ApiError> {
+        // Remove from active_streams if present.
+        if let Some((_, entry)) = self.active_streams.remove(&session_key) {
+            entry.cancel.cancel();
+        }
+        self.pending_interactions.remove(&session_key);
+
+        // Emit synthetic terminal event so the FE unwinds its spinner.
+        let terminal = desktop_shared::thread_event_v2::ThreadEvent::Terminal {
+            generation: 0, // FE ignores generation on terminal events for reset
+            session_key: session_key.clone(),
+            kind: desktop_shared::thread_event_v2::TerminalKind::Error {
+                message: "Session force-reset by user".to_string(),
+            },
+            transparency: None,
+        };
+        let payload = serde_json::to_value(&terminal)
+            .map_err(|e| ApiError::new("SERIALIZE_ERROR", e.to_string()))?;
+
+        // We don't have an emitter here — emit via the domain bus if available,
+        // otherwise the caller must handle UI-level reset.
+        if let Some(ref bus) = self.domain_event_bus {
+            bus.publish(bus::DomainEvent::Generic {
+                kind: "thread:event".to_string(),
+                payload,
+            });
+        }
+
+        Ok(())
     }
 }

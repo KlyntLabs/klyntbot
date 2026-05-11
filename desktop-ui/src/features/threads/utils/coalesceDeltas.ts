@@ -50,11 +50,7 @@ export class EventCoalescer<T> {
 
     // In vitest/jsdom environments, requestAnimationFrame may not fire
     // promptly. Flush synchronously to keep unit tests deterministic.
-    if (
-      typeof process !== "undefined" &&
-      process.env &&
-      (process.env.VITEST || process.env.NODE_ENV === "test")
-    ) {
+    if (typeof import.meta.env !== "undefined" && import.meta.env.VITEST) {
       this.flushBuffer();
       return;
     }

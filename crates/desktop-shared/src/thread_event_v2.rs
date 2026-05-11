@@ -209,6 +209,13 @@ pub enum ThreadEvent {
         request: common::InteractionRequest,
     },
 
+    // ── Heartbeat — emitted every 30s during active turns ─────────────
+    Heartbeat {
+        generation: Generation,
+        session_key: String,
+        server_time: i64,
+    },
+
     // ── Terminal — guaranteed on every exit path ───────────────────────
     Terminal {
         generation: Generation,
@@ -266,6 +273,7 @@ impl ThreadEvent {
             ThreadEvent::ConfidenceAssessed { session_key, .. } => session_key,
             ThreadEvent::BudgetWarning { session_key, .. } => session_key,
             ThreadEvent::InteractionRequest { session_key, .. } => session_key,
+            ThreadEvent::Heartbeat { session_key, .. } => session_key,
             ThreadEvent::Terminal { session_key, .. } => session_key,
         }
     }
@@ -297,6 +305,7 @@ impl ThreadEvent {
             ThreadEvent::ConfidenceAssessed { generation, .. } => *generation,
             ThreadEvent::BudgetWarning { generation, .. } => *generation,
             ThreadEvent::InteractionRequest { generation, .. } => *generation,
+            ThreadEvent::Heartbeat { generation, .. } => *generation,
             ThreadEvent::Terminal { generation, .. } => *generation,
         }
     }

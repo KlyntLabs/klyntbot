@@ -1043,6 +1043,31 @@ impl SessionRepo {
             .await?;
         Ok(())
     }
+
+    /// Detect "zombie" sessions: sessions whose last message is from the user
+    /// (meaning the agent never replied) and whose updated_at is older than
+    /// the given threshold.
+    pub async fn detect_zombie_sessions(
+        &self,
+        threshold_ms: i64,
+    ) -> Result<Vec<SessionRow>, StorageError> {
+        let cutoff = jiff::Timestamp::now().as_millisecond() - threshold_ms;
+        let rows: Vec<SessionRow> = sqlx::query_as::<_, SessionRow>(
+            "SELECT s.* FROM sessions s
+             WHERE s.updated_at < ?1
+               AND s.archived_at IS NULL
+               AND (
+                 SELECT role FROM session_messages
+                 WHERE session_key = s.key
+                 ORDER BY timestamp DESC
+                 LIMIT 1
+               ) = 'user'",
+        )
+        .bind(cutoff)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
 }
 
 /// A message with deserialized Parts — returned by `get_messages_parts`.
