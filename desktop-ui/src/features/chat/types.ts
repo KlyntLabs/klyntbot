@@ -106,6 +106,12 @@ export interface AgentErrorPayload {
   message: string;
 }
 
+export interface AgentCancelledPayload {
+  sessionKey: string;
+  partialContent: string;
+  partialReasoning: string;
+}
+
 export interface ClassificationCompletePayload {
   sessionKey: string;
   strategy: string;

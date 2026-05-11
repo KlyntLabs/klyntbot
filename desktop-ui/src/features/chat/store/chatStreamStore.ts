@@ -9,6 +9,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import type { ConversationItem } from "@/types";
 import type {
   ActiveInteraction,
+  AgentCancelledPayload,
   AgentDonePayload,
   AgentErrorPayload,
   AgentSelectedPayload,
@@ -63,6 +64,7 @@ const SSE_AGENT_EVENTS = [
   "agent:tool_end",
   "agent:done",
   "agent:error",
+  "agent:cancelled",
   "agent:classification_complete",
   "agent:execution_started",
   "agent:iteration_start",
@@ -126,6 +128,9 @@ export interface StreamSnapshot {
   statusPhase: string | null;
   /** True when a stream finished while no component was subscribed to consume onDone. */
   needsRefetch: boolean;
+  cancelled: boolean;
+  partialContent: string;
+  partialReasoning: string;
 }
 
 const DEFAULT_SNAPSHOT: StreamSnapshot = Object.freeze({
@@ -146,6 +151,9 @@ const DEFAULT_SNAPSHOT: StreamSnapshot = Object.freeze({
   judgeDecisions: [],
   statusPhase: null,
   needsRefetch: false,
+  cancelled: false,
+  partialContent: "",
+  partialReasoning: "",
 });
 
 type Listener = () => void;
@@ -430,6 +438,7 @@ class ChatStreamStore {
     on<ToolEndPayload>("agent:tool_end", (p) => this.onToolEnd(p));
     on<AgentDonePayload>("agent:done", (p) => this.onDone(p));
     on<AgentErrorPayload>("agent:error", (p) => this.onError(p));
+    on<AgentCancelledPayload>("agent:cancelled", (p) => this.onCancelled(p));
     on<InteractionRequestPayload>("agent:interaction_request", (p) => this.onInteractionRequest(p));
     on<PipelineStartedPayload>("agent:pipeline_started", (p) => this.onPipelineStarted(p));
     on<ClassificationCompletePayload>("agent:classification_complete", (p) =>
@@ -493,6 +502,7 @@ class ChatStreamStore {
       register<ToolEndPayload>("agent:tool_end", (p) => this.onToolEnd(p));
       register<AgentDonePayload>("agent:done", (p) => this.onDone(p));
       register<AgentErrorPayload>("agent:error", (p) => this.onError(p));
+      register<AgentCancelledPayload>("agent:cancelled", (p) => this.onCancelled(p));
       register<InteractionRequestPayload>("agent:interaction_request", (p) =>
         this.onInteractionRequest(p),
       );
@@ -728,6 +738,19 @@ class ChatStreamStore {
       error: payload.message,
     });
     this.notify();
+  }
+
+  private onCancelled(payload: AgentCancelledPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.textBuffers.set(payload.sessionKey, "");
+    this.cancelRaf(payload.sessionKey);
+    this.updateState(payload.sessionKey, (s) => ({
+      ...s,
+      isStreaming: false,
+      cancelled: true,
+      partialContent: payload.partialContent,
+      partialReasoning: payload.partialReasoning,
+    }));
   }
 
   private onInteractionRequest(payload: InteractionRequestPayload): void {
