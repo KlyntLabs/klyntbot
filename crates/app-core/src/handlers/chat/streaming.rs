@@ -1361,4 +1361,9 @@ impl AppCore {
             Arc::clone(&self.session_end_fired),
         ));
     }
+
+    #[cfg(any(test, feature = "test-helpers"))]
+    pub fn active_streams_len(&self) -> usize {
+        self.active_streams.len()
+    }
 }
