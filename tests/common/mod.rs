@@ -4,6 +4,7 @@
 //! message buses, mock providers, storage pools, and test data factories.
 #![allow(dead_code)]
 
+pub mod chat_harness;
 pub mod mocks;
 
 use klyntbot::bus::{InboundMessage, MessageBus, OutboundMessage};
