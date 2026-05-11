@@ -178,6 +178,7 @@ fn run_mcp_stdio() {
             None, // notification_sender — not needed for stdio MCP
             Some(event_emitter),
             None, // approval_channel — stdio MCP defers to BlockingFallback (decline destructive)
+            None,
         )
         .await
         .expect("init failed");

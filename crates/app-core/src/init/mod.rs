@@ -77,7 +77,7 @@ impl AppCore {
         mode: common::AppMode,
         config_override: Option<config::Config>,
     ) -> Result<(Self, EventChannels), String> {
-        Self::init_with_sender(mode, config_override, None, None, None).await
+        Self::init_with_sender(mode, config_override, None, None, None, None).await
     }
 
     /// Initialize with an optional custom notification sender and event emitter.
@@ -96,6 +96,7 @@ impl AppCore {
         notification_sender: Option<Arc<dyn common::NotificationSender>>,
         event_emitter: Option<Arc<dyn AppEventEmitter>>,
         _approval_channel: Option<Arc<dyn approval::ApprovalChannel>>,
+        provider_override: Option<providers::DynProvider>,
     ) -> Result<(Self, EventChannels), String> {
         // ── Phase 1: Storage ─────────────────────────────────────────────
         let storage::StorageResult {
@@ -107,6 +108,8 @@ impl AppCore {
             provider,
             provider_manager,
         } = storage::init_storage(config_override).await?;
+
+        let provider = provider_override.unwrap_or(provider);
 
         // Keep a clone for the Distiller (constructed after agent init).
         let provider_for_distiller = provider.clone();

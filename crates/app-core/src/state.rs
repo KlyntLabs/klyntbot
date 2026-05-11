@@ -906,7 +906,26 @@ impl AppCore {
             config.data_dir = Some(home);
         }
         let (core, _channels) =
-            Self::init_with_sender(common::AppMode::Server, Some(config), None, None, None).await?;
+            Self::init_with_sender(common::AppMode::Server, Some(config), None, None, None, None).await?;
+        Ok(core)
+    }
+
+    /// Test AppCore with a custom LLM provider and event emitter.
+    #[cfg(any(test, feature = "test-helpers"))]
+    pub async fn for_tests(
+        provider: providers::DynProvider,
+        emitter: std::sync::Arc<dyn crate::events::AppEventEmitter>,
+    ) -> Result<Self, String> {
+        let config = config::Config::default();
+        let (core, _channels) = Self::init_with_sender(
+            common::AppMode::Server,
+            Some(config),
+            None,
+            Some(emitter),
+            None,
+            Some(provider),
+        )
+        .await?;
         Ok(core)
     }
 }

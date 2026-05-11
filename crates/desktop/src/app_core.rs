@@ -108,6 +108,7 @@ pub async fn init(
         Some(sender),
         Some(emitter),
         Some(approval_channel.clone() as Arc<dyn ::approval::ApprovalChannel>),
+        None,
     )
     .await?;
     // Cross-process event bridge — receives frames from a child
