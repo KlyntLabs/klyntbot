@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
-import type { ThreadEvent } from "../hooks/useThreadEvents";
+import { useChatStore } from "@/features/threads/store/useChatStore";
+import type { ThreadEvent } from "./codingEventReducer";
 
 const RING_BUFFER_CAP = 500;
 const RECENT_WINDOW_MS = 30 * 60 * 1000;
@@ -17,7 +18,6 @@ type RecentEntry = {
 type Subscriber = (event: ThreadEvent) => void;
 
 const eventsByThread = new Map<string, ThreadEvent[]>();
-const runningIds = new Set<string>();
 const runningHeartbeats = new Map<string, ReturnType<typeof setTimeout>>();
 const recentlyCompleted = new Map<string, RecentEntry>();
 const threadSubscribers = new Map<string, Set<Subscriber>>();
@@ -34,21 +34,20 @@ function armHeartbeat(threadId: string): void {
   clearHeartbeat(threadId);
   const timer = setTimeout(() => {
     runningHeartbeats.delete(threadId);
-    if (runningIds.delete(threadId)) {
-      notify();
+    const store = useChatStore.getState();
+    const next = new Set(store.codingRunningIds);
+    if (next.delete(threadId)) {
+      store.setCodingRunningIds(next);
     }
   }, RUNNING_HEARTBEAT_MS);
   runningHeartbeats.set(threadId, timer);
 }
 
-const storeListeners = new Set<() => void>();
-let runningSnapshot: ReadonlySet<string> = new Set();
-let recentSnapshot: ReadonlyMap<string, number> = new Map();
-
 function maybePruneThreadBuffer(threadId: string): void {
+  const store = useChatStore.getState();
   if (
     !threadSubscribers.has(threadId) &&
-    !runningIds.has(threadId) &&
+    !store.codingRunningIds.has(threadId) &&
     !recentlyCompleted.has(threadId)
   ) {
     eventsByThread.delete(threadId);
@@ -56,28 +55,33 @@ function maybePruneThreadBuffer(threadId: string): void {
 }
 
 function rebuildSnapshots(): void {
-  runningSnapshot = new Set(runningIds);
-  const m = new Map<string, number>();
-  for (const [id, entry] of recentlyCompleted) m.set(id, entry.finishedAt);
-  recentSnapshot = m;
+  const store = useChatStore.getState();
+  const recent = new Map<string, number>();
+  for (const [id, entry] of recentlyCompleted) recent.set(id, entry.finishedAt);
+  store.setCodingRecentlyCompleted(recent);
 }
 
 function notify(): void {
   rebuildSnapshots();
-  for (const l of storeListeners) l();
 }
 
 function subscribeStore(listener: () => void): () => void {
-  storeListeners.add(listener);
-  return () => storeListeners.delete(listener);
+  return useChatStore.subscribe((state, prevState) => {
+    if (
+      state.codingRunningIds !== prevState.codingRunningIds ||
+      state.codingRecentlyCompleted !== prevState.codingRecentlyCompleted
+    ) {
+      listener();
+    }
+  });
 }
 
 export function getRunningIds(): ReadonlySet<string> {
-  return runningSnapshot;
+  return useChatStore.getState().codingRunningIds;
 }
 
 export function getRecentlyCompleted(): ReadonlyMap<string, number> {
-  return recentSnapshot;
+  return useChatStore.getState().codingRecentlyCompleted;
 }
 
 export function useRunningCodingIds(): ReadonlySet<string> {
@@ -106,11 +110,12 @@ function applyEvent(event: ThreadEvent): void {
 
   pushToRingBuffer(threadId, event);
 
+  const store = useChatStore.getState();
   let stateChanged = false;
 
   if (event.kind === "turn_started") {
-    if (!runningIds.has(threadId)) {
-      runningIds.add(threadId);
+    if (!store.codingRunningIds.has(threadId)) {
+      store.setCodingRunningIds(new Set([...store.codingRunningIds, threadId]));
       stateChanged = true;
     }
     armHeartbeat(threadId);
@@ -122,8 +127,10 @@ function applyEvent(event: ThreadEvent): void {
     }
   } else if (event.kind === "turn_completed") {
     clearHeartbeat(threadId);
-    if (runningIds.has(threadId)) {
-      runningIds.delete(threadId);
+    if (store.codingRunningIds.has(threadId)) {
+      const next = new Set(store.codingRunningIds);
+      next.delete(threadId);
+      store.setCodingRunningIds(next);
       stateChanged = true;
     }
     const prev = recentlyCompleted.get(threadId);
@@ -143,9 +150,12 @@ function applyEvent(event: ThreadEvent): void {
   // Any event for a running thread proves the loop is alive — rearm the
   // heartbeat so a single quiet stretch doesn't kick a busy thread out of
   // the running set.
-  if (runningIds.has(threadId) && event.kind !== "turn_completed") {
+  if (store.codingRunningIds.has(threadId) && event.kind !== "turn_completed") {
     armHeartbeat(threadId);
   }
+
+  // Apply to global Zustand store
+  useChatStore.getState().applyCodingThreadEvent(threadId, event);
 
   // Fan-out to per-thread subscribers
   const subs = threadSubscribers.get(threadId);
@@ -194,7 +204,8 @@ export function subscribeToThread(threadId: string, onEvent: Subscriber): () => 
 export const __testing = {
   reset(): void {
     eventsByThread.clear();
-    runningIds.clear();
+    const store = useChatStore.getState();
+    store.setCodingRunningIds(new Set());
     for (const t of runningHeartbeats.values()) clearTimeout(t);
     runningHeartbeats.clear();
     for (const entry of recentlyCompleted.values()) {
@@ -202,8 +213,7 @@ export const __testing = {
     }
     recentlyCompleted.clear();
     threadSubscribers.clear();
-    storeListeners.clear();
-    rebuildSnapshots();
+    store.setCodingRecentlyCompleted(new Map());
   },
   applyEvent(event: ThreadEvent): void {
     applyEvent(event);

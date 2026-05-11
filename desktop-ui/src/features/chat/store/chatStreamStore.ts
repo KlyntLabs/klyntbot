@@ -1,14 +1,20 @@
 /**
- * Global chat stream store — manages streaming state and EventSource connections
- * independently of React component lifecycle, so streams survive route changes.
+ * Global chat stream store — thin shim over `useChatStore`.
  *
- * Components subscribe via `useSyncExternalStore` in useAgentStream.
+ * During the PR6 migration window this module keeps its public API so
+ * non-React callers (approval queue, file-edit events) don't break.
+ * React consumers should migrate to `useChatStore` directly (see
+ * `useAgentStream.ts` for the reference implementation).
  */
 
 import { isTauri } from "@tauri-apps/api/core";
 import type { ConversationItem } from "@/types";
+import {
+  DEFAULT_STREAM_SNAPSHOT,
+  type StreamSnapshot,
+} from "@/features/chat/types";
+import { useChatStore } from "@/features/threads/store/useChatStore";
 import type {
-  ActiveInteraction,
   AgentCancelledPayload,
   AgentDonePayload,
   AgentErrorPayload,
@@ -20,7 +26,6 @@ import type {
   ContentChunkPayload,
   DeadEndWarningSurfacedPayload,
   DebateJudgeDecisionPayload,
-  DebateRound,
   DebateRoundCompletedPayload,
   DebateRoundStartedPayload,
   DelegationCompletedPayload,
@@ -28,10 +33,8 @@ import type {
   ExecutionStartedPayload,
   InteractionRequestPayload,
   IterationStartPayload,
-  JudgeDecisionEntry,
   LearningEventPayload,
   MemoryAccessPayload,
-  MessageSegment,
   PersonaPerspectivePayload,
   PersonaSegment,
   PlanGeneratedPayload,
@@ -43,7 +46,6 @@ import type {
   SubagentSpawnedPayload,
   ToolEndPayload,
   ToolStartPayload,
-  TransparencyData,
   UsageReportPayload,
 } from "../types";
 
@@ -106,56 +108,6 @@ interface ContextAssembledPayload {
   durationMs: number;
 }
 
-// ── Stream state ────────────────────────────────────────────────────────
-
-export interface StreamSnapshot {
-  segments: MessageSegment[];
-  isStreaming: boolean;
-  activeTools: string[];
-  error: string | null;
-  activeInteraction: ActiveInteraction | null;
-  transparency: TransparencyData | null;
-  activeDelegateAgent: string | null;
-  personaMessages: PersonaSegment[];
-  debateRounds: DebateRound[];
-  currentDebateRound: number | null;
-  totalDebateRounds: number | null;
-  squadMode: "quick" | "debate" | null;
-  consensusReached: boolean;
-  consensusSummary: string | null;
-  judgeDecisions: JudgeDecisionEntry[];
-  /** Dynamic status phase shown alongside the loading indicator (e.g. "Thinking", "Using tasks:search"). */
-  statusPhase: string | null;
-  /** True when a stream finished while no component was subscribed to consume onDone. */
-  needsRefetch: boolean;
-  cancelled: boolean;
-  partialContent: string;
-  partialReasoning: string;
-}
-
-const DEFAULT_SNAPSHOT: StreamSnapshot = Object.freeze({
-  segments: [],
-  isStreaming: false,
-  activeTools: [],
-  error: null,
-  activeInteraction: null,
-  transparency: null,
-  activeDelegateAgent: null,
-  personaMessages: [],
-  debateRounds: [],
-  currentDebateRound: null,
-  totalDebateRounds: null,
-  squadMode: null,
-  consensusReached: false,
-  consensusSummary: null,
-  judgeDecisions: [],
-  statusPhase: null,
-  needsRefetch: false,
-  cancelled: false,
-  partialContent: "",
-  partialReasoning: "",
-});
-
 type Listener = () => void;
 
 // ── Store ───────────────────────────────────────────────────────────────
@@ -164,14 +116,11 @@ class ChatStreamStore {
   private static MAX_IDLE_SESSIONS = 5;
   private static MAX_SEGMENTS = 200;
   private static MAX_TOOL_RESULT_LENGTH = 2000;
-  private states = new Map<string, StreamSnapshot>();
-  private listeners = new Set<Listener>();
-  private eventSources = new Map<string, EventSource>();
+
   private textBuffers = new Map<string, string>();
   private rafIds = new Map<string, number>();
+  private eventSources = new Map<string, EventSource>();
   private onDoneCallbacks = new Map<string, Set<() => void>>();
-  private approvalsBySession = new Map<string, ApprovalItem[]>();
-  private fileEditsBySession = new Map<string, DiffItem[]>();
   private listenersInitialized = false;
   private tauriUnlisteners: Array<() => void> = [];
 
@@ -179,30 +128,36 @@ class ChatStreamStore {
     this.initEventListeners();
   }
 
-  // ── Public API (consumed by useAgentStream) ─────────────────────────
+  // ── Public API (consumed by useAgentStream shim) ────────────────────
 
   /** Subscribe to store changes — passed to useSyncExternalStore. */
   subscribe = (listener: Listener): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return useChatStore.subscribe((state, prevState) => {
+      if (
+        state.streamSnapshots !== prevState.streamSnapshots ||
+        state.streamApprovals !== prevState.streamApprovals ||
+        state.streamFileEdits !== prevState.streamFileEdits
+      ) {
+        listener();
+      }
+    });
   };
 
   /** Get snapshot for a session — passed to useSyncExternalStore. */
   getSnapshot(sessionKey: string): StreamSnapshot {
-    return this.states.get(sessionKey) ?? DEFAULT_SNAPSHOT;
+    return useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
   }
 
   /** Reset state and begin streaming for a session. */
   startStream(sessionKey: string): void {
     this.textBuffers.set(sessionKey, "");
     this.cancelRaf(sessionKey);
-    this.states.set(sessionKey, {
-      ...DEFAULT_SNAPSHOT,
+    useChatStore.getState()._setStreamSnapshot(sessionKey, {
+      ...DEFAULT_STREAM_SNAPSHOT,
       isStreaming: true,
       statusPhase: "Thinking",
       needsRefetch: false,
     });
-    this.notify();
 
     if (!isTauri()) {
       this.connectEventSource(sessionKey);
@@ -215,8 +170,7 @@ class ChatStreamStore {
   failStream(sessionKey: string, message: string): void {
     this.textBuffers.set(sessionKey, "");
     this.cancelRaf(sessionKey);
-    this.states.set(sessionKey, { ...DEFAULT_SNAPSHOT, error: message });
-    this.notify();
+    useChatStore.getState()._setStreamSnapshot(sessionKey, { ...DEFAULT_STREAM_SNAPSHOT, error: message });
   }
 
   /** Register an onDone callback for a session (component-scoped). */
@@ -232,40 +186,37 @@ class ChatStreamStore {
 
   /** Mark needsRefetch as consumed after a component processes it. */
   consumeRefetch(sessionKey: string): void {
-    const state = this.states.get(sessionKey);
+    const state = useChatStore.getState().streamSnapshots[sessionKey];
     if (state?.needsRefetch) {
-      this.states.set(sessionKey, { ...state, needsRefetch: false });
-      this.notify();
+      useChatStore.getState()._setStreamSnapshot(sessionKey, { ...state, needsRefetch: false });
     }
   }
 
   /** Get pending approvals for a session. */
   getApprovals(sessionKey: string): ApprovalItem[] {
-    return this.approvalsBySession.get(sessionKey) ?? EMPTY_APPROVALS;
+    return useChatStore.getState().streamApprovals[sessionKey] ?? EMPTY_APPROVALS;
   }
 
   /** Get file edit diffs for a session. */
   getFileEdits(sessionKey: string): DiffItem[] {
-    return this.fileEditsBySession.get(sessionKey) ?? [];
+    return useChatStore.getState().streamFileEdits[sessionKey] ?? [];
   }
 
   /** Insert a file edit diff for a session. */
   upsertFileEdit(sessionKey: string, item: DiffItem): void {
-    const existing = this.fileEditsBySession.get(sessionKey) ?? [];
-    this.fileEditsBySession.set(sessionKey, [...existing, item]);
-    this.notify();
+    const existing = useChatStore.getState().streamFileEdits[sessionKey] ?? [];
+    useChatStore.getState()._setStreamFileEdits(sessionKey, [...existing, item]);
   }
 
   /** Insert or update an approval request for a session. */
   upsertApproval(sessionKey: string, item: ApprovalItem): void {
-    const existing = this.approvalsBySession.get(sessionKey) ?? [];
+    const existing = useChatStore.getState().streamApprovals[sessionKey] ?? [];
     const index = existing.findIndex((a) => a.requestId === item.requestId);
     const next =
       index >= 0
         ? [...existing.slice(0, index), item, ...existing.slice(index + 1)]
         : [...existing, item];
-    this.approvalsBySession.set(sessionKey, next);
-    this.notify();
+    useChatStore.getState()._setStreamApprovals(sessionKey, next);
   }
 
   /** Resolve an approval request with a final status. */
@@ -275,7 +226,7 @@ class ChatStreamStore {
     status: ApprovalItem["status"],
     decidedBy: ApprovalItem["decidedBy"],
   ): void {
-    const existing = this.approvalsBySession.get(sessionKey) ?? [];
+    const existing = useChatStore.getState().streamApprovals[sessionKey] ?? [];
     const index = existing.findIndex((a) => a.requestId === requestId);
     if (index < 0) return;
     const next = [...existing];
@@ -285,66 +236,50 @@ class ChatStreamStore {
       decidedBy,
       decidedAt: new Date().toISOString(),
     };
-    this.approvalsBySession.set(sessionKey, next);
-    this.notify();
+    useChatStore.getState()._setStreamApprovals(sessionKey, next);
   }
 
   clearSegments(sessionKey: string): void {
     this.textBuffers.set(sessionKey, "");
     this.cancelRaf(sessionKey);
-    this.updateState(sessionKey, (s) => ({ ...s, segments: [] }));
+    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(sessionKey, { ...snap, segments: [] });
   }
 
   clearTransparency(sessionKey: string): void {
-    this.updateState(sessionKey, (s) => ({ ...s, transparency: null }));
+    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(sessionKey, { ...snap, transparency: null });
   }
 
   clearInteraction(sessionKey: string): void {
-    this.updateState(sessionKey, (s) => ({ ...s, activeInteraction: null }));
+    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(sessionKey, { ...snap, activeInteraction: null });
   }
 
   clearPersonaMessages(sessionKey: string): void {
-    this.updateState(sessionKey, (s) => ({ ...s, personaMessages: [] }));
+    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(sessionKey, { ...snap, personaMessages: [] });
   }
 
   /** Append a synthetic system segment to the stream. */
   appendSystemItem(sessionKey: string, kind: string, item: unknown): void {
-    this.updateState(sessionKey, (s) => ({
-      ...s,
-      segments: [...s.segments, { type: "system" as const, kind, item }],
-    }));
+    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(sessionKey, {
+      ...snap,
+      segments: [...snap.segments, { type: "system" as const, kind, item }],
+    });
   }
 
   /** Append a synthetic error segment to the stream. */
   appendErrorItem(sessionKey: string, message: string): void {
-    this.updateState(sessionKey, (s) => ({
-      ...s,
-      segments: [...s.segments, { type: "error" as const, message }],
-    }));
-  }
-
-  // ── Internal helpers ────────────────────────────────────────────────
-
-  private notifyPending = false;
-
-  private notify(): void {
-    for (const l of this.listeners) l();
-  }
-
-  private scheduleNotify(): void {
-    if (this.notifyPending) return;
-    this.notifyPending = true;
-    queueMicrotask(() => {
-      this.notifyPending = false;
-      this.notify();
+    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(sessionKey, {
+      ...snap,
+      segments: [...snap.segments, { type: "error" as const, message }],
     });
   }
 
-  private updateState(sessionKey: string, updater: (s: StreamSnapshot) => StreamSnapshot): void {
-    const current = this.states.get(sessionKey) ?? DEFAULT_SNAPSHOT;
-    this.states.set(sessionKey, updater(current));
-    this.scheduleNotify();
-  }
+  // ── Internal helpers ────────────────────────────────────────────────
 
   private cancelRaf(sessionKey: string): void {
     const id = this.rafIds.get(sessionKey);
@@ -359,19 +294,18 @@ class ChatStreamStore {
     const text = this.textBuffers.get(sessionKey) || "";
     if (!text) return;
 
-    this.updateState(sessionKey, (s) => {
-      const last = s.segments[s.segments.length - 1];
-      let newSegments: MessageSegment[];
-      if (last && last.type === "text") {
-        newSegments = [...s.segments.slice(0, -1), { type: "text", content: text }];
-      } else {
-        newSegments = [...s.segments, { type: "text", content: text }];
-      }
-      if (newSegments.length > ChatStreamStore.MAX_SEGMENTS) {
-        newSegments = newSegments.slice(-ChatStreamStore.MAX_SEGMENTS);
-      }
-      return { ...s, segments: newSegments };
-    });
+    const current = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    const last = current.segments[current.segments.length - 1];
+    let newSegments: StreamSnapshot["segments"];
+    if (last && last.type === "text") {
+      newSegments = [...current.segments.slice(0, -1), { type: "text", content: text }];
+    } else {
+      newSegments = [...current.segments, { type: "text", content: text }];
+    }
+    if (newSegments.length > ChatStreamStore.MAX_SEGMENTS) {
+      newSegments = newSegments.slice(-ChatStreamStore.MAX_SEGMENTS);
+    }
+    useChatStore.getState()._setStreamSnapshot(sessionKey, { ...current, segments: newSegments });
   }
 
   private scheduleFlush(sessionKey: string): void {
@@ -574,7 +508,7 @@ class ChatStreamStore {
   // ── Event handlers ──────────────────────────────────────────────────
 
   private isActive(sessionKey: string): boolean {
-    const state = this.states.get(sessionKey);
+    const state = useChatStore.getState().streamSnapshots[sessionKey];
     return !!state?.isStreaming;
   }
 
@@ -582,10 +516,12 @@ class ChatStreamStore {
     if (!this.isActive(payload.sessionKey)) return;
     const buf = (this.textBuffers.get(payload.sessionKey) || "") + payload.data;
     this.textBuffers.set(payload.sessionKey, buf);
-    // Set "Composing" on first content chunk (when no segments or tools yet)
-    const state = this.states.get(payload.sessionKey);
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey];
     if (state && state.segments.length === 0 && state.activeTools.length === 0) {
-      this.updateState(payload.sessionKey, (s) => ({ ...s, statusPhase: "Composing" }));
+      useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+        ...state,
+        statusPhase: "Composing",
+      });
     }
     this.scheduleFlush(payload.sessionKey);
   }
@@ -595,60 +531,58 @@ class ChatStreamStore {
     this.flushText(payload.sessionKey);
     this.textBuffers.set(payload.sessionKey, "");
     const toolDisplay = qualifiedToolName(payload.name, payload.action);
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       statusPhase: `Using ${toolDisplay}`,
-      activeTools: [...s.activeTools, toolDisplay],
-    }));
+      activeTools: [...state.activeTools, toolDisplay],
+    });
   }
 
   private onToolEnd(payload: ToolEndPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
     const displayName = qualifiedToolName(payload.name, payload.action);
-    this.updateState(payload.sessionKey, (s) => {
-      const idx = s.activeTools.indexOf(displayName);
-      const activeTools =
-        idx === -1
-          ? s.activeTools
-          : [...s.activeTools.slice(0, idx), ...s.activeTools.slice(idx + 1)];
-      const newSegments = [
-        ...s.segments,
-        {
-          type: "tool" as const,
-          name: payload.name,
-          action: payload.action,
-          success: payload.success,
-          durationMs: payload.durationMs,
-          result:
-            payload.result && payload.result.length > ChatStreamStore.MAX_TOOL_RESULT_LENGTH
-              ? `${payload.result.slice(0, ChatStreamStore.MAX_TOOL_RESULT_LENGTH)}\n… (truncated)`
-              : payload.result,
-          estimatedTokens: payload.estimatedTokens,
-          agent: payload.agent,
-        },
-      ];
-      return {
-        ...s,
-        activeTools,
-        segments:
-          newSegments.length > ChatStreamStore.MAX_SEGMENTS
-            ? newSegments.slice(-ChatStreamStore.MAX_SEGMENTS)
-            : newSegments,
-        transparency: {
-          ...s.transparency,
-          tools: [
-            ...(s.transparency?.tools ?? []),
-            {
-              name: payload.name,
-              action: payload.action,
-              success: payload.success,
-              durationMs: payload.durationMs,
-              estimatedTokens: payload.estimatedTokens,
-              agent: payload.agent,
-            },
-          ],
-        },
-      };
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    const idx = state.activeTools.indexOf(displayName);
+    const activeTools =
+      idx === -1 ? state.activeTools : [...state.activeTools.slice(0, idx), ...state.activeTools.slice(idx + 1)];
+    const newSegments = [
+      ...state.segments,
+      {
+        type: "tool" as const,
+        name: payload.name,
+        action: payload.action,
+        success: payload.success,
+        durationMs: payload.durationMs,
+        result:
+          payload.result && payload.result.length > ChatStreamStore.MAX_TOOL_RESULT_LENGTH
+            ? `${payload.result.slice(0, ChatStreamStore.MAX_TOOL_RESULT_LENGTH)}\n… (truncated)`
+            : payload.result,
+        estimatedTokens: payload.estimatedTokens,
+        agent: payload.agent,
+      },
+    ];
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
+      activeTools,
+      segments:
+        newSegments.length > ChatStreamStore.MAX_SEGMENTS
+          ? newSegments.slice(-ChatStreamStore.MAX_SEGMENTS)
+          : newSegments,
+      transparency: {
+        ...state.transparency,
+        tools: [
+          ...(state.transparency?.tools ?? []),
+          {
+            name: payload.name,
+            action: payload.action,
+            success: payload.success,
+            durationMs: payload.durationMs,
+            estimatedTokens: payload.estimatedTokens,
+            agent: payload.agent,
+          },
+        ],
+      },
     });
   }
 
@@ -657,18 +591,17 @@ class ChatStreamStore {
     this.flushText(payload.sessionKey);
     this.textBuffers.set(payload.sessionKey, "");
 
-    // Fire onDone callbacks if any components are subscribed
     const cbs = this.onDoneCallbacks.get(payload.sessionKey);
     const hasCallbacks = cbs && cbs.size > 0;
 
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       isStreaming: false,
       statusPhase: null,
       activeInteraction: null,
-      // If no component is listening, mark for deferred refetch
       needsRefetch: !hasCallbacks,
-    }));
+    });
 
     if (cbs && hasCallbacks) {
       for (const cb of cbs) cb();
@@ -678,10 +611,12 @@ class ChatStreamStore {
   }
 
   private evictIdleSessions(): void {
-    if (this.states.size <= ChatStreamStore.MAX_IDLE_SESSIONS) return;
+    const snapshots = useChatStore.getState().streamSnapshots;
+    const keys = Object.keys(snapshots);
+    if (keys.length <= ChatStreamStore.MAX_IDLE_SESSIONS) return;
 
     const idle: string[] = [];
-    for (const [key, state] of this.states) {
+    for (const [key, state] of Object.entries(snapshots)) {
       if (!state.isStreaming) idle.push(key);
     }
     if (idle.length <= ChatStreamStore.MAX_IDLE_SESSIONS) return;
@@ -693,12 +628,17 @@ class ChatStreamStore {
   }
 
   private deleteSessionState(key: string): void {
-    this.states.delete(key);
+    const { [key]: _, ...restSnapshots } = useChatStore.getState().streamSnapshots;
+    const { [key]: __, ...restApprovals } = useChatStore.getState().streamApprovals;
+    const { [key]: ___, ...restFileEdits } = useChatStore.getState().streamFileEdits;
+    useChatStore.setState({
+      streamSnapshots: restSnapshots,
+      streamApprovals: restApprovals,
+      streamFileEdits: restFileEdits,
+    });
     this.textBuffers.delete(key);
     this.rafIds.delete(key);
     this.onDoneCallbacks.delete(key);
-    this.approvalsBySession.delete(key);
-    this.fileEditsBySession.delete(key);
     const es = this.eventSources.get(key);
     if (es) {
       es.close();
@@ -716,11 +656,7 @@ class ChatStreamStore {
       es.close();
     }
     this.eventSources.clear();
-    this.listeners.clear();
-    this.states.clear();
     this.textBuffers.clear();
-    this.approvalsBySession.clear();
-    this.fileEditsBySession.clear();
     this.onDoneCallbacks.clear();
     for (const id of this.rafIds.values()) {
       cancelAnimationFrame(id);
@@ -733,95 +669,101 @@ class ChatStreamStore {
     if (!this.isActive(payload.sessionKey)) return;
     this.textBuffers.set(payload.sessionKey, "");
     this.cancelRaf(payload.sessionKey);
-    this.states.set(payload.sessionKey, {
-      ...DEFAULT_SNAPSHOT,
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...DEFAULT_STREAM_SNAPSHOT,
       error: payload.message,
     });
-    this.notify();
   }
 
   private onCancelled(payload: AgentCancelledPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
     this.textBuffers.set(payload.sessionKey, "");
     this.cancelRaf(payload.sessionKey);
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       isStreaming: false,
       cancelled: true,
       partialContent: payload.partialContent,
       partialReasoning: payload.partialReasoning,
-    }));
+    });
   }
 
   private onInteractionRequest(payload: InteractionRequestPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       activeInteraction: {
         requestId: payload.requestId,
         request: payload.request,
       },
-    }));
+    });
   }
 
   private onPipelineStarted(payload: PipelineStartedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       statusPhase: "Routing",
-    }));
+    });
   }
 
   private onClassificationComplete(payload: ClassificationCompletePayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       statusPhase: "Analyzing",
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         classification: {
           strategy: payload.strategy,
           confidence: payload.confidence,
           source: payload.source,
         },
       },
-    }));
+    });
   }
 
   private onContextAssembled(payload: ContextAssembledPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       statusPhase: "Recalling",
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         contextTokens: payload.totalTokens,
       },
-    }));
+    });
   }
 
   private onRetrievalEnhanced(payload: RetrievalEnhancedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         enhancement: {
           stages: payload.stages,
           totalLatencyMs: payload.totalLatencyMs,
           totalLlmCalls: payload.totalLlmCalls,
         },
       },
-    }));
+    });
   }
 
   private onExecutionStarted(payload: ExecutionStartedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       statusPhase: "Preparing",
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         execution: {
           engine: payload.engine,
           iterations: 0,
@@ -829,17 +771,18 @@ class ChatStreamStore {
           escalations: 0,
         },
       },
-    }));
+    });
   }
 
   private onIterationStart(payload: IterationStartPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       transparency: {
-        ...s.transparency,
-        execution: s.transparency?.execution
-          ? { ...s.transparency.execution, iterations: payload.iteration }
+        ...state.transparency,
+        execution: state.transparency?.execution
+          ? { ...state.transparency.execution, iterations: payload.iteration }
           : {
               engine: "unknown",
               iterations: payload.iteration,
@@ -847,15 +790,16 @@ class ChatStreamStore {
               escalations: 0,
             },
       },
-    }));
+    });
   }
 
   private onUsageReport(payload: UsageReportPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         usage: {
           promptTokens: payload.promptTokens,
           completionTokens: payload.completionTokens,
@@ -863,19 +807,20 @@ class ChatStreamStore {
           cacheWriteTokens: payload.cacheWriteTokens,
         },
         cost: { estimatedUsd: payload.estimatedCostUsd, model: payload.model },
-        timing: { ...s.transparency?.timing, totalMs: payload.responseTimeMs },
+        timing: { ...state.transparency?.timing, totalMs: payload.responseTimeMs },
       },
-    }));
+    });
   }
 
   private onMemoryAccess(payload: MemoryAccessPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         memoryAccesses: [
-          ...(s.transparency?.memoryAccesses ?? []),
+          ...(state.transparency?.memoryAccesses ?? []),
           {
             action: payload.action,
             query: payload.query,
@@ -883,74 +828,79 @@ class ChatStreamStore {
           },
         ],
       },
-    }));
+    });
   }
 
   private onSkillLoaded(payload: SkillLoadedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
     const skillLabel = payload.name.replace(/-management$/, "").replace(/-/g, " ");
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       statusPhase: `Loading ${skillLabel}`,
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         skills: [
-          ...(s.transparency?.skills ?? []),
+          ...(state.transparency?.skills ?? []),
           { name: payload.name, trigger: payload.trigger, agent: payload.agent },
         ],
       },
-    }));
+    });
   }
 
   private onLearningEvent(payload: LearningEventPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         learning: [
-          ...(s.transparency?.learning ?? []),
+          ...(state.transparency?.learning ?? []),
           { eventType: payload.eventType, detail: payload.detail },
         ],
       },
-    }));
+    });
   }
 
   private onAgentSelected(payload: AgentSelectedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       statusPhase: `Consulting ${payload.name}`,
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         agentSelected: { name: payload.name, description: payload.description },
       },
-    }));
+    });
   }
 
   private onSubagentSpawned(payload: SubagentSpawnedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         subagents: [
-          ...(s.transparency?.subagents ?? []),
+          ...(state.transparency?.subagents ?? []),
           { label: payload.label, profile: payload.profile },
         ],
       },
-    }));
+    });
   }
 
   private onDelegationStarted(payload: DelegationStartedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       activeDelegateAgent: payload.toAgent,
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         delegations: [
-          ...(s.transparency?.delegations ?? []),
+          ...(state.transparency?.delegations ?? []),
           {
             fromAgent: payload.fromAgent,
             toAgent: payload.toAgent,
@@ -960,17 +910,18 @@ class ChatStreamStore {
           },
         ],
       },
-    }));
+    });
   }
 
   private onDelegationCompleted(payload: DelegationCompletedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       activeDelegateAgent: null,
       transparency: {
-        ...s.transparency,
-        delegations: (s.transparency?.delegations ?? []).map((d) =>
+        ...state.transparency,
+        delegations: (state.transparency?.delegations ?? []).map((d) =>
           d.toAgent === payload.toAgent && d.status === "active"
             ? {
                 ...d,
@@ -980,34 +931,36 @@ class ChatStreamStore {
             : d,
         ),
       },
-    }));
+    });
   }
 
   private onPlanGenerated(payload: PlanGeneratedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         plan: { steps: payload.steps, completedSteps: [] },
       },
-    }));
+    });
   }
 
   private onPlanStepCompleted(payload: PlanStepCompletedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       transparency: {
-        ...s.transparency,
-        plan: s.transparency?.plan
+        ...state.transparency,
+        plan: state.transparency?.plan
           ? {
-              ...s.transparency.plan,
-              completedSteps: [...s.transparency.plan.completedSteps, payload.stepIndex],
+              ...state.transparency.plan,
+              completedSteps: [...state.transparency.plan.completedSteps, payload.stepIndex],
             }
           : undefined,
       },
-    }));
+    });
   }
 
   private onPersonaPerspective(payload: PersonaPerspectivePayload): void {
@@ -1020,30 +973,31 @@ class ChatStreamStore {
       content: payload.content,
       challenge: payload.challenge ?? undefined,
     };
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
-      personaMessages: [...s.personaMessages, segment],
-      // Also append to current debate round if in debate mode
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
+      personaMessages: [...state.personaMessages, segment],
       debateRounds:
-        s.currentDebateRound !== null
-          ? s.debateRounds.map((r) =>
-              r.round === s.currentDebateRound
+        state.currentDebateRound !== null
+          ? state.debateRounds.map((r) =>
+              r.round === state.currentDebateRound
                 ? { ...r, personaMessages: [...r.personaMessages, segment] }
                 : r,
             )
-          : s.debateRounds,
-    }));
+          : state.debateRounds,
+    });
   }
 
   private onDebateRoundStarted(payload: DebateRoundStartedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       currentDebateRound: payload.round,
       totalDebateRounds: payload.totalRounds,
       squadMode: "debate",
       debateRounds: [
-        ...s.debateRounds,
+        ...state.debateRounds,
         {
           round: payload.round,
           phase: payload.phase,
@@ -1051,34 +1005,37 @@ class ChatStreamStore {
           consensusScore: null,
         },
       ],
-    }));
+    });
   }
 
   private onDebateRoundCompleted(payload: DebateRoundCompletedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
-      debateRounds: s.debateRounds.map((r) =>
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
+      debateRounds: state.debateRounds.map((r) =>
         r.round === payload.round ? { ...r, consensusScore: payload.consensusScore } : r,
       ),
-    }));
+    });
   }
 
   private onConsensusReached(payload: ConsensusReachedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       consensusReached: true,
       consensusSummary: payload.summary,
-    }));
+    });
   }
 
   private onDebateJudgeDecision(payload: DebateJudgeDecisionPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       judgeDecisions: [
-        ...s.judgeDecisions,
+        ...state.judgeDecisions,
         {
           round: payload.round,
           consensusScore: payload.consensusScore,
@@ -1087,7 +1044,7 @@ class ChatStreamStore {
           reasoning: payload.reasoning,
         },
       ],
-    }));
+    });
   }
 
   private onApprovalRequested(payload: ApprovalRequestedPayload): void {
@@ -1144,17 +1101,18 @@ class ChatStreamStore {
 
   private onSandboxPolicyApplied(payload: SandboxPolicyAppliedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
-    this.updateState(payload.sessionKey, (s) => ({
-      ...s,
+    const state = useChatStore.getState().streamSnapshots[payload.sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(payload.sessionKey, {
+      ...state,
       transparency: {
-        ...s.transparency,
+        ...state.transparency,
         sandboxPolicy: {
           tool: payload.tool,
           policySummary: payload.policy_summary,
           fallbackUnsandboxed: payload.fallback_unsandboxed,
         },
       },
-    }));
+    });
   }
 
   private onFileEditWithSymbols(payload: {
@@ -1163,7 +1121,6 @@ class ChatStreamStore {
     bytes: number;
     diff: string;
   }): void {
-    // File edits are shown even when not actively streaming (they're historical)
     const id = `diff-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const item: DiffItem = {
       id,
@@ -1174,14 +1131,13 @@ class ChatStreamStore {
       op: payload.op as DiffItem["op"],
       bytes: payload.bytes,
     };
-    // Attach to the most recent active session if we can infer one;
-    // otherwise the hook will route by sessionKey explicitly.
     const sessionKey = this.inferActiveSessionKey() ?? "global";
     this.upsertFileEdit(sessionKey, item);
   }
 
   private inferActiveSessionKey(): string | null {
-    for (const [key, state] of this.states) {
+    const snapshots = useChatStore.getState().streamSnapshots;
+    for (const [key, state] of Object.entries(snapshots)) {
       if (state.isStreaming) return key;
     }
     return null;

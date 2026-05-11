@@ -13,7 +13,7 @@ import {
   extractThreadFromResponse,
 } from "@threads/utils/threadSummary";
 import { CHAT_SCROLLBACK_DEFAULT } from "@utils/chatScrollback";
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type {
   CollabAgentRef,
   CustomPromptOption,
@@ -33,7 +33,7 @@ import { useThreadRateLimits } from "./useThreadRateLimits";
 import { useThreadSelectors } from "./useThreadSelectors";
 import { useThreadStatus } from "./useThreadStatus";
 import { useThreadStorage } from "./useThreadStorage";
-import { initialState, threadReducer } from "./useThreadsReducer";
+import { useThreadsReducer } from "./useThreadsStore";
 import { useThreadTitleAutogeneration } from "./useThreadTitleAutogeneration";
 import { useThreadUserInput } from "./useThreadUserInput";
 
@@ -91,17 +91,7 @@ export function useThreads({
   const maxItemsPerThread =
     chatHistoryScrollbackItems === undefined ? CHAT_SCROLLBACK_DEFAULT : chatHistoryScrollbackItems;
 
-  const [state, dispatch] = useReducer(
-    threadReducer,
-    maxItemsPerThread,
-    (initialMaxItemsPerThread) => ({
-      ...initialState,
-      maxItemsPerThread: initialMaxItemsPerThread,
-    }),
-  );
-  useEffect(() => {
-    dispatch({ type: "setMaxItemsPerThread", maxItemsPerThread });
-  }, [maxItemsPerThread]);
+  const [state, dispatch] = useThreadsReducer(maxItemsPerThread);
   const loadedThreadsRef = useRef<Record<string, boolean>>({});
   const replaceOnResumeRef = useRef<Record<string, boolean>>({});
   const pendingInterruptsRef = useRef<Set<string>>(new Set());

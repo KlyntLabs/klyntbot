@@ -391,6 +391,12 @@ export interface TransparencyData {
     totalLatencyMs: number;
     totalLlmCalls: number;
   };
+  contextTokens?: number;
+  sandboxPolicy?: {
+    tool: string;
+    policySummary: string;
+    fallbackUnsandboxed: boolean;
+  };
 }
 
 // ── Interaction (ask_user) ───────────────────────────────────
@@ -443,3 +449,53 @@ export interface Answer {
 }
 
 export type FormResponse = { Completed: Answer[] } | "Cancelled";
+
+// ── Stream Snapshot (moved from chatStreamStore.ts for shareability) ──
+
+export interface StreamSnapshot {
+  segments: MessageSegment[];
+  isStreaming: boolean;
+  activeTools: string[];
+  error: string | null;
+  activeInteraction: ActiveInteraction | null;
+  transparency: TransparencyData | null;
+  activeDelegateAgent: string | null;
+  personaMessages: PersonaSegment[];
+  debateRounds: DebateRound[];
+  currentDebateRound: number | null;
+  totalDebateRounds: number | null;
+  squadMode: "quick" | "debate" | null;
+  consensusReached: boolean;
+  consensusSummary: string | null;
+  judgeDecisions: JudgeDecisionEntry[];
+  /** Dynamic status phase shown alongside the loading indicator (e.g. "Thinking", "Using tasks:search"). */
+  statusPhase: string | null;
+  /** True when a stream finished while no component was subscribed to consume onDone. */
+  needsRefetch: boolean;
+  cancelled: boolean;
+  partialContent: string;
+  partialReasoning: string;
+}
+
+export const DEFAULT_STREAM_SNAPSHOT: StreamSnapshot = Object.freeze({
+  segments: [],
+  isStreaming: false,
+  activeTools: [],
+  error: null,
+  activeInteraction: null,
+  transparency: null,
+  activeDelegateAgent: null,
+  personaMessages: [],
+  debateRounds: [],
+  currentDebateRound: null,
+  totalDebateRounds: null,
+  squadMode: null,
+  consensusReached: false,
+  consensusSummary: null,
+  judgeDecisions: [],
+  statusPhase: null,
+  needsRefetch: false,
+  cancelled: false,
+  partialContent: "",
+  partialReasoning: "",
+});

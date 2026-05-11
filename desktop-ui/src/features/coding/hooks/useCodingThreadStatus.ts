@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useRunningCodingIds } from "@/features/coding/state/ThreadEventBuffer";
+import { useChatStore } from "@/features/threads/store/useChatStore";
 
 type ThreadActivityStatus = {
   isProcessing: boolean;
@@ -11,14 +11,11 @@ type ThreadActivityStatus = {
 
 /**
  * Per-thread "is a turn in flight?" map for coding threads, derived from
- * the global ThreadEventBuffer running set. Replaces the standalone
- * `agent:thread_event` listener that lived in this file pre-Phase 4.
- *
- * Returns the full ThreadActivityStatus shape so the spread-merge with
- * assistant-mode threadStatusById in MainApp is type-safe.
+ * the global `useChatStore` running set. Replaces the standalone
+ * `ThreadEventBuffer` sync-external-store hook.
  */
 export function useCodingThreadStatus(): Record<string, ThreadActivityStatus> {
-  const running = useRunningCodingIds();
+  const running = useChatStore((store) => store.codingRunningIds);
   return useMemo(() => {
     const map: Record<string, ThreadActivityStatus> = {};
     for (const id of running) {

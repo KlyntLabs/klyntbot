@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useSyncExternalStore } from "react";
-import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
+import { useMemo } from "react";
+import { useChatStore } from "@/features/threads/store/useChatStore";
 import type { ConversationItem } from "@/types";
 import { getActiveItemsForThread, getActiveThreadIdForWorkspace } from "./threadSelectorsHelpers";
 import type { ThreadState } from "./useThreadsReducer";
@@ -26,11 +26,9 @@ export function useThreadSelectors({
     ? threadsByWorkspace[activeWorkspaceId]
     : undefined;
 
-  const getApprovals = useCallback(
-    () => chatStreamStore.getApprovals(activeThreadId ?? ""),
-    [activeThreadId],
+  const approvals = useChatStore(
+    (store) => store.streamApprovals[activeThreadId ?? ""] ?? [],
   );
-  const approvals = useSyncExternalStore(chatStreamStore.subscribe, getApprovals);
 
   const activeItems = useMemo<ConversationItem[]>(
     () =>
