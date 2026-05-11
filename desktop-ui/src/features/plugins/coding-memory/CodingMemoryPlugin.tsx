@@ -13,6 +13,18 @@ const POLL_INTERVAL_MS = 4000;
 
 export function CodingMemoryPlugin() {
   const [provider, setProvider] = useState<ProviderId | "all">("all");
+
+  const handleProviderChange = (next: ProviderId | "all") => {
+    if (next !== provider) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("session");
+      url.searchParams.delete("klynt_session");
+      window.history.replaceState({}, "", url.toString());
+      setSelectedId(null);
+    }
+    setProvider(next);
+  };
+
   const [sessions, setSessions] = useState<SessionSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -91,7 +103,7 @@ export function CodingMemoryPlugin() {
   return (
     <div className="cm-plugin">
       <div className="cm-plugin__live-row">
-        <ProviderChips active={provider} onChange={setProvider} counts={counts} />
+        <ProviderChips active={provider} onChange={handleProviderChange} counts={counts} />
         <button
           type="button"
           className={`cm-plugin__live-toggle${live ? " cm-plugin__live-toggle--on" : ""}`}
