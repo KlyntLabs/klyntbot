@@ -215,9 +215,7 @@ export function useThreadMessaging({
           try {
             await ensureWorkspaceRuntimeCodexArgs(workspace.id, threadId);
           } catch (preflightError) {
-            onDebug?.(
-              buildErrorDebugEntry("thread/runtime-codex-args sync error", preflightError),
-            );
+            onDebug?.(buildErrorDebugEntry("thread/runtime-codex-args sync error", preflightError));
             // Best-effort: if the preflight command is missing (e.g.
             // set_workspace_runtime_codex_args not registered), don't block
             // the send — the args were already set at thread-start time.

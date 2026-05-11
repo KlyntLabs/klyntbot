@@ -7,8 +7,8 @@ export type WorkspaceRunMode = "local" | "worktree";
 function assertSendSuccess(sendResult: SendMessageResult | undefined | null): void {
   if (!sendResult || sendResult.status === "sent") return;
   throw new Error(
-    sendResult.error
-      ?? (sendResult.status === "blocked"
+    sendResult.error ??
+      (sendResult.status === "blocked"
         ? "Message was blocked — the turn may have failed to start."
         : "Failed to send message to thread."),
   );
@@ -494,12 +494,18 @@ export function useWorkspaceHome({
             const localModel = selectedModelId
               ? (modelLookup.get(selectedModelId)?.model ?? null)
               : null;
-            const sendResult = await sendUserMessageToThread(activeWorkspace, threadId, prompt, images, {
-              model: localModel,
-              effort,
-              serviceTier,
-              collaborationMode,
-            });
+            const sendResult = await sendUserMessageToThread(
+              activeWorkspace,
+              threadId,
+              prompt,
+              images,
+              {
+                model: localModel,
+                effort,
+                serviceTier,
+                collaborationMode,
+              },
+            );
             assertSendSuccess(sendResult);
             const model = selectedModelId ? (modelLookup.get(selectedModelId) ?? null) : null;
             instances.push({
@@ -558,12 +564,18 @@ export function useWorkspaceHome({
                 if (prompt) {
                   seedThreadPrompt?.(worktreeWorkspace.id, threadId, prompt);
                 }
-                const sendResult = await sendUserMessageToThread(worktreeWorkspace, threadId, prompt, images, {
-                  model: selection.model?.model ?? selection.modelId,
-                  effort,
-                  serviceTier,
-                  collaborationMode,
-                });
+                const sendResult = await sendUserMessageToThread(
+                  worktreeWorkspace,
+                  threadId,
+                  prompt,
+                  images,
+                  {
+                    model: selection.model?.model ?? selection.modelId,
+                    effort,
+                    serviceTier,
+                    collaborationMode,
+                  },
+                );
                 assertSendSuccess(sendResult);
                 instances.push({
                   id: `${runId}-${selection.modelId}-${index + 1}`,

@@ -5,22 +5,24 @@ interface Props {
 }
 
 export function CompactionCard({ event }: Props) {
-  const meta = (event.payload as {
-    compactMetadata?: {
-      trigger?: string;
-      preTokens?: number;
-      postTokens?: number;
-      durationMs?: number;
-      preCompactDiscoveredTools?: string[];
-    };
-  }).compactMetadata ?? {};
+  const meta =
+    (
+      event.payload as {
+        compactMetadata?: {
+          trigger?: string;
+          preTokens?: number;
+          postTokens?: number;
+          durationMs?: number;
+          preCompactDiscoveredTools?: string[];
+        };
+      }
+    ).compactMetadata ?? {};
   return (
     <div className="cc-card cc-card--compaction">
       <strong>Conversation compacted</strong>
       <span className="cc-card__compact-trigger">{meta.trigger ?? "auto"}</span>
       <span>
-        {(meta.preTokens ?? 0).toLocaleString()} →{" "}
-        {(meta.postTokens ?? 0).toLocaleString()} tokens
+        {(meta.preTokens ?? 0).toLocaleString()} → {(meta.postTokens ?? 0).toLocaleString()} tokens
       </span>
       <span>{Math.round((meta.durationMs ?? 0) / 1000)}s</span>
       {meta.preCompactDiscoveredTools && meta.preCompactDiscoveredTools.length > 0 && (

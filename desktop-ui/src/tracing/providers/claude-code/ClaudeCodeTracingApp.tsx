@@ -22,9 +22,9 @@ import {
   getSessionSummary,
   getSubagents,
   getWireEvents,
+  type HeaderLayoutResponse,
   listSessions,
   openInPath,
-  type HeaderLayoutResponse,
   type SessionInfo,
   type SessionSummary,
   type SubagentInfo,
@@ -247,9 +247,7 @@ function SessionDetailView({
 
       <div className="cc-app__content">
         {activeTab === "wire" && <ClaudeCodeWireViewer events={wireEvents} />}
-        {activeTab === "agents" && (
-          <ClaudeCodeAgentsPanel agents={subagents} onSelect={() => {}} />
-        )}
+        {activeTab === "agents" && <ClaudeCodeAgentsPanel agents={subagents} onSelect={() => {}} />}
       </div>
     </>
   );

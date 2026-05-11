@@ -8,9 +8,7 @@ export function CommandPreview({ command, cwd, is_dangerous, risk_hits }: Comman
       <header className="approval-preview__head">
         <span className="approval-preview__cwd">{cwd}</span>
         {is_dangerous && (
-          <span className="approval-preview__badge approval-preview__badge--danger">
-            dangerous
-          </span>
+          <span className="approval-preview__badge approval-preview__badge--danger">dangerous</span>
         )}
       </header>
       <pre className="approval-preview__command">{command}</pre>

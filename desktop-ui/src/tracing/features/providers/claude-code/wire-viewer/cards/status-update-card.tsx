@@ -29,8 +29,10 @@ function renderSummary(subtype: string, payload: Record<string, unknown>): strin
     }
     case "stop_hook_summary": {
       const c = (payload as { hookCount?: number }).hookCount ?? 0;
-      const total = ((payload as { hookInfos?: { durationMs: number }[] }).hookInfos ?? [])
-        .reduce((acc, h) => acc + (h.durationMs ?? 0), 0);
+      const total = ((payload as { hookInfos?: { durationMs: number }[] }).hookInfos ?? []).reduce(
+        (acc, h) => acc + (h.durationMs ?? 0),
+        0,
+      );
       return `${c} hook(s) · ${total} ms`;
     }
     default:

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ApprovalDecision } from "@/features/coding/hooks/useApprovalQueue";
-import type { SuggestedGrant } from "./preview/types";
 import { PatternPicker } from "./PatternPicker";
+import type { SuggestedGrant } from "./preview/types";
 
 type Props = {
   requestId: string;

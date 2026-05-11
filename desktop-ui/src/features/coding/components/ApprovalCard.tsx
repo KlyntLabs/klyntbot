@@ -47,11 +47,7 @@ export function ApprovalCard({ item, onRespond }: Props) {
         <dd>{item.tool}</dd>
         <dt>Preview</dt>
         <dd className="approval-card__preview">
-          {item.preview ? (
-            <PreviewRenderer preview={item.preview} />
-          ) : (
-            summarizeArgs(item.args)
-          )}
+          {item.preview ? <PreviewRenderer preview={item.preview} /> : summarizeArgs(item.args)}
         </dd>
         <dt>CWD</dt>
         <dd>{item.cwd}</dd>

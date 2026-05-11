@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
-import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { PlanModeBanner } from "./PlanModeBanner";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { applyView, cleanupTodos } from "../state/todoStore";
+import { PlanModeBanner } from "./PlanModeBanner";
 
 vi.mock("@/api/endpoints/coding", () => ({
   removePlanItems: vi.fn(async () => ({
@@ -51,7 +51,13 @@ describe("PlanModeBanner", () => {
     seedStore(
       [
         { id: "a", title: "Read schema", status: "pending", concurrency: "safe", blockedBy: [] },
-        { id: "b", title: "Add migration", status: "pending", concurrency: "sequential", blockedBy: [] },
+        {
+          id: "b",
+          title: "Add migration",
+          status: "pending",
+          concurrency: "sequential",
+          blockedBy: [],
+        },
       ],
       {
         planSessionId: "sess-1",

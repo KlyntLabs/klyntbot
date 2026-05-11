@@ -1,12 +1,12 @@
-import { useState, useCallback, useRef, useEffect } from "react";
-import { useTodos, type TodoItem } from "../state/todoStore";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  removePlanItems,
-  editPlanItems,
-  ratifyPlan,
   cancelPlanMode,
+  editPlanItems,
   openPlanFile,
+  ratifyPlan,
+  removePlanItems,
 } from "@/api/endpoints/coding";
+import { type TodoItem, useTodos } from "../state/todoStore";
 
 type ConfirmAction = null | "ratify" | "cancel";
 

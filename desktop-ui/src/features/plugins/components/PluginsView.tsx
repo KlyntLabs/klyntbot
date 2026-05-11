@@ -8,7 +8,11 @@ export function PluginsView() {
 
   return (
     <section className="plugins-view">
-      <div className="plugins-view__pane" data-testid="plugins-active-pane" data-plugin="coding-memory">
+      <div
+        className="plugins-view__pane"
+        data-testid="plugins-active-pane"
+        data-plugin="coding-memory"
+      >
         <CodingMemoryPlugin />
       </div>
     </section>

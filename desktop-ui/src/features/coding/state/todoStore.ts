@@ -54,7 +54,7 @@ export function setPlanModeState(threadId: string, planModeState: PlanModeState 
 
 export function applyView(
   threadId: string,
-  view: { agents: Record<string, TodoItem[]>; planModeState: PlanModeState | null }
+  view: { agents: Record<string, TodoItem[]>; planModeState: PlanModeState | null },
 ) {
   const prev = getStore(threadId);
   const items = Object.values(view.agents).flat();

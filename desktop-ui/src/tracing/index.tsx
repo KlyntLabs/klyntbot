@@ -41,9 +41,9 @@ import {
   getSessionDownloadUrl,
   getSessionSummary,
   getVisCapabilities,
+  type HeaderLayoutResponse,
   listSessions,
   openInPath,
-  type HeaderLayoutResponse,
   type SessionInfo,
   type SessionSummary,
 } from "@/tracing/lib/api";
@@ -385,11 +385,7 @@ export function KimiTracingApp() {
         {/* Session Stats */}
         {sessionId && (
           <div className="flex items-center border-b">
-            <SessionStats
-              sessionId={sessionId}
-              summary={sessionSummary}
-              layout={headerLayout}
-            />
+            <SessionStats sessionId={sessionId} summary={sessionSummary} layout={headerLayout} />
             {currentSession && (
               <SessionDirectoryActions session={currentSession} openInSupported={openInSupported} />
             )}
@@ -492,10 +488,19 @@ export function KimiTracingApp() {
                 />
               )}
               {activeTab === "state" && (
-                <StateViewer sessionId={sessionId} refreshKey={refreshKey} providerId={PROVIDER_ID} />
+                <StateViewer
+                  sessionId={sessionId}
+                  refreshKey={refreshKey}
+                  providerId={PROVIDER_ID}
+                />
               )}
               {activeTab === "dual" && (
-                <DualView sessionId={sessionId} refreshKey={refreshKey} agentScope={agentScope} providerId={PROVIDER_ID} />
+                <DualView
+                  sessionId={sessionId}
+                  refreshKey={refreshKey}
+                  agentScope={agentScope}
+                  providerId={PROVIDER_ID}
+                />
               )}
               {activeTab === "agents" && (
                 <AgentsPanel

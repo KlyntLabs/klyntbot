@@ -220,7 +220,10 @@ function reshapeSession(b: BackendSessionSummary): SessionInfo {
   };
 }
 
-export async function listSessions(providerId: string, forceRefresh = false): Promise<SessionInfo[]> {
+export async function listSessions(
+  providerId: string,
+  forceRefresh = false,
+): Promise<SessionInfo[]> {
   if (forceRefresh) apiCache.invalidate("sessions");
   return apiCache.get(
     "sessions",
@@ -310,7 +313,11 @@ function reshapeWire(detail: BackendSessionDetail): WireResponse {
   };
 }
 
-export function getWireEvents(providerId: string, sessionId: string, forceRefresh = false): Promise<WireResponse> {
+export function getWireEvents(
+  providerId: string,
+  sessionId: string,
+  forceRefresh = false,
+): Promise<WireResponse> {
   const key = `wire:${sessionId}`;
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
@@ -432,7 +439,11 @@ function reshapeSubagent(b: BackendSubagentSummary): SubagentInfo {
   };
 }
 
-export function getSubagents(providerId: string, sessionId: string, forceRefresh = false): Promise<SubagentInfo[]> {
+export function getSubagents(
+  providerId: string,
+  sessionId: string,
+  forceRefresh = false,
+): Promise<SubagentInfo[]> {
   const key = `subagents:${sessionId}`;
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
@@ -501,7 +512,10 @@ type BackendStats = {
   cacheHitPct: number;
 };
 
-export async function getAggregateStats(providerId: string, forceRefresh = false): Promise<AggregateStats> {
+export async function getAggregateStats(
+  providerId: string,
+  forceRefresh = false,
+): Promise<AggregateStats> {
   const key = "aggregate-stats";
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(
@@ -547,7 +561,11 @@ export function getSessionDownloadUrl(_providerId: string, _sessionId: string): 
   return "";
 }
 
-export async function openInPath(providerId: string, _app: "finder", sessionId: string): Promise<void> {
+export async function openInPath(
+  providerId: string,
+  _app: "finder",
+  sessionId: string,
+): Promise<void> {
   await invoke("tracing_open_dir", { providerId, sessionId });
 }
 
@@ -591,17 +609,13 @@ export interface HeaderLayoutResponse {
 }
 
 export async function fetchSupportedTabs(providerId: string): Promise<SessionTabsResponse> {
-  const tabs = await invoke<SessionTabsResponse["tabs"]>(
-    "tracing_supported_tabs",
-    { providerId },
-  );
+  const tabs = await invoke<SessionTabsResponse["tabs"]>("tracing_supported_tabs", { providerId });
   return { tabs };
 }
 
 export async function fetchHeaderLayout(providerId: string): Promise<HeaderLayoutResponse> {
-  const chips = await invoke<HeaderLayoutResponse["chips"]>(
-    "tracing_header_layout",
-    { providerId },
-  );
+  const chips = await invoke<HeaderLayoutResponse["chips"]>("tracing_header_layout", {
+    providerId,
+  });
   return { chips };
 }

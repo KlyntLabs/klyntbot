@@ -1,8 +1,8 @@
-import type { ApprovalPreview } from "./types";
 import { CommandPreview } from "./CommandPreview";
 import { DiffPreview } from "./DiffPreview";
 import { GenericPreview } from "./GenericPreview";
 import { McpPreview } from "./McpPreview";
+import type { ApprovalPreview } from "./types";
 import { UrlPreview } from "./UrlPreview";
 
 export function PreviewRenderer({ preview }: { preview: ApprovalPreview }) {

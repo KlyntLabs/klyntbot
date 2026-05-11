@@ -31,8 +31,8 @@ type Props = {
 export function PatternPicker({ suggested, onCommit, onCustom }: Props) {
   const alternatives = deriveAlternatives(suggested);
   return (
-    <ul className="approval-card__pattern-picker" role="radiogroup">
-      <li>
+    <div className="approval-card__pattern-picker" role="radiogroup">
+      <div>
         <button
           type="button"
           className="approval-card__pattern-picker-item approval-card__pattern-picker-item--suggested"
@@ -41,9 +41,9 @@ export function PatternPicker({ suggested, onCommit, onCustom }: Props) {
           <strong>{suggested.pattern}</strong>
           <span className="approval-card__pattern-reason">{suggested.reason}</span>
         </button>
-      </li>
+      </div>
       {alternatives.map((alt) => (
-        <li key={alt.pattern}>
+        <div key={alt.pattern}>
           <button
             type="button"
             className="approval-card__pattern-picker-item"
@@ -52,17 +52,13 @@ export function PatternPicker({ suggested, onCommit, onCustom }: Props) {
             {alt.pattern}
             <span className="approval-card__pattern-reason">{alt.label}</span>
           </button>
-        </li>
+        </div>
       ))}
-      <li>
-        <button
-          type="button"
-          className="approval-card__pattern-picker-item"
-          onClick={onCustom}
-        >
+      <div>
+        <button type="button" className="approval-card__pattern-picker-item" onClick={onCustom}>
           Custom Starlark rule...
         </button>
-      </li>
-    </ul>
+      </div>
+    </div>
   );
 }

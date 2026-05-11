@@ -448,9 +448,8 @@ export function PromptPanel({
                   type="button"
                   className="prompt-row prompt-row--file"
                   onClick={() => {
-                    void invoke("plugin:opener|open_path", { path: file.path }).catch(
-                      (error) =>
-                        window.alert(error instanceof Error ? error.message : String(error)),
+                    void invoke("plugin:opener|open_path", { path: file.path }).catch((error) =>
+                      window.alert(error instanceof Error ? error.message : String(error)),
                     );
                   }}
                   title={`Open ${file.path}`}

@@ -1,4 +1,4 @@
-import { useTodos, countPending, countBlocked } from "../state/todoStore";
+import { countBlocked, countPending, useTodos } from "../state/todoStore";
 
 export function TodoSidebarBadge({ threadId }: { threadId: string }) {
   const { items } = useTodos(threadId);

@@ -406,9 +406,7 @@ function SessionListView({
       <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
         <List size={32} className="opacity-40" />
         <span>No Klynt sessions found.</span>
-        <span className="text-xs opacity-60">
-          Coding-mode sessions appear here automatically.
-        </span>
+        <span className="text-xs opacity-60">Coding-mode sessions appear here automatically.</span>
       </div>
     );
   }
@@ -431,13 +429,14 @@ function SessionListView({
                   className="w-full flex flex-col gap-0.5 rounded-md border px-3 py-2 text-left transition-colors hover:bg-accent"
                   onClick={() => onSelect(`${s.work_dir_hash}/${s.session_id}`)}
                 >
-                  <span className="text-sm font-medium">
-                    {s.title || s.session_id.slice(0, 8)}
-                  </span>
+                  <span className="text-sm font-medium">{s.title || s.session_id.slice(0, 8)}</span>
                   <span className="text-xs text-muted-foreground">
                     {s.turns} turns
                     {(s.subagent_count ?? 0) > 0 && (
-                      <> <span>·</span> <span>{s.subagent_count} agents</span> </>
+                      <>
+                        {" "}
+                        <span>·</span> <span>{s.subagent_count} agents</span>{" "}
+                      </>
                     )}
                     <span> · </span>
                     <span>{formatRelativeTime(s.last_updated)}</span>

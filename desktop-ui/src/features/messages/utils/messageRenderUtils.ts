@@ -661,12 +661,11 @@ export function toolRowDescriptor(
   const fallbackArg =
     fallbackPrimary ||
     (fallbackArgs
-      ? (Object.values(fallbackArgs).find(
-          (v) => typeof v === "string" && v.trim().length > 0,
-        ) as string | undefined) ?? ""
+      ? ((Object.values(fallbackArgs).find((v) => typeof v === "string" && v.trim().length > 0) as
+          | string
+          | undefined) ?? "")
       : item.detail);
-  const truncatedArg =
-    fallbackArg.length > 80 ? `${fallbackArg.slice(0, 80)}…` : fallbackArg;
+  const truncatedArg = fallbackArg.length > 80 ? `${fallbackArg.slice(0, 80)}…` : fallbackArg;
   return {
     family: "system",
     name: item.title || "Tool",

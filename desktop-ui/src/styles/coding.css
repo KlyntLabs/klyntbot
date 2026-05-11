@@ -250,5 +250,7 @@
   flex-shrink: 0;
 }
 @media (max-width: 720px) {
-  .coding-thread-view__todo { display: none; }
+  .coding-thread-view__todo {
+    display: none;
+  }
 }

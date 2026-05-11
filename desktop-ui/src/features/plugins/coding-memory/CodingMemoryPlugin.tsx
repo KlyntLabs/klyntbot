@@ -161,7 +161,8 @@ export function CodingMemoryPlugin() {
               <KlyntTracingApp />
             ) : (
               <div className="cm-state cm-state--empty">
-                Tracing is available for Claude Code, Kimi, and Klynt. Select one of those chips above.
+                Tracing is available for Claude Code, Kimi, and Klynt. Select one of those chips
+                above.
               </div>
             )}
           </main>

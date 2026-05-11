@@ -1,7 +1,21 @@
+import type {
+  BashJobsPanelView,
+  BashJobView,
+  CodingTodoView,
+  JobOutputView,
+  PlanModeView,
+  TodoItem,
+} from "@/bindings";
 import { commands } from "@/bindings";
-import type { BashJobView, BashJobsPanelView, CodingTodoView, JobOutputView, PlanModeView, TodoItem } from "@/bindings";
 
-export type { BashJobView, BashJobsPanelView, CodingTodoView, JobOutputView, PlanModeView, TodoItem };
+export type {
+  BashJobsPanelView,
+  BashJobView,
+  CodingTodoView,
+  JobOutputView,
+  PlanModeView,
+  TodoItem,
+};
 
 export async function fetchCodingTodos(threadId: string): Promise<CodingTodoView> {
   const r = await commands.codingTodoGet(threadId);
@@ -21,10 +35,7 @@ export async function cancelPlanMode(threadId: string): Promise<CodingTodoView> 
   return r.data;
 }
 
-export async function ratifyPlan(
-  threadId: string,
-  planSessionId: string,
-): Promise<CodingTodoView> {
+export async function ratifyPlan(threadId: string, planSessionId: string): Promise<CodingTodoView> {
   const r = await commands.codingPlanRatify(threadId, planSessionId);
   if (r.status !== "ok") throw new Error(r.error.message ?? "coding_plan_ratify failed");
   return r.data;

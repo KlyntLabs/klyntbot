@@ -32,6 +32,9 @@ async fn echo_hi_runs_and_emits_sandbox_event() {
                 command: "echo hi".into(),
                 cwd: Some("/tmp".into()),
                 timeout_ms: Some(5000),
+                run_in_background: None,
+                description: None,
+                silent_completion: None,
             },
             &ctx,
         )
@@ -80,6 +83,9 @@ async fn cwd_none_uses_registry_base() {
                 command: "pwd".into(),
                 cwd: None,
                 timeout_ms: Some(5000),
+                run_in_background: None,
+                description: None,
+                silent_completion: None,
             },
             &RoutingContext::new(ChannelName::new("coding"), ChatId::new("test")),
         )
@@ -106,6 +112,9 @@ async fn cwd_relative_joins_registry_base() {
                 command: "pwd".into(),
                 cwd: Some("sub".into()),
                 timeout_ms: Some(5000),
+                run_in_background: None,
+                description: None,
+                silent_completion: None,
             },
             &RoutingContext::new(ChannelName::new("coding"), ChatId::new("test")),
         )
@@ -129,6 +138,9 @@ async fn cwd_absolute_wins_over_registry_base() {
                 command: "pwd".into(),
                 cwd: Some(other_path.to_string_lossy().into_owned()),
                 timeout_ms: Some(5000),
+                run_in_background: None,
+                description: None,
+                silent_completion: None,
             },
             &RoutingContext::new(ChannelName::new("coding"), ChatId::new("test")),
         )
@@ -158,6 +170,9 @@ async fn denied_command_returns_error_and_does_not_run() {
                 command: "rm -rf /tmp/k2".into(),
                 cwd: Some("/tmp".into()),
                 timeout_ms: Some(5000),
+                run_in_background: None,
+                description: None,
+                silent_completion: None,
             },
             &RoutingContext::new(ChannelName::new("coding"), ChatId::new("test")),
         )

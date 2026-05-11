@@ -153,7 +153,12 @@ export function SessionCard({
           <span className="text-xs truncate flex-1">
             <HighlightText text={displayTitle} query={searchQuery} />
           </span>
-          <LazyStats sessionId={sessionPath} hasWire={session.has_wire} inline providerId={providerId} />
+          <LazyStats
+            sessionId={sessionPath}
+            hasWire={session.has_wire}
+            inline
+            providerId={providerId}
+          />
           <span className="text-[10px] text-muted-foreground shrink-0 w-14 text-right">
             {formatBytes(session.total_size)}
           </span>

@@ -318,7 +318,10 @@ export function useThreadEvents(threadId: string | null, seedThreadPrompt?: stri
           m.parts.some((p) => p.kind === "text" && p.text === seedThreadPrompt),
       );
       if (exists) return prev;
-      return { ...prev, items: [...prev.items, makeOptimisticUserMessage(threadId, seedThreadPrompt)] };
+      return {
+        ...prev,
+        items: [...prev.items, makeOptimisticUserMessage(threadId, seedThreadPrompt)],
+      };
     });
   }, [threadId, seedThreadPrompt]);
 
