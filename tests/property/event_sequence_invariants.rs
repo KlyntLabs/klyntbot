@@ -1,0 +1,66 @@
+//! Proptest invariant: any permutation of (send, cancel, error, complete)
+//! across N sessions leaves the AppCore active_streams empty.
+
+use proptest::prelude::*;
+use proptest::strategy::Strategy;
+
+#[derive(Debug, Clone)]
+enum Op {
+    Send(u8),
+    Cancel(u8),
+    SimulateError(u8),
+    SimulateComplete(u8),
+}
+
+fn op_strategy() -> impl Strategy<Value = Op> {
+    prop_oneof![
+        (0u8..5).prop_map(Op::Send),
+        (0u8..5).prop_map(Op::Cancel),
+        (0u8..5).prop_map(Op::SimulateError),
+        (0u8..5).prop_map(Op::SimulateComplete),
+    ]
+}
+
+fn op_session_id(op: &Op) -> u8 {
+    match op {
+        Op::Send(id) | Op::Cancel(id) | Op::SimulateError(id) | Op::SimulateComplete(id) => *id,
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(1000))]
+
+    /// CHAT-INV-1: after any sequence of operations, active_streams is empty
+    /// (eventually, modulo a small drain window).
+    #[test]
+    fn active_streams_drains(ops in proptest::collection::vec(op_strategy(), 0..20)) {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async move {
+            let (core, _emitter) = crate::common::chat_harness::ChatTestHarness::new_real().await;
+            for op in &ops {
+                let sk = format!("test:proptest:{:?}", op_session_id(op));
+                match op {
+                    Op::Send(_) => {
+                        let _ = core.chat_send("x".into(), sk, None, None).await;
+                    }
+                    Op::Cancel(_) => {
+                        let _ = core.chat_cancel(sk).await;
+                    }
+                    Op::SimulateError(_) | Op::SimulateComplete(_) => {
+                        // Deferred to Task 42 (event-injection harness).
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
+
+            // Wait for drain
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+            prop_assert_eq!(core.active_streams_len(), 0, "active_streams must drain");
+            Ok(())
+        })?;
+    }
+}

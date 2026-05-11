@@ -142,6 +142,9 @@ impl From<KlyntbotError> for ApiError {
             KlyntbotError::NotImplemented(msg) => ApiError::new("NOT_IMPLEMENTED", msg),
             KlyntbotError::PermissionDenied(msg) => ApiError::new("PERMISSION_DENIED", msg),
             KlyntbotError::Cancelled(msg) => ApiError::new("CANCELLED", msg),
+            KlyntbotError::SessionAlreadyStreaming(msg) => {
+                ApiError::new("SESSION_ALREADY_STREAMING", msg)
+            }
         }
     }
 }
