@@ -110,17 +110,26 @@ export type MessageDto = {
 
 export type TurnState =
   | { kind: "idle"; lastFinishReason?: unknown }
-  | { kind: "streaming"; turnId: string; model: string }
-  | { kind: "tool_executing"; callId: string; tool: string };
+  | { kind: "streaming"; turnId: string; model: string; startedAt: number }
+  | { kind: "tool_executing"; callId: string; tool: string; startedAt: number };
 
 type State = {
   items: MessageDto[];
   turnState: TurnState;
+  // Wall-clock ms when the current turn began. Mirrored on `turnState` for
+  // streaming/tool variants, hoisted here so consumers don't have to discriminate.
+  // Cleared back to null when the turn completes.
+  processingStartedAt: number | null;
+  // Duration of the most recently completed turn, surfaced by the "Done in
+  // …" indicator after streaming finishes.
+  lastDurationMs: number | null;
 };
 
 const initialState: State = {
   items: [],
   turnState: { kind: "idle" },
+  processingStartedAt: null,
+  lastDurationMs: null,
 };
 
 function sameTextParts(a: MessagePart[], b: MessagePart[]): boolean {
@@ -145,7 +154,17 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
     case "turn_started":
       return {
         ...state,
-        turnState: { kind: "streaming", turnId: event.turn_id, model: event.model },
+        turnState: {
+          kind: "streaming",
+          turnId: event.turn_id,
+          model: event.model,
+          startedAt: event.started_at,
+        },
+        processingStartedAt: event.started_at,
+        // Clear the previous turn's duration the moment a new turn begins,
+        // otherwise the "Done in …" indicator would briefly flash next to
+        // the live working spinner.
+        lastDurationMs: null,
       };
     case "item_started": {
       // Dedupe: backend may echo a user message that the FE already pushed
@@ -221,9 +240,20 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
     case "tool_call_started":
       return {
         ...state,
-        turnState: { kind: "tool_executing", callId: event.call_id, tool: event.tool },
+        turnState: {
+          kind: "tool_executing",
+          callId: event.call_id,
+          tool: event.tool,
+          // Preserve the original turn start so the timer keeps ticking
+          // through tool execution rather than resetting to 0:00 each call.
+          startedAt: state.processingStartedAt ?? Date.now(),
+        },
       };
     case "tool_call_completed":
+      // Returning to "streaming" (kind, model unknown to this event) would
+      // require synthesizing data we don't have. Leave `turnState` alone —
+      // the next `item_delta` keeps the spinner alive, and `turn_completed`
+      // clears it. `processingStartedAt` is unchanged so the timer continues.
       return state;
     case "file_changed": {
       const items = appendPartToLatestAssistant(state.items, {
@@ -251,7 +281,12 @@ export function applyThreadEvent(state: State, event: ThreadEvent): State {
     case "heartbeat":
       return state;
     case "turn_completed":
-      return { ...state, turnState: { kind: "idle", lastFinishReason: event.finish_reason } };
+      return {
+        ...state,
+        turnState: { kind: "idle", lastFinishReason: event.finish_reason },
+        processingStartedAt: null,
+        lastDurationMs: event.duration_ms,
+      };
     case "todos_updated":
       // Handled by the dedicated todo-refetch effect below,
       // which fetches full items rather than partial thread-event data.

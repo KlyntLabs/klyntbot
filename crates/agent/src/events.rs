@@ -30,6 +30,12 @@ pub enum AgentEvent {
         /// Which agent initiated this tool (set during delegation).
         #[serde(skip_serializing_if = "Option::is_none")]
         agent: Option<String>,
+        /// Provider-assigned id for the tool call. Carried through so that
+        /// downstream consumers (turn-handler bridge, FE message reducer) can
+        /// correlate `ToolStart` with the matching `ToolEnd` and merge them
+        /// into a single transparency row instead of two orphaned ones.
+        #[serde(rename = "callId", skip_serializing_if = "Option::is_none")]
+        call_id: Option<String>,
     },
 
     /// A tool execution has completed.
@@ -43,6 +49,10 @@ pub enum AgentEvent {
         /// Which agent initiated this tool (set during delegation).
         #[serde(skip_serializing_if = "Option::is_none")]
         agent: Option<String>,
+        /// Mirrors the `call_id` from the matching `ToolStart` so consumers
+        /// can pair them — see the `ToolStart` doc above for why.
+        #[serde(rename = "callId", skip_serializing_if = "Option::is_none")]
+        call_id: Option<String>,
     },
 
     /// A new agent iteration has started.

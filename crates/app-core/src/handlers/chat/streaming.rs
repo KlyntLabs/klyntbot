@@ -530,7 +530,7 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
-                    AgentEvent::ToolStart { name, args, agent } => {
+                    AgentEvent::ToolStart { name, args, agent, .. } => {
                         flush_text(&mut current_text, &mut segments);
                         tool_names.push(name.clone());
                         let action = args.get("action").and_then(|v| v.as_str()).map(String::from);
@@ -547,7 +547,7 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
-                    AgentEvent::ToolEnd { name, success, duration_ms, result, agent } => {
+                    AgentEvent::ToolEnd { name, success, duration_ms, result, agent, .. } => {
                         // Pop the stashed action from ToolStart (FIFO per tool name)
                         let action = match pending_actions.entry(name.clone()) {
                             std::collections::hash_map::Entry::Occupied(mut e) => {

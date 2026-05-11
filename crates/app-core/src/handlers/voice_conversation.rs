@@ -775,7 +775,7 @@ impl VoiceConversationManager {
                             }
                             break;
                         }
-                        Some(agent::AgentEvent::ToolStart { name, args, agent }) => {
+                        Some(agent::AgentEvent::ToolStart { name, args, agent, .. }) => {
                             let action = args.get("action").and_then(|v| v.as_str()).map(String::from);
                             if let Ok(val) = serde_json::to_value(
                                 &desktop_shared::events::ToolStartPayload {
@@ -791,7 +791,7 @@ impl VoiceConversationManager {
                                 );
                             }
                         }
-                        Some(agent::AgentEvent::ToolEnd { name, success, duration_ms, result, agent }) => {
+                        Some(agent::AgentEvent::ToolEnd { name, success, duration_ms, result, agent, .. }) => {
                             if let Ok(val) = serde_json::to_value(
                                 &desktop_shared::events::ToolEndPayload {
                                     session_key: session_key_str.clone(),
@@ -1048,7 +1048,7 @@ impl VoiceConversationManager {
                             }
                             break;
                         }
-                        Some(agent::AgentEvent::ToolStart { name, args, agent }) => {
+                        Some(agent::AgentEvent::ToolStart { name, args, agent, .. }) => {
                             let action = args.get("action").and_then(|v| v.as_str()).map(String::from);
                             if let Ok(val) = serde_json::to_value(
                                 &desktop_shared::events::ToolStartPayload {
@@ -1064,7 +1064,7 @@ impl VoiceConversationManager {
                                 );
                             }
                         }
-                        Some(agent::AgentEvent::ToolEnd { name, success, duration_ms, result, agent }) => {
+                        Some(agent::AgentEvent::ToolEnd { name, success, duration_ms, result, agent, .. }) => {
                             if let Ok(val) = serde_json::to_value(
                                 &desktop_shared::events::ToolEndPayload {
                                     session_key: session_key_str.clone(),

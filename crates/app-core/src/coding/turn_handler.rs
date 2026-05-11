@@ -104,13 +104,30 @@ impl AppCore {
         let turn_id = format!("turn-{}", uuid::Uuid::new_v4());
         let started_at = jiff::Timestamp::now().as_millisecond();
 
-        // 1. Echo the user message to the FE so the chat shows the prompt
-        // immediately rather than only the assistant reply. The actual
-        // persistence happens inside `setup_session` (writes both `content`
-        // and parts via `session.add_message`); writing here too produced a
-        // duplicate row whose `content` was empty, which Anthropic rejected
-        // with HTTP 400 ("position 1 user must not be empty").
+        // 1. Persist the user message to the DB and echo it to the FE so the
+        // chat shows the prompt immediately. `add_message_with_parts` mirrors
+        // text into both the legacy `content` column and the structured
+        // `parts` column, so Anthropic-spec providers don't 400 on empty
+        // content. Without this DB write, the prompt only ever lives in the
+        // in-memory session that downstream `setup_session` populates — and
+        // that in-memory session is never flushed to disk on the coding-mode
+        // happy path (the bridge writes assistant rows, not user ones), so
+        // the prompt would silently disappear on refresh.
         let user_msg_id = uuid::Uuid::new_v4();
+        let user_part = MessagePart::Text {
+            text: text.to_string(),
+        };
+        self.repos
+            .sessions
+            .add_message_with_parts(
+                thread_id,
+                user_msg_id,
+                "user",
+                std::slice::from_ref(&user_part),
+                Some(&turn_id),
+                None,
+            )
+            .await?;
         self.thread_events.publish(ThreadEvent::ItemStarted {
             thread_id: thread_id.to_string(),
             turn_id: turn_id.clone(),
@@ -118,10 +135,7 @@ impl AppCore {
                 id: user_msg_id.to_string(),
                 session_id: thread_id.to_string(),
                 role: "user".into(),
-                parts: vec![serde_json::to_value(MessagePart::Text {
-                    text: text.to_string(),
-                })
-                .unwrap()],
+                parts: vec![serde_json::to_value(&user_part).unwrap()],
                 model: None,
                 turn_id: Some(turn_id.clone()),
                 created_at: started_at,
@@ -410,7 +424,12 @@ impl AppCore {
                                         },
                                     });
                                 }
-                                agent::AgentEvent::ToolStart { name, args, .. } => {
+                                agent::AgentEvent::ToolStart {
+                                    name,
+                                    args,
+                                    call_id: ev_call_id,
+                                    ..
+                                } => {
                                     // Iteration boundary: commit any in-flight
                                     // text/reasoning bursts in arrival order, then
                                     // persist all pending parts as one assistant row.
@@ -445,11 +464,21 @@ impl AppCore {
                                         last_kind = None;
                                         current_part_idx = 0;
                                     }
-                                    let call_id = args
-                                        .get("call_id")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("unknown")
-                                        .to_string();
+                                    // Prefer the call_id carried on the AgentEvent (provider-
+                                    // assigned, stable across ToolStart/ToolEnd). The legacy
+                                    // `args.call_id` lookup almost never matched any real arg
+                                    // schema, which is why every tool ended up persisted with
+                                    // `"unknown"` and the FE merge collapsed them into a single
+                                    // row. Fall back to a fresh UUID only if neither source has
+                                    // an id — that still lets the FE distinguish tools, just
+                                    // without provider-traceable correlation.
+                                    let call_id = ev_call_id
+                                        .or_else(|| {
+                                            args.get("call_id")
+                                                .and_then(|v| v.as_str())
+                                                .map(String::from)
+                                        })
+                                        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
                                     // Persist so the tool call shows up on thread reload
                                     // (without this, tool transparency only exists during
                                     // the live turn and disappears on refresh).
@@ -510,14 +539,22 @@ impl AppCore {
                                     success,
                                     duration_ms,
                                     result,
+                                    call_id: ev_call_id,
                                     ..
                                 } => {
                                     // Render the tool's output as a user-visible item
                                     // (prefix with bash/file/etc. via the kind tag).
                                     let result_text = result.unwrap_or_default();
-                                    // Persist tool result so reload still shows it.
+                                    // Use the call_id from the event so the FE can pair this
+                                    // result back to its originating ToolCall row. Hardcoding
+                                    // `"unknown"` here was the cause of every tool except the
+                                    // last one in a turn appearing stuck on the loading
+                                    // spinner — every result ended up with the same id and
+                                    // the FE map only kept the last association.
+                                    let result_call_id =
+                                        ev_call_id.unwrap_or_else(|| "unknown".into());
                                     let result_part = MessagePart::ToolResult {
-                                        call_id: "unknown".into(),
+                                        call_id: result_call_id.clone(),
                                         output: storage::messages::parts::ToolOutput {
                                             text: result_text.clone(),
                                             mime: None,
@@ -549,7 +586,7 @@ impl AppCore {
                                             role: "assistant".into(),
                                             parts: vec![serde_json::to_value(
                                                 MessagePart::ToolResult {
-                                                    call_id: "unknown".into(),
+                                                    call_id: result_call_id.clone(),
                                                     output: storage::messages::parts::ToolOutput {
                                                         text: result_text.clone(),
                                                         mime: None,
@@ -568,7 +605,7 @@ impl AppCore {
                                     broker.publish(ThreadEvent::ToolCallCompleted {
                                         thread_id: tid.clone(),
                                         turn_id: tuid_bridge.clone(),
-                                        call_id: "unknown".into(),
+                                        call_id: result_call_id,
                                         success,
                                         duration_ms,
                                     });

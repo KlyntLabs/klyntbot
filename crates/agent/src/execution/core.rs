@@ -880,6 +880,7 @@ impl ExecutionCore {
                                 name: name.clone(),
                                 args: args.clone(),
                                 agent: None,
+                                call_id: Some(id.clone()),
                             },
                         )
                         .await;
@@ -924,6 +925,7 @@ impl ExecutionCore {
                                 duration_ms,
                                 result: truncated,
                                 agent: None,
+                                call_id: Some(id.clone()),
                             },
                         )
                         .await;

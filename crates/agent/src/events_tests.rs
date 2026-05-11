@@ -85,6 +85,7 @@ mod tests {
             name: "todo".to_string(),
             args: serde_json::json!({"action": "add"}),
             agent: None,
+            call_id: None,
         };
         let v = serialize(&event);
         assert_eq!(v["type"], "toolStart");
@@ -99,6 +100,7 @@ mod tests {
             name: "x".to_string(),
             args: serde_json::Value::Null,
             agent: None,
+            call_id: None,
         };
         let v = serialize(&event);
         let tag = v["type"].as_str().unwrap();
@@ -117,6 +119,7 @@ mod tests {
             duration_ms: 42,
             result: Some("Found 3 tasks".to_string()),
             agent: None,
+            call_id: None,
         };
         let v = serialize(&event);
         assert_eq!(v["type"], "toolEnd");
@@ -140,6 +143,7 @@ mod tests {
             duration_ms: 0,
             result: None,
             agent: None,
+            call_id: None,
         };
         let v = serialize(&event);
         assert_eq!(v["type"].as_str().unwrap(), "toolEnd");
@@ -221,6 +225,7 @@ mod tests {
                 name: "tool".to_string(),
                 args: serde_json::Value::Null,
                 agent: None,
+                call_id: None,
             },
             AgentEvent::ToolEnd {
                 name: "tool".to_string(),
@@ -228,6 +233,7 @@ mod tests {
                 duration_ms: 1,
                 result: Some("ok".to_string()),
                 agent: None,
+                call_id: None,
             },
             AgentEvent::IterationStart {
                 iteration: 1,

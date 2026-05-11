@@ -33,7 +33,10 @@ export function CodingThreadView({
   draftPrompt,
   onDraftConsumed,
 }: Props) {
-  const { items, turnState } = useThreadEvents(threadId, draftPrompt ?? null);
+  const { items, turnState, processingStartedAt, lastDurationMs } = useThreadEvents(
+    threadId,
+    draftPrompt ?? null,
+  );
 
   const consumedRef = useRef(false);
   useEffect(() => {
@@ -83,6 +86,8 @@ export function CodingThreadView({
             openTargets={openTargets}
             selectedOpenAppId={selectedOpenAppId}
             isThinking={isThinking}
+            processingStartedAt={processingStartedAt}
+            lastDurationMs={lastDurationMs}
           />
         </div>
       </div>
@@ -155,6 +160,12 @@ function adaptItems(rawItems: MessageDto[]): ConversationItem[] {
     (item) => !isAgentsMdSyntheticMessage(item),
   );
   const out: ConversationItem[] = [];
+  // Track index in `out` keyed by call_id so we can merge a later
+  // `tool_result` part back into its originating `tool_call` row, instead
+  // of rendering two independent rows. Without this, the call row never
+  // receives a terminal `status`/`output`, so `toolStatusTone` defaults to
+  // "processing" and its spinner spins forever — even after the turn is done.
+  const callIdToOutIdx = new Map<string, number>();
   for (const item of items) {
     // Buffers accumulate consecutive same-kind parts, then flush in-order
     // when a different-kind part arrives — this keeps the natural temporal
@@ -199,6 +210,7 @@ function adaptItems(rawItems: MessageDto[]): ConversationItem[] {
           break;
         case "tool_call":
           flushBuffers();
+          callIdToOutIdx.set(part.call_id, out.length);
           out.push({
             id: `${item.id}-call-${part.call_id}`,
             kind: "tool",
@@ -207,18 +219,38 @@ function adaptItems(rawItems: MessageDto[]): ConversationItem[] {
             detail: previewArgs(part.args),
           });
           break;
-        case "tool_result":
+        case "tool_result": {
           flushBuffers();
-          out.push({
-            id: `${item.id}-result-${part.call_id}`,
-            kind: "tool",
-            toolType: "result",
-            title: "result",
-            detail: part.output.text.slice(0, 200),
-            output: part.output.text,
-            status: part.is_error ? "error" : "ok",
-          });
+          const idx = callIdToOutIdx.get(part.call_id);
+          const existing = idx !== undefined ? out[idx] : undefined;
+          if (existing && existing.kind === "tool") {
+            // Merge the result into the originating call row. We keep the
+            // call's `toolType`, `title`, and `detail` (the args preview)
+            // untouched so the row continues to read as
+            // `<tool>: <args>` once completed — only the trailing
+            // status/output/spinner state changes.
+            out[idx!] = {
+              ...existing,
+              output: part.output.text,
+              status: part.is_error ? "error" : "ok",
+            };
+          } else {
+            // Defensive fallback: an orphan result with no matching call
+            // (shouldn't happen, but if the bridge ever changes order or
+            // an event is dropped, surface it as its own row rather than
+            // silently swallowing it).
+            out.push({
+              id: `${item.id}-result-${part.call_id}`,
+              kind: "tool",
+              toolType: "result",
+              title: "result",
+              detail: part.output.text.slice(0, 200),
+              output: part.output.text,
+              status: part.is_error ? "error" : "ok",
+            });
+          }
           break;
+        }
         case "file_change":
           flushBuffers();
           out.push({

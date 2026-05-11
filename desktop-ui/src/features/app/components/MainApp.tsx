@@ -661,21 +661,37 @@ export default function MainApp() {
   });
   // Bridge: legacy `app-server-event` only feeds assistant-mode thread status.
   // Coding threads emit `agent:thread_event` instead, so we merge that stream
-  // in here. Without this, `isProcessing` for a coding thread never flips back
-  // to false and the composer stays in "queue" mode forever.
+  // in here. The `useCodingThreadStatus` running set is the *authoritative*
+  // signal for coding threads — when a turn completes, the SSE `turn_completed`
+  // removes the id from the running set in real time. We therefore override
+  // any stale `isProcessing: true` left in the assistant store by the
+  // send-time `markProcessing(true)` call. Previously this loop only iterated
+  // over currently-running threads, so completed coding turns never got their
+  // stale flag cleared and the composer stayed in "queue" mode until a
+  // tab-switch refresh dispatched a new status.
   const codingThreadStatus = useCodingThreadStatus();
   const threadStatusById = useMemo(() => {
     const merged: typeof assistantThreadStatusById = { ...assistantThreadStatusById };
-    for (const [threadId, status] of Object.entries(codingThreadStatus)) {
-      // Coding bridge only tracks isProcessing; pad to the full
-      // ThreadActivityStatus shape consumers expect.
+    // 1. Override `isProcessing` for any coding thread already in the merged
+    //    map — running set is canonical, even when it says "not running".
+    for (const threadId of Object.keys(merged).filter((id) => id.startsWith("coding:"))) {
       merged[threadId] = {
-        isProcessing: status.isProcessing,
-        hasUnread: false,
-        isReviewing: false,
-        processingStartedAt: null,
-        lastDurationMs: null,
+        ...merged[threadId],
+        isProcessing: Boolean(codingThreadStatus[threadId]?.isProcessing),
       };
+    }
+    // 2. Backfill any running coding thread the assistant store hasn't seen
+    //    yet (e.g. a turn started before the thread row was created).
+    for (const [threadId, status] of Object.entries(codingThreadStatus)) {
+      if (!merged[threadId]) {
+        merged[threadId] = {
+          isProcessing: status.isProcessing,
+          hasUnread: false,
+          isReviewing: false,
+          processingStartedAt: null,
+          lastDurationMs: null,
+        };
+      }
     }
     return merged;
   }, [assistantThreadStatusById, codingThreadStatus]);

@@ -55,13 +55,21 @@ export function basename(path: string) {
   return parts.length ? parts[parts.length - 1] : path;
 }
 
+const _parseToolArgsCache = new Map<string, Record<string, unknown> | null>();
 function parseToolArgs(detail: string) {
   if (!detail) {
     return null;
   }
+  const cached = _parseToolArgsCache.get(detail);
+  if (cached !== undefined) {
+    return cached;
+  }
   try {
-    return JSON.parse(detail) as Record<string, unknown>;
+    const parsed = JSON.parse(detail) as Record<string, unknown>;
+    _parseToolArgsCache.set(detail, parsed);
+    return parsed;
   } catch {
+    _parseToolArgsCache.set(detail, null);
     return null;
   }
 }
@@ -621,5 +629,48 @@ export function toolRowDescriptor(
   if (item.toolType === "plan") {
     return { family: "domain", name: "Plan", arg: "", meta: [] };
   }
-  return { family: "system", name: item.title || "Tool", arg: "", meta: [] };
+  // Generic fallback for raw tool names emitted by the coding bridge —
+  // `read`, `list_dir`, `glob`, `tool_search`, `bash`, etc. Render as
+  // `<tool>: <primary arg>` by reaching into the args JSON (stored in
+  // `item.detail`) for the most-meaningful field. Without this branch the
+  // row reads as bare `read:` with no path, which is what users were seeing.
+  const fallbackArgs = parseToolArgs(item.detail);
+  const fallbackPrimary = firstStringField(fallbackArgs, [
+    // File-ish tools
+    "path",
+    "file_path",
+    "filename",
+    "file",
+    // Directory-ish tools
+    "directory",
+    "dir",
+    "target_directory",
+    // Search-ish tools
+    "pattern",
+    "glob",
+    "query",
+    "q",
+    "search",
+    "search_query",
+    // Shell / network
+    "command",
+    "cmd",
+    "url",
+  ]);
+  // Last-resort: take the first string-valued field in the args object.
+  const fallbackArg =
+    fallbackPrimary ||
+    (fallbackArgs
+      ? (Object.values(fallbackArgs).find(
+          (v) => typeof v === "string" && v.trim().length > 0,
+        ) as string | undefined) ?? ""
+      : item.detail);
+  const truncatedArg =
+    fallbackArg.length > 80 ? `${fallbackArg.slice(0, 80)}…` : fallbackArg;
+  return {
+    family: "system",
+    name: item.title || "Tool",
+    arg: truncatedArg,
+    meta: [],
+  };
 }

@@ -160,8 +160,10 @@
 }
 
 .message.user {
-  display: grid;
-  justify-items: end;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  align-self: stretch;
 }
 
 .bubble {

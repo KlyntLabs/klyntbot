@@ -200,6 +200,7 @@ mod tests {
                 name: "task".into(),
                 args: serde_json::json!({}),
                 agent: None,
+                call_id: None,
             })
             .await
             .unwrap();
@@ -210,6 +211,7 @@ mod tests {
                 duration_ms: 50,
                 result: None,
                 agent: None,
+                call_id: None,
             })
             .await
             .unwrap();
