@@ -5,17 +5,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
 vi.mock("@/api/client", () => ({ invoke: vi.fn().mockResolvedValue(undefined) }));
-vi.mock("@/features/chat/store/chatStreamStore", () => ({
-  chatStreamStore: { upsertApproval: vi.fn(), resolveApproval: vi.fn() },
-}));
 
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@/api/client";
-import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
+import { useChatStore } from "@/features/threads/store/useChatStore";
 import { useApprovalQueue } from "./useApprovalQueue";
 
 describe("useApprovalQueue", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useChatStore.setState({
+      streamApprovals: {},
+      streamFileEdits: {},
+      streamSnapshots: {},
+    });
+  });
 
   it("subscribes to approval events", async () => {
     vi.mocked(listen).mockImplementation(() => Promise.resolve(() => {}));
@@ -58,13 +62,25 @@ describe("useApprovalQueue", () => {
       },
     });
 
-    expect(chatStreamStore.upsertApproval).toHaveBeenCalledWith(
-      "session-1",
-      expect.objectContaining({ kind: "approval", requestId: "r1", status: "pending" }),
-    );
+    const approvals = useChatStore.getState().streamApprovals["session-1"] ?? [];
+    expect(approvals).toHaveLength(1);
+    expect(approvals[0]).toMatchObject({ kind: "approval", requestId: "r1", status: "pending" });
   });
 
   it("resolves approval on agent:approval_resolved", async () => {
+    useChatStore.getState().upsertApproval("session-1", {
+      id: "approval-r1",
+      kind: "approval",
+      requestId: "r1",
+      tool: "bash",
+      args: {},
+      cwd: "/repo",
+      sandboxSummary: "",
+      layer: "default_mode",
+      layerReason: "",
+      status: "pending",
+    });
+
     const listeners: Record<string, (event: { payload: unknown }) => void> = {};
     vi.mocked(listen).mockImplementation((event, handler) => {
       listeners[event as string] = handler as (e: { payload: unknown }) => void;
@@ -81,11 +97,8 @@ describe("useApprovalQueue", () => {
       },
     });
 
-    expect(chatStreamStore.resolveApproval).toHaveBeenCalledWith(
-      "session-1",
-      "r1",
-      "approved-once",
-      "user",
-    );
+    const approvals = useChatStore.getState().streamApprovals["session-1"] ?? [];
+    expect(approvals[0].status).toBe("approved-once");
+    expect(approvals[0].decidedBy).toBe("user");
   });
 });

@@ -150,13 +150,42 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 
 **Execution constants** (`crates/agent/src/execution/core.rs`): `MAX_CONCURRENT_TOOLS = 10` (parallel tool fan-out via global semaphore — there's no per-tool serial-only flag today), `MAX_TOOL_RESULT_LENGTH = 50_000` bytes (results truncated past this), `INTERACTIVE_TOOL_TIMEOUT = 600s` (only for `ask_user`; default `params.tool_timeout = 30s`). `MidLoopCompressor` constants: `COMPRESSION_THRESHOLD = 0.70`, `MIN_RECENT_MESSAGES = 8`, `MIN_COMPRESSIBLE_TOKENS = 50`. `ANTHROPIC_CONTEXT_WINDOW = 200_000`.
 
-**Cancellation:** `tokio_util::sync::CancellationToken` carried in `ExecutionParams::cancel_token`. Active sessions tracked in `ActiveStreams = DashMap<String, CancellationToken>` (`crates/agent/src/agent_loop/streaming.rs:27`). Cancel observed at iteration boundary (`execute_loop.rs:113`) — in-flight tool calls run to their timeout before cancellation fires. `chat_cancel()` removes the entry and calls `token.cancel()`.
+**Cancellation:** `tokio_util::sync::CancellationToken` carried in `ExecutionParams::cancel_token`. Active turns tracked in `ActiveTurns = Arc<DashMap<String, ActiveTurnEntry>>` (`crates/app-core/src/runtime/mod.rs`). Each entry has a monotonic `guard_id: u64`; `StreamGuard` performs value-identity removal on drop (only deletes if `guard_id` still matches). Cancel observed at iteration boundary (`execute_loop.rs:113`) — in-flight tool calls run to their timeout before cancellation fires. `chat_cancel()` removes the entry and calls `token.cancel()`. Double-send rejection: `chat_send` returns `ApiError::conflict` if the session already has an active turn.
 
 **Mid-loop context compression:** `MidLoopCompressor` (in `crates/agent/src/execution/`) triggers when message tokens exceed 70% of context window. Replaces older `Message::Tool` results with extractive summaries (~150-char first-snippet + size annotation). Preserves system messages and last 8 messages verbatim. Emits `AgentEvent::ContextCompressed`. **Note:** `Message::Tool.content` is currently a plain `String`; image-bearing tool results have no schema today.
 
 **Tiered History Compression (THC):** `TieredHistoryCompressor` (in `crates/context_engine/src/history_compressor/`) operates at the context-engine level before messages enter the LLM. Groups messages into `ConversationTurn`s, optionally scores via `MemoryScorer`, assigns tiers (Verbatim / Detailed / Condensed), and compresses with tier-specific prompts. Extractive-first: falls back to snippet extraction when LLM summaries aren't needed or fail. Configured via `HistoryCompressionConfig`.
 
 **Live context refresh:** `LiveContextRefresher` (in `crates/agent/src/execution/`) drains `ContextUpdateQueue` (in `bus` crate) at each iteration boundary. Injects `Message::ContextUpdate` entries. Token budget: standard 80%, high-priority 90%. Set `pause_context_updates: true` on `ExecutionParams` for frozen-context mode.
+
+### Chat / Thread runtime
+
+**`ThreadRuntime` trait** (`crates/app-core/src/runtime/mod.rs`): Unified interface for assistant and coding modes. Both `AssistantThreadRuntime` (`runtime/assistant.rs`) and `CodingThreadRuntime` (`runtime/coding.rs`) implement `start_turn`, `cancel_turn`, `is_active`, and `active_turns`. `AppCore` stores both as `OnceLock<Arc<dyn ThreadRuntime>>`.
+
+**`ThreadEvent` v2** (`desktop-shared/src/thread_event_v2.rs`): Single `specta::Type`-derived union replaces 50+ individual `agent:*` Tauri events. Every turn guarantees exactly one `Terminal` variant on exit (Done, Error, or Cancelled). Emitted via `thread:event` Tauri channel. Generation counter (`u32`) per thread prevents stale events from updating state after a new turn starts.
+
+**Frontend store:** `useChatStore` (`desktop-ui/src/features/threads/store/useChatStore.ts`) is a Zustand store with three slices:
+- **Threads:** `threadReducer` state (activeThreadId, itemsByThread, threadStatus, etc.)
+- **Streams:** `StreamSnapshot` per sessionKey (segments, approvals, fileEdits, transparency)
+- **Coding:** `CodingThreadState` per threadId, plus `codingRunningIds` and `codingRecentlyCompleted`
+
+Delta coalescing: `CoalescerRegistry` (`threads/utils/coalesceDeltas.ts`) batches `ThreadEvent`s with `requestAnimationFrame` (fallback to `setTimeout(..., 16)` in tests). Keeps 10k-token stream DOM commit p95 ≤ 16ms.
+
+**Virtualized messages:** `VirtualizedMessageList` (`messages/components/VirtualizedMessageList.tsx`) wraps `Messages` and `CodingThreadView` with `@tanstack/react-virtual`. `useTransition` defers non-urgent historical renders.
+
+**Heartbeat & watchdog:** Backend emits `ThreadEvent::Heartbeat` every 30s from both chat relay (`streaming.rs`) and coding bridge (`turn_handler.rs`). Frontend `useThreadWatchdog` resets a 90s timer on each heartbeat; fires `onFire` if no heartbeat arrives while `isProcessing=true`.
+
+**Zombie detection:** `sessions.last_event_at` (added in `001_initial.sql`) is updated on every event. `SessionRepo::detect_zombie_sessions(threshold_ms)` finds sessions where `last_event_at < now - threshold` and the most recent message role is "user". Tauri command `chat_zombie_check` exposes this; `chat_force_reset` clears `active_streams` and emits a synthetic `Terminal` event.
+
+**Performance gates:** `scripts/run_chat_perf_gates.sh` runs four criterion benches + one vitest bench with numeric `awk` assertions:
+- TTFT p95 ≤ 15ms (`agent/benches/ttft_e2e.rs`)
+- Stream throughput ≥ 5,000 evt/s (`agent/benches/stream_throughput.rs`)
+- Relay cleanup p99 ≤ 1ms (`desktop/benches/relay_cleanup_latency.rs`)
+- Coalescer p95 ≤ 16ms (`desktop-ui/__benches__/coalescer.bench.ts`)
+
+Bundle budget: 30 kB gzipped for `src/features/threads/**/*` (`.size-limit.json`).
+
+**Soak testing:** `scripts/run_chat_proptest_soak.sh` runs `event_sequence_invariants` with 10,000 cases (gated under `--features soak`). Default proptest uses 100 cases.
 
 ## Behavioral Guidelines
 

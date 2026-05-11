@@ -45,12 +45,13 @@ echo "[perf-gate] criterion: stream_throughput"
 cargo bench -p agent --bench stream_throughput -- --quick --noplot 2>&1 | tee /tmp/throughput.log
 
 # Extract throughput at 10,000 batch size (last group in the bench).
-THRPT_10K=$(grep -A2 'stream_throughput/10000' /tmp/throughput.log | grep 'thrpt:' | awk '{
+THRPT_10K=$(grep -A2 'stream_throughput/10000' /tmp/throughput.log | grep 'thrpt:' | head -1 | awk '{
     val = $2
+    gsub(/[\[\]]/, "", val)
     if (val ~ /K/) { gsub(/K/, "", val); print val * 1000 }
     else if (val ~ /M/) { gsub(/M/, "", val); print val * 1000000 }
     else { print val }
-}' | head -1 || true)
+}' || true)
 
 if [[ -n "$THRPT_10K" ]]; then
     THRPT_10K_INT=$(printf '%.0f' "$THRPT_10K")

@@ -234,6 +234,7 @@ default = ["email"]
 email = ["channels/email"]
 browser-integration = ["tools/browser-integration"]
 plugin-integration = ["plugin-runtime/plugin-integration"]
+soak = []
 
 [dependencies]
 # Re-export all workspace crates

@@ -1,10 +1,14 @@
 /**
- * Global chat stream store — thin shim over `useChatStore`.
+ * Legacy v1 chat event bridge.
  *
- * During the PR6 migration window this module keeps its public API so
- * non-React callers (approval queue, file-edit events) don't break.
- * React consumers should migrate to `useChatStore` directly (see
- * `useAgentStream.ts` for the reference implementation).
+ * All state now lives in `useChatStore`; direct consumers were migrated
+ * in PR10. This module is retained solely for its Tauri event listeners
+ * that translate old per-event `agent:*` payloads into `streamSnapshots`
+ * updates. It is imported as a side-effect from `useChatStore.ts`.
+ *
+ * Full removal requires completing the frontend v2 `thread:event`
+ * migration for assistant chat (currently coding threads use v2 via
+ * `agent:thread_event`, but assistant chat still relies on v1).
  */
 
 import { isTauri } from "@tauri-apps/api/core";

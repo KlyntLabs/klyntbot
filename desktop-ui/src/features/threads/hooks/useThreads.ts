@@ -33,7 +33,8 @@ import { useThreadRateLimits } from "./useThreadRateLimits";
 import { useThreadSelectors } from "./useThreadSelectors";
 import { useThreadStatus } from "./useThreadStatus";
 import { useThreadStorage } from "./useThreadStorage";
-import { useThreadsReducer } from "./useThreadsStore";
+import { useChatStore, selectThreadState } from "../store/useChatStore";
+import { useEffect } from "react";
 import { useThreadTitleAutogeneration } from "./useThreadTitleAutogeneration";
 import { useThreadUserInput } from "./useThreadUserInput";
 
@@ -91,7 +92,11 @@ export function useThreads({
   const maxItemsPerThread =
     chatHistoryScrollbackItems === undefined ? CHAT_SCROLLBACK_DEFAULT : chatHistoryScrollbackItems;
 
-  const [state, dispatch] = useThreadsReducer(maxItemsPerThread);
+  const dispatch = useChatStore((s) => s.dispatchThreadAction);
+  useEffect(() => {
+    dispatch({ type: "setMaxItemsPerThread", maxItemsPerThread });
+  }, [dispatch, maxItemsPerThread]);
+  const state = useChatStore(selectThreadState);
   const loadedThreadsRef = useRef<Record<string, boolean>>({});
   const replaceOnResumeRef = useRef<Record<string, boolean>>({});
   const pendingInterruptsRef = useRef<Set<string>>(new Set());

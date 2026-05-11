@@ -2,7 +2,7 @@
 
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
+import { useChatStore } from "@/features/threads/store/useChatStore";
 import { useSlashCommands } from "../hooks/useSlashCommands";
 
 vi.mock("@/api/client", () => ({
@@ -35,7 +35,7 @@ vi.mock("@/api/client", () => ({
 
 describe("slash command e2e", () => {
   beforeEach(() => {
-    chatStreamStore.clearSegments("session-e2e");
+    useChatStore.getState().clearSegments("session-e2e");
   });
 
   test("typing /skills list in coding mode dispatches and renders system row", async () => {
@@ -52,11 +52,11 @@ describe("slash command e2e", () => {
     expect(item?.result[0].name).toBe("alpha");
 
     // Simulate what Composer.tsx does on render result
-    chatStreamStore.appendSystemItem("session-e2e", res.itemKind, item);
+    useChatStore.getState().appendSystemItem("session-e2e", res.itemKind, item);
 
-    const snapshot = chatStreamStore.getSnapshot("session-e2e");
-    expect(snapshot.segments.length).toBe(1);
-    expect((snapshot.segments[0] as { type: string }).type).toBe("system");
+    const snapshot = useChatStore.getState().streamSnapshots["session-e2e"];
+    expect(snapshot?.segments.length).toBe(1);
+    expect((snapshot?.segments[0] as { type: string }).type).toBe("system");
   });
 
   test("/plan refactor is agent-routed and transforms text", async () => {

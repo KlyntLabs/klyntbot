@@ -25,6 +25,7 @@ impl LlmProvider for FixedProvider {
         _messages: &[Message],
         _tools: Option<&[serde_json::Value]>,
         _params: &ChatParams,
+        _breakpoints: &[providers::types::CacheBreakpoint],
     ) -> common::Result<LlmResponse> {
         Ok(LlmResponse {
             content: Some(String::new()),

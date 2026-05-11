@@ -141,6 +141,7 @@ mod tests {
                     metadata: serde_json::json!({}),
                     created_at: now,
                     updated_at: now,
+                    last_event_at: None,
                     project_id: None,
                     conversation_type: None,
                     pinned: false,
