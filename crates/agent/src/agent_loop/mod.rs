@@ -1193,8 +1193,8 @@ impl AgentLoop {
         tracing::debug!(session = %session_key, history_len = history.len(), "process_direct_streaming: after setup_session");
 
         // Create event channel and interaction channel
-        let (event_tx, event_rx) = mpsc::channel(64);
-        let (interaction_tx, interaction_rx) = mpsc::channel(4);
+        let (event_tx, event_rx) = mpsc::channel(256);
+        let (interaction_tx, interaction_rx) = mpsc::channel(8);
 
         // Authoritative session mode comes from the session row itself.
         // The legacy `mode: Option<String>` parameter is now an override hint

@@ -511,7 +511,9 @@ pub async fn relay_chat_stream(
     // Merge pipeline events and domain-bus agent events into a single stream
     // so that tools (e.g. BashTool) that publish via the domain bus are relayed
     // to the UI just like native pipeline events.
-    let (merged_tx, mut merged_rx) = mpsc::channel::<AgentEvent>(64);
+    // Capacity 256: bursty providers can emit ~50 events/sec at peak; 64 is too
+    // small once we add token-by-token streaming + parallel tool calls.
+    let (merged_tx, mut merged_rx) = mpsc::channel::<AgentEvent>(256);
     let merged_tx2 = merged_tx.clone();
 
     tokio::spawn(async move {
@@ -753,6 +755,9 @@ pub async fn relay_chat_stream(
                                     base: Default::default(),
                                 };
                                 let _ = engine.fire(HookFireInput::SessionEnd(input)).await;
+                                // Now that the hook has fired exactly once, drop the marker
+                                // so the next turn on this session can fire SessionStart cleanly.
+                                session_end_fired.remove(sk.as_str());
                             }
                         }
                         break;
@@ -762,9 +767,31 @@ pub async fn relay_chat_stream(
                             AGENT_ERROR,
                             AgentErrorPayload {
                                 session_key: sk.clone(),
-                                message,
+                                message: message.clone(),
                             }
                         );
+                        // ALSO emit chat:message_added so the FE re-reads the session.
+                        // Without this, FE consumers that gate on chat:message_added to refresh
+                        // history will never see the error message even though it's persisted.
+                        emit!(
+                            CHAT_MESSAGE_ADDED,
+                            ChatMessagePayload {
+                                session_key: sk.clone(),
+                                source: "agent_error".to_string(),
+                            }
+                        );
+                        break;
+                    }
+                    AgentEvent::Cancelled { partial_content, partial_reasoning } => {
+                        emit!(
+                            AGENT_CANCELLED,
+                            CancelledPayload {
+                                session_key: sk.clone(),
+                                partial_content,
+                                partial_reasoning,
+                            }
+                        );
+                        // Cancellation is terminal — drop the stream guard by breaking.
                         break;
                     }
                     AgentEvent::ExecutionStarted { engine, max_iterations } => {

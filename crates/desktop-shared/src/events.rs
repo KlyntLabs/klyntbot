@@ -32,6 +32,7 @@ pub const AGENT_DONE: &str = "agent:done";
 pub const AGENT_TOOL_START: &str = "agent:tool_start";
 pub const AGENT_TOOL_END: &str = "agent:tool_end";
 pub const AGENT_ERROR: &str = "agent:error";
+pub const AGENT_CANCELLED: &str = "agent:cancelled";
 pub const AGENT_ENTITY_CREATED: &str = "agent:entity_created";
 pub const AGENT_INTERACTION_REQUEST: &str = "agent:interaction_request";
 pub const AGENT_PIPELINE_STARTED: &str = "agent:pipeline_started";
@@ -154,6 +155,14 @@ pub struct ToolEndPayload {
 pub struct AgentErrorPayload {
     pub session_key: String,
     pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CancelledPayload {
+    pub session_key: String,
+    pub partial_content: String,
+    pub partial_reasoning: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -717,6 +726,10 @@ impl tauri_specta::Event for ToolEndPayload {
 
 impl tauri_specta::Event for AgentErrorPayload {
     const NAME: &'static str = "agent:error";
+}
+
+impl tauri_specta::Event for CancelledPayload {
+    const NAME: &'static str = "agent:cancelled";
 }
 
 impl tauri_specta::Event for EntityCreatedPayload {
