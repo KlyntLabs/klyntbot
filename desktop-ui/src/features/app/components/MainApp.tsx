@@ -33,6 +33,7 @@ import { useThreadListActions } from "@app/hooks/useThreadListActions";
 import { useThreadListSortKey } from "@app/hooks/useThreadListSortKey";
 import { useThreadRows } from "@app/hooks/useThreadRows";
 import { useTrayRecentThreads } from "@app/hooks/useTrayRecentThreads";
+import { useThreadWatchdog } from "@threads/hooks/useThreadWatchdog";
 import { useTraySessionUsage } from "@app/hooks/useTraySessionUsage";
 import { useUpdaterController } from "@app/hooks/useUpdaterController";
 import { useWorkspaceController } from "@app/hooks/useWorkspaceController";
@@ -580,6 +581,7 @@ export default function MainApp() {
     threadParentById,
     isSubagentThread,
     threadStatusById: assistantThreadStatusById,
+    markProcessing,
     threadResumeLoadingById,
     threadListLoadingByWorkspace,
     threadListPagingByWorkspace,
@@ -695,6 +697,21 @@ export default function MainApp() {
     }
     return merged;
   }, [assistantThreadStatusById, codingThreadStatus]);
+  // Assistant-mode watchdog: if a turn is processing for >90s with no event,
+  // fire and reset state so the user can retry.
+  useThreadWatchdog({
+    threadId: mode === "assistant" ? activeThreadId : null,
+    isProcessing: Boolean(
+      activeThreadId && threadStatusById[activeThreadId]?.isProcessing,
+    ),
+    onFire: useCallback(
+      (threadId: string) => {
+        markProcessing(threadId, false);
+      },
+      [markProcessing],
+    ),
+  });
+
   const { connectionState: remoteThreadConnectionState } = useRemoteThreadLiveConnection({
     backendMode: appSettings.backendMode,
     activeWorkspace,

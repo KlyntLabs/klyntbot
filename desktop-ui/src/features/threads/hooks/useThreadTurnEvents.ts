@@ -18,7 +18,7 @@ import {
   shouldClearCompletedPlanForThread,
   shouldIgnoreOrphanSubagentThread,
 } from "./threadTurnEventHelpers";
-import { selectTurnGeneration, type ThreadAction, type ThreadState } from "./useThreadsReducer";
+import type { ThreadAction } from "./useThreadsReducer";
 
 type UseThreadTurnEventsOptions = {
   dispatch: Dispatch<ThreadAction>;
@@ -374,13 +374,12 @@ export function useThreadTurnEvents({
     (
       workspaceId: string,
       threadId: string,
-      turnId: string,
+      _turnId: string,
       payload: { message: string; willRetry: boolean },
     ) => {
       if (payload.willRetry) {
         return;
       }
-      const currentGeneration = getTurnGeneration(threadId);
       // Note: onTurnError doesn't have eventGeneration wired yet (PR4),
       // but we remove the silent-drop guard that caused permanent stuck state.
       // Generation check will be added once wire events carry generation.

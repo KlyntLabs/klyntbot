@@ -645,6 +645,7 @@ describe("useThreadTurnEvents", () => {
       current: {} as Record<string, TurnPlan | null>,
     };
 
+    const getTurnGeneration = vi.fn(() => 0);
     const { result, rerender } = renderHook(() =>
       useThreadTurnEvents({
         dispatch,
@@ -656,6 +657,7 @@ describe("useThreadTurnEvents", () => {
         setThreadLoaded,
         setActiveTurnId,
         getActiveTurnId,
+        getTurnGeneration,
         pendingInterruptsRef,
         pushThreadErrorMessage,
         safeMessageActivity,
