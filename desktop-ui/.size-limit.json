@@ -1,0 +1,14 @@
+[
+  {
+    "name": "threads route",
+    "path": ["dist/assets/threads-*.js", "dist/assets/messages-*.js", "dist/assets/coding-*.js"],
+    "limit": "350 kB",
+    "gzip": true
+  },
+  {
+    "name": "total app",
+    "path": "dist/assets/*.js",
+    "limit": "2.5 MB",
+    "gzip": true
+  }
+]

@@ -1,6 +1,6 @@
 import { PlanReadyFollowupMessage } from "@app/components/PlanReadyFollowupMessage";
 import { RequestUserInputMessage } from "@app/components/RequestUserInputMessage";
-import { memo, useCallback } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { CostCeilingBanner } from "@/features/coding/components/CostCeilingBanner";
 import { DeadEndWarning } from "@/features/coding/components/DeadEndWarning";
 import { RecallTrayCard } from "@/features/coding/components/RecallTrayCard";
@@ -13,7 +13,7 @@ import type {
   RequestUserInputResponse,
 } from "@/types";
 import { useFileLinkOpener } from "../hooks/useFileLinkOpener";
-import { groupBursts } from "../utils/groupBursts";
+import { groupBursts, type BurstGroup } from "../utils/groupBursts";
 import { parseReasoning } from "../utils/messageRenderUtils";
 import { BurstRow } from "./BurstRow";
 import {
@@ -28,6 +28,7 @@ import {
   WorkingIndicator,
 } from "./MessageRows";
 import { useMessagesViewState } from "./useMessagesViewState";
+import { VirtualizedMessageList } from "./VirtualizedMessageList";
 
 type MessagesProps = {
   items: ConversationItem[];
@@ -161,7 +162,6 @@ export const Messages = memo(function Messages({
       const isCopied = copiedMessageId === item.id;
       return (
         <MessageRow
-          key={item.id}
           item={item}
           isCopied={isCopied}
           onCopy={handleCopyMessage}
@@ -179,7 +179,6 @@ export const Messages = memo(function Messages({
       const parsed = reasoningMetaById.get(item.id) ?? parseReasoning(item);
       return (
         <ReasoningRow
-          key={item.id}
           item={item}
           parsed={parsed}
           showMessageFilePath={showMessageFilePath}
@@ -193,7 +192,6 @@ export const Messages = memo(function Messages({
     if (item.kind === "review") {
       return (
         <ReviewRow
-          key={item.id}
           item={item}
           showMessageFilePath={showMessageFilePath}
           workspacePath={workspacePath}
@@ -206,17 +204,16 @@ export const Messages = memo(function Messages({
     if (item.kind === "userInput") {
       const isExpanded = expandedItems.has(item.id);
       return (
-        <UserInputRow key={item.id} item={item} isExpanded={isExpanded} onToggle={toggleExpanded} />
+        <UserInputRow item={item} isExpanded={isExpanded} onToggle={toggleExpanded} />
       );
     }
     if (item.kind === "diff") {
-      return <DiffRow key={item.id} item={item} />;
+      return <DiffRow item={item} />;
     }
     if (item.kind === "tool") {
       const isExpanded = expandedItems.has(item.id);
       return (
         <ToolRow
-          key={item.id}
           item={item}
           isExpanded={isExpanded}
           onToggle={toggleExpanded}
@@ -230,15 +227,14 @@ export const Messages = memo(function Messages({
       );
     }
     if (item.kind === "explore") {
-      return <ExploreRow key={item.id} item={item} />;
+      return <ExploreRow item={item} />;
     }
     if (item.kind === "approval") {
-      return <ApprovalRow key={item.id} item={item} onRespond={handleApprovalRespond} />;
+      return <ApprovalRow item={item} onRespond={handleApprovalRespond} />;
     }
     if (item.kind === "recall") {
       return (
         <RecallTrayCard
-          key={item.id}
           memoryIds={item.memory_ids}
           coverageScore={item.coverage_score}
           snippets={item.snippets}
@@ -248,7 +244,6 @@ export const Messages = memo(function Messages({
     if (item.kind === "dead_end_warning") {
       return (
         <DeadEndWarning
-          key={item.id}
           approachSummary={item.approach_summary}
           priorAttemptId={item.prior_attempt_id}
           confidence={item.confidence}
@@ -258,48 +253,76 @@ export const Messages = memo(function Messages({
     return null;
   };
 
+  const grouped = useMemo(() => groupBursts(visibleItems), [visibleItems]);
+
+  type GroupedEntry = ConversationItem | BurstGroup;
+
+  const renderGroupedEntry = useCallback(
+    (entry: GroupedEntry) => {
+      if ("kind" in entry && entry.kind === "burst") {
+        return (
+          <BurstRow
+            group={entry}
+            expandedItems={expandedItems}
+            onToggle={toggleExpanded}
+          />
+        );
+      }
+      return renderItem(entry);
+    },
+    [expandedItems, toggleExpanded],
+  );
+
+  const getEntryKey = useCallback(
+    (entry: GroupedEntry, index: number) => {
+      if ("kind" in entry && entry.kind === "burst") {
+        return `burst-${entry.id}`;
+      }
+      return entry.id ?? `entry-${index}`;
+    },
+    [],
+  );
+
   return (
     <div className="messages messages-full" ref={containerRef} onScroll={updateAutoScroll}>
       <div className="messages-inner">
         <CostCeilingBanner sessionKey={threadId ?? ""} />
-        {groupBursts(visibleItems).map((entry) => {
-          if ("kind" in entry && entry.kind === "burst") {
-            return (
-              <BurstRow
-                key={entry.id}
-                group={entry}
-                expandedItems={expandedItems}
-                onToggle={toggleExpanded}
+        <VirtualizedMessageList
+          items={grouped}
+          renderItem={renderGroupedEntry}
+          getItemKey={getEntryKey}
+          scrollContainerRef={containerRef}
+          estimateSize={120}
+          trailingContent={
+            <>
+              {planFollowupNode}
+              {userInputNode}
+              <WorkingIndicator
+                isThinking={isThinking}
+                processingStartedAt={processingStartedAt}
+                lastDurationMs={lastDurationMs}
+                hasItems={items.length > 0}
+                reasoningLabel={latestReasoningLabel}
+                showPollingFetchStatus={showPollingFetchStatus}
+                pollingIntervalMs={pollingIntervalMs}
               />
-            );
+              {!items.length && !userInputNode && !isThinking && !isLoadingMessages && (
+                <div className="empty messages-empty">
+                  {threadId ? "Send a prompt to the agent." : "Send a prompt to start a new agent."}
+                </div>
+              )}
+              {!items.length && !userInputNode && !isThinking && isLoadingMessages && (
+                <div className="empty messages-empty">
+                  <div className="messages-loading-indicator" role="status" aria-live="polite">
+                    <span className="working-spinner" aria-hidden />
+                    <span className="messages-loading-label">Loading…</span>
+                  </div>
+                </div>
+              )}
+              <div ref={bottomRef} />
+            </>
           }
-          return renderItem(entry);
-        })}
-        {planFollowupNode}
-        {userInputNode}
-        <WorkingIndicator
-          isThinking={isThinking}
-          processingStartedAt={processingStartedAt}
-          lastDurationMs={lastDurationMs}
-          hasItems={items.length > 0}
-          reasoningLabel={latestReasoningLabel}
-          showPollingFetchStatus={showPollingFetchStatus}
-          pollingIntervalMs={pollingIntervalMs}
         />
-        {!items.length && !userInputNode && !isThinking && !isLoadingMessages && (
-          <div className="empty messages-empty">
-            {threadId ? "Send a prompt to the agent." : "Send a prompt to start a new agent."}
-          </div>
-        )}
-        {!items.length && !userInputNode && !isThinking && isLoadingMessages && (
-          <div className="empty messages-empty">
-            <div className="messages-loading-indicator" role="status" aria-live="polite">
-              <span className="working-spinner" aria-hidden />
-              <span className="messages-loading-label">Loading…</span>
-            </div>
-          </div>
-        )}
-        <div ref={bottomRef} />
       </div>
     </div>
   );

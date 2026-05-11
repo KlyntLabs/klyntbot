@@ -10,6 +10,7 @@ import { applyThreadEvent, initialCodingState } from "@/features/coding/state/co
 import type { ConversationItem } from "@/types";
 import { initialState as threadInitialState, threadReducer } from "../hooks/useThreadsReducer";
 import type { ThreadAction, ThreadState } from "../hooks/useThreadsReducer";
+import { CoalescerRegistry } from "../utils/coalesceDeltas";
 
 type ApprovalItem = Extract<ConversationItem, { kind: "approval" }>;
 type DiffItem = Extract<ConversationItem, { kind: "diff" }>;
@@ -38,15 +39,25 @@ interface StreamSlice {
   _setStreamFileEdits: (sessionKey: string, edits: DiffItem[]) => void;
 }
 
+const streamCoalescers = new CoalescerRegistry<StreamSnapshot>();
+
 const createStreamSlice = (set: any): StreamSlice => ({
   streamSnapshots: {},
   streamApprovals: {},
   streamFileEdits: {},
 
-  _setStreamSnapshot: (sessionKey: string, snapshot: StreamSnapshot) =>
-    set((state: ChatStore) => ({
-      streamSnapshots: { ...state.streamSnapshots, [sessionKey]: snapshot },
-    })),
+  _setStreamSnapshot: (sessionKey: string, snapshot: StreamSnapshot) => {
+    const coalescer = streamCoalescers.get(sessionKey, {
+      flush: (snapshots) => {
+        const latest = snapshots[snapshots.length - 1];
+        set((state: ChatStore) => ({
+          streamSnapshots: { ...state.streamSnapshots, [sessionKey]: latest },
+        }));
+      },
+      maxWaitMs: 50,
+    });
+    coalescer.push(snapshot);
+  },
 
   _setStreamApprovals: (sessionKey: string, approvals: ApprovalItem[]) =>
     set((state: ChatStore) => ({
@@ -72,20 +83,36 @@ interface CodingSlice {
   resetCodingThreadState: (threadId: string) => void;
 }
 
+const codingCoalescers = new CoalescerRegistry<ThreadEvent>();
+
 const createCodingSlice = (set: any): CodingSlice => ({
   codingStateByThread: {},
   codingRunningIds: new Set<string>(),
   codingRecentlyCompleted: new Map<string, number>(),
 
-  applyCodingThreadEvent: (threadId: string, event: ThreadEvent) =>
-    set((state: ChatStore) => {
-      const prev = state.codingStateByThread[threadId] ?? initialCodingState;
-      const next = applyThreadEvent(prev, event);
-      if (next === prev) return {};
-      return {
-        codingStateByThread: { ...state.codingStateByThread, [threadId]: next },
-      };
-    }),
+  applyCodingThreadEvent: (threadId: string, event: ThreadEvent) => {
+    const coalescer = codingCoalescers.get(threadId, {
+      flush: (events) => {
+        set((state: ChatStore) => {
+          let prev = state.codingStateByThread[threadId] ?? initialCodingState;
+          let changed = false;
+          for (const evt of events) {
+            const next = applyThreadEvent(prev, evt);
+            if (next !== prev) {
+              prev = next;
+              changed = true;
+            }
+          }
+          if (!changed) return {};
+          return {
+            codingStateByThread: { ...state.codingStateByThread, [threadId]: prev },
+          };
+        });
+      },
+      maxWaitMs: 50,
+    });
+    coalescer.push(event);
+  },
 
   setCodingRunningIds: (ids: Set<string>) =>
     set(() => ({ codingRunningIds: new Set(ids) })),
@@ -93,11 +120,14 @@ const createCodingSlice = (set: any): CodingSlice => ({
   setCodingRecentlyCompleted: (map: Map<string, number>) =>
     set(() => ({ codingRecentlyCompleted: new Map(map) })),
 
-  resetCodingThreadState: (threadId: string) =>
+  resetCodingThreadState: (threadId: string) => {
+    codingCoalescers.dispose(threadId);
     set((state: ChatStore) => {
       const { [threadId]: _, ...rest } = state.codingStateByThread;
       return { codingStateByThread: rest };
-    }),
+    });
+  },
+
 });
 
 // ── Store ─────────────────────────────────────────────────────────────
