@@ -27,9 +27,11 @@ fn stream_throughput(c: &mut Criterion) {
                     let (tx, mut rx) = mpsc::channel::<AgentEvent>(64);
                     let producer = tokio::spawn(async move {
                         for _ in 0..n {
-                            tx.send(AgentEvent::ContentChunk { data: "x".repeat(16) })
-                                .await
-                                .unwrap();
+                            tx.send(AgentEvent::ContentChunk {
+                                data: "x".repeat(16),
+                            })
+                            .await
+                            .unwrap();
                         }
                     });
                     let mut count = 0usize;

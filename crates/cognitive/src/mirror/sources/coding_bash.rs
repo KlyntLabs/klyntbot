@@ -256,9 +256,7 @@ mod tests {
     #[test]
     fn spec_returns_4_kinds() {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let pool = rt.block_on(async {
-            storage::StoragePool::connect_in_memory().await.unwrap()
-        });
+        let pool = rt.block_on(async { storage::StoragePool::connect_in_memory().await.unwrap() });
         let bash_repo = Arc::new(BashJobRepo::new(pool.inner().clone()));
         let ep_repo = EpisodicMemoryRepo::new(pool.inner().clone());
         let src = BackgroundJobSignalSource::new(ep_repo, bash_repo);

@@ -2,8 +2,8 @@
 mod common;
 
 mod alarm_lifecycle;
-mod chat_lifecycle;
 mod channels;
+mod chat_lifecycle;
 mod coding_in_chat;
 mod coding_memory_phase2_desktop_off;
 mod coding_memory_phase2_roundtrip;

@@ -11,7 +11,6 @@ use desktop_shared::events::{self, *};
 use storage::{Repos, SessionContextParams};
 use tokio::sync::mpsc;
 
-
 use klynt_hooks::engine::HookFireInput;
 use klynt_hooks::events::{
     notification::NotificationInput, session_end::SessionEndInput,
@@ -32,8 +31,7 @@ pub struct ActiveStreamEntry {
     pub cancel: tokio_util::sync::CancellationToken,
 }
 
-static STREAM_GUARD_COUNTER: std::sync::atomic::AtomicU64 =
-    std::sync::atomic::AtomicU64::new(0);
+static STREAM_GUARD_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 fn next_guard_id() -> u64 {
     STREAM_GUARD_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
@@ -1300,9 +1298,9 @@ impl AppCore {
         // Reject double-send while a stream is already active for this session.
         if let Some(entry) = self.active_streams.get(&session_key) {
             if !entry.cancel.is_cancelled() {
-                return Err(ApiError::from(common::KlyntbotError::SessionAlreadyStreaming(
-                    session_key.clone(),
-                )));
+                return Err(ApiError::from(
+                    common::KlyntbotError::SessionAlreadyStreaming(session_key.clone()),
+                ));
             }
         }
 

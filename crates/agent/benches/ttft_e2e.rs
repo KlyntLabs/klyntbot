@@ -15,10 +15,7 @@ fn ttft_e2e(c: &mut Criterion) {
     group.sample_size(50);
     group.measurement_time(Duration::from_secs(10));
 
-    let rt = Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
+    let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
     group.bench_function("mock_8_tokens", |b| {
         b.to_async(&rt).iter(|| async move {

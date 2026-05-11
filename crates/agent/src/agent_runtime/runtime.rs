@@ -674,8 +674,11 @@ impl AgentRuntime {
         let mode_name = depth.to_string();
         let mut validation = self.validator.validate(&loop_result.content);
         let pipeline_elapsed_ms = pipeline_start.elapsed().as_millis() as u64;
-        let ttft_ms = first_chunk_instant
-            .and_then(|inst| inst.lock().unwrap().map(|i| i.duration_since(pipeline_start).as_millis() as u64));
+        let ttft_ms = first_chunk_instant.and_then(|inst| {
+            inst.lock()
+                .unwrap()
+                .map(|i| i.duration_since(pipeline_start).as_millis() as u64)
+        });
 
         // Record usage
         self.record_usage(

@@ -89,16 +89,24 @@ impl OpencodePoller {
             .acquire_timeout(std::time::Duration::from_secs(2))
             .connect_with(opts)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(format!("opencode ensure_indexes connect: {e}")))?;
+            .map_err(|e| {
+                common::KlyntbotError::Storage(format!("opencode ensure_indexes connect: {e}"))
+            })?;
 
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_message_time_created ON message(time_created)")
             .execute(&pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(format!("opencode create idx_message_time_created: {e}")))?;
+            .map_err(|e| {
+                common::KlyntbotError::Storage(format!(
+                    "opencode create idx_message_time_created: {e}"
+                ))
+            })?;
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_part_message_id ON part(message_id)")
             .execute(&pool)
             .await
-            .map_err(|e| common::KlyntbotError::Storage(format!("opencode create idx_part_message_id: {e}")))?;
+            .map_err(|e| {
+                common::KlyntbotError::Storage(format!("opencode create idx_part_message_id: {e}"))
+            })?;
         pool.close().await;
         Ok(())
     }

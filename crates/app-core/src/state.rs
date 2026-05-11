@@ -905,8 +905,15 @@ impl AppCore {
         } else if let Ok(home) = std::env::var("KLYNTBOT_HOME") {
             config.data_dir = Some(home);
         }
-        let (core, _channels) =
-            Self::init_with_sender(common::AppMode::Server, Some(config), None, None, None, None).await?;
+        let (core, _channels) = Self::init_with_sender(
+            common::AppMode::Server,
+            Some(config),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await?;
         Ok(core)
     }
 

@@ -42,7 +42,9 @@ async fn double_send_is_rejected() {
     core.spawn_chat_relay(info, emitter.clone());
 
     // Immediately fire a second send while the first is still in flight.
-    let result = core.chat_send("second".into(), sk.clone(), None, None).await;
+    let result = core
+        .chat_send("second".into(), sk.clone(), None, None)
+        .await;
     assert!(result.is_err(), "second send should be rejected");
 }
 
