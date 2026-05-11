@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect } from "react";
-import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
+import { useChatStore } from "@/features/threads/store/useChatStore";
 import type { ConversationItem } from "@/types";
 
 type DiffItem = Extract<ConversationItem, { kind: "diff" }>;
@@ -25,7 +25,7 @@ export function useFileEditEvents(sessionKey: string) {
         op: e.payload.op,
         bytes: e.payload.bytes,
       };
-      chatStreamStore.upsertFileEdit(sessionKey, item);
+      useChatStore.getState().upsertFileEdit(sessionKey, item);
     });
     return () => {
       un.then((f) => f());

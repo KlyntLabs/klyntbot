@@ -1,10 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ComponentProps } from "react";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Composer } from "@/features/composer/components/Composer";
 import type { Messages } from "@/features/messages/components/Messages";
 import type { ConversationItem, RequestUserInputRequest, RequestUserInputResponse } from "@/types";
-import { chatStreamStore } from "../store/chatStreamStore";
+import { useChatStore } from "@/features/threads/store/useChatStore";
 import type {
   ActiveInteraction,
   Answer,
@@ -14,6 +14,8 @@ import type {
   Question,
 } from "../types";
 import { useChatSession } from "./useChatSession";
+
+const EMPTY_APPROVALS: Extract<ConversationItem, { kind: "approval" }>[] = [];
 
 type MessagesProps = ComponentProps<typeof Messages>;
 type ComposerProps = ComponentProps<typeof Composer>;
@@ -200,9 +202,11 @@ export function useKlyntbotSurfaceProps(
   }, [chat.error, dismissedError]);
   const visibleError = dismissedError === chat.error ? null : chat.error;
 
-  const approvals = useSyncExternalStore(
-    chatStreamStore.subscribe,
-    useCallback(() => chatStreamStore.getApprovals(sessionKey ?? ""), [sessionKey]),
+  const approvals = useChatStore(
+    useCallback(
+      (store) => store.streamApprovals[sessionKey ?? ""] ?? EMPTY_APPROVALS,
+      [sessionKey],
+    ),
   );
 
   const items = useMemo(

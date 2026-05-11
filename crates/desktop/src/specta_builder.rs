@@ -91,6 +91,8 @@ desktop_macros::klynt_collect_commands![
     crate::commands::chat::chat_list_sessions_by_project,
     crate::commands::chat::chat_delete_stale_sessions,
     crate::commands::chat::chat_cancel,
+    crate::commands::chat::chat_zombie_check,
+    crate::commands::chat::chat_force_reset,
     crate::commands::chat::chat_respond_interaction,
     crate::commands::chat::chat_respond_approval,
     crate::commands::chat::chat_save_starlark_rule,

@@ -235,13 +235,14 @@ impl SessionRepo {
         tool_calls: Option<&serde_json::Value>,
         metadata: Option<&serde_json::Value>,
     ) -> Result<SessionMessageRow, StorageError> {
+        let mut tx = self.pool.begin().await?;
         let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
 
         // Touch session updated_at
         sqlx::query("UPDATE sessions SET updated_at = ?1 WHERE key = ?2")
             .bind(now)
             .bind(session_key)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
 
         // Insert the message
@@ -259,8 +260,10 @@ impl SessionRepo {
         .bind(request_id)
         .bind(tool_calls)
         .bind(metadata)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
+
+        tx.commit().await?;
         Ok(row)
     }
 
@@ -1039,6 +1042,31 @@ impl SessionRepo {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    /// Detect "zombie" sessions: sessions whose last message is from the user
+    /// (meaning the agent never replied) and whose updated_at is older than
+    /// the given threshold.
+    pub async fn detect_zombie_sessions(
+        &self,
+        threshold_ms: i64,
+    ) -> Result<Vec<SessionRow>, StorageError> {
+        let cutoff = jiff::Timestamp::now().as_millisecond() - threshold_ms;
+        let rows: Vec<SessionRow> = sqlx::query_as::<_, SessionRow>(
+            "SELECT s.* FROM sessions s
+             WHERE s.updated_at < ?1
+               AND s.archived_at IS NULL
+               AND (
+                 SELECT role FROM session_messages
+                 WHERE session_key = s.key
+                 ORDER BY timestamp DESC
+                 LIMIT 1
+               ) = 'user'",
+        )
+        .bind(cutoff)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
     }
 }
 

@@ -150,7 +150,8 @@ CREATE TABLE sessions (
     forked_from_id         TEXT REFERENCES sessions(key) ON DELETE SET NULL,
     summary_message_id     TEXT,
     ephemeral              INTEGER NOT NULL DEFAULT 0,
-    archived_at            INTEGER
+    archived_at            INTEGER,
+    last_event_at          INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_workspace_archived ON sessions(workspace_id, archived_at);

@@ -30,6 +30,7 @@ pub struct SessionRow {
     pub summary_message_id: Option<String>,
     pub ephemeral: i64,
     pub archived_at: Option<i64>,
+    pub last_event_at: Option<i64>,
 }
 
 impl SessionRow {

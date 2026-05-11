@@ -47,4 +47,28 @@ describe("useThreadWatchdog", () => {
     });
     expect(onFire).not.toHaveBeenCalled();
   });
+
+  it("resets timer on heartbeat", () => {
+    const onFire = vi.fn();
+    const { rerender } = renderHook(
+      ({ hb }: { hb: number }) =>
+        useThreadWatchdog({ threadId: "t1", isProcessing: true, lastHeartbeatAt: hb, onFire }),
+      { initialProps: { hb: 0 } },
+    );
+    act(() => {
+      vi.advanceTimersByTime(80_000);
+    });
+    expect(onFire).not.toHaveBeenCalled();
+    // Heartbeat arrives at 80s — timer resets
+    rerender({ hb: 80_000 });
+    act(() => {
+      vi.advanceTimersByTime(80_000);
+    });
+    expect(onFire).not.toHaveBeenCalled();
+    // Now 170s total (80s + 80s + 10s), should fire since last heartbeat at 80s
+    act(() => {
+      vi.advanceTimersByTime(10_001);
+    });
+    expect(onFire).toHaveBeenCalledWith("t1");
+  });
 });

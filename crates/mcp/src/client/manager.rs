@@ -424,14 +424,14 @@ impl McpManager {
     ///
     /// The task runs until the `cancel` token is cancelled.
     pub fn start_health_check(
-        manager: Arc<tokio::sync::Mutex<Option<McpManager>>>,
+        manager: Arc<tokio::sync::RwLock<Option<McpManager>>>,
         registry: Arc<tokio::sync::RwLock<tools_core::ToolRegistry>>,
         cancel: tokio_util::sync::CancellationToken,
     ) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
             // Take the tool-list-changed receiver out of the manager (one-shot).
             let mut tool_list_rx = {
-                let mut guard = manager.lock().await;
+                let mut guard = manager.write().await;
                 guard
                     .as_mut()
                     .and_then(|mgr| mgr.take_tool_list_changed_rx())
@@ -449,7 +449,7 @@ impl McpManager {
                     }
                     _ = interval.tick() => {
                         // Collect servers that need reconnection (brief lock)
-                        let guard = manager.lock().await;
+                        let guard = manager.read().await;
                         match guard.as_ref() {
                             Some(mgr) => mgr.config
                                 .servers
@@ -473,7 +473,7 @@ impl McpManager {
                             "Tool list changed notification received, triggering re-discovery"
                         );
                         // Find the server def for this server
-                        let guard = manager.lock().await;
+                        let guard = manager.read().await;
                         match guard.as_ref() {
                             Some(mgr) => mgr.config
                                 .servers
@@ -494,7 +494,7 @@ impl McpManager {
                     // Reconnect under manager lock, then drop it before
                     // acquiring registry lock to avoid AB/BA deadlock.
                     let (new_tools, server_name) = {
-                        let mut guard = manager.lock().await;
+                        let mut guard = manager.write().await;
                         let mgr = match guard.as_mut() {
                             Some(m) => m,
                             None => continue,
@@ -509,14 +509,14 @@ impl McpManager {
                             reg.register_dyn(tool as Arc<dyn tools_core::Tool>);
                         }
                         drop(reg);
-                        let guard = manager.lock().await;
+                        let guard = manager.read().await;
                         if let Some(mgr) = guard.as_ref() {
                             mgr.circuit_breaker.record_success(&server_name);
                         }
                         info!(name = %server_name, "Auto-reconnected MCP server");
                     } else {
                         // Re-record failure so cleanup() doesn't remove the entry
-                        let guard = manager.lock().await;
+                        let guard = manager.read().await;
                         if let Some(mgr) = guard.as_ref() {
                             mgr.circuit_breaker.record_failure(&server_name);
                         }
@@ -528,7 +528,7 @@ impl McpManager {
                 }
 
                 // Cleanup stale circuit breaker entries
-                let guard = manager.lock().await;
+                let guard = manager.read().await;
                 if let Some(mgr) = guard.as_ref() {
                     mgr.circuit_breaker.cleanup();
                 }

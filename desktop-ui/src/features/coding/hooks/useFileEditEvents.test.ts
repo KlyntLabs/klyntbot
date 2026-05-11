@@ -1,13 +1,21 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
 
 import { listen } from "@tauri-apps/api/event";
-import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
+import { useChatStore } from "@/features/threads/store/useChatStore";
 import { useFileEditEvents } from "./useFileEditEvents";
 
 describe("useFileEditEvents", () => {
+  beforeEach(() => {
+    useChatStore.setState({
+      streamApprovals: {},
+      streamFileEdits: {},
+      streamSnapshots: {},
+    });
+  });
+
   it("upserts a kind: diff item on agent:file_edit_with_symbols", async () => {
     let handler: ((e: { payload: Record<string, unknown> }) => void) | undefined;
     vi.mocked(listen).mockImplementation((_event, h) => {
@@ -26,7 +34,7 @@ describe("useFileEditEvents", () => {
         },
       });
     });
-    const items = chatStreamStore.getFileEdits("s1");
+    const items = useChatStore.getState().streamFileEdits["s1"] ?? [];
     expect(items).toHaveLength(1);
     expect(items[0].kind).toBe("diff");
     expect(items[0].path).toBe("/repo/src/x.rs");

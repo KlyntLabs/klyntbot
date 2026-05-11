@@ -10,6 +10,11 @@ import { applyThreadEvent, initialCodingState } from "@/features/coding/state/co
 import type { ConversationItem } from "@/types";
 import { initialState as threadInitialState, threadReducer } from "../hooks/useThreadsReducer";
 import type { ThreadAction, ThreadState } from "../hooks/useThreadsReducer";
+import { CoalescerRegistry } from "../utils/coalesceDeltas";
+
+// Preserve legacy v1 chat event bridge side-effects until full v2 migration.
+// chatStreamStore registers Tauri listeners that populate streamSnapshots.
+import "@/features/chat/store/chatStreamStore";
 
 type ApprovalItem = Extract<ConversationItem, { kind: "approval" }>;
 type DiffItem = Extract<ConversationItem, { kind: "diff" }>;
@@ -36,17 +41,40 @@ interface StreamSlice {
   _setStreamSnapshot: (sessionKey: string, snapshot: StreamSnapshot) => void;
   _setStreamApprovals: (sessionKey: string, approvals: ApprovalItem[]) => void;
   _setStreamFileEdits: (sessionKey: string, edits: DiffItem[]) => void;
+
+  // Convenience helpers (migrated from chatStreamStore)
+  appendSystemItem: (sessionKey: string, kind: string, item: unknown) => void;
+  appendErrorItem: (sessionKey: string, message: string) => void;
+  upsertApproval: (sessionKey: string, item: ApprovalItem) => void;
+  resolveApproval: (
+    sessionKey: string,
+    requestId: string,
+    status: ApprovalItem["status"],
+    decidedBy: ApprovalItem["decidedBy"],
+  ) => void;
+  upsertFileEdit: (sessionKey: string, item: DiffItem) => void;
+  clearSegments: (sessionKey: string) => void;
 }
+
+const streamCoalescers = new CoalescerRegistry<StreamSnapshot>();
 
 const createStreamSlice = (set: any): StreamSlice => ({
   streamSnapshots: {},
   streamApprovals: {},
   streamFileEdits: {},
 
-  _setStreamSnapshot: (sessionKey: string, snapshot: StreamSnapshot) =>
-    set((state: ChatStore) => ({
-      streamSnapshots: { ...state.streamSnapshots, [sessionKey]: snapshot },
-    })),
+  _setStreamSnapshot: (sessionKey: string, snapshot: StreamSnapshot) => {
+    const coalescer = streamCoalescers.get(sessionKey, {
+      flush: (snapshots) => {
+        const latest = snapshots[snapshots.length - 1];
+        set((state: ChatStore) => ({
+          streamSnapshots: { ...state.streamSnapshots, [sessionKey]: latest },
+        }));
+      },
+      maxWaitMs: 50,
+    });
+    coalescer.push(snapshot);
+  },
 
   _setStreamApprovals: (sessionKey: string, approvals: ApprovalItem[]) =>
     set((state: ChatStore) => ({
@@ -57,6 +85,61 @@ const createStreamSlice = (set: any): StreamSlice => ({
     set((state: ChatStore) => ({
       streamFileEdits: { ...state.streamFileEdits, [sessionKey]: edits },
     })),
+
+  appendSystemItem: (sessionKey: string, kind: string, item: unknown) => {
+    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(sessionKey, {
+      ...snap,
+      segments: [...snap.segments, { type: "system" as const, kind, item }],
+    });
+  },
+
+  appendErrorItem: (sessionKey: string, message: string) => {
+    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(sessionKey, {
+      ...snap,
+      segments: [...snap.segments, { type: "error" as const, message }],
+    });
+  },
+
+  upsertApproval: (sessionKey: string, item: ApprovalItem) => {
+    const existing = useChatStore.getState().streamApprovals[sessionKey] ?? [];
+    const index = existing.findIndex((a) => a.requestId === item.requestId);
+    const next =
+      index >= 0
+        ? [...existing.slice(0, index), item, ...existing.slice(index + 1)]
+        : [...existing, item];
+    useChatStore.getState()._setStreamApprovals(sessionKey, next);
+  },
+
+  resolveApproval: (
+    sessionKey: string,
+    requestId: string,
+    status: ApprovalItem["status"],
+    decidedBy: ApprovalItem["decidedBy"],
+  ) => {
+    const existing = useChatStore.getState().streamApprovals[sessionKey] ?? [];
+    const index = existing.findIndex((a) => a.requestId === requestId);
+    if (index < 0) return;
+    const next = [...existing];
+    next[index] = {
+      ...next[index],
+      status,
+      decidedBy,
+      decidedAt: new Date().toISOString(),
+    };
+    useChatStore.getState()._setStreamApprovals(sessionKey, next);
+  },
+
+  upsertFileEdit: (sessionKey: string, item: DiffItem) => {
+    const existing = useChatStore.getState().streamFileEdits[sessionKey] ?? [];
+    useChatStore.getState()._setStreamFileEdits(sessionKey, [...existing, item]);
+  },
+
+  clearSegments: (sessionKey: string) => {
+    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    useChatStore.getState()._setStreamSnapshot(sessionKey, { ...snap, segments: [] });
+  },
 });
 
 // ── Coding Slice ──────────────────────────────────────────────────────
@@ -72,20 +155,36 @@ interface CodingSlice {
   resetCodingThreadState: (threadId: string) => void;
 }
 
+const codingCoalescers = new CoalescerRegistry<ThreadEvent>();
+
 const createCodingSlice = (set: any): CodingSlice => ({
   codingStateByThread: {},
   codingRunningIds: new Set<string>(),
   codingRecentlyCompleted: new Map<string, number>(),
 
-  applyCodingThreadEvent: (threadId: string, event: ThreadEvent) =>
-    set((state: ChatStore) => {
-      const prev = state.codingStateByThread[threadId] ?? initialCodingState;
-      const next = applyThreadEvent(prev, event);
-      if (next === prev) return {};
-      return {
-        codingStateByThread: { ...state.codingStateByThread, [threadId]: next },
-      };
-    }),
+  applyCodingThreadEvent: (threadId: string, event: ThreadEvent) => {
+    const coalescer = codingCoalescers.get(threadId, {
+      flush: (events) => {
+        set((state: ChatStore) => {
+          let prev = state.codingStateByThread[threadId] ?? initialCodingState;
+          let changed = false;
+          for (const evt of events) {
+            const next = applyThreadEvent(prev, evt);
+            if (next !== prev) {
+              prev = next;
+              changed = true;
+            }
+          }
+          if (!changed) return {};
+          return {
+            codingStateByThread: { ...state.codingStateByThread, [threadId]: prev },
+          };
+        });
+      },
+      maxWaitMs: 50,
+    });
+    coalescer.push(event);
+  },
 
   setCodingRunningIds: (ids: Set<string>) =>
     set(() => ({ codingRunningIds: new Set(ids) })),
@@ -93,11 +192,14 @@ const createCodingSlice = (set: any): CodingSlice => ({
   setCodingRecentlyCompleted: (map: Map<string, number>) =>
     set(() => ({ codingRecentlyCompleted: new Map(map) })),
 
-  resetCodingThreadState: (threadId: string) =>
+  resetCodingThreadState: (threadId: string) => {
+    codingCoalescers.dispose(threadId);
     set((state: ChatStore) => {
       const { [threadId]: _, ...rest } = state.codingStateByThread;
       return { codingStateByThread: rest };
-    }),
+    });
+  },
+
 });
 
 // ── Store ─────────────────────────────────────────────────────────────

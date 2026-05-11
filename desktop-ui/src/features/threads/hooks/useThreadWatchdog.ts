@@ -5,6 +5,8 @@ const WATCHDOG_TIMEOUT_MS = 90_000;
 type Args = {
   threadId: string | null;
   isProcessing: boolean;
+  /** Timestamp (ms) of the last server heartbeat. Changing this resets the timer. */
+  lastHeartbeatAt?: number | null;
   onFire: (threadId: string) => void;
 };
 
@@ -12,8 +14,11 @@ type Args = {
  * Assistant-mode watchdog. Mirrors the coding-mode 90s heartbeat from
  * ThreadEventBuffer.ts. If no event arrives within 90s while isProcessing
  * is true, fire `onFire` and let the caller reset state.
+ *
+ * When `lastHeartbeatAt` changes, the timer resets — this is wired to the
+ * server-side `ThreadEvent::Heartbeat` emitted every 30s during active turns.
  */
-export function useThreadWatchdog({ threadId, isProcessing, onFire }: Args): void {
+export function useThreadWatchdog({ threadId, isProcessing, lastHeartbeatAt, onFire }: Args): void {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -35,5 +40,5 @@ export function useThreadWatchdog({ threadId, isProcessing, onFire }: Args): voi
         timeoutRef.current = null;
       }
     };
-  }, [threadId, isProcessing, onFire]);
+  }, [threadId, isProcessing, lastHeartbeatAt, onFire]);
 }

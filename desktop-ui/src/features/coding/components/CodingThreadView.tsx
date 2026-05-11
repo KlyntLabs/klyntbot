@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Messages } from "@/features/messages/components/Messages";
 import type { ConversationItem, OpenAppTarget } from "@/types";
 import { type MessageDto, useThreadEvents } from "../hooks/useThreadEvents";
@@ -45,7 +45,15 @@ export function CodingThreadView({
     onDraftConsumed?.();
   }, [draftPrompt, threadId, onDraftConsumed]);
 
-  const conversationItems = useMemo(() => adaptItems(items), [items]);
+  const [isItemsPending, startItemsTransition] = useTransition();
+  const [conversationItems, setConversationItems] = useState<ConversationItem[]>(EMPTY_ITEMS);
+
+  useEffect(() => {
+    startItemsTransition(() => {
+      setConversationItems(adaptItems(items));
+    });
+  }, [items]);
+
   const isThinking = turnState.kind !== "idle";
 
   // Surface hard backend errors (e.g. cwd-rebind failure) as a synthetic
@@ -88,6 +96,7 @@ export function CodingThreadView({
             isThinking={isThinking}
             processingStartedAt={processingStartedAt}
             lastDurationMs={lastDurationMs}
+            isLoadingMessages={isItemsPending}
           />
         </div>
       </div>

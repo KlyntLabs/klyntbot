@@ -88,7 +88,7 @@ pub struct AgentLoop {
     pub(crate) _memory_maintenance_token: Option<CancellationToken>,
     /// MCP manager for external server connections (kept alive for the agent's lifetime).
     /// Wrapped in Arc<Mutex> so the health check background task can share access.
-    pub(crate) mcp_manager: Arc<tokio::sync::Mutex<Option<mcp::McpManager>>>,
+    pub(crate) mcp_manager: Arc<tokio::sync::RwLock<Option<mcp::McpManager>>>,
     /// Cancellation token for the MCP health check background service.
     pub(crate) _mcp_health_check_token: Option<CancellationToken>,
     /// Shared DomainEventBus for cross-feature communication (cognitive + coaching + autotuner).
@@ -495,7 +495,7 @@ impl AgentLoop {
         }
 
         // Disconnect MCP servers (cleanly terminates child processes)
-        if let Some(manager) = self.mcp_manager.lock().await.take() {
+        if let Some(manager) = self.mcp_manager.write().await.take() {
             manager.disconnect_all().await;
         }
 
@@ -509,7 +509,7 @@ impl AgentLoop {
     pub async fn reconnect_mcp_server(&self, server_def: &config::McpServerDef) {
         let prefix = mcp::sanitize::server_prefix(&server_def.name);
 
-        let mut manager_guard = self.mcp_manager.lock().await;
+        let mut manager_guard = self.mcp_manager.write().await;
         let manager = match manager_guard.as_mut() {
             Some(m) => m,
             None => {
@@ -554,7 +554,7 @@ impl AgentLoop {
         }
 
         // Disconnect server in MCP manager
-        let mut manager_guard = self.mcp_manager.lock().await;
+        let mut manager_guard = self.mcp_manager.write().await;
         if let Some(manager) = manager_guard.as_mut() {
             manager.disconnect_server(server_name).await;
         }

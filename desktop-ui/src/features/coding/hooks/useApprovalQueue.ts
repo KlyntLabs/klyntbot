@@ -1,7 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect } from "react";
 import { invoke } from "@/api/client";
-import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
+import { useChatStore } from "@/features/threads/store/useChatStore";
 import type { ConversationItem } from "@/types";
 import type { ApprovalPreview, SuggestedGrant } from "../components/preview/types";
 
@@ -81,7 +81,7 @@ export function useApprovalQueue(sessionKey: string) {
       try {
         const un = await listen<ApprovalPayload>("agent:approval_requested", (e) => {
           if (!e.payload.requires_user_input) return;
-          chatStreamStore.upsertApproval(sessionKey, toItem(e.payload));
+          useChatStore.getState().upsertApproval(sessionKey, toItem(e.payload));
         });
         if (cancelled) {
           un();
@@ -92,7 +92,7 @@ export function useApprovalQueue(sessionKey: string) {
 
       try {
         const un = await listen<ResolvedPayload>("agent:approval_resolved", (e) => {
-          chatStreamStore.resolveApproval(
+          useChatStore.getState().resolveApproval(
             sessionKey,
             e.payload.request_id,
             mapStatus(e.payload.decided_by),

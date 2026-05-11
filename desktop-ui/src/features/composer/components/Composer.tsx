@@ -14,7 +14,7 @@ import {
   connectorMentionSlug,
   resolveBoundAppMentions,
 } from "@/features/apps/utils/appMentions";
-import { chatStreamStore } from "@/features/chat/store/chatStreamStore";
+import { useChatStore } from "@/features/threads/store/useChatStore";
 import { CodingModePill } from "@/features/coding/components/CodingModePill";
 import { CostPill } from "@/features/coding/components/CostPill";
 import { useCodingMode } from "@/features/coding/hooks/useCodingMode";
@@ -417,14 +417,14 @@ export const Composer = memo(function Composer({
       if (mode === "coding" && trimmed.startsWith("/")) {
         const res = await dispatch(trimmed, historyKey ?? "");
         if (res.kind === "render") {
-          chatStreamStore.appendSystemItem(historyKey ?? "", res.itemKind, res.item);
+          useChatStore.getState().appendSystemItem(historyKey ?? "", res.itemKind, res.item);
           resetHistoryNavigation();
           setComposerText("");
           setAppMentionBindings([]);
           return;
         }
         if (res.kind === "error") {
-          chatStreamStore.appendErrorItem(historyKey ?? "", res.message);
+          useChatStore.getState().appendErrorItem(historyKey ?? "", res.message);
           resetHistoryNavigation();
           setComposerText("");
           setAppMentionBindings([]);

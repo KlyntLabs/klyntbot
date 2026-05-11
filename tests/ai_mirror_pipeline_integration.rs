@@ -27,6 +27,7 @@ async fn skill_routed_event_persists_routing_snapshot_via_ai_pipeline() {
         None,
         None,
         None,
+        None,
     );
 
     let _router = ai_core::SignalRouter::start(

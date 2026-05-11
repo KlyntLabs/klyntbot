@@ -273,7 +273,30 @@ pub fn agent_event_to_thread_event(
             transparency: None,
         },
 
-        // Events with no v2 equivalent yet.
-        _ => return None,
+        // Telemetry / internal events with no v2 equivalent.
+        agent::AgentEvent::ReasoningChunk { .. }
+        | agent::AgentEvent::SubagentProgress { .. }
+        | agent::AgentEvent::SubagentCompleted { .. }
+        | agent::AgentEvent::SubagentCancelled { .. }
+        | agent::AgentEvent::SkillActivationConsidered { .. }
+        | agent::AgentEvent::SkillActivated { .. }
+        | agent::AgentEvent::SkillReferenceLoaded { .. }
+        | agent::AgentEvent::ContextEngineDecision { .. }
+        | agent::AgentEvent::ToolCallStreamChunk { .. }
+        | agent::AgentEvent::MCPSubcallTrace { .. }
+        | agent::AgentEvent::ProviderRequest { .. }
+        | agent::AgentEvent::ProviderResponse { .. }
+        | agent::AgentEvent::MidLoopCompressionTriggered { .. }
+        | agent::AgentEvent::TestRunDetailed { .. }
+        | agent::AgentEvent::PowerModeToggled { .. }
+        | agent::AgentEvent::TurnInterrupted { .. } => {
+            tracing::debug!(?event, "agent event has no v2 equivalent");
+            return None;
+        }
+        // Safety net for future AgentEvent variants.
+        _ => {
+            tracing::warn!(?event, "unknown agent event variant has no v2 equivalent");
+            return None;
+        }
     })
 }
