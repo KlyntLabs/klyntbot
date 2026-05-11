@@ -119,6 +119,7 @@ export function reduceThreadLifecycle(state: ThreadState, action: ThreadAction):
       const { [action.threadId]: _, ...restItems } = state.itemsByThread;
       const { [action.threadId]: __, ...restStatus } = state.threadStatusById;
       const { [action.threadId]: ___, ...restTurns } = state.activeTurnIdByThread;
+      const { [action.threadId]: __g, ...restGenerations } = state.turnGenerationByThread;
       const { [action.threadId]: ____, ...restDiffs } = state.turnDiffByThread;
       const { [action.threadId]: _____, ...restPlans } = state.planByThread;
       const { [action.threadId]: ______, ...restParents } = state.threadParentById;
@@ -131,6 +132,7 @@ export function reduceThreadLifecycle(state: ThreadState, action: ThreadAction):
         itemsByThread: restItems,
         threadStatusById: restStatus,
         activeTurnIdByThread: restTurns,
+        turnGenerationByThread: restGenerations,
         turnDiffByThread: restDiffs,
         planByThread: restPlans,
         threadParentById: restParents,
@@ -212,6 +214,16 @@ export function reduceThreadLifecycle(state: ThreadState, action: ThreadAction):
           [action.threadId]: action.turnId,
         },
       };
+    case "incrementTurnGeneration": {
+      const current = state.turnGenerationByThread[action.threadId] ?? 0;
+      return {
+        ...state,
+        turnGenerationByThread: {
+          ...state.turnGenerationByThread,
+          [action.threadId]: current + 1,
+        },
+      };
+    }
     case "markReviewing": {
       const previous = state.threadStatusById[action.threadId];
       const nextStatus: ThreadStatus = {

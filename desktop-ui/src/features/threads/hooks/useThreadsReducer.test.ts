@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationItem, ThreadSummary } from "@/types";
 import type { ThreadState } from "./useThreadsReducer";
-import { initialState, threadReducer } from "./useThreadsReducer";
+import { initialState, selectTurnGeneration, threadReducer } from "./useThreadsReducer";
 
 describe("threadReducer", () => {
   it("ensures thread with default name and active selection", () => {
@@ -728,5 +728,19 @@ describe("threadReducer", () => {
     });
     expect(trimmed.itemsByThread["thread-1"]).toHaveLength(3);
     expect(trimmed.itemsByThread["thread-1"]?.[0]?.id).toBe("msg-2");
+  });
+
+  it("increments turn generation on every new turn", () => {
+    let state = initialState;
+    state = threadReducer(state, {
+      type: "incrementTurnGeneration",
+      threadId: "t1",
+    });
+    state = threadReducer(state, {
+      type: "incrementTurnGeneration",
+      threadId: "t1",
+    });
+    expect(selectTurnGeneration(state, "t1")).toBe(2);
+    expect(selectTurnGeneration(state, "t2")).toBe(0);
   });
 });

@@ -38,6 +38,7 @@ export type ThreadState = {
   threadListCursorByWorkspace: Record<string, string | null>;
   threadSortKeyByWorkspace: Record<string, ThreadListSortKey>;
   activeTurnIdByThread: Record<string, string | null>;
+  turnGenerationByThread: Record<string, number>;
   turnDiffByThread: Record<string, string>;
   approvals: ApprovalRequest[];
   userInputRequests: RequestUserInputRequest[];
@@ -164,6 +165,7 @@ export type ThreadAction =
       account: AccountSnapshot | null;
     }
   | { type: "setActiveTurnId"; threadId: string; turnId: string | null }
+  | { type: "incrementTurnGeneration"; threadId: string }
   | { type: "setThreadTurnDiff"; threadId: string; diff: string }
   | { type: "setThreadPlan"; threadId: string; plan: TurnPlan | null }
   | { type: "clearThreadPlan"; threadId: string }
@@ -190,6 +192,7 @@ export const initialState: ThreadState = {
   threadListCursorByWorkspace: {},
   threadSortKeyByWorkspace: {},
   activeTurnIdByThread: {},
+  turnGenerationByThread: {},
   turnDiffByThread: {},
   approvals: [],
   userInputRequests: [],
@@ -209,6 +212,11 @@ const threadSliceReducers: ThreadSliceReducer[] = [
   reduceThreadQueue,
   reduceThreadSnapshots,
 ];
+
+export const selectTurnGeneration = (
+  state: ThreadState,
+  threadId: string,
+): number => state.turnGenerationByThread[threadId] ?? 0;
 
 export function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
   for (const reduceSlice of threadSliceReducers) {
