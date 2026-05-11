@@ -224,9 +224,10 @@ export async function listSessions(
   providerId: string,
   forceRefresh = false,
 ): Promise<SessionInfo[]> {
-  if (forceRefresh) apiCache.invalidate("sessions");
+  const key = `${providerId}:sessions`;
+  if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(
-    "sessions",
+    key,
     async () => {
       const rows = await invoke<BackendSessionSummary[]>("tracing_list_sessions", {
         providerId,
@@ -318,7 +319,7 @@ export function getWireEvents(
   sessionId: string,
   forceRefresh = false,
 ): Promise<WireResponse> {
-  const key = `wire:${sessionId}`;
+  const key = `${providerId}:wire:${sessionId}`;
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
     const detail = await invoke<BackendSessionDetail>("tracing_load_session", {
@@ -354,7 +355,7 @@ export function getContextMessages(
   sessionId: string,
   forceRefresh = false,
 ): Promise<ContextResponse> {
-  const key = `context:${sessionId}`;
+  const key = `${providerId}:context:${sessionId}`;
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
     const rows = await invoke<BackendContextMessage[]>("tracing_load_context", {
@@ -373,7 +374,7 @@ export function getSessionState(
   sessionId: string,
   forceRefresh = false,
 ): Promise<Record<string, unknown>> {
-  const key = `state:${sessionId}`;
+  const key = `${providerId}:state:${sessionId}`;
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, () =>
     invoke<Record<string, unknown>>("tracing_load_state", {
@@ -388,7 +389,7 @@ export function getSessionSummary(
   sessionId: string,
   forceRefresh = false,
 ): Promise<SessionSummary> {
-  const key = `summary:${sessionId}`;
+  const key = `${providerId}:summary:${sessionId}`;
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
     const b = await invoke<BackendSessionSummary>("tracing_session_summary", {
@@ -444,7 +445,7 @@ export function getSubagents(
   sessionId: string,
   forceRefresh = false,
 ): Promise<SubagentInfo[]> {
-  const key = `subagents:${sessionId}`;
+  const key = `${providerId}:subagents:${sessionId}`;
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
     const rows = await invoke<BackendSubagentSummary[]>("tracing_list_subagents", {
@@ -461,7 +462,7 @@ export function getSubagentWireEvents(
   agentId: string,
   forceRefresh = false,
 ): Promise<WireResponse> {
-  const key = `subagent-wire:${sessionId}:${agentId}`;
+  const key = `${providerId}:subagent-wire:${sessionId}:${agentId}`;
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
     const detail = await invoke<BackendSessionDetail>("tracing_load_subagent_session", {
@@ -479,7 +480,7 @@ export function getSubagentContextMessages(
   agentId: string,
   forceRefresh = false,
 ): Promise<ContextResponse> {
-  const key = `subagent-context:${sessionId}:${agentId}`;
+  const key = `${providerId}:subagent-context:${sessionId}:${agentId}`;
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(key, async () => {
     const rows = await invoke<BackendContextMessage[]>("tracing_load_subagent_context", {
@@ -516,7 +517,7 @@ export async function getAggregateStats(
   providerId: string,
   forceRefresh = false,
 ): Promise<AggregateStats> {
-  const key = "aggregate-stats";
+  const key = `${providerId}:aggregate-stats`;
   if (forceRefresh) apiCache.invalidate(key);
   return apiCache.get(
     key,
@@ -580,7 +581,7 @@ export async function importSession(
     bytes,
     fileName: file.name,
   });
-  apiCache.invalidate("sessions");
+  apiCache.invalidate(`${providerId}:sessions`);
   return { session_id: result.sessionId, work_dir_hash: result.workDirHash };
 }
 

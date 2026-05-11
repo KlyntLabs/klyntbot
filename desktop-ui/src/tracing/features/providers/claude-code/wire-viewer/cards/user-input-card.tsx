@@ -10,7 +10,13 @@ export function UserInputCard({ event }: Props) {
   const isImage = p.type === "image";
   return (
     <div className="cc-card cc-card--user">
-      {isImage ? <span>[image]</span> : <Markdown>{p.text ?? ""}</Markdown>}
+      <div className="cc-card__header">
+        <span className="cc-card__role cc-card__role--user">User</span>
+        {isImage && <span className="cc-card__meta">image</span>}
+      </div>
+      <div className="cc-card__body">
+        {isImage ? <span>[image]</span> : <Markdown>{p.text ?? ""}</Markdown>}
+      </div>
     </div>
   );
 }
