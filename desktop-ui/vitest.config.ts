@@ -31,5 +31,9 @@ export default defineConfig(async () => {
       include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
       setupFiles: ["src/test/vitest.setup.ts"],
     },
+    benchmark: {
+      include: ["src/**/__benches__/*.bench.ts"],
+      reporters: ["default"],
+    },
   });
 });

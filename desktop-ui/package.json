@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "bindings:check": "cargo test -p desktop --test bindings_are_current",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "bench": "vitest bench --run"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",

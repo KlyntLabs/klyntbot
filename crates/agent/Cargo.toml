@@ -61,3 +61,11 @@ proptest.workspace = true
 [[bench]]
 name = "chat_send_to_first_token"
 harness = false
+
+[[bench]]
+name = "ttft_e2e"
+harness = false
+
+[[bench]]
+name = "stream_throughput"
+harness = false
