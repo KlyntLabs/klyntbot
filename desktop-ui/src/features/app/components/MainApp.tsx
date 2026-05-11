@@ -33,9 +33,6 @@ import { useThreadListActions } from "@app/hooks/useThreadListActions";
 import { useThreadListSortKey } from "@app/hooks/useThreadListSortKey";
 import { useThreadRows } from "@app/hooks/useThreadRows";
 import { useTrayRecentThreads } from "@app/hooks/useTrayRecentThreads";
-import { useThreadWatchdog } from "@threads/hooks/useThreadWatchdog";
-import { StuckThreadBanner } from "@threads/components/StuckThreadBanner";
-import { useStuckThreadDetector } from "@threads/hooks/useStuckThreadDetector";
 import { useTraySessionUsage } from "@app/hooks/useTraySessionUsage";
 import { useUpdaterController } from "@app/hooks/useUpdaterController";
 import { useWorkspaceController } from "@app/hooks/useWorkspaceController";
@@ -54,8 +51,11 @@ import {
   useWorkspaceOrderingOrchestration,
 } from "@app/orchestration/useWorkspaceOrchestration";
 import { subscribeTrayOpenThread } from "@services/events";
+import { StuckThreadBanner } from "@threads/components/StuckThreadBanner";
 import { useCopyThread } from "@threads/hooks/useCopyThread";
+import { useStuckThreadDetector } from "@threads/hooks/useStuckThreadDetector";
 import { useThreads } from "@threads/hooks/useThreads";
+import { useThreadWatchdog } from "@threads/hooks/useThreadWatchdog";
 import { lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import errorSoundUrl from "@/assets/error-notification.mp3";
 import successSoundUrl from "@/assets/success-notification.mp3";
@@ -703,9 +703,7 @@ export default function MainApp() {
   // fire and reset state so the user can retry.
   useThreadWatchdog({
     threadId: mode === "assistant" ? activeThreadId : null,
-    isProcessing: Boolean(
-      activeThreadId && threadStatusById[activeThreadId]?.isProcessing,
-    ),
+    isProcessing: Boolean(activeThreadId && threadStatusById[activeThreadId]?.isProcessing),
     onFire: useCallback(
       (threadId: string) => {
         markProcessing(threadId, false);

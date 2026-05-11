@@ -213,10 +213,8 @@ const threadSliceReducers: ThreadSliceReducer[] = [
   reduceThreadSnapshots,
 ];
 
-export const selectTurnGeneration = (
-  state: ThreadState,
-  threadId: string,
-): number => state.turnGenerationByThread[threadId] ?? 0;
+export const selectTurnGeneration = (state: ThreadState, threadId: string): number =>
+  state.turnGenerationByThread[threadId] ?? 0;
 
 export function threadReducer(state: ThreadState, action: ThreadAction): ThreadState {
   for (const reduceSlice of threadSliceReducers) {

@@ -12,7 +12,9 @@
   color: var(--color-warning-fg);
 }
 
-.stuck-thread-banner__msg { flex: 1; }
+.stuck-thread-banner__msg {
+  flex: 1;
+}
 
 .stuck-thread-banner__btn {
   padding: 4px 10px;

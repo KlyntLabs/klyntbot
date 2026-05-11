@@ -10,11 +10,7 @@ export function StuckThreadBanner({ durationMs, onReset }: Props): React.ReactEl
       <span className="stuck-thread-banner__msg">
         This thread has been processing for {seconds}s with no response. It may be stuck.
       </span>
-      <button
-        type="button"
-        className="stuck-thread-banner__btn"
-        onClick={onReset}
-      >
+      <button type="button" className="stuck-thread-banner__btn" onClick={onReset}>
         Reset and try again
       </button>
     </div>

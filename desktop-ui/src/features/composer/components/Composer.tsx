@@ -262,8 +262,11 @@ export const Composer = memo(function Composer({
   const oppositeFollowUpIntent: ComposerSendIntent =
     effectiveFollowUpBehavior === "queue" ? "steer" : "queue";
   const oppositeFallsBackToQueue = oppositeFollowUpIntent === "steer" && !steerAvailable;
-  const defaultSubmitIntent: ComposerSendIntent =
-    isStuck ? "default" : isProcessing ? effectiveFollowUpBehavior : "default";
+  const defaultSubmitIntent: ComposerSendIntent = isStuck
+    ? "default"
+    : isProcessing
+      ? effectiveFollowUpBehavior
+      : "default";
   const oppositeSubmitIntent: ComposerSendIntent = isProcessing
     ? oppositeFollowUpIntent
     : "default";

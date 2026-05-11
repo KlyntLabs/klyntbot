@@ -59,41 +59,6 @@ export function useThreadTurnEvents({
   const lastReducerActiveTurnIdByThreadRef = useRef<Record<string, string | null>>({});
   const hasOptimisticActiveTurnByThreadRef = useRef<Record<string, boolean>>({});
 
-  const getLatestKnownActiveTurnId = useCallback(
-    (threadId: string) => {
-      const reducerTurnId = getActiveTurnId(threadId);
-      const lastReducerTurnId = lastReducerActiveTurnIdByThreadRef.current[threadId];
-      const immediateTurnId = immediateActiveTurnIdByThreadRef.current[threadId];
-      const hasOptimisticTurn = hasOptimisticActiveTurnByThreadRef.current[threadId] === true;
-
-      if (hasOptimisticTurn && immediateTurnId !== undefined) {
-        if (reducerTurnId === immediateTurnId) {
-          // Reducer caught up with our optimistic write.
-          hasOptimisticActiveTurnByThreadRef.current[threadId] = false;
-        } else if (lastReducerTurnId !== undefined && reducerTurnId !== lastReducerTurnId) {
-          // Reducer changed independently (e.g. resume hydration), so adopt it.
-          hasOptimisticActiveTurnByThreadRef.current[threadId] = false;
-          immediateActiveTurnIdByThreadRef.current[threadId] = reducerTurnId;
-        } else {
-          lastReducerActiveTurnIdByThreadRef.current[threadId] = reducerTurnId;
-          return immediateTurnId;
-        }
-      }
-
-      if (lastReducerTurnId !== reducerTurnId) {
-        // Keep cache aligned with reducer when we are not in an optimistic window.
-        lastReducerActiveTurnIdByThreadRef.current[threadId] = reducerTurnId;
-        immediateActiveTurnIdByThreadRef.current[threadId] = reducerTurnId;
-      }
-
-      if (immediateTurnId !== undefined) {
-        return immediateActiveTurnIdByThreadRef.current[threadId];
-      }
-      return reducerTurnId;
-    },
-    [getActiveTurnId],
-  );
-
   const shouldClearCompletedPlan = useCallback(
     (threadId: string, turnId: string) =>
       shouldClearCompletedPlanForThread(planByThreadRef, threadId, turnId),
@@ -245,7 +210,12 @@ export function useThreadTurnEvents({
       const currentGeneration = getTurnGeneration(threadId);
       if (eventGeneration != null && eventGeneration < currentGeneration) {
         // Truly stale event from a previous turn — safe to drop, generation guarantees it.
-        console.debug("[threads] dropping stale turn_completed", { threadId, turnId, eventGeneration, currentGeneration });
+        console.debug("[threads] dropping stale turn_completed", {
+          threadId,
+          turnId,
+          eventGeneration,
+          currentGeneration,
+        });
         return;
       }
       // Always reset processing — even if turnId mismatches our optimistic guess.
@@ -267,7 +237,6 @@ export function useThreadTurnEvents({
     },
     [
       dispatch,
-      getLatestKnownActiveTurnId,
       getTurnGeneration,
       markProcessing,
       pendingInterruptsRef,
@@ -401,7 +370,6 @@ export function useThreadTurnEvents({
     },
     [
       dispatch,
-      getTurnGeneration,
       markProcessing,
       markReviewing,
       pushThreadErrorMessage,

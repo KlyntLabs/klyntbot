@@ -945,8 +945,12 @@ describe("useThreadTurnEvents", () => {
     );
 
     // Set up the optimistic mismatch: turn-A is optimistic, but backend emits completion for turn-B.
-    act(() => { result.current.onTurnStarted("ws-1", "thread-1", "turn-A"); });
-    act(() => { result.current.onTurnCompleted("ws-1", "thread-1", "turn-B"); });
+    act(() => {
+      result.current.onTurnStarted("ws-1", "thread-1", "turn-A");
+    });
+    act(() => {
+      result.current.onTurnCompleted("ws-1", "thread-1", "turn-B");
+    });
 
     expect(markProcessing).toHaveBeenCalledWith("thread-1", false);
   });
