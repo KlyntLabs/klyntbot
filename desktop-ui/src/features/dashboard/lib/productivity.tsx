@@ -109,7 +109,6 @@ export const APP_COLORS: Record<string, string> = {
   "aws.amazon.com": "#FF9900",
   "azure.com": "#0078D4",
   "docker.com": "#2496ED",
-  "sentry.io": "#362D59",
   "crates.io": "#FFC933",
   "docs.rs": "#27AE60",
   "npmjs.com": "#CB3837",

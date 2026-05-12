@@ -1,4 +1,3 @@
-import { captureException } from "@sentry/react";
 import { openWorkspaceIn } from "@services/tauri";
 import { pushErrorToast } from "@services/toasts";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -79,26 +78,16 @@ export function OpenAppMenu({
 
   const reportOpenError = (error: unknown, target: OpenTarget) => {
     const message = error instanceof Error ? error.message : String(error);
-    captureException(error instanceof Error ? error : new Error(message), {
-      tags: {
-        feature: "open-app-menu",
-      },
-      extra: {
-        path,
-        targetId: target.id,
-        targetKind: target.target.kind,
-        targetAppName: target.target.appName ?? null,
-        targetCommand: target.target.command ?? null,
-      },
+    console.error("[open-app-menu]", error, {
+      path,
+      targetId: target.id,
+      targetKind: target.target.kind,
+      targetAppName: target.target.appName ?? null,
+      targetCommand: target.target.command ?? null,
     });
     pushErrorToast({
       title: "Couldn’t open workspace",
       message,
-    });
-    console.warn("Failed to open workspace in target app", {
-      message,
-      path,
-      targetId: target.id,
     });
   };
 

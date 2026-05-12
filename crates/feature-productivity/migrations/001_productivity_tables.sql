@@ -58,7 +58,7 @@ INSERT OR IGNORE INTO activity_categories (id, name, category_type, rules, is_sy
      '{"appNames":[],"bundleIds":[],"urlPatterns":["github.com","gitlab.com","bitbucket.org","stackoverflow.com","stackexchange.com","crates.io","docs.rs","npmjs.com","pypi.org","rubygems.org","developer.apple.com","developer.mozilla.org","mdn.mozilla.org","web.dev","bundlephobia.com","pkg.go.dev","hex.pm","codepen.io","codesandbox.io","replit.com","regex101.com","excalidraw.com"]}',
      TRUE),
     ('cloud_devops', 'Cloud & DevOps', 'productive',
-     '{"appNames":[],"bundleIds":[],"urlPatterns":["console.aws.amazon.com","portal.azure.com","console.cloud.google.com","vercel.com","netlify.com","railway.app","fly.io","render.com","heroku.com","digitalocean.com","cloudflare.com","supabase.com","planetscale.com","neon.tech","upstash.com","docker.com","grafana.com","datadog.com","sentry.io"]}',
+     '{"appNames":[],"bundleIds":[],"urlPatterns":["console.aws.amazon.com","portal.azure.com","console.cloud.google.com","vercel.com","netlify.com","railway.app","fly.io","render.com","heroku.com","digitalocean.com","cloudflare.com","supabase.com","planetscale.com","neon.tech","upstash.com","docker.com","grafana.com","datadog.com"]}',
      TRUE),
     ('project_management', 'Project Management', 'productive',
      '{"appNames":["Klynt","Linear","Jira","Asana","Trello","ClickUp","Monday","Height","Basecamp"],"bundleIds":["com.klynt.app","com.linear"],"urlPatterns":["linear.app","jira.atlassian.com","asana.com","trello.com","clickup.com","monday.com","basecamp.com","shortcut.com","height.app","plane.so"]}',

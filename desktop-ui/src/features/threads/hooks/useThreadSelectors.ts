@@ -4,6 +4,9 @@ import type { ConversationItem } from "@/types";
 import { getActiveItemsForThread, getActiveThreadIdForWorkspace } from "./threadSelectorsHelpers";
 import type { ThreadState } from "./useThreadsReducer";
 
+type ApprovalItem = Extract<ConversationItem, { kind: "approval" }>;
+const EMPTY_APPROVALS: ApprovalItem[] = [];
+
 type UseThreadSelectorsOptions = {
   activeWorkspaceId: string | null;
   activeThreadIdByWorkspace: ThreadState["activeThreadIdByWorkspace"];
@@ -27,7 +30,7 @@ export function useThreadSelectors({
     : undefined;
 
   const approvals = useChatStore(
-    (store) => store.streamApprovals[activeThreadId ?? ""] ?? [],
+    (store) => store.streamApprovals[activeThreadId ?? ""] ?? EMPTY_APPROVALS,
   );
 
   const activeItems = useMemo<ConversationItem[]>(

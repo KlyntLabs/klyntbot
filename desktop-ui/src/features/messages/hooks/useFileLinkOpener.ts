@@ -1,4 +1,3 @@
-import { captureException } from "@sentry/react";
 import { openWorkspaceIn } from "@services/tauri";
 import { pushErrorToast } from "@services/toasts";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
@@ -80,17 +79,11 @@ export function useFileLinkOpener(
 ) {
   const reportOpenError = useCallback((error: unknown, context: Record<string, string | null>) => {
     const message = error instanceof Error ? error.message : String(error);
-    captureException(error instanceof Error ? error : new Error(message), {
-      tags: {
-        feature: "file-link-open",
-      },
-      extra: context,
-    });
+    console.error("[file-link-open]", error, context);
     pushErrorToast({
       title: "Couldn’t open file",
       message,
     });
-    console.warn("Failed to open file link", { message, ...context });
   }, []);
 
   const openFileLink = useCallback(

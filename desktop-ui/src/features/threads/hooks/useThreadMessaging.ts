@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/react";
 import {
   compactThread as compactThreadService,
   getAppsList as getAppsListService,
@@ -163,19 +162,6 @@ export function useThreadMessaging({
           steerEnabled,
           isProcessing,
           activeTurnId,
-        },
-      });
-      Sentry.metrics.count("prompt_sent", 1, {
-        attributes: {
-          workspace_id: workspace.id,
-          thread_id: threadId,
-          has_images: images.length > 0 ? "true" : "false",
-          text_length: String(finalText.length),
-          model: resolvedModel ?? "unknown",
-          effort: resolvedEffort ?? "unknown",
-          service_tier: resolvedServiceTier ?? "default",
-          collaboration_mode: sanitizedCollaborationMode ?? "unknown",
-          send_intent: sendIntent,
         },
       });
       const timestamp = Date.now();

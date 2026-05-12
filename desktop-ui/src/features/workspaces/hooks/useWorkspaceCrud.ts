@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/react";
 import {
   addWorkspaceFromGitUrl as addWorkspaceFromGitUrlService,
   addWorkspace as addWorkspaceService,
@@ -135,12 +134,6 @@ export function useWorkspaceCrud({
         if (shouldActivate) {
           setActiveWorkspaceId(workspace.id);
         }
-        Sentry.metrics.count("workspace_added", 1, {
-          attributes: {
-            workspace_id: workspace.id,
-            workspace_kind: workspace.kind ?? "main",
-          },
-        });
         return workspace;
       } catch (error) {
         onDebug?.({

@@ -1,6 +1,5 @@
 /** @vitest-environment jsdom */
 
-import * as Sentry from "@sentry/react";
 import {
   compactThread as compactThreadService,
   getAppsList as getAppsListService,
@@ -14,12 +13,6 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceInfo } from "@/types";
 import { useThreadMessaging } from "./useThreadMessaging";
-
-vi.mock("@sentry/react", () => ({
-  metrics: {
-    count: vi.fn(),
-  },
-}));
 
 vi.mock("@services/tauri", () => ({
   sendUserMessage: vi.fn(),
@@ -96,7 +89,7 @@ describe("useThreadMessaging telemetry", () => {
     );
   });
 
-  it("records prompt_sent once for one message send", async () => {
+  it("ensures workspace runtime codex args are called for one message send", async () => {
     const ensureWorkspaceRuntimeCodexArgs = vi.fn(async () => undefined);
     const { result } = renderHook(() =>
       useThreadMessaging({
@@ -135,19 +128,6 @@ describe("useThreadMessaging telemetry", () => {
       await result.current.sendUserMessageToThread(workspace, "thread-1", "hello", []);
     });
 
-    expect(Sentry.metrics.count).toHaveBeenCalledTimes(1);
-    expect(Sentry.metrics.count).toHaveBeenCalledWith(
-      "prompt_sent",
-      1,
-      expect.objectContaining({
-        attributes: expect.objectContaining({
-          workspace_id: "ws-1",
-          thread_id: "thread-1",
-          has_images: "false",
-          text_length: "5",
-        }),
-      }),
-    );
     expect(ensureWorkspaceRuntimeCodexArgs).toHaveBeenCalledTimes(1);
     expect(ensureWorkspaceRuntimeCodexArgs).toHaveBeenCalledWith("ws-1", "thread-1");
   });

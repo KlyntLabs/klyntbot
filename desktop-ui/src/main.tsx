@@ -2,32 +2,11 @@
 // @tauri-apps/api/* import resolves it. No-op inside the real Tauri webview.
 import "./services/__mocks__/tauri-browser-shim";
 import "./tracing/styles/tracing.css";
-import * as Sentry from "@sentry/react";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { BrainEventBridge } from "./components/BrainEventBridge";
 import { isMobilePlatform } from "./utils/platformPaths";
-
-const sentryDsn =
-  import.meta.env.VITE_SENTRY_DSN ??
-  "https://8ab67175daed999e8c432a93d8f98e49@o4510750015094784.ingest.us.sentry.io/4510750016012288";
-
-Sentry.init({
-  dsn: sentryDsn,
-  enabled: Boolean(sentryDsn),
-  release: __APP_VERSION__,
-});
-
-// Sentry.metrics was removed in @sentry/react v9+. Shim it as a no-op so the
-// many `Sentry.metrics.count(...)` call sites across the app keep working
-// without per-site rewrites. TODO(klynt-integration): replace with spans/events.
-const sentryWithMetrics = Sentry as unknown as {
-  metrics?: { count: (...args: unknown[]) => void };
-};
-if (!sentryWithMetrics.metrics) {
-  sentryWithMetrics.metrics = { count: () => {} };
-}
 
 let mobileInitDone = false;
 

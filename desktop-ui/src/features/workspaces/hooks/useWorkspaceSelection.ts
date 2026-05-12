@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/react";
 import { useCallback } from "react";
 import type { WorkspaceInfo, WorkspaceSettings } from "@/types";
 
@@ -49,13 +48,6 @@ export function useWorkspaceSelection({
       }
       setActiveWorkspaceId(workspaceId);
       if (didSwitch) {
-        Sentry.metrics.count("workspace_switched", 1, {
-          attributes: {
-            workspace_id: workspaceId,
-            workspace_kind: target?.kind ?? "main",
-            reason: "select",
-          },
-        });
       }
       if (isCompact) {
         setActiveTab("codex");

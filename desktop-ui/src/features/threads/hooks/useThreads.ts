@@ -1,5 +1,4 @@
 import { useAppServerEvents } from "@app/hooks/useAppServerEvents";
-import * as Sentry from "@sentry/react";
 import {
   archiveThread as archiveThreadService,
   readThread as readThreadService,
@@ -13,7 +12,8 @@ import {
   extractThreadFromResponse,
 } from "@threads/utils/threadSummary";
 import { CHAT_SCROLLBACK_DEFAULT } from "@utils/chatScrollback";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type {
   CollabAgentRef,
   CustomPromptOption,
@@ -34,7 +34,6 @@ import { useThreadSelectors } from "./useThreadSelectors";
 import { useThreadStatus } from "./useThreadStatus";
 import { useThreadStorage } from "./useThreadStorage";
 import { useChatStore, selectThreadState } from "../store/useChatStore";
-import { useEffect } from "react";
 import { useThreadTitleAutogeneration } from "./useThreadTitleAutogeneration";
 import { useThreadUserInput } from "./useThreadUserInput";
 
@@ -96,7 +95,7 @@ export function useThreads({
   useEffect(() => {
     dispatch({ type: "setMaxItemsPerThread", maxItemsPerThread });
   }, [dispatch, maxItemsPerThread]);
-  const state = useChatStore(selectThreadState);
+  const state = useChatStore(useShallow(selectThreadState));
   const loadedThreadsRef = useRef<Record<string, boolean>>({});
   const replaceOnResumeRef = useRef<Record<string, boolean>>({});
   const pendingInterruptsRef = useRef<Set<string>>(new Set());
@@ -777,17 +776,7 @@ export function useThreads({
       if (!targetId) {
         return;
       }
-      const currentThreadId = state.activeThreadIdByWorkspace[targetId] ?? null;
       dispatch({ type: "setActiveThreadId", workspaceId: targetId, threadId });
-      if (threadId && currentThreadId !== threadId) {
-        Sentry.metrics.count("thread_switched", 1, {
-          attributes: {
-            workspace_id: targetId,
-            thread_id: threadId,
-            reason: "select",
-          },
-        });
-      }
       if (threadId) {
         void (async () => {
           const hasLocalSnapshot = hasLocalThreadSnapshot(threadId);

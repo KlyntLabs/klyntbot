@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import "./styles/index.css";
 
+import { AppErrorBoundary } from "@app/components/AppErrorBoundary";
 import MainApp from "@app/components/MainApp";
 import { useWindowLabel } from "@/features/layout/hooks/useWindowLabel";
 import { QueryProvider } from "@/lib/query";
@@ -41,9 +42,11 @@ export default function App() {
   if (realLabel === "launcher" || windowLabel === "launcher") {
     return (
       <QueryProvider>
-        <Suspense fallback={null}>
-          <Launcher />
-        </Suspense>
+        <AppErrorBoundary surface="launcher">
+          <Suspense fallback={null}>
+            <Launcher />
+          </Suspense>
+        </AppErrorBoundary>
       </QueryProvider>
     );
   }
@@ -51,9 +54,11 @@ export default function App() {
   if (realLabel === "tray" || windowLabel === "tray") {
     return (
       <QueryProvider>
-        <Suspense fallback={null}>
-          <Tray />
-        </Suspense>
+        <AppErrorBoundary surface="tray">
+          <Suspense fallback={null}>
+            <Tray />
+          </Suspense>
+        </AppErrorBoundary>
       </QueryProvider>
     );
   }
@@ -61,9 +66,11 @@ export default function App() {
   if (realLabel === "distraction-overlay" || windowLabel === "distraction-overlay") {
     return (
       <QueryProvider>
-        <Suspense fallback={null}>
-          <DistractionOverlay />
-        </Suspense>
+        <AppErrorBoundary surface="distraction overlay">
+          <Suspense fallback={null}>
+            <DistractionOverlay />
+          </Suspense>
+        </AppErrorBoundary>
       </QueryProvider>
     );
   }
@@ -71,16 +78,20 @@ export default function App() {
   if (windowLabel === "about") {
     return (
       <QueryProvider>
-        <Suspense fallback={null}>
-          <AboutView />
-        </Suspense>
+        <AppErrorBoundary surface="about">
+          <Suspense fallback={null}>
+            <AboutView />
+          </Suspense>
+        </AppErrorBoundary>
       </QueryProvider>
     );
   }
 
   return (
     <QueryProvider>
-      <MainApp />
+      <AppErrorBoundary surface="main">
+        <MainApp />
+      </AppErrorBoundary>
     </QueryProvider>
   );
 }

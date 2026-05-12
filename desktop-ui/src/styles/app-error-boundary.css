@@ -1,0 +1,76 @@
+.app-error-boundary {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ds-layer-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--surface-context-core, #0b0f1a);
+  color: var(--text, #e8ecf3);
+  -webkit-app-region: drag;
+}
+
+.app-error-boundary__card {
+  max-width: 520px;
+  width: 100%;
+  padding: 28px 32px;
+  border-radius: 14px;
+  background: var(--ds-surface-card, #131826);
+  border: 1px solid var(--ds-border-strong, rgba(255, 255, 255, 0.08));
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
+  -webkit-app-region: no-drag;
+}
+
+.app-error-boundary__icon {
+  font-size: var(--fs-display-md);
+  line-height: 1;
+  color: var(--status-error, #ff6b6b);
+  margin-bottom: 12px;
+}
+
+.app-error-boundary__title {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--ds-text-strong);
+}
+
+.app-error-boundary__subtitle {
+  font-size: var(--fs-sm);
+  color: var(--ds-text-subtle);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.app-error-boundary__message {
+  font-family: ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Code", monospace;
+  font-size: var(--fs-xs);
+  color: var(--ds-text-subtle);
+  background: var(--ds-surface-muted, rgba(0, 0, 0, 0.25));
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0 0 18px;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.app-error-boundary__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.app-error-boundary__button {
+  font-size: var(--fs-sm);
+}
+
+.app-error-boundary__event-id {
+  font-size: var(--fs-2xs);
+  color: var(--ds-text-faint);
+  margin: 14px 0 0;
+  font-family: ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Code", monospace;
+}
