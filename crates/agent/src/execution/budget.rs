@@ -58,7 +58,11 @@ pub struct SkillBudget {
 impl Default for SkillBudget {
     fn default() -> Self {
         Self {
-            normal_tokens: 60_000,
+            // 0 = disabled. `SafetyCap::token_cap_hit` guards on `max_tokens > 0`,
+            // so the token cap never fires for interactive chat — the turn cap
+            // (100) remains the runaway backstop. Subagents and review pass
+            // explicit limits via `SafetyCap::with_limits` and are unaffected.
+            normal_tokens: 0,
             normal_turns: DEFAULT_SAFETY_TURN_CAP,
             deep_multiplier: 1.5,
             ultra_multiplier: 3.0,
@@ -155,17 +159,25 @@ mod tests {
 
     #[test]
     fn normal_uses_defaults() {
-        let cap = SafetyCap::new(DepthMode::Normal);
-        assert_eq!(cap.max_tokens, 60_000);
+        let mut cap = SafetyCap::new(DepthMode::Normal);
+        assert_eq!(cap.max_tokens, 0, "token cap disabled by default");
         assert_eq!(cap.max_turns, DEFAULT_SAFETY_TURN_CAP);
         assert!(!cap.turn_cap_hit());
+        assert!(!cap.token_cap_hit());
+        // A massive usage still must not trip the token cap when disabled.
+        cap.deduct(&providers::Usage {
+            prompt_tokens: 10_000_000,
+            completion_tokens: 10_000_000,
+            ..Default::default()
+        });
         assert!(!cap.token_cap_hit());
     }
 
     #[test]
     fn deep_think_scales() {
         let cap = SafetyCap::new(DepthMode::DeepThink);
-        assert_eq!(cap.max_tokens, 90_000);
+        // Token cap stays disabled (multiplier × 0 = 0); turn cap still scales.
+        assert_eq!(cap.max_tokens, 0);
         assert_eq!(cap.max_turns, 150);
     }
 
@@ -173,7 +185,7 @@ mod tests {
     fn ultra_unlimited_turns() {
         let cap = SafetyCap::new(DepthMode::Ultra);
         assert_eq!(cap.max_turns, u32::MAX);
-        assert_eq!(cap.max_tokens, 180_000);
+        assert_eq!(cap.max_tokens, 0);
     }
 
     #[test]

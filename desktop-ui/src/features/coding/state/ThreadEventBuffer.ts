@@ -133,6 +133,23 @@ function applyEvent(event: ThreadEvent): void {
       store.setCodingRunningIds(next);
       stateChanged = true;
     }
+    // Coding turns don't pass through the legacy `app-server-event`
+    // `turn/completed` path, so the reducer's `threadStatusById` /
+    // `activeTurnIdByThread` would stay stuck on the just-finished turn.
+    // `useThreadMessaging` reads those raw — leaving them stale routes
+    // the next send to `coding_turn_steer` against a turn the backend
+    // has already unregistered ("Storage not found: turn ...").
+    store.dispatchThreadAction({
+      type: "markProcessing",
+      threadId,
+      isProcessing: false,
+      timestamp: Date.now(),
+    });
+    store.dispatchThreadAction({
+      type: "setActiveTurnId",
+      threadId,
+      turnId: null,
+    });
     const prev = recentlyCompleted.get(threadId);
     if (prev?.timer) clearTimeout(prev.timer);
     const timer = setTimeout(() => {

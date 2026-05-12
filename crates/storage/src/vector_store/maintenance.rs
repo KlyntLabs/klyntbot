@@ -222,11 +222,36 @@ impl VectorStore {
     /// that accumulate fragments faster than periodic `optimize_all_tables`.
     pub async fn optimize_table(&self, table_name: &str) -> Result<(), StorageError> {
         let tbl = self.get_table(table_name).await?;
-        tbl.optimize(OptimizeAction::All)
-            .await
-            .map_err(|e| StorageError::Vector(format!("optimize {table_name}: {e}")))?;
+        Self::optimize_with_retry(&tbl, table_name).await?;
         self.table_cache.remove(table_name);
         Ok(())
+    }
+
+    /// Retry `optimize` on transient Lance commit conflicts.
+    async fn optimize_with_retry(
+        tbl: &lancedb::Table,
+        table_name: &str,
+    ) -> Result<lancedb::table::OptimizeStats, StorageError> {
+        let mut last_err = None;
+        for attempt in 1..=4 {
+            match tbl.optimize(OptimizeAction::All).await {
+                Ok(stats) => return Ok(stats),
+                Err(e) => {
+                    let msg = e.to_string();
+                    if msg.contains("Please retry") || msg.contains("Retryable commit conflict") {
+                        tracing::debug!("Retryable commit conflict on {table_name}, attempt {attempt}/4");
+                        tokio::time::sleep(std::time::Duration::from_millis(100 * attempt)).await;
+                        last_err = Some(e);
+                        continue;
+                    }
+                    return Err(StorageError::Vector(format!("optimize {table_name}: {e}")));
+                }
+            }
+        }
+        Err(StorageError::Vector(format!(
+            "optimize {table_name}: {e}",
+            e = last_err.unwrap()
+        )))
     }
 
     /// Compact all vector tables to reclaim memory and disk space.
@@ -255,7 +280,7 @@ impl VectorStore {
                 continue;
             }
 
-            let result = tbl.optimize(OptimizeAction::All).await;
+            let result = Self::optimize_with_retry(&tbl, table_name).await;
             // Drop the cached handle so LanceDB can unmap fragment files.
             drop(tbl);
             self.table_cache.remove(table_name);

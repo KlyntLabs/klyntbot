@@ -87,7 +87,12 @@ export function isStaleSteerTurnError(message: string): boolean {
   if (normalized.includes("no active turn")) {
     return true;
   }
-  return normalized.includes("active turn") && normalized.includes("not found");
+  if (normalized.includes("active turn") && normalized.includes("not found")) {
+    return true;
+  }
+  // Coding `SteerQueue::push` rejects with `StorageNotFound("turn <id>")`
+  // when the turn has already been unregistered.
+  return normalized.includes("storage not found") && normalized.includes("turn ");
 }
 
 export function parseFastCommand(text: string): FastCommandAction {
