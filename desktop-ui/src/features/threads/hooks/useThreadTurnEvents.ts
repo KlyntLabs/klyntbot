@@ -65,6 +65,20 @@ export function useThreadTurnEvents({
     [planByThreadRef],
   );
 
+  const resetTurnState = useCallback(
+    (threadId: string) => {
+      resetThreadTurnState(
+        {
+          hasOptimisticActiveTurnByThreadRef,
+          immediateActiveTurnIdByThreadRef,
+          pendingInterruptsRef,
+        },
+        threadId,
+      );
+    },
+    [pendingInterruptsRef],
+  );
+
   const onThreadStarted = useCallback(
     (workspaceId: string, thread: Record<string, unknown>) => {
       const threadId = asString(thread.id);
@@ -222,14 +236,7 @@ export function useThreadTurnEvents({
       // Generation count prevents the bug we used to have where a mismatched
       // turnId from a real backend event got silently dropped.
       markProcessing(threadId, false);
-      resetThreadTurnState(
-        {
-          hasOptimisticActiveTurnByThreadRef,
-          immediateActiveTurnIdByThreadRef,
-          pendingInterruptsRef,
-        },
-        threadId,
-      );
+      resetTurnState(threadId);
       setActiveTurnId(threadId, null);
       if (shouldClearCompletedPlan(threadId, turnId)) {
         dispatch({ type: "clearThreadPlan", threadId });
@@ -239,7 +246,7 @@ export function useThreadTurnEvents({
       dispatch,
       getTurnGeneration,
       markProcessing,
-      pendingInterruptsRef,
+      resetTurnState,
       setActiveTurnId,
       shouldClearCompletedPlan,
     ],
@@ -261,18 +268,11 @@ export function useThreadTurnEvents({
           setThreadLoaded(threadId, false);
           markReviewing(threadId, false);
         }
-        resetThreadTurnState(
-          {
-            hasOptimisticActiveTurnByThreadRef,
-            immediateActiveTurnIdByThreadRef,
-            pendingInterruptsRef,
-          },
-          threadId,
-        );
+        resetTurnState(threadId);
         setActiveTurnId(threadId, null);
       }
     },
-    [markProcessing, markReviewing, pendingInterruptsRef, setActiveTurnId, setThreadLoaded],
+    [markProcessing, markReviewing, resetTurnState, setActiveTurnId, setThreadLoaded],
   );
 
   const onThreadClosed = useCallback(
@@ -280,17 +280,10 @@ export function useThreadTurnEvents({
       setThreadLoaded(threadId, false);
       markProcessing(threadId, false);
       markReviewing(threadId, false);
-      resetThreadTurnState(
-        {
-          hasOptimisticActiveTurnByThreadRef,
-          immediateActiveTurnIdByThreadRef,
-          pendingInterruptsRef,
-        },
-        threadId,
-      );
+      resetTurnState(threadId);
       setActiveTurnId(threadId, null);
     },
-    [markProcessing, markReviewing, pendingInterruptsRef, setActiveTurnId, setThreadLoaded],
+    [markProcessing, markReviewing, resetTurnState, setActiveTurnId, setThreadLoaded],
   );
 
   const onTurnPlanUpdated = useCallback(

@@ -27,10 +27,10 @@ impl AppEventEmitter for RecordingEmitter {
     }
 }
 
-pub struct ChatTestHarness {
-    pub core: Arc<app_core::AppCore>,
-    pub emitter: Arc<RecordingEmitter>,
-}
+/// Test utility for constructing an AppCore with a mock provider and
+/// recording emitter. All methods are associated functions — the struct
+/// carries no state.
+pub struct ChatTestHarness;
 
 impl ChatTestHarness {
     pub async fn new_real() -> (Arc<app_core::AppCore>, Arc<RecordingEmitter>) {
@@ -44,15 +44,6 @@ impl ChatTestHarness {
         (Arc::new(core), emitter_clone)
     }
 
-    pub fn event_names(&self) -> Vec<String> {
-        self.emitter
-            .events
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|e| e.name.clone())
-            .collect()
-    }
 }
 
 #[cfg(test)]

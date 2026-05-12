@@ -10,10 +10,7 @@ type Handler = (event: ThreadEvent) => void;
  * Replaces the 50+ individual `agent:*` listeners with a single typed channel.
  * Generation filtering is the caller's responsibility.
  */
-export function useThreadEventsV2(
-  sessionKey: string | null,
-  onEvent: Handler,
-): void {
+export function useThreadEventsV2(sessionKey: string | null, onEvent: Handler): void {
   const handlerRef = useRef(onEvent);
   handlerRef.current = onEvent;
 
@@ -21,15 +18,21 @@ export function useThreadEventsV2(
     if (!sessionKey) return;
 
     let unlisten: (() => void) | null = null;
+    let cancelled = false;
 
     listen<ThreadEvent>("thread:event", (evt: TauriEvent<ThreadEvent>) => {
       if (evt.payload.session_key !== sessionKey) return;
       handlerRef.current(evt.payload);
     }).then((fn) => {
-      unlisten = fn;
+      if (cancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
     });
 
     return () => {
+      cancelled = true;
       if (unlisten) unlisten();
     };
   }, [sessionKey]);

@@ -1,4 +1,4 @@
-import { Component, useState, type ErrorInfo, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode, useEffect, useState } from "react";
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -53,7 +53,7 @@ interface FallbackProps {
 function AppErrorBoundaryFallback({ surface, error, componentStack, resetError }: FallbackProps) {
   const [copied, setCopied] = useState(false);
   const message = error instanceof Error ? error.message : String(error);
-  const stack = error instanceof Error ? error.stack ?? "" : "";
+  const stack = error instanceof Error ? (error.stack ?? "") : "";
 
   const copyDetails = async () => {
     const payload = [
@@ -67,11 +67,16 @@ function AppErrorBoundaryFallback({ surface, error, componentStack, resetError }
     try {
       await navigator.clipboard.writeText(payload);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
     } catch {
       // Clipboard write can fail in restricted contexts — non-fatal.
     }
   };
+
+  useEffect(() => {
+    if (!copied) return;
+    const id = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(id);
+  }, [copied]);
 
   return (
     <div className="app-error-boundary" role="alert" aria-live="assertive">
@@ -99,11 +104,7 @@ function AppErrorBoundaryFallback({ surface, error, componentStack, resetError }
           >
             Try again
           </button>
-          <button
-            type="button"
-            className="ghost app-error-boundary__button"
-            onClick={copyDetails}
-          >
+          <button type="button" className="ghost app-error-boundary__button" onClick={copyDetails}>
             {copied ? "Copied" : "Copy details"}
           </button>
         </div>

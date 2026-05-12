@@ -1344,7 +1344,6 @@ pub async fn relay_chat_stream(
                             emitter.emit_event("agent:plan_mode_changed", payload);
                         }
                         // Telemetry / internal events — intentionally not relayed to FE.
-                        // Telemetry / internal events — intentionally not relayed to FE.
                         AgentEvent::ReasoningChunk { .. }
                         | AgentEvent::SubagentProgress { .. }
                         | AgentEvent::SubagentCompleted { .. }

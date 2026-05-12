@@ -2,14 +2,11 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import type { StreamSnapshot } from "@/features/chat/types";
 import { DEFAULT_STREAM_SNAPSHOT } from "@/features/chat/types";
-import type {
-  CodingThreadState,
-  ThreadEvent,
-} from "@/features/coding/state/codingEventReducer";
+import type { CodingThreadState, ThreadEvent } from "@/features/coding/state/codingEventReducer";
 import { applyThreadEvent, initialCodingState } from "@/features/coding/state/codingEventReducer";
 import type { ConversationItem } from "@/types";
-import { initialState as threadInitialState, threadReducer } from "../hooks/useThreadsReducer";
 import type { ThreadAction, ThreadState } from "../hooks/useThreadsReducer";
+import { initialState as threadInitialState, threadReducer } from "../hooks/useThreadsReducer";
 import { CoalescerRegistry } from "../utils/coalesceDeltas";
 
 // Preserve legacy v1 chat event bridge side-effects until full v2 migration.
@@ -58,7 +55,7 @@ interface StreamSlice {
 
 const streamCoalescers = new CoalescerRegistry<StreamSnapshot>();
 
-const createStreamSlice = (set: any): StreamSlice => ({
+const createStreamSlice = (set: any, get: () => ChatStore): StreamSlice => ({
   streamSnapshots: {},
   streamApprovals: {},
   streamFileEdits: {},
@@ -87,29 +84,29 @@ const createStreamSlice = (set: any): StreamSlice => ({
     })),
 
   appendSystemItem: (sessionKey: string, kind: string, item: unknown) => {
-    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
-    useChatStore.getState()._setStreamSnapshot(sessionKey, {
+    const snap = get().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    get()._setStreamSnapshot(sessionKey, {
       ...snap,
       segments: [...snap.segments, { type: "system" as const, kind, item }],
     });
   },
 
   appendErrorItem: (sessionKey: string, message: string) => {
-    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
-    useChatStore.getState()._setStreamSnapshot(sessionKey, {
+    const snap = get().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    get()._setStreamSnapshot(sessionKey, {
       ...snap,
       segments: [...snap.segments, { type: "error" as const, message }],
     });
   },
 
   upsertApproval: (sessionKey: string, item: ApprovalItem) => {
-    const existing = useChatStore.getState().streamApprovals[sessionKey] ?? [];
+    const existing = get().streamApprovals[sessionKey] ?? [];
     const index = existing.findIndex((a) => a.requestId === item.requestId);
     const next =
       index >= 0
         ? [...existing.slice(0, index), item, ...existing.slice(index + 1)]
         : [...existing, item];
-    useChatStore.getState()._setStreamApprovals(sessionKey, next);
+    get()._setStreamApprovals(sessionKey, next);
   },
 
   resolveApproval: (
@@ -118,7 +115,7 @@ const createStreamSlice = (set: any): StreamSlice => ({
     status: ApprovalItem["status"],
     decidedBy: ApprovalItem["decidedBy"],
   ) => {
-    const existing = useChatStore.getState().streamApprovals[sessionKey] ?? [];
+    const existing = get().streamApprovals[sessionKey] ?? [];
     const index = existing.findIndex((a) => a.requestId === requestId);
     if (index < 0) return;
     const next = [...existing];
@@ -128,17 +125,17 @@ const createStreamSlice = (set: any): StreamSlice => ({
       decidedBy,
       decidedAt: new Date().toISOString(),
     };
-    useChatStore.getState()._setStreamApprovals(sessionKey, next);
+    get()._setStreamApprovals(sessionKey, next);
   },
 
   upsertFileEdit: (sessionKey: string, item: DiffItem) => {
-    const existing = useChatStore.getState().streamFileEdits[sessionKey] ?? [];
-    useChatStore.getState()._setStreamFileEdits(sessionKey, [...existing, item]);
+    const existing = get().streamFileEdits[sessionKey] ?? [];
+    get()._setStreamFileEdits(sessionKey, [...existing, item]);
   },
 
   clearSegments: (sessionKey: string) => {
-    const snap = useChatStore.getState().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
-    useChatStore.getState()._setStreamSnapshot(sessionKey, { ...snap, segments: [] });
+    const snap = get().streamSnapshots[sessionKey] ?? DEFAULT_STREAM_SNAPSHOT;
+    get()._setStreamSnapshot(sessionKey, { ...snap, segments: [] });
   },
 });
 
@@ -186,8 +183,7 @@ const createCodingSlice = (set: any): CodingSlice => ({
     coalescer.push(event);
   },
 
-  setCodingRunningIds: (ids: Set<string>) =>
-    set(() => ({ codingRunningIds: new Set(ids) })),
+  setCodingRunningIds: (ids: Set<string>) => set(() => ({ codingRunningIds: new Set(ids) })),
 
   setCodingRecentlyCompleted: (map: Map<string, number>) =>
     set(() => ({ codingRecentlyCompleted: new Map(map) })),
@@ -199,7 +195,6 @@ const createCodingSlice = (set: any): CodingSlice => ({
       return { codingStateByThread: rest };
     });
   },
-
 });
 
 // ── Store ─────────────────────────────────────────────────────────────
@@ -208,9 +203,9 @@ export type ChatStore = ThreadsSlice & StreamSlice & CodingSlice;
 
 export const useChatStore = create<ChatStore>()(
   devtools(
-    (set, _get) => ({
+    (set, get) => ({
       ...createThreadsSlice(set),
-      ...createStreamSlice(set),
+      ...createStreamSlice(set, get),
       ...createCodingSlice(set),
     }),
     {
