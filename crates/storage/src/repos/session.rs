@@ -1068,6 +1068,36 @@ impl SessionRepo {
         .await?;
         Ok(rows)
     }
+
+    /// Insert a new `mode='subagent'` session with `parent_session_id` set.
+    pub async fn insert_subagent_session(
+        &self,
+        session_key: &str,
+        parent_session_id: &str,
+        workspace_path: &str,
+    ) -> Result<(), StorageError> {
+        sqlx::query(
+            r#"
+            INSERT INTO sessions (key, mode, parent_session_id, cwd)
+            VALUES (?1, 'subagent', ?2, ?3)
+            "#,
+        )
+        .bind(session_key)
+        .bind(parent_session_id)
+        .bind(workspace_path)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Load conversation history for a session, ordered by timestamp ascending.
+    /// Alias for `get_messages` with the name expected by the subagent runtime.
+    pub async fn load_messages(
+        &self,
+        session_key: &str,
+    ) -> Result<Vec<SessionMessageRow>, StorageError> {
+        self.get_messages(session_key).await
+    }
 }
 
 /// A message with deserialized Parts — returned by `get_messages_parts`.

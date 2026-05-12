@@ -20,6 +20,7 @@ pub mod session_context;
 pub mod session_memory;
 pub mod skill_version;
 pub mod status;
+pub mod subagent_instance;
 pub mod task;
 pub mod task_alarm;
 pub mod task_group;
@@ -35,6 +36,7 @@ pub use reforge_state::ReforgeStateRow;
 pub use session_memory::SessionMemoryRow;
 pub use skill_version::SkillVersionRow;
 pub use status::{StatusLabelRow, StatusWorkflowRow};
+pub use subagent_instance::{SubagentInstanceRow, SubagentStatus};
 pub use task_group::TaskGroupRow;
 
 #[cfg(test)]

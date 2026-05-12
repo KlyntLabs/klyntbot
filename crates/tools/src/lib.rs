@@ -26,7 +26,7 @@ pub mod embedding;
 // ── Module re-exports ───────────────────────────────────────────────────────
 pub use domain::{
     agent_task_tool, annotate, area_tool, context_request, cron_tool, docs, learning_tool,
-    memory_tool, mirror, okr_tool, project_tool, skill_reference, spawn, temporal,
+    memory_tool, mirror, okr_tool, project_tool, skill_reference, subagents, temporal,
 };
 pub use embedding::{embedding_engine, embedding_store};
 
@@ -95,3 +95,6 @@ pub use temporal::TemporalTool;
 
 // Skill reference
 pub use skill_reference::{SkillReferenceIndex, SkillReferenceTool};
+
+// Subagents
+pub use subagents::{KillAction, ListAction, ResumeAction, SpawnAction, SubagentsHandler, SubagentsTool};

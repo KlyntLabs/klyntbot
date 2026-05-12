@@ -13,6 +13,7 @@ pub enum SessionMode {
     #[default]
     Assistant,
     Coding,
+    Subagent,
 }
 
 impl SessionMode {
@@ -20,6 +21,7 @@ impl SessionMode {
         match self {
             Self::Assistant => "assistant",
             Self::Coding => "coding",
+            Self::Subagent => "subagent",
         }
     }
 
@@ -27,6 +29,7 @@ impl SessionMode {
         match s {
             "assistant" => Some(Self::Assistant),
             "coding" => Some(Self::Coding),
+            "subagent" => Some(Self::Subagent),
             _ => None,
         }
     }
@@ -38,9 +41,17 @@ mod tests {
 
     #[test]
     fn round_trips_via_str() {
-        for m in [SessionMode::Assistant, SessionMode::Coding] {
+        for m in [SessionMode::Assistant, SessionMode::Coding, SessionMode::Subagent] {
             assert_eq!(SessionMode::parse(m.as_str()), Some(m));
         }
+    }
+
+    #[test]
+    fn subagent_serde_uses_snake_case() {
+        let s = serde_json::to_string(&SessionMode::Subagent).unwrap();
+        assert_eq!(s, "\"subagent\"");
+        let parsed: SessionMode = serde_json::from_str("\"subagent\"").unwrap();
+        assert_eq!(parsed, SessionMode::Subagent);
     }
 
     #[test]

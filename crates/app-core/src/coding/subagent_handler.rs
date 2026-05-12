@@ -17,7 +17,7 @@ impl AppCore {
             .map(|s| SubagentActiveSummary {
                 agent_id: s.agent_id,
                 label: s.label,
-                profile: s.profile,
+                profile: "".to_string(),
                 iteration: s.iteration,
                 status: s.status,
                 started_at: s.started_at,
@@ -38,13 +38,13 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn subagent_inspect(&self, agent_id: &str) -> Result<SubagentDetail> {
-        let _row = self.repos.agent_tasks.get(agent_id).await?;
-        // AgentTaskRow does not currently track messages_json, tokens_used, or duration_ms.
+        let row = self.repos.subagent_instances.get(agent_id).await?
+            .ok_or_else(|| common::KlyntbotError::StorageNotFound(format!("subagent {agent_id}")))?;
         Ok(SubagentDetail {
-            agent_id: agent_id.to_string(),
+            agent_id: row.agent_id,
             messages: vec![],
-            tokens_used: 0,
-            duration_ms: 0,
+            tokens_used: row.turns_used_total as u64,
+            duration_ms: (row.updated_at - row.created_at).max(0) as u64,
         })
     }
 }

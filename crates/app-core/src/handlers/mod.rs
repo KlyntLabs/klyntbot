@@ -36,6 +36,7 @@ pub mod retention_history;
 pub mod review_stats;
 pub mod settings;
 pub mod status;
+pub mod subagent;
 pub mod tasks;
 pub mod timeline;
 mod view;

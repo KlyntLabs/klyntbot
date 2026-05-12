@@ -12,5 +12,5 @@ pub mod mirror;
 pub mod okr_tool;
 pub mod project_tool;
 pub mod skill_reference;
-pub mod spawn;
+pub mod subagents;
 pub mod temporal;

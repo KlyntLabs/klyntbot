@@ -539,6 +539,7 @@ desktop_macros::klynt_collect_commands![
     crate::commands::subagent::subagent_list_active,
     crate::commands::subagent::subagent_cancel,
     crate::commands::subagent::subagent_inspect,
+    crate::commands::subagent::subagent_list_for_session,
     crate::commands::tracing::tracing_list_providers,
     crate::commands::tracing::tracing_list_sessions,
     crate::commands::tracing::tracing_load_session,

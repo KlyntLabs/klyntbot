@@ -45,6 +45,7 @@ pub mod session_memory;
 pub mod skill_version;
 pub mod status_workflow;
 pub mod strategy;
+pub mod subagent_instance;
 pub mod task_alarms;
 pub mod task_group;
 pub mod task_recurrence;
@@ -102,6 +103,7 @@ pub use session_memory::SessionMemoryRepo;
 pub use skill_version::SkillVersionRepo;
 pub use status_workflow::StatusWorkflowRepo;
 pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
+pub use subagent_instance::{NewSubagentInstance, SubagentInstanceRepo};
 pub use task_alarms::TaskAlarmsRepo;
 pub use task_group::TaskGroupRepo;
 pub use task_recurrence::TaskRecurrenceRepo;
@@ -180,6 +182,7 @@ pub struct Repos {
     pub coding_approval_history: CodingApprovalHistoryRepo,
     pub coding_reviews: CodingReviewsRepo,
     pub coding_todo: TodoRepo,
+    pub subagent_instances: SubagentInstanceRepo,
     pub workspaces: WorkspaceRepo,
 }
 
@@ -223,6 +226,7 @@ impl Repos {
             coding_approval_history: CodingApprovalHistoryRepo::new(db.clone()),
             coding_reviews: CodingReviewsRepo::new(db.clone()),
             coding_todo: TodoRepo::new(db.clone()),
+            subagent_instances: SubagentInstanceRepo::new(db.clone()),
             workspaces: WorkspaceRepo::new(db.clone()),
             pool: db,
         }

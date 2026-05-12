@@ -20,7 +20,7 @@ use tools::{
     okr_tool::OkrTool,
     project_tool::ProjectTool,
     registry::ToolRegistry,
-    spawn::SpawnTool,
+    subagents::SubagentsTool,
 };
 use tools_core::FeaturePackage;
 
@@ -665,15 +665,16 @@ impl AgentLoopBuilder {
                 .agent_task_repo(repos.agent_tasks.clone())
                 .coding_policies(self.coding_policies.clone())
                 .job_supervisor(self.job_supervisor.clone())
+                .repos(repos.clone())
                 .build(),
         );
 
         // ── Tool registry ─────────────────────────────────────────────────
         let mut tool_registry = ToolRegistry::new();
 
-        // Spawn tool
-        tool_registry.register(SpawnTool::with_handler(
-            Arc::clone(&subagent_manager) as Arc<dyn tools::spawn::SpawnHandler>
+        // Subagents tool
+        tool_registry.register(SubagentsTool::with_handler(
+            Arc::clone(&subagent_manager) as Arc<dyn tools::subagents::SubagentsHandler>
         ));
 
         // Standalone AlarmTool (free-floating reminders, spec §8.2/§8.4).

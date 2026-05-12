@@ -157,6 +157,9 @@ pub async fn execute_loop(
         accumulate_usage(&mut accumulated_usage, &cycle_usage);
         cap.deduct(&cycle_usage);
         cap.tick_turn();
+        if let Some(ref cb) = params.on_iteration {
+            cb();
+        }
 
         // ── Handle outcome ───────────────────────────────────
         match outcome {

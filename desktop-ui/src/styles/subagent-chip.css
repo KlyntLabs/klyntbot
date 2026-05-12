@@ -1,0 +1,17 @@
+.subagent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: var(--fs-xs);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+.subagent-chip:hover { background: var(--color-surface-hover); }
+.subagent-chip__arrow { opacity: 0.6; }
+.subagent-chip__id { font-family: var(--font-mono); }
+.subagent-chip__sep { opacity: 0.5; }
+.subagent-chip__desc { font-style: italic; }

@@ -46,6 +46,7 @@
 @import "./app-mode-switch.css";
 @import "./agents-md-panel.css";
 @import "./subagent-tray.css";
+@import "./subagent-chip.css";
 @import "./review-result-part.css";
 @import "./coding-jobs.css";
 @import "./components/stuck-thread-banner.css";

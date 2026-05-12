@@ -6,7 +6,7 @@ use std::time::Duration;
 use providers::{ChatParams, Usage};
 
 /// Parameters controlling a single LLM-tool execution cycle.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ExecutionParams {
     pub tool_timeout: Duration,
     pub chat_params: ChatParams,
@@ -36,6 +36,31 @@ pub struct ExecutionParams {
     pub cache_enabled: bool,
     /// Dynamic injectors (e.g. PlanModeInjector) evaluated at each iteration boundary.
     pub injector_registry: bus::InjectorRegistry,
+    /// Optional callback fired at each iteration boundary (after cap.tick_turn).
+    /// Used by SubagentRuntime to refresh `subagent_instances.updated_at`.
+    pub on_iteration: Option<Arc<dyn Fn() + Send + Sync>>,
+}
+
+impl std::fmt::Debug for ExecutionParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExecutionParams")
+            .field("tool_timeout", &self.tool_timeout)
+            .field("chat_params", &self.chat_params)
+            .field("max_iterations", &self.max_iterations)
+            .field("max_fabrication_retries", &self.max_fabrication_retries)
+            .field("cancel_token", &self.cancel_token)
+            .field("original_message", &self.original_message)
+            .field("planning_prompt", &self.planning_prompt)
+            .field("pipeline_timeout", &self.pipeline_timeout)
+            .field("context_window", &self.context_window)
+            .field("context_update_queue", &self.context_update_queue.is_some())
+            .field("pause_context_updates", &self.pause_context_updates)
+            .field("hook_engine", &self.hook_engine.is_some())
+            .field("cache_enabled", &self.cache_enabled)
+            .field("injector_registry", &self.injector_registry)
+            .field("on_iteration", &self.on_iteration.is_some())
+            .finish()
+    }
 }
 
 impl ExecutionParams {
@@ -60,6 +85,7 @@ impl ExecutionParams {
             hook_engine: None,
             cache_enabled: true,
             injector_registry: bus::InjectorRegistry::empty(),
+            on_iteration: None,
         }
     }
 
@@ -128,6 +154,11 @@ impl ExecutionParams {
 
     pub fn with_injector_registry(mut self, registry: bus::InjectorRegistry) -> Self {
         self.injector_registry = registry;
+        self
+    }
+
+    pub fn with_on_iteration(mut self, cb: Arc<dyn Fn() + Send + Sync>) -> Self {
+        self.on_iteration = Some(cb);
         self
     }
 }

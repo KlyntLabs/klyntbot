@@ -117,6 +117,12 @@ impl AppCore {
             provider_manager,
         } = storage::init_storage(config_override).await?;
 
+        // Subagent zombie sweep: flip any `running` rows older than 5 min to `failed`.
+        // Mirrors the zombie-session detector documented in CLAUDE.md.
+        if let Err(e) = repos.subagent_instances.sweep_zombies(300_000).await {
+            tracing::warn!(error = %e, "subagent zombie sweep failed at startup");
+        }
+
         let provider = provider_override.unwrap_or(provider);
 
         // Keep a clone for the Distiller (constructed after agent init).

@@ -4004,6 +4004,14 @@ async subagentInspect(agentId: string) : Promise<Result<SubagentDetail, ApiError
     else return { status: "error", error: e  as any };
 }
 },
+async subagentListForSession(sessionId: string) : Promise<Result<SubagentInstanceSummary[], ApiError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("subagent_list_for_session", { sessionId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async tracingListProviders() : Promise<Result<ProviderInfo[], ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("tracing_list_providers") };
@@ -5799,6 +5807,7 @@ export type SubagentActiveSummary = { agentId: string; label: string; profile: s
 export type SubagentCancelReason = "user_requested" | "timeout" | "parent_cancelled" | "policy_violation"
 export type SubagentDetail = { agentId: string; messages: JsonValue[]; tokensUsed: number; durationMs: number }
 export type SubagentEvent = { kind: "spawned"; agent_id: string; label: string; profile: string; parent_session_id: string; spawned_at: number } | { kind: "progress"; agent_id: string; iteration: number; last_tool: string | null } | { kind: "completed"; agent_id: string; success: boolean; summary: string; tokens_used: number; duration_ms: number } | { kind: "cancelled"; agent_id: string; reason: SubagentCancelReason; cancelled_at: number }
+export type SubagentInstanceSummary = { agentId: string; sessionId: string; parentAgentId: string | null; description: string; status: string; turnsUsedTotal: number; lastCapHitAt: number | null; updatedAt: number }
 export type SubagentSpawnedPayload = { sessionKey: string; label: string; profile: string }
 export type SubagentSummary = { agentId: string; subagentType: string; status: string; description: string | null; createdAt: string; updatedAt: string; eventCount: number }
 export type SubagentTypeCount = { subagentType: string; count: number }

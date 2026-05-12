@@ -1,8 +1,7 @@
 //! Subagent manager for background task execution.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, RwLock, Semaphore};
 use tokio_util::sync::CancellationToken;
@@ -14,93 +13,13 @@ use bus::InboundMessage;
 use providers::{DynProvider, Message};
 use storage::AgentTaskRepo;
 use tools::{
-    agent_task_tool::AgentTaskTool, registry::ToolRegistry, spawn::SpawnHandler, RoutingContext,
+    agent_task_tool::AgentTaskTool, registry::ToolRegistry, subagents::SubagentsHandler, RoutingContext,
 };
-
-/// Specialized profiles for sub-agents with different tool sets and behaviors.
-///
-/// klyntbot is a personal AI agent — no code execution tools are provided.
-/// Profiles control access to filesystem (read/write), web, and browser tools.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub enum SubagentProfile {
-    /// Read-only access: search, read files, web fetch, ask user (default)
-    #[default]
-    ReadOnly,
-    /// Read-write access: read-only tools + bash, write, edit, apply_patch, notebook_edit
-    ReadWrite,
-    /// Full access: all read-write tools + plan-mode tools
-    Full,
-}
-
-impl FromStr for SubagentProfile {
-    type Err = std::convert::Infallible;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(match s.to_lowercase().as_str() {
-            "read_only" | "readonly" | "analyst" | "research" => Self::ReadOnly,
-            "read_write" | "readwrite" | "general" => Self::ReadWrite,
-            "full" | "code" => Self::Full,
-            _ => Self::ReadWrite,
-        })
-    }
-}
-
-impl std::fmt::Display for SubagentProfile {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::ReadOnly => f.write_str("read_only"),
-            Self::ReadWrite => f.write_str("read_write"),
-            Self::Full => f.write_str("full"),
-        }
-    }
-}
-
-impl SubagentProfile {
-    /// Maximum iteration count for this profile.
-    pub fn max_iterations(&self) -> u32 {
-        match self {
-            Self::ReadOnly => 5,
-            Self::ReadWrite => 10,
-            Self::Full => 15,
-        }
-    }
-
-    /// System prompt role preamble for this profile.
-    pub fn role_prompt(&self) -> &'static str {
-        match self {
-            Self::ReadOnly => {
-                "You are an analyst. Reason about the information provided. You have read-only file access and web fetch tools."
-            }
-            Self::ReadWrite => {
-                "You are a research specialist. Focus on finding and synthesizing information from files. You have read and write file access."
-            }
-            Self::Full => {
-                "You are a general-purpose subagent. You have full access to filesystem, web, and plan-mode tools."
-            }
-        }
-    }
-
-    /// Tool description for the system prompt.
-    pub fn tool_description(&self) -> &'static str {
-        match self {
-            Self::ReadOnly => {
-                "- Read files in the workspace (read-only)\n- Search file contents (grep) and find files by pattern (glob)\n- Fetch web pages"
-            }
-            Self::ReadWrite => {
-                "- Read and write files in the workspace\n- Search file contents (grep) and find files by pattern (glob)\n- Execute shell commands and apply patches"
-            }
-            Self::Full => {
-                "- Read and write files in the workspace\n- Search file contents (grep) and find files by pattern (glob)\n- Execute shell commands, apply patches, and manage plan mode"
-            }
-        }
-    }
-}
 
 /// Tracks a running subagent for cancel/status operations.
 struct SubagentHandle {
     cancel_token: CancellationToken,
     label: String,
-    profile: SubagentProfile,
     spawned_at: std::time::Instant,
     spawned_at_ms: i64,
 }
@@ -109,7 +28,6 @@ struct SubagentHandle {
 pub struct SubagentHandleSummary {
     pub agent_id: String,
     pub label: String,
-    pub profile: String,
     pub iteration: u32,
     pub status: String,
     pub started_at: i64,
@@ -138,11 +56,11 @@ pub struct SubagentManager {
     agent_task_repo: AgentTaskRepo,
     tool_kit: std::sync::Mutex<Option<Arc<klynt_core::ToolKitBuilder>>>,
     hook_engine: std::sync::Mutex<Option<Arc<klynt_hooks::HookEngine>>>,
-    /// Cache of base ToolRegistry builds keyed by (profile, cwd).
+    /// Cache of base ToolRegistry builds keyed by cwd.
     /// The cache stores the registry *before* AgentTaskTool is added,
     /// so each invocation can clone the base and append its task tool.
     registry_cache:
-        std::sync::Mutex<HashMap<(SubagentProfile, PathBuf), Arc<RwLock<ToolRegistry>>>>,
+        std::sync::Mutex<HashMap<PathBuf, Arc<RwLock<ToolRegistry>>>>,
     event_tx: std::sync::Mutex<
         Option<tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>>,
     >,
@@ -155,6 +73,7 @@ pub struct SubagentManager {
     >,
     /// Optional because headless test environments do not spawn background jobs.
     job_supervisor: Option<tools_core::DynJobSupervisor>,
+    pub runtime: crate::subagent_runtime::SubagentRuntime,
 }
 
 /// Builder for SubagentManager
@@ -174,6 +93,7 @@ pub struct SubagentManagerBuilder {
         Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
     >,
     job_supervisor: Option<tools_core::DynJobSupervisor>,
+    repos: Option<storage::Repos>,
 }
 
 impl SubagentManagerBuilder {
@@ -192,6 +112,7 @@ impl SubagentManagerBuilder {
             event_sender: None,
             coding_policies: None,
             job_supervisor: None,
+            repos: None,
         }
     }
 
@@ -207,6 +128,11 @@ impl SubagentManagerBuilder {
 
     pub fn job_supervisor(mut self, supervisor: Option<tools_core::DynJobSupervisor>) -> Self {
         self.job_supervisor = supervisor;
+        self
+    }
+
+    pub fn repos(mut self, repos: storage::Repos) -> Self {
+        self.repos = Some(repos);
         self
     }
 
@@ -246,7 +172,21 @@ impl SubagentManagerBuilder {
     }
 
     pub fn build(self) -> SubagentManager {
+        let repos = self.repos.expect("repos is required for SubagentRuntime");
         SubagentManager {
+            runtime: crate::subagent_runtime::SubagentRuntime {
+                repo: repos.subagent_instances.clone(),
+                sessions: repos.sessions.clone(),
+                active: crate::subagent_runtime::ActiveSubagentRegistry::new(),
+                provider: self.provider.clone(),
+                workspace: self.workspace.clone(),
+                model: self.model.clone().unwrap_or_else(|| "claude-sonnet-4".to_string()),
+                tool_kit: self.tool_kit.clone(),
+                hook_engine: self.hook_engine.clone(),
+                coding_policies: self.coding_policies.clone(),
+                job_supervisor: self.job_supervisor.clone(),
+                event_tx: Arc::new(std::sync::Mutex::new(self.event_sender.clone())),
+            },
             provider: self.provider,
             workspace: self.workspace,
             inbound_tx: self.inbound_tx.expect("inbound_sender is required"),
@@ -291,7 +231,8 @@ impl SubagentManager {
         tx: tokio::sync::broadcast::Sender<crate::subagent_events::SubagentLifecycleEvent>,
     ) {
         let mut lock = self.event_tx.lock().unwrap();
-        *lock = Some(tx);
+        *lock = Some(tx.clone());
+        self.runtime.set_event_sender(tx);
     }
 
     /// Returns the total semaphore permit count (max concurrent subagents).
@@ -308,7 +249,6 @@ impl SubagentManager {
         &self,
         task: String,
         label: Option<String>,
-        profile: SubagentProfile,
         origin_channel: String,
         origin_chat_id: String,
     ) -> String {
@@ -345,7 +285,7 @@ impl SubagentManager {
             let input = klynt_hooks::events::subagent_spawn::SubagentSpawnInput {
                 session_id: origin_key.clone(),
                 parent_session_id: None,
-                profile: profile.to_string(),
+                profile: "full".to_string(),
                 task_summary: label_text.clone(),
                 base: Default::default(),
             };
@@ -370,7 +310,6 @@ impl SubagentManager {
                 SubagentHandle {
                     cancel_token: cancel_token.clone(),
                     label: label_text.clone(),
-                    profile,
                     spawned_at: std::time::Instant::now(),
                     spawned_at_ms,
                 },
@@ -384,7 +323,7 @@ impl SubagentManager {
                 let _ = sender.send(crate::subagent_events::SubagentLifecycleEvent::Spawned {
                     agent_id: short_id.clone(),
                     label: label_text.clone(),
-                    profile: profile.to_string(),
+                    profile: "full".to_string(),
                     parent_session_id: origin_key.clone(),
                     spawned_at: spawned_at_ms,
                 });
@@ -402,24 +341,13 @@ impl SubagentManager {
         // Build or retrieve cached base registry (without AgentTaskTool).
         let base_registry = if let Some(ref kit) = tool_kit {
             let kit = (**kit).clone().with_cwd(workspace.clone());
-            let cache_key = (profile, workspace.clone());
+            let cache_key = workspace.clone();
             let mut cache = self.registry_cache.lock().unwrap();
             if let Some(cached) = cache.get(&cache_key) {
                 Some(cached.clone())
             } else {
                 let mut tools = ToolRegistry::new();
-                match profile {
-                    SubagentProfile::ReadOnly => {
-                        kit.register_read_only(&mut tools);
-                    }
-                    SubagentProfile::ReadWrite => {
-                        kit.register_read_only(&mut tools);
-                        kit.register_mutating(&mut tools);
-                    }
-                    SubagentProfile::Full => {
-                        kit.register_all(&mut tools);
-                    }
-                }
+                kit.register_all(&mut tools);
                 let arc = Arc::new(RwLock::new(tools));
                 cache.insert(cache_key, arc.clone());
                 Some(arc)
@@ -454,7 +382,7 @@ impl SubagentManager {
                     Err("Cancelled by user".into())
                 }
                 r = run_subagent_task(
-                    &provider, &workspace, &model, &task, config, profile,
+                    &provider, &workspace, &model, &task, config,
                     tool_kit, hook_engine.clone(), origin_key.clone(), base_registry,
                     short_id_clone.clone(), Arc::clone(&progress_ref), event_tx_clone.clone(),
                     coding_policies.clone(), job_supervisor.clone(),
@@ -547,30 +475,56 @@ impl SubagentManager {
     }
 
     /// List active subagents.
+    /// Merges old-style ephemeral handles with new-style persistent instances.
     pub async fn list_active(&self, _session_key: &str) -> Vec<SubagentHandleSummary> {
+        let mut out = Vec::new();
+
+        // Old-style ephemeral handles.
         let handles = self.handles.lock().await;
-        handles
-            .iter()
-            .filter(|(_, h)| !h.cancel_token.is_cancelled())
-            .map(|(id, h)| {
-                let duration_ms = h.spawned_at.elapsed().as_millis() as u64;
-                let (iteration, last_tool) = self
-                    .progress
-                    .get(id)
-                    .map(|e| e.value().clone())
-                    .unwrap_or((0, None));
-                SubagentHandleSummary {
-                    agent_id: id.clone(),
-                    label: h.label.clone(),
-                    profile: h.profile.to_string(),
-                    iteration,
-                    status: "running".into(),
-                    started_at: h.spawned_at_ms,
-                    last_tool,
-                    duration_ms,
+        for (id, h) in handles.iter() {
+            if h.cancel_token.is_cancelled() {
+                continue;
+            }
+            let duration_ms = h.spawned_at.elapsed().as_millis() as u64;
+            let (iteration, last_tool) = self
+                .progress
+                .get(id)
+                .map(|e| e.value().clone())
+                .unwrap_or((0, None));
+            out.push(SubagentHandleSummary {
+                agent_id: id.clone(),
+                label: h.label.clone(),
+                iteration,
+                status: "running".into(),
+                started_at: h.spawned_at_ms,
+                last_tool,
+                duration_ms,
+            });
+        }
+        drop(handles);
+
+        // New-style persistent instances that are currently running.
+        if let Ok(rows) = self.runtime.repo.list_by_status(storage::rows::SubagentStatus::Running).await {
+            let old_ids: HashSet<String> = out.iter().map(|s| s.agent_id.clone()).collect();
+            for row in rows {
+                // Skip if this agent is already tracked as an old-style handle.
+                if old_ids.contains(&row.agent_id) {
+                    continue;
                 }
-            })
-            .collect()
+                let duration_ms = (row.updated_at - row.created_at).max(0) as u64;
+                out.push(SubagentHandleSummary {
+                    agent_id: row.agent_id,
+                    label: row.description,
+                    iteration: row.turns_used as u32,
+                    status: "running".into(),
+                    started_at: row.created_at,
+                    last_tool: None,
+                    duration_ms,
+                });
+            }
+        }
+
+        out
     }
 
     /// Get status of all running subagents.
@@ -584,10 +538,9 @@ impl SubagentManager {
         for (id, handle) in handles.iter() {
             let elapsed = handle.spawned_at.elapsed();
             lines.push(format!(
-                "  {} — '{}' [{}] (running for {}s)",
+                "  {} — '{}' (running for {}s)",
                 id,
                 handle.label,
-                handle.profile,
                 elapsed.as_secs()
             ));
         }
@@ -595,45 +548,187 @@ impl SubagentManager {
     }
 }
 
-/// Implement SpawnHandler trait for dependency inversion (tools layer can use agent layer)
 #[async_trait]
-impl SpawnHandler for SubagentManager {
+impl SubagentsHandler for SubagentManager {
     async fn spawn(
         &self,
-        task: String,
-        label: Option<String>,
-        profile: String,
-        origin_channel: String,
-        origin_chat_id: String,
-    ) -> String {
-        let profile = SubagentProfile::from_str(&profile).unwrap_or_default();
-        self.spawn(task, label, profile, origin_channel, origin_chat_id)
-            .await
+        action: tools::subagents::SpawnAction,
+        ctx: &tools::RoutingContext,
+    ) -> common::Result<String> {
+        let parent_session_id = ctx.session_key.as_ref()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        match self.runtime.spawn(crate::subagent_runtime::SpawnParams {
+            description: action.description,
+            prompt: action.prompt,
+            model: action.model,
+            max_turns: action.max_turns,
+            workspace_path: self.workspace.clone(),
+            parent_session_id,
+            parent_agent_id: ctx.agent_chain.last().cloned(),
+        }).await {
+            Ok(res) => json_ok(serde_json::json!({
+                "agent_id": res.agent_id,
+                "session_id": res.session_id,
+                "status": res.status.as_str(),
+                "summary": res.summary,
+                "turns_used": res.turns_used,
+            })),
+            Err(e) => Err(common::ToolError::ExecutionFailed(json_payload_for_error(&e)).into()),
+        }
     }
 
-    async fn cancel(&self, agent_id: &str) -> common::Result<String> {
-        self.cancel_subagent(agent_id).await
+    async fn resume(
+        &self,
+        action: tools::subagents::ResumeAction,
+        _ctx: &tools::RoutingContext,
+    ) -> common::Result<String> {
+        match self.runtime.resume(crate::subagent_runtime::ResumeParams {
+            agent_id: action.agent_id,
+            prompt: action.prompt,
+        }).await {
+            Ok(res) => json_ok(serde_json::json!({
+                "agent_id": res.agent_id,
+                "session_id": res.session_id,
+                "status": res.status.as_str(),
+                "summary": res.summary,
+                "turns_used": res.turns_used,
+            })),
+            Err(e) => Err(common::ToolError::ExecutionFailed(json_payload_for_error(&e)).into()),
+        }
     }
 
-    async fn status(&self, _session_key: &str) -> common::Result<String> {
-        self.get_status().await
+    async fn list(
+        &self,
+        action: tools::subagents::ListAction,
+        _ctx: &tools::RoutingContext,
+    ) -> common::Result<String> {
+        let status = action.status.as_deref().and_then(storage::rows::SubagentStatus::parse);
+        let rows = self.runtime.list(action.parent_agent_id.as_deref(), status).await
+            .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+        json_ok(serde_json::json!({
+            "instances": rows.into_iter().map(|r| serde_json::json!({
+                "agent_id": r.agent_id,
+                "session_id": r.session_id,
+                "parent_agent_id": r.parent_agent_id,
+                "description": r.description,
+                "status": r.status,
+                "turns_used_total": r.turns_used_total,
+                "last_cap_hit_at": r.last_cap_hit_at,
+                "updated_at": r.updated_at,
+            })).collect::<Vec<_>>(),
+        }))
+    }
+
+    async fn kill(
+        &self,
+        action: tools::subagents::KillAction,
+        _ctx: &tools::RoutingContext,
+    ) -> common::Result<String> {
+        let res = self.runtime.kill(&action.agent_id).await
+            .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+        json_ok(serde_json::json!({
+            "agent_id": res.agent_id,
+            "status": res.status.as_str(),
+        }))
     }
 }
 
-/// Run an agent loop for a subagent task with profile-based tools.
-///
-/// Tool access is determined by `SubagentProfile`:
-/// - ReadOnly: read-only / network / interaction tools
-/// - ReadWrite: read-only + mutating tools
-/// - Full: all tools including plan-mode
+fn json_payload_for_error(e: &common::KlyntbotError) -> String {
+    match e {
+        common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(s)) => s.clone(),
+        _ => e.to_string(),
+    }
+}
+
+fn json_ok<T: serde::Serialize>(value: T) -> common::Result<String> {
+    serde_json::to_string(&value).map_err(|e| common::ToolError::ExecutionFailed(e.to_string()).into())
+}
+
+/// Run the agent loop for a subagent and return the raw result.
 #[allow(clippy::too_many_arguments)]
+pub async fn run_subagent_loop(
+    provider: DynProvider,
+    messages: Vec<providers::types::Message>,
+    workspace: std::path::PathBuf,
+    model: String,
+    tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
+    hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
+    session_key: String,
+    agent_id: String,
+    coding_policies: Option<
+        Arc<dashmap::DashMap<String, Arc<parking_lot::RwLock<approval::CodingApprovalPolicy>>>>,
+    >,
+    job_supervisor: Option<tools_core::DynJobSupervisor>,
+    cancel_token: tokio_util::sync::CancellationToken,
+    max_turns: u32,
+    on_iteration: Option<std::sync::Arc<dyn Fn() + Send + Sync>>,
+) -> common::Result<crate::execution::execute_loop::ExecuteLoopResult> {
+    use crate::execution::budget::{DepthMode, SafetyCap};
+    use crate::execution::core::ExecutionCore;
+    use crate::execution::execute_loop::execute_loop;
+    use crate::execution::types::ExecutionParams;
+    use tokio::sync::RwLock;
+    use tools::registry::ToolRegistry;
+
+    let tools = if let Some(kit) = tool_kit {
+        let kit = (*kit).clone().with_cwd(workspace.clone());
+        let mut tools = ToolRegistry::new();
+        kit.register_all(&mut tools);
+        tools
+    } else {
+        ToolRegistry::new()
+    };
+
+    let tool_defs = tools.get_definitions();
+
+    // Build execution engine
+    let core = Arc::new(ExecutionCore::new(
+        provider,
+        Arc::new(RwLock::new(tools)),
+    ));
+
+    let mut params = ExecutionParams::new(&model, 128_000)
+        .with_cancel_token(cancel_token);
+    if let Some(cb) = on_iteration {
+        params = params.with_on_iteration(cb);
+    }
+
+    let mut routing_ctx = tools::RoutingContext::new("subagent".into(), "background".into());
+    routing_ctx.hook_engine = hook_engine;
+    routing_ctx.session_key = Some(session_key.clone().into());
+    routing_ctx.agent_chain = vec![agent_id.clone()];
+    routing_ctx.job_supervisor = job_supervisor;
+    routing_ctx.plan_mode_active = coding_policies
+        .as_ref()
+        .map(|policies| crate::agent_loop::is_plan_mode_for_thread(policies, &session_key))
+        .unwrap_or(false);
+
+    // Execute via unified execute loop with a fixed safety cap
+    let mut budget = SafetyCap::with_limits(
+        DepthMode::Normal,
+        0, // no token cap for subagents
+        max_turns,
+    );
+
+    execute_loop(
+        &core,
+        messages,
+        &tool_defs,
+        &params,
+        &mut budget,
+        &routing_ctx,
+        None,
+    )
+    .await
+}
+
 async fn run_subagent_task(
     provider: &DynProvider,
     workspace: &std::path::Path,
     model: &str,
     task: &str,
     config: SubagentConfig,
-    profile: SubagentProfile,
     tool_kit: Option<Arc<klynt_core::ToolKitBuilder>>,
     hook_engine: Option<Arc<klynt_hooks::HookEngine>>,
     session_key: String,
@@ -674,18 +769,7 @@ async fn run_subagent_task(
         let kit = (*kit).clone().with_cwd(workspace.to_path_buf());
 
         let mut tools = ToolRegistry::new();
-        match profile {
-            SubagentProfile::ReadOnly => {
-                kit.register_read_only(&mut tools);
-            }
-            SubagentProfile::ReadWrite => {
-                kit.register_read_only(&mut tools);
-                kit.register_mutating(&mut tools);
-            }
-            SubagentProfile::Full => {
-                kit.register_all(&mut tools);
-            }
-        }
+        kit.register_all(&mut tools);
 
         let task_handler = Arc::new(crate::adapters::agent_task::AgentTaskHandlerImpl::new(
             config.agent_task_repo,
@@ -706,7 +790,7 @@ async fn run_subagent_task(
         Arc::new(RwLock::new(tools)),
     ));
     // Build system prompt and messages
-    let system_prompt = build_subagent_prompt(workspace, task, profile);
+    let system_prompt = build_subagent_prompt(workspace, task);
     let messages = vec![
         Message::system(system_prompt),
         Message::user(task.to_string()),
@@ -727,8 +811,8 @@ async fn run_subagent_task(
     // Execute via unified execute loop with a fixed safety cap
     let mut budget = SafetyCap::with_limits(
         DepthMode::Normal,
-        120_000, // generous token budget for subagents
-        profile.max_iterations(),
+        0, // no token cap for subagents
+        500, // default turn cap
     );
 
     // Side channel: translate AgentEvent::IterationStart / ToolStart into
@@ -789,53 +873,44 @@ async fn run_subagent_task(
     Ok(("ok".to_string(), result.content))
 }
 
-/// Build a focused system prompt for subagents, tailored to the profile.
-fn build_subagent_prompt(
-    workspace: &std::path::Path,
-    task: &str,
-    profile: SubagentProfile,
-) -> String {
-    let tool_description = profile.tool_description();
-
+/// Build a focused system prompt for subagents.
+pub fn build_subagent_prompt(workspace: &std::path::Path, task: &str) -> String {
     format!(
         r#"# Subagent
 
-{}
-
-## Your Task
-{}
+You are a subagent. Complete the task assigned and return a clear, concise summary.
 
 ## Rules
-1. Stay focused - complete only the assigned task, nothing else
-2. Your final response will be reported back to the main agent
-3. Do not initiate conversations or take on side tasks
-4. Be concise but informative in your findings
+1. Stay focused — complete only the assigned task.
+2. Your final response is reported back to the parent agent.
+3. Do not initiate side tasks. Do not spawn other subagents.
+4. Be concise but informative.
 
-## What You Can Do
-{}
-- Manage tasks on the shared task board (agent_task tool: list, claim, complete, fail)
-
-## What You Cannot Do
-- Send messages directly to users (no message tool available)
-- Spawn other subagents
-- Access the main agent's conversation history
-
-## Task Board
-Use the `agent_task` tool to coordinate with other subagents:
-- `list` — see all tasks for this session
-- `claim` — take ownership of an unclaimed task
-- `complete` — mark a task done with your results
-- `fail` — report that a task failed
+## Your task
+{task}
 
 ## Workspace
-Your workspace is at: {}
-
-When you have completed the task, provide a clear summary of your findings or actions."#,
-        profile.role_prompt(),
-        task,
-        tool_description,
-        workspace.display()
+{workspace}
+"#,
+        task = task,
+        workspace = workspace.display(),
     )
+}
+
+/// Adapt a stored session message row into a provider Message.
+/// Returns None for rows that don't map cleanly (e.g. malformed).
+pub(crate) fn row_to_message(
+    row: storage::rows::session::SessionMessageRow,
+) -> Option<providers::types::Message> {
+    let role = row.role.as_str();
+    match role {
+        "system" => Some(providers::types::Message::system(row.content)),
+        "user" => Some(providers::types::Message::user(row.content)),
+        "assistant" => Some(providers::types::Message::assistant(row.content)),
+        // Tool messages: skip for now; resume bootstraps with the assistant
+        // summary, not the raw tool-result history (parity with Kimi).
+        _ => None,
+    }
 }
 
 /// Announce subagent result back to main agent via message bus
@@ -918,10 +993,12 @@ mod tests {
         let provider: DynProvider = Arc::new(NoOpProvider);
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let repo = storage::AgentTaskRepo::new(pool.inner().clone());
+        let repos = storage::Repos::from_pool(&pool);
         SubagentManager::builder(provider, std::path::PathBuf::from("/tmp"))
             .inbound_sender(tx)
             .max_concurrent_subagents(permits)
             .agent_task_repo(repo)
+            .repos(repos)
             .build()
     }
 
@@ -958,7 +1035,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_subagent_task_returns_text_response() {
-        let provider: DynProvider = Arc::new(NoOpProvider);
+        let provider = providers::testing::SingleResponseProvider::dyn_arc("ok");
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let repo = storage::AgentTaskRepo::new(pool.inner().clone());
         let kit = make_tool_kit(&pool);
@@ -971,10 +1048,9 @@ mod tests {
         let result = run_subagent_task(
             &provider,
             std::path::Path::new("/tmp"),
-            "no-op",
+            "test-single-response",
             "Say hello",
             config,
-            SubagentProfile::ReadWrite,
             Some(kit),
             None,
             "test:session".to_string(),
@@ -989,7 +1065,7 @@ mod tests {
         assert!(result.is_ok());
         let (status, text) = result.unwrap();
         assert_eq!(status, "ok");
-        assert_eq!(text, "ok"); // NoOpProvider returns "ok"
+        assert_eq!(text, "ok");
     }
 
     #[tokio::test]
@@ -1012,86 +1088,12 @@ mod tests {
     }
 
     #[test]
-    fn test_subagent_profile_default_is_read_only() {
-        let profile = SubagentProfile::default();
-        assert!(matches!(profile, SubagentProfile::ReadOnly));
-    }
-
-    #[test]
-    fn test_subagent_profile_from_str() {
-        assert!(matches!(
-            SubagentProfile::from_str("research"),
-            Ok(SubagentProfile::ReadOnly)
-        ));
-        assert!(matches!(
-            SubagentProfile::from_str("analyst"),
-            Ok(SubagentProfile::ReadOnly)
-        ));
-        assert!(matches!(
-            SubagentProfile::from_str("read_only"),
-            Ok(SubagentProfile::ReadOnly)
-        ));
-        assert!(matches!(
-            SubagentProfile::from_str("general"),
-            Ok(SubagentProfile::ReadWrite)
-        ));
-        assert!(matches!(
-            SubagentProfile::from_str("read_write"),
-            Ok(SubagentProfile::ReadWrite)
-        ));
-        assert!(matches!(
-            SubagentProfile::from_str("full"),
-            Ok(SubagentProfile::Full)
-        ));
-        assert!(matches!(
-            SubagentProfile::from_str("code"),
-            Ok(SubagentProfile::Full)
-        ));
-        // Unknown profiles default to ReadWrite
-        assert!(matches!(
-            SubagentProfile::from_str("unknown"),
-            Ok(SubagentProfile::ReadWrite)
-        ));
-    }
-
-    #[test]
-    fn test_subagent_profile_max_iterations() {
-        assert_eq!(SubagentProfile::Full.max_iterations(), 15);
-        assert_eq!(SubagentProfile::ReadWrite.max_iterations(), 10);
-        assert_eq!(SubagentProfile::ReadOnly.max_iterations(), 5);
-    }
-
-    #[test]
-    fn test_build_subagent_prompt_includes_profile_role() {
+    fn test_build_subagent_prompt_has_task_and_workspace() {
         let prompt = build_subagent_prompt(
             std::path::Path::new("/tmp"),
             "Research Rust patterns",
-            SubagentProfile::ReadOnly,
         );
-        assert!(prompt.contains("analyst"));
         assert!(prompt.contains("Research Rust patterns"));
-        assert!(prompt.contains("read-only"));
-    }
-
-    #[test]
-    fn test_build_subagent_prompt_read_write_profile() {
-        let prompt = build_subagent_prompt(
-            std::path::Path::new("/tmp"),
-            "Do something",
-            SubagentProfile::ReadWrite,
-        );
-        assert!(prompt.contains("research specialist"));
-        assert!(prompt.contains("shell commands"));
-    }
-
-    #[test]
-    fn test_build_subagent_prompt_full_profile() {
-        let prompt = build_subagent_prompt(
-            std::path::Path::new("/tmp"),
-            "Analyze data",
-            SubagentProfile::Full,
-        );
-        assert!(prompt.contains("general-purpose subagent"));
-        assert!(prompt.contains("plan mode"));
+        assert!(prompt.contains("/tmp"));
     }
 }

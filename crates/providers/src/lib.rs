@@ -22,6 +22,7 @@ mod factory;
 pub mod manager;
 pub mod registry;
 pub(crate) mod streaming;
+pub mod testing;
 pub mod types;
 
 // -- Adapters --

@@ -1210,7 +1210,7 @@ impl AgentLoop {
 
         let channel: common::ChannelName = match session_mode {
             common::SessionMode::Coding => common::CODING_CHANNEL.into(),
-            common::SessionMode::Assistant => "desktop".into(),
+            common::SessionMode::Assistant | common::SessionMode::Subagent => "desktop".into(),
         };
 
         // Routing context with interaction channel for ask_user tool

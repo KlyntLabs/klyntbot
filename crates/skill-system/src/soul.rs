@@ -204,7 +204,7 @@ impl ContextSource for SoulContextSource {
             common::SessionMode::Coding => {
                 (&self.coding_path, &self.coding, &self.last_coding_mtime)
             }
-            common::SessionMode::Assistant => (
+            common::SessionMode::Assistant | common::SessionMode::Subagent => (
                 &self.assistant_path,
                 &self.assistant,
                 &self.last_assistant_mtime,

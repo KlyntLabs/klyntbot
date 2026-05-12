@@ -61,6 +61,19 @@ pub struct SubagentDetail {
     pub duration_ms: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SubagentInstanceSummary {
+    pub agent_id: String,
+    pub session_id: String,
+    pub parent_agent_id: Option<String>,
+    pub description: String,
+    pub status: String,
+    pub turns_used_total: i64,
+    pub last_cap_hit_at: Option<i64>,
+    pub updated_at: i64,
+}
+
 // Per-thread channels are emitted as `agent:subagent_event#<thread_id>` via raw
 // `app.emit` (see crates/desktop/src/app_core.rs::fan_subagent_events_to_tauri).
 // Frontend uses `listen<SubagentEvent>(...)` raw; this `NAME` is a registration

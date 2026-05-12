@@ -446,6 +446,17 @@ export default function MainApp() {
     setAppView("chat");
   }, []);
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { sessionId?: string };
+      if (detail?.sessionId) {
+        onSelectThread(detail.sessionId);
+      }
+    };
+    window.addEventListener("klynt:navigate-to-thread", handler);
+    return () => window.removeEventListener("klynt:navigate-to-thread", handler);
+  }, [onSelectThread]);
+
   const {
     handleSelectModel,
     handleSelectEffort,

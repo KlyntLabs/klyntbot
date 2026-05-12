@@ -1475,6 +1475,19 @@ impl AppCore {
 
     #[tracing::instrument(skip(self), err)]
     pub async fn chat_cancel(&self, session_key: String) -> Result<(), ApiError> {
+        // Route subagent-mode sessions to SubagentRuntime::kill.
+        let session = self.repos.sessions.get_session(&session_key).await
+            .map_err(|e| ApiError::from(common::KlyntbotError::from(e)))?;
+        if session.session_mode() == common::SessionMode::Subagent {
+            if let Some(ref sm) = self.agent.subagent_manager() {
+                if let Some(row) = self.repos.subagent_instances.get_by_session(&session_key).await
+                    .map_err(|e| ApiError::from(common::KlyntbotError::from(e)))? {
+                    sm.runtime.kill(&row.agent_id).await
+                        .map_err(|e| ApiError::from(common::KlyntbotError::from(e)))?;
+                    return Ok(());
+                }
+            }
+        }
         if let Some(engine) = self.agent.runtime().hook_engine() {
             if !self.session_end_fired.contains_key(&session_key) {
                 self.session_end_fired.insert(session_key.clone(), ());

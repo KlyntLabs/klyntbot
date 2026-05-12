@@ -126,7 +126,7 @@ CREATE INDEX idx_task_groups_project_id ON task_groups(project_id);
 CREATE TABLE sessions (
     key        TEXT PRIMARY KEY,
     mode       TEXT NOT NULL DEFAULT 'assistant'
-                 CHECK (mode IN ('assistant', 'coding')),
+                 CHECK (mode IN ('assistant', 'coding', 'subagent')),
     metadata   TEXT NOT NULL DEFAULT '{}',
     created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
@@ -144,7 +144,7 @@ CREATE TABLE sessions (
     approval_mode          TEXT NOT NULL DEFAULT 'default',
     total_cost_usd         REAL NOT NULL DEFAULT 0,
     total_tokens           INTEGER NOT NULL DEFAULT 0,
-    parent_session_id      TEXT,
+    parent_session_id      TEXT REFERENCES sessions(key) ON DELETE SET NULL,
     -- Phase 4 columns
     workspace_id           TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
     forked_from_id         TEXT REFERENCES sessions(key) ON DELETE SET NULL,
@@ -157,6 +157,7 @@ CREATE TABLE sessions (
 CREATE INDEX IF NOT EXISTS idx_sessions_workspace_archived ON sessions(workspace_id, archived_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_mode ON sessions(mode);
 CREATE INDEX IF NOT EXISTS idx_sessions_mode_updated_at ON sessions(mode, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id);
 
 -- ============================================================
 -- Session Messages
@@ -956,3 +957,28 @@ CREATE INDEX IF NOT EXISTS idx_aph_tool_path
 
 CREATE INDEX IF NOT EXISTS idx_aph_recency
   ON approval_pattern_history(user_id, tool_name, occurred_at);
+
+-- ============================================================
+-- Subagent Instances (per design: 2026-05-12-subagent-persistence-and-resume)
+-- ============================================================
+CREATE TABLE subagent_instances (
+    agent_id          TEXT PRIMARY KEY,
+    session_id        TEXT NOT NULL REFERENCES sessions(key) ON DELETE CASCADE,
+    parent_agent_id   TEXT REFERENCES subagent_instances(agent_id) ON DELETE SET NULL,
+    description       TEXT NOT NULL,
+    status            TEXT NOT NULL
+                        CHECK (status IN ('running','idle','stopped_turn','failed','killed','completed')),
+    model             TEXT,
+    workspace_path    TEXT NOT NULL,
+    turn_cap          INTEGER NOT NULL,
+    turns_used        INTEGER NOT NULL DEFAULT 0,
+    turns_used_total  INTEGER NOT NULL DEFAULT 0,
+    partial_summary   TEXT,
+    last_cap_hit_at   INTEGER,
+    created_at        INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at        INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
+);
+CREATE INDEX idx_subagent_instances_session ON subagent_instances(session_id);
+CREATE INDEX idx_subagent_instances_parent  ON subagent_instances(parent_agent_id);
+CREATE INDEX idx_subagent_instances_status  ON subagent_instances(status);
+CREATE INDEX idx_subagent_instances_updated_at ON subagent_instances(updated_at);
