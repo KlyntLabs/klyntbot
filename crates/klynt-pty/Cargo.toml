@@ -7,8 +7,9 @@ publish = false
 
 [dependencies]
 async-trait = { workspace = true }
+portable-pty = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["process", "io-util", "sync"] }
+tokio = { workspace = true, features = ["process", "io-util", "sync", "rt"] }
 tracing = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

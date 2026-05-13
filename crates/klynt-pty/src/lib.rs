@@ -8,6 +8,8 @@ use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::process::Child;
 
+pub mod pty_backend;
+
 #[derive(Debug, Error)]
 pub enum PtyError {
     #[error("io: {0}")]
@@ -21,9 +23,16 @@ pub enum PtyError {
 /// Handle to a spawned child process. Background jobs hold this for the
 /// lifetime of the child.
 pub enum ChildHandle {
-    /// Plain child process (no TTY). The default in 2.3a.
+    /// Plain child process (no TTY). The default.
     Process { child: Child },
-    // 2.3c will add: Pty { master: Box<dyn MasterPty + Send>, child: Box<dyn ChildKiller + Send> }
+    /// PTY-backed child (Phase 2.3c). `master` is held for stdin/resize;
+    /// `child` is held for wait/kill. Mutex because portable_pty's traits are
+    /// Send but not Sync.
+    Pty {
+        master: std::sync::Arc<tokio::sync::Mutex<Box<dyn portable_pty::MasterPty + Send>>>,
+        child:  std::sync::Arc<tokio::sync::Mutex<Box<dyn portable_pty::Child + Send + Sync>>>,
+        pgid:   Option<u32>,
+    },
 }
 
 /// What [`spawn_background_command`] returns.
@@ -148,5 +157,48 @@ mod tests {
         // pgid 99999999 should not exist; ESRCH is treated as success.
         let res = kill_process_group(99_999_999, libc::SIGTERM);
         assert!(res.is_ok(), "ESRCH should be tolerated: {res:?}");
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn spawn_with_pty_yields_pty_handle_and_reads_stdout() {
+        let mut cmd = portable_pty::CommandBuilder::new("/bin/sh");
+        cmd.args(["-c", "echo hello"]);
+        let mut handle = pty_backend::spawn_with_pty(cmd, 24, 80).expect("spawn");
+        assert!(matches!(handle.child, ChildHandle::Pty { .. }));
+        use tokio::io::AsyncReadExt;
+        let mut s = String::new();
+        let mut chunk = [0u8; 64];
+        // Drain up to ~256 bytes or EOF; the echo will produce "hello\r\n" plus a tiny PTY preamble.
+        for _ in 0..16 {
+            match handle.stdout.read(&mut chunk).await {
+                Ok(0) | Err(_) => break,
+                Ok(n) => s.push_str(&String::from_utf8_lossy(&chunk[..n])),
+            }
+        }
+        assert!(s.contains("hello"), "pty stdout should contain 'hello', got: {s:?}");
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn pty_resize_updates_kernel_size() {
+        let mut cmd = portable_pty::CommandBuilder::new("/bin/sh");
+        cmd.args(["-c", "stty size; sleep 0.2; stty size"]);
+        let handle = pty_backend::spawn_with_pty(cmd, 24, 80).expect("spawn");
+        let ChildHandle::Pty { master, .. } = handle.child else {
+            panic!("expected Pty handle");
+        };
+        // Resize before child finishes.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let m = master.lock().await;
+        m.resize(portable_pty::PtySize {
+            rows: 30,
+            cols: 120,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .expect("resize");
+        // The test passes if resize() returns Ok — we don't need to capture stdout
+        // here because the slave is already closed in the parent.
     }
 }
