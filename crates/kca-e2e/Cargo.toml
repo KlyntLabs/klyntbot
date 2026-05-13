@@ -26,9 +26,9 @@ uuid = { workspace = true }
 sqlx = { workspace = true, features = ["sqlite", "runtime-tokio"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
-proptest = "1"
-tempfile = "3"
-futures = "0.3"
+proptest.workspace = true
+tempfile.workspace = true
+futures.workspace = true
 
 [features]
 default = []

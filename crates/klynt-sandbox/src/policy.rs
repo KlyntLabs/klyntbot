@@ -45,7 +45,7 @@ impl SandboxPolicy {
     pub fn policy_hash(&self) -> String {
         let mut h = Sha256::new();
         h.update(format!("{:?}", self).as_bytes());
-        format!("{:x}", h.finalize())
+        h.finalize().iter().map(|b| format!("{:02x}", b)).collect()
     }
 
     pub fn summary(&self) -> String {

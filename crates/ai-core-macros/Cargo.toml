@@ -15,4 +15,4 @@ proc-macro2.workspace = true
 ai-core = { path = "../ai-core" }
 bus = { path = "../bus" }
 jiff.workspace = true
-trybuild = "1"
+trybuild.workspace = true

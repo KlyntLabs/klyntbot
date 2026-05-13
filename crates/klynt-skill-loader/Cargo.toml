@@ -12,10 +12,10 @@ config = { path = "../config" }
 skill-system = { path = "../skill-system" }
 serde = { workspace = true }
 serde_json = { workspace = true }
-serde_yaml = "0.9"
-globset = "0.4"
-walkdir = "2.5"
-lru = "0.12"
+serde_yaml.workspace = true
+globset = { workspace = true }
+walkdir.workspace = true
+lru.workspace = true
 reqwest = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }

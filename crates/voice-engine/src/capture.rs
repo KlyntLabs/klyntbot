@@ -156,7 +156,7 @@ impl AudioCapture {
             )))
         })?;
 
-        let native_sample_rate = default_config.sample_rate().0;
+        let native_sample_rate = default_config.sample_rate();
         let native_channels = default_config.channels();
         info!(
             "Device native config: {}Hz, {} ch (target: {}Hz)",
@@ -387,7 +387,7 @@ impl AudioCapture {
             )))
         })?;
 
-        let native_sample_rate = default_config.sample_rate().0;
+        let native_sample_rate = default_config.sample_rate();
         let native_channels = default_config.channels();
 
         let stream_config = cpal::StreamConfig {

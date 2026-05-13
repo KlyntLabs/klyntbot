@@ -24,17 +24,17 @@ tokio = { workspace = true, features = ["sync", "process", "macros", "rt", "time
 tokio-util = { workspace = true }
 dashmap = { workspace = true }
 globset = { workspace = true }
-sha2 = "0.10"
-blake3 = "1"
+sha2 = { workspace = true }
+blake3.workspace = true
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 dirs = { workspace = true }
-shellexpand = "3"
-walkdir = "2"
+shellexpand.workspace = true
+walkdir.workspace = true
 regex = { workspace = true }
 url = { workspace = true }
-bstr = "1"
-diffy = "0.4"
+bstr.workspace = true
+diffy.workspace = true
 reqwest = { workspace = true, default-features = false, features = ["rustls", "json"] }
 html2text = { workspace = true }
 tools = { workspace = true }

@@ -17,21 +17,21 @@ uuid = { workspace = true, features = ["v4", "serde"] }
 jiff = { workspace = true, features = ["serde"] }
 thiserror = { workspace = true }
 sqlx = { workspace = true }
-globset = "0.4"
-md5 = "0.7"
+globset = { workspace = true }
+md5.workspace = true
 url = { workspace = true }
 once_cell = { workspace = true }
 
-git2 = { version = "0.19", default-features = false, features = ["vendored-libgit2"] }
+git2.workspace = true
 
 [dev-dependencies]
 tempfile = { workspace = true }
 cognitive = { workspace = true }
 coding-memory = { path = "../coding-memory" }
 storage = { workspace = true }
-filetime = "0.2"
-assert_cmd = "2"
-proptest = "1"
+filetime.workspace = true
+assert_cmd.workspace = true
+proptest.workspace = true
 
 [[bin]]
 name = "klyntbot-hook"

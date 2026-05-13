@@ -20,7 +20,7 @@ tracing.workspace = true
 jiff = { workspace = true }
 uuid = { workspace = true }
 sqlx.workspace = true
-serde-saphyr = "0.0.23"
+serde-saphyr.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "test-util"] }

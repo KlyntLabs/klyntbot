@@ -151,7 +151,7 @@ pub fn query_hash(query: &str) -> String {
     use sha2::{Digest, Sha256};
     let mut h = Sha256::new();
     h.update(query.trim().to_lowercase().as_bytes());
-    format!("{:x}", h.finalize())
+    h.finalize().iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 #[cfg(test)]

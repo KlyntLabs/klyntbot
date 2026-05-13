@@ -340,7 +340,7 @@ impl ContextEngine {
                 hasher.update(correction.corrected_to.as_bytes());
             }
         }
-        format!("{:x}", hasher.finalize())
+        hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect::<String>()
     }
 
     async fn assemble_uncached_with_memory(

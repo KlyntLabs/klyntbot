@@ -15,7 +15,7 @@ shlex = { workspace = true }
 starlark = { workspace = true }
 walkdir = { workspace = true }
 tracing = { workspace = true }
-parking_lot = "0.12"
+parking_lot.workspace = true
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -9,7 +9,7 @@ description = "Klynt sandbox — Seatbelt (.sbpl) for macOS, Landlock+bwrap for 
 common = { path = "../common" }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
-sha2 = "0.10"
+sha2 = { workspace = true }
 async-trait = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]

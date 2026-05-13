@@ -22,7 +22,7 @@ tracing.workspace = true
 async-trait.workspace = true
 tokio-util.workspace = true
 sha2 = { workspace = true }
-ulid = { version = "1", features = ["serde"] }
+ulid = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }

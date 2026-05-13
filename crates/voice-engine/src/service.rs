@@ -111,7 +111,7 @@ impl AudioPlayer {
 
                         let config = cpal::StreamConfig {
                             channels: 1,
-                            sample_rate: cpal::SampleRate(sample_rate),
+                            sample_rate,
                             buffer_size: cpal::BufferSize::Default,
                         };
 

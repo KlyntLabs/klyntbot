@@ -224,9 +224,6 @@ mod tests {
 
     #[test]
     fn porcelain_z_consumes_rename_origin() {
-        // Rename: "R  new\0old\0"
-        let raw = "R  new.rs\0old.rs\0other.rs\0";
-        // Wait — last entry starts mid-record; build a clean two-record fixture:
         let raw = "R  new.rs\0old.rs\0 M other.rs\0";
         let entries = parse_porcelain_z(raw);
         assert_eq!(entries.len(), 2);

@@ -84,8 +84,64 @@ walkdir = "2"
 schemars = "0.8.22"
 ulid = "1.1"
 vte = "0.13"
-chrono = "0.4"
+chrono = { version = "0.4", default-features = false }
 futures = "0.3"
+meval = "0.2"
+nucleo-matcher = "0.3"
+arc-swap = "1.7"
+smol_str = "0.3"
+rustc-hash = "2"
+fst = "0.4"
+roaring = "0.11"
+parking_lot = "0.12"
+blake3 = "1"
+tiktoken-rs = "0.11"
+tree-sitter = "0.26"
+tree-sitter-rust = "0.24"
+tree-sitter-typescript = "0.23"
+tree-sitter-javascript = "0.25"
+tree-sitter-python = "0.25"
+tree-sitter-go = "0.25"
+git2 = { version = "0.20", default-features = false, features = ["vendored-libgit2"] }
+lru = "0.18"
+chrono-tz = "0.10"
+md5 = "0.8"
+filetime = "0.2.29"
+assert_cmd = "2.2.2"
+petgraph = "0.8"
+hex = "0.4"
+similar = "3"
+serde-saphyr = "0.0.26"
+heck = "0.5"
+trybuild = "1"
+bstr = "1"
+diffy = "0.5"
+clap = { version = "4", features = ["derive"] }
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
+toml = "1.1"
+cpal = "0.17"
+hound = "3.5"
+webrtc-vad = "0.4"
+nnnoiseless = "0.5"
+qwen3-asr = { version = "0.2", default-features = false, features = ["metal", "hub"] }
+qwen3-tts-rs = { version = "0.2", default-features = false, features = ["mlx"] }
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSRunningApplication", "NSPasteboard", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSScreen"] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSArray", "NSData"] }
+core-graphics = { version = "0.25", features = ["highsierra"] }
+core-foundation = "0.10"
+screencapturekit = "0.3.6"
+core-media-rs = "0.3"
+core-video-rs = "0.3"
+landlock = "0.4"
+nix = { version = "0.31", features = ["process"] }
+tauri = { version = "2.11", features = ["macos-private-api", "tray-icon", "image-png"] }
+tauri-build = { version = "2.6", features = [] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-dialog = "2.7.1"
+tauri-plugin-process = "2"
 
 # Internal workspace crates
 common = { path = "crates/common" }
@@ -215,7 +271,7 @@ analytics = { path = "crates/analytics" }
 notify = "7"
 notify-debouncer-mini = "0.5"
 dotenvy = "0.15"
-sha2 = "0.10"
+sha2 = "0.11"
 
 # Optional email dependencies
 async-imap = { version = "0.11.2", default-features = false, features = ["runtime-tokio"] }
@@ -280,7 +336,7 @@ plugin-runtime.workspace = true
 tools-core.workspace = true
 extism.workspace = true
 dashmap.workspace = true
-assert_cmd = "2"
+assert_cmd.workspace = true
 coding-ingest = { path = "crates/coding-ingest" }
 coding-memory = { path = "crates/coding-memory" }
 serde.workspace = true

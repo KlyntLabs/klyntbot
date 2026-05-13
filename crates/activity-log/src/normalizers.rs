@@ -23,7 +23,7 @@ pub fn parse_rfc3339(s: &str) -> Timestamp {
 pub fn content_hash(content: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(content.as_bytes());
-    format!("{:x}", hasher.finalize())
+    hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 // ── Chat message normalizer ─────────────────────────────────────

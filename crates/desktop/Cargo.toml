@@ -8,7 +8,7 @@ name = "desktop"
 path = "src/lib.rs"
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build.workspace = true
 
 [dependencies]
 app-core = { workspace = true }
@@ -32,12 +32,12 @@ session = { workspace = true }
 storage = { workspace = true }
 voice-engine = { workspace = true }
 tools-core = { workspace = true }
-tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
-tauri-plugin-global-shortcut = "2"
-tauri-plugin-notification = "2"
-tauri-plugin-updater = "2"
-tauri-plugin-dialog = "2"
-tauri-plugin-process = "2"
+tauri.workspace = true
+tauri-plugin-global-shortcut.workspace = true
+tauri-plugin-notification.workspace = true
+tauri-plugin-updater.workspace = true
+tauri-plugin-dialog.workspace = true
+tauri-plugin-process.workspace = true
 async-trait = { workspace = true }
 futures-util = { workspace = true }
 tokio = { workspace = true }
@@ -54,8 +54,8 @@ tower-http = { workspace = true }
 open = { workspace = true }
 rand = { workspace = true }
 url = { workspace = true }
-clap = { version = "4", features = ["derive"] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 rmcp = { workspace = true, features = ["server", "transport-io", "transport-streamable-http-server"] }
 mcp-bridge = { path = "../mcp-bridge" }
 coding-agents-md = { path = "../coding-agents-md" }
@@ -76,7 +76,7 @@ name = "relay_cleanup_latency"
 harness = false
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { workspace = true, features = ["html_reports"] }
 
 [features]
 default = ["qwen3"]

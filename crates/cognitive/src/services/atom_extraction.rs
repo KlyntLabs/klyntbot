@@ -373,8 +373,10 @@ async fn process_note(
 
 /// Compute hex-encoded SHA-256 of the content.
 fn hex_sha256(content: &str) -> String {
-    let digest = sha2::Sha256::digest(content.as_bytes());
-    format!("{digest:x}")
+    sha2::Sha256::digest(content.as_bytes())
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect()
 }
 
 /// Split note content into sections suitable for LLM extraction.

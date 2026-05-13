@@ -94,9 +94,9 @@ fn get_window_title_cg(pid: i32) -> Option<String> {
     use core_foundation::dictionary::CFDictionaryRef;
     use core_foundation::number::CFNumber;
     use core_foundation::string::CFString;
-    use core_graphics::display::{
+    use core_graphics::display::CGWindowListCopyWindowInfo;
+    use core_graphics::window::{
         kCGNullWindowID, kCGWindowListExcludeDesktopElements, kCGWindowListOptionOnScreenOnly,
-        CGWindowListCopyWindowInfo,
     };
 
     let options = kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements;

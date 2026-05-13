@@ -29,10 +29,10 @@ futures-util = { workspace = true }
 providers = { workspace = true }
 config = { workspace = true }
 sha2 = { workspace = true }
-hex = "0.4"
-similar = "2"
-petgraph = "0.7"
-lru = "0.12"
+hex.workspace = true
+similar.workspace = true
+petgraph.workspace = true
+lru.workspace = true
 
 [dev-dependencies]
 tempfile = { workspace = true }
