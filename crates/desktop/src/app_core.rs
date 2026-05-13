@@ -585,7 +585,11 @@ fn wire_event_channels(
                         Ok(evt) => {
                             let channel = match &evt {
                                 desktop_shared::coding::SubagentEvent::Spawned { parent_session_id, .. } => {
-                                    format!("agent:subagent_event#{parent_session_id}")
+                                    // Tauri 2 only allows [a-zA-Z0-9-/:_] in event names.
+                                    // `/` separates the topic from the routing key; the key
+                                    // (`coding:<uuid>`) already contains `:`, so using `/`
+                                    // keeps the structure readable in logs.
+                                    format!("agent:subagent_event/{parent_session_id}")
                                 }
                                 _ => "agent:subagent_event".to_string(),
                             };

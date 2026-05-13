@@ -10,9 +10,25 @@ async fn test_core() -> AppCore {
         .unwrap()
 }
 
+struct NoOpEmitter;
+
+impl app_core::events::AppEventEmitter for NoOpEmitter {
+    fn emit_event(&self, _event_name: &str, _payload: serde_json::Value) {}
+}
+
+async fn test_core_with_provider() -> AppCore {
+    let provider = providers::testing::SingleResponseProvider::dyn_arc(
+        r#"{"summary":"stub review for src/main.rs","issues":[]}"#,
+    );
+    let emitter = std::sync::Arc::new(NoOpEmitter);
+    let mut core = AppCore::for_tests(provider.clone(), emitter).await.unwrap();
+    core.cognitive_provider = Some(provider);
+    core
+}
+
 #[tokio::test]
 async fn coding_review_start_smoke_test() {
-    let core = test_core().await;
+    let core = test_core_with_provider().await;
 
     // Seed a session so the review has something to reference
     sqlx::query(
@@ -43,7 +59,7 @@ async fn coding_review_start_smoke_test() {
 
 #[tokio::test]
 async fn coding_review_start_with_target() {
-    let core = test_core().await;
+    let core = test_core_with_provider().await;
 
     sqlx::query(
         "INSERT INTO sessions (key, metadata, created_at, updated_at, approval_mode, total_cost_usd, total_tokens) \

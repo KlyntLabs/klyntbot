@@ -17,7 +17,7 @@ export function useSubagents(threadId: string) {
 
     // Spawned events are routed to a thread-specific channel; all other
     // lifecycle events flow through the global channel.
-    const unlistenSpawned = listen<SubagentEvent>(`agent:subagent_event#${threadId}`, (e) => {
+    const unlistenSpawned = listen<SubagentEvent>(`agent:subagent_event/${threadId}`, (e) => {
       if (!cancelled) setActive((prev) => applySubagentEvent(prev, e.payload));
     });
     const unlistenGlobal = listen<SubagentEvent>("agent:subagent_event", (e) => {

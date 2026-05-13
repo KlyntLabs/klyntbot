@@ -1387,20 +1387,7 @@ fn icontains(haystack: &str, needle: &str) -> bool {
     if needle.is_empty() {
         return true;
     }
-    let mut chars = haystack.chars();
-    loop {
-        if chars
-            .clone()
-            .zip(needle.chars())
-            .all(|(a, b)| a.eq_ignore_ascii_case(&b))
-        {
-            return true;
-        }
-        if chars.next().is_none() {
-            break;
-        }
-    }
-    false
+    haystack.to_lowercase().contains(&needle.to_lowercase())
 }
 
 /// Detects if a user message starts with a correction phrase.

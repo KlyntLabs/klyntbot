@@ -173,7 +173,15 @@ impl AppCore {
             let emitter = self.event_emitter.clone();
             let session_key = thread_id.to_string();
             let first_msg = text.to_string();
-            let title_model = resolved_model.clone();
+            // Use the cognitive model (cheaper/faster) for title generation if configured,
+            // otherwise fall back to the chat model.
+            let title_model = {
+                let cfg = self.config.read().await;
+                cfg.cognitive
+                    .model
+                    .clone()
+                    .unwrap_or_else(|| resolved_model.clone())
+            };
             tokio::spawn(async move {
                 // Re-check title and message count from inside the task to avoid
                 // races with concurrent first messages on the same session.

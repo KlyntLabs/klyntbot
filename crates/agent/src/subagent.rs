@@ -558,21 +558,40 @@ impl SubagentsHandler for SubagentManager {
         let parent_session_id = ctx.session_key.as_ref()
             .map(|s| s.to_string())
             .unwrap_or_default();
-        match self.runtime.spawn(crate::subagent_runtime::SpawnParams {
+        // `agent_chain` defaults to `["root"]` for the main agent. "root" is a
+        // sentinel — not a row in `subagent_instances` — so emitting it as a
+        // parent_agent_id would trip the FK on insert. Only forward an ID that
+        // refers to an actual subagent row (set when running inside another
+        // subagent, see `run_subagent_loop`).
+        let parent_agent_id = ctx
+            .agent_chain
+            .last()
+            .filter(|id| id.as_str() != "root")
+            .cloned();
+        let label = action.description.clone();
+        // Fire-and-forget: the runtime returns as soon as the DB rows are
+        // inserted and the cancel token is registered. The full LLM loop runs
+        // on a detached task. The parent observes completion via lifecycle
+        // events and `subagents list` / `subagents resume`.
+        match self.runtime.spawn_detached(crate::subagent_runtime::SpawnParams {
             description: action.description,
             prompt: action.prompt,
             model: action.model,
             max_turns: action.max_turns,
             workspace_path: self.workspace.clone(),
             parent_session_id,
-            parent_agent_id: ctx.agent_chain.last().cloned(),
+            parent_agent_id,
         }).await {
-            Ok(res) => json_ok(serde_json::json!({
-                "agent_id": res.agent_id,
-                "session_id": res.session_id,
-                "status": res.status.as_str(),
-                "summary": res.summary,
-                "turns_used": res.turns_used,
+            Ok((agent_id, session_id)) => json_ok(serde_json::json!({
+                "agent_id": agent_id,
+                "session_id": session_id,
+                "status": "running",
+                "message": format!(
+                    "Subagent '{label}' spawned and running in background. \
+                     Use `subagents list` to monitor progress, \
+                     `subagents kill` to cancel, or `subagents resume` to continue \
+                     once it reaches an idle/stopped state."
+                ),
             })),
             Err(e) => Err(common::ToolError::ExecutionFailed(json_payload_for_error(&e)).into()),
         }

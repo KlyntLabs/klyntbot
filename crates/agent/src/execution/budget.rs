@@ -42,15 +42,14 @@ impl std::fmt::Display for DepthMode {
 
 // ── Default safety caps ──────────────────────────────────────
 
-/// Default user-facing safety cap on turns. Hitting this is treated as a bug
-/// indicator. Subagents override this with tier-specific caps (5/10/15).
-pub const DEFAULT_SAFETY_TURN_CAP: u32 = 100;
-
 /// Default budget parameters used by HUD and config.
+///
+/// The main agent runs without a turn cap (`SafetyCap::new` uses `u32::MAX`).
+/// Subagents and the coding review pass set their own explicit caps via
+/// `SafetyCap::with_limits`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillBudget {
     pub normal_tokens: u64,
-    pub normal_turns: u32,
     pub deep_multiplier: f32,
     pub ultra_multiplier: f32,
 }
@@ -59,11 +58,8 @@ impl Default for SkillBudget {
     fn default() -> Self {
         Self {
             // 0 = disabled. `SafetyCap::token_cap_hit` guards on `max_tokens > 0`,
-            // so the token cap never fires for interactive chat — the turn cap
-            // (100) remains the runaway backstop. Subagents and review pass
-            // explicit limits via `SafetyCap::with_limits` and are unaffected.
+            // so the token cap never fires for interactive chat.
             normal_tokens: 0,
-            normal_turns: DEFAULT_SAFETY_TURN_CAP,
             deep_multiplier: 1.5,
             ultra_multiplier: 3.0,
         }
@@ -84,23 +80,24 @@ pub struct SafetyCap {
 
 impl SafetyCap {
     /// Create a cap from the user's depth choice.
+    ///
+    /// The main agent has no turn cap — `max_turns` is always `u32::MAX`.
+    /// Depth only affects the token cap (which is disabled by default).
+    /// Subagents and the coding review pass set explicit caps via
+    /// [`SafetyCap::with_limits`].
     pub fn new(depth: DepthMode) -> Self {
         let base = SkillBudget::default();
-        let (max_tokens, max_turns) = match depth {
-            DepthMode::Normal => (base.normal_tokens, base.normal_turns),
-            DepthMode::DeepThink => (
-                (base.normal_tokens as f64 * base.deep_multiplier as f64) as u64,
-                (base.normal_turns as f64 * base.deep_multiplier as f64) as u32,
-            ),
-            DepthMode::Ultra => (
-                (base.normal_tokens as f64 * base.ultra_multiplier as f64) as u64,
-                u32::MAX,
-            ),
+        let max_tokens = match depth {
+            DepthMode::Normal => base.normal_tokens,
+            DepthMode::DeepThink => {
+                (base.normal_tokens as f64 * base.deep_multiplier as f64) as u64
+            }
+            DepthMode::Ultra => (base.normal_tokens as f64 * base.ultra_multiplier as f64) as u64,
         };
         Self {
             depth,
             max_tokens,
-            max_turns,
+            max_turns: u32::MAX,
             tokens_used: 0,
             turns_used: 0,
         }
@@ -161,7 +158,7 @@ mod tests {
     fn normal_uses_defaults() {
         let mut cap = SafetyCap::new(DepthMode::Normal);
         assert_eq!(cap.max_tokens, 0, "token cap disabled by default");
-        assert_eq!(cap.max_turns, DEFAULT_SAFETY_TURN_CAP);
+        assert_eq!(cap.max_turns, u32::MAX, "main agent has no turn cap");
         assert!(!cap.turn_cap_hit());
         assert!(!cap.token_cap_hit());
         // A massive usage still must not trip the token cap when disabled.
@@ -174,11 +171,11 @@ mod tests {
     }
 
     #[test]
-    fn deep_think_scales() {
+    fn deep_think_keeps_caps_disabled() {
         let cap = SafetyCap::new(DepthMode::DeepThink);
-        // Token cap stays disabled (multiplier × 0 = 0); turn cap still scales.
+        // Token cap stays disabled (multiplier × 0 = 0); turn cap is unbounded.
         assert_eq!(cap.max_tokens, 0);
-        assert_eq!(cap.max_turns, 150);
+        assert_eq!(cap.max_turns, u32::MAX);
     }
 
     #[test]

@@ -105,6 +105,15 @@ impl SubagentInstanceRepo {
         .map_err(|e| common::KlyntbotError::Storage(format!("subagent list_by_status: {e}")))
     }
 
+    pub async fn list_all(&self) -> Result<Vec<SubagentInstanceRow>> {
+        sqlx::query_as::<_, SubagentInstanceRow>(
+            "SELECT * FROM subagent_instances ORDER BY updated_at DESC",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("subagent list_all: {e}")))
+    }
+
     /// Allowed transitions:
     /// - From terminal states (failed/killed/completed): forbidden.
     /// - From `running`: any non-running state.

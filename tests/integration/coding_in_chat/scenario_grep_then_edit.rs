@@ -29,7 +29,7 @@ async fn grep_then_edit_emits_diff() {
         .execute(serde_json::json!({"pattern":"old_name"}), &ctx)
         .await
         .unwrap();
-    assert!(grep_out.contains("f.rs:1::fn old_name"));
+    assert!(grep_out.contains("f.rs:1:fn old_name"));
 
     // edit
     let pol = Arc::new(Policy::empty());

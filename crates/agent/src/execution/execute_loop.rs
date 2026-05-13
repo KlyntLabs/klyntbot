@@ -4,7 +4,9 @@
 //! - The user cancels (partial results returned, FinishReason::Cancelled)
 //! - The model returns a final response without tool calls (FinishReason::Completed)
 //! - LoopDetector::HardStop fires (FinishReason::LoopDetected)
-//! - The safety cap is hit (FinishReason::SafetyTurnLimit or ::TokenLimit)
+//! - An explicit safety cap is hit (FinishReason::SafetyTurnLimit or ::TokenLimit) —
+//!   only fires for callers that pass a real cap via `SafetyCap::with_limits`
+//!   (subagents, coding review). The main agent has no turn cap.
 //! - A provider error propagates (FinishReason::Error)
 //!
 //! There is **no wrap-up message**, **no forced synthesis pass**, and

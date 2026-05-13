@@ -11,7 +11,7 @@ use providers::DynProvider;
 use std::sync::Arc;
 use storage::SessionRepo;
 
-const TITLE_TIMEOUT_SECS: u64 = 5;
+const TITLE_TIMEOUT_SECS: u64 = 10;
 const MAX_TITLE_LEN: usize = 60;
 const MAX_PROMPT_LEN: usize = 500;
 

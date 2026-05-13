@@ -283,6 +283,92 @@ impl SubagentRuntime {
         result
     }
 
+    /// Fire-and-forget variant of [`spawn`]. Performs the synchronous setup
+    /// (insert session + `subagent_instances` row, register cancel token, emit
+    /// `Spawned`) on the calling task, then runs the multi-turn LLM loop on a
+    /// detached `tokio::spawn`. Returns the freshly allocated `(agent_id,
+    /// session_id)` so the caller (a tool execution) can report them back to
+    /// the parent agent in well under any tool timeout. Completion is observed
+    /// via the lifecycle event channel and the `subagent_instances` row.
+    pub async fn spawn_detached(&self, p: SpawnParams) -> Result<(String, String)> {
+        let agent_id = Self::new_agent_id();
+        let session_id = Self::new_session_id();
+        let max_turns = p.max_turns.unwrap_or(DEFAULT_TURN_CAP);
+        let model = p.model.clone().unwrap_or_else(|| self.model.clone());
+        let started_at = jiff::Timestamp::now().as_millisecond();
+
+        // Sync setup — must succeed before we return, so the parent can
+        // immediately address this subagent by id (e.g. via `subagents list`
+        // or `subagents kill`).
+        self.sessions
+            .insert_subagent_session(
+                &session_id,
+                &p.parent_session_id,
+                p.workspace_path.to_string_lossy().as_ref(),
+            )
+            .await?;
+        self.repo
+            .insert(&NewSubagentInstance {
+                agent_id: agent_id.clone(),
+                session_id: session_id.clone(),
+                parent_agent_id: p.parent_agent_id.clone(),
+                description: p.description.clone(),
+                model: Some(model.clone()),
+                workspace_path: p.workspace_path.to_string_lossy().to_string(),
+                turn_cap: max_turns as i64,
+            })
+            .await?;
+
+        let token = CancellationToken::new();
+        self.active.register(&agent_id, token.clone());
+        self.emit(crate::subagent_events::SubagentLifecycleEvent::Spawned {
+            agent_id: agent_id.clone(),
+            label: p.description.clone(),
+            profile: "full".to_string(),
+            parent_session_id: p.parent_session_id.clone(),
+            spawned_at: started_at,
+        });
+
+        // Detached loop. `SubagentRuntime` is `Clone` over shared `Arc` state,
+        // so cloning here is cheap and safe for the background task.
+        let runtime = self.clone();
+        let aid = agent_id.clone();
+        let sid = session_id.clone();
+        let workspace = p.workspace_path.clone();
+        let prompt = p.prompt.clone();
+        tokio::spawn(async move {
+            let system = crate::subagent::build_subagent_prompt(&workspace, &prompt);
+            let messages = vec![
+                providers::types::Message::system(system),
+                providers::types::Message::user(prompt),
+            ];
+            let on_iter = runtime.make_heartbeat_callback(&aid);
+            let started = std::time::Instant::now();
+            let loop_res = crate::subagent::run_subagent_loop(
+                runtime.provider.clone(),
+                messages,
+                workspace,
+                model,
+                runtime.tool_kit.clone(),
+                runtime.hook_engine.clone(),
+                sid.clone(),
+                aid.clone(),
+                runtime.coding_policies.clone(),
+                runtime.job_supervisor.clone(),
+                token,
+                max_turns,
+                Some(on_iter),
+            )
+            .await;
+            let duration_ms = started.elapsed().as_millis() as u64;
+            let result = runtime.finalize_run(&aid, &sid, loop_res).await;
+            runtime.active.unregister(&aid);
+            runtime.emit_result(&aid, &result, duration_ms);
+        });
+
+        Ok((agent_id, session_id))
+    }
+
     /// Resume an existing idle/stopped_turn instance.
     pub async fn resume(&self, p: ResumeParams) -> Result<SubagentRunResult> {
         let row = self
@@ -393,18 +479,16 @@ impl SubagentRuntime {
         parent_agent_id: Option<&str>,
         status: Option<SubagentStatus>,
     ) -> Result<Vec<SubagentInstanceRow>> {
-        let rows = if let Some(s) = status {
-            self.repo.list_by_status(s).await?
-        } else {
-            self.repo.list_by_parent(parent_agent_id).await?
+        let rows = match (status, parent_agent_id) {
+            (Some(s), Some(p)) => {
+                let by_status = self.repo.list_by_status(s).await?;
+                Ok(by_status.into_iter().filter(|r| r.parent_agent_id.as_deref() == Some(p)).collect())
+            }
+            (Some(s), None) => self.repo.list_by_status(s).await,
+            (None, Some(p)) => self.repo.list_by_parent(Some(p)).await,
+            (None, None) => self.repo.list_all().await,
         };
-        // If both filters were provided, intersect.
-        if status.is_some() && parent_agent_id.is_some() {
-            let parent = parent_agent_id.unwrap();
-            Ok(rows.into_iter().filter(|r| r.parent_agent_id.as_deref() == Some(parent)).collect())
-        } else {
-            Ok(rows)
-        }
+        rows.map_err(|e| common::KlyntbotError::Storage(format!("subagent list: {e}")))
     }
 
     /// Persist final state and return the structured result.

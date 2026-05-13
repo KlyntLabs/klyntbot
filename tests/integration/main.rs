@@ -21,5 +21,6 @@ mod notifications_dispatcher;
 mod quiet_hours_tz_boundary;
 mod sessions;
 mod subagent_crash_recovery;
+mod subagent_full_lifecycle;
 mod subagent_resume;
 mod temporal_scheduler;
