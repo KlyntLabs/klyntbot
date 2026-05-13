@@ -152,6 +152,13 @@ pub struct JobSpec {
     pub cwd: PathBuf,
     pub timeout_ms: u64,
     pub silent_completion: bool,
+    /// Allocate a PTY for the child. Only meaningful when the supervisor
+    /// supports PTY mode; Process supervisors must reject `tty=true`.
+    pub tty: bool,
+    /// PTY rows. Defaults to 24 when omitted. Ignored when `tty=false`.
+    pub tty_rows: Option<u16>,
+    /// PTY cols. Defaults to 80 when omitted. Ignored when `tty=false`.
+    pub tty_cols: Option<u16>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -201,6 +208,40 @@ pub enum JobError {
     Spawn(String),
     #[error("classification error: {0}")]
     Classification(String),
+    #[error("job is not a PTY")]
+    NotPty,
+    #[error("attach error: {0}")]
+    Attach(String),
+}
+
+/// Handle returned to the frontend after a successful `attach`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachHandle {
+    /// Full URL the frontend should open as a WebSocket, including `?token=…`.
+    pub ws_url: String,
+    pub rows: u16,
+    pub cols: u16,
+    /// Last 4 KB of the ring file, base64-encoded — primes xterm.js immediately
+    /// before the WebSocket starts streaming live bytes.
+    pub tail_b64: String,
+}
+
+#[derive(Debug, Error)]
+pub enum AttachError {
+    #[error("job not found: {0}")]
+    NotFound(String),
+    #[error("job is not a PTY")]
+    NotPty,
+    #[error("another window is already attached to this job")]
+    AlreadyAttached,
+    #[error("storage: {0}")]
+    Storage(String),
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("websocket: {0}")]
+    Ws(String),
+    #[error("supervisor: {0}")]
+    Supervisor(String),
 }
 
 #[async_trait]
@@ -220,6 +261,39 @@ pub trait JobSupervisorHandle: Send + Sync + std::fmt::Debug {
         agent_chain: &[String],
         active_only: bool,
     ) -> Vec<JobView>;
+
+    // ---------- 2.3c PTY methods (default impls return NotPty) ----------
+
+    /// Send bytes to the stdin of a PTY-backed job.
+    async fn write_stdin(&self, _id: &JobId, _data: &[u8]) -> Result<usize, JobError> {
+        Err(JobError::NotPty)
+    }
+
+    /// Resize the PTY of a job. Issues TIOCSWINSZ + SIGWINCH.
+    async fn resize(&self, _id: &JobId, _rows: u16, _cols: u16) -> Result<(), JobError> {
+        Err(JobError::NotPty)
+    }
+
+    /// Begin a user attach. Issues a fresh token, marks the row attached, and
+    /// returns the WebSocket URL + ring tail. Atomic against concurrent attaches.
+    async fn attach(&self, _id: &JobId) -> Result<AttachHandle, AttachError> {
+        Err(AttachError::NotPty)
+    }
+
+    /// End a user attach. Idempotent.
+    async fn detach(&self, _id: &JobId) -> Result<(), AttachError> {
+        Err(AttachError::NotPty)
+    }
+
+    /// Wire the outbound WebSocket channel so the PTY reader task can fan
+    /// output bytes to it. Called by the WS handler at connection time.
+    async fn set_attach_channel(
+        &self,
+        _id: &JobId,
+        _tx: tokio::sync::mpsc::UnboundedSender<Vec<u8>>,
+    ) -> Result<(), AttachError> {
+        Err(AttachError::NotPty)
+    }
 }
 
 pub type DynJobSupervisor = Arc<dyn JobSupervisorHandle>;
@@ -266,5 +340,30 @@ mod tests {
             FailureKind::Other("oom".into()).as_db_str().as_ref(),
             "Other:oom"
         );
+    }
+
+    #[test]
+    fn job_spec_defaults_to_non_tty() {
+        let spec = JobSpec {
+            session_id: "s".into(),
+            agent_id: "a".into(),
+            agent_chain: vec!["a".into()],
+            description: "d".into(),
+            command: "echo".into(),
+            cwd: std::path::PathBuf::from("/tmp"),
+            timeout_ms: 1000,
+            silent_completion: false,
+            tty: false,
+            tty_rows: None,
+            tty_cols: None,
+        };
+        assert!(!spec.tty);
+        assert!(spec.tty_rows.is_none());
+    }
+
+    #[test]
+    fn job_error_not_pty_is_distinct() {
+        let e = JobError::NotPty;
+        assert!(e.to_string().contains("not a PTY"));
     }
 }
