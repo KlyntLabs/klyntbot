@@ -92,12 +92,16 @@ impl Default for SubagentsTool {
 
 #[tool_actions(
     name = "subagents",
-    description = "Manage persistent subagents: spawn a new one, resume a paused one, list active instances, or kill a running instance.",
+    description = "Manage persistent background subagents. spawn: launch a new one (returns immediately, runs in background). list: poll status/progress of all subagents (use this for progress checks). resume: send a follow-up prompt to a subagent that has reached idle or stopped_turn (NOT for status checks). kill: cancel a running subagent.",
     category = "System",
     tags = "agent,delegate,subagent,spawn",
     cost = "Variable"
 )]
 impl SubagentsTool {
+    /// Launch a new subagent. Returns `{agent_id, session_id, status:"running", message}`
+    /// as soon as the persistent row is inserted; the subagent's LLM loop runs
+    /// detached in the background. Use `subagents list` afterwards to poll
+    /// status.
     #[action(name = "spawn")]
     async fn handle_spawn(
         &self,
@@ -111,6 +115,10 @@ impl SubagentsTool {
         handler.spawn(params, ctx).await
     }
 
+    /// Send a follow-up prompt to a subagent that has reached `idle` or
+    /// `stopped_turn`. NOT for checking on a running subagent — use
+    /// `subagents list` for status checks. Calling resume on a running
+    /// subagent returns a snapshot instead of resuming.
     #[action(name = "resume")]
     async fn handle_resume(
         &self,
@@ -123,6 +131,8 @@ impl SubagentsTool {
         handler.resume(params, ctx).await
     }
 
+    /// List subagents and their current status. This is the right action for
+    /// progress polling. Optional filters: `parent_agent_id`, `status`.
     #[action(name = "list")]
     async fn handle_list(
         &self,
@@ -135,6 +145,7 @@ impl SubagentsTool {
         handler.list(params, ctx).await
     }
 
+    /// Cancel a running subagent. Terminal — the row transitions to `killed`.
     #[action(name = "kill")]
     async fn handle_kill(
         &self,

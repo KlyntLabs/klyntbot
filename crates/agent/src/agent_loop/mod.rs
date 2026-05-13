@@ -1219,6 +1219,16 @@ impl AgentLoop {
         routing_ctx.session_mode = session_mode;
         routing_ctx.session_key = Some(session_key.clone().into());
         routing_ctx.message_id = user_msg_id;
+        // The three other RoutingContext construction sites in this file
+        // (process_message_bus, process_correction, process_direct) set these
+        // — the streaming path used to forget, leaving coding tools like
+        // `coding_task_list` to bail with "background jobs disabled".
+        routing_ctx.job_supervisor = self.job_supervisor.clone();
+        routing_ctx.plan_mode_active = self
+            .coding_policies
+            .as_ref()
+            .map(|policies| is_plan_mode_for_thread(policies, session_key.as_str()))
+            .unwrap_or(false);
 
         let cancel_token = CancellationToken::new();
         let cancel_clone = cancel_token.clone();

@@ -602,6 +602,29 @@ impl SubagentsHandler for SubagentManager {
         action: tools::subagents::ResumeAction,
         _ctx: &tools::RoutingContext,
     ) -> common::Result<String> {
+        // `resume` is for re-engaging an *idle* or *stopped_turn* subagent
+        // with a follow-up prompt. LLMs sometimes call it on a still-running
+        // subagent to "check progress", which the runtime would reject with
+        // a hard error. Short-circuit that case with a structured snapshot
+        // so the parent agent gets useful info and a hint to use `list`.
+        if let Ok(Some(row)) = self.runtime.repo.get(&action.agent_id).await {
+            let status = row.status_enum();
+            if matches!(status, storage::rows::SubagentStatus::Running) {
+                return json_ok(serde_json::json!({
+                    "agent_id": row.agent_id,
+                    "session_id": row.session_id,
+                    "status": status.as_str(),
+                    "turns_used": row.turns_used,
+                    "turns_used_total": row.turns_used_total,
+                    "partial_summary": row.partial_summary,
+                    "updated_at": row.updated_at,
+                    "message": "Subagent is still running. `resume` is only \
+                                valid for idle/stopped_turn subagents; use \
+                                `subagents list` for status checks, or \
+                                `subagents kill` to cancel.",
+                }));
+            }
+        }
         match self.runtime.resume(crate::subagent_runtime::ResumeParams {
             agent_id: action.agent_id,
             prompt: action.prompt,
