@@ -130,6 +130,8 @@ desktop_macros::klynt_collect_commands![
     crate::commands::coding_jobs::coding_job_output,
     crate::commands::coding_jobs::coding_job_stop,
     crate::commands::coding_jobs::coding_job_open_log,
+    crate::commands::coding_jobs::coding_job_attach,
+    crate::commands::coding_jobs::coding_job_detach,
     crate::commands::coding_skills::coding_skills_list,
     crate::commands::coding_skills::coding_skills_info,
     crate::commands::coding_skills::coding_skills_install,

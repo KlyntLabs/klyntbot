@@ -24,6 +24,9 @@ async fn run_script(
             cwd: dir,
             timeout_ms: 60_000,
             silent_completion: false,
+            tty: false,
+            tty_rows: None,
+            tty_cols: None,
         })
         .await
         .expect("spawn")

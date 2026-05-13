@@ -45,6 +45,9 @@ async fn silent_completion_skips_push() {
             cwd: dir.path().to_path_buf(),
             timeout_ms: 60_000,
             silent_completion: true,
+            tty: false,
+            tty_rows: None,
+            tty_cols: None,
         })
         .await
         .expect("spawn");

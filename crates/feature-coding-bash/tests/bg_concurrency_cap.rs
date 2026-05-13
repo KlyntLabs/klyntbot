@@ -40,6 +40,9 @@ async fn cap_rejected_at_seven() {
         cwd: dir.path().to_path_buf(),
         timeout_ms: 60_000,
         silent_completion: false,
+        tty: false,
+        tty_rows: None,
+        tty_cols: None,
     };
 
     // 6 should succeed

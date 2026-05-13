@@ -72,6 +72,9 @@ async fn passed_job_writes_episode_with_importance_0_3() {
             cwd: std::env::temp_dir(),
             timeout_ms: 30_000,
             silent_completion: false,
+            tty: false,
+            tty_rows: None,
+            tty_cols: None,
         })
         .await
         .unwrap();

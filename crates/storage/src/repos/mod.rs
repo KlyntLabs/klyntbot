@@ -66,7 +66,7 @@ pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoa
 pub use coding_approval_history::{
     ApprovalHistorySummary, CodingApprovalHistoryRepo, HistoryEntry,
 };
-pub use coding_background_jobs::{BashJobRepo, BashJobRow};
+pub use coding_background_jobs::{AttachStorageError, BashJobRepo, BashJobRow};
 pub use coding_reviews::{CodingReviewRow, CodingReviewsRepo};
 pub use coding_todo::{TodoRepo, TodoRow};
 pub use cron::CronRepo;

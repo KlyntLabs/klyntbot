@@ -30,6 +30,9 @@ fn spec(command: &str) -> JobSpec {
         cwd: std::env::temp_dir(),
         timeout_ms: 30_000,
         silent_completion: false,
+        tty: false,
+        tty_rows: None,
+        tty_cols: None,
     }
 }
 

@@ -103,3 +103,38 @@
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+
+.coding-jobs-panel__attach-pane {
+  margin-top: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 4px;
+  background: var(--surface-card);
+}
+
+.coding-jobs-panel__attach-term {
+  height: 320px;
+  width: 100%;
+}
+
+.coding-jobs-panel__attach,
+.coding-jobs-panel__detach {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+}
+
+.coding-jobs-panel__attach:hover,
+.coding-jobs-panel__detach:hover {
+  background: var(--surface-hover);
+}
+
+.coding-jobs-panel__attach-error {
+  color: var(--status-error);
+  padding: 8px;
+  font-size: var(--fs-xs);
+}

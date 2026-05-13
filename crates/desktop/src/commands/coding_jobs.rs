@@ -7,6 +7,26 @@ pub struct OpenLogResult {
     pub opened: bool,
 }
 
+#[derive(serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CodingJobAttachResult {
+    pub ws_url: String,
+    pub rows: u16,
+    pub cols: u16,
+    pub tail_b64: String,
+}
+
+impl From<app_core::handlers::coding_jobs::AttachResult> for CodingJobAttachResult {
+    fn from(r: app_core::handlers::coding_jobs::AttachResult) -> Self {
+        Self {
+            ws_url: r.ws_url,
+            rows: r.rows,
+            cols: r.cols,
+            tail_b64: r.tail_b64,
+        }
+    }
+}
+
 #[klynt_command]
 pub async fn coding_job_list(
     thread_id: String,
@@ -48,6 +68,21 @@ pub async fn coding_job_open_log(job_id: String) -> OpenLogResult {
     open::that(&path)
         .map_err(|e| ApiError::new("OPEN_ERROR", format!("failed to open log: {e}")))?;
     Ok(OpenLogResult { opened: true })
+}
+
+#[klynt_command]
+pub async fn coding_job_attach(job_id: String) -> CodingJobAttachResult {
+    state
+        .coding_job_attach(&job_id)
+        .await
+        .map_err(ApiError::from)
+        .map(Into::into)
+}
+
+#[klynt_command]
+pub async fn coding_job_detach(job_id: String) -> () {
+    state.coding_job_detach(&job_id).await.map_err(ApiError::from)?;
+    Ok(())
 }
 
 #[cfg(debug_assertions)]
@@ -109,6 +144,26 @@ pub(crate) async fn dispatch_dev(
                         })
                 }
             }))
+        }
+        "coding_job_attach" => {
+            let job_id = try_field!(dev::get_str(body, "jobId"));
+            dev::val(
+                core.coding_job_attach(&job_id)
+                    .await
+                    .map(|r| {
+                        serde_json::json!({
+                            "wsUrl": r.ws_url,
+                            "rows": r.rows,
+                            "cols": r.cols,
+                            "tailB64": r.tail_b64,
+                        })
+                    })
+                    .map_err(ApiError::from),
+            )
+        }
+        "coding_job_detach" => {
+            let job_id = try_field!(dev::get_str(body, "jobId"));
+            dev::val(core.coding_job_detach(&job_id).await.map_err(ApiError::from))
         }
         _ => return None,
     })

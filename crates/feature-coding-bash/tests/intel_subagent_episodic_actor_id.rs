@@ -28,6 +28,11 @@ fn fake_row(agent_id: &str) -> BashJobRow {
         final_path: None,
         last_polled_at: None,
         last_seen_offset: 0,
+        tty: false,
+        tty_rows: None,
+        tty_cols: None,
+        attach_token: None,
+        attached_user_at: None,
     }
 }
 

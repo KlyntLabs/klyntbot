@@ -18,6 +18,10 @@ export type BashJobView = {
   total_bytes_emitted: number;
   last_polled_at: string | null;
   last_seen_offset: number;
+  tty: boolean;
+  tty_rows: number | null;
+  tty_cols: number | null;
+  attached_user_at: string | null;
 };
 
 export type BashJobsPanelView = {

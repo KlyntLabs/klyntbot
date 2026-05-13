@@ -4570,6 +4570,7 @@ dependencies = [
  "tauri-specta",
  "tokio",
  "tokio-util",
+ "tools-core",
  "tower-http",
  "tracing",
  "tracing-subscriber",
@@ -5387,17 +5388,21 @@ dependencies = [
  "ai-core",
  "approval",
  "async-trait",
+ "base64 0.22.1",
  "bus",
  "cognitive",
  "common",
  "config",
  "dashmap",
+ "futures-util",
  "hex",
  "jiff",
  "klynt-pty",
  "klynt-sandbox",
  "libc",
  "once_cell",
+ "portable-pty",
+ "rand 0.9.4",
  "regex",
  "serde",
  "serde_json",
@@ -5405,13 +5410,16 @@ dependencies = [
  "specta",
  "sqlx",
  "storage",
+ "subtle",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-tungstenite 0.28.0",
  "tokio-util",
  "tools-core",
  "tools-core-macros",
  "tracing",
+ "vte",
 ]
 
 [[package]]
@@ -16888,6 +16896,27 @@ checksum = "fb067e4cbd1ff067d1df46c9194b5de0e98efd2810bbc95c5d5e5f25a3231150"
 dependencies = [
  "cc",
  "libc",
+]
+
+[[package]]
+name = "vte"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a0b683b20ef64071ff03745b14391751f6beab06a54347885459b77a3f2caa5"
+dependencies = [
+ "arrayvec",
+ "utf8parse",
+ "vte_generate_state_changes",
+]
+
+[[package]]
+name = "vte_generate_state_changes"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e369bee1b05d510a7b4ed645f5faa90619e05437111783ea5848f28d97d3c2e"
+dependencies = [
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]

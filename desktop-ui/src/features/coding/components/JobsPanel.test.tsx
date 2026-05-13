@@ -29,6 +29,10 @@ const fixture = (id: string, status = "Running"): BashJobView => ({
   total_bytes_emitted: 1024,
   last_polled_at: null,
   last_seen_offset: 0,
+  tty: false,
+  tty_rows: null,
+  tty_cols: null,
+  attached_user_at: null,
 });
 
 describe("JobsPanel", () => {
@@ -54,5 +58,19 @@ describe("JobsPanel", () => {
     render(<JobsPanel threadId="t1" />);
     const stopButtons = screen.getAllByRole("button", { name: /stop/i });
     expect(stopButtons).toHaveLength(1);
+  });
+
+  it("renders Attach button on tty=true running jobs", () => {
+    const pty = fixture("bash-pty0000001", "Running");
+    pty.tty = true;
+    applyJobsView("t1", [pty]);
+    render(<JobsPanel threadId="t1" />);
+    expect(screen.getByRole("button", { name: "Attach" })).toBeInTheDocument();
+  });
+
+  it("does NOT render Attach button on tty=false jobs", () => {
+    applyJobsView("t1", [fixture("bash-aaa0000001", "Running")]);
+    render(<JobsPanel threadId="t1" />);
+    expect(screen.queryByRole("button", { name: "Attach" })).toBeNull();
   });
 });

@@ -42,6 +42,9 @@ async fn failed_job_pushes_context_update() {
             cwd: dir.path().to_path_buf(),
             timeout_ms: 60_000,
             silent_completion: false,
+            tty: false,
+            tty_rows: None,
+            tty_cols: None,
         })
         .await
         .expect("spawn");

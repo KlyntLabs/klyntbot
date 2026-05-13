@@ -26,6 +26,10 @@ const fixture = (id: string, status = "Running"): BashJobView => ({
   total_bytes_emitted: 0,
   last_polled_at: null,
   last_seen_offset: 0,
+  tty: false,
+  tty_rows: null,
+  tty_cols: null,
+  attached_user_at: null,
 });
 
 describe("jobsStore", () => {

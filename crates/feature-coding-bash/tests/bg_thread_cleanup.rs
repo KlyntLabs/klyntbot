@@ -43,6 +43,9 @@ async fn reap_kills_jobs_leaves_rows() {
                 cwd: dir.path().to_path_buf(),
                 timeout_ms: 60_000,
                 silent_completion: false,
+                tty: false,
+                tty_rows: None,
+                tty_cols: None,
             })
             .await
             .expect("spawn");

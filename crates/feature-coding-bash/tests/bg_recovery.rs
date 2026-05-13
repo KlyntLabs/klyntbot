@@ -52,6 +52,11 @@ async fn marks_orphan_lost_and_preserves_log() {
         final_path: None,
         last_polled_at: None,
         last_seen_offset: 0,
+        tty: false,
+        tty_rows: None,
+        tty_cols: None,
+        attach_token: None,
+        attached_user_at: None,
     })
     .await
     .unwrap();

@@ -152,11 +152,6 @@ pub fn spawn_with_pty(
         .master
         .try_clone_reader()
         .map_err(|e| PtyError::PgrpCapture(format!("try_clone_reader: {e}")))?;
-    let writer = pair
-        .master
-        .take_writer()
-        .map_err(|e| PtyError::PgrpCapture(format!("take_writer: {e}")))?;
-
     let pid = child.process_id();
     let pgid = pid.and_then(|p| {
         #[cfg(unix)]
@@ -183,7 +178,7 @@ pub fn spawn_with_pty(
         },
         stdout: Box::new(BlockingReaderToAsync::new(reader)) as _,
         stderr: None,
-        stdin: Some(Box::new(BlockingWriterToAsync::new(writer)) as _),
+        stdin: None,
         pgid,
     })
 }

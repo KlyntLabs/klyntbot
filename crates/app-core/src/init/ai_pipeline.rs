@@ -70,6 +70,8 @@ fn translate_bash_job(event: &bus::DomainEvent) -> Option<AiSignal> {
         bus::BashJobEvent::Failed { .. } => "BashJob.Failed",
         bus::BashJobEvent::Cancelled { .. } => "BashJob.Cancelled",
         bus::BashJobEvent::Lost { .. } => "BashJob.Lost",
+        bus::BashJobEvent::AttachStarted { .. } => "BashJob.AttachStarted",
+        bus::BashJobEvent::AttachEnded { .. } => "BashJob.AttachEnded",
     };
 
     Some(AiSignal {
@@ -101,6 +103,8 @@ fn importance_for_bash_event(e: &bus::BashJobEvent) -> f64 {
         bus::BashJobEvent::Cancelled { .. } => 0.5,
         bus::BashJobEvent::Completed { .. } => 0.3,
         bus::BashJobEvent::Started { .. } => 0.2,
+        bus::BashJobEvent::AttachStarted { .. } => 0.3,
+        bus::BashJobEvent::AttachEnded { .. } => 0.3,
     }
 }
 

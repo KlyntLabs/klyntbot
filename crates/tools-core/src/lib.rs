@@ -31,8 +31,8 @@ pub use events::ToolEvent;
 pub use feature::{FeatureMigration, FeaturePackage, HealthStatus};
 pub use interceptor::{InterceptorChain, ToolCallInterceptor};
 pub use job_supervisor::{
-    DynJobSupervisor, FailureKind, GateResult, JobError, JobId, JobSpec, JobStatus,
-    JobSupervisorHandle, JobView, RingRead,
+    AttachError, AttachHandle, DynJobSupervisor, FailureKind, GateResult, JobError, JobId, JobSpec,
+    JobStatus, JobSupervisorHandle, JobView, RingRead,
 };
 pub use metadata::{CostHint, ToolCategory, ToolMetadata, ToolSource};
 pub use pagination::Page;

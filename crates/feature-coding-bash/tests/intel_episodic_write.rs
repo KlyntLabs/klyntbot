@@ -78,6 +78,9 @@ async fn failed_job_writes_episodic_memory() {
             cwd: std::env::temp_dir(),
             timeout_ms: 30_000,
             silent_completion: false,
+            tty: false,
+            tty_rows: None,
+            tty_cols: None,
         })
         .await
         .unwrap();

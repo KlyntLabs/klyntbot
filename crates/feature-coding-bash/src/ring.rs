@@ -226,6 +226,11 @@ impl RingFile {
 
     pub async fn finalize(&self, final_path: impl AsRef<Path>) -> std::io::Result<PathBuf> {
         let final_path = final_path.as_ref().to_path_buf();
+        // Flush any buffered bytes so the on-disk file is complete before we read it.
+        {
+            let mut writer = self.writer.lock().await;
+            writer.flush().await?;
+        }
         let on_disk_size = tokio::fs::metadata(&self.path).await?.len();
         let mut file = File::open(&self.path).await?;
 

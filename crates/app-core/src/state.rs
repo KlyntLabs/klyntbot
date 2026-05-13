@@ -849,6 +849,27 @@ impl AppCore {
         crate::handlers::coding_jobs::coding_jobs_log_path(self, job_id)
     }
 
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_job_attach(
+        &self,
+        job_id: &str,
+    ) -> Result<crate::handlers::coding_jobs::AttachResult, ApiError> {
+        crate::handlers::coding_jobs::coding_task_attach(self, job_id).await
+    }
+
+    #[tracing::instrument(skip(self), err)]
+    pub async fn coding_job_detach(&self, job_id: &str) -> Result<(), ApiError> {
+        crate::handlers::coding_jobs::coding_task_detach(self, job_id).await
+    }
+
+    /// Return the background job supervisor or a "feature disabled" error.
+    #[tracing::instrument(skip(self), err)]
+    pub fn job_supervisor(&self) -> Result<&Arc<feature_coding_bash::JobSupervisor>, ApiError> {
+        self.job_supervisor
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "background bash jobs not initialized"))
+    }
+
     /// Return the assistant-mode thread runtime, constructing it on first call.
     pub fn assistant_runtime(self: Arc<Self>) -> Arc<dyn crate::runtime::ThreadRuntime> {
         let core = Arc::clone(&self);

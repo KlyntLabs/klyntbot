@@ -42,6 +42,9 @@ async fn parent_job_visible_to_subagent_chain() {
             cwd: dir.path().to_path_buf(),
             timeout_ms: 60_000,
             silent_completion: false,
+            tty: false,
+            tty_rows: None,
+            tty_cols: None,
         })
         .await
         .expect("spawn");

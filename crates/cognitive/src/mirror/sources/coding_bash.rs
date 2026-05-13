@@ -20,6 +20,8 @@ const SUBSCRIBED_KINDS: &[&str] = &[
     "BashJob.Failed",
     "BashJob.Cancelled",
     "BashJob.Lost",
+    "BashJob.AttachStarted",
+    "BashJob.AttachEnded",
 ];
 
 pub struct BackgroundJobSignalSource {
@@ -51,10 +53,11 @@ impl MirrorSignalSource for BackgroundJobSignalSource {
     }
 
     async fn accumulate(&self, signal: &AiSignal) -> common::Result<()> {
-        let job_id = match &signal.raw_event {
-            Some(bus::DomainEvent::BashJob(inner)) => inner.job_id().to_string(),
+        let inner = match &signal.raw_event {
+            Some(bus::DomainEvent::BashJob(inner)) => inner,
             _ => return Ok(()),
         };
+        let job_id = inner.job_id().to_string();
 
         let row = match self.bash_repo.get(&job_id).await {
             Ok(Some(r)) => r,
@@ -68,7 +71,22 @@ impl MirrorSignalSource for BackgroundJobSignalSource {
             }
         };
 
-        let mem = build_episodic_memory(&row);
+        let mem = match inner {
+            bus::BashJobEvent::AttachStarted { timestamp, .. } => {
+                build_attach_episode(&row, "bash_job_attach_started", *timestamp, None)
+            }
+            bus::BashJobEvent::AttachEnded {
+                timestamp,
+                duration_ms,
+                ..
+            } => build_attach_episode(
+                &row,
+                "bash_job_attach_ended",
+                *timestamp,
+                Some(*duration_ms),
+            ),
+            _ => build_episodic_memory(&row),
+        };
         if let Err(e) = self.episodic_repo.insert(&mem).await {
             tracing::warn!(error = ?e, job_id, "episodic insert failed");
         }
@@ -154,6 +172,64 @@ pub fn build_episodic_memory(row: &BashJobRow) -> EpisodicMemory {
     }
 }
 
+/// Build a `bash_job_attach_*` episode. Importance 0.4 (mid-tier — useful
+/// when correlating later failures with prior attach sessions).
+pub fn build_attach_episode(
+    row: &BashJobRow,
+    sub_kind: &str,
+    occurred_at: Timestamp,
+    duration_ms: Option<u64>,
+) -> EpisodicMemory {
+    let content = serde_json::json!({
+        "job_id": row.id,
+        "command": row.command,
+        "description": row.description,
+        "sub_kind": sub_kind,
+        "duration_ms": duration_ms,
+    })
+    .to_string();
+    let summary = match duration_ms {
+        Some(ms) => format!(
+            "User attached to `{}` for {:.1}s",
+            truncate(&row.command, 60),
+            ms as f64 / 1000.0
+        ),
+        None => format!("User attached to `{}`", truncate(&row.command, 60)),
+    }
+    .chars()
+    .take(160)
+    .collect();
+    let metadata = serde_json::json!({
+        "agent_id": row.agent_id,
+        "thread_id": row.session_id,
+    })
+    .to_string();
+    let now = Timestamp::now().to_string();
+    EpisodicMemory {
+        id: Uuid::new_v4().to_string(),
+        domain: "coding".into(),
+        content,
+        summary: Some(summary),
+        importance: 0.4,
+        occurred_at: occurred_at.to_string(),
+        recorded_at: now,
+        stability: 1.0,
+        last_accessed: None,
+        access_count: 0,
+        project_id: None,
+        scope_type: "session".into(),
+        scope_id: Some(row.session_id.clone()),
+        scope_repo_id: None,
+        metadata: Some(metadata),
+        kind: Some("bash_job_attach".into()),
+        actor_id: Some(row.agent_id.clone()),
+        tier: "raw".into(),
+        parent_id: None,
+        child_count: 0,
+        rolled_up_at: None,
+    }
+}
+
 fn render_episode_summary(row: &BashJobRow, elapsed_ms: u64) -> String {
     let secs = elapsed_ms as f64 / 1000.0;
     match (row.status.as_str(), row.failure_kind.as_deref()) {
@@ -207,6 +283,11 @@ mod tests {
             cwd: "/".into(),
             timeout_ms: 60_000,
             silent_completion: false,
+            tty: false,
+            tty_rows: None,
+            tty_cols: None,
+            attached_user_at: None,
+            attach_token: None,
             status: status.into(),
             exit_code: Some(if status == "Completed" { 0 } else { 1 }),
             failure_kind: kind.map(String::from),
@@ -254,13 +335,39 @@ mod tests {
     }
 
     #[test]
-    fn spec_returns_4_kinds() {
+    fn spec_returns_6_kinds_after_attach_subscription() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let pool = rt.block_on(async { storage::StoragePool::connect_in_memory().await.unwrap() });
         let bash_repo = Arc::new(BashJobRepo::new(pool.inner().clone()));
         let ep_repo = EpisodicMemoryRepo::new(pool.inner().clone());
         let src = BackgroundJobSignalSource::new(ep_repo, bash_repo);
-        assert_eq!(src.spec().subscribed_kinds.len(), 4);
+        assert_eq!(src.spec().subscribed_kinds.len(), 6);
         assert_eq!(src.spec().flush_interval_secs, None);
+    }
+
+    #[test]
+    fn attach_episode_importance_04() {
+        let row = fake_row("e", "Running", None);
+        let mem = build_attach_episode(
+            &row,
+            "bash_job_attach_started",
+            jiff::Timestamp::now(),
+            None,
+        );
+        assert!((mem.importance - 0.4).abs() < 1e-9);
+        assert_eq!(mem.kind, Some("bash_job_attach".into()));
+    }
+
+    #[test]
+    fn attach_episode_with_duration_reports_seconds() {
+        let row = fake_row("f", "Completed", None);
+        let mem = build_attach_episode(
+            &row,
+            "bash_job_attach_ended",
+            jiff::Timestamp::now(),
+            Some(12_345),
+        );
+        let s = mem.summary.unwrap();
+        assert!(s.contains("12.3s"), "expected 12.3s in summary, got: {s}");
     }
 }

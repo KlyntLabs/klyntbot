@@ -28,14 +28,27 @@ use crate::intelligence::command_key;
 use crate::ring::RingFile;
 use crate::spawner::spawn_background_command;
 
-#[derive(Debug)]
 pub(crate) enum ChildBackend {
     Process,
     Pty {
         master: std::sync::Arc<tokio::sync::Mutex<Box<dyn portable_pty::MasterPty + Send>>>,
+        writer: std::sync::Arc<std::sync::Mutex<Option<Box<dyn std::io::Write + Send>>>>,
         rows: AtomicU16,
         cols: AtomicU16,
     },
+}
+
+impl std::fmt::Debug for ChildBackend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChildBackend::Process => f.debug_struct("Process").finish(),
+            ChildBackend::Pty { rows, cols, .. } => f
+                .debug_struct("Pty")
+                .field("rows", rows)
+                .field("cols", cols)
+                .finish(),
+        }
+    }
 }
 
 impl ChildBackend {
@@ -389,7 +402,7 @@ impl JobSupervisor {
         Ok(())
     }
 
-    async fn handle_exit(&self, id: &JobId, exit: std::io::Result<std::process::ExitStatus>) {
+    async fn handle_exit(&self, id: &JobId, exit: std::io::Result<Option<i32>>) {
         let live = match self.jobs.get(id).map(|e| e.value().clone()) {
             Some(l) => l,
             None => return,
@@ -402,7 +415,7 @@ impl JobSupervisor {
         let total = live.ring.total_bytes_emitted();
         let bisect_count = live.ring.bisect_count() as i64;
 
-        let exit_code = exit.as_ref().ok().and_then(|s| s.code()).unwrap_or(-1);
+        let exit_code = exit.as_ref().ok().and_then(|s| *s).unwrap_or(-1);
         let was_timeout = false;
         let elapsed_ms = (Timestamp::now() - live.started_at)
             .total(jiff::Unit::Millisecond)
@@ -663,11 +676,19 @@ impl JobSupervisorHandle for JobSupervisor {
 
         let backend = match &handle.child {
             klynt_pty::ChildHandle::Process { .. } => ChildBackend::Process,
-            klynt_pty::ChildHandle::Pty { master, .. } => ChildBackend::Pty {
-                master: master.clone(),
-                rows: AtomicU16::new(spec.tty_rows.unwrap_or(24)),
-                cols: AtomicU16::new(spec.tty_cols.unwrap_or(80)),
-            },
+            klynt_pty::ChildHandle::Pty { master, .. } => {
+                let writer = {
+                    let m = master.clone();
+                    let guard = m.lock().await;
+                    guard.take_writer().map_err(|e| JobError::Spawn(format!("take_writer: {e}")))?
+                };
+                ChildBackend::Pty {
+                    master: master.clone(),
+                    writer: std::sync::Arc::new(std::sync::Mutex::new(Some(writer))),
+                    rows: AtomicU16::new(spec.tty_rows.unwrap_or(24)),
+                    cols: AtomicU16::new(spec.tty_cols.unwrap_or(80)),
+                }
+            }
         };
 
         let live = Arc::new(LiveJob {
@@ -706,7 +727,9 @@ impl JobSupervisorHandle for JobSupervisor {
         let child_handle = handle.child;
         tokio::spawn(async move {
             let exit = match child_handle {
-                klynt_pty::ChildHandle::Process { mut child } => child.wait().await,
+                klynt_pty::ChildHandle::Process { mut child } => {
+                    child.wait().await.map(|s| Some(s.code().unwrap_or(-1)))
+                }
                 klynt_pty::ChildHandle::Pty { child, .. } => {
                     // portable-pty's Child::wait() is blocking; offload.
                     tokio::task::spawn_blocking(move || {
@@ -717,6 +740,7 @@ impl JobSupervisorHandle for JobSupervisor {
                     .map_err(|e| std::io::Error::other(format!("wait join: {e}")))
                     .and_then(|res| {
                         res.map_err(|e| std::io::Error::other(e.to_string()))
+                            .map(|s| Some(s.exit_code() as i32))
                     })
                 }
             };
@@ -860,19 +884,19 @@ impl JobSupervisorHandle for JobSupervisor {
             .get(id)
             .map(|e| e.value().clone())
             .ok_or_else(|| JobError::NotFound(id.0.clone()))?;
-        let master = match &live.backend {
+        let writer = match &live.backend {
             ChildBackend::Process => return Err(JobError::NotPty),
-            ChildBackend::Pty { master, .. } => master.clone(),
+            ChildBackend::Pty { writer, .. } => writer.clone(),
         };
         let bytes = data.to_vec();
         let n = bytes.len();
         let res = tokio::task::spawn_blocking(move || -> std::io::Result<()> {
-            let mut guard = master.blocking_lock();
-            let mut writer = guard
-                .take_writer()
-                .map_err(|e| std::io::Error::other(format!("take_writer: {e}")))?;
-            std::io::Write::write_all(&mut writer, &bytes)?;
-            std::io::Write::flush(&mut writer)?;
+            let mut guard = writer.lock().unwrap();
+            let w = guard
+                .as_mut()
+                .ok_or_else(|| std::io::Error::other("PTY writer not available"))?;
+            std::io::Write::write_all(w, &bytes)?;
+            std::io::Write::flush(w)?;
             Ok(())
         })
         .await
@@ -891,10 +915,10 @@ impl JobSupervisorHandle for JobSupervisor {
             .ok_or_else(|| JobError::NotFound(id.0.clone()))?;
         let (master, r_atom, c_atom) = match &live.backend {
             ChildBackend::Process => return Err(JobError::NotPty),
-            ChildBackend::Pty { master, rows, cols } => (master.clone(), rows, cols),
+            ChildBackend::Pty { master, rows, cols, .. } => (master.clone(), rows, cols),
         };
         {
-            let mut guard = master.lock().await;
+            let guard = master.lock().await;
             guard
                 .resize(portable_pty::PtySize {
                     rows,
@@ -1024,10 +1048,13 @@ fn drain_reader_with_attach<R: tokio::io::AsyncRead + Unpin + Send>(
         loop {
             tokio::select! {
                 biased;
-                _ = cancel.cancelled() => return Ok(()),
-                n = reader.read(&mut buf) => match n? {
-                    0 => return Ok(()),
-                    n => {
+                _ = cancel.cancelled() => {
+                    eprintln!("[drain] cancelled");
+                    return Ok(());
+                }
+                n = reader.read(&mut buf) => match n {
+                    Ok(0) => return Ok(()),
+                    Ok(n) => {
                         ring.append(&buf[..n]).await?;
                         // Fork to attach WS if a live attachment exists.
                         let guard = attach.read().await;
@@ -1037,6 +1064,7 @@ fn drain_reader_with_attach<R: tokio::io::AsyncRead + Unpin + Send>(
                             let _ = tx.send(buf[..n].to_vec());
                         }
                     }
+                    Err(e) => return Err(e),
                 }
             }
         }
@@ -1069,7 +1097,7 @@ mod tests {
         let migration = crate::migrations::coding_background_jobs_migration();
         sqlx::query(&migration.sql).execute(pool.inner()).await.unwrap();
         let repo = BashJobRepo::new(pool.inner().clone());
-        let bus = Arc::new(bus::DomainEventBus::new());
+        let bus = Arc::new(bus::DomainEventBus::new(256));
         let queue = Arc::new(bus::context_updates::ContextUpdateQueue::new());
         let data_dir = tempfile::tempdir().unwrap().into_path();
         let sandbox = Arc::new(MacOsSeatbeltRunner::new());

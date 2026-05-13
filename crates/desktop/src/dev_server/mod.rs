@@ -7,6 +7,7 @@
 //! Only compiled in debug builds. Chat streaming is supported via SSE
 //! at `/api/events/{sessionKey}`.
 
+mod attach_ws;
 mod dispatch;
 mod ingest;
 mod streaming;
@@ -93,6 +94,10 @@ pub async fn start(core: Arc<AppCore>, global_event_tx: broadcast::Sender<(Strin
         )
         .route("/api/v1/ingest", post(ingest::ingest_handler))
         .route("/api/v1/ingest/batch", post(ingest::ingest_batch_handler))
+        .route(
+            "/api/coding/jobs/{job_id}/attach",
+            axum::routing::get(attach_ws::attach_handler),
+        )
         .route("/api/{cmd}", post(dispatch::dispatch))
         .with_state(state);
 
