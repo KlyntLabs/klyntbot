@@ -8,5 +8,9 @@
 (allow ipc-posix-shm-read*)
 (allow file-read-data file-read-metadata)
 (allow file-write* (subpath "{{CWD}}"))
+; --- Phase 2.3c PTY device access ---
+(allow file-read* file-write* (literal "/dev/ptmx"))
+(allow file-read* file-write* (regex #"^/dev/ttys[0-9]+$"))
+; --- end PTY ---
 {{EXTRA_WRITES}}
 {{NETWORK}}

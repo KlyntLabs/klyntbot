@@ -32,6 +32,16 @@ pub struct BashArgs {
 
     /// When true, skip the auto-injected completion notification.
     pub silent_completion: Option<bool>,
+
+    /// Allocate a PTY for the command. Only valid with run_in_background=true.
+    /// Enables ANSI/colour passthrough and accepts stdin via coding_task_stdin.
+    pub tty: Option<bool>,
+
+    /// PTY rows. Default 24. Only valid when tty=true.
+    pub tty_rows: Option<u16>,
+
+    /// PTY cols. Default 80. Only valid when tty=true.
+    pub tty_cols: Option<u16>,
 }
 
 #[derive(tools_core::Tool)]
@@ -116,6 +126,13 @@ impl ToolExecute for BashTool {
         let start = std::time::Instant::now();
 
         let result: common::Result<String> = (async {
+            if args.tty.unwrap_or(false) && !args.run_in_background.unwrap_or(false) {
+                return Err(common::KlyntbotError::Tool(
+                    common::ToolError::ExecutionFailed(
+                        "tty=true requires run_in_background=true".into(),
+                    ),
+                ));
+            }
             if args.run_in_background.unwrap_or(false) {
                 return self.execute_background(args, ctx).await;
             }
@@ -155,6 +172,40 @@ impl BashTool {
                 common::ToolError::ExecutionFailed("description must be 1-120 chars".into()),
             ));
         }
+
+        // ---------- 2.3c PTY validation ----------
+        let tty = args.tty.unwrap_or(false);
+        if (args.tty_rows.is_some() || args.tty_cols.is_some()) && !tty {
+            return Err(common::KlyntbotError::Tool(
+                common::ToolError::ExecutionFailed(
+                    "tty_rows/tty_cols require tty=true".into(),
+                ),
+            ));
+        }
+        let mut warnings: Vec<String> = Vec::new();
+        let clamp = |v: u16, lo: u16, hi: u16, name: &str, warnings: &mut Vec<String>| -> u16 {
+            if v < lo {
+                warnings.push(format!("{name} clamped from {v} to {lo}"));
+                lo
+            } else if v > hi {
+                warnings.push(format!("{name} clamped from {v} to {hi}"));
+                hi
+            } else {
+                v
+            }
+        };
+        let tty_rows = if tty {
+            Some(clamp(args.tty_rows.unwrap_or(24), 4, 200, "tty_rows", &mut warnings))
+        } else {
+            None
+        };
+        let tty_cols = if tty {
+            Some(clamp(args.tty_cols.unwrap_or(80), 20, 400, "tty_cols", &mut warnings))
+        } else {
+            None
+        };
+        // ----------------------------------------
+
         let cwd = args
             .cwd
             .as_deref()
@@ -169,16 +220,42 @@ impl BashTool {
             cwd,
             timeout_ms: args.timeout_ms.unwrap_or(600_000),
             silent_completion: args.silent_completion.unwrap_or(false),
+            tty,
+            tty_rows,
+            tty_cols,
         };
         let view = supervisor.spawn(spec).await.map_err(|e| {
             common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
                 "spawn failed: {e}"
             )))
         })?;
-        Ok(format!(
-            "Started background job {}.\nDescription: {}\nInspect:    coding_task_output(\"{}\")\nCancel:     coding_task_stop(\"{}\")\n\nThis job will auto-notify on completion.",
-            view.id.as_str(), view.description, view.id.as_str(), view.id.as_str(),
-        ))
+        let banner = if tty {
+            format!(
+                "Started background PTY job {}.\nDescription: {}\nTTY: {} rows × {} cols\nSend stdin:    coding_task_stdin(\"{}\", \"y\\n\")\nResize:        coding_task_resize(\"{}\", rows, cols)\nInspect output: coding_task_output(\"{}\")\nCancel:        coding_task_stop(\"{}\")\n\nThe user may attach via JobsPanel. While attached, defer stdin to them.",
+                view.id.as_str(),
+                view.description,
+                tty_rows.unwrap_or(24),
+                tty_cols.unwrap_or(80),
+                view.id.as_str(),
+                view.id.as_str(),
+                view.id.as_str(),
+                view.id.as_str(),
+            )
+        } else {
+            format!(
+                "Started background job {}.\nDescription: {}\nInspect:    coding_task_output(\"{}\")\nCancel:     coding_task_stop(\"{}\")\n\nThis job will auto-notify on completion.",
+                view.id.as_str(),
+                view.description,
+                view.id.as_str(),
+                view.id.as_str(),
+            )
+        };
+        let mut out = banner;
+        if !warnings.is_empty() {
+            out.push_str("\n\nWarnings:\n- ");
+            out.push_str(&warnings.join("\n- "));
+        }
+        Ok(out)
     }
 
     async fn execute_foreground(
