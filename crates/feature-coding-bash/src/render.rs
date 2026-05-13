@@ -174,6 +174,31 @@ pub struct VerificationAffordance<'a> {
     pub verb: VerificationVerb,
 }
 
+/// Render the cooperative-handoff section for any jobs the user is attached to.
+pub fn attach_handoff_reminder(items: &[(JobView, Timestamp)]) -> String {
+    let mut s = String::from("<system-reminder>\n");
+    s.push_str("The user is currently attached to the following PTY jobs:\n");
+    for (j, attached_at) in items {
+        // Local time render.
+        let local = attached_at
+            .to_zoned(jiff::tz::TimeZone::system())
+            .strftime("%H:%M");
+        s.push_str(&format!(
+            "- {} ({}) — attached at {} local\n",
+            j.id.as_str(),
+            j.description,
+            local
+        ));
+    }
+    s.push_str(
+        "Defer stdin to the user. Do NOT call coding_task_stdin on these jobs while \
+attached. You may still observe their output via coding_task_output. The \
+attach indicator clears automatically when the user closes the panel.\n",
+    );
+    s.push_str("</system-reminder>");
+    s
+}
+
 pub fn verification_affordance_reminder(items: &[VerificationAffordance<'_>]) -> String {
     let mut s = String::new();
     s.push_str("<system-reminder>\n");
@@ -214,6 +239,45 @@ mod verification_affordance_tests {
         assert!(body.contains("[verb: Run]"));
         assert!(body.contains("Verify migration safety"));
         assert!(body.contains("[verb: Verify]"));
+    }
+}
+
+#[cfg(test)]
+mod attach_render_tests {
+    use super::*;
+    use tools_core::{JobId, JobStatus, JobView};
+
+    fn fake_view(id: &str, desc: &str) -> JobView {
+        JobView {
+            id: JobId(id.into()),
+            session_id: "s1".into(),
+            agent_id: "a1".into(),
+            description: desc.into(),
+            command: "c".into(),
+            cwd: "/".into(),
+            status: JobStatus::Running,
+            started_at: jiff::Timestamp::now(),
+            finished_at: None,
+            exit_code: None,
+            gate_result: None,
+            failure_extracted: None,
+            total_bytes_emitted: 0,
+            bisect_generation: 0,
+            last_polled_at: None,
+            last_seen_offset: 0,
+        }
+    }
+
+    #[test]
+    fn renders_one_attached_job_with_handoff_text() {
+        let v = fake_view("bash-aaaaaaaaaa", "gh auth login");
+        let body = attach_handoff_reminder(&[(v, jiff::Timestamp::now())]);
+        assert!(body.contains("<system-reminder>"));
+        assert!(body.contains("bash-aaaaaaaaaa"));
+        assert!(body.contains("gh auth login"));
+        assert!(body.contains("Defer stdin to the user"));
+        assert!(body.contains("Do NOT call coding_task_stdin"));
+        assert!(body.contains("</system-reminder>"));
     }
 }
 

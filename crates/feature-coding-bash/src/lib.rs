@@ -2,6 +2,7 @@
 //!
 //! Spec: `docs/superpowers/specs/2026-05-08-coding-background-bash-design.md`
 
+pub mod attach;
 pub mod gate;
 pub mod injector;
 pub mod intelligence;
@@ -13,6 +14,7 @@ pub mod supervisor;
 pub mod tools;
 pub mod view;
 
+pub use attach::{generate_attach_token, tokens_eq_constant_time};
 pub use injector::BackgroundJobsInjector;
 pub use intelligence::ExecutionIntelligenceInjector;
 pub use supervisor::JobSupervisor;
@@ -61,6 +63,8 @@ impl FeaturePackage for CodingBashFeature {
             Arc::new(tools::coding_task_list::CodingTaskListTool),
             Arc::new(tools::coding_task_output::CodingTaskOutputTool),
             Arc::new(tools::coding_task_stop::CodingTaskStopTool),
+            Arc::new(tools::coding_task_stdin::CodingTaskStdinTool),
+            Arc::new(tools::coding_task_resize::CodingTaskResizeTool),
         ]
     }
 

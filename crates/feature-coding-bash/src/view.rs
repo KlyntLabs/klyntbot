@@ -21,6 +21,10 @@ pub struct BashJobView {
     pub total_bytes_emitted: u64,
     pub last_polled_at: Option<String>,
     pub last_seen_offset: u64,
+    pub tty: bool,
+    pub tty_rows: Option<u16>,
+    pub tty_cols: Option<u16>,
+    pub attached_user_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -53,6 +57,43 @@ impl BashJobView {
             total_bytes_emitted: v.total_bytes_emitted,
             last_polled_at: v.last_polled_at.map(|t| t.to_string()),
             last_seen_offset: v.last_seen_offset,
+            tty: false,
+            tty_rows: None,
+            tty_cols: None,
+            attached_user_at: None,
+        }
+    }
+}
+
+impl BashJobView {
+    pub fn from_row(row: &storage::repos::BashJobRow) -> Self {
+        let (failure_kind, failure_detail) = match row.status.as_str() {
+            "Failed" | "Lost" | "Cancelled" => {
+                (row.failure_kind.clone(), row.failure_detail.clone())
+            }
+            _ => (None, None),
+        };
+        Self {
+            id: row.id.clone(),
+            session_id: row.session_id.clone(),
+            agent_id: row.agent_id.clone(),
+            description: row.description.clone(),
+            command: row.command.clone(),
+            cwd: row.cwd.clone().into(),
+            status: row.status.clone(),
+            started_at: row.started_at.to_string(),
+            finished_at: row.finished_at.map(|t| t.to_string()),
+            exit_code: row.exit_code,
+            failure_kind,
+            failure_detail,
+            failure_extracted: row.failure_extracted.as_deref().and_then(|s| serde_json::from_str(s).ok()),
+            total_bytes_emitted: row.total_bytes_emitted as u64,
+            last_polled_at: row.last_polled_at.map(|t| t.to_string()),
+            last_seen_offset: row.last_seen_offset as u64,
+            tty: row.tty,
+            tty_rows: row.tty_rows,
+            tty_cols: row.tty_cols,
+            attached_user_at: row.attached_user_at.map(|t| t.to_string()),
         }
     }
 }

@@ -2,7 +2,7 @@
 //! Spec §5.1.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU16, AtomicU8, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -15,6 +15,7 @@ use jiff::Timestamp;
 use klynt_pty::kill_process_group;
 use klynt_sandbox::MacOsSeatbeltRunner;
 use storage::repos::{BashJobRepo, BashJobRow};
+use tokio::sync::{mpsc, RwLock};
 use tokio_util::sync::CancellationToken;
 use tools_core::{
     FailureKind, GateResult, JobError, JobId, JobSpec, JobStatus, JobSupervisorHandle, JobView,
@@ -26,6 +27,29 @@ use crate::gate::GateClassifier;
 use crate::intelligence::command_key;
 use crate::ring::RingFile;
 use crate::spawner::spawn_background_command;
+
+#[derive(Debug)]
+pub(crate) enum ChildBackend {
+    Process,
+    Pty {
+        master: std::sync::Arc<tokio::sync::Mutex<Box<dyn portable_pty::MasterPty + Send>>>,
+        rows: AtomicU16,
+        cols: AtomicU16,
+    },
+}
+
+impl ChildBackend {
+    pub(crate) fn is_pty(&self) -> bool {
+        matches!(self, ChildBackend::Pty { .. })
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct AttachState {
+    pub user_at: Option<Timestamp>,
+    pub token: Option<String>,
+    pub ws_tx: Option<mpsc::UnboundedSender<Vec<u8>>>,
+}
 
 const CAP_PER_CHAIN: usize = 6;
 
@@ -42,6 +66,8 @@ struct LiveJob {
     cancel: CancellationToken,
     state: AtomicU8,
     started_at: Timestamp,
+    backend: ChildBackend,
+    attach: Arc<RwLock<AttachState>>,
 }
 
 #[derive(Clone)]
@@ -113,12 +139,66 @@ impl JobSupervisor {
             .collect()
     }
 
+    /// Like `list_active`, but also returns each job's attached_user_at.
+    /// Used by the injector to render the cooperative-handoff section.
+    pub fn list_active_with_attach(
+        &self,
+        session_id: &str,
+        agent_chain: &[String],
+    ) -> Vec<(JobView, Option<Timestamp>)> {
+        self.jobs
+            .iter()
+            .filter(|e| {
+                e.value().spec.session_id == session_id
+                    && agent_chain.contains(&e.value().spec.agent_id)
+            })
+            .map(|e| {
+                let live = e.value();
+                let attached_at = live
+                    .attach
+                    .try_read()
+                    .ok()
+                    .and_then(|g| g.user_at);
+                let view = JobView {
+                    id: live.id.clone(),
+                    session_id: live.spec.session_id.clone(),
+                    agent_id: live.spec.agent_id.clone(),
+                    description: live.spec.description.clone(),
+                    command: live.spec.command.clone(),
+                    cwd: live.spec.cwd.clone(),
+                    status: JobStatus::Running,
+                    started_at: live.started_at,
+                    finished_at: None,
+                    exit_code: None,
+                    gate_result: None,
+                    failure_extracted: None,
+                    total_bytes_emitted: live.ring.total_bytes_emitted(),
+                    bisect_generation: live.ring.bisect_generation(),
+                    last_polled_at: None,
+                    last_seen_offset: 0,
+                };
+                (view, attached_at)
+            })
+            .collect()
+    }
+
     fn storage_err<T>(r: Result<T, storage::error::StorageError>) -> Result<T, JobError> {
         r.map_err(|e| JobError::Storage(e.to_string()))
     }
 
     fn jobs_dir(&self) -> PathBuf {
         self.data_dir.join("jobs")
+    }
+
+    async fn read_ring_tail_b64(&self, id: &JobId, max_bytes: usize) -> std::io::Result<String> {
+        let path = self.log_path(id);
+        if !path.exists() {
+            return Ok(String::new());
+        }
+        let bytes = tokio::fs::read(&path).await?;
+        let start = bytes.len().saturating_sub(max_bytes);
+        use base64::engine::Engine;
+        Ok(base64::engine::general_purpose::STANDARD.encode(&bytes[start..]))
     }
 
     pub fn log_path(&self, id: &JobId) -> PathBuf {
@@ -137,6 +217,11 @@ impl JobSupervisor {
             .collect();
         let n = to_kill.len();
         for id in to_kill {
+            // Defensively detach any live attach so the WebSocket gets a clean
+            // close frame before the process group dies. detach() is idempotent.
+            if let Err(e) = <Self as JobSupervisorHandle>::detach(self, &id).await {
+                tracing::debug!(job_id=%id.0, "detach during reap failed (ok if not attached): {e}");
+            }
             if let Err(e) = self.stop(&id, "thread deleted").await {
                 tracing::warn!(job_id=%id.0, "reap_session stop failed: {}", e);
             }
@@ -217,6 +302,21 @@ impl JobSupervisor {
                         )
                         .await,
                 )?;
+
+                if row.tty {
+                    if let Err(e) = self.repo.clear_attached(&row.id).await {
+                        tracing::warn!(error = ?e, job_id=%row.id, "clear_attached on lost row failed");
+                    }
+                    if row.attached_user_at.is_some() {
+                        self.bus.publish_bash_job(BashJobEvent::AttachEnded {
+                            job_id: row.id.clone(),
+                            thread_id: row.session_id.clone(),
+                            agent_id: row.agent_id.clone(),
+                            timestamp: Timestamp::now(),
+                            duration_ms: 0,
+                        });
+                    }
+                }
 
                 let body = format!(
                     "<system-reminder>\nBackground job {} was lost (klynt restarted while it was running).\nDescription: {}\nPartial output preserved at: {}\nUse coding_task_output(\"{}\") to inspect.\n</system-reminder>",
@@ -510,6 +610,11 @@ impl JobSupervisorHandle for JobSupervisor {
             cwd: cwd_str.clone(),
             timeout_ms: spec.timeout_ms as i64,
             silent_completion: spec.silent_completion,
+            tty: spec.tty,
+            tty_rows: spec.tty_rows,
+            tty_cols: spec.tty_cols,
+            attached_user_at: None,
+            attach_token: None,
             status: JobStatus::Starting.as_str().into(),
             exit_code: None,
             failure_kind: None,
@@ -535,26 +640,35 @@ impl JobSupervisorHandle for JobSupervisor {
         };
         let cancel = CancellationToken::new();
 
-        let handle = match spawn_background_command(&self.sandbox, &spec.command, &spec.cwd) {
-            Ok(h) => h,
-            Err(e) => {
-                let _ = self.repo.delete(&id.0).await;
-                return Err(JobError::Spawn(e.to_string()));
+        let handle = if spec.tty {
+            let rows = spec.tty_rows.unwrap_or(24);
+            let cols = spec.tty_cols.unwrap_or(80);
+            match crate::spawner::spawn_pty(&self.sandbox, &spec.command, &spec.cwd, rows, cols) {
+                Ok(h) => h,
+                Err(e) => {
+                    let _ = self.repo.delete(&id.0).await;
+                    return Err(JobError::Spawn(e.to_string()));
+                }
+            }
+        } else {
+            match spawn_background_command(&self.sandbox, &spec.command, &spec.cwd) {
+                Ok(h) => h,
+                Err(e) => {
+                    let _ = self.repo.delete(&id.0).await;
+                    return Err(JobError::Spawn(e.to_string()));
+                }
             }
         };
         let pgid = handle.pgid;
 
-        let stdout_ring = ring.clone();
-        let stdout_cancel = cancel.clone();
-        let mut stdout = handle.stdout;
-        tokio::spawn(async move { drain_reader(&mut stdout, stdout_ring, stdout_cancel).await });
-        if let Some(mut stderr) = handle.stderr {
-            let stderr_ring = ring.clone();
-            let stderr_cancel = cancel.clone();
-            tokio::spawn(
-                async move { drain_reader(&mut stderr, stderr_ring, stderr_cancel).await },
-            );
-        }
+        let backend = match &handle.child {
+            klynt_pty::ChildHandle::Process { .. } => ChildBackend::Process,
+            klynt_pty::ChildHandle::Pty { master, .. } => ChildBackend::Pty {
+                master: master.clone(),
+                rows: AtomicU16::new(spec.tty_rows.unwrap_or(24)),
+                cols: AtomicU16::new(spec.tty_cols.unwrap_or(80)),
+            },
+        };
 
         let live = Arc::new(LiveJob {
             id: id.clone(),
@@ -564,8 +678,28 @@ impl JobSupervisorHandle for JobSupervisor {
             cancel: cancel.clone(),
             state: AtomicU8::new(STATE_RUNNING),
             started_at,
+            backend,
+            attach: Arc::new(RwLock::new(AttachState::default())),
         });
         self.jobs.insert(id.clone(), live.clone());
+
+        // Spawn readers AFTER `live` exists so they can fan output to attach.ws_tx.
+        let attach_for_readers = live.attach.clone();
+        let mut stdout = handle.stdout;
+        let stdout_ring = ring.clone();
+        let stdout_cancel = cancel.clone();
+        let stdout_attach = attach_for_readers.clone();
+        tokio::spawn(async move {
+            drain_reader_with_attach(&mut stdout, stdout_ring, stdout_cancel, stdout_attach).await
+        });
+        if let Some(mut stderr) = handle.stderr {
+            let stderr_ring = ring.clone();
+            let stderr_cancel = cancel.clone();
+            let stderr_attach = attach_for_readers.clone();
+            tokio::spawn(async move {
+                drain_reader_with_attach(&mut stderr, stderr_ring, stderr_cancel, stderr_attach).await
+            });
+        }
 
         let supervisor = self.clone();
         let id_for_wait = id.clone();
@@ -573,6 +707,18 @@ impl JobSupervisorHandle for JobSupervisor {
         tokio::spawn(async move {
             let exit = match child_handle {
                 klynt_pty::ChildHandle::Process { mut child } => child.wait().await,
+                klynt_pty::ChildHandle::Pty { child, .. } => {
+                    // portable-pty's Child::wait() is blocking; offload.
+                    tokio::task::spawn_blocking(move || {
+                        let mut guard = child.blocking_lock();
+                        guard.wait()
+                    })
+                    .await
+                    .map_err(|e| std::io::Error::other(format!("wait join: {e}")))
+                    .and_then(|res| {
+                        res.map_err(|e| std::io::Error::other(e.to_string()))
+                    })
+                }
             };
             supervisor.handle_exit(&id_for_wait, exit).await;
         });
@@ -707,12 +853,170 @@ impl JobSupervisorHandle for JobSupervisor {
             .unwrap_or_default();
         rows.into_iter().map(view_from_row).collect()
     }
+
+    async fn write_stdin(&self, id: &JobId, data: &[u8]) -> Result<usize, JobError> {
+        let live = self
+            .jobs
+            .get(id)
+            .map(|e| e.value().clone())
+            .ok_or_else(|| JobError::NotFound(id.0.clone()))?;
+        let master = match &live.backend {
+            ChildBackend::Process => return Err(JobError::NotPty),
+            ChildBackend::Pty { master, .. } => master.clone(),
+        };
+        let bytes = data.to_vec();
+        let n = bytes.len();
+        let res = tokio::task::spawn_blocking(move || -> std::io::Result<()> {
+            let mut guard = master.blocking_lock();
+            let mut writer = guard
+                .take_writer()
+                .map_err(|e| std::io::Error::other(format!("take_writer: {e}")))?;
+            std::io::Write::write_all(&mut writer, &bytes)?;
+            std::io::Write::flush(&mut writer)?;
+            Ok(())
+        })
+        .await
+        .map_err(|e| JobError::Spawn(format!("join: {e}")))?;
+        res.map_err(JobError::Io)?;
+        Ok(n)
+    }
+
+    async fn resize(&self, id: &JobId, rows: u16, cols: u16) -> Result<(), JobError> {
+        let rows = rows.clamp(4, 200);
+        let cols = cols.clamp(20, 400);
+        let live = self
+            .jobs
+            .get(id)
+            .map(|e| e.value().clone())
+            .ok_or_else(|| JobError::NotFound(id.0.clone()))?;
+        let (master, r_atom, c_atom) = match &live.backend {
+            ChildBackend::Process => return Err(JobError::NotPty),
+            ChildBackend::Pty { master, rows, cols } => (master.clone(), rows, cols),
+        };
+        {
+            let mut guard = master.lock().await;
+            guard
+                .resize(portable_pty::PtySize {
+                    rows,
+                    cols,
+                    pixel_width: 0,
+                    pixel_height: 0,
+                })
+                .map_err(|e| JobError::Spawn(format!("resize: {e}")))?;
+        }
+        r_atom.store(rows, std::sync::atomic::Ordering::Relaxed);
+        c_atom.store(cols, std::sync::atomic::Ordering::Relaxed);
+        Ok(())
+    }
+
+    async fn attach(&self, id: &JobId) -> Result<tools_core::AttachHandle, tools_core::AttachError> {
+        let live = self
+            .jobs
+            .get(id)
+            .map(|e| e.value().clone())
+            .ok_or_else(|| tools_core::AttachError::NotFound(id.0.clone()))?;
+        if !live.backend.is_pty() {
+            return Err(tools_core::AttachError::NotPty);
+        }
+        let token = crate::attach::generate_attach_token();
+        match self
+            .repo
+            .mark_attached(id.as_str(), Some(&token))
+            .await
+        {
+            Ok(_) => {}
+            Err(storage::repos::AttachStorageError::AlreadyAttached) => {
+                return Err(tools_core::AttachError::AlreadyAttached);
+            }
+            Err(e) => return Err(tools_core::AttachError::Storage(e.to_string())),
+        }
+        {
+            let mut state = live.attach.write().await;
+            state.user_at = Some(Timestamp::now());
+            state.token = Some(token.clone());
+        }
+        let (rows, cols) = match &live.backend {
+            ChildBackend::Pty { rows, cols, .. } => (
+                rows.load(std::sync::atomic::Ordering::Relaxed),
+                cols.load(std::sync::atomic::Ordering::Relaxed),
+            ),
+            _ => unreachable!(),
+        };
+        self.bus.publish_bash_job(BashJobEvent::AttachStarted {
+            job_id: id.0.clone(),
+            thread_id: live.spec.session_id.clone(),
+            agent_id: live.spec.agent_id.clone(),
+            timestamp: Timestamp::now(),
+        });
+        // Tail = last 4 KB of ring file, base64.
+        let tail_b64 = self
+            .read_ring_tail_b64(id, 4096)
+            .await
+            .map_err(|e| tools_core::AttachError::Io(e))?;
+        Ok(tools_core::AttachHandle {
+            ws_url: format!(
+                "ws://localhost:3456/api/coding/jobs/{}/attach?token={}",
+                id.as_str(),
+                token
+            ),
+            rows,
+            cols,
+            tail_b64,
+        })
+    }
+
+    async fn detach(&self, id: &JobId) -> Result<(), tools_core::AttachError> {
+        let live = self
+            .jobs
+            .get(id)
+            .map(|e| e.value().clone())
+            .ok_or_else(|| tools_core::AttachError::NotFound(id.0.clone()))?;
+        let started_at = {
+            let mut state = live.attach.write().await;
+            let ts = state.user_at.take();
+            state.token = None;
+            state.ws_tx = None;
+            ts
+        };
+        self.repo
+            .clear_attached(id.as_str())
+            .await
+            .map_err(|e| tools_core::AttachError::Storage(e.to_string()))?;
+        if let Some(ts) = started_at {
+            let duration_ms = (Timestamp::now() - ts)
+                .total(jiff::Unit::Millisecond)
+                .unwrap_or(0.0) as u64;
+            self.bus.publish_bash_job(BashJobEvent::AttachEnded {
+                job_id: id.0.clone(),
+                thread_id: live.spec.session_id.clone(),
+                agent_id: live.spec.agent_id.clone(),
+                timestamp: Timestamp::now(),
+                duration_ms,
+            });
+        }
+        Ok(())
+    }
+
+    async fn set_attach_channel(
+        &self,
+        id: &JobId,
+        tx: tokio::sync::mpsc::UnboundedSender<Vec<u8>>,
+    ) -> Result<(), tools_core::AttachError> {
+        let live = self
+            .jobs
+            .get(id)
+            .map(|e| e.value().clone())
+            .ok_or_else(|| tools_core::AttachError::NotFound(id.0.clone()))?;
+        live.attach.write().await.ws_tx = Some(tx);
+        Ok(())
+    }
 }
 
-fn drain_reader<R: tokio::io::AsyncRead + Unpin + Send>(
+fn drain_reader_with_attach<R: tokio::io::AsyncRead + Unpin + Send>(
     reader: &mut R,
     ring: Arc<RingFile>,
     cancel: CancellationToken,
+    attach: Arc<RwLock<AttachState>>,
 ) -> impl std::future::Future<Output = std::io::Result<()>> + Send + use<'_, R> {
     async move {
         use tokio::io::AsyncReadExt;
@@ -725,10 +1029,81 @@ fn drain_reader<R: tokio::io::AsyncRead + Unpin + Send>(
                     0 => return Ok(()),
                     n => {
                         ring.append(&buf[..n]).await?;
+                        // Fork to attach WS if a live attachment exists.
+                        let guard = attach.read().await;
+                        if let Some(tx) = guard.ws_tx.as_ref() {
+                            // UnboundedSender::send only fails on closed receiver;
+                            // we drop in that case (the bridge will clean up on next call).
+                            let _ = tx.send(buf[..n].to_vec());
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tools_core::JobSupervisorHandle;
+
+    fn ephemeral_spec(tty: bool) -> JobSpec {
+        JobSpec {
+            session_id: "s1".into(),
+            agent_id: "a1".into(),
+            agent_chain: vec!["a1".into()],
+            description: "t".into(),
+            command: "bash -c 'read x; echo got=$x'".into(),
+            cwd: std::env::temp_dir(),
+            timeout_ms: 5_000,
+            silent_completion: true,
+            tty,
+            tty_rows: if tty { Some(24) } else { None },
+            tty_cols: if tty { Some(80) } else { None },
+        }
+    }
+
+    async fn build_supervisor() -> JobSupervisor {
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let migration = crate::migrations::coding_background_jobs_migration();
+        sqlx::query(&migration.sql).execute(pool.inner()).await.unwrap();
+        let repo = BashJobRepo::new(pool.inner().clone());
+        let bus = Arc::new(bus::DomainEventBus::new());
+        let queue = Arc::new(bus::context_updates::ContextUpdateQueue::new());
+        let data_dir = tempfile::tempdir().unwrap().into_path();
+        let sandbox = Arc::new(MacOsSeatbeltRunner::new());
+        JobSupervisor::new(repo, bus, queue, data_dir, sandbox)
+    }
+
+    #[tokio::test]
+    #[cfg(target_os = "macos")]
+    async fn write_stdin_to_pty_job_echoes_input() {
+        let sup = build_supervisor().await;
+        let view = sup.spawn(ephemeral_spec(true)).await.expect("spawn");
+        // Give the child a moment to call `read`.
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        let n = sup.write_stdin(&view.id, b"hello\n").await.expect("stdin");
+        assert!(n >= 6, "expected at least 6 bytes, got {n}");
+        // Wait for the child to finish + ring to drain.
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        let rd = sup
+            .output_delta(&view.id, 0, false, 0)
+            .await
+            .expect("delta");
+        let s = String::from_utf8_lossy(&rd.bytes);
+        assert!(
+            s.contains("got=hello"),
+            "expected got=hello in output, got: {s:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn write_stdin_to_non_pty_job_errors() {
+        let sup = build_supervisor().await;
+        let view = sup.spawn(ephemeral_spec(false)).await.expect("spawn");
+        let err = sup.write_stdin(&view.id, b"x").await;
+        assert!(matches!(err, Err(JobError::NotPty)));
     }
 }
 

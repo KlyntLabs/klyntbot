@@ -25,6 +25,52 @@ static ESLINT_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"✖ (\d+) problems? \((\d+) errors?").unwrap());
 static EADDRINUSE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"EADDRINUSE.*?:::?(\d+)").unwrap());
 
+#[derive(Default)]
+struct AnsiStripPerform {
+    out: String,
+}
+
+impl vte::Perform for AnsiStripPerform {
+    fn print(&mut self, c: char) {
+        self.out.push(c);
+    }
+    fn execute(&mut self, b: u8) {
+        if b == b'\n' || b == b'\t' || b == b'\r' {
+            self.out.push(b as char);
+        }
+    }
+    fn csi_dispatch(&mut self, _: &vte::Params, _: &[u8], _: bool, _: char) {}
+    fn osc_dispatch(&mut self, _: &[&[u8]], _: bool) {}
+    fn esc_dispatch(&mut self, _: &[u8], _: bool, _: u8) {}
+    fn hook(&mut self, _: &vte::Params, _: &[u8], _: bool, _: char) {}
+    fn put(&mut self, _: u8) {}
+    fn unhook(&mut self) {}
+}
+
+/// Strip ANSI/CSI/OSC/DCS escape sequences from `input`. Caps the parsed
+/// region at the last 64 KB; older head is dropped on overflow (matches the
+/// gate's existing read budget).
+pub fn strip_ansi(input: &str) -> String {
+    let cap = 64 * 1024usize;
+    let bounded = if input.len() > cap {
+        let cut = input.len() - cap;
+        // Move cut forward to a char boundary to keep `&str` slicing safe.
+        let mut start = cut;
+        while !input.is_char_boundary(start) && start < input.len() {
+            start += 1;
+        }
+        &input[start..]
+    } else {
+        input
+    };
+    let mut parser = vte::Parser::new();
+    let mut perform = AnsiStripPerform::default();
+    for byte in bounded.bytes() {
+        parser.advance(&mut perform, byte);
+    }
+    perform.out
+}
+
 pub struct GateClassifier;
 
 impl GateClassifier {
@@ -62,6 +108,18 @@ impl GateClassifier {
         if exit_code == 0 {
             return GateResult::Passed;
         }
+
+        // 2.3c: strip ANSI before regex extraction so colour codes don't break detectors.
+        let stdout_owned;
+        let stderr_owned;
+        let (stdout, stderr): (&str, &str) =
+            if stdout.contains('\x1b') || stderr.contains('\x1b') {
+                stdout_owned = strip_ansi(stdout);
+                stderr_owned = strip_ansi(stderr);
+                (&stdout_owned, &stderr_owned)
+            } else {
+                (stdout, stderr)
+            };
 
         // Try detectors in priority order.
         if let Some(r) = detect_compile_error(stderr, stdout) {
@@ -488,6 +546,48 @@ mod tests {
         let result = GateClassifier::classify(&text, "", 101, "cargo test", false, false, false, 0);
         if let GateResult::Failed { extracted, .. } = result {
             assert_eq!(extracted["failed_test_names"].as_array().unwrap().len(), 50);
+        }
+    }
+
+    #[test]
+    fn strip_ansi_removes_csi_sgr() {
+        let raw = "\x1b[31merror\x1b[0m: aborting due to 3 previous errors";
+        let out = strip_ansi(raw);
+        assert_eq!(out, "error: aborting due to 3 previous errors");
+    }
+
+    #[test]
+    fn strip_ansi_preserves_newline_tab() {
+        let raw = "a\tb\nc";
+        assert_eq!(strip_ansi(raw), "a\tb\nc");
+    }
+
+    #[test]
+    fn strip_ansi_strips_osc_and_dcs() {
+        let raw = "\x1b]0;title\x07hello";
+        let out = strip_ansi(raw);
+        assert!(out.contains("hello"));
+        assert!(!out.contains("title"));
+    }
+
+    #[test]
+    fn classify_with_cargo_color_output_still_extracts_failure() {
+        let coloured = "\x1b[31merror[E0432]\x1b[0m: unresolved import\n  --> src/main.rs:1:5";
+        let r = GateClassifier::classify(
+            "",
+            coloured,
+            101,
+            "cargo build",
+            false,
+            false,
+            false,
+            0,
+        );
+        match r {
+            GateResult::Failed { kind, .. } => {
+                assert!(matches!(kind, FailureKind::CompileError));
+            }
+            _ => panic!("expected Failed/CompileError"),
         }
     }
 }

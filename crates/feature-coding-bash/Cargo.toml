@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 approval = { path = "../approval" }
 async-trait = { workspace = true }
+base64 = { workspace = true }
 bus = { path = "../bus" }
 common = { path = "../common" }
 config = { path = "../config" }
@@ -16,6 +17,8 @@ jiff = { workspace = true, features = ["serde"] }
 klynt-pty = { path = "../klynt-pty" }
 klynt-sandbox = { path = "../klynt-sandbox" }
 once_cell = { workspace = true }
+portable-pty = { workspace = true }
+rand = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -24,12 +27,16 @@ hex = "0.4"
 specta = { workspace = true }
 sqlx = { workspace = true, features = ["sqlite", "runtime-tokio"] }
 storage = { path = "../storage" }
+subtle = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "process", "rt", "sync", "time"] }
+tokio-tungstenite = { workspace = true }
 tokio-util = { workspace = true }
 tools-core = { path = "../tools-core" }
 tools-core-macros = { path = "../tools-core-macros" }
 tracing = { workspace = true }
+vte = { workspace = true }
+futures-util = "0.3"
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }
