@@ -18,6 +18,11 @@ pub struct BashJobRow {
     pub cwd: String,
     pub timeout_ms: i64,
     pub silent_completion: bool,
+    pub tty: bool,
+    pub tty_rows: Option<u16>,
+    pub tty_cols: Option<u16>,
+    pub attached_user_at: Option<Timestamp>,
+    pub attach_token: Option<String>,
     pub status: String,
     pub exit_code: Option<i32>,
     pub failure_kind: Option<String>,
@@ -31,6 +36,14 @@ pub struct BashJobRow {
     pub final_path: Option<String>,
     pub last_polled_at: Option<Timestamp>,
     pub last_seen_offset: i64,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AttachStorageError {
+    #[error("storage: {0}")]
+    Storage(#[from] StorageError),
+    #[error("another attach is already live")]
+    AlreadyAttached,
 }
 
 #[derive(Debug, Clone)]
@@ -48,11 +61,13 @@ impl BashJobRepo {
             r#"
             INSERT INTO coding_background_jobs (
                 id, session_id, agent_id, description, command, command_key, cwd,
-                timeout_ms, silent_completion, status, exit_code,
+                timeout_ms, silent_completion,
+                tty, tty_rows, tty_cols, attached_user_at, attach_token,
+                status, exit_code,
                 failure_kind, failure_detail, failure_extracted,
                 started_at, finished_at, total_bytes_emitted, bisect_count,
                 log_path, final_path, last_polled_at, last_seen_offset
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&row.id)
@@ -64,6 +79,11 @@ impl BashJobRepo {
         .bind(&row.cwd)
         .bind(row.timeout_ms)
         .bind(row.silent_completion as i64)
+        .bind(row.tty as i64)
+        .bind(row.tty_rows.map(|v| v as i64))
+        .bind(row.tty_cols.map(|v| v as i64))
+        .bind(row.attached_user_at.map(|t| t.to_string()))
+        .bind(&row.attach_token)
         .bind(&row.status)
         .bind(row.exit_code)
         .bind(&row.failure_kind)
@@ -143,7 +163,9 @@ impl BashJobRepo {
     pub async fn get(&self, id: &str) -> Result<Option<BashJobRow>, StorageError> {
         let row = sqlx::query(
             r#"SELECT id, session_id, agent_id, description, command, command_key, cwd,
-                      timeout_ms, silent_completion, status, exit_code,
+                      timeout_ms, silent_completion,
+                      tty, tty_rows, tty_cols, attached_user_at, attach_token,
+                      status, exit_code,
                       failure_kind, failure_detail, failure_extracted,
                       started_at, finished_at, total_bytes_emitted, bisect_count,
                       log_path, final_path, last_polled_at, last_seen_offset
@@ -167,7 +189,9 @@ impl BashJobRepo {
         let row_opt = sqlx::query(
             r#"
             SELECT id, session_id, agent_id, description, command, command_key, cwd,
-                   timeout_ms, silent_completion, status, exit_code,
+                   timeout_ms, silent_completion,
+                   tty, tty_rows, tty_cols, attached_user_at, attach_token,
+                   status, exit_code,
                    failure_kind, failure_detail, failure_extracted,
                    started_at, finished_at, total_bytes_emitted, bisect_count,
                    log_path, final_path, last_polled_at, last_seen_offset
@@ -209,7 +233,9 @@ impl BashJobRepo {
         };
         let sql = format!(
             r#"SELECT id, session_id, agent_id, description, command, command_key, cwd,
-                      timeout_ms, silent_completion, status, exit_code,
+                      timeout_ms, silent_completion,
+                      tty, tty_rows, tty_cols, attached_user_at, attach_token,
+                      status, exit_code,
                       failure_kind, failure_detail, failure_extracted,
                       started_at, finished_at, total_bytes_emitted, bisect_count,
                       log_path, final_path, last_polled_at, last_seen_offset
@@ -232,7 +258,9 @@ impl BashJobRepo {
     ) -> Result<Vec<BashJobRow>, StorageError> {
         let mut qb = sqlx::QueryBuilder::new(
             "SELECT id, session_id, agent_id, description, command, command_key, cwd, \
-             timeout_ms, silent_completion, status, exit_code, \
+             timeout_ms, silent_completion, \
+             tty, tty_rows, tty_cols, attached_user_at, attach_token, \
+             status, exit_code, \
              failure_kind, failure_detail, failure_extracted, \
              started_at, finished_at, total_bytes_emitted, bisect_count, \
              log_path, final_path, last_polled_at, last_seen_offset \
@@ -274,7 +302,9 @@ impl BashJobRepo {
     pub async fn list_orphans(&self) -> Result<Vec<BashJobRow>, StorageError> {
         let rows = sqlx::query(
             r#"SELECT id, session_id, agent_id, description, command, command_key, cwd,
-                      timeout_ms, silent_completion, status, exit_code,
+                      timeout_ms, silent_completion,
+                      tty, tty_rows, tty_cols, attached_user_at, attach_token,
+                      status, exit_code,
                       failure_kind, failure_detail, failure_extracted,
                       started_at, finished_at, total_bytes_emitted, bisect_count,
                       log_path, final_path, last_polled_at, last_seen_offset
@@ -311,6 +341,13 @@ impl BashJobRepo {
             .map(|s| s.parse::<Timestamp>())
             .transpose()
             .map_err(|e| StorageError::Serialization(format!("last_polled_at: {e}")))?;
+        let attached_user_at: Option<String> = row.try_get("attached_user_at")?;
+        let attached_user_at = attached_user_at
+            .map(|s| s.parse::<Timestamp>())
+            .transpose()
+            .map_err(|e| StorageError::Serialization(format!("attached_user_at: {e}")))?;
+        let tty_rows: Option<i64> = row.try_get("tty_rows")?;
+        let tty_cols: Option<i64> = row.try_get("tty_cols")?;
         Ok(BashJobRow {
             id: row.try_get("id")?,
             session_id: row.try_get("session_id")?,
@@ -321,6 +358,11 @@ impl BashJobRepo {
             cwd: row.try_get("cwd")?,
             timeout_ms: row.try_get("timeout_ms")?,
             silent_completion: row.try_get::<i64, _>("silent_completion")? != 0,
+            tty: row.try_get::<i64, _>("tty")? != 0,
+            tty_rows: tty_rows.map(|v| v as u16),
+            tty_cols: tty_cols.map(|v| v as u16),
+            attached_user_at,
+            attach_token: row.try_get("attach_token")?,
             status: row.try_get("status")?,
             exit_code: row.try_get("exit_code")?,
             failure_kind: row.try_get("failure_kind")?,
@@ -335,6 +377,78 @@ impl BashJobRepo {
             last_polled_at,
             last_seen_offset: row.try_get("last_seen_offset")?,
         })
+    }
+
+    /// Mark a job as user-attached. Atomic — returns `AlreadyAttached` if
+    /// another attach is already live. Uses `UPDATE ... WHERE attached_user_at
+    /// IS NULL` and inspects rowcount.
+    pub async fn mark_attached(
+        &self,
+        job_id: &str,
+        token: Option<&str>,
+    ) -> Result<String, AttachStorageError> {
+        let token_owned = token.map(|s| s.to_string()).unwrap_or_else(|| {
+            // Defensive fallback — callers normally provide a token.
+            use rand::RngCore;
+            let mut buf = [0u8; 16];
+            rand::rng().fill_bytes(&mut buf);
+            base64::engine::Engine::encode(
+                &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+                buf,
+            )
+        });
+        let now = jiff::Timestamp::now().to_string();
+        let res = sqlx::query(
+            r#"UPDATE coding_background_jobs
+               SET attached_user_at = ?, attach_token = ?
+               WHERE id = ? AND attached_user_at IS NULL"#,
+        )
+        .bind(&now)
+        .bind(&token_owned)
+        .bind(job_id)
+        .execute(&self.pool)
+        .await
+        .map_err(StorageError::from)?;
+        if res.rows_affected() == 0 {
+            return Err(AttachStorageError::AlreadyAttached);
+        }
+        Ok(token_owned)
+    }
+
+    /// Clear attach state. Idempotent.
+    pub async fn clear_attached(&self, job_id: &str) -> Result<(), StorageError> {
+        sqlx::query(
+            r#"UPDATE coding_background_jobs
+               SET attached_user_at = NULL, attach_token = NULL
+               WHERE id = ?"#,
+        )
+        .bind(job_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Look up a job by attach token. Used by the WebSocket handler at
+    /// connection time before opening the bridge.
+    pub async fn find_by_attach_token(
+        &self,
+        token: &str,
+    ) -> Result<Option<BashJobRow>, StorageError> {
+        let row = sqlx::query(
+            r#"SELECT id, session_id, agent_id, description, command, command_key, cwd,
+                      timeout_ms, silent_completion,
+                      tty, tty_rows, tty_cols, attached_user_at, attach_token,
+                      status, exit_code,
+                      failure_kind, failure_detail, failure_extracted,
+                      started_at, finished_at, total_bytes_emitted, bisect_count,
+                      log_path, final_path, last_polled_at, last_seen_offset
+               FROM coding_background_jobs
+               WHERE attach_token = ?"#,
+        )
+        .bind(token)
+        .fetch_optional(&self.pool)
+        .await?;
+        row.as_ref().map(Self::map_row).transpose()
     }
 }
 
@@ -354,6 +468,11 @@ mod tests {
             cwd                   TEXT NOT NULL,
             timeout_ms            INTEGER NOT NULL,
             silent_completion     INTEGER NOT NULL DEFAULT 0,
+            tty                   INTEGER NOT NULL DEFAULT 0,
+            tty_rows              INTEGER,
+            tty_cols              INTEGER,
+            attached_user_at      TEXT,
+            attach_token          TEXT,
             status                TEXT NOT NULL,
             exit_code             INTEGER,
             failure_kind          TEXT,
@@ -366,9 +485,19 @@ mod tests {
             log_path              TEXT NOT NULL,
             final_path            TEXT,
             last_polled_at        TEXT,
-            last_seen_offset      INTEGER NOT NULL DEFAULT 0
+            last_seen_offset      INTEGER NOT NULL DEFAULT 0,
+            CHECK (tty IN (0, 1)),
+            CHECK (tty = 0 OR (tty_rows IS NOT NULL AND tty_cols IS NOT NULL)),
+            CHECK (attached_user_at IS NULL OR tty = 1),
+            CHECK ((attached_user_at IS NULL) = (attach_token IS NULL))
         );
         CREATE INDEX idx_cbj_session_status ON coding_background_jobs(session_id, status);
+        CREATE INDEX idx_cbj_active        ON coding_background_jobs(status) WHERE status IN ('Starting','Running');
+        CREATE INDEX idx_cbj_session_command_key
+            ON coding_background_jobs(session_id, command_key, started_at DESC);
+        CREATE INDEX idx_cbj_attached
+            ON coding_background_jobs(session_id, attached_user_at)
+            WHERE attached_user_at IS NOT NULL;
     "#;
 
     async fn setup() -> SqlitePool {
@@ -388,6 +517,11 @@ mod tests {
             cwd: "/tmp".into(),
             timeout_ms: 600_000,
             silent_completion: false,
+            tty: false,
+            tty_rows: None,
+            tty_cols: None,
+            attached_user_at: None,
+            attach_token: None,
             status: "Running".into(),
             exit_code: None,
             failure_kind: None,
@@ -574,6 +708,77 @@ mod tests {
 
         assert!(repo
             .find_prior_by_command_key("s2", "k1", "bash-x")
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn insert_pty_row_with_required_columns() {
+        let pool = setup().await;
+        let repo = BashJobRepo::new(pool);
+        let mut row = fixture_row("bash-aaaaaaaaaa", "s1", "ag1");
+        row.tty = true;
+        row.tty_rows = Some(24);
+        row.tty_cols = Some(80);
+        repo.insert(&row).await.expect("insert");
+        let got = repo.get("bash-aaaaaaaaaa").await.unwrap().expect("row");
+        assert!(got.tty);
+        assert_eq!(got.tty_rows, Some(24));
+        assert_eq!(got.tty_cols, Some(80));
+        assert!(got.attached_user_at.is_none());
+        assert!(got.attach_token.is_none());
+    }
+
+    #[tokio::test]
+    async fn mark_attached_atomic_rejects_second_attempt() {
+        let pool = setup().await;
+        let repo = BashJobRepo::new(pool);
+        let mut row = fixture_row("bash-bbbbbbbbbb", "s1", "ag1");
+        row.tty = true;
+        row.tty_rows = Some(24);
+        row.tty_cols = Some(80);
+        repo.insert(&row).await.unwrap();
+        let t1 = repo
+            .mark_attached("bash-bbbbbbbbbb", Some("tok1"))
+            .await
+            .expect("first attach ok");
+        assert_eq!(t1, "tok1");
+        let err = repo.mark_attached("bash-bbbbbbbbbb", Some("tok2")).await;
+        assert!(matches!(err, Err(AttachStorageError::AlreadyAttached)));
+    }
+
+    #[tokio::test]
+    async fn clear_attached_idempotent() {
+        let pool = setup().await;
+        let repo = BashJobRepo::new(pool);
+        let mut row = fixture_row("bash-cccccccccc", "s1", "ag1");
+        row.tty = true;
+        row.tty_rows = Some(24);
+        row.tty_cols = Some(80);
+        repo.insert(&row).await.unwrap();
+        repo.mark_attached("bash-cccccccccc", Some("tokX")).await.unwrap();
+        repo.clear_attached("bash-cccccccccc").await.unwrap();
+        repo.clear_attached("bash-cccccccccc").await.unwrap(); // idempotent
+        let got = repo.get("bash-cccccccccc").await.unwrap().unwrap();
+        assert!(got.attached_user_at.is_none());
+        assert!(got.attach_token.is_none());
+    }
+
+    #[tokio::test]
+    async fn find_by_attach_token_returns_row() {
+        let pool = setup().await;
+        let repo = BashJobRepo::new(pool);
+        let mut row = fixture_row("bash-dddddddddd", "s1", "ag1");
+        row.tty = true;
+        row.tty_rows = Some(24);
+        row.tty_cols = Some(80);
+        repo.insert(&row).await.unwrap();
+        repo.mark_attached("bash-dddddddddd", Some("topsecret")).await.unwrap();
+        let got = repo.find_by_attach_token("topsecret").await.unwrap();
+        assert_eq!(got.map(|r| r.id), Some("bash-dddddddddd".to_string()));
+        assert!(repo
+            .find_by_attach_token("wrong")
             .await
             .unwrap()
             .is_none());
