@@ -43,7 +43,7 @@ export function JobsPanel({ threadId }: Props) {
       </ul>
       {attachedJobId && (
         <div className="coding-jobs-panel__attach-pane">
-          <AttachTerminal threadId={threadId} jobId={attachedJobId} />
+          <AttachTerminal jobId={attachedJobId} />
         </div>
       )}
     </div>

@@ -7,7 +7,6 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 use storage::repos::BashJobRow;
-use tools_core::FailureKind;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct JobDiff {

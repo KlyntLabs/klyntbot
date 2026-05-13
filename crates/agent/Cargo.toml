@@ -51,6 +51,7 @@ tokio-util.workspace = true
 async-trait.workspace = true
 regex.workspace = true
 sha2.workspace = true
+hex.workspace = true
 dashmap = { workspace = true }
 parking_lot.workspace = true
 

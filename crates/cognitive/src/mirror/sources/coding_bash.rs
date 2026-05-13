@@ -191,10 +191,10 @@ pub fn build_attach_episode(
     let summary = match duration_ms {
         Some(ms) => format!(
             "User attached to `{}` for {:.1}s",
-            truncate(&row.command, 60),
+            common::helpers::truncate_at_boundary(&row.command, 60),
             ms as f64 / 1000.0
         ),
-        None => format!("User attached to `{}`", truncate(&row.command, 60)),
+        None => format!("User attached to `{}`", common::helpers::truncate_at_boundary(&row.command, 60)),
     }
     .chars()
     .take(160)
@@ -233,40 +233,29 @@ pub fn build_attach_episode(
 fn render_episode_summary(row: &BashJobRow, elapsed_ms: u64) -> String {
     let secs = elapsed_ms as f64 / 1000.0;
     match (row.status.as_str(), row.failure_kind.as_deref()) {
-        ("Completed", _) => format!("Passed `{}` in {:.1}s", truncate(&row.command, 60), secs),
+        ("Completed", _) => format!("Passed `{}` in {:.1}s", common::helpers::truncate_at_boundary(&row.command, 60), secs),
         ("Cancelled", _) => format!(
             "Cancelled `{}` after {:.1}s",
-            truncate(&row.command, 60),
+            common::helpers::truncate_at_boundary(&row.command, 60),
             secs
         ),
         ("Lost", _) => format!(
             "Lost `{}` (Klynt restarted mid-run)",
-            truncate(&row.command, 60)
+            common::helpers::truncate_at_boundary(&row.command, 60)
         ),
         ("Failed", Some(kind)) => format!(
             "{} in `{}` after {:.1}s",
             kind,
-            truncate(&row.command, 60),
+            common::helpers::truncate_at_boundary(&row.command, 60),
             secs
         ),
-        _ => format!("Bash job `{}` ended", truncate(&row.command, 60)),
+        _ => format!("Bash job `{}` ended", common::helpers::truncate_at_boundary(&row.command, 60)),
     }
     .chars()
     .take(160)
     .collect()
 }
 
-fn truncate(s: &str, n: usize) -> &str {
-    if s.len() <= n {
-        s
-    } else {
-        let mut end = n;
-        while !s.is_char_boundary(end) && end < s.len() {
-            end += 1;
-        }
-        &s[..end.min(s.len())]
-    }
-}
 
 #[cfg(test)]
 mod tests {

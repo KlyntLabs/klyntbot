@@ -15,6 +15,7 @@ use jiff::Timestamp;
 use klynt_pty::kill_process_group;
 use klynt_sandbox::MacOsSeatbeltRunner;
 use storage::repos::{BashJobRepo, BashJobRow};
+use tokio::io::AsyncSeekExt;
 use tokio::sync::{mpsc, RwLock};
 use tokio_util::sync::CancellationToken;
 use tools_core::{
@@ -93,6 +94,27 @@ pub struct JobSupervisor {
     sandbox: Arc<MacOsSeatbeltRunner>,
 }
 
+fn live_to_view(live: &LiveJob) -> JobView {
+    JobView {
+        id: live.id.clone(),
+        session_id: live.spec.session_id.clone(),
+        agent_id: live.spec.agent_id.clone(),
+        description: live.spec.description.clone(),
+        command: live.spec.command.clone(),
+        cwd: live.spec.cwd.clone(),
+        status: JobStatus::Running,
+        started_at: live.started_at,
+        finished_at: None,
+        exit_code: None,
+        gate_result: None,
+        failure_extracted: None,
+        total_bytes_emitted: live.ring.total_bytes_emitted(),
+        bisect_generation: live.ring.bisect_generation(),
+        last_polled_at: None,
+        last_seen_offset: 0,
+    }
+}
+
 impl std::fmt::Debug for JobSupervisor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("JobSupervisor")
@@ -128,27 +150,7 @@ impl JobSupervisor {
                 e.value().spec.session_id == session_id
                     && agent_chain.contains(&e.value().spec.agent_id)
             })
-            .map(|e| {
-                let live = e.value();
-                JobView {
-                    id: live.id.clone(),
-                    session_id: live.spec.session_id.clone(),
-                    agent_id: live.spec.agent_id.clone(),
-                    description: live.spec.description.clone(),
-                    command: live.spec.command.clone(),
-                    cwd: live.spec.cwd.clone(),
-                    status: JobStatus::Running,
-                    started_at: live.started_at,
-                    finished_at: None,
-                    exit_code: None,
-                    gate_result: None,
-                    failure_extracted: None,
-                    total_bytes_emitted: live.ring.total_bytes_emitted(),
-                    bisect_generation: live.ring.bisect_generation(),
-                    last_polled_at: None,
-                    last_seen_offset: 0,
-                }
-            })
+            .map(|e| live_to_view(e.value()))
             .collect()
     }
 
@@ -172,31 +174,27 @@ impl JobSupervisor {
                     .try_read()
                     .ok()
                     .and_then(|g| g.user_at);
-                let view = JobView {
-                    id: live.id.clone(),
-                    session_id: live.spec.session_id.clone(),
-                    agent_id: live.spec.agent_id.clone(),
-                    description: live.spec.description.clone(),
-                    command: live.spec.command.clone(),
-                    cwd: live.spec.cwd.clone(),
-                    status: JobStatus::Running,
-                    started_at: live.started_at,
-                    finished_at: None,
-                    exit_code: None,
-                    gate_result: None,
-                    failure_extracted: None,
-                    total_bytes_emitted: live.ring.total_bytes_emitted(),
-                    bisect_generation: live.ring.bisect_generation(),
-                    last_polled_at: None,
-                    last_seen_offset: 0,
-                };
-                (view, attached_at)
+                (live_to_view(live), attached_at)
             })
             .collect()
     }
 
     fn storage_err<T>(r: Result<T, storage::error::StorageError>) -> Result<T, JobError> {
         r.map_err(|e| JobError::Storage(e.to_string()))
+    }
+
+    fn get_live(&self, id: &JobId) -> Result<Arc<LiveJob>, JobError> {
+        self.jobs
+            .get(id)
+            .map(|e| e.value().clone())
+            .ok_or_else(|| JobError::NotFound(id.0.clone()))
+    }
+
+    fn get_live_pty(&self, id: &JobId) -> Result<Arc<LiveJob>, tools_core::AttachError> {
+        self.jobs
+            .get(id)
+            .map(|e| e.value().clone())
+            .ok_or_else(|| tools_core::AttachError::NotFound(id.0.clone()))
     }
 
     fn jobs_dir(&self) -> PathBuf {
@@ -208,10 +206,38 @@ impl JobSupervisor {
         if !path.exists() {
             return Ok(String::new());
         }
-        let bytes = tokio::fs::read(&path).await?;
-        let start = bytes.len().saturating_sub(max_bytes);
         use base64::engine::Engine;
-        Ok(base64::engine::general_purpose::STANDARD.encode(&bytes[start..]))
+        use tokio::io::AsyncReadExt;
+        let mut file = tokio::fs::File::open(&path).await?;
+        let len = file.metadata().await?.len() as usize;
+        let start = len.saturating_sub(max_bytes);
+        if start > 0 {
+            file.seek(std::io::SeekFrom::Start(start as u64)).await?;
+        }
+        let mut buf = vec![0u8; max_bytes.min(len)];
+        let n = file.read(&mut buf).await?;
+        Ok(base64::engine::general_purpose::STANDARD.encode(&buf[..n]))
+    }
+
+    /// Read the first `max_chars` and last `max_chars` from a file without
+    /// loading the whole thing into a single `String`.
+    async fn read_head_tail(path: &std::path::Path, max_chars: usize) -> std::io::Result<(String, String)> {
+        use tokio::io::AsyncReadExt;
+        let mut file = tokio::fs::File::open(path).await?;
+        let len = file.metadata().await?.len() as usize;
+        let mut head_buf = vec![0u8; max_chars.min(len)];
+        let n = file.read(&mut head_buf).await?;
+        let head = String::from_utf8_lossy(&head_buf[..n]).into_owned();
+
+        let tail_start = len.saturating_sub(max_chars);
+        let mut tail = String::new();
+        if tail_start < len {
+            file.seek(std::io::SeekFrom::Start(tail_start as u64)).await?;
+            let mut tail_buf = vec![0u8; len - tail_start];
+            let n = file.read(&mut tail_buf).await?;
+            tail = String::from_utf8_lossy(&tail_buf[..n]).into_owned();
+        }
+        Ok((head, tail))
     }
 
     pub fn log_path(&self, id: &JobId) -> PathBuf {
@@ -229,16 +255,23 @@ impl JobSupervisor {
             .map(|e| e.key().clone())
             .collect();
         let n = to_kill.len();
-        for id in to_kill {
-            // Defensively detach any live attach so the WebSocket gets a clean
-            // close frame before the process group dies. detach() is idempotent.
-            if let Err(e) = <Self as JobSupervisorHandle>::detach(self, &id).await {
-                tracing::debug!(job_id=%id.0, "detach during reap failed (ok if not attached): {e}");
-            }
-            if let Err(e) = self.stop(&id, "thread deleted").await {
-                tracing::warn!(job_id=%id.0, "reap_session stop failed: {}", e);
-            }
-        }
+        let futures: Vec<_> = to_kill
+            .into_iter()
+            .map(|id| {
+                let this = self.clone();
+                async move {
+                    // Defensively detach any live attach so the WebSocket gets a clean
+                    // close frame before the process group dies. detach() is idempotent.
+                    if let Err(e) = <Self as JobSupervisorHandle>::detach(&this, &id).await {
+                        tracing::debug!(job_id=%id.0, "detach during reap failed (ok if not attached): {e}");
+                    }
+                    if let Err(e) = this.stop(&id, "thread deleted").await {
+                        tracing::warn!(job_id=%id.0, "reap_session stop failed: {}", e);
+                    }
+                }
+            })
+            .collect();
+        futures_util::future::join_all(futures).await;
         Ok(n)
     }
 
@@ -425,23 +458,13 @@ impl JobSupervisor {
             tracing::warn!(job_id=%id.0, "ring finalize failed: {}", e);
         }
 
-        let final_bytes = match tokio::fs::read(&final_path).await {
-            Ok(b) => b,
+        let (head, tail) = match Self::read_head_tail(&final_path, 8000).await {
+            Ok((h, t)) => (h, t),
             Err(e) => {
                 tracing::warn!(job_id=%id.0, "failed to read final file: {}", e);
-                vec![]
+                (String::new(), String::new())
             }
         };
-        let final_str = String::from_utf8_lossy(&final_bytes);
-        let head = final_str.chars().take(8000).collect::<String>();
-        let tail = final_str
-            .chars()
-            .rev()
-            .take(8000)
-            .collect::<String>()
-            .chars()
-            .rev()
-            .collect::<String>();
 
         let result = GateClassifier::classify(
             &head,
@@ -552,7 +575,7 @@ impl JobSupervisor {
                 id,
                 &live.spec,
                 &result,
-                &final_str,
+                &tail,
                 diff.as_ref(),
             );
             self.queue.push(ContextUpdate {
@@ -653,18 +676,15 @@ impl JobSupervisorHandle for JobSupervisor {
         };
         let cancel = CancellationToken::new();
 
-        let handle = if spec.tty {
-            let rows = spec.tty_rows.unwrap_or(24);
-            let cols = spec.tty_cols.unwrap_or(80);
-            match crate::spawner::spawn_pty(&self.sandbox, &spec.command, &spec.cwd, rows, cols) {
-                Ok(h) => h,
-                Err(e) => {
-                    let _ = self.repo.delete(&id.0).await;
-                    return Err(JobError::Spawn(e.to_string()));
-                }
-            }
-        } else {
-            match spawn_background_command(&self.sandbox, &spec.command, &spec.cwd) {
+        let handle = {
+            let spawn_res = if spec.tty {
+                let rows = spec.tty_rows.unwrap_or(24);
+                let cols = spec.tty_cols.unwrap_or(80);
+                crate::spawner::spawn_pty(&self.sandbox, &spec.command, &spec.cwd, rows, cols)
+            } else {
+                spawn_background_command(&self.sandbox, &spec.command, &spec.cwd)
+            };
+            match spawn_res {
                 Ok(h) => h,
                 Err(e) => {
                     let _ = self.repo.delete(&id.0).await;
@@ -838,11 +858,7 @@ impl JobSupervisorHandle for JobSupervisor {
     }
 
     async fn stop(&self, id: &JobId, reason: &str) -> Result<JobView, JobError> {
-        let live = self
-            .jobs
-            .get(id)
-            .map(|e| e.value().clone())
-            .ok_or_else(|| JobError::NotFound(id.0.clone()))?;
+        let live = self.get_live(id)?;
         live.state.store(STATE_STOPPING, Ordering::Release);
 
         if let Some(pgid) = live.pgid {
@@ -879,11 +895,7 @@ impl JobSupervisorHandle for JobSupervisor {
     }
 
     async fn write_stdin(&self, id: &JobId, data: &[u8]) -> Result<usize, JobError> {
-        let live = self
-            .jobs
-            .get(id)
-            .map(|e| e.value().clone())
-            .ok_or_else(|| JobError::NotFound(id.0.clone()))?;
+        let live = self.get_live(id)?;
         let writer = match &live.backend {
             ChildBackend::Process => return Err(JobError::NotPty),
             ChildBackend::Pty { writer, .. } => writer.clone(),
@@ -906,13 +918,9 @@ impl JobSupervisorHandle for JobSupervisor {
     }
 
     async fn resize(&self, id: &JobId, rows: u16, cols: u16) -> Result<(), JobError> {
-        let rows = rows.clamp(4, 200);
-        let cols = cols.clamp(20, 400);
-        let live = self
-            .jobs
-            .get(id)
-            .map(|e| e.value().clone())
-            .ok_or_else(|| JobError::NotFound(id.0.clone()))?;
+        let rows = rows.clamp(tools_core::PTY_ROWS_MIN, tools_core::PTY_ROWS_MAX);
+        let cols = cols.clamp(tools_core::PTY_COLS_MIN, tools_core::PTY_COLS_MAX);
+        let live = self.get_live(id)?;
         let (master, r_atom, c_atom) = match &live.backend {
             ChildBackend::Process => return Err(JobError::NotPty),
             ChildBackend::Pty { master, rows, cols, .. } => (master.clone(), rows, cols),
@@ -934,11 +942,7 @@ impl JobSupervisorHandle for JobSupervisor {
     }
 
     async fn attach(&self, id: &JobId) -> Result<tools_core::AttachHandle, tools_core::AttachError> {
-        let live = self
-            .jobs
-            .get(id)
-            .map(|e| e.value().clone())
-            .ok_or_else(|| tools_core::AttachError::NotFound(id.0.clone()))?;
+        let live = self.get_live_pty(id)?;
         if !live.backend.is_pty() {
             return Err(tools_core::AttachError::NotPty);
         }
@@ -990,11 +994,7 @@ impl JobSupervisorHandle for JobSupervisor {
     }
 
     async fn detach(&self, id: &JobId) -> Result<(), tools_core::AttachError> {
-        let live = self
-            .jobs
-            .get(id)
-            .map(|e| e.value().clone())
-            .ok_or_else(|| tools_core::AttachError::NotFound(id.0.clone()))?;
+        let live = self.get_live_pty(id)?;
         let started_at = {
             let mut state = live.attach.write().await;
             let ts = state.user_at.take();
@@ -1026,11 +1026,7 @@ impl JobSupervisorHandle for JobSupervisor {
         id: &JobId,
         tx: tokio::sync::mpsc::UnboundedSender<Vec<u8>>,
     ) -> Result<(), tools_core::AttachError> {
-        let live = self
-            .jobs
-            .get(id)
-            .map(|e| e.value().clone())
-            .ok_or_else(|| tools_core::AttachError::NotFound(id.0.clone()))?;
+        let live = self.get_live_pty(id)?;
         live.attach.write().await.ws_tx = Some(tx);
         Ok(())
     }
@@ -1049,7 +1045,7 @@ fn drain_reader_with_attach<R: tokio::io::AsyncRead + Unpin + Send>(
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => {
-                    eprintln!("[drain] cancelled");
+                    tracing::debug!("[drain] cancelled");
                     return Ok(());
                 }
                 n = reader.read(&mut buf) => match n {
@@ -1057,8 +1053,11 @@ fn drain_reader_with_attach<R: tokio::io::AsyncRead + Unpin + Send>(
                     Ok(n) => {
                         ring.append(&buf[..n]).await?;
                         // Fork to attach WS if a live attachment exists.
-                        let guard = attach.read().await;
-                        if let Some(tx) = guard.ws_tx.as_ref() {
+                        let tx = {
+                            let guard = attach.read().await;
+                            guard.ws_tx.clone()
+                        };
+                        if let Some(tx) = tx {
                             // UnboundedSender::send only fails on closed receiver;
                             // we drop in that case (the bridge will clean up on next call).
                             let _ = tx.send(buf[..n].to_vec());

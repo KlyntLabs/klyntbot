@@ -296,6 +296,13 @@ pub trait JobSupervisorHandle: Send + Sync + std::fmt::Debug {
     }
 }
 
+/// PTY dimension clamps shared across the spawn path, resize tool, and
+/// schema validation.
+pub const PTY_ROWS_MIN: u16 = 4;
+pub const PTY_ROWS_MAX: u16 = 200;
+pub const PTY_COLS_MIN: u16 = 20;
+pub const PTY_COLS_MAX: u16 = 400;
+
 pub type DynJobSupervisor = Arc<dyn JobSupervisorHandle>;
 
 #[cfg(test)]

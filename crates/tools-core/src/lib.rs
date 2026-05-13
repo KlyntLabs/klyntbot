@@ -32,7 +32,8 @@ pub use feature::{FeatureMigration, FeaturePackage, HealthStatus};
 pub use interceptor::{InterceptorChain, ToolCallInterceptor};
 pub use job_supervisor::{
     AttachError, AttachHandle, DynJobSupervisor, FailureKind, GateResult, JobError, JobId, JobSpec,
-    JobStatus, JobSupervisorHandle, JobView, RingRead,
+    JobStatus, JobSupervisorHandle, JobView, RingRead, PTY_COLS_MAX, PTY_COLS_MIN, PTY_ROWS_MAX,
+    PTY_ROWS_MIN,
 };
 pub use metadata::{CostHint, ToolCategory, ToolMetadata, ToolSource};
 pub use pagination::Page;

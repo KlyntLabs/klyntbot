@@ -19,6 +19,7 @@ jiff.workspace = true
 uuid.workspace = true
 sqlx.workspace = true
 sha2.workspace = true
+hex.workspace = true
 
 [dev-dependencies]
 cognitive.workspace = true

@@ -40,7 +40,7 @@ pub async fn build_all_skill_trees(
         }
     }
 
-    Ok(hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect())
+    Ok(hex::encode(hasher.finalize()))
 }
 
 #[cfg(test)]

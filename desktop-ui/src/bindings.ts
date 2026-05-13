@@ -671,7 +671,7 @@ async codingJobOpenLog(jobId: string) : Promise<Result<OpenLogResult, ApiError>>
     else return { status: "error", error: e  as any };
 }
 },
-async codingJobAttach(jobId: string) : Promise<Result<CodingJobAttachResult, ApiError>> {
+async codingJobAttach(jobId: string) : Promise<Result<AttachResult, ApiError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("coding_job_attach", { jobId }) };
 } catch (e) {
@@ -4931,6 +4931,7 @@ export type AreaResponse = { id: string; name: string; color: string; icon: stri
 export type AreaUpdateParams = { id: string; name: string | null; color: string | null; icon: string | null }
 export type ArgKind = { type: "text" } | { type: "number" } | { type: "choice"; values: string[] }
 export type ArgSpec = { name: string; placeholder: string; kind: ArgKind; required?: boolean }
+export type AttachResult = { wsUrl: string; rows: number; cols: number; tailB64: string }
 /**
  * Audio device listing for settings UI.
  */
@@ -5523,7 +5524,6 @@ export type ObjectiveResponse = { id: string; title: string; status: string; pro
 export type ObjectiveSummaryResponse = { id: string; title: string; progress: number; status: string }
 export type ObjectiveUpdateParams = { id: string; title: string | null; description: string | null; status: string | null; priority: number | null; dueDate: string | null }
 export type OpenLogResult = { opened: boolean }
-export type CodingJobAttachResult = { wsUrl: string; rows: number; cols: number; tailB64: string }
 export type PendingMemoryResponse = { id: string; fact: unknown; reason: string; createdAt: string }
 export type Pin = { item_id: string; kind: string; position: number }
 /**

@@ -375,6 +375,6 @@ impl InsightService {
     /// Compute input hash for cache check (same algorithm as before).
     pub fn compute_input_hash(note_title: &str, note_body: &str, related_ids: &[String]) -> String {
         let hash_input = format!("{}{}{}", note_title, note_body, related_ids.join(","));
-        Sha256::digest(hash_input.as_bytes()).iter().map(|b| format!("{:02x}", b)).collect()
+        hex::encode(Sha256::digest(hash_input.as_bytes()))
     }
 }

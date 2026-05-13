@@ -10,6 +10,7 @@ common = { path = "../common" }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 sha2 = { workspace = true }
+hex.workspace = true
 async-trait = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]

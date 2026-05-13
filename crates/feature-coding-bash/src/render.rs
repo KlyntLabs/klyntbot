@@ -178,11 +178,10 @@ pub struct VerificationAffordance<'a> {
 pub fn attach_handoff_reminder(items: &[(JobView, Timestamp)]) -> String {
     let mut s = String::from("<system-reminder>\n");
     s.push_str("The user is currently attached to the following PTY jobs:\n");
+    let tz = jiff::tz::TimeZone::system();
     for (j, attached_at) in items {
         // Local time render.
-        let local = attached_at
-            .to_zoned(jiff::tz::TimeZone::system())
-            .strftime("%H:%M");
+        let local = attached_at.to_zoned(tz.clone()).strftime("%H:%M");
         s.push_str(&format!(
             "- {} ({}) — attached at {} local\n",
             j.id.as_str(),

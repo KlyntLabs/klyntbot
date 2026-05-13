@@ -11,6 +11,8 @@ use tracing::{info, warn};
 
 use crate::dev_server::DevState;
 
+pub use feature_coding_bash::attach::ControlFrame;
+
 #[derive(Deserialize)]
 pub struct AttachQuery {
     token: String,
@@ -97,15 +99,13 @@ async fn run_attach(
                         .map_err(|e| format!("write_stdin failed: {e}"))?;
                 }
                 axum::extract::ws::Message::Text(s) => {
-                    if let Ok(frame) = serde_json::from_str::<ControlFrame>(&s) {
-                        match frame {
-                            ControlFrame::Resize { rows, cols } => {
-                                supervisor2
-                                    .resize(&job_id2, rows, cols)
-                                    .await
-                                    .map_err(|e| format!("resize failed: {e}"))?;
-                            }
-                        }
+                    if let Ok(ControlFrame::Resize { rows, cols }) =
+                        serde_json::from_str::<ControlFrame>(&s)
+                    {
+                        supervisor2
+                            .resize(&job_id2, rows, cols)
+                            .await
+                            .map_err(|e| format!("resize failed: {e}"))?;
                     } else {
                         supervisor2
                             .write_stdin(&job_id2, s.as_bytes())
@@ -130,9 +130,4 @@ async fn run_attach(
     Ok(())
 }
 
-#[derive(serde::Deserialize)]
-#[serde(tag = "kind")]
-enum ControlFrame {
-    #[serde(rename = "resize")]
-    Resize { rows: u16, cols: u16 },
-}
+

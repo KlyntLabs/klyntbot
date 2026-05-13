@@ -7,25 +7,7 @@ pub struct OpenLogResult {
     pub opened: bool,
 }
 
-#[derive(serde::Serialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct CodingJobAttachResult {
-    pub ws_url: String,
-    pub rows: u16,
-    pub cols: u16,
-    pub tail_b64: String,
-}
-
-impl From<app_core::handlers::coding_jobs::AttachResult> for CodingJobAttachResult {
-    fn from(r: app_core::handlers::coding_jobs::AttachResult) -> Self {
-        Self {
-            ws_url: r.ws_url,
-            rows: r.rows,
-            cols: r.cols,
-            tail_b64: r.tail_b64,
-        }
-    }
-}
+pub type CodingJobAttachResult = app_core::handlers::coding_jobs::AttachResult;
 
 #[klynt_command]
 pub async fn coding_job_list(
@@ -76,7 +58,6 @@ pub async fn coding_job_attach(job_id: String) -> CodingJobAttachResult {
         .coding_job_attach(&job_id)
         .await
         .map_err(ApiError::from)
-        .map(Into::into)
 }
 
 #[klynt_command]

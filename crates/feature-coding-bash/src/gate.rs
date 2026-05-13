@@ -64,7 +64,9 @@ pub fn strip_ansi(input: &str) -> String {
         input
     };
     let mut parser = vte::Parser::new();
-    let mut perform = AnsiStripPerform::default();
+    let mut perform = AnsiStripPerform {
+        out: String::with_capacity(bounded.len()),
+    };
     for byte in bounded.bytes() {
         parser.advance(&mut perform, byte);
     }

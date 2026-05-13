@@ -13,7 +13,7 @@ use tools_core::{AttachError, JobId, JobSupervisorHandle};
 
 #[derive(serde::Deserialize)]
 #[serde(tag = "kind")]
-enum ControlFrame {
+pub enum ControlFrame {
     #[serde(rename = "resize")]
     Resize { rows: u16, cols: u16 },
 }

@@ -1,12 +1,12 @@
 //! PTY backend powered by `portable-pty`. Bridges its blocking Read/Write to
 //! async via `spawn_blocking` adapters.
 
-use std::io::{Read, Write};
+use std::io::Read;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::io::{AsyncRead, ReadBuf};
 use tokio::sync::{mpsc, Mutex};
 
 use crate::{BackgroundCommandHandle, ChildHandle, PtyError};
@@ -76,52 +76,6 @@ impl AsyncRead for BlockingReaderToAsync {
             self.cursor = new_cursor;
         }
         Poll::Ready(Ok(()))
-    }
-}
-
-/// Wrap a `std::io::Write` (blocking) as a tokio `AsyncWrite`.
-pub struct BlockingWriterToAsync {
-    writer: Arc<Mutex<Box<dyn Write + Send>>>,
-}
-
-impl BlockingWriterToAsync {
-    pub fn new<W: Write + Send + 'static>(writer: W) -> Self {
-        Self {
-            writer: Arc::new(Mutex::new(Box::new(writer))),
-        }
-    }
-}
-
-impl AsyncWrite for BlockingWriterToAsync {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        let writer = self.writer.clone();
-        let bytes = buf.to_vec();
-        // Synchronously try to acquire the lock; if contended, spin-wait briefly.
-        // PTY writes are short; this matches portable-pty's intended use.
-        let mut guard = match writer.try_lock() {
-            Ok(g) => g,
-            Err(_) => return Poll::Pending,
-        };
-        let n = guard.write(&bytes)?;
-        Poll::Ready(Ok(n))
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        let writer = self.writer.clone();
-        let mut guard = match writer.try_lock() {
-            Ok(g) => g,
-            Err(_) => return Poll::Pending,
-        };
-        guard.flush()?;
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        self.poll_flush(cx)
     }
 }
 

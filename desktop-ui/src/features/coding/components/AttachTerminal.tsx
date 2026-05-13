@@ -3,13 +3,11 @@ import { useAttachSession } from "@/features/coding/hooks/useAttachSession";
 
 interface Props {
   jobId: string;
-  threadId: string;
 }
 
-export function AttachTerminal({ jobId, threadId }: Props) {
+export function AttachTerminal({ jobId }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const { ws, handle, error } = useAttachSession({
-    threadId,
     jobId,
     enabled: true,
   });

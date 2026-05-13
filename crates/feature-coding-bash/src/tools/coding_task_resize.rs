@@ -52,8 +52,8 @@ impl tools_core::ToolExecute for CodingTaskResizeTool {
         Ok(format!(
             "Resized {} to {} rows × {} cols.",
             id.as_str(),
-            args.rows.clamp(4, 200),
-            args.cols.clamp(20, 400)
+            args.rows.clamp(tools_core::PTY_ROWS_MIN, tools_core::PTY_ROWS_MAX),
+            args.cols.clamp(tools_core::PTY_COLS_MIN, tools_core::PTY_COLS_MAX)
         ))
     }
 }

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttachTerminal } from "./AttachTerminal";
 
@@ -77,7 +77,7 @@ describe("AttachTerminal", () => {
       tailB64: btoa("prev output\n"),
     });
     invokeMock.mockResolvedValue(undefined); // for detach
-    render(<AttachTerminal threadId="t1" jobId="bash-x" />);
+    render(<AttachTerminal jobId="bash-x" />);
     await new Promise((r) => setTimeout(r, 50));
     expect(invokeMock).toHaveBeenCalledWith("coding_job_attach", {
       jobId: "bash-x",
@@ -94,7 +94,7 @@ describe("AttachTerminal", () => {
       tailB64: "",
     });
     invokeMock.mockResolvedValue(undefined);
-    render(<AttachTerminal threadId="t1" jobId="bash-x" />);
+    render(<AttachTerminal jobId="bash-x" />);
     await new Promise((r) => setTimeout(r, 50));
     const ws = FakeWS.instances[0];
     expect(ws).toBeDefined();
@@ -110,7 +110,7 @@ describe("AttachTerminal", () => {
       tailB64: "",
     });
     invokeMock.mockResolvedValue(undefined);
-    render(<AttachTerminal threadId="t1" jobId="bash-x" />);
+    render(<AttachTerminal jobId="bash-x" />);
     await new Promise((r) => setTimeout(r, 50));
     onResizeCallbacks[0]({ rows: 30, cols: 120 });
     const ws = FakeWS.instances[0];

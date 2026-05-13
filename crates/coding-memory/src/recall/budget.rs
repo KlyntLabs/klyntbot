@@ -50,9 +50,15 @@ impl TokenBudgeter for HeuristicBudgeter {
 }
 
 /// `tiktoken-rs` cl100k_base counter. Constructed lazily — encoding load can fail.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TiktokenBudgeter {
     bpe: std::sync::Arc<tiktoken_rs::CoreBPE>,
+}
+
+impl std::fmt::Debug for TiktokenBudgeter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TiktokenBudgeter").finish_non_exhaustive()
+    }
 }
 
 impl TiktokenBudgeter {

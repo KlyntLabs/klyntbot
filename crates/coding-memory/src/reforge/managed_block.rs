@@ -101,7 +101,7 @@ impl ManagedBlock {
     pub fn inside_hash(&self) -> String {
         let mut hasher = Sha256::new();
         hasher.update(self.inside.as_bytes());
-        hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect()
+        hex::encode(hasher.finalize())
     }
 
     /// Atomic write: replace the inside body with `new_body` and stamp `cycle_id` in the start marker.

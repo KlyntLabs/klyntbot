@@ -195,12 +195,24 @@ impl BashTool {
             }
         };
         let tty_rows = if tty {
-            Some(clamp(args.tty_rows.unwrap_or(24), 4, 200, "tty_rows", &mut warnings))
+            Some(clamp(
+                args.tty_rows.unwrap_or(24),
+                tools_core::PTY_ROWS_MIN,
+                tools_core::PTY_ROWS_MAX,
+                "tty_rows",
+                &mut warnings,
+            ))
         } else {
             None
         };
         let tty_cols = if tty {
-            Some(clamp(args.tty_cols.unwrap_or(80), 20, 400, "tty_cols", &mut warnings))
+            Some(clamp(
+                args.tty_cols.unwrap_or(80),
+                tools_core::PTY_COLS_MIN,
+                tools_core::PTY_COLS_MAX,
+                "tty_cols",
+                &mut warnings,
+            ))
         } else {
             None
         };

@@ -1,31 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@/api/client";
-
-interface AttachHandle {
-  wsUrl: string;
-  rows: number;
-  cols: number;
-  tailB64: string;
-}
+import type { AttachResult } from "@/bindings";
 
 interface UseAttachSessionArgs {
-  threadId: string;
   jobId: string;
   enabled: boolean;
 }
 
 interface UseAttachSessionResult {
   ws: WebSocket | null;
-  handle: AttachHandle | null;
+  handle: AttachResult | null;
   error: string | null;
 }
 
 export function useAttachSession({
-  threadId,
   jobId,
   enabled,
 }: UseAttachSessionArgs): UseAttachSessionResult {
-  const [handle, setHandle] = useState<AttachHandle | null>(null);
+  const [handle, setHandle] = useState<AttachResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [wsState, setWsState] = useState<WebSocket | null>(null);
@@ -35,7 +27,7 @@ export function useAttachSession({
     let cancelled = false;
     (async () => {
       try {
-        const h = await invoke<AttachHandle>("coding_job_attach", {
+        const h = await invoke<AttachResult>("coding_job_attach", {
           jobId,
         });
         if (cancelled) return;
@@ -63,7 +55,7 @@ export function useAttachSession({
         /* ignore — bridge auto-detaches on WS close */
       });
     };
-  }, [threadId, jobId, enabled]);
+  }, [jobId, enabled]);
 
   return { ws: wsState, handle, error };
 }
