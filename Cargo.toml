@@ -135,7 +135,7 @@ core-media-rs = "0.3"
 core-video-rs = "0.3"
 landlock = "0.4"
 nix = { version = "0.31", features = ["process"] }
-tauri = { version = "2.11", features = ["macos-private-api", "tray-icon", "image-png"] }
+tauri = { version = "2.11", features = ["macos-private-api", "tray-icon", "image-png", "devtools"] }
 tauri-build = { version = "2.6", features = [] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"

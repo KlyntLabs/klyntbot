@@ -210,11 +210,14 @@ export default defineConfig({
           }
           if (
             id.includes("node_modules/lucide-react") ||
-            id.includes("node_modules/@tanstack/react-virtual") ||
-            id.includes("node_modules/prismjs")
+            id.includes("node_modules/@tanstack/react-virtual")
           ) {
             return "vendor-ui";
           }
+          // prismjs intentionally NOT split: its components/prism-*.js files
+          // reference a global `Prism` that utils/prism-init.ts assigns. Keep
+          // them in the same chunk as the importer so ESM evaluation order
+          // (init runs before language components) is preserved.
           if (id.includes("node_modules/@xterm")) {
             return "vendor-xterm";
           }
