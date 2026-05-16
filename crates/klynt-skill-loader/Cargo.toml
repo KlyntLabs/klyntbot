@@ -7,9 +7,9 @@ description = "Klynt skill discovery + paths-conditional activation + dynamic di
 
 [dependencies]
 async-trait = { workspace = true }
-common = { path = "../common" }
-config = { path = "../config" }
-skill-system = { path = "../skill-system" }
+common = { workspace = true }
+config = { workspace = true }
+skill-system = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml.workspace = true

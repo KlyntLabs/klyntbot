@@ -76,21 +76,25 @@ Browser-only dev: run `cd desktop-ui && bun run dev` then `cargo tauri dev` (whi
 
 Rust personal AI agent — single binary connecting 6+ chat platforms to LLMs with task/project management and persistent memory. All state in SQLite + LanceDB.
 
-### Workspace (39 crates, 9 layers)
+### Workspace (66 crates / packages, 14 subsystems)
+
+> **Authoritative architecture docs are in `docs/architecture/`** — 14 subsystems, 11 critical-crate deep-dives, and a tech-debt inventory. The layer summary below is a quick reference; if it disagrees with `docs/architecture/`, the docs win.
 
 ```
 L0: common, platform-macos, platform-input, platform-capture — KlyntbotError, MessageRole, ChannelName, ChatId, SessionKey; macOS native APIs (pasteboard, window mgmt, computer-use input + capture); platform-neutral input/capture trait crates
 L1: config, bus, tools-core, tools-core-macros, analytics — Config (camelCase JSON), message bus, Tool/FeaturePackage traits, derive macros, FIRE/Monte Carlo analytics
-L2: storage               — SqlitePool, migrations, *Repo structs, *Row types
-L3: providers, session, scheduling, context_engine, skill-system — LLM clients, session persistence, cron, token budgets, skill discovery/routing
-L4: tools, feature-tasks, feature-finance, feature-notes, feature-productivity, feature-coaching, feature-insights, feature-launcher, feature-learning (flashcard generation), feature-language-learning (pronunciation, practice sessions, exam tracking), activity-log, notifications (AlarmFired subscriber, quiet hours, held release, multi-channel fan-out), plugin-runtime, autotuner, voice-engine, simulator — 20+ tools, feature packages, WASM plugins, self-optimization experiments, voice synthesis, agent simulation
+L2: storage, session       — SqlitePool, migrations, *Repo structs, *Row types; session facade
+L3: providers, scheduling, context_engine, skill-system — LLM clients, cron, token budgets, skill discovery/routing
+L4: tools, feature-tasks, feature-finance, feature-notes, feature-productivity, feature-coaching, feature-insights, feature-launcher, feature-learning, feature-language-learning, feature-alarms, feature-coding-bash, feature-coding-todo, activity-log, notifications, plugin-runtime, plugin-sdk, autotuner, voice-engine — tools, feature packages, WASM plugins, self-optimization, voice synthesis
 L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/Slack/Email), agent runtime, cognitive memory (episodic/semantic extraction, spaced repetition via FSRS5, salience decay, reflection, reforge)
-L6: mcp                   — MCP server/client
-L7: app-core, desktop-shared, desktop — Application core (shared handlers), Tauri desktop app
+L6: mcp, mcp-bridge        — MCP server/client, Unix-socket bridge
+L7: app-core, desktop-shared, desktop, desktop-macros, desktop-ui — Application core, Tauri desktop app, React frontend
 L8: klyntbot, klyntbot-server — Re-export facade, standalone MCP server binary
+L9: kca-bench, kca-e2e     — Validation benchmarks and end-to-end tests
+Coding: klynt-core, coding-ingest, coding-memory, coding-agents-md, klynt-protocol, klynt-hooks, klynt-execpolicy, klynt-skill-loader, klynt-pty, klynt-git-utils, klynt-truncation, klynt-sandbox, klynt-sandbox-helper, klynt-process-hardening, lsp-client — 14 crates for Claude-Code-style coding mode
 ```
 
-Dependencies flow strictly upward. `plugin-sdk` and `tests/fixtures/hello_plugin` excluded from workspace.
+Dependencies flow strictly upward (with one known upward anomaly: `storage` → `ai-core`). `plugin-sdk` and `tests/fixtures/hello_plugin` are excluded from workspace. See `docs/architecture/00-overview.md` for the canonical 14-subsystem model.
 
 ### Storage
 

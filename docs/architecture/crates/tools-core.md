@@ -332,13 +332,14 @@ Concrete impl lives in `feature-coding-bash`. Tools reach it via `RoutingContext
 ```rust
 #[async_trait]
 pub trait ToolCallInterceptor: Send + Sync {
-    async fn before(
+    async fn before_call(
         &self, name: &str, args: &mut Value, ctx: &RoutingContext,
     ) -> Result<InterceptorOutcome>;
 
-    async fn after(
-        &self, name: &str, result: &mut String, ctx: &RoutingContext,
-    ) -> Result<()>;
+    /// Optional post-execution check. Default is a no-op.
+    async fn check(&self, name: &str, result: &str, ctx: &RoutingContext) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub enum InterceptorOutcome {
@@ -351,12 +352,9 @@ pub struct InterceptorChain { /* Vec<Arc<dyn ToolCallInterceptor>> */ }
 impl InterceptorChain {
     pub fn new() -> Self;
     pub fn add(&mut self, interceptor: Arc<dyn ToolCallInterceptor>);
-    pub async fn run_before(
+    pub async fn check(
         &self, name: &str, args: &mut Value, ctx: &RoutingContext,
     ) -> Result<InterceptorOutcome>;
-    pub async fn run_after(
-        &self, name: &str, result: &mut String, ctx: &RoutingContext,
-    ) -> Result<()>;
 }
 ```
 
@@ -543,7 +541,7 @@ Tools declare `allowed_channels` via `common::ChannelMask` bitfield. Variants: `
 2. ExecutionCore (agent crate):
    - registry.prepare(name, args, ctx)
      → tool found + params valid → returns DynTool
-3. InterceptorChain.run_before(name, args, ctx)
+3. InterceptorChain.check(name, args, ctx)
    → Continue / Replace / Reject
 4. ApprovalGate (approval crate):
    - class  = tool.approval_class(&args)
@@ -553,8 +551,7 @@ Tools declare `allowed_channels` via `common::ChannelMask` bitfield. Variants: `
    - If no grant: prompt via ApprovalChannel
    - Returns Allow / Deny / Cancel
 5. tool.execute(args, ctx) — runs to completion
-6. InterceptorChain.run_after(name, result, ctx)
-7. ToolOutput::parse(result)
+6. ToolOutput::parse(result)
    - __STRUCTURED__ → Structured { summary, data }
    - else           → Text(result)
 8. Emit ToolEvent::Completed via ctx.event_tx
@@ -746,19 +743,13 @@ struct MyInterceptor;
 
 #[async_trait]
 impl ToolCallInterceptor for MyInterceptor {
-    async fn before(&self, name: &str, args: &mut Value, ctx: &RoutingContext)
+    async fn before_call(&self, name: &str, args: &mut Value, ctx: &RoutingContext)
         -> Result<InterceptorOutcome>
     {
         if name == "bash" {
             tracing::info!(?args, "intercepted bash call");
         }
         Ok(InterceptorOutcome::Continue)
-    }
-
-    async fn after(&self, name: &str, result: &mut String, ctx: &RoutingContext)
-        -> Result<()>
-    {
-        Ok(())
     }
 }
 

@@ -203,13 +203,13 @@ pub struct RecurrenceTemplate {
 }
 pub trait TemplateRepo: Send + Sync {
     async fn get(&self, id: &str) -> Result<Option<RecurrenceTemplate>>;
-    async fn update_next_instance(&self, id: &str, next: Timestamp) -> Result<()>;
-    async fn decrement_count(&self, id: &str) -> Result<()>;
+    async fn update_next_instance(&self, id: &str, next: Option<Timestamp>) -> Result<()>;
+    async fn decrement_count(&self, id: &str) -> Result<Option<u32>>;
     async fn disable(&self, id: &str) -> Result<()>;
 }
 pub trait InstanceRepo: Send + Sync {
-    async fn create_instance(&self, template_id: &str, due_at: Timestamp) -> Result<String>;
-    async fn cancel_unfired_instances(&self, template_id: &str) -> Result<u64>;
+    async fn create_instance(&self, template_id: &str, due_at: Timestamp) -> Result<CreateInstanceOutcome>;
+    async fn cancel_unfired_instances(&self, template_id: &str) -> Result<()>;
 }
 pub struct RecurrenceEngine { ... }
 impl RecurrenceEngine {

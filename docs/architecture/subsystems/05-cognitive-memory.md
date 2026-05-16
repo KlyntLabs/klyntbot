@@ -11,7 +11,7 @@
 
 Klyntbot's memory system. **`cognitive`** is the largest single crate in the workspace and the most intricate: it implements semantic + episodic memory, FSRS-5 spaced repetition, Louvain community detection (394-line first-party impl), Personalized PageRank retrieval (404-line first-party impl), the reforge nightly cycle (16 phase markers, 3 LLM calls at the handler level, 6 extension hook traits), and the mirror engine (8–10 signal sources feeding a self-reflection facade). **`ai-core`** is the trait system that lets feature crates declare LLM-routable events / entities / recall providers with minimal boilerplate; **`ai-core-macros`** generates the impls. **`autotuner`** runs A/B-style trials on agent parameters (prompts, weights, thresholds) with constraint-based promotion.
 
-This is also the subsystem with the most env-gated feature flags (`KCA_*`) and the deepest extension surface — `run_reforge` alone takes 26 parameters, many of which are `Option<&dyn Trait>` hooks.
+This is also the subsystem with the most env-gated feature flags (`KCA_*`) and the deepest extension surface — `run_reforge` alone takes 25 parameters, many of which are `Option<&dyn Trait>` hooks.
 
 ---
 
@@ -41,7 +41,7 @@ flowchart TB
     FSR[FSRS-5<br/><i>pure math, 19 weights</i>]:::serv
     DEC[decay.rs<br/><i>retrieval-side retrievability<br/>12-factor RelevanceWeights</i>]:::serv
 
-    RUN[run_reforge<br/><i>16 phase markers · 3 LLM calls<br/>26-parameter signature</i>]:::refor
+    RUN[run_reforge<br/><i>16 phase markers · 3 LLM calls<br/>25-parameter signature</i>]:::refor
     RH[ReforgeHandler]:::refor
     AB1[AutotunerBridge<br/><i>reforge</i>]:::refor
     GEH[GraphEnrichmentHandler]:::refor
@@ -237,7 +237,7 @@ pub enum Aggregation { Avg, Sum, Count }
 | 7 | Compact | No | — | Trim retired data; rebuild indexes |
 | 7.7 | Compression | No (deterministic dedup) | — | Env-gated `KCA_REFORGE_COMPRESS=1`. Comment notes "Phase C will add LLM merge." |
 
-`run_reforge` has a **26-parameter signature** — many of those parameters are `Option<&dyn Trait>` extension hooks. The cycle degrades gracefully when hooks aren't installed. See [Open questions & debt](#open-questions--debt) for the API-shape concern.
+`run_reforge` has a **25-parameter signature** — many of those parameters are `Option<&dyn Trait>` extension hooks. The cycle degrades gracefully when hooks aren't installed. See [Open questions & debt](#open-questions--debt) for the API-shape concern.
 
 ### Mirror signal sources
 
@@ -388,7 +388,7 @@ Phase 6.5 (Graph Consolidation) and 6.5b (Community Intelligence) only run if th
 
 ## Internals
 
-### Why `run_reforge` has 26 parameters
+### Why `run_reforge` has 25 parameters
 
 The cycle was originally a tight 8-phase function. As community-intelligence, graph-enrichment, coding-specific phases, cross-CLI transfer, and skill discovery were added as **extension points** rather than core logic, each landed as a new `Option<&dyn Trait>` parameter. The current signature reflects this organic growth.
 
@@ -474,7 +474,7 @@ The `SkillFileManager` root is passed in at construction time; not hard-coded.
 
 ## Open questions & debt
 
-- **`run_reforge`'s 26-parameter signature** is a code smell. Refactor to `ReforgeContext` builder.
+- **`run_reforge`'s 25-parameter signature** is a code smell. Refactor to `ReforgeContext` builder.
 - **File-level doc comment in `service.rs:1` says "8 phases"** — actual is 16. Update.
 - **Two `AutotunerBridge` traits with the same name** (reforge vs mirror) — rename one to disambiguate.
 - **Two `retrievability` functions** (FSRS-5 power-law vs decay exponential) — rename one or co-locate with clear docstring.

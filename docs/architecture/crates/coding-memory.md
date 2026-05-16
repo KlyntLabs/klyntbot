@@ -21,42 +21,116 @@ Four Reforge phases owned by this crate (`CodingSynthesisPhase` 2.5, `RuleArtifa
 crates/coding-memory/src/
 ├── lib.rs                  ← Re-exports + crate doc
 ├── error.rs                ← NotImplementedInPhase + other errors
+├── facts.rs                ← Semantic fact types
+├── code_domain_searcher.rs ← Code domain search utilities
+├── code_state.rs           ← Code state tracking
+├── counterfactual.rs       ← Counterfactual reasoning helpers
+├── problem_hash.rs         ← Problem hash utilities
+├── git_invalidation.rs     ← Git-based invalidation logic
+├── scope.rs                ← Scope definitions
+├── skills.rs               ← Skill types and helpers
+├── mcp.rs                  ← CodingMemoryToolset + 8 MCP tool impls
+├── reforge_phase.rs        ← Reforge phase trait / common types
+│
+├── causal/
+│   ├── mod.rs              ← Causal analysis exports
+│   ├── detector.rs         ← Causal edge detector
+│   ├── problem_hash_lookup.rs ← Problem hash lookups
+│   └── repo.rs             ← Causal repository
 │
 ├── distiller/
 │   ├── mod.rs              ← Distiller — fire-and-forget per-turn pipeline
 │   ├── turn_buffer.rs      ← TurnBuffer (event accumulator)
-│   ├── boundary.rs         ← TurnBoundary detection
 │   ├── phase_a.rs          ← Phase A: extractive (always runs)
-│   ├── phase_a5.rs         ← Phase A.5: tree-sitter refactor episodes
 │   ├── phase_b.rs          ← Phase B: LLM synthesis (record_observation tool)
 │   ├── phase_c.rs          ← Phase C: reconciliation (Add / Supersede / Noop)
-│   └── writer.rs           ← DistillerWriter (logical-time supersede)
+│   ├── writer.rs           ← DistillerWriter (logical-time supersede)
+│   ├── error.rs            ← Distiller-specific errors
+│   ├── fact_builder.rs     ← Semantic fact builder
+│   ├── record_observation.rs ← record_observation tool schema
+│   ├── retry_queue.rs      ← Retry queue for transient Phase B failures
+│   └── test_helpers.rs     ← Distiller test utilities
+│
+├── mirror/
+│   ├── mod.rs              ← Mirror service exports
+│   ├── alerts.rs           ← Mirror alert handling
+│   ├── coding_alerts_query.rs ← Coding alerts query builder
+│   ├── coding_meta_rules.rs ← Coding meta rules
+│   ├── coding_routing.rs   ← Coding event routing
+│   ├── pattern_effectiveness.rs ← Pattern effectiveness tracking
+│   ├── stale_memory.rs     ← Stale memory detection
+│   └── coding_signals/
+│       ├── mod.rs
+│       ├── approval_history.rs
+│       ├── recall_coverage.rs
+│       └── skill_effectiveness.rs
+│
+├── recall/
+│   ├── mod.rs              ← CodingRecallService
+│   ├── service.rs          ← Service implementation
+│   ├── budget.rs           ← Recall budget management
+│   ├── causal_walker.rs    ← Causal graph walker
+│   ├── change_history.rs   ← Fact change history
+│   ├── dead_end.rs         ← Dead-end query handler
+│   ├── decision_points.rs  ← Decision point queries
+│   ├── facts_as_of.rs      ← Temporal fact queries
+│   ├── fetch_builder.rs    ← Fetch query builder
+│   ├── index_builder.rs    ← Recall index builder
+│   ├── open_threads.rs     ← Open thread tracking
+│   ├── probe.rs            ← Recall probe utilities
+│   ├── renderers.rs        ← Output renderers
+│   ├── scope_resolve.rs    ← Scope resolution
+│   ├── telemetry.rs        ← Recall telemetry
+│   └── timeline_builder.rs ← Timeline builder
 │
 ├── reforge/
 │   ├── mod.rs              ← Re-exports
 │   ├── writer.rs           ← ReforgeWriter (bi-temporal supersede; NO raw DELETE)
 │   ├── coding_synthesis.rs ← CodingSynthesisPhase (2.5) — STUB
+│   ├── cross_cli_synthesis.rs ← Cross-cli synthesis
+│   ├── cross_session_dedup.rs ← CrossSessionDedup — STUB
+│   ├── managed_block.rs    ← Managed block writer
 │   ├── rule_artifacts.rs   ← RuleArtifactGenerationPhase (3.5) — STUB
-│   ├── session_end_pass.rs ← SessionEndPass — STUB
-│   └── cross_session_dedup.rs ← CrossSessionDedup — STUB
+│   ├── selective_delete.rs ← Selective delete logic
+│   ├── sensitivity_filter.rs ← Sensitivity filtering
+│   ├── session_end.rs      ← SessionEndPass — STUB
+│   ├── session_summary_repo.rs ← Session summary repository
+│   ├── symbol_validation.rs ← Symbol validation
+│   ├── synth_handler.rs    ← Synthesis handler
+│   └── types.rs            ← Reforge types
 │
-├── recall/
-│   ├── mod.rs              ← CodingRecallService
-│   └── …                   ← Query implementations for each recall tool
+├── retrieval_skills/
+│   ├── mod.rs              ← Retrieval skill exports
+│   ├── causal_context_expander.rs ← Causal context expansion
+│   ├── evidence_focuser.rs ← Evidence focusing
+│   ├── query_decomposer.rs ← Query decomposition
+│   ├── query_rewriter.rs   ← Query rewriting
+│   ├── raw_event_escalator.rs ← Raw event escalation
+│   └── registry.rs         ← Retrieval skill registry
 │
-├── mcp.rs                  ← CodingMemoryToolset + 8 MCP tool impls
+├── sink/
+│   ├── mod.rs              ← Sink exports
+│   ├── aggregator.rs       ← Event aggregator
+│   ├── subscriber.rs       ← Sink subscriber
+│   └── translator.rs       ← Sink translator
 │
-├── symbols/
-│   ├── mod.rs              ← SymbolExtractor trait
-│   ├── tree_sitter.rs      ← TreeSitterExtractor (Rust/TS/JS/Python/Go grammars)
-│   └── anchors.rs          ← Symbol anchor types
+├── skill_evolver/
+│   ├── mod.rs              ← Skill evolution exports
+│   ├── detect.rs           ← Skill change detection
+│   ├── supersede.rs        ← Skill supersession
+│   └── write.rs            ← Skill writer
 │
-├── observation/
-│   ├── mod.rs              ← Observation types
-│   └── reconcile.rs        ← Phase C decision logic
-│
-└── retry/
-    └── mod.rs              ← DistillationRetryRepo accessor
+└── symbols/
+    ├── mod.rs              ← SymbolExtractor trait
+    ├── extractor.rs        ← TreeSitterExtractor + symbol extraction
+    ├── cache.rs            ← Symbol cache
+    ├── language.rs         ← Language definitions
+    └── queries/
+        ├── go.scm
+        ├── javascript.scm
+        ├── python.scm
+        ├── rust.scm
+        └── typescript.scm
 ```
 
 ---
@@ -160,14 +234,16 @@ impl ReforgeWriter {
 }
 ```
 
-**No physical DELETE ever runs through this writer.** Two distinct "supersede" paths exist:
+**Physical DELETE is rare but exists.** The Distiller and Reforge writers use logical supersession by default, but `SessionEndPass` performs physical `DELETE` for:
+
+1. **Within-session dedup** — duplicate `fix_attempt` episodes sharing a `problem_hash` (keeps one survivor, deletes the rest).
+2. **Stale-candidate resolution** — facts with `stability < 0.2` and no access in 30 days.
 
 | Path | Where | Semantics | When |
 |---|---|---|---|
 | `DistillerWriter::complete_supersede` | Distiller Phase C | Logical-time: sets `superseded_at` + `superseded_by` | Within-session, per-turn reconciliation |
 | `ReforgeWriter::set_superseded_by` | Reforge phases | Bi-temporal: sets `valid_until` + `superseded_by` | Cross-session, batch dedup |
-
-Both keep all rows on disk.
+| `SessionEndPass` (physical) | `reforge/session_end.rs` | `ep_repo.delete_by_id(id)` | Within-session dedup + stale cleanup |
 
 ### `DistillerWriter` (within-session)
 
@@ -618,7 +694,7 @@ tree-sitter-ruby = "0.20"
 ```
 
 ```rust
-// crates/coding-memory/src/symbols/tree_sitter.rs
+// crates/coding-memory/src/symbols/extractor.rs
 let mut ruby_parser = Parser::new();
 ruby_parser.set_language(tree_sitter_ruby::language()).unwrap();
 self.parsers.insert("rb".to_string(), ruby_parser);
@@ -634,7 +710,7 @@ self.parsers.insert("rb".to_string(), ruby_parser);
 | Default Distiller `phase_b_timeout` | `30s` | `distiller/mod.rs` |
 | Phase B temperature | `0.2` | `phase_b.rs` |
 | Phase B max_tokens | `2048` | `phase_b.rs` |
-| Reforge phase `required_phase` | `5` | `reforge/{coding_synthesis,rule_artifacts,session_end_pass,cross_session_dedup}.rs` |
+| Reforge phase `required_phase` | `5` | `reforge/{coding_synthesis,rule_artifacts,session_end,cross_session_dedup}.rs` |
 | `CODING_MEMORY_MCP_TOOLS` count | `8` | `mcp.rs` |
 | `RuleArtifactGenerationPhase` thresholds (future) | `confidence ≥ 0.7`, `stability ≥ 0.5` | `reforge/rule_artifacts.rs` |
 

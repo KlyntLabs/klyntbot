@@ -146,7 +146,7 @@ pub enum KlyntbotError {
 
 **Hot-reload semantics:**
 - File watcher polls `config.json` mtime; on change, calls `reload_if_changed`.
-- Fields in `HotConfig` (model, temperature, max_tokens, max_iterations, pipeline_timeout, monthly_budget) take effect within 5 seconds.
+- Fields in `HotConfig` (model, temperature, max_tokens, max_tool_iterations, safety_timeout_secs, monthly_budget_usd, per_thread_cost_ceiling_usd, cost_alert_at_percent) take effect within 5 seconds.
 - Settings UI applies them **immediately** (writes file, triggers reload).
 - Structural changes (channels, provider init, feature enable/disable) require **restart**.
 
@@ -164,7 +164,7 @@ pub enum KlyntbotError {
 | Path | Purpose |
 |---|---|
 | `src/lib.rs` | Re-exports |
-| `src/queue.rs` | `MessageBus` — async MPMC queue for `InboundMessage` / `OutboundMessage` (chat I/O) |
+| `src/queue.rs` | `MessageBus` — async mpsc queue for `InboundMessage` / `OutboundMessage` (chat I/O) |
 | `src/events.rs` | `InboundMessage`, `OutboundMessage`, `MessageKind` |
 | `src/domain_events.rs` | `DomainEvent` enum, `DomainEventBus` (broadcast), `BashJobEvent`, `TodoEvent`, `TodoStatus`, `CodingMemoryKind`, `FeedbackResponse`, `CorrectionKind`, `ConcurrencyClass` |
 | `src/typed_broker.rs` | `TypedBroker<T>` — single-type pub/sub with per-subscriber queues |
@@ -177,14 +177,14 @@ pub enum KlyntbotError {
 
 | Type | What it carries | Backed by |
 |---|---|---|
-| `MessageBus` | `InboundMessage` (channel → agent) / `OutboundMessage` (agent → channel) | `tokio::sync::mpsc` (MPMC via `Clone` of sender) |
+| `MessageBus` | `InboundMessage` (channel → agent) / `OutboundMessage` (agent → channel) | `tokio::sync::mpsc` (multi-producer, single-consumer — senders are `Clone`, receiver is not) |
 | `DomainEventBus` | `DomainEvent` enum — task created/completed, alarm fired, bash-job event, todo event, coding-memory write, cron fired, etc. | `tokio::sync::broadcast` (fan-out; slow consumers can lag) |
 | `TypedBroker<T>` | Single typed `T` | Per-subscriber queues; useful when broadcast lag is unacceptable |
 | `ContextUpdateQueue` | `ContextUpdate` (with `UpdatePriority`) | MPSC; drained at iteration boundaries by `LiveContextRefresher` |
 | `LearningEventBus` | `LearningEvent` | Broadcast |
 
-**Why two MPMC patterns** (queue vs broker):
-- `MessageBus` is MPMC because the same channel can have multiple consumers (e.g., persister + sender). Cloning the sender gives you a publisher.
+**Why two patterns** (queue vs broker):
+- `MessageBus` is mpsc because there is a single consumer (the agent loop) but multiple producers (channels, UI, MCP). Cloning the sender gives you a publisher; the receiver is not cloneable.
 - `DomainEventBus` is broadcast because **subscribers are independent** — cognitive, mirror, autotuner, activity-log all want every event without competing for it.
 
 ---
@@ -201,7 +201,7 @@ pub enum KlyntbotError {
 3. config::loader::reload_if_changed() reads file + applies env overrides
    ↓
 4. Diff against current Config:
-   - Fields in HotConfig:   apply immediately (model, temperature, max_tokens, max_iterations, ...)
+   - Fields in HotConfig:   apply immediately (model, temperature, max_tokens, max_tool_iterations, ...)
    - Fields NOT in HotConfig: require restart; logged at WARN with the field path
    ↓
 5. HotConfigDiff broadcast on DomainEventBus
@@ -271,7 +271,7 @@ Tools declare `allowed_channels` on the `Tool` trait. The agent runtime filters 
 
 The trade-off versus a queue: **broadcast loses events on slow consumers, queue blocks them.** For cross-feature notification (`TaskCompleted` published, mirror + cognitive + activity-log subscribed), it is acceptable for a lagging subscriber to drop an event — the data is also persisted in SQLite and the cognitive extraction can read backwards if needed. Blocking would create coupling between unrelated subsystems.
 
-For data that **must not** be lost (e.g. user-typed chat messages), use `MessageBus` (MPMC queue) instead.
+For data that **must not** be lost (e.g. user-typed chat messages), use `MessageBus` (mpsc queue) instead.
 
 ### `ContextUpdateQueue` ordering
 

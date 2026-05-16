@@ -11,9 +11,9 @@
 
 The integration cross-section of everything below. The **`desktop` binary** is the single deployable: it doubles as `klyntbot-hook` (sub-10ms short-circuit) and as the MCP stdio server (`mcp serve --stdio`). Startup runs through 17 steps including `pre_main_hardening` (load-bearing — must precede mimalloc), Tauri builder, lazy secondary windows, and an optional embedded Axum MCP server. **`app-core`** is the actual integration crate — it owns `AppCore`, all handlers, the init sequence, both `ThreadRuntime` impls (assistant + coding), and is transport-agnostic. The root **`klyntbot` facade** does `pub use` re-exports of every workspace crate plus convenience type-level re-exports. **`klyntbot-server`** is the MCP server library used by both stdio + HTTP modes.
 
-The **frontend** at `/desktop-ui/` (repo root, **NOT** `crates/desktop-ui/`) is React 19 + Vite + Bun + **Tailwind** (CLAUDE.md says "plain CSS — no Tailwind" — wrong, both `@tailwindcss/vite` and explicit `tailwindcss()` plugin are present). 33 feature directories. `useChatStore` is a 3-slice Zustand store (Threads / Stream / Coding) with a 50ms-coalescer for stream snapshots and `@tanstack/react-virtual` for message virtualization.
+The **frontend** at `/desktop-ui/` (repo root, **NOT** `crates/desktop-ui/`) is React 19 + Vite + Bun + **Tailwind** (CLAUDE.md says "plain CSS — no Tailwind" — wrong, both `@tailwindcss/vite` and explicit `tailwindcss()` plugin are present). 32 feature directories. `useChatStore` is a 3-slice Zustand store (Threads / Stream / Coding) with a 50ms-coalescer for stream snapshots and `@tanstack/react-virtual` for message virtualization.
 
-Two attribute macros (`#[klynt_command]` constrained, `#[klynt_raw_command]` unconstrained) plus two collection macros (`klynt_collect_commands!` + `klynt_collect_events!`) enforce the IPC surface. **Four CI tests guard the surface**: `no_raw_tauri_command_outside_macros`, `registration_drift`, `bindings_are_current`, `no_double_registration`.
+Two attribute macros (`#[klynt_command]` constrained, `#[klynt_raw_command]` unconstrained) plus two collection macros (`klynt_collect_commands!` + `klynt_collect_events!`) enforce the IPC surface. **Five CI tests guard the surface**: `no_raw_tauri_command_outside_macros`, `registration_drift`, `bindings_are_current`, `no_double_registration`, plus a `specta_builder_smoke` test.
 
 ---
 
@@ -32,14 +32,14 @@ flowchart TB
     DESK[desktop binary<br/><i>main.rs 17-step startup<br/>--hook short-circuit<br/>mcp serve subcommand<br/>5 secondary windows<br/>OAuth Axum server<br/>tray_countdown</i>]:::bin
     DSH[desktop-shared<br/><i>ThreadEvent v2 (26 variants)<br/>CommandResult / ApiError<br/>specta::Type DTOs</i>]:::core
     DMC[desktop-macros<br/><i>#[klynt_command]<br/>#[klynt_raw_command]<br/>klynt_collect_commands![]<br/>klynt_collect_events![]</i>]:::macro
-    TST[4 CI guards<br/><i>no_raw_tauri_command_outside_macros<br/>registration_drift<br/>bindings_are_current<br/>no_double_registration</i>]:::test
+    TST[5 CI guards<br/><i>no_raw_tauri_command_outside_macros<br/>registration_drift<br/>bindings_are_current<br/>no_double_registration<br/>specta_builder_smoke</i>]:::test
 
     AC[app-core<br/><i>AppCore struct (transport-agnostic)<br/>~40 handler domains<br/>init/ (14 phases)<br/>runtime/ (ThreadRuntime trait + 2 impls)<br/>coding/ + coding_memory/<br/>tracing providers (CC/Kimi/Klynt)</i>]:::core
     FAC[klyntbot facade<br/><i>pub use all 64 crates<br/>+ convenience type re-exports</i>]:::facade
     SRV[klyntbot-server<br/><i>KlyntbotServerHandler<br/>ToolRegistryBridge + AgentBridge<br/>Stdio + Embedded HTTP (Axum)</i>]:::server
 
-    UI[/desktop-ui — repo root<br/><i>React 19 + Vite + Bun + Tailwind<br/>33 features<br/>useChatStore (3 slices)<br/>VirtualizedMessageList<br/>50ms coalescer + watchdog</i>]:::ui
-    BIN_STUB[crates/desktop-ui<br/><i>STUB: only src/bindings.ts<br/>auto-generated tauri-specta</i>]:::ui
+    UI[/desktop-ui — repo root<br/><i>React 19 + Vite + Bun + Tailwind<br/>32 features<br/>useChatStore (3 slices)<br/>VirtualizedMessageList<br/>50ms coalescer + watchdog</i>]:::ui
+    BIN_STUB[crates/desktop-ui<br/><i>REMOVED from workspace<br/>orphaned src/bindings.ts</i>]:::ui
 
     DESK --> AC
     DESK --> SRV

@@ -9,7 +9,7 @@
 
 ## TL;DR
 
-`providers` is the only crate in the workspace that talks to LLM endpoints. Every `chat_completion`, `embed`, and `transcribe` call goes through `LlmProvider`. Four concrete adapters ship today (`AnthropicNativeProvider`, `OpenAiCompatProvider`, `TranscriptionProvider`, `NoopProvider`). `ProviderManager` wraps any provider with circuit-breaker + failover + degradation tracking. `factory` translates `Config` into ready-to-use providers including per-role variants for cognitive (`Distiller`, `ReforgeSynth`, `ReforgeRules`).
+`providers` is the only crate in the workspace that talks to LLM endpoints. Every `chat` and `chat_stream` call goes through `LlmProvider`. Four concrete adapters ship today (`AnthropicNativeProvider`, `OpenAiCompatProvider`, `TranscriptionProvider`, `NoopProvider`). `ProviderManager` wraps any provider with circuit-breaker + failover + degradation tracking. `factory` translates `Config` into ready-to-use providers including per-role variants for cognitive (`Distiller`, `ReforgeSynth`, `ReforgeRules`).
 
 If you're adding a new model, a new API, or per-role routing, this is the file you'll edit.
 
@@ -43,31 +43,57 @@ crates/providers/src/
 
 ```rust
 #[async_trait]
-pub trait LlmProvider: Send + Sync + std::fmt::Debug {
+pub trait LlmProvider: Send + Sync {
+    /// Send a chat completion request (non-streaming)
+    async fn chat(
+        &self,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+        params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
+    ) -> Result<LlmResponse>;
+
+    /// Send a streaming chat completion request
+    /// Default implementation falls back to non-streaming chat()
+    async fn chat_stream(
+        &self,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+        params: &ChatParams,
+        cache_breakpoints: &[CacheBreakpoint],
+    ) -> Result<LlmStream>;
+
+    /// Check if streaming is supported
+    fn supports_streaming(&self) -> bool;
+
+    /// Get the default model for this provider
+    fn default_model(&self) -> &str;
+
+    /// Provider name (for logging)
     fn name(&self) -> &str;
-    fn model(&self) -> &str;
+
+    /// Count tokens for the given messages and tools.
+    /// Default: character-based estimation (4 chars ≈ 1 token).
+    async fn count_tokens(&self, messages: &[Message], tools: Option<&[Value]>) -> Result<usize>;
+
+    /// Provider capabilities
     fn capabilities(&self) -> ProviderCapabilities;
-    async fn health(&self) -> ProviderHealth;
 
-    async fn chat_completion(
-        &self,
-        messages: Vec<Message>,
-        params: ChatParams,
-    ) -> Result<LlmResponse, ProviderError>;
+    /// Context window size for the current model
+    fn context_window(&self) -> usize;
 
-    fn chat_completion_stream(
-        &self,
-        messages: Vec<Message>,
-        params: ChatParams,
-    ) -> LlmStream;
+    /// Check provider health. Default returns `Unknown`.
+    async fn health_check(&self) -> Result<ProviderHealth>;
 
-    /// Optional — defaults to "not supported"
-    async fn embed(&self, _text: &str) -> Result<Vec<f32>, ProviderError> {
-        Err(ProviderError::Unsupported("embed".into()))
-    }
+    /// Optional dedicated provider for lightweight classification tasks.
+    /// Returns `None` by default (use self for classification).
+    fn classifier_provider(&self) -> Option<DynProvider>;
+
+    /// Discover models advertised by this provider.
+    async fn list_models(&self) -> Result<Vec<ProviderModel>>;
 }
 
-pub type DynProvider = Box<dyn LlmProvider>;
+pub type DynProvider = Arc<dyn LlmProvider>;
 ```
 
 ### `ProviderRole`
@@ -123,35 +149,22 @@ pub struct ImageUrl {
 ```rust
 pub struct ChatParams {
     pub model: String,
-    pub temperature: f32,
-    pub max_tokens: u32,
-    pub tools: Option<Vec<Tool>>,
-    pub tool_choice: Option<ToolChoice>,
+    pub temperature: Option<f32>,
+    pub max_tokens: Option<u32>,
     pub response_format: Option<ResponseFormat>,
-    pub cache_breakpoints: Vec<CacheBreakpoint>,
-    pub cache_system_prompt: bool,        // legacy fallback flag
-    pub stop_sequences: Vec<String>,
-    pub reasoning_effort: Option<ReasoningEffort>,  // for reasoning models
-    pub session_id: Option<String>,       // for sampling delegation
-    pub trace_id: Option<String>,
-    pub stream_id: Option<String>,
-    pub turn_id: Option<String>,
+    /// Optional provider role for role-based routing (e.g. Distiller, ReforgeRules).
+    pub role: Option<ProviderRole>,
+    /// Opaque session identifier. Used by the OpenAI-compat debug assertion
+    /// to dedupe prefix-stability hashes across calls. Production builds
+    /// don't read it.
+    pub session_key: Option<String>,
 }
 
 pub enum ResponseFormat {
     Text,
     JsonObject,
-    JsonSchema { schema: Value },
+    JsonSchema { name: String, schema: Value },
 }
-
-pub enum ToolChoice {
-    Auto,
-    None,
-    Required,
-    Function(String),                     // force a specific tool
-}
-
-pub enum ReasoningEffort { Low, Medium, High }
 ```
 
 #### `CacheBreakpoint` (Anthropic-specific)
@@ -163,10 +176,15 @@ pub struct CacheBreakpoint {
 }
 
 pub enum CacheAnchor {
-    LastSystem,                           // mark cache_control after last system message
-    LastUser,                             // mark after last user message
-    LastTool,                             // mark after last tool result
-    LastN(usize),                         // mark N messages from end
+    /// On the last `Message::System` block in the messages vec.
+    /// No-op if there are no System messages.
+    LastSystem,
+    /// On the last entry in the tools array.
+    /// No-op if `tools` is None or empty.
+    LastTool,
+    /// On the message at this index in the messages vec.
+    /// Logged + skipped if out-of-range.
+    MessageIndex(usize),
 }
 
 pub enum CacheTtl {
@@ -265,15 +283,17 @@ pub enum LlmStreamChunk {
 
 ```rust
 pub struct ProviderCapabilities {
-    pub supports_tools: bool,
-    pub supports_streaming: bool,
-    pub supports_vision: bool,
-    pub supports_caching: bool,
-    pub supports_reasoning: bool,
-    pub supports_embeddings: bool,
-    pub supports_json_mode: bool,
-    pub max_context: usize,
-    pub max_output: usize,
+    pub extended_thinking: bool,
+    pub structured_outputs: bool,
+    pub prompt_caching: bool,
+    /// True if this provider honors explicit `CacheBreakpoint` markers.
+    /// Anthropic: true. OpenAI/Gemini/etc. (auto-prefix-cache only): false.
+    pub explicit_cache_markers: bool,
+    pub native_token_counting: bool,
+    pub vision: bool,
+    pub streaming: bool,
+    pub tool_choice_required: bool,
+    pub parallel_tool_calls: bool,
 }
 
 pub enum ProviderHealth {
@@ -290,7 +310,7 @@ pub struct ProviderModel {
     pub price_out: f64,
 }
 
-pub const DEFAULT_CONTEXT_WINDOW: usize = 200_000;
+pub const DEFAULT_CONTEXT_WINDOW: usize = 128_000;
 
 pub fn id_implies_reasoning(model_id: &str) -> bool;
 ```
@@ -320,10 +340,10 @@ pub struct CircuitBreakerConfig {
 }
 
 pub enum DegradationLevel {
-    Healthy,                              // use primary
-    Slow,                                  // primary in use; latency warning emitted
-    FailingOver,                          // switched to first fallback
-    Exhausted,                            // all providers tripped; fail fast
+    /// Primary circuit opened; requests are being routed to the fallback provider.
+    Fallback,
+    /// All providers have failed; no LLM calls can succeed.
+    Offline,
 }
 
 pub type OnCircuitOpen = Arc<dyn Fn(&str /*provider_name*/, &ProviderError) + Send + Sync>;
@@ -518,19 +538,16 @@ let provider: DynProvider = create_provider_with_failover(
     &config,
 )?;
 
-let mut stream = provider.chat_completion_stream(
-    vec![Message::System("...".into()), Message::User(UserContent::Text("...".into()))],
-    ChatParams {
-        model: "claude-opus-4-7".into(),
-        temperature: 0.7,
-        max_tokens: 4096,
-        cache_breakpoints: vec![CacheBreakpoint {
-            anchor: CacheAnchor::LastSystem,
-            ttl: CacheTtl::Ephemeral,
-        }],
-        ..Default::default()
-    },
-);
+let mut stream = provider.chat_stream(
+    &[Message::system("..."), Message::user("...")],
+    None,
+    &ChatParams::new("claude-opus-4-7")
+        .with_max_tokens(4096),
+    &[CacheBreakpoint {
+        anchor: CacheAnchor::LastSystem,
+        ttl: CacheTtl::Ephemeral,
+    }],
+).await?;
 
 while let Some(chunk) = stream.next().await {
     match chunk? {
@@ -550,10 +567,10 @@ while let Some(chunk) = stream.next().await {
 // Reforge Phase 2 — Synthesize (LLM call #1)
 let synth_provider = create_cognitive_provider(ProviderRole::ReforgeSynth, &config)?;
 let synth_params = cognitive_chat_params(ProviderRole::ReforgeSynth);
-let response = synth_provider.chat_completion(messages, synth_params).await?;
+let response = synth_provider.chat(messages, None, &synth_params, &[]).await?;
 ```
 
-Each call constructs a fresh `Box<dyn LlmProvider>` rather than holding a long-lived `Arc`. The cost is negligible vs. the latency of the call; the simplicity is worth it.
+Each call constructs a fresh `DynProvider` rather than holding a long-lived reference. The cost is negligible vs. the latency of the call; the simplicity is worth it.
 
 ### Failover detection
 
@@ -568,7 +585,7 @@ let mgr = ProviderManager::new(primary, fallback, CircuitBreakerConfig::default(
     }));
 ```
 
-`on_circuit_open` fires each time a breaker transitions to `Open`. `on_degraded` fires on `Slow` (latency spike) and `FailingOver` (active failover).
+`on_circuit_open` fires each time a breaker transitions to `Open`. `on_degraded` fires on `Fallback` (active failover) and `Offline` (all providers exhausted).
 
 ---
 
@@ -577,7 +594,7 @@ let mgr = ProviderManager::new(primary, fallback, CircuitBreakerConfig::default(
 ### `NoopProvider` with canned responses
 
 ```rust
-let provider: DynProvider = Box::new(
+let provider: DynProvider = Arc::new(
     NoopProvider::new().with_response(LlmResponse {
         content: Some("hello".into()),
         tool_calls: vec![],
@@ -585,7 +602,7 @@ let provider: DynProvider = Box::new(
     })
 );
 
-let resp = provider.chat_completion(messages, params).await.unwrap();
+let resp = provider.chat(messages, None, &params, &[]).await.unwrap();
 assert_eq!(resp.content.as_deref(), Some("hello"));
 ```
 
@@ -608,7 +625,7 @@ let breaker_config = CircuitBreakerConfig {
 let primary = NoopProvider::new().with_error(/* fail twice */);
 let fallback = NoopProvider::new().with_response(/* succeed */);
 
-let mgr = ProviderManager::new(Box::new(primary), vec![Box::new(fallback)], breaker_config);
+let mgr = ProviderManager::with_config(Arc::new(primary), Some(Arc::new(fallback)), None, breaker_config);
 
 // First 2 calls fail on primary, succeed via fallback
 // Breaker opens after threshold; subsequent calls skip primary
@@ -644,12 +661,11 @@ let provider = AnthropicNativeProvider::new(
    #[async_trait]
    impl LlmProvider for MyProvider {
        fn name(&self) -> &str { "my_provider" }
-       fn model(&self) -> &str { &self.model }
+       fn default_model(&self) -> &str { &self.model }
        fn capabilities(&self) -> ProviderCapabilities { /* ... */ }
-       async fn health(&self) -> ProviderHealth { /* probe */ }
-       async fn chat_completion(&self, messages, params) -> Result<LlmResponse, ProviderError> { /* ... */ }
-       fn chat_completion_stream(&self, messages, params) -> LlmStream { /* ... */ }
-       async fn embed(&self, text) -> Result<Vec<f32>, ProviderError> { /* ... */ }
+       async fn health_check(&self) -> Result<ProviderHealth> { /* probe */ }
+       async fn chat(&self, messages, tools, params, cache_breakpoints) -> Result<LlmResponse> { /* ... */ }
+       async fn chat_stream(&self, messages, tools, params, cache_breakpoints) -> Result<LlmStream> { /* ... */ }
    }
    ```
 3. Re-export from `adapters/mod.rs`.
@@ -689,7 +705,7 @@ This sets the `anthropic-beta` HTTP header.
 
 | Constant | Value | Location |
 |---|---|---|
-| `DEFAULT_CONTEXT_WINDOW` | `200_000` | `types.rs` |
+| `DEFAULT_CONTEXT_WINDOW` | `128_000` | `types.rs` |
 | `CircuitBreakerConfig::failure_threshold` (default) | `5` | `manager.rs` |
 | `CircuitBreakerConfig::cooldown` (default) | `60s` | `manager.rs` |
 | `CircuitBreakerConfig::probe_timeout` (default) | `10s` | `manager.rs` |
@@ -703,9 +719,9 @@ This sets the `anthropic-beta` HTTP header.
 
 - **`Message::Tool.content` is plain `String`** — no image-bearing schema. Blocks Computer Use spec which needs `ContentPart::ImageData`.
 - **`CacheBreakpoint` leaks Anthropic-specific semantics through the generic trait.** Acceptable today; footgun if a second provider adds prompt caching with a different model.
-- **`cache_system_prompt` legacy flag** should be deleted once all call sites set `cache_breakpoints` explicitly.
+- **`ChatParams` builders** (`new`, `with_temperature`, `with_max_tokens`, etc.) are the preferred construction path. Direct struct literals are discouraged.
 - **Multi-role provider router design** exists at `docs/superpowers/specs/2026-05-07-provider-router-multi-role-design.md` (spec file present). Not implemented.
-- **`LlmProvider::embed`** is rarely used — cognitive layer goes through `fastembed` locally instead. Trait method exists but is mostly unused.
+- **`LlmProvider` no longer carries `embed`** — cognitive layer goes through `fastembed` locally instead.
 - **No structured per-call cost emission** — `Usage` returned but cost translation (via `common::pricing`) happens in callers. Could centralize.
 - **No retry inside adapters** — failover is via `ProviderManager`. If a single transient error happens, the call fails entirely (no per-adapter retry). Acceptable today; would matter for high-latency APIs.
 

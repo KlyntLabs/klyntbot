@@ -89,7 +89,7 @@ This is the anomaly flagged in [`00-overview.md`](../00-overview.md#3-migration-
 | `src/error.rs` | `StorageError`, `OptionExt` (helper for `Option → Result<_, NotFound>` conversion) |
 | `src/macros.rs` | `#[macro_use]`-imported helpers for repo definitions |
 | `src/sqlite_types.rs` | `SqlDate`, `SqlTs` (newtypes for `jiff::Timestamp` ↔ SQLite TEXT/INTEGER) |
-| `src/circuit_breaker.rs` | Per-repo circuit breaker state (degrades writes after consecutive failures) |
+| `src/circuit_breaker.rs` | Global circuit breaker state (persists a single open-until deadline across restarts) |
 | `src/finance_storage.rs` | `FinanceStorage` — facade combining 9 finance repos for atomic finance ops |
 | `src/messages/` | `MessagePart` enum, `MessagePartsRow`, parts↔content mirroring |
 | `src/repos/` | 50+ `*Repo` modules — see [Repository directory](#repository-directory) |
@@ -252,9 +252,9 @@ async fn my_repo_test() {
 
 `Repos` construction just `.clone()`s the `StoragePool` (which is itself a `.clone()` of `Arc<sqlx::SqlitePool>`). No connections opened, no queries run. Safe to construct per-handler or per-request.
 
-### Circuit breaker per-repo
+### Circuit breaker
 
-`circuit_breaker.rs` tracks per-repo failure counts. After N consecutive write failures, the breaker opens — subsequent writes return `StorageError` immediately without hitting SQLite. Periodic half-open probes attempt to close. Used mostly for cognitive (where a single failing memory write shouldn't block the chat path).
+`circuit_breaker.rs` is a simple global deadline persistence layer. It stores a single `open_until_utc` timestamp in SQLite; if present, the breaker is "open" until that time. There is no per-repo tracking, no failure counting, and no half-open probe logic. The actual circuit-breaker behavior (counting failures, deciding when to open) lives upstream in the `ProviderManager` (`crates/providers/src/manager.rs`).
 
 ### `FinanceStorage` facade
 

@@ -184,12 +184,12 @@ pub async fn init(handle: tauri::AppHandle) -> Result<(
 impl AppCore {
     pub async fn init_with_sender(
         mode: AppMode,
-        config: Config,
+        config_override: Option<Config>,
         notification_sender: Option<Arc<dyn NotificationSender>>,
-        event_emitter: Arc<dyn AppEventEmitter>,
-        approval_channel: Arc<dyn ApprovalChannel>,
-        provider: Option<DynProvider>,
-    ) -> Result<Arc<Self>>;
+        event_emitter: Option<Arc<dyn AppEventEmitter>>,
+        approval_channel: Option<Arc<dyn ApprovalChannel>>,
+        provider_override: Option<DynProvider>,
+    ) -> Result<(Self, EventChannels), String>;
 
     pub async fn shutdown(&self);
 }
@@ -200,7 +200,7 @@ impl AppCore {
 ```rust
 #[async_trait]
 pub trait ThreadRuntime: Send + Sync {
-    async fn start_turn(&self, params: StartTurnParams) -> Result<TurnHandle>;
+    async fn start_turn(&self, req: StartTurnRequest) -> Result<StartTurnOutcome, ApiError>;
     async fn cancel_turn(&self, turn_id: &str) -> Result<()>;
     fn is_active(&self, thread_id: &str) -> bool;
     fn active_turns(&self) -> Vec<String>;
@@ -618,10 +618,10 @@ async fn test_thing() {
 
     let core = AppCore::init_with_sender(
         AppMode::Server,
-        config,
+        Some(config),
         None,
-        event_emitter,
-        approval,
+        Some(event_emitter),
+        Some(approval),
         None,
     ).await.unwrap();
 

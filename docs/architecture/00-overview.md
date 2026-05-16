@@ -249,7 +249,7 @@ These **11 crates** each get a dedicated deep-dive at `docs/architecture/crates/
 | **`providers`** | Subsystem 03 | `LlmProvider` trait + Anthropic native + OpenAI adapter + circuit breaker + role routing + cache breakpoint synthesis. The fan-out point for every LLM call. |
 | **`tools-core`** | Subsystem 07 | `Tool` / `FeaturePackage` / `ToolRegistry` / `ApprovalClass` traits. Changing anything here has workspace-wide blast radius. |
 | **`mcp`** | Subsystem 11 | The external trust boundary. Tool exposure (whitelist), sampling delegation (LLM-to-LLM), circuit breaker, server-side approval *(currently always-decline placeholder)*. |
-| **`coding-memory`** | Subsystem 09 | Distiller + Reforge phases + recall service + 15 MCP tools + symbol extraction. Phase-gated with `NotImplementedInPhase`; significant production surface is still scaffolding. |
+| **`coding-memory`** | Subsystem 09 | Distiller + Reforge phases + recall service + 15 MCP tools + symbol extraction. `SessionEndPass` and `CrossSessionDedup` are fully implemented; `CodingSynthesisPhase` and `RuleArtifactGenerationPhase` in `reforge_phase.rs` remain stubbed. |
 | **`coding-ingest`** | Subsystem 09 | Owns `AgentEvent`, the `klyntbot-hook` binary, the daemon socket, and **5 ingest adapters** (`claude_code`, `codex`, `kimi_cli`, `opencode`, `git_post_commit` — CLAUDE.md says 4). |
 | **`desktop`** | Subsystem 13 | The single deployable binary. Owns startup sequencing (hardening → mimalloc → AppCore → Tauri), the sub-10ms `--hook` short-circuit, and the MCP serve subcommand. |
 
@@ -308,7 +308,7 @@ Multiple components have honest-looking type signatures, are referenced in CLAUD
 | `lsp-client` (all methods) | `crates/lsp-client/src/lib.rs:42,59`, `server_pool.rs:24,58,86` | Diagnostics, document symbols, server pool — all `TODO(T5)` stubs returning empty. |
 | Notification channels for Telegram/Discord/Email | `crates/notifications/src/channel/mod.rs:64` | Concrete types exist but **not wired** into `NotificationDispatcher`. Alarms with those channel bits silently go nowhere. |
 | MCP server approval | `crates/mcp/src/server/approval.rs:6,21` | `BlockingFallbackChannel` always returns Decline; remote MCP clients can never get approval. |
-| 4 Reforge phases in `coding-memory` | `crates/coding-memory/src/reforge/` | `CodingSynthesisPhase` (2.5), `RuleArtifactGenerationPhase` (3.5), `SessionEndPass`, `CrossSessionDedup` — all return `NotImplementedInPhase { required_phase: 5 }`. The Distiller (Phases 3–6) is wired and active; cross-session Reforge is on hold. |
+| 2 Reforge phases in `coding-memory` (legacy trait stubs) | `crates/coding-memory/src/reforge_phase.rs` | `CodingSynthesisPhase` (2.5) and `RuleArtifactGenerationPhase` (3.5) return `NotImplementedInPhase { required_phase: 5 }`. **However**, real implementations exist in `reforge/coding_synthesis.rs` and `reforge/rule_artifacts.rs` and are wired into `app-core::CodingPhaseRunnerImpl`. `SessionEndPass` and `CrossSessionDedup` in `reforge/` are fully implemented. |
 | `InProcess` hook execution mode | `crates/klynt-protocol` + `crates/klynt-hooks` | Variant exists in `HookExecutionMode` enum but no dispatch path implements it — only `Subprocess` is wired. |
 | `Hook.fail_open` field | `crates/klynt-hooks/src/engine/dispatcher.rs` | Field in schema is ignored; fail-open is hardcoded — hook errors are silently dropped regardless. Security implication: hooks can't actually enforce. |
 | Plugin `agent_ask_user` host function | `crates/plugin-runtime/src/host/mod.rs:477` | Returns `"agent callbacks not connected"` unconditionally. Granting `Agent` permission to a plugin does nothing. |
@@ -458,6 +458,10 @@ sequenceDiagram
 - `MIN_RECENT_MESSAGES = 8` (preserved verbatim by `MidLoopCompressor`)
 - `DEFAULT_TURN_CAP = 500` (subagents only — **main agent has no turn cap**)
 - Context window: provided by `RuntimeConfig.context_window` (NOT a named `ANTHROPIC_CONTEXT_WINDOW` constant)
+
+**Behavioral features** (see [`subsystems/04-agent-runtime.md`](./subsystems/04-agent-runtime.md) for details):
+- **Focus-session message deferral** — `AgentLoop` buffers inbound messages when `FocusSessionStarted` fires on `DomainEventBus`, sends a single auto-reply per `(channel, sender)`, and drains the queue on `FocusSessionEnded`.
+- **Predictive cache warming (KCA Track 7)** — After each completed turn, a detached `tokio::spawn` calls `LlmQueryPredictorHandler::predict_next` to pre-retrieve memories for predicted follow-up queries, storing them in `PredictiveCache` for potential cache hits on the next turn.
 
 **Heartbeat & cancellation:**
 - Backend emits `ThreadEvent::Heartbeat` every 30s.
@@ -632,6 +636,36 @@ RUST_LOG=info,klyntbot=debug
 ```
 
 Environment overrides for config follow the `KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o` pattern (double underscore = nested key).
+
+### KCA environment-only feature flags
+
+A set of `KCA_*` env flags control production behavior. They are **not** in `config.json` — they are toggles for phased rollouts, escape hatches, and bench instrumentation. All are optional; omitting them keeps default behavior.
+
+| Flag | Crate | Default | Effect |
+|---|---|---|---|
+| `KCA_DISABLE_COMPRESSION=1` | `context_engine` | off | Skips tiered history compression (escape hatch for bench reproducibility) |
+| `KCA_PHASE_4=1` | `agent` | off | Enables Phase-4 Letta-style memory-refusal recovery nudge |
+| `KCA_PHASE_4_TOOL_DRIVEN=1` | `agent` | off | Uses tool-call nudge instead of text nudge |
+| `KCA_PHASE_4_LEGACY_NUDGE=1` | `agent` | off | Falls back to legacy A/B nudge text |
+| `KCA_COMMUNITY_SUMMARIES=1` | `cognitive` | off | Enables Wave-8 community summary generation in reforge |
+| `KCA_REFORGE_COMPRESS=1` | `cognitive` | off | Enables Wave-10 LLM merge compression in reforge |
+| `KCA_EPISODIC_THRESHOLD=<f32>` | `cognitive` | 0.3 | Overrides episodic memory importance threshold |
+| `KCA_TRACE_FSRS=1` | `cognitive` | off | Emits per-card FSRS trace logs to stderr |
+| `KCA_PER_TURN_INGEST=1` | `cognitive` | off | Persists raw turn data for distiller debugging |
+| `KCA_RAW_EPISODE_PERSIST=1` | `cognitive` | off | Persists unprocessed episode rows |
+| `KCA_VECTOR=<provider>` | `cognitive` | default | Forces a specific embedding provider |
+| `KCA_OPENAI_EMBED_MODEL=<model>` | `cognitive` | default | Overrides OpenAI embedding model |
+| `KCA_FACT_SEARCH_HANDLER=1` | `agent` | off | Routes fact search through handler path |
+| `KCA_PHASE_3=1` | `kca-bench` | off | Enables Phase-3 bench paths |
+| `KCA_E2E_LIMIT=<n>` | `kca-e2e` | unlimited | Caps E2E fixture count |
+| `KCA_RUN_ID=<id>` | `kca-bench` | auto | Forces a specific bench run ID |
+| `KCA_BENCH_DIRECT_DIAG=1` | `kca-bench` | off | Bypasses normal bench routing |
+| `KCA_BENCH_DIRECT_FALLBACK=1` | `kca-bench` | off | Forces fallback bench path |
+| `KCA_LOCOMO_GRADER_KEY` | `kca-bench` | — | API key for external LoCoMo grader |
+| `KCA_LOCOMO_GRADER_MODEL` | `kca-bench` | — | Model for external LoCoMo grader |
+| `KCA_LOCOMO_GRADER_URL` | `kca-bench` | — | URL for external LoCoMo grader |
+| `KCA_LOCOMO_LIMIT=<n>` | `kca-bench` | unlimited | Caps LoCoMo eval questions |
+| `KCA_LOCOMO_QA_LIMIT=<n>` | `kca-bench` | unlimited | Caps LoCoMo QA pairs |
 
 ---
 

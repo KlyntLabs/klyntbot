@@ -90,7 +90,7 @@ The clearest mental model: this subsystem is **the floor of a future feature, no
 
 ### Host functions — full enumeration
 
-All 14 host functions live in the Extism namespace `"klyntbot"`. Plugin `wasm` declares `host_fn!(klyntbot, fn_name)` to bind them.
+All 12 host functions live in the Extism namespace `"klyntbot"`. Plugin `wasm` declares `host_fn!(klyntbot, fn_name)` to bind them.
 
 **`db` (2 functions)** — `Storage` permission required:
 
@@ -293,7 +293,7 @@ pub struct AccessibilityNode {
 |---|---|---|
 | `capture.rs` | `MacCapture` — `screencapturekit::SCShareableContent` + `SCScreenshotManager::capture` inside `spawn_blocking`. | Scale hardcoded `2.0` (Retina assumption). `capture_window` + `get_active_window` return `NotImplemented`. |
 | `input.rs` | `MacInput` — `CGEventSource` with `HIDSystemState`. | 14 of 16 actions implemented (see table above). |
-| `computer_use/ax_walker.rs` | `walk_focused_app(pid, max_depth=6)` — `AXUIElement` + recursive children. | Depth bounded at 6. Frame y-flip not done. |
+| `computer_use/ax_tree.rs` | `walk_focused_app(pid, max_depth=6)` — `AXUIElement` + recursive children. | Depth bounded at 6. Frame y-flip not done. |
 | `ax.rs` | RAII wrappers for `AXUIElement` and `AXValue` (`declare_TCFType!`/`impl_TCFType!`). | Safe — no manual `CFRelease` anywhere. |
 | `speech.rs` | `list_voices()` parses `say --voice=?`; `synthesize_to_file(text, voice, rate, path)` → `say -v <voice> -r <wpm> -o <path>`. | **`say` CLI, NOT `AVSpeechSynthesizer`.** objc2 wiring deferred. |
 | `dnd.rs` | `is_dnd_active()` reads `defaults read com.apple.controlcenter "NSStatusItem Visible FocusModes"`; `toggle_dnd()` calls `shortcuts run "Toggle Do Not Disturb"`. | **Requires user to manually create the Shortcut.** Brittle dependency. |

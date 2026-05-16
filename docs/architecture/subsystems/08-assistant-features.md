@@ -11,7 +11,7 @@
 
 The 13 crates that comprise assistant-mode user-facing functionality. They span four shapes: **tool-bearing features** (tasks, notes, finance, productivity, language-learning, alarms, launcher — register LLM-visible tools), **service-only features** (coaching, focus, insights — pipeline/bridge code with no LLM surface), **shells** (learning — the tool actually lives in `crates/tools/`), and **support libraries** (voice-engine, analytics — provide capability to other features). The naming convention `feature-*` implies a uniform shape that the code doesn't deliver — see [Open questions](#open-questions--debt).
 
-The two architectural standouts are **`feature-finance`** (57 actions in 12 sub-modules — the largest multi-action tool in the workspace) and **`feature-launcher`** (a substantial standalone system: inverted file index, clipboard FTS, attention-decay aggregator, window manager, calendar source — wired in `app-core`, not the agent builder).
+The two architectural standouts are **`feature-finance`** (64 actions in 12 sub-modules — the largest multi-action tool in the workspace) and **`feature-launcher`** (a substantial standalone system: inverted file index, clipboard FTS, attention-decay aggregator, window manager, calendar source — wired in `app-core`, not the agent builder).
 
 ---
 
@@ -27,7 +27,7 @@ flowchart LR
     T[feature-tasks<br/><i>19 actions · RRULE · alarms · OKR<br/>focus slots · LanceDB hybrid search</i>]:::tooled
     N[feature-notes<br/><i>notebooks · YAML front matter · FTS<br/>entity mentions · practice sessions</i>]:::tooled
     P[feature-productivity<br/><i>20 tables · activity FSM<br/>auto-focus · nudges</i>]:::tooled
-    F[feature-finance<br/><i>57 actions · 11 tables<br/>price service · FIRE · Six-Jar</i>]:::tooled
+    F[feature-finance<br/><i>64 actions · 11 tables<br/>price service · FIRE · Six-Jar</i>]:::tooled
     A[feature-alarms<br/><i>standalone reminders<br/>via scheduled_fires</i>]:::tooled
     LP[feature-language-learning<br/><i>pronunciation · practice<br/>exam tracking</i>]:::tooled
     LCH[feature-launcher<br/><i>inverted index · clipboard<br/>attention · windows · calendar</i>]:::tooled
@@ -76,7 +76,7 @@ The naming convention `feature-*` implies "user-visible feature with tools." Sev
 | `feature-tasks` | `tasks` | 19 | Destructive (deletes), Sensitive (writes/focus/recur), Safe (reads) | NON_CODING | 8 |
 | `feature-notes` | `notes` | CRUD + search + inbox | (default) | (default) | 8 |
 | `feature-productivity` | `productivity` | focus + activity + dashboard | Sensitive (writes), Safe (reads) | (default) | 20 |
-| `feature-finance` | `finance` | **57** | Destructive (deletes), Sensitive (writes), Safe (reads) | NON_CODING | 11 |
+| `feature-finance` | `finance` | **64** | Destructive (deletes), Sensitive (writes), Safe (reads) | NON_CODING | 11 |
 | `feature-language-learning` | `language_practice` | pronunciation + practice + exam | (default) | (default) | 3 |
 | `feature-launcher` | `launcher` | search/execute/apply_window/pin/unpin | (sensitive on execute/window) | (default) | 6 |
 | `feature-alarms` | `alarm` | create/cancel/snooze/list | Destructive (cancel), Sensitive (create/snooze) | (default) | 0 (uses `scheduled_fires`) |
@@ -93,7 +93,7 @@ The naming convention `feature-*` implies "user-visible feature with tools." Sev
 
 **Tables:** `tasks`, `task_activity`, `task_attachments`, `task_time_entries`, `task_dependencies`, `task_estimation_history`, `task_recurrence_templates`, `task_alarms`.
 
-### `feature-finance` — 57 actions across 12 sub-modules
+### `feature-finance` — 64 actions across 12 sub-modules
 
 | Group | Actions |
 |---|---|
@@ -152,7 +152,7 @@ Actions: `search`, `execute`, `apply_window`, `pin`, `unpin`.
 
 ## Spotlight: `feature-finance`
 
-**The 57-action surface** is the largest multi-action tool in the workspace. Organized by 12 functional groups (see table above).
+**The 64-action surface** is the largest multi-action tool in the workspace. Organized by 12 functional groups (see table above).
 
 **Live market data.** `PriceService` fetches prices via `reqwest`. `RateCache` provides two-layer caching: in-memory `DashMap` + SQLite `finance_exchange_rates` with **15-minute TTL**.
 

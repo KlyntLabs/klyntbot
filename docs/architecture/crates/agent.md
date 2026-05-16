@@ -22,7 +22,7 @@ If you're touching this crate, you're touching the central path of every message
 ```
 crates/agent/src/
 ├── lib.rs                  ← Re-exports
-├── events.rs               ← AgentEvent enum (~30 variants — every streaming event)
+├── events.rs               ← AgentEvent enum (~64 variants — every streaming event)
 ├── subagent.rs             ← run_subagent_loop + per-invocation AgentTaskTool clone
 ├── subagent_runtime.rs     ← SubagentRuntime + ActiveSubagentRegistry + DEFAULT_TURN_CAP
 ├── subagent_events.rs      ← SubagentLifecycleEvent broadcast types
@@ -255,11 +255,10 @@ pub struct ExecuteLoopResult {
 }
 
 pub enum LoopFinishReason {
-    FinalResponse,
-    FabricatedResponse,
-    EmptyResponse,
+    Completed,
     Cancelled,
-    SafetyCap,
+    SafetyTurnLimit,
+    TokenLimit,
     LoopDetected,
 }
 ```

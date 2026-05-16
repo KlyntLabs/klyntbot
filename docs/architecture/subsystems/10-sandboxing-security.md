@@ -111,11 +111,11 @@ flowchart TB
 |---|---|
 | `src/lib.rs` | Re-exports |
 | `src/gate.rs` | `ApprovalGate`, `GateOutcome`, `check()` |
-| `src/hook.rs` | `ClassifyHook` trait |
+| `src/policy.rs` | `ClassifyHook` trait |
 | `src/coding_policy.rs` | `CodingApprovalPolicy` (3 variants) |
 | `src/channel.rs` | `ApprovalChannel` trait + `BlockingFallbackChannel` |
 | `src/grants.rs` | `GrantRow`, `GrantRepo` (CRUD on `approval_grants` table) |
-| `src/suggester.rs` | `ApprovalSuggester` trait (mirror feedback) |
+| `src/gate.rs` | `ApprovalSuggester` trait (mirror feedback) |
 
 ### `ApprovalGate`
 

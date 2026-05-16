@@ -12,7 +12,7 @@
 Klyntbot's memory system. This crate implements:
 - **Memory services** — `UnifiedMemoryService` (embedding + BM25 + PPR), `ConversationRecallService`, `SessionMemoryService`, `CognitiveContextSource`
 - **Extraction** — `ExtractionHandler` trait, `ExtractedFact`/`Entity`/`Relationship`, `ExtractionCritic`
-- **Reforge** — `run_reforge` (26-parameter signature, **16 phase markers**, 3 handler-level LLM calls, **6 extension hook traits**)
+- **Reforge** — `run_reforge` (25-parameter signature, **16 phase markers**, 3 handler-level LLM calls, **6 extension hook traits**)
 - **Mirror** — `MirrorEngine::start` returns `StartedMirror` with **8 unconditional + 2 conditional signal sources** (`SkillEffectivenessSource` is a stub)
 - **Schedulers** — `fsrs5` (power-law `retrievability` for flashcards) + `decay` (exponential `retrievability` for retrieval scoring) — **two functions with the same name and different formulas**
 - **Graph** — `louvain.rs` (394 LOC, `UnGraph<String, f64>`) + `ppr_retrieval.rs` (404 LOC, `DiGraph<String, f32, u32>`) — both first-party
@@ -318,7 +318,7 @@ pub async fn run_reforge(
 ) -> Option<ReforgeResult>;
 ```
 
-**26 parameters.** Most are `Option<&dyn Trait>` extension hooks — the cycle degrades gracefully when hooks aren't installed. A `ReforgeContext` builder refactor would help, but hasn't been done.
+**25 parameters.** Most are `Option<&dyn Trait>` extension hooks — the cycle degrades gracefully when hooks aren't installed. A `ReforgeContext` builder refactor would help, but hasn't been done.
 
 ### 6 Reforge hook traits
 
@@ -901,7 +901,7 @@ Append to `cognitive_migrations()` in `repos/mod.rs`. Pre-1.0: edit existing mig
 
 ## Open questions
 
-- **`run_reforge` 26-parameter signature.** Refactor to `ReforgeContext` builder.
+- **`run_reforge` 25-parameter signature.** Refactor to `ReforgeContext` builder.
 - **`service.rs:1` doc comment says "8 phases"** — actual is 16. Update.
 - **Two `AutotunerBridge` traits with same name.** Rename one (e.g., `ReforgeAutotunerBridge` + `MirrorAutotunerBridge`).
 - **Two `retrievability` functions with same name + different formulas.** Rename or co-locate.

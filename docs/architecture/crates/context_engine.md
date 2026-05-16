@@ -169,43 +169,57 @@ pub struct BudgetAllocator { /* opaque */ }
 impl BudgetAllocator {
     pub fn new(config: BudgetConfig) -> Self;
 
+    /// Total context window size from config.
+    pub fn config_total_window(&self) -> usize;
+
+    /// Total tokens allocated across all priorities.
+    pub fn total_allocated(&self) -> usize;
+
+    /// Tokens still available for allocation.
+    pub fn remaining(&self) -> usize;
+
+    /// Allocate up to `tokens` for the given priority, capped at remaining budget.
+    /// Emits a warning when the budget drops below 15% of available input.
     pub fn allocate(&mut self, priority: Priority, tokens: usize);
 
     /// Best-effort allocation; returns the number actually allocated.
     pub fn try_allocate(&mut self, priority: Priority, tokens: usize) -> usize;
 
-    pub fn remaining(&self) -> usize;
-    pub fn used(&self) -> usize;
-    pub fn total(&self) -> usize;
+    /// Get the current allocation for a specific priority.
+    pub fn get(&self, priority: Priority) -> usize;
 
+    /// Generate a budget usage report.
     pub fn report(&self) -> BudgetReport;
 }
 
 pub struct BudgetConfig {
-    pub total_tokens: usize,
-    pub low_budget_threshold: f32,        // default: 0.15
+    pub total_context_window: usize,
+    pub response_reserve_pct: f32,        // default: 0.15
+}
+
+impl BudgetConfig {
+    pub fn standard(window: usize) -> Self;
+    pub fn response_reserve(&self) -> usize;
+    pub fn available_input(&self) -> usize;
 }
 
 pub enum Priority {
-    Critical = 0,      // soul + skill listing — never truncated
-    VeryHigh = 1,
-    High = 2,
-    AboveNormal = 3,
-    Normal = 4,
-    BelowNormal = 5,
-    Low = 6,
-    VeryLow = 7,
+    SystemIdentity = 0,
+    ActiveTask = 1,
+    ToolDefinitions = 2,
+    RecentHistory = 3,
+    RetrievedMemory = 4,
+    CompressedHistory = 5,
+    BootstrapPersona = 6,
+    Skills = 7,
 }
 
 pub struct BudgetReport {
-    pub total: usize,
-    pub used: usize,
+    pub total_window: usize,
+    pub total_allocated: usize,
     pub remaining: usize,
-    pub low_budget: bool,
-    pub by_priority: HashMap<Priority, usize>,
+    pub per_priority: Vec<(Priority, usize)>,
 }
-
-pub const LOW_BUDGET_THRESHOLD: f32 = 0.15;
 ```
 
 ### `TieredHistoryCompressor`
@@ -549,7 +563,7 @@ LLM-based summarization adds latency + cost per turn. Extractive (first 150 char
 `BudgetAllocator::try_allocate` reserves budget per priority level. When budget is tight:
 - Sources tagged `protected()` are never truncated
 - Higher-priority sources allocated first
-- `LOW_BUDGET_THRESHOLD = 0.15` triggers warnings (via `BudgetReport::low_budget`)
+- `LOW_BUDGET_THRESHOLD = 0.15` triggers warnings during `allocate()` when remaining budget falls below 15% of available input
 
 Sources can call `try_allocate(priority, estimated)` to learn if they fit, and gracefully shorten or skip themselves.
 
@@ -790,7 +804,7 @@ engine = engine.with_memory_scorer(Arc::new(MyScorer));
 
 | Constant | Value | Location |
 |---|---|---|
-| `LOW_BUDGET_THRESHOLD` | `0.15` | `budget.rs:7` |
+| `LOW_BUDGET_THRESHOLD` | `0.15` | `budget.rs:6` |
 | Default `tier0_count` | `8` | `HistoryCompressionConfig::default` |
 | Default `batch_size` | `5` | `HistoryCompressionConfig::default` |
 | Default `target_ratio` | `0.5` | `HistoryCompressionConfig::default` |

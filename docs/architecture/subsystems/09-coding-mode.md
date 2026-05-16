@@ -1,6 +1,6 @@
 # Subsystem 09 — Coding Mode
 
-> **Status:** 🟡 In Progress (4 Reforge phases stubbed at `required_phase: 5`; `lsp-client` all-stubs; `feature-coding-bash` PTY supervisor stable)
+> **Status:** 🟡 In Progress (2 Reforge phases stubbed in `reforge_phase.rs`; `lsp-client` all-stubs; `feature-coding-bash` PTY supervisor stable)
 > **Status last verified:** 2026-05-16
 > **Crates:** `klynt-core`, `coding-agents-md`, `coding-ingest`, `coding-memory`, `feature-coding-bash`, `feature-coding-todo`, `klynt-protocol`, `klynt-hooks`, `klynt-execpolicy`, `klynt-skill-loader`, `klynt-pty`, `klynt-git-utils`, `klynt-truncation`, `lsp-client` *(14 crates — the largest single subsystem)*
 > **Parent overview:** [`00-overview.md`](../00-overview.md)
@@ -9,9 +9,9 @@
 
 ## TL;DR
 
-Klyntbot's Claude-Code-style coding experience. **`klynt-core`** registers **21 tools** (7 read-only, 5 mutating, 2 plan-mode, 8 recall stubs). **`coding-ingest`** normalizes events from **5 external CLIs** (Claude Code, Codex, kimi-cli, opencode, git post-commit) into a unified `AgentEvent` stream with 21 `EventKind` variants. **`coding-memory`** runs a **3-phase Distiller** (extractive → LLM synthesis → reconciliation) that writes `episodic_memories` + `semantic_facts` per turn, plus 8 MCP recall tools. **`klynt-execpolicy`** + **`klynt-sandbox`** + **`klynt-hooks`** gate every command. **`klynt-git-utils`** captures undo state via **ghost commits** that never touch branch refs.
+Klyntbot's Claude-Code-style coding experience. **`klynt-core`** registers **22 tools** (7 read-only, 5 mutating, 2 plan-mode, 8 recall stubs). **`coding-ingest`** normalizes events from **5 external CLIs** (Claude Code, Codex, kimi-cli, opencode, git post-commit) into a unified `AgentEvent` stream with 21 `EventKind` variants. **`coding-memory`** runs a **3-phase Distiller** (extractive → LLM synthesis → reconciliation) that writes `episodic_memories` + `semantic_facts` per turn, plus 8 MCP recall tools. **`klynt-execpolicy`** + **`klynt-sandbox`** + **`klynt-hooks`** gate every command. **`klynt-git-utils`** captures undo state via **ghost commits** that never touch branch refs.
 
-Several pieces are scaffolded but not finished: `lsp-client` is all-stubs, the 4 coding-memory Reforge phases all return `NotImplementedInPhase { required_phase: 5 }`, the `InProcess` hook execution mode is typed but dead, and the kimi-cli/opencode adapters are hook-registered but actually poll-only.
+Several pieces are scaffolded but not finished: `lsp-client` is all-stubs, `CodingSynthesisPhase` and `RuleArtifactGenerationPhase` in `coding-memory/src/reforge_phase.rs` return `NotImplementedInPhase { required_phase: 5 }` (the real implementations live in `reforge/coding_synthesis.rs` and `reforge/rule_artifacts.rs` and are wired into `app-core`), the `InProcess` hook execution mode is typed but dead, and the kimi-cli/opencode adapters are hook-registered but actually poll-only.
 
 ---
 
@@ -27,14 +27,14 @@ flowchart TB
     classDef util fill:#fffde7,stroke:#fbc02d,color:#f57f17
     classDef stub fill:#f5f5f5,stroke:#999,color:#616161
 
-    KC[klynt-core<br/><i>ToolKitBuilder · 21 tools</i><br/>read · list_dir · glob · grep · web_fetch · ask_user · tool_search<br/>bash · write · edit · apply_patch · notebook_edit<br/>enter_plan_mode · exit_plan_mode<br/>8 recall stubs]:::tool
+    KC[klynt-core<br/><i>ToolKitBuilder · 22 tools</i><br/>read · list_dir · glob · grep · web_fetch · ask_user · tool_search<br/>bash · write · edit · apply_patch · notebook_edit<br/>enter_plan_mode · exit_plan_mode<br/>8 recall stubs]:::tool
     FCB[feature-coding-bash<br/><i>PTY supervisor</i><br/>ring-buffer · attach/detach<br/>JobSupervisorHandle impl]:::tool
     FCT[feature-coding-todo<br/><i>TodoWrite scratchpad</i>]:::tool
 
-    CI[coding-ingest<br/><i>5 adapters · AgentEvent::V1<br/>hook_cli::run · OpencodePoller<br/>21 EventKind variants</i>]:::ingest
+    CI[coding-ingest<br/><i>5 adapters · AgentEvent::V1<br/>hook_cli::run · OpencodePoller<br/>22 EventKind variants</i>]:::ingest
     CAM[coding-agents-md<br/><i>WorkspaceAgentsSource<br/>walks AGENTS.md chain</i>]:::ingest
 
-    CM[coding-memory<br/><i>Distiller (3-phase)<br/>ReforgeWriter (bi-temporal)<br/>4 Reforge phases (stubbed)<br/>8 MCP recall tools<br/>TreeSitterExtractor</i>]:::mem
+    CM[coding-memory<br/><i>Distiller (3-phase)<br/>ReforgeWriter (bi-temporal)<br/>2 Reforge phases stubbed in legacy trait<br/>8 MCP recall tools<br/>TreeSitterExtractor</i>]:::mem
 
     KP[klynt-protocol<br/><i>Op · Submission<br/>13 HookEventName variants<br/>adapted from codex-rs</i>]:::hook
     KH[klynt-hooks<br/><i>HookEngine · subprocess<br/>5s default timeout · fail-open<br/>InProcess mode TYPED-BUT-DEAD</i>]:::hook
@@ -86,7 +86,7 @@ The **6 conceptual layers** in this subsystem:
 
 ## Reference
 
-### `klynt-core` — 21 tools in 4 groups
+### `klynt-core` — 22 tools in 4 groups
 
 **`register_read_only` (7 tools, `ChannelMask::ALL`)**
 
@@ -97,7 +97,7 @@ The **6 conceptual layers** in this subsystem:
 | `glob` | Glob file matching |
 | `grep` | Regex file search |
 | `tool_search` | MCP tool discovery |
-| `ask_user` | Synchronous user prompt (uses `LONG_RUNNING_TOOL_TIMEOUT = 600s`) |
+| `ask_user` | Synchronous user prompt (uses `LONG_RUNNING_TOOL_TIMEOUT = 600s` from `crates/agent/src/execution/core.rs:54`) |
 | `web_fetch` | HTTP fetch — policy-gated, mirror-learning wired |
 
 **`register_mutating` (5 tools, `ChannelMask::CODING_ONLY`)**
@@ -333,7 +333,7 @@ pub async fn diagnostics_for(...) -> Result<Vec<...>> {
    ↓
 3. CodingThreadRuntime::init:
    - Build ToolKitBuilder (policy from ~/.klyntbot/rules/, privacy, sandbox, hooks, snapshots, mirror)
-   - register_all(&tool_registry)  ← 21 tools registered
+   - register_all(&tool_registry)  ← 22 tools registered
    - klynt-skill-loader::SkillIndex::discover()  ← 4 roots scanned
    - SkillActivator constructed with `always_activate` set
    ↓

@@ -229,8 +229,8 @@ impl ToolRegistry {
 
     pub fn get_definitions(&self) -> Arc<Vec<Value>>;     // cached schema list for the LLM
     pub fn get_metadata(&self, name: &str) -> Option<&ToolMetadata>;
-    pub fn list_meta(&self) -> Vec<&ToolMetadata>;
-    pub fn by_category(&self, cat: &ToolCategory) -> Vec<DynTool>;
+    pub fn list_meta(&self) -> Vec<(String, String, Vec<String>)>;
+    pub fn by_category(&self, cat: &ToolCategory) -> Vec<&str>;
 
     pub fn record_usage(&self, name: &str);
     pub fn top_used(&self, n: usize) -> Vec<(String, u64)>;

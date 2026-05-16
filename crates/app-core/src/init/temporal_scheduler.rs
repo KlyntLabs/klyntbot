@@ -1,8 +1,8 @@
 //! Phase 2 unified TemporalScheduler initialization.
 //!
-//! Runs SIDE-BY-SIDE with the legacy `CronService` in `init/cron.rs`.
+//! Runs SIDE-BY-SIDE with the legacy `CronExecutor` in `init/cron.rs`.
 //! Phase 3 will migrate callback consumers to bus subscribers; at that point
-//! `CronService` can be removed.
+//! `CronExecutor` can be removed.
 
 use std::sync::Arc;
 
@@ -33,7 +33,7 @@ pub(super) struct TemporalSchedulerResult {
 /// existing `cron_jobs`. Subscribes to `SystemDidWake` for immediate catch-up
 /// after macOS sleep/resume.
 ///
-/// Runs alongside `CronService` for Phase 2 — both schedulers will process
+/// Runs alongside `CronExecutor` for Phase 2 — both schedulers will process
 /// cron_jobs independently. Phase 3 migrates callback consumers to bus
 /// subscribers and removes `CronService`.
 pub(super) async fn init_temporal_scheduler(
@@ -96,7 +96,7 @@ pub(super) async fn init_temporal_scheduler(
     });
 
     let scheduler_handle = scheduler.clone().start_background();
-    info!("TemporalScheduler started (side-by-side with CronService)");
+    info!("TemporalScheduler started (side-by-side with CronExecutor)");
 
     Ok(TemporalSchedulerResult {
         scheduler,

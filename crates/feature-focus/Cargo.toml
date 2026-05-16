@@ -4,10 +4,10 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-common = { path = "../common" }
-storage = { path = "../storage" }
-scheduling = { path = "../scheduling" }
-tools-core = { path = "../tools-core" }
+common = { workspace = true }
+storage = { workspace = true }
+scheduling = { workspace = true }
+tools-core = { workspace = true }
 jiff = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

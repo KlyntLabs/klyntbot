@@ -164,6 +164,7 @@ feature-productivity = { path = "crates/feature-productivity" }
 plugin-runtime = { path = "crates/plugin-runtime" }
 cognitive = { path = "crates/cognitive" }
 feature-coaching = { path = "crates/feature-coaching" }
+feature-coding-bash = { path = "crates/feature-coding-bash" }
 feature-coding-todo = { path = "crates/feature-coding-todo" }
 feature-insights = { path = "crates/feature-insights" }
 desktop-shared = { path = "crates/desktop-shared" }

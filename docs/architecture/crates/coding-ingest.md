@@ -11,7 +11,7 @@
 
 The crate that turns external CLI events into a unified `AgentEvent` stream. Five adapters (`claude_code`, `codex`, `kimi_cli`, `opencode`, `git_post_commit`) implement `IngestAdapter`. Two are hook-driven (`claude_code`, `codex`); two are poll-only (`kimi_cli`, `opencode`) — registered in the hook CLI but short-circuit with `"poll-only (Phase 7)"`. One (`git_post_commit`) is hook-driven via `.git/hooks/post-commit`.
 
-`AgentEvent::V1` has 21 `EventKind` variants (9 base + 10 klynt-cli-only + 2 background-job). The cross-CLI normalization invariant (**Inv 7**: `parse(serialize(event)) == event`) is enforced by a 64-case proptest at `tests/cross_cli_normalization.rs`.
+`AgentEvent::V1` has 22 `EventKind` variants (10 base + 10 klynt-cli-only + 2 background-job). The cross-CLI normalization invariant (**Inv 7**: `parse(serialize(event)) == event`) is enforced by a 64-case proptest at `tests/cross_cli_normalization.rs`.
 
 The `klyntbot-hook` binary and the `desktop --hook` short-circuit share `hook_cli::run()` — sub-10ms hot path that creates a fresh `new_current_thread` Tokio runtime per invocation.
 
@@ -22,7 +22,7 @@ The `klyntbot-hook` binary and the `desktop --hook` short-circuit share `hook_cl
 ```
 crates/coding-ingest/src/
 ├── lib.rs                      ← Re-exports + IngestAdapter trait
-├── event.rs                    ← AgentEvent::V1 + 21 EventKind variants + AgentSource
+├── event.rs                    ← AgentEvent::V1 + 22 EventKind variants + AgentSource
 ├── hook_cli.rs                 ← run(args) — sub-10ms hot path (shared by klyntbot-hook + desktop --hook)
 ├── hook_client.rs              ← HookClient — Unix socket + buffer fallback
 ├── daemon.rs                   ← Ingest daemon (event log writer + dispatcher)
@@ -102,12 +102,12 @@ pub struct RepoScope {
 }
 ```
 
-### 21 `EventKind` variants
+### 22 `EventKind` variants
 
 ```rust
 pub enum EventKind {
-    // 9 base — emitted by all 5 adapters
-    SessionStart { profile: Option<String>, agent_id: Option<String> },
+    // 10 base — emitted by all 5 adapters
+    SessionStart { model: Option<String>, source_reason: String },
     SessionEnd { summary: Option<String> },
     UserPrompt { content: String },
     AssistantMsg { content: String, model: Option<String> },
@@ -116,6 +116,7 @@ pub enum EventKind {
     TestRun { kind: String, passed: u32, failed: u32, duration_ms: u64 },
     CompactEvent { tokens_before: u32, tokens_after: u32 },
     Error { message: String },
+    GitCommit { commit_hash: String, parent_hash: Option<String>, repo_root: PathBuf, changed_files: Vec<PathBuf> },
 
     // 10 klynt-cli-only — high-resolution Klynt-specific events
     SkillActivated { skill_name: String, reason: SkillActivationReason },

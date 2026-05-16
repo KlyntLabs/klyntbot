@@ -1,6 +1,6 @@
 [package]
 name = "approval"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 
 [dependencies]
@@ -18,12 +18,12 @@ tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4", "serde"] }
 jiff = { workspace = true }
 
-common = { path = "../common" }
-config = { path = "../config" }
-tools-core = { path = "../tools-core" }
-storage = { path = "../storage" }
-bus = { path = "../bus" }
-activity-log = { path = "../activity-log" }
+common = { workspace = true }
+config = { workspace = true }
+tools-core = { workspace = true }
+storage = { workspace = true }
+bus = { workspace = true }
+activity-log = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true

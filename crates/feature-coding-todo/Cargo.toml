@@ -5,23 +5,23 @@ edition = "2024"
 rust-version = "1.93"
 
 [dependencies]
-approval = { path = "../approval" }
+approval = { workspace = true }
 async-trait = { workspace = true }
 ai-core = { workspace = true }
 ai-core-macros = { workspace = true }
-bus = { path = "../bus" }
-common = { path = "../common" }
-config = { path = "../config" }
+bus = { workspace = true }
+common = { workspace = true }
+config = { workspace = true }
 dashmap = { workspace = true }
 jiff = { workspace = true, features = ["serde"] }
 parking_lot.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 specta = { workspace = true }
-storage = { path = "../storage" }
+storage = { workspace = true }
 thiserror = { workspace = true }
-tools-core = { path = "../tools-core" }
-tools-core-macros = { path = "../tools-core-macros" }
+tools-core = { workspace = true }
+tools-core-macros = { workspace = true }
 tracing = { workspace = true }
 ulid = { workspace = true }
 uuid = { workspace = true }

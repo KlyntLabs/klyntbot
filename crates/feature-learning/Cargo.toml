@@ -6,8 +6,8 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-ai-core = { path = "../ai-core" }
-ai-core-macros = { path = "../ai-core-macros" }
+ai-core = { workspace = true }
+ai-core-macros = { workspace = true }
 async-trait = { workspace = true }
 bus = { workspace = true }
 common = { workspace = true }

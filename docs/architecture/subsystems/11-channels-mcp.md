@@ -47,7 +47,7 @@ flowchart TB
     MCSRV[MCP Server<br/><i>ToolRegistryBridge<br/>AgentBridge (agent tool)</i>]:::mcp
     MCCLI[MCP Client<br/><i>McpManager · McpTransport<br/>Stdio | Http</i>]:::mcp
     SAMP[SamplingDelegate<br/><i>LLM-to-LLM</i>]:::mcp
-    CB[McpCircuitBreaker<br/><i>per-server · cooldown 30s</i>]:::mcp
+    CB[McpCircuitBreaker<br/><i>per-server · cooldown 60s</i>]:::mcp
     WL[ExposedTools whitelist<br/><i>AiFeatureRegistry ∪ EXPLICIT_TOOL_ALLOWLIST</i>]:::mcp
 
     BR[mcp-bridge<br/><i>Unix socket: $KLYNTBOT_HOME/mcp-events.sock<br/>BridgeFrame: 4-byte LE + JSON, 1MB cap</i>]:::bridge
@@ -253,7 +253,7 @@ Set via `McpClientOptions::sampling_delegate`. When an external MCP server sends
 
 - Opens after `threshold` failures within `cooldown` window
 - `is_open(server)` — auto-resets if cooldown expired
-- `start_health_check` task polls every 30s for servers with `cooldown_expired()` and reconnects. Reacts to `notifications/tools/list_changed` signals from servers.
+- `McpManager::start_health_check` task polls every 60s for servers with `cooldown_expired()` and reconnects. Reacts to `notifications/tools/list_changed` signals from servers. The `McpCircuitBreaker` itself does not own the health-check task.
 
 ### MCP allowlists (multiple layers)
 
