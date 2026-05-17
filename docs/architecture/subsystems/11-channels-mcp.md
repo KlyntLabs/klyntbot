@@ -536,7 +536,6 @@ So raw events ≠ work contexts. A user looking for "what was I doing yesterday"
 - **`McpApprovalChannel` always declines.** Documented in [`10-sandboxing-security.md`](./10-sandboxing-security.md); also a debt item here because MCP users hitting `Sensitive` tools see only a "Open Klynt on desktop" error.
 - **Email is the only channel with `consent_granted` gating.** Either remove (if API token implies consent) or extend to others for consistency.
 - **The dispatcher passes any non-`held_release` `kind` through.** Combined with the `cron_job` vs `cron` naming overlap from [`06-scheduling.md`](./06-scheduling.md), there's a latent bug if `CronExecutor` ever fails to subscribe.
-- **`mcp-bridge`'s 1 MB frame cap** is not documented in any user-facing material. Frames larger than that are dropped silently from the consumer's perspective.
 - **Each channel uses a different transport** with different reconnect/heartbeat strategies. Worth normalizing OR documenting the trade-off explicitly (today each adapter just does whatever the platform requires).
 - **Activity-log inference loop** runs on a schedule but its cadence isn't user-facing. Document or expose.
 - **MCP tool name namespacing** truncates at 64 chars with hash suffix. If two long-named server+tool combos collide on the hash, we'd have a silent registration conflict. Worth a test.

@@ -1,7 +1,7 @@
 # KlyntBot — Technical Debt Inventory
 
 > **Living document.** Categorized, not chronological. Updated as items are found, fixed, or re-evaluated.
-> **Last refreshed:** 2026-05-17 (Tier 2 sweep — closed 4 more entries: feature-coding-bash workspace deps, orphan `crates/desktop-ui/` confirmed gone, root `AGENTS.md` deleted, feature-coding-todo health_check now real; cumulative ~28 entries closed today).
+> **Last refreshed:** 2026-05-17 (Tier 3 sweep — closed 5 more entries via doc-only edits + verification: 3 entries (voice/say, MCP 1MB cap, sandbox-helper exit 2) were already documented in subsystems but TECH_DEBT.md was stale; 1 entry (kimi/opencode poll-only) is documented in `crates/coding-ingest.md`; the `feature-learning` Task-47 comment was rewritten with a navigable file pointer. Cumulative ~33 entries closed today).
 > **Scope:** the whole Rust workspace + `/desktop-ui` frontend. Not third-party deps.
 > **Total entries:** ~130 across 9 categories.
 
@@ -139,7 +139,6 @@ These are not bugs — they're real fallback paths kept alive during a migration
 
 | Sev | Location | Item | Notes |
 |---|---|---|---|
-| P3 | `crates/feature-learning/src/feature.rs:43` | Comment: "see Task 47 for the exposure path" | Task ID is internal/Linear-style — stale identifier; wiring exists. |
 
 ---
 
@@ -148,7 +147,6 @@ These are not bugs — they're real fallback paths kept alive during a migration
 | Sev | Location | Item | Notes |
 |---|---|---|---|
 | P1 | Bundle budget not wired into any merge-gate script | `.size-limit.json` exists (threads route ≤ 350 kB gzipped, total ≤ 2.5 MB) but no script invokes `size-limit` — only `bun run size-limit` manually. | Wire into `run_chat_perf_gates.sh` or similar so regressions fail CI. |
-| P2 | Voice/speech path docs | `voice-engine::synthesize_to_file` shells out to `/usr/bin/say` — AVSpeechSynthesizer objc2 wiring is deferred. Surface this in `crates/voice-engine.md` and `subsystems/12-plugins-platform.md` so readers don't expect AVSpeech. | Source is honest; just needs a one-line note in the relevant docs. |
 | P1 | TTFT perf gate is a no-op skeleton | `scripts/run_chat_perf_gates.sh` runs `agent/benches/ttft_e2e.rs` with `THRESHOLD_TTFT_P95_MS=25` (default — NOT 15ms as docs claim) but prints `"numeric gate deferred to PR8"` and never `exit 1`s. | Implement the numeric assertion. |
 | P1 | `crates/plugin-runtime/src/manifest.rs` (`PluginCronJob`) | Manifest deserializes `cronJobs: Vec<PluginCronJob>` but **no executor reads them**. Plugins can declare cron jobs and they will never fire. | Implement plugin-cron executor or remove the field. |
 | P1 | `crates/platform-macos/src/computer_use/ax_walker.rs` (`AccessibilityNode.frame`) | Frame coordinates are in **AppKit (bottom-left)** space, not Quartz (top-left) as the rest of `PlatformInput`/`PlatformCapture` API documents. Y-flip is a Phase 4 TODO. | Significant correctness gotcha for future Computer Use. Fix y-flip or document the inconsistency loudly. |
@@ -205,7 +203,6 @@ These are not bugs but they violate stated invariants.
 | P2 | `Hook.matcher` / Glob rule tool-name normalization | Strips `_` and `-` and lowercases tool names before matching. So `BashTool`, `bash-tool`, `bash_tool`, and `bash` all match a `bash(*)` glob. | Footgun for case-sensitive systems; non-obvious behavior. |
 | P2 | `CodingApprovalPolicy::YoloMode` expiry edge case | When `until` timestamp passes, `classify` returns `None`. The fallback logic in `Default` then applies — but the hardcoded fallback is `matches!(DefaultPolicy::Ask, DefaultPolicy::Allow)` (false). Effectively becomes "ask everything," NOT "go back to Default." | Subtle; document loudly or change semantics. |
 | P2 | `BlockingFallbackChannel.capabilities()` mismatch | Claims `supports_classes: {Destructive, Admin}` but always returns Decline regardless of class. | Either tighten capabilities to advertise correctly, or rename to convey "I will decline but you should still ask me." |
-| P3 | kimi-cli + opencode hook USAGE listing | `klyntbot-hook --help` lists both as supported sources, but the `hook_cli::run()` dispatch short-circuits with `"poll-only (Phase 7)"` for both. Data collection happens via background `OpencodePoller` (and similar). | Confusing for anyone reading `--help`. Either remove from USAGE or implement the hook path. |
 
 ---
 
@@ -229,8 +226,6 @@ Things present in the codebase that aren't enumerated in any doc today.
 | P2 | `coding_approval_history` retention | Grows unboundedly; no retention policy or compaction job. | Add a 90-day retention or similar. |
 | P2 | `feature-productivity` 20 tables undocumented | Only `activity_events` and `daily_summaries` are mentioned in CLAUDE.md. 18 other tables (incl. `productivity_quality_scores`, `productivity_narratives`, `productivity_voice_journals`, `productivity_categorization_cache`, `productivity_privacy_rules`, `productivity_rule_evolution_log`, etc.) are completely undocumented. | Schema discoverability gap. |
 | P2 | Cross-feature shared tables | `practice_sessions` is defined in `feature-notes` migration 002 but also used by `feature-language-learning`. `activity_events` (in `feature-productivity`) is read by `feature-launcher::AttentionAggregator`. | No enforcement mechanism prevents schema changes from breaking the other crate. Add a runtime ownership registry or move shared tables to a dedicated crate. |
-| P3 | `mcp-bridge` `MAX_FRAME_BYTES = 1MB` | Frames > 1 MB return `Err` (silently from the consumer's perspective). Limit not documented in user-facing material. | Surface in docs. |
-| P3 | `klynt-sandbox-helper` exit code 2 on non-Linux | Linux-only branch of `main()`; non-Linux prints error + `process::exit(2)`. Any cross-platform code path mistakenly invoking the helper on macOS sees exit 2, not a sandbox error. | Worth surfacing as a debugging hint. |
 
 ---
 
