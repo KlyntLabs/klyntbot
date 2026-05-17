@@ -9,7 +9,7 @@
 
 ## TL;DR
 
-Three crates that every other crate in the workspace imports. **`common`** owns the error type (`KlyntbotError`), the strong newtypes (`SessionKey`, `ChannelName`, `ChatId`, `MessageRole`), and a grab bag of shared utilities (HTTP client, date parsing, pricing tables, notification ports). **`config`** owns the `Config` schema (camelCase JSON at `~/.klyntbot/config.json`), file I/O, hot-reload, and the `KLYNTBOT_...` env-override layer. **`bus`** owns the in-process pub/sub backbone — `MessageBus` (inbound/outbound chat), `DomainEventBus` (cross-feature events), `TypedBroker` (typed topic pub/sub), and `ContextUpdateQueue` (live agent-context refresh).
+Three crates that every other crate in the workspace imports. **`common`** owns the error type (`KlyntBotError`), the strong newtypes (`SessionKey`, `ChannelName`, `ChatId`, `MessageRole`), and a grab bag of shared utilities (HTTP client, date parsing, pricing tables, notification ports). **`config`** owns the `Config` schema (camelCase JSON at `~/.klyntbot/config.json`), file I/O, hot-reload, and the `KLYNTBOT_...` env-override layer. **`bus`** owns the in-process pub/sub backbone — `MessageBus` (inbound/outbound chat), `DomainEventBus` (cross-feature events), `TypedBroker` (typed topic pub/sub), and `ContextUpdateQueue` (live agent-context refresh).
 
 If any of these change, **everything downstream rebuilds.** Treat them like the C ABI of the workspace.
 
@@ -23,7 +23,7 @@ flowchart TB
     classDef found fill:#e8f5e9,stroke:#388e3c,color:#1b5e20
 
     subgraph FOUND ["Foundations"]
-        COM[common<br/><i>17 modules</i><br/>KlyntbotError · SessionKey · MessageRole · HTTP · pricing]:::found
+        COM[common<br/><i>17 modules</i><br/>KlyntBotError · SessionKey · MessageRole · HTTP · pricing]:::found
         CFG[config<br/><i>3 modules</i><br/>Config schema · hot-reload · env overrides · Secret]:::found
         BUS[bus<br/><i>8 modules</i><br/>MessageBus · DomainEventBus · TypedBroker · ContextUpdateQueue]:::found
     end
@@ -47,7 +47,7 @@ flowchart TB
 Foundations sit at the bottom of the dependency stack. They have **three jobs**:
 
 1. **Make impossible states unrepresentable.** Use `SessionKey` instead of `String`, `MessageRole` instead of a stringly-typed enum, `Secret<String>` for API keys. The type system prevents whole categories of bugs from ever compiling.
-2. **Provide the one true error type.** Every crate returns `common::Result<T>` (alias for `Result<T, KlyntbotError>`). Domain errors auto-convert via `From`. A handler ten layers deep can `?` its way to the API boundary without manual translation.
+2. **Provide the one true error type.** Every crate returns `common::Result<T>` (alias for `Result<T, KlyntBotError>`). Domain errors auto-convert via `From`. A handler ten layers deep can `?` its way to the API boundary without manual translation.
 3. **Be the only place pub/sub lives.** No crate rolls its own broadcast channel. Everything that needs to publish events goes through `bus` — usually `DomainEventBus` for cross-feature events, sometimes `MessageBus` for chat I/O.
 
 Foundations is also **the only place to put truly cross-cutting utilities** — HTTP client construction, pricing tables, date parsing, the FSRS5 helpers in `memory.rs`. The bar for landing something here is high: it must be useful to ≥3 other crates and have no domain dependencies.
@@ -61,7 +61,7 @@ Foundations is also **the only place to put truly cross-cutting utilities** — 
 | Path | Purpose |
 |---|---|
 | `src/lib.rs` | Module declarations + curated re-exports |
-| `src/error.rs` | `KlyntbotError`, `ToolError`, `ProviderError`, `ChannelError`, `SessionError`, `ConfigError`, `Result<T>` |
+| `src/error.rs` | `KlyntBotError`, `ToolError`, `ProviderError`, `ChannelError`, `SessionError`, `ConfigError`, `Result<T>` |
 | `src/types.rs` | `SessionKey`, `ChannelName`, `ChatId`, `MessageRole`, `AppMode`, channel string constants |
 | `src/session_mode.rs` | `SessionMode` enum (`assistant` / `coding`) — creation-time, immutable |
 | `src/prompts.rs` | `InteractionRequest`, `Question`, `Answer`, `AnswerOption`, `AnswerType`, `AnswerValue`, `FormResponse` (form-based agent ↔ user interaction) |
@@ -78,10 +78,10 @@ Foundations is also **the only place to put truly cross-cutting utilities** — 
 | `src/helpers.rs` | `truncate_at_boundary`, `truncate_chars` (Unicode-safe truncation) |
 | `src/ports.rs` | `NotificationSender` trait (dependency-inversion seam) |
 
-### `KlyntbotError` — variants
+### `KlyntBotError` — variants
 
 ```rust
-pub enum KlyntbotError {
+pub enum KlyntBotError {
     Bus(String),
     BusDisconnected,
     Tool(ToolError),                  // Sub-enum: NotFound, InvalidParams, ExecutionFailed, PermissionDenied, HookBlocked
@@ -104,7 +104,7 @@ pub enum KlyntbotError {
 ```
 
 **Key invariants:**
-- `From<sqlx::Error>` lands in `KlyntbotError::Storage` (only when `sqlx` feature is on).
+- `From<sqlx::Error>` lands in `KlyntBotError::Storage` (only when `sqlx` feature is on).
 - `NotImplemented` is the canonical phased-stub marker (matches `coding-memory::NotImplementedInPhase`).
 - `SessionAlreadyStreaming` is the double-send guard surfaced by `app-core::chat_send`.
 
@@ -234,14 +234,14 @@ tokio::spawn(async move {
 ```rust
 // In a leaf function
 let row = repo.find(id).await
-    .map_err(|e| KlyntbotError::Storage(e.to_string()))?;   // sqlx::Error → KlyntbotError
+    .map_err(|e| KlyntBotError::Storage(e.to_string()))?;   // sqlx::Error → KlyntBotError
 
 // In a handler
-let result = self.do_thing().await?;                        // any KlyntbotError variant
+let result = self.do_thing().await?;                        // any KlyntBotError variant
 
 // At the API boundary (Tauri command)
 let outcome = appcore.do_thing(req).await
-    .map_err(ApiError::from)?;                              // KlyntbotError → ApiError
+    .map_err(ApiError::from)?;                              // KlyntBotError → ApiError
 ```
 
 The pattern is: **convert at boundaries, propagate the unified type internally.** No handler should match on `sqlx::Error` directly.
@@ -305,8 +305,8 @@ Effectively every other workspace crate. The Cargo dependency graph shows `commo
 
 ### Adding a new error variant
 
-1. Prefer extending an existing sub-error enum (`ToolError`, `ProviderError`, …) over adding to `KlyntbotError` directly.
-2. If you add to `KlyntbotError`, add the `#[error("...")]` formatting and a category (e.g. `StorageNotFound` is 404-shaped, `StorageConflict` is 409-shaped).
+1. Prefer extending an existing sub-error enum (`ToolError`, `ProviderError`, …) over adding to `KlyntBotError` directly.
+2. If you add to `KlyntBotError`, add the `#[error("...")]` formatting and a category (e.g. `StorageNotFound` is 404-shaped, `StorageConflict` is 409-shaped).
 3. Audit `From` impls — if your variant could absorb a foreign error type, add the `From`.
 
 ### Adding a config field

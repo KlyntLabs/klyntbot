@@ -26,7 +26,7 @@ crates/mcp/src/
 │
 ├── client/
 │   ├── mod.rs              ← McpManager + McpClientOptions
-│   ├── handler.rs          ← KlyntbotClientHandler + SamplingDelegate
+│   ├── handler.rs          ← KlyntBotClientHandler + SamplingDelegate
 │   ├── transport.rs        ← McpTransport (Stdio | Http) variant resolution
 │   └── circuit_breaker.rs  ← McpCircuitBreaker
 │
@@ -35,7 +35,7 @@ crates/mcp/src/
     └── approval.rs         ← McpApprovalChannel (always-decline stub)
 
 crates/klyntbot-server/src/
-├── lib.rs                  ← KlyntbotServerHandler + serve_stdio + serve_http
+├── lib.rs                  ← KlyntBotServerHandler + serve_stdio + serve_http
 ├── bridge/
 │   ├── mod.rs
 │   ├── registry.rs         ← ToolRegistryBridge
@@ -51,23 +51,23 @@ crates/klyntbot-server/src/
 
 ## Public API surface (server side, in `klyntbot-server`)
 
-### `KlyntbotServerHandler`
+### `KlyntBotServerHandler`
 
 ```rust
-pub struct KlyntbotServerHandler {
+pub struct KlyntBotServerHandler {
     app: Arc<AppCore>,
     bridge: ToolRegistryBridge,
     agent_bridge: Option<AgentBridge>,
     whitelist: HashSet<String>,
 }
 
-impl KlyntbotServerHandler {
+impl KlyntBotServerHandler {
     pub fn new(app: Arc<AppCore>, whitelist: Vec<String>) -> Self;
 }
 
 // Implements rmcp::handler::server::ServerHandler
 #[async_trait]
-impl ServerHandler for KlyntbotServerHandler {
+impl ServerHandler for KlyntBotServerHandler {
     async fn list_tools(&self) -> Result<ListToolsResult, McpError>;
     async fn call_tool(&self, params: CallToolRequestParams) -> Result<CallToolResult, McpError>;
     async fn list_resources(&self) -> Result<ListResourcesResult, McpError>;
@@ -164,7 +164,7 @@ pub async fn serve_http(
 
 **Stdio mode:** Used by `klyntbot mcp serve --stdio` (called by Claude Code etc.). Uses `rmcp::transport::io::stdio()`. Drains event channels in a separate task. Calls `app.shutdown()` before returning.
 
-**HTTP mode:** Embedded Axum HTTP server, spawned from `desktop::run_desktop_app` if `config.mcp.server.enabled`. Uses `rmcp::transport::streamable_http_server::StreamableHttpService<KlyntbotServerHandler, LocalSessionManager>` mounted at `/mcp`. Optional bearer-token auth middleware (`Authorization: Bearer <token>`).
+**HTTP mode:** Embedded Axum HTTP server, spawned from `desktop::run_desktop_app` if `config.mcp.server.enabled`. Uses `rmcp::transport::streamable_http_server::StreamableHttpService<KlyntBotServerHandler, LocalSessionManager>` mounted at `/mcp`. Optional bearer-token auth middleware (`Authorization: Bearer <token>`).
 
 ---
 
@@ -238,7 +238,7 @@ pub trait SamplingDelegate: Send + Sync {
 }
 ```
 
-Set via `McpClientOptions::sampling_delegate`. When an external MCP server sends `sampling/createMessage`, `KlyntbotClientHandler::create_message` invokes the delegate. Returns `method_not_found` if none configured.
+Set via `McpClientOptions::sampling_delegate`. When an external MCP server sends `sampling/createMessage`, `KlyntBotClientHandler::create_message` invokes the delegate. Returns `method_not_found` if none configured.
 
 The delegate is typically `Arc<DynProvider>` wrapped to translate MCP `CreateMessageRequest` ↔ `providers::ChatParams` — Klynt as the LLM for an MCP server's sampling needs.
 
@@ -419,7 +419,7 @@ MCP doesn't have a generic interactive-prompt primitive (`sampling/createMessage
 `klyntbot://tasks/today` → calls task handler with today's filter.
 `klyntbot://config/skills` → returns skill listing from `SkillStore`.
 
-All return `ReadResourceResult` with `contents` as a `Vec<ResourceContents>`. Each resource is implemented as a method on `KlyntbotServerHandler::handle_<resource>`.
+All return `ReadResourceResult` with `contents` as a `Vec<ResourceContents>`. Each resource is implemented as a method on `KlyntBotServerHandler::handle_<resource>`.
 
 ---
 
@@ -430,7 +430,7 @@ All return `ReadResourceResult` with `contents` as a `Vec<ResourceContents>`. Ea
 ```
 1. Claude Code config has:
    mcp_servers: {
-     "klyntbot": { command: "/Applications/Klyntbot.app/Contents/MacOS/Klyntbot",
+     "klyntbot": { command: "/Applications/KlyntBot.app/Contents/MacOS/KlyntBot",
                     args: ["mcp", "serve", "--stdio"], env: { ... } }
    }
 2. Claude Code spawns the binary as a child process
@@ -441,7 +441,7 @@ All return `ReadResourceResult` with `contents` as a `Vec<ResourceContents>`. Ea
    - app_core::init(handle) → AppCore::init_with_sender
    - klyntbot_server::serve_stdio(app, whitelist).await
 5. serve_stdio:
-   - KlyntbotServerHandler::new(app, whitelist)
+   - KlyntBotServerHandler::new(app, whitelist)
    - Build rmcp stdio transport from std::io::stdin + std::io::stdout
    - Server loop: rmcp handles initialize, listTools, callTool, readResource, etc.
 6. On Ctrl+C / parent disconnect:
@@ -455,7 +455,7 @@ All return `ReadResourceResult` with `contents` as a `Vec<ResourceContents>`. Ea
 ```
 Claude Code: tools/call { name: "tasks", arguments: { action: "list", limit: 10 } }
    ↓
-KlyntbotServerHandler::call_tool
+KlyntBotServerHandler::call_tool
    ↓
 1. Is "tasks" in whitelist? Yes → ToolRegistryBridge::execute
    (If "agent" → AgentBridge::execute)
@@ -512,7 +512,7 @@ let tools = manager.list_tools().await;
 ```
 External MCP server: sampling/createMessage { prompt: "Summarize this code", … }
    ↓
-KlyntbotClientHandler::create_message
+KlyntBotClientHandler::create_message
    ↓
 if let Some(delegate) = &self.sampling_delegate {
     let result = delegate.sample(params).await?;
@@ -652,7 +652,7 @@ impl SamplingDelegate for EchoDelegate {
 
 ### Add a resource
 
-1. Add a method on `KlyntbotServerHandler::handle_<resource>(uri: &str) -> Result<Vec<ResourceContents>, McpError>`.
+1. Add a method on `KlyntBotServerHandler::handle_<resource>(uri: &str) -> Result<Vec<ResourceContents>, McpError>`.
 2. Add a match arm in `read_resource` dispatch.
 3. Add to `list_resources` output.
 4. Document the URI scheme.
@@ -661,7 +661,7 @@ impl SamplingDelegate for EchoDelegate {
 
 If you want to expose something that isn't already a `Tool` in the registry:
 1. Add to `list_tools` (returned alongside `get_status` and `agent`).
-2. Add a `handle_<tool>` method on `KlyntbotServerHandler`.
+2. Add a `handle_<tool>` method on `KlyntBotServerHandler`.
 3. Add dispatch arm in `call_tool`.
 
 This is a special path — usually you'd add the tool to the regular `ToolRegistry` instead and rely on whitelist.
@@ -704,7 +704,7 @@ For tools registered via `FeaturePackage` and discovered through `AiFeatureRegis
 
 The `McpCircuitBreaker::start_health_check` task watches for this notification. To customize:
 1. Modify the health-check task or
-2. Add a separate handler in `KlyntbotClientHandler`
+2. Add a separate handler in `KlyntBotClientHandler`
 
 ---
 
@@ -743,6 +743,6 @@ See [`TECH_DEBT.md`](../TECH_DEBT.md) categories #2 (stubs) + #5 (drift) for spe
 - [Subsystem 11 — Channels, MCP & Activity](../subsystems/11-channels-mcp.md) (parent)
 - [`crates/tools-core.md`](./tools-core.md) — `ToolRegistry`, `ApprovalClass`, `RoutingContext`
 - [`crates/agent.md`](./agent.md) — `AgentBridge` delegates to `AgentLoop::process_direct_streaming`
-- [`crates/app-core.md`](./app-core.md) — `KlyntbotServerHandler::new(app: Arc<AppCore>, …)`
+- [`crates/app-core.md`](./app-core.md) — `KlyntBotServerHandler::new(app: Arc<AppCore>, …)`
 - [`crates/desktop.md`](./desktop.md) — `mcp serve` subcommand + embedded HTTP server startup
 - [`crates/providers.md`](./providers.md) — `SamplingDelegate` typically wraps `DynProvider`

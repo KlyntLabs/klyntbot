@@ -1,4 +1,4 @@
-<h1 align="center">Klyntbot</h1>
+<h1 align="center">KlyntBot</h1>
 
 <p align="center">
   <strong>A local-first personal cognitive agent OS for macOS.</strong><br>
@@ -13,13 +13,13 @@
   <a href="https://github.com/KlyntLabs/klyntbot/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/badge/discuss-GitHub-181717?logo=github"></a>
 </p>
 
-> **Pre-1.0 / unstable.** APIs, schemas, and config formats may change between releases without migrations. Don't rely on Klyntbot for anything you can't afford to rebuild.
+> **Pre-1.0 / unstable.** APIs, schemas, and config formats may change between releases without migrations. Don't rely on KlyntBot for anything you can't afford to rebuild.
 
 ---
 
-## What is Klyntbot?
+## What is KlyntBot?
 
-Klyntbot is a personal cognitive agent OS built in Rust. It runs entirely on your local machine and is designed to **think, remember, act, and improve over time**.
+KlyntBot is a personal cognitive agent OS built in Rust. It runs entirely on your local machine and is designed to **think, remember, act, and improve over time**.
 
 - 🧠 **Cognitive memory** — semantic + episodic memory, FSRS-style decay, knowledge graphs, procedural rules
 - 💻 **Local-first** — Tauri 2 desktop app; all data lives in SQLite (WAL) and LanceDB under `~/.klyntbot/`
@@ -27,7 +27,7 @@ Klyntbot is a personal cognitive agent OS built in Rust. It runs entirely on you
 - 🌐 **Multi-channel** — Telegram, Discord, Slack, Email, and [MCP](https://modelcontextprotocol.io) — all sharing the same memory and persona
 - 🧩 **Extensible** — feature crates, skills, WASM plugins, and an MCP server that exposes tools to other AI clients
 
-It is not a chat wrapper. It is a 39-crate Rust workspace organized into 9 strict layers, with a dedicated agent runtime, cognitive layer, and skill router as first-class primitives.
+It is not a chat wrapper. It is a **66-crate Rust workspace** (see [architecture overview](./docs/architecture/00-overview.md)) organized into 14 subsystems, with a dedicated agent runtime, cognitive layer, and skill catalog as first-class primitives.
 
 ---
 
@@ -97,20 +97,28 @@ echo 'KLYNTBOT_HOME=~/.klyntbot-dev' > .env
 | **Productivity & coaching** | Focus sessions, activity analytics, behavior interventions |
 | **Multi-channel chat** | Telegram, Discord, Slack, Email, desktop, MCP |
 | **Learning & language** | Flashcard generation, language practice, exam tracking |
-| **MCP server** | Exposes Klyntbot tools to Claude Code, Cursor, and other MCP clients |
+| **MCP server** | Exposes KlyntBot tools to Claude Code, Cursor, and other MCP clients |
 
 Each capability is a self-contained **feature package** with its own tools, migrations, config, and health checks.
 
 ---
 
-## Why Klyntbot
+## Why KlyntBot
 
-- **Architected, not glued together** — strict 9-layer crate hierarchy with upward-only dependencies
+- **Architected, not glued together** — 14 subsystems on a layered crate hierarchy with (mostly) upward-only dependencies
 - **Cognitive layer is first-class** — memory, reflection, and learning are core, not retrofits
 - **Extensible like an OS** — skills, feature crates, WASM plugins, MCP client + server
 - **Honest local-first** — no cloud sync, no telemetry, no account, no SaaS
 
 If you want a SaaS chatbot, this isn't it. If you want a real agent OS you can read, fork, and extend, keep going.
+
+---
+
+## Architecture
+
+Start with [**`docs/architecture/00-overview.md`**](./docs/architecture/00-overview.md) — a single-file mental model of the whole system: subsystem map, three end-to-end sequence diagrams (assistant turn, coding turn, nightly reforge cycle), the 14-subsystem inventory, and 11 critical-crate deep-dives. The doc system index is at [`docs/architecture/README.md`](./docs/architecture/README.md); the living tech-debt log lives at [`docs/architecture/TECH_DEBT.md`](./docs/architecture/TECH_DEBT.md).
+
+If anything in this README or in `CLAUDE.md` disagrees with `docs/architecture/`, the architecture docs win — they're the authoritative source.
 
 ---
 
@@ -131,11 +139,11 @@ If you want a SaaS chatbot, this isn't it. If you want a real agent OS you can r
 
 ## License
 
-Klyntbot is licensed under [**AGPL-3.0**](./LICENSE).
+KlyntBot is licensed under [**AGPL-3.0**](./LICENSE).
 
-**Why AGPL?** Klyntbot is built to be a personal agent OS, not a SaaS substrate. AGPL ensures that anyone who runs a modified version as a network service must publish their changes — keeping improvements in the commons rather than locked behind a hosted product. If you're building a personal tool, a self-hosted deployment, or a contribution back upstream, AGPL is unobtrusive. If you want to wrap Klyntbot into a closed-source hosted service, AGPL will be in your way — that's by design.
+**Why AGPL?** KlyntBot is built to be a personal agent OS, not a SaaS substrate. AGPL ensures that anyone who runs a modified version as a network service must publish their changes — keeping improvements in the commons rather than locked behind a hosted product. If you're building a personal tool, a self-hosted deployment, or a contribution back upstream, AGPL is unobtrusive. If you want to wrap KlyntBot into a closed-source hosted service, AGPL will be in your way — that's by design.
 
-**Running Klyntbot locally on your own machine — including the bundled MCP server consumed by your local AI clients — does not trigger AGPL's network-service clause.** The clause activates when you offer modified Klyntbot to *other users* over a network.
+**Running KlyntBot locally on your own machine — including the bundled MCP server consumed by your local AI clients — does not trigger AGPL's network-service clause.** The clause activates when you offer modified KlyntBot to *other users* over a network.
 
 For commercial licensing inquiries, contact **jayden.dangvu@gmail.com**.
 
@@ -143,7 +151,7 @@ For commercial licensing inquiries, contact **jayden.dangvu@gmail.com**.
 
 ## Status & expectations
 
-Klyntbot is pre-1.0, single-maintainer, and built primarily for the maintainer's own use. We welcome contributions, bug reports, and feedback — but please don't expect SLAs, polished UX in every corner, or stable APIs yet. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the realistic response time and how to file useful reports.
+KlyntBot is pre-1.0, single-maintainer, and built primarily for the maintainer's own use. We welcome contributions, bug reports, and feedback — but please don't expect SLAs, polished UX in every corner, or stable APIs yet. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the realistic response time and how to file useful reports.
 
 ---
 

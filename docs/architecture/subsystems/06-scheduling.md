@@ -11,7 +11,7 @@
 
 A single crate that does three jobs at once: (1) **cron** — name-keyed recurring jobs (`CronExecutor`), (2) **wall-clock dispatch** — a unified firing table for cron, alarms, recurrence, and held notifications (`TemporalScheduler` + `FireStore`), and (3) **recurrence engine** — RRULE-based materialization of recurring tasks (`RecurrenceEngine`). Today these run **side-by-side** via `CronBridge`, which keeps the `cron_jobs` definition table in sync with the `scheduled_fires` firing table.
 
-Every wall-clock event in Klyntbot — cron jobs, task alarms, recurrence spawns, held notification releases — flows through `scheduled_fires`. It's the universal timer table; `kind` distinguishes the four types.
+Every wall-clock event in KlyntBot — cron jobs, task alarms, recurrence spawns, held notification releases — flows through `scheduled_fires`. It's the universal timer table; `kind` distinguishes the four types.
 
 ---
 

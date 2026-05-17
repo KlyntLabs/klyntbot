@@ -579,7 +579,7 @@ let final_text = handle.handle.await.unwrap().unwrap();
 let handle = agent_loop.process_direct_streaming(...).await.unwrap();
 handle.cancel_token.cancel();
 let result = handle.handle.await.unwrap();
-assert!(matches!(result, Err(KlyntbotError::Cancelled(_))));
+assert!(matches!(result, Err(KlyntBotError::Cancelled(_))));
 ```
 
 ### Test compression behavior

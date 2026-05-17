@@ -217,7 +217,7 @@ impl ReforgeWriter {
 
     /// ALWAYS returns an error — no raw DELETE is allowed.
     pub async fn reject_delete(&self, _id: i64) -> Result<()> {
-        Err(KlyntbotError::PermissionDenied("raw DELETE rejected".into()))
+        Err(KlyntBotError::PermissionDenied("raw DELETE rejected".into()))
     }
 
     /// Demote stability — sets convergence_score → 0.01.
@@ -271,7 +271,7 @@ pub struct CodingSynthesisPhase { /* deps */ }
 #[async_trait]
 impl ReforgePhase for CodingSynthesisPhase {
     async fn run(&self, ctx: PhaseContext) -> Result<PhaseResult> {
-        Err(KlyntbotError::NotImplemented(
+        Err(KlyntBotError::NotImplemented(
             format!("NotImplementedInPhase {{ required_phase: 5 }}")
         ))
     }
@@ -530,7 +530,7 @@ Bi-temporal is more expressive but slower per write — appropriate for batch.
 
 ```
 1. Claude Code MCP client calls tools/call { name: "recall_timeline", arguments: {...} }
-2. KlyntbotServerHandler routes to ToolRegistryBridge
+2. KlyntBotServerHandler routes to ToolRegistryBridge
 3. ToolRegistryBridge dispatches to CodingMemoryToolset
 4. CodingMemoryToolset.dispatch("recall_timeline", args)
 5. CodingRecallService.recall_timeline(args)
@@ -555,7 +555,7 @@ async fn run_synthesis(&self, args: ...) -> Result<()> {
 
 // In coding-memory::reforge::coding_synthesis::CodingSynthesisPhase
 async fn run(&self, ctx: PhaseContext) -> Result<PhaseResult> {
-    Err(KlyntbotError::NotImplemented(
+    Err(KlyntBotError::NotImplemented(
         "NotImplementedInPhase { required_phase: 5 }".into()
     ))
 }
@@ -616,7 +616,7 @@ assert!(stored > 0);
 ```rust
 let writer = ReforgeWriter::new(semantic_repo, episodic_repo);
 let result = writer.reject_delete(123).await;
-assert!(matches!(result, Err(KlyntbotError::PermissionDenied(_))));
+assert!(matches!(result, Err(KlyntBotError::PermissionDenied(_))));
 ```
 
 ### Test bi-temporal supersede
@@ -642,7 +642,7 @@ assert_eq!(fetched.superseded_by, Some(successor_id));
 ```rust
 let phase = CodingSynthesisPhase::new(/* deps */);
 let result = phase.run(ctx).await;
-assert!(matches!(result, Err(KlyntbotError::NotImplemented(_))));
+assert!(matches!(result, Err(KlyntBotError::NotImplemented(_))));
 ```
 
 ---

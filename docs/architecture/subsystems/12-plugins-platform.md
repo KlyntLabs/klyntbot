@@ -67,7 +67,7 @@ flowchart TB
 
 Plugins and platform adapters are both **plug-in points** that the agent will eventually grow into. Today neither is wired to LLM-callable surfaces:
 
-- **Plugins:** The WASM host works. You can ship a plugin and Klyntbot will load it, expose its tools via `FeaturePackage`, give it scoped DB access, and emit its events on the bus. But the `agent_ask_user` callback is dead, plugins can't be hot-reloaded, and any `cronJobs` in the manifest are parsed but ignored.
+- **Plugins:** The WASM host works. You can ship a plugin and KlyntBot will load it, expose its tools via `FeaturePackage`, give it scoped DB access, and emit its events on the bus. But the `agent_ask_user` callback is dead, plugins can't be hot-reloaded, and any `cronJobs` in the manifest are parsed but ignored.
 - **Platform:** `MacInput` can move a mouse, type text, click, drag, scroll. `MacCapture` can take a screenshot of the screen. `walk_focused_app` returns an AX tree of the frontmost app. But nothing inside `agent`, `klynt-core`, or `mcp` ever calls any of this. Computer Use is **scaffolded, not shipped**.
 
 The clearest mental model: this subsystem is **the floor of a future feature, not a current one**. Two scaffolds; both await a wiring layer.
@@ -143,7 +143,7 @@ Checked at the top of each host function via `ctx.permissions.contains(&PluginPe
     "version": "0.1.0",                     // required
     "description": "What it does",          // required
     "author": "Author Name",                // required
-    "minKlyntbotVersion": "0.1.0",          // optional
+    "minKlyntBotVersion": "0.1.0",          // optional
     "tools": [                              // optional — agent-callable tools
         { "name": "...", "description": "...", "parameters": {...} }
     ],
@@ -429,7 +429,7 @@ AX APIs use Core Foundation reference counting (`CFRetain`/`CFRelease`). Forgett
 1. Author with `klyntbot-plugin-sdk` crate type `["cdylib", "rlib"]`.
 2. Implement `#[plugin_fn]` functions; declare permissions in `klyntbot.plugin.json`.
 3. Drop `plugin.wasm` + `klyntbot.plugin.json` into `~/.klyntbot/plugins/<id>/`.
-4. **Restart Klyntbot** — no hot-reload.
+4. **Restart KlyntBot** — no hot-reload.
 5. **Don't grant `Agent` permission expecting `ask_user`** — it's a stub.
 
 ### Adding a `ComputerUseAction` variant

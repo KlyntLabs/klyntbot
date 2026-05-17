@@ -1,4 +1,4 @@
-# Klyntbot — Technical Debt Inventory
+# KlyntBot — Technical Debt Inventory
 
 > **Living document.** Categorized, not chronological. Updated as items are found, fixed, or re-evaluated.
 > **Last refreshed:** 2026-05-16.

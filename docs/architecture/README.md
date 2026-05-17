@@ -1,6 +1,6 @@
-# Klyntbot Architecture Documentation
+# KlyntBot Architecture Documentation
 
-> **The single source of truth for the Klyntbot codebase architecture.**
+> **The single source of truth for the KlyntBot codebase architecture.**
 > If this disagrees with `CLAUDE.md`, `README.md`, or `AGENTS.md` at the repo root, **this wins** — those files lag and need a refresh pass. See [Document maintenance](#document-maintenance).
 > **Last refreshed:** 2026-05-16 (commit `575b7014c`)
 

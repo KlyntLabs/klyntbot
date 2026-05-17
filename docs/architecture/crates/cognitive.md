@@ -9,7 +9,7 @@
 
 ## TL;DR
 
-Klyntbot's memory system. This crate implements:
+KlyntBot's memory system. This crate implements:
 - **Memory services** — `UnifiedMemoryService` (embedding + BM25 + PPR), `ConversationRecallService`, `SessionMemoryService`, `CognitiveContextSource`
 - **Extraction** — `ExtractionHandler` trait, `ExtractedFact`/`Entity`/`Relationship`, `ExtractionCritic`
 - **Reforge** — `run_reforge` (25-parameter signature, **16 phase markers**, 3 handler-level LLM calls, **6 extension hook traits**)

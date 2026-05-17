@@ -1,5 +1,8 @@
 # CLAUDE.md
 
+> **This file is operational — build commands, conventions, gotchas, behavioral guidelines.**
+> **Architecture lives in [`docs/architecture/`](./docs/architecture/).** Start there for any "how does X work" question; jump back here for "how do I build/test/contribute X". If the two disagree, the docs win.
+
 ## Prerequisites
 
 `rustup`, `cargo-nextest`, `bun`, `cargo-tauri` (Tauri CLI v2). Rust stable toolchain.
@@ -74,122 +77,28 @@ Browser-only dev: run `cd desktop-ui && bun run dev` then `cargo tauri dev` (whi
 
 ## Architecture
 
-Rust personal AI agent — single binary connecting 6+ chat platforms to LLMs with task/project management and persistent memory. All state in SQLite + LanceDB.
+> **Authoritative architecture documentation lives in [`docs/architecture/`](./docs/architecture/).** Start with [`00-overview.md`](./docs/architecture/00-overview.md) — single-file mental model with the subsystem map, three end-to-end sequence diagrams (assistant turn, coding turn, nightly reforge), the 14-subsystem inventory, 11 critical-crate deep-dives, and a glossary. **If this file disagrees with `docs/architecture/`, the docs win** — keep them in sync.
 
-### Workspace (66 crates / packages, 14 subsystems)
+Quick orientation: KlyntBot is a **66-crate Rust workspace** that ships as a single Tauri 2 desktop binary on macOS. Business logic lives in `app-core`; the `desktop` crate is a thin Tauri adapter; the root `klyntbot` crate is a *partial* re-export facade (≈18 of 64 crates). All state in SQLite (WAL) + LanceDB under `~/.klyntbot/`. Sessions are tagged `assistant` or `coding` at creation and the mode is **immutable**; tools declare `allowed_channels = "all" | "non_coding" | "coding_only"`.
 
-> **Authoritative architecture docs are in `docs/architecture/`** — 14 subsystems, 11 critical-crate deep-dives, and a tech-debt inventory. The layer summary below is a quick reference; if it disagrees with `docs/architecture/`, the docs win.
+| When you're working on… | Open |
+|---|---|
+| The whole picture | [`docs/architecture/00-overview.md`](./docs/architecture/00-overview.md) |
+| A specific subsystem | [`docs/architecture/subsystems/`](./docs/architecture/subsystems/) (14 files) |
+| A critical crate's internals | [`docs/architecture/crates/`](./docs/architecture/crates/) (11 crates) |
+| Known stubs, drift, anomalies | [`docs/architecture/TECH_DEBT.md`](./docs/architecture/TECH_DEBT.md) |
+| Doc-system index & maintenance rules | [`docs/architecture/README.md`](./docs/architecture/README.md) |
 
-```
-L0: common, platform-macos, platform-input, platform-capture — KlyntbotError, MessageRole, ChannelName, ChatId, SessionKey; macOS native APIs (pasteboard, window mgmt, computer-use input + capture); platform-neutral input/capture trait crates
-L1: config, bus, tools-core, tools-core-macros, analytics — Config (camelCase JSON), message bus, Tool/FeaturePackage traits, derive macros, FIRE/Monte Carlo analytics
-L2: storage, session       — SqlitePool, migrations, *Repo structs, *Row types; session facade
-L3: providers, scheduling, context_engine, skill-system — LLM clients, cron, token budgets, skill discovery/routing
-L4: tools, feature-tasks, feature-finance, feature-notes, feature-productivity, feature-coaching, feature-insights, feature-launcher, feature-learning, feature-language-learning, feature-alarms, feature-coding-bash, feature-coding-todo, activity-log, notifications, plugin-runtime, plugin-sdk, autotuner, voice-engine — tools, feature packages, WASM plugins, self-optimization, voice synthesis
-L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/Slack/Email), agent runtime, cognitive memory (episodic/semantic extraction, spaced repetition via FSRS5, salience decay, reflection, reforge)
-L6: mcp, mcp-bridge        — MCP server/client, Unix-socket bridge
-L7: app-core, desktop-shared, desktop, desktop-macros, desktop-ui — Application core, Tauri desktop app, React frontend
-L8: klyntbot, klyntbot-server — Re-export facade, standalone MCP server binary
-L9: kca-bench, kca-e2e     — Validation benchmarks and end-to-end tests
-Coding: klynt-core, coding-ingest, coding-memory, coding-agents-md, klynt-protocol, klynt-hooks, klynt-execpolicy, klynt-skill-loader, klynt-pty, klynt-git-utils, klynt-truncation, klynt-sandbox, klynt-sandbox-helper, klynt-process-hardening, lsp-client — 14 crates for Claude-Code-style coding mode
-```
+### Coding patterns (day-to-day)
 
-Dependencies flow strictly upward (with one known upward anomaly: `storage` → `ai-core`). `plugin-sdk` and `tests/fixtures/hello_plugin` are excluded from workspace. See `docs/architecture/00-overview.md` for the canonical 14-subsystem model.
-
-### Storage
-
-`StoragePool` wraps `SqlitePool` (Clone+Send+Sync, no `Arc<RwLock>` needed). Relational data in `{data_dir}/data.db`, vectors in `{data_dir}/lance/`. Data dir defaults to `~/.klyntbot`. Access via `Repos::from_pool(&pool)`. Feature crates add migrations via `FeatureMigration`.
-
-### Key patterns
-
-- **App-core + thin adapters:** `app-core` crate holds all shared business logic (handlers). Desktop `commands/*.rs` files are thin Tauri adapters that delegate to `AppCore` methods. Mutations use `emit_updates(&app, &updates)` for UI events. Dev server (`dev_server/`) delegates identically but discards entity updates.
-- **Derive-based tools:** `#[derive(Tool)]` + `#[derive(ToolParams)]` from `tools-core-macros`. Multi-action: `#[tool_actions]` + `#[derive(ActionParams)]`. Domain enums (canonical name + alias resolution): `#[derive(DomainEnum)]` with per-variant `#[canonical("...")]` and `#[aliases(...)]`. See `crates/tools/src/domain/docs.rs`. JSON Schema is hand-rolled in `tools-core-macros/src/helpers.rs::classify_type` — supports `String`, `bool`, primitives, `Vec<T>`, `Option<T>`; nested structs panic with a descriptive workaround pointer.
-- **Feature packages:** `feature-*` crates implement `FeaturePackage` (tools + migrations + config + health). Exception: some tools (e.g. `TaskTool`) are wired directly in the agent builder, not via `FeaturePackage::tools()` — check the crate's `tools()` return if wiring seems missing.
-- **Dependency inversion:** Handler traits (`SpawnHandler`, `CronHandler`, etc.) defined in lower layers, implemented in `agent`. Injected as `Arc<dyn Trait>`.
-- **Config:** `#[serde(rename_all = "camelCase")]`. File at `~/.klyntbot/config.json`. API keys in `Secret<String>` (access via `.expose()`). Env override: `KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o`.
-- **Re-export facade:** `src/lib.rs` re-exports all public types. Use `klyntbot::AgentLoop`, `klyntbot::Config`, etc.
-
-### Approval gate
-
-Every tool call passes through `approval::ApprovalGate::check` (`crates/approval/`) before
-execution. Tools declare `approval_class` (Safe/Sensitive/Destructive/Admin) on the `Tool`
-trait; coding-mode shell/edit/web_fetch get runtime classification via `CodingApprovalPolicy`.
-Persistent grants live in the `approval_grants` table; remote channels (Telegram, MCP, etc.)
-implement `ApprovalChannel`. Desktop modal at `desktop-ui/src/features/approvals/ApprovalModal.tsx`.
-`BlockingFallbackChannel` handles Discord/Slack/Email until real impls land.
-
-### Skill system & MCP
-
-Five built-in orchestrator skills in `skills/`: task-management, finance-management, automation, learning, notebook. Each has `SKILL.md` (Agent Skills spec YAML frontmatter); some have `references/` folders. Compiled via `include_str!` in `skill-system` crate. `SkillRouter` selects orchestrator per-message via keyword + semantic scoring. MCP tool names: `mcp_{server}_{tool}` (see `mcp::sanitize`). MCP access controlled per-skill via `mcp_tools` field (`["*"]` = all, `[]` = none). Task-management skill has `mcp_tools: ["google-calendar"]`.
-
-**Progressive skill loading:** Orchestrator skills inject their full body on first activation (deduplicated per session). Activated (non-orchestrator) skills inject a summary only — the agent calls `skill_reference` tool to load full instructions when needed. Always-loaded references are filtered by message relevance (single-token refs always load, multi-token refs need a keyword match). This reduces token usage for simple messages.
-
-Claude Code skills (`.claude/skills/klyntbot-*/SKILL.md`) are a separate layer that teaches Claude Code how to call klyntbot MCP tools. They follow Agent Skills format with `references/` for on-demand detail loading. These are NOT the same as internal skills in `skills/`.
-
-### MCP server — exposing tools to Claude Code
-
-Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MCP stdio transport. The MCP server is merged into the desktop binary as a subcommand (`klyntbot mcp serve --stdio`) — there is no separate `klyntbot-mcp` binary. Claude Code spawns the binary as a child process per session; it shares `~/.klyntbot/data.db` with the desktop process via SQLite WAL. The desktop app also embeds an MCP HTTP server (config: `mcp.server` in `config.json`). On first launch the desktop app auto-registers itself with Claude Code via `claude mcp add` if the CLI is detected — gated by a one-time marker file at `~/.klyntbot/.claude-code-integration-offered`.
-
-**Architecture:** `ToolRegistryBridge` translates MCP calls → internal `Tool::execute()`. The `agent` tool delegates natural language to the full AI pipeline via `AgentBridge`. Tool names must match the `ToolRegistry` key exactly (e.g. `tasks` not `task`, `notes` not `note`).
-
-**Currently exposed tools:** `tasks`, `project`, `area`, `notes`, `memory`, `okr`, `finance`, `productivity`, `work_context`, `agent`, `annotate`, `learning`, `cron`, `mirror`, `temporal` — configured in `default_exposed_tools()` at `crates/config/src/schema/mcp.rs`.
-
-**To expose a new tool via MCP:** (1) `#[derive(Tool)]` in a `feature-*` crate, register via `FeaturePackage::tools()`. (2) Add registry name to `default_exposed_tools()` in `crates/config/src/schema/mcp.rs`. (3) Verify: `cargo nextest run -p klyntbot-server`. Common mistake: plural/singular mismatch (`tasks` vs `task`). (4) Rebuild the desktop binary (`cargo build -p desktop`) — the MCP server ships inside it. Users can override the whitelist in `config.json` → `mcp.server.exposedTools`.
-
-**Debug CLI:** `klyntbot mcp tools --list` (lists exposed tools the embedded server would advertise).
-
-### Cognitive subsystems
-
-**Tray countdown** (`tray_countdown.rs`): Live menu bar countdown to next calendar event/task deadline. Coordinates with focus timer via `FOCUS_ACTIVE` atomic flag. Uses `tauri::async_runtime::spawn` (not `tokio::spawn`) — starts during Tauri `setup` hook before tokio runtime is available.
-
-**Mirror** (`crates/cognitive/src/mirror/`): Event-driven self-reflection. Six signal sources (routing snapshots, meta-rule detection, config archiving, trial preview, task focus, finance drift) implementing `MirrorSignalSource` trait. `MirrorEngine::start()` returns `StartedMirror { facade, consumers, flush_handles, shutdown }` — handles must be stored in `AppCore` (not dropped). `MirrorFacade` stored as `Option<Arc<MirrorFacade>>` in `AppCore`. MCP: `MirrorTool` (multi-action, read-only) registered post-init. 8 tables in `003_mirror_tables.sql`.
-
-**Computer Use & Procedural Memory** (in design — see [`docs/superpowers/specs/2026-04-28-computer-use-and-procedural-memory-design.md`](docs/superpowers/specs/2026-04-28-computer-use-and-procedural-memory-design.md), not yet implemented): Full-OS automation feature with hybrid AVR perception cascade (Accessibility tree → local VLM → cloud VLM, all routed through `ProviderManager`), risk-tier safety gates with NSAlert + `AskUserTool` confirmation, HUD overlay + side panel UI, time-bound `ComputerUseSession` for background automation, and procedural memory (Intent → Stage → Action trajectories distilled into `web_tree_memories` for replay). When implementing: adds `platform-input`/`platform-capture` trait crates at L0, `feature-browser-control` (CDP integration) + `feature-computer-use` at L4, and `WorkflowInductionSignals` as a 7th mirror source. Anthropic adapter gains `ContentPart::ImageData`, the `computer_20251124` tool block, and an `anthropic-beta` header for the `computer-use-2025-11-24` channel — none of which exist today. `MidLoopCompressor` will need an image-aware exception path; `RoutingContext` will gain a `screenshot_tx` sidecar channel mirroring the existing `entity_tx` pattern. Pending implementation plan in `docs/superpowers/plans/`.
-
-**Reforge** (`crates/cognitive/src/services/reforge/`): Nightly self-improvement cycle (cron `JOB_REFORGE_NIGHTLY`, 03:00 local — registered in `app-core/src/init/cron.rs`). Reviews strategy files, collects behavioral feedback, generates rewrite suggestions via LLM. The `service.rs::run_reforge` pipeline has **9 phases** with 3 LLM calls: Collect → Synthesize (LLM JSON) → Coding-Synthesis → Review (LLM JSON) → Rule-Artifact-Generation → Narrate (LLM text) → Apply → Optimize → Graph-Consolidation+Community → Compact. Provider sourced from `config.cognitive.provider` via `DynProvider` (NOT the agent `ProviderManager`); temperature 0.2, max_tokens 4096. Suggestions persist to `reforge_suggestions` table. Extension hooks: `CodingPhaseRunner`, `GraphEnrichmentHandler`, `CommunityIntelligenceHandler` — each is an `Option<&dyn Trait>` parameter on `run_reforge`.
-
-### Agent runtime
-
-`AgentRuntime` → `SkillCatalog` + `SkillRouter` → `IntentAnalyzer` → `ContextEngine` → `ExecutionRouter` → `CostTracker`. Two execution modes: **Direct** (single LLM call, no tools) and **Reactive** (ReAct loop with tool calls, synthesizes at max_iterations). Code in `crates/agent/src/agent_runtime/` and `crates/agent/src/intent_pipeline/`. Execution loop internals in `crates/agent/src/execution/`. Skill types in `crates/skill-system/`.
-
-**Execution constants** (`crates/agent/src/execution/core.rs`): `MAX_CONCURRENT_TOOLS = 10` (parallel tool fan-out via global semaphore — there's no per-tool serial-only flag today), `MAX_TOOL_RESULT_LENGTH = 50_000` bytes (results truncated past this), `INTERACTIVE_TOOL_TIMEOUT = 600s` (only for `ask_user`; default `params.tool_timeout = 30s`). `MidLoopCompressor` constants: `COMPRESSION_THRESHOLD = 0.70`, `MIN_RECENT_MESSAGES = 8`, `MIN_COMPRESSIBLE_TOKENS = 50`. `ANTHROPIC_CONTEXT_WINDOW = 200_000`.
-
-**Cancellation:** `tokio_util::sync::CancellationToken` carried in `ExecutionParams::cancel_token`. Active turns tracked in `ActiveTurns = Arc<DashMap<String, ActiveTurnEntry>>` (`crates/app-core/src/runtime/mod.rs`). Each entry has a monotonic `guard_id: u64`; `StreamGuard` performs value-identity removal on drop (only deletes if `guard_id` still matches). Cancel observed at iteration boundary (`execute_loop.rs:113`) — in-flight tool calls run to their timeout before cancellation fires. `chat_cancel()` removes the entry and calls `token.cancel()`. Double-send rejection: `chat_send` returns `ApiError::conflict` if the session already has an active turn.
-
-**Mid-loop context compression:** `MidLoopCompressor` (in `crates/agent/src/execution/`) triggers when message tokens exceed 70% of context window. Replaces older `Message::Tool` results with extractive summaries (~150-char first-snippet + size annotation). Preserves system messages and last 8 messages verbatim. Emits `AgentEvent::ContextCompressed`. **Note:** `Message::Tool.content` is currently a plain `String`; image-bearing tool results have no schema today.
-
-**Tiered History Compression (THC):** `TieredHistoryCompressor` (in `crates/context_engine/src/history_compressor/`) operates at the context-engine level before messages enter the LLM. Groups messages into `ConversationTurn`s, optionally scores via `MemoryScorer`, assigns tiers (Verbatim / Detailed / Condensed), and compresses with tier-specific prompts. Extractive-first: falls back to snippet extraction when LLM summaries aren't needed or fail. Configured via `HistoryCompressionConfig`.
-
-**Live context refresh:** `LiveContextRefresher` (in `crates/agent/src/execution/`) drains `ContextUpdateQueue` (in `bus` crate) at each iteration boundary. Injects `Message::ContextUpdate` entries. Token budget: standard 80%, high-priority 90%. Set `pause_context_updates: true` on `ExecutionParams` for frozen-context mode.
-
-### Chat / Thread runtime
-
-**`ThreadRuntime` trait** (`crates/app-core/src/runtime/mod.rs`): Unified interface for assistant and coding modes. Both `AssistantThreadRuntime` (`runtime/assistant.rs`) and `CodingThreadRuntime` (`runtime/coding.rs`) implement `start_turn`, `cancel_turn`, `is_active`, and `active_turns`. `AppCore` stores both as `OnceLock<Arc<dyn ThreadRuntime>>`.
-
-**`ThreadEvent` v2** (`desktop-shared/src/thread_event_v2.rs`): Single `specta::Type`-derived union replaces 50+ individual `agent:*` Tauri events. Every turn guarantees exactly one `Terminal` variant on exit (Done, Error, or Cancelled). Emitted via `thread:event` Tauri channel. Generation counter (`u32`) per thread prevents stale events from updating state after a new turn starts.
-
-**Frontend store:** `useChatStore` (`desktop-ui/src/features/threads/store/useChatStore.ts`) is a Zustand store with three slices:
-- **Threads:** `threadReducer` state (activeThreadId, itemsByThread, threadStatus, etc.)
-- **Streams:** `StreamSnapshot` per sessionKey (segments, approvals, fileEdits, transparency)
-- **Coding:** `CodingThreadState` per threadId, plus `codingRunningIds` and `codingRecentlyCompleted`
-
-Delta coalescing: `CoalescerRegistry` (`threads/utils/coalesceDeltas.ts`) batches `ThreadEvent`s with `requestAnimationFrame` (fallback to `setTimeout(..., 16)` in tests). Keeps 10k-token stream DOM commit p95 ≤ 16ms.
-
-**Virtualized messages:** `VirtualizedMessageList` (`messages/components/VirtualizedMessageList.tsx`) wraps `Messages` and `CodingThreadView` with `@tanstack/react-virtual`. `useTransition` defers non-urgent historical renders.
-
-**Heartbeat & watchdog:** Backend emits `ThreadEvent::Heartbeat` every 30s from both chat relay (`streaming.rs`) and coding bridge (`turn_handler.rs`). Frontend `useThreadWatchdog` resets a 90s timer on each heartbeat; fires `onFire` if no heartbeat arrives while `isProcessing=true`.
-
-**Zombie detection:** `sessions.last_event_at` (added in `001_initial.sql`) is updated on every event. `SessionRepo::detect_zombie_sessions(threshold_ms)` finds sessions where `last_event_at < now - threshold` and the most recent message role is "user". Tauri command `chat_zombie_check` exposes this; `chat_force_reset` clears `active_streams` and emits a synthetic `Terminal` event.
-
-**Performance gates:** `scripts/run_chat_perf_gates.sh` runs four criterion benches + one vitest bench with numeric `awk` assertions:
-- TTFT p95 ≤ 15ms (`agent/benches/ttft_e2e.rs`)
-- Stream throughput ≥ 5,000 evt/s (`agent/benches/stream_throughput.rs`)
-- Relay cleanup p99 ≤ 1ms (`desktop/benches/relay_cleanup_latency.rs`)
-- Coalescer p95 ≤ 16ms (`desktop-ui/__benches__/coalescer.bench.ts`)
-
-Bundle budget: 30 kB gzipped for `src/features/threads/**/*` (`.size-limit.json`).
-
-**Soak testing:** `scripts/run_chat_proptest_soak.sh` runs `event_sequence_invariants` with 10,000 cases (gated under `--features soak`). Default proptest uses 100 cases.
+- **App-core + thin adapters:** `app-core` holds all shared business logic (handlers). Desktop `commands/*.rs` files are thin Tauri adapters that delegate to `AppCore` methods. Mutations call `emit_updates(&app, &updates)` for UI events. The dev server (`dev_server/`) delegates identically but discards entity updates.
+- **Derive-based tools:** `#[derive(Tool)]` + `#[derive(ToolParams)]` from `tools-core-macros`. Multi-action: `#[tool_actions]` + `#[derive(ActionParams)]`. Domain enums: `#[derive(DomainEnum)]` with per-variant `#[canonical("...")]` and `#[aliases(...)]`. See `crates/tools/src/domain/docs.rs`. JSON Schema is hand-rolled in `tools-core-macros/src/helpers.rs::classify_type` — supports `String`, `bool`, primitives, `Vec<T>`, `Option<T>`; nested structs panic with a descriptive workaround pointer. **Four wiring paths exist** (`FeaturePackage`, agent builder, app-core init, subagent) — see the "Extension points" section in the overview.
+- **Feature packages:** `feature-*` crates implement `FeaturePackage` (tools + migrations + config + health). Exception: some tools (e.g. `TaskTool`, `AlarmTool`, `LearningTool`) are wired directly in the agent builder, not via `FeaturePackage::tools()` — check the crate's `tools()` return if wiring seems missing.
+- **Dependency inversion:** Handler traits (`SpawnHandler`, `CronHandler`, etc.) are defined in lower layers and implemented in `agent`. Injected as `Arc<dyn Trait>` to avoid circular crate deps.
+- **Config:** `#[serde(rename_all = "camelCase")]`. File at `~/.klyntbot/config.json`. API keys in `Secret<String>` (access via `.expose()`). Env override: `KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o` (double-underscore = nested key).
+- **Approval gate:** Every tool call passes through `approval::ApprovalGate::check`. Declare `approval_class` (Safe / Sensitive / Destructive / Admin) on the `Tool` trait. Coding-mode shell/edit/web_fetch get runtime classification via `CodingApprovalPolicy`. Persistent grants live in the `approval_grants` table.
+- **Storage:** `StoragePool` wraps `SqlitePool` (Clone+Send+Sync). Access via `Repos::from_pool(&pool)`. Feature crates add migrations via `FeatureMigration`. **Tests must use `StoragePool::connect_in_memory()`** — `from_existing()` skips migrations.
+- **MCP tool exposure:** To expose a new tool via MCP, add its registry name to `default_exposed_tools()` in `crates/config/src/schema/mcp.rs`. Tool names must match the `ToolRegistry` key exactly (e.g. `tasks` not `task`). Rebuild `desktop` — the MCP server ships inside it. Debug with `klyntbot mcp tools --list`.
 
 ## Behavioral Guidelines
 
@@ -225,7 +134,7 @@ Transform vague tasks into verifiable goals — "fix the bug" → "write a test 
 
 ## Conventions
 
-- Errors: `common::Result<T>` (alias for `Result<T, KlyntbotError>`). Domain errors auto-convert via `From`.
+- Errors: `common::Result<T>` (alias for `Result<T, KlyntBotError>`). Domain errors auto-convert via `From`.
 - Imports: Use crate names directly (`use common::Result`), not `use crate::` for cross-crate refs.
 - Tests: `#[cfg(test)] mod tests` inline. Integration tests in `tests/` via facade crate.
 - Commits: Conventional format — `feat(scope): description`, `fix(scope): description`.
@@ -234,7 +143,10 @@ Transform vague tasks into verifiable goals — "fix the bug" → "write a test 
 
 ## Non-goals
 
-- **Structured observability (OpenTelemetry, Prometheus, metrics dashboards)** — this is a single-user local app. Existing `tracing` logs and `PipelineEvent` SSE stream are sufficient. Don't add observability infrastructure.
+The canonical list lives in the overview ([What's intentionally not in this system](./docs/architecture/00-overview.md#whats-intentionally-not-in-this-system)). The two most-likely-to-be-mistakenly-added items:
+
+- **Structured observability** (OpenTelemetry, Prometheus, metrics dashboards) — single-user local app; existing `tracing` logs + `PipelineEvent` SSE stream are sufficient. Don't add observability infrastructure.
+- **Backwards-compatibility migrations** pre-1.0 — alter schemas in place; see the pre-release gotcha below.
 
 ## System prompt = KLYNTBOT.md
 
@@ -254,10 +166,8 @@ The system prompt sent to the LLM on every chat turn is built from `ContextEngin
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
 - **`tauri.conf.json` uses `bun`** in `beforeBuildCommand`. Ensure `bun` is installed globally.
 - **Timestamps are UTC, display in local time** — Rust stores `jiff::Timestamp::now()` which serialises as RFC 3339 (`2026-04-19T14:30:00Z`) by default via serde. For user-facing display strings formatted in Rust, convert with `ts.to_zoned(jiff::tz::TimeZone::system())` and format via `.strftime("%-I:%M %p")`. In the frontend, parse with `new Date(iso)` and use `toLocaleTimeString()` — never `.slice()` ISO strings. Shared helper: `formatTime()` in `desktop-ui/src/shared/lib/dates.ts`.
-- **`MirrorEngine::start` takes `Arc<DomainEventBus>`** — not `&DomainEventBus`. Signature: `start(repo, bus: Arc<DomainEventBus>, narrative_handler, autotuner_bridge, episodic_repo)`. Returns `StartedMirror` with `facade`, `consumers`, `flush_handles`, `shutdown`.
-- **Built-in AI task automations removed (2026-04-20).** The task tool no longer supports `plan_day`, `decompose`, `execute`, `suggest` / `apply_suggestion` / `dismiss_suggestion` / `list_suggestions`, `forecast_task` / `forecast_project` / `accuracy_report`, or auto-enrichment (LLM priority/duration/scheduling inference). These LLM-driven behaviors are now meant to be composed by users via cron + skills + the `agent` tool. `TaskCreated` / `TaskCompleted` still publish to the domain bus so cognitive and reforge continue to receive task signals. Design for deepening that integration is parked in `docs/superpowers/brainstorms/2026-04-20-seed-task-cognitive-integration.md`.
-- **opencode adapter is poll-only** — no `klyntbot-hook opencode` subcommand fires; the daemon's `OpencodePoller` task drives ingestion. Disable via `coding_memory.opencode.enabled = false`.
-- **Coding-memory Phase 7 — multi-CLI ingest.** Four `IngestAdapter` implementations live under `crates/coding-ingest/src/adapters/`: `claude_code`, `codex`, `kimi_cli`, `opencode`. Codex, Kimi, and opencode are poll-only (Codex via `~/.codex/sessions` JSONL; Kimi via `~/.kimi/sessions/<hash>/<uuid>/wire.jsonl`; opencode via SQLite WAL). Hook-driven adapters were removed in 2026-04-29 — `KimiInstaller` no longer exists. All adapters emit `AgentEvent` tagged with `AgentSource` (`ClaudeCode`, `Codex`, `KimiCli`, `OpenCode`, `KlyntCli`). The cross-CLI normalization invariant (Inv 7 — `parse(serialize(event)) == event`) is enforced by the proptest in `crates/coding-ingest/tests/cross_cli_normalization.rs`. Reforge removal-side writes route through `coding_memory::reforge::ReforgeWriter` (re-exported from `reforge/mod.rs`) — raw `DELETE` is rejected; supersede via `valid_until + superseded_by` is the only sanctioned removal.
+- **Built-in AI task automations were removed (2026-04-20).** The task tool no longer supports `plan_day`, `decompose`, `execute`, suggest/forecast actions, or auto-enrichment. These are now meant to be composed via cron + skills + the `agent` tool. `TaskCreated` / `TaskCompleted` still publish to the domain bus.
+- **Coding-mode ingest is 5 adapters, mostly poll-only.** `claude_code` (hook-driven), `codex`, `kimi_cli`, `opencode`, `git_post_commit` — all under `crates/coding-ingest/src/adapters/` except `git_post_commit` (top-level `.rs`). Reforge writes go through `coding_memory::reforge::ReforgeWriter`; raw `DELETE` is rejected (supersede via `valid_until + superseded_by`). Full detail: [`docs/architecture/subsystems/09-coding-mode.md`](./docs/architecture/subsystems/09-coding-mode.md) and [`docs/architecture/crates/coding-ingest.md`](./docs/architecture/crates/coding-ingest.md).
 - **Process hardening runs at startup** — `crates/desktop/src/main.rs` calls `klynt_process_hardening::pre_main_hardening()` as its first statement. This (a) sets `RLIMIT_CORE = 0` (no core dumps), (b) calls `ptrace(PT_DENY_ATTACH)` on macOS (debuggers cannot attach to a release build), and (c) scrubs `LD_*`/`DYLD_*`/`MallocStackLogging*` env vars. To debug a release build, comment the call out — debug builds are not affected because `PT_DENY_ATTACH` is harmless when no debugger tries to attach.
 - **Snapshot rewind has two modes** — `coding_snapshots` rows with non-NULL `ghost_commit_sha` are restored via `klynt_git_utils::restore_ghost_commit` (git working-tree restore); rows with NULL `ghost_commit_sha` use the original BLOB path. The choice is made at snapshot-record time by `try_record_with_ghost` based on whether the file lives in a git repo. Implication: deleting `.git/` between snapshot and rewind makes ghost-mode rewind fail silently (logs a `tracing::error!`). Plan `2026-05-02-klynt-coding-in-chat-phase3-codex-polish.md` introduced this.
 - **Pre-release — no user data to migrate.** All schema changes can be made directly (alter tables, drop and recreate) without writing migration scripts. No need for backwards-compatible migrations until first release. When a migration is consolidated, update the `FeatureMigration` version and SQL in-place rather than adding incremental migration files. After first release, all schema changes require proper versioned migrations with `INSERT OR IGNORE` for idempotency.
@@ -272,6 +182,4 @@ The memory system is governed by spec section 7 quality / perf / stability gates
 
 `./scripts/run_kca_validation.sh`
 
-Any gate failure blocks merge. Soak test runs only on tagged release branches (`RUN_SOAK=1`).
-
-Auto-generated game-changer report lives at `docs/architecture/kca-game-changer.md`, refreshed every CI run, archived as artifact.
+Any gate failure blocks merge. Soak test runs only on tagged release branches (`RUN_SOAK=1`). For the gate-by-gate breakdown — including which gates actually fail the build vs which are no-op skeletons — see [`docs/architecture/subsystems/14-validation.md`](./docs/architecture/subsystems/14-validation.md).

@@ -1,4 +1,4 @@
-# Klyntbot — Architecture Overview
+# KlyntBot — Architecture Overview
 
 > **Status:** Stable (overall) — see per-subsystem badges in [Subsystem inventory](#subsystem-inventory).
 > **Last verified:** 2026-05-16 (commit `575b7014c`).
@@ -17,7 +17,7 @@ This file is the single entry point for understanding the project. It is intenti
 5. [Subsystem inventory](#subsystem-inventory)
 6. [Critical-crate index](#critical-crate-index)
 7. [Status badge legend](#status-badge-legend)
-8. [Five cross-cutting findings](#five-cross-cutting-findings)
+8. [Cross-cutting findings](#cross-cutting-findings)
 9. [Storage layout](#storage-layout-klyntbot)
 10. [End-to-end: assistant-mode chat turn](#end-to-end-assistant-mode-chat-turn)
 11. [End-to-end: coding-mode chat turn](#end-to-end-coding-mode-chat-turn)
@@ -34,7 +34,7 @@ This file is the single entry point for understanding the project. It is intenti
 
 ## TL;DR
 
-Klyntbot is a **local-first personal cognitive agent OS for macOS**, written in Rust and shipped as a single Tauri 2 desktop binary. It connects ~5 chat platforms (Telegram, Discord, Slack, Email, plus the desktop UI itself) to LLM providers (Anthropic, OpenAI, local MLX), with task/project/notes/finance management, persistent **cognitive memory** (FSRS5 decay, episodic/semantic extraction, Louvain community detection, personalized-pagerank retrieval), and a nightly self-improvement loop (**reforge**) that rewrites its own strategy files. All state lives in SQLite (WAL) + LanceDB under `~/.klyntbot/`.
+KlyntBot is a **local-first personal cognitive agent OS for macOS**, written in Rust and shipped as a single Tauri 2 desktop binary. It connects ~5 chat platforms (Telegram, Discord, Slack, Email, plus the desktop UI itself) to LLM providers (Anthropic, OpenAI, local MLX), with task/project/notes/finance management, persistent **cognitive memory** (FSRS5 decay, episodic/semantic extraction, Louvain community detection, personalized-pagerank retrieval), and a nightly self-improvement loop (**reforge**) that rewrites its own strategy files. All state lives in SQLite (WAL) + LanceDB under `~/.klyntbot/`.
 
 It is **not** a chat wrapper. It is a **66-crate Rust workspace** with a dedicated agent runtime, a unified memory system that meets formal quality gates (the KCA validation suite), an embedded MCP server, a WASM plugin runtime, and a coding-mode that ingests events from 5 different external CLIs (Claude Code, Codex, kimi-cli, opencode, plus git post-commit hooks).
 
@@ -44,10 +44,10 @@ It is **not** a chat wrapper. It is a **66-crate Rust workspace** with a dedicat
 
 | You are… | Start here | Then go to |
 |---|---|---|
-| **External evaluator / open-source visitor** | [TL;DR](#tldr) → [The picture](#the-picture) → [Five cross-cutting findings](#five-cross-cutting-findings) | [README.md](../../README.md) for install instructions |
+| **External evaluator / open-source visitor** | [TL;DR](#tldr) → [The picture](#the-picture) → [Cross-cutting findings](#cross-cutting-findings) | [README.md](../../README.md) for install instructions |
 | **New contributor (human)** | Read top to bottom | Pick a subsystem from [the inventory](#subsystem-inventory), open `subsystems/NN-name.md` |
 | **AI agent (Claude Code session)** | [Subsystem inventory](#subsystem-inventory) → [Critical-crate index](#critical-crate-index) → [Extension points](#extension-points) | The specific subsystem doc, plus `CLAUDE.md` for build commands |
-| **Future-you (solo dev memory aid)** | [Five cross-cutting findings](#five-cross-cutting-findings) → [Open questions & debt](#open-questions--debt) | `TECH_DEBT.md` |
+| **Future-you (solo dev memory aid)** | [Cross-cutting findings](#cross-cutting-findings) → [Open questions & debt](#open-questions--debt) | `TECH_DEBT.md` |
 
 ---
 
@@ -177,7 +177,7 @@ flowchart LR
 
 ## Mental model
 
-The fastest way to think about Klyntbot is **three concentric rings**:
+The fastest way to think about KlyntBot is **three concentric rings**:
 
 1. **The bus & store at the center.** Every signal eventually lands in `bus::DomainEventBus` (an in-process pub/sub) and persists into `~/.klyntbot/data.db` (SQLite) plus `~/.klyntbot/lance/` (vectors). Nearly every subsystem either publishes to or subscribes from the bus.
 2. **The runtime + cognition ring.** When a message arrives (from any channel), `AgentRuntime` (in the `agent` crate) classifies intent via `SkillRouter`, assembles context via `ContextEngine` (token-budget-aware), and routes the LLM call via `ProviderRouter`. The result, tool calls, and side-effects feed back into `Cognitive` for memory extraction. Nightly, `Reforge` re-reads recent behavior and rewrites strategy files.
@@ -194,7 +194,7 @@ Tools declare `allowed_channels = "non_coding" | "coding_only" | "all"` so the L
 
 ### How memory works
 
-Klyntbot doesn't have "a memory feature." It has a **layered memory system**:
+KlyntBot doesn't have "a memory feature." It has a **layered memory system**:
 
 | Layer | Where | What it stores |
 |---|---|---|
@@ -231,7 +231,7 @@ Each subsystem has a dedicated deep-dive at `docs/architecture/subsystems/NN-nam
 | 13 | **Desktop App & Frontend** | 🟢 Stable | `desktop`, `desktop-shared`, `desktop-macros`, `crates/desktop-ui` *(stub)*, `/desktop-ui` *(root TS)*, `app-core`, `klyntbot` *(facade)*, `klyntbot-server` |
 | 14 | **Validation & Benchmarks** | 🟢 Stable | `kca-bench`, `kca-e2e` |
 
-**Status counts:** 8 Stable, 4 In Progress, 1 Scaffolded, 0 Stub-only, 0 Deprecated subsystems.
+**Status counts:** 9 Stable, 4 In Progress, 1 Scaffolded, 0 Stub-only, 0 Deprecated subsystems.
 
 ---
 
@@ -243,7 +243,7 @@ These **11 crates** each get a dedicated deep-dive at `docs/architecture/crates/
 |---|---|---|
 | **`agent`** | Subsystem 04 | Owns `AgentLoop`, `AgentRuntime`, `ExecutionCore`, `SubagentRuntime`, all handler adapters. Every message passes through. The builder (`agent_loop/builder.rs`) wires every crate together at startup. |
 | **`app-core`** | Subsystem 13 | The actual integration crate. Imports every feature, holds `AppCore`, orchestrates init. CLAUDE.md misattributes this role to the `klyntbot` facade. |
-| **`cognitive`** | Subsystem 05 | KCA gates, Louvain community detection (394-line first-party impl), PPR retrieval (404-line first-party impl), reforge nightly cycle (9 phases, 3 LLM calls). Most complex internal service graph in the workspace. |
+| **`cognitive`** | Subsystem 05 | KCA gates, Louvain community detection (394-line first-party impl), PPR retrieval (404-line first-party impl), reforge nightly cycle (16 phase markers, 3 LLM calls at handler level). Most complex internal service graph in the workspace. |
 | **`context_engine`** | Subsystem 04 | Token budgeting, `TieredHistoryCompressor`, query enhancement, `InsightForge` retrieval pipeline. Mid-loop compression interacts with this from the `agent` side — interaction is non-obvious. |
 | **`storage`** | Subsystem 02 | Every data path. Surprise: depends upward on `ai-core`. Legacy `content` column is still mirrored on every message write. |
 | **`providers`** | Subsystem 03 | `LlmProvider` trait + Anthropic native + OpenAI adapter + circuit breaker + role routing + cache breakpoint synthesis. The fan-out point for every LLM call. |
@@ -271,13 +271,13 @@ Each doc carries a `Status last verified: YYYY-MM-DD` line so readers know how s
 
 ---
 
-## Five cross-cutting findings
+## Cross-cutting findings
 
 Read these even if you skip everything else. They are the things no single subsystem owns, but every reader needs to know.
 
 ### 1. The "9-layer" model in CLAUDE.md doesn't match the code
 
-CLAUDE.md (line 79) and README.md both describe Klyntbot as a "39-crate Rust workspace organized into 9 strict layers." The workspace `Cargo.toml` lists **64 member crates** + `plugin-sdk` (excluded) + root `klyntbot` (facade) = ~66 crates. The "9 layers" description omits at least 12 crates entirely (`kca-bench`, `kca-e2e`, `klynt-execpolicy`, `klynt-process-hardening`, `klynt-pty`, `klynt-sandbox`, `klynt-sandbox-helper`, `klynt-truncation`, `lsp-client`, `mcp-bridge`, all `coding-*`, all `platform-*`). The layers also don't reflect actual dependency direction (`storage` → `ai-core` is upward in the stated model).
+CLAUDE.md (line 79) and README.md both describe KlyntBot as a "39-crate Rust workspace organized into 9 strict layers." The workspace `Cargo.toml` lists **64 member crates** + `plugin-sdk` (excluded) + root `klyntbot` (facade) = ~66 crates. The "9 layers" description omits at least 12 crates entirely (`kca-bench`, `kca-e2e`, `klynt-execpolicy`, `klynt-process-hardening`, `klynt-pty`, `klynt-sandbox`, `klynt-sandbox-helper`, `klynt-truncation`, `lsp-client`, `mcp-bridge`, all `coding-*`, all `platform-*`). The layers also don't reflect actual dependency direction (`storage` → `ai-core` is upward in the stated model).
 
 CLAUDE.md also has several other significant drifts surfaced by this audit:
 - **"5 built-in orchestrator skills"** → actually 6 (`coding-orchestrator` added). 
@@ -344,7 +344,7 @@ The root `klyntbot` facade (`src/lib.rs`) is also a partial re-export, not a ful
 
 ## Storage layout (`~/.klyntbot/`)
 
-Everything Klyntbot persists lives under a single directory. Dev mode uses `~/.klyntbot-dev/` (or whatever `KLYNTBOT_HOME` points to).
+Everything KlyntBot persists lives under a single directory. Dev mode uses `~/.klyntbot-dev/` (or whatever `KLYNTBOT_HOME` points to).
 
 ```
 ~/.klyntbot/
@@ -746,7 +746,7 @@ These are deliberate non-goals — not missing features.
 | **ReAct loop** | Reason + Act — the agent's iterative tool-calling loop. Implemented in `crates/agent/src/execution/`. |
 | **Skill** | A markdown file (Agent Skills spec) with YAML frontmatter. Discovered from 4 roots; orchestrator skills load full body, others inject summary. |
 | **Distiller** | The component (in `coding-memory`) that turns raw `AgentEvent`s from CLI adapters into structured coding-memory facts. |
-| **MCP** | Model Context Protocol. Klyntbot has both an MCP server (exposes tools to Claude Code etc.) and an MCP client (consumes external MCP servers). Server exposure is **runtime-computed**: `default_exposed_tools()` returns empty Vec; `app-core` post-init fills it with `AiFeatureRegistry::tool_names()` ∪ `EXPLICIT_TOOL_ALLOWLIST` (which adds `memory`, `agent`, `annotate`, `cron`, `alarm`, `mirror`, `temporal`, `launcher`, plus 8 coding-memory recall tools). |
+| **MCP** | Model Context Protocol. KlyntBot has both an MCP server (exposes tools to Claude Code etc.) and an MCP client (consumes external MCP servers). Server exposure is **runtime-computed**: `default_exposed_tools()` returns empty Vec; `app-core` post-init fills it with `AiFeatureRegistry::tool_names()` ∪ `EXPLICIT_TOOL_ALLOWLIST` (which adds `memory`, `agent`, `annotate`, `cron`, `alarm`, `mirror`, `temporal`, `launcher`, plus 8 coding-memory recall tools). |
 | **mcp-bridge** | Bespoke Unix-socket IPC (NOT the MCP wire format). Lets the standalone `klyntbot mcp serve --stdio` child receive live Tauri events from the desktop parent. |
 | **AppCore** | The actual integration crate (`app-core`). Holds shared business logic; desktop commands are thin adapters that delegate. |
 | **Ghost commit** | A snapshot mechanism for coding-mode rewinds. Stores git working-tree state via `klynt-git-utils::restore_ghost_commit` so undo doesn't need full file BLOBs. |
@@ -795,7 +795,7 @@ The living debt inventory lives at [`TECH_DEBT.md`](./TECH_DEBT.md). Highlights:
 2. Update the section that changed.
 3. If a subsystem boundary moved, update the master Mermaid diagram **and** the relevant subsystem doc(s).
 4. If a critical-crate doc gets stale, update the per-crate doc — the index here links to it.
-5. If a TECH_DEBT.md item is closed, remove it from there and update the [Five cross-cutting findings](#five-cross-cutting-findings) if relevant.
+5. If a TECH_DEBT.md item is closed, remove it from there and update the [Cross-cutting findings](#cross-cutting-findings) if relevant.
 
 ### Validation
 

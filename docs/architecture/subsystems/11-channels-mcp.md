@@ -245,7 +245,7 @@ pub trait SamplingDelegate: Send + Sync {
 }
 ```
 
-Set via `McpClientOptions::sampling_delegate`. When an external MCP server sends `sampling/createMessage`, `KlyntbotClientHandler::create_message` invokes the delegate. Returns `method_not_found` if none configured.
+Set via `McpClientOptions::sampling_delegate`. When an external MCP server sends `sampling/createMessage`, `KlyntBotClientHandler::create_message` invokes the delegate. Returns `method_not_found` if none configured.
 
 ### `McpCircuitBreaker`
 
@@ -382,7 +382,7 @@ Content is SHA-256 hashed for dedup; previews truncated to 500 chars; IDs are UL
 ```
 1. Claude Code runs: klyntbot mcp serve --stdio
 2. serve_stdio(app, whitelist) called
-   KlyntbotServerHandler::new(app, whitelist) wraps ToolRegistryBridge + AgentBridge
+   KlyntBotServerHandler::new(app, whitelist) wraps ToolRegistryBridge + AgentBridge
 3. rmcp performs MCP initialization handshake (initialize / initialized)
 4. Claude Code: tools/list
    → ToolRegistryBridge::list_tools()

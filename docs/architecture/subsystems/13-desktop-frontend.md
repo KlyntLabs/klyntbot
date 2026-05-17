@@ -36,7 +36,7 @@ flowchart TB
 
     AC[app-core<br/><i>AppCore struct (transport-agnostic)<br/>~40 handler domains<br/>init/ (14 phases)<br/>runtime/ (ThreadRuntime trait + 2 impls)<br/>coding/ + coding_memory/<br/>tracing providers (CC/Kimi/Klynt)</i>]:::core
     FAC[klyntbot facade<br/><i>pub use all 64 crates<br/>+ convenience type re-exports</i>]:::facade
-    SRV[klyntbot-server<br/><i>KlyntbotServerHandler<br/>ToolRegistryBridge + AgentBridge<br/>Stdio + Embedded HTTP (Axum)</i>]:::server
+    SRV[klyntbot-server<br/><i>KlyntBotServerHandler<br/>ToolRegistryBridge + AgentBridge<br/>Stdio + Embedded HTTP (Axum)</i>]:::server
 
     UI[/desktop-ui — repo root<br/><i>React 19 + Vite + Bun + Tailwind<br/>32 features<br/>useChatStore (3 slices)<br/>VirtualizedMessageList<br/>50ms coalescer + watchdog</i>]:::ui
     BIN_STUB[crates/desktop-ui<br/><i>REMOVED from workspace<br/>orphaned src/bindings.ts</i>]:::ui
@@ -340,7 +340,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 ### `klyntbot-server`
 
 ```rust
-KlyntbotServerHandler::new(app: Arc<AppCore>, whitelist: Vec<String>)
+KlyntBotServerHandler::new(app: Arc<AppCore>, whitelist: Vec<String>)
    ↓ implements rmcp::handler::server::ServerHandler
 
 list_tools() → [get_status] + [agent?] + bridge.list_tools()
@@ -354,7 +354,7 @@ call_tool(name, args)  → dispatches to:
 
 **Modes:**
 - **Stdio** — `klyntbot_server::serve_stdio(app, whitelist)`, called from `run_mcp_stdio()` in `main.rs`. Uses `rmcp::transport::io::stdio()`. Drains event channels in a separate task. Calls `app.shutdown()` before returning.
-- **Embedded HTTP** — Spawned in `run_desktop_app` if `config.mcp.server.enabled`. Uses `rmcp::transport::streamable_http_server::StreamableHttpService<KlyntbotServerHandler, LocalSessionManager>` mounted at `/mcp`. Optional bearer-token auth middleware. Bound to `config.mcp.server.host:port`.
+- **Embedded HTTP** — Spawned in `run_desktop_app` if `config.mcp.server.enabled`. Uses `rmcp::transport::streamable_http_server::StreamableHttpService<KlyntBotServerHandler, LocalSessionManager>` mounted at `/mcp`. Optional bearer-token auth middleware. Bound to `config.mcp.server.host:port`.
 
 **Post-mutation entity updates** are dispatched via `emit_entity_update_for_tool` using `AiFeatureRegistry` (primary) or `NON_FEATURE_TOOL_ENTITY_KINDS` fallback (OKR, project, area, work_context, productivity).
 
@@ -366,7 +366,7 @@ call_tool(name, args)  → dispatches to:
 |---|---|
 | `ThreadEvent` (v2) | 26-variant tagged union; canonical thread event surface |
 | `CommandResult<T>` | `Result<T, ApiError>` — every `#[klynt_command]` returns this |
-| `ApiError { code: String, message: String }` | Serde-tagged camelCase; exhaustive `From<KlyntbotError>` |
+| `ApiError { code: String, message: String }` | Serde-tagged camelCase; exhaustive `From<KlyntBotError>` |
 | Coding event types | Per-feature thread payload types |
 | All derive `specta::Type` | Feeds `tauri-specta` type export → `bindings.ts` |
 

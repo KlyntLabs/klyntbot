@@ -9,7 +9,7 @@
 
 ## TL;DR
 
-The single deployable Klyntbot binary. Three modes selected at startup:
+The single deployable KlyntBot binary. Three modes selected at startup:
 1. **`--hook`** (sub-10ms short-circuit) — doubles as `klyntbot-hook` for Claude Code / git hooks
 2. **`mcp serve --stdio`** — runs the MCP stdio server for external AI clients
 3. **(default)** — runs the full Tauri desktop app
@@ -556,7 +556,7 @@ Briefly:
    - state: State<Arc<AppCore>> injected by macro
    - calls state.handlers::chat::handle_send(args)
 4. crates/app-core/src/handlers/chat/mod.rs::handle_send
-   - returns Result<T, KlyntbotError>
+   - returns Result<T, KlyntBotError>
 5. Wrapped as CommandResult<T> (ApiError on Err)
 6. Serialized via Tauri IPC back to frontend
 ```

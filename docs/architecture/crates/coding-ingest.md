@@ -488,7 +488,7 @@ Idempotency via `time_created` cursor in `IngestEventLogRepo`.
 
 ```
 1. Claude Code (or git hook) invokes:
-   /Applications/Klyntbot.app/Contents/MacOS/Klyntbot --hook claude-code
+   /Applications/KlyntBot.app/Contents/MacOS/KlyntBot --hook claude-code
 2. desktop main():
    - raw_args[1] == "--hook" → call coding_ingest::hook_cli::run(&raw_args[2..])
    - Skip pre_main_hardening (no need for hook path)

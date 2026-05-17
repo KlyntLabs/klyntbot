@@ -491,7 +491,7 @@ Tool name matching strips `_` and `-` and lowercases. So `BashTool`, `bash-tool`
 
 - **`McpApprovalChannel` always declines.** Real MCP clients cannot get interactive approval. Either implement a callback-based protocol (sampling delegation in reverse?) or leave as-is and document the limitation prominently in MCP-related material.
 - **`BlockingFallbackChannel.capabilities()` claims it supports Destructive/Admin** but always declines. Either tighten capabilities to advertise correctly, or change the channel name to convey "I will decline but you should still ask me."
-- **`pre_main_hardening_windows()` is a stub.** Acknowledged non-goal per `lib.rs:95`. If Klyntbot ever expands to Windows, this needs Job Object + mitigations work.
+- **`pre_main_hardening_windows()` is a stub.** Acknowledged non-goal per `lib.rs:95`. If KlyntBot ever expands to Windows, this needs Job Object + mitigations work.
 - **YoloMode expiry edge case** (expired → "ask everything") is non-obvious. Either document loudly or change semantics to "fall back to Default policy."
 - **Seatbelt `.sbpl` template is small (3 substitutions)** but the actual permission model lives in the base `(deny default)` + allow rules. Refactor candidates exist for richer policy expression.
 - **"Plan 1 stub" comment in `klynt-sandbox-helper/src/main.rs:1-4`** is stale — Plan 3 is fully active. Update the doc comment.
@@ -504,7 +504,7 @@ See [`TECH_DEBT.md`](../TECH_DEBT.md) categories #2 (stubs), #4 (stale refs) for
 
 ## Cross-references
 
-- [`01-foundations.md`](./01-foundations.md) — `KlyntbotError::PermissionDenied`, `KlyntbotError::Cancelled`
+- [`01-foundations.md`](./01-foundations.md) — `KlyntBotError::PermissionDenied`, `KlyntBotError::Cancelled`
 - [`02-storage.md`](./02-storage.md) — `approval_grants`, `coding_approval_history`, `approval_pattern_history`
 - [`07-tools-framework.md`](./07-tools-framework.md) — `ApprovalClass`, `ApprovalScope`, `Tool::approval_class` + `approval_scope`
 - [`09-coding-mode.md`](./09-coding-mode.md) — bash/edit/write tool integration with sandbox

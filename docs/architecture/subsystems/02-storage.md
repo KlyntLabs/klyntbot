@@ -335,7 +335,7 @@ See [`TECH_DEBT.md`](../TECH_DEBT.md) categories #3 (legacy paths) and #7 (archi
 
 ## Cross-references
 
-- [`01-foundations.md`](./01-foundations.md) — the `KlyntbotError`, `Result`, `SessionKey` types
+- [`01-foundations.md`](./01-foundations.md) — the `KlyntBotError`, `Result`, `SessionKey` types
 - [`04-agent-runtime.md`](./04-agent-runtime.md) — uses `SessionManager` and `SessionRepo`
 - [`05-cognitive-memory.md`](./05-cognitive-memory.md) — heavy `VectorStore` + cognitive repo user
 - [`07-tools-framework.md`](./07-tools-framework.md) — `FeatureMigration` definition lives there
