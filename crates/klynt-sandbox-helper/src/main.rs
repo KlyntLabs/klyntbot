@@ -1,7 +1,9 @@
 //! klynt-sandbox-helper — Linux Landlock + seccomp child binary.
 //!
-//! Plan 1: stub; prints version and exits.
-//! Plan 3: vendored from codex-rs/linux-sandbox/ and lit up.
+//! Vendored from `codex-rs/linux-sandbox/`. On Linux, applies
+//! `no_new_privs` + a Landlock ruleset derived from the parsed CLI
+//! policy, then `execvp`s the target program. On non-Linux platforms
+//! the binary prints an error and exits with code 2.
 
 #[cfg(target_os = "linux")]
 mod cli;

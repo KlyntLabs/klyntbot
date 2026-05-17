@@ -1,7 +1,7 @@
 # KlyntBot — Technical Debt Inventory
 
 > **Living document.** Categorized, not chronological. Updated as items are found, fixed, or re-evaluated.
-> **Last refreshed:** 2026-05-17 (post-KCA-bench removal — closed 9 more entries; cumulative ~20 entries closed today).
+> **Last refreshed:** 2026-05-17 (Tier 1 sweep — closed 4 P3 entries: stale init/mod.rs TODO, klynt-sandbox-helper header, llm_summary legacy fallback, feature-coaching skill-name verified live; cumulative ~24 entries closed today).
 > **Scope:** the whole Rust workspace + `/desktop-ui` frontend. Not third-party deps.
 > **Total entries:** ~130 across 9 categories.
 
@@ -141,9 +141,6 @@ These are not bugs — they're real fallback paths kept alive during a migration
 | Sev | Location | Item | Notes |
 |---|---|---|---|
 | P3 | `crates/feature-learning/src/feature.rs:43` | Comment: "see Task 47 for the exposure path" | Task ID is internal/Linear-style — stale identifier; wiring exists. |
-| P3 | `crates/klynt-sandbox-helper/src/main.rs:3` | `//! Plan 1: stub; prints version and exits. Plan 3: vendored from codex-rs/linux-sandbox/ and lit up.` | Plan 3 logic is present and active; header not updated. |
-| P3 | `crates/feature-coaching/src/...` | `#[ai] skill = "automation"` attribute | Possibly stale skill name if `automation` skill was renamed/removed — verify. |
-| P3 | `crates/agent/src/adapters/llm_summary.rs:82` | "fall back to the legacy slice when none is found" | Trivial. |
 
 ---
 
@@ -173,7 +170,6 @@ These are not bugs — they're real fallback paths kept alive during a migration
 | P2 | `crates/app-core/src/init/temporal_scheduler.rs:19-21` | `DEFAULT_MATERIALIZE_AHEAD = 3` hardcoded; spec §3.2 references `config.notifications.default_materialize_ahead` | Promotion to config deferred. |
 | P3 | `crates/platform-macos/src/computer_use/capture.rs:97` | `scale: 2.0` hardcoded | Should use `NSScreen.backingScaleFactor`. |
 | P3 | `crates/scheduling/Cargo.toml:13-16` | Both `chrono`/`chrono-tz` and `jiff` dependencies — `cron` crate API boundary requires `chrono::TimeZone` | Intentional dual dependency; ongoing friction. |
-| P3 | `crates/app-core/src/init/mod.rs:1034` | User timezone **is wired** via `config.timezone.as_str()`; the `TODO` comment is stale and misleading. | Remove the stale TODO. |
 
 ---
 

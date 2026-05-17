@@ -72,21 +72,14 @@ impl LlmSummaryProvider {
         prompt
     }
 
-    /// Try to extract a `Vec<String>` JSON array from LLM output,
-    /// delegating bracket-finding to `common::helpers::extract_json_array`.
+    /// Try to extract a `Vec<String>` JSON array from LLM output.
+    ///
+    /// Reasoning models (Mimo, DeepSeek-R1) emit chain-of-thought prose
+    /// around the final answer with stray brackets, so we pick the LAST
+    /// balanced top-level array via `extract_last_json_array`.
     fn extract_json(text: &str) -> Option<Vec<String>> {
-        // Reasoning models (Mimo, DeepSeek-R1) emit chain-of-thought prose
-        // around the final answer; the prose itself can contain stray
-        // brackets, so the naive first-`[` to last-`]` slice spans
-        // unrelated content. Prefer the LAST balanced top-level array;
-        // fall back to the legacy slice when none is found.
         let stripped = common::helpers::strip_llm_fences(text);
-        if let Some(slice) = common::helpers::extract_last_json_array(stripped) {
-            if let Ok(v) = serde_json::from_str::<Vec<String>>(slice) {
-                return Some(v);
-            }
-        }
-        let slice = common::helpers::extract_json_array(stripped.trim());
+        let slice = common::helpers::extract_last_json_array(stripped)?;
         serde_json::from_str::<Vec<String>>(slice).ok()
     }
 
