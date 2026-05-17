@@ -159,7 +159,9 @@ impl CommunityRepo {
         Ok(row.map(|r| r.0))
     }
 
-    /// Update only the `summary` text for a community (Wave 8 / Phase 6.7).
+    /// Update only the `summary` text for a community. Currently uncalled
+    /// in production after the env-gated reforge summary phase was removed
+    /// 2026-05-17; kept for future LLM-backed summarization wiring.
     pub async fn update_summary(&self, community_id: &str, summary: &str) -> Result<()> {
         let now = jiff::Timestamp::now().to_string();
         sqlx::query("UPDATE communities SET summary = ?1, updated_at = ?2 WHERE id = ?3")

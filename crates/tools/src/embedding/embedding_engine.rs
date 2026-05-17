@@ -48,13 +48,15 @@ pub enum EmbeddingProvider {
 ///
 /// When compiled without the `semantic-search` feature, local mode returns
 /// errors but OpenAI mode still works.
+const DEFAULT_OPENAI_MODEL: &str = "text-embedding-3-small";
+
 pub struct EmbeddingEngine {
     provider: EmbeddingProvider,
     #[cfg(feature = "semantic-search")]
     model: Mutex<Option<TextEmbedding>>,
     last_used: Mutex<Instant>,
     http_client: reqwest::Client,
-    /// OpenAI embedding model name (default: "text-embedding-3-small").
+    /// OpenAI embedding model name (default: `DEFAULT_OPENAI_MODEL`).
     /// Override via `with_openai_model` — typically wired from
     /// `config.cognitive.openai_embedding_model` at startup.
     openai_model: String,
@@ -77,14 +79,14 @@ impl EmbeddingEngine {
             model: Mutex::new(None),
             last_used: Mutex::new(Instant::now()),
             http_client: common::shared_http_client().clone(),
-            openai_model: "text-embedding-3-small".to_string(),
+            openai_model: DEFAULT_OPENAI_MODEL.to_string(),
             #[cfg(not(feature = "semantic-search"))]
             _phantom: (),
         }
     }
 
     /// Override the OpenAI embedding model name (default
-    /// "text-embedding-3-small"). Has no effect when the provider is
+    /// `DEFAULT_OPENAI_MODEL`). Has no effect when the provider is
     /// Local. Wire from `config.cognitive.openai_embedding_model` at
     /// startup.
     pub fn with_openai_model(mut self, model: String) -> Self {
@@ -100,7 +102,7 @@ impl EmbeddingEngine {
             model: Mutex::new(None),
             last_used: Mutex::new(Instant::now()),
             http_client: common::shared_http_client().clone(),
-            openai_model: "text-embedding-3-small".to_string(),
+            openai_model: DEFAULT_OPENAI_MODEL.to_string(),
             #[cfg(not(feature = "semantic-search"))]
             _phantom: (),
         }
@@ -369,7 +371,7 @@ impl EmbeddingEngine {
     pub fn model_name(&self) -> &str {
         match &self.provider {
             EmbeddingProvider::Local => "bge-small-en-v1.5-Q",
-            EmbeddingProvider::OpenAi { .. } => "text-embedding-3-small",
+            EmbeddingProvider::OpenAi { .. } => &self.openai_model,
         }
     }
 

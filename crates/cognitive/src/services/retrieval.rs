@@ -267,10 +267,8 @@ pub async fn retrieve_relevant_facts(
         // nouns the embedder under-weighted.
         let mut merged: std::collections::HashMap<String, (usize, SemanticFact)> =
             std::collections::HashMap::new();
-        let mut total_hits = 0usize;
         for term in &fts_terms {
             if let Ok(bm25_hits) = repo.search_fts(term, bm25_domain, params.limit * 2).await {
-                total_hits += bm25_hits.len();
                 for (rank, f) in bm25_hits.into_iter().enumerate() {
                     merged
                         .entry(f.id.clone())

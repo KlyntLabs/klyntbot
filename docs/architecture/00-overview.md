@@ -243,7 +243,7 @@ These **11 crates** each get a dedicated deep-dive at `docs/architecture/crates/
 |---|---|---|
 | **`agent`** | Subsystem 04 | Owns `AgentLoop`, `AgentRuntime`, `ExecutionCore`, `SubagentRuntime`, all handler adapters. Every message passes through. The builder (`agent_loop/builder.rs`) wires every crate together at startup. |
 | **`app-core`** | Subsystem 13 | The actual integration crate. Imports every feature, holds `AppCore`, orchestrates init. CLAUDE.md misattributes this role to the `klyntbot` facade. |
-| **`cognitive`** | Subsystem 05 | Louvain community detection (394-line first-party impl), PPR retrieval (404-line first-party impl), reforge nightly cycle (16 phase markers, 3 LLM calls at handler level). Most complex internal service graph in the workspace. |
+| **`cognitive`** | Subsystem 05 | Louvain community detection (394-line first-party impl), PPR retrieval (404-line first-party impl), reforge nightly cycle (14 phase markers, 3 LLM calls at handler level). Most complex internal service graph in the workspace. |
 | **`context_engine`** | Subsystem 04 | Token budgeting, `TieredHistoryCompressor`, query enhancement, `InsightForge` retrieval pipeline. Mid-loop compression interacts with this from the `agent` side — interaction is non-obvious. |
 | **`storage`** | Subsystem 02 | Every data path. Surprise: depends upward on `ai-core`. Legacy `content` column is still mirrored on every message write. |
 | **`providers`** | Subsystem 03 | `LlmProvider` trait + Anthropic native + OpenAI adapter + circuit breaker + role routing + cache breakpoint synthesis. The fan-out point for every LLM call. |
@@ -502,11 +502,11 @@ sequenceDiagram
 
 ## End-to-end: reforge nightly cycle
 
-Triggered by the `JOB_REFORGE_NIGHTLY` cron at **03:00 local** (registered in `app-core/init/cron.rs`). The actual cycle has grown to **16 phase markers** (the file's own doc comment still says "8 phases" — stale).
+Triggered by the `JOB_REFORGE_NIGHTLY` cron at **03:00 local** (registered in `app-core/init/cron.rs`). The cycle has **14 phase markers** (file-level doc comment in `service.rs:1` documents them in full).
 
 ```
 [ 03:00 ] Reforge cycle starts (cognitive/services/reforge/service.rs::run_reforge)
-   │       — 26-parameter signature; most params are Option<&dyn Trait> extension hooks
+   │       — 25-parameter signature; most params are Option<&dyn Trait> extension hooks
    │
    ├─ Phase 1   Collect ............................. Read strategy files + behavioral feedback + mirror signals
    ├─ Phase 2   Synthesize ..................[LLM #1] ReforgeHandler::synthesize (T=0.2, max_tokens=4096)
@@ -523,9 +523,7 @@ Triggered by the `JOB_REFORGE_NIGHTLY` cron at **03:00 local** (registered in `a
    ├─ Phase 6.5b Community Intelligence ...[hook]..... CommunityIntelligenceHandler::analyze_communities
    │                                                  (uses Louvain — 394 LOC first-party impl)
    ├─ Phase 6.5 ext Cross-session fact dedup [hook]... CodingPhaseRunner::run_cross_session_dedup
-   ├─ Phase 6.7 Community Summaries ................. Deterministic; env-gated KCA_COMMUNITY_SUMMARIES=1
-   ├─ Phase 7   Compact ............................. Trim retired data; rebuild indexes
-   └─ Phase 7.7 Compression ......................... Deterministic dedup; env-gated KCA_REFORGE_COMPRESS=1
+   └─ Phase 7   Compact ............................. Trim retired data; rebuild indexes
 ```
 
 **3 LLM calls at the `ReforgeHandler` level** (Synthesize / Review / Narrate). Hook traits may add their own LLM calls in the agent layer; the actual call count depends on which hooks are wired.
@@ -534,7 +532,9 @@ Triggered by the `JOB_REFORGE_NIGHTLY` cron at **03:00 local** (registered in `a
 
 PPR (404 LOC) is **not used in reforge** — it runs at retrieval time via `UnifiedMemoryService`. Don't confuse the two.
 
-See [`subsystems/05-cognitive-memory.md`](./subsystems/05-cognitive-memory.md#the-reforge-cycle--all-16-phases) for the full per-phase reference.
+**History:** Phase 6.7 (Community Summaries) and Phase 7.7 (Compression) used to live here, env-gated under `KCA_COMMUNITY_SUMMARIES` / `KCA_REFORGE_COMPRESS`. Both were removed 2026-05-17.
+
+See [`subsystems/05-cognitive-memory.md`](./subsystems/05-cognitive-memory.md#the-reforge-cycle--all-14-phases) for the full per-phase reference.
 
 ---
 
@@ -697,7 +697,7 @@ These are deliberate non-goals — not missing features.
 | **FSRS5** | Free Spaced Repetition Scheduler v5 — the algorithm used for memory salience decay. |
 | **Louvain** | Community-detection algorithm used on the semantic graph (first-party impl in `cognitive`). |
 | **PPR** | Personalized PageRank — graph-traversal retrieval over the semantic graph (first-party impl in `cognitive`). |
-| **Reforge** | The nightly self-improvement cycle (03:00 local). **16 phase markers, 3 LLM calls at the handler level, 6 extension hook traits.** Rewrites strategy files. |
+| **Reforge** | The nightly self-improvement cycle (03:00 local). **14 phase markers, 3 LLM calls at the handler level, 6 extension hook traits.** Rewrites strategy files. |
 | **Mirror** | Event-driven self-reflection subsystem (`cognitive::mirror`). **8 unconditional signal sources + 2 conditional + 1 stub.** Does NOT require `Arc<DomainEventBus>` (was removed). |
 | **Soul** | The system prompt — `~/.klyntbot/KLYNTBOT.md` (assistant) or `KLYNTBOT-coding.md` (coding). Live-read with mtime caching. |
 | **ReAct loop** | Reason + Act — the agent's iterative tool-calling loop. Implemented in `crates/agent/src/execution/`. |

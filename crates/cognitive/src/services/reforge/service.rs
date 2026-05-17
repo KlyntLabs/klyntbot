@@ -1,8 +1,32 @@
 //! Phase orchestrator for the Reforge cycle.
 //!
-//! `run_reforge` drives all 8 phases: Collect → Synthesize → Review →
-//! Narrate → Apply → Optimize → Graph Consolidation → Compact.  Each phase is isolated so that
-//! a single failure does not abort the remaining phases.
+//! `run_reforge` drives **14 phase markers** with 3 LLM calls at the
+//! handler level (Synthesize, Review, Narrate). The core path:
+//!
+//!   1   Collect
+//!   2   Synthesize  [LLM #1]    — ReforgeHandler::synthesize
+//!   2.5 Coding Synthesis        — CodingPhaseRunner hook
+//!   2.6 Cross-CLI transfer      — CrossCliPhaseRunner hook
+//!   3   Review      [LLM #2]    — ReforgeHandler::review
+//!   3.5 Rule Artifact Gen       — CodingPhaseRunner hook
+//!   3.6 Skill discovery         — SkillDiscoveryRunner hook
+//!   4   Narrate     [LLM #3]    — ReforgeHandler::narrate
+//!   5   Apply                   — persist suggestions + rewrite strategies
+//!   6   Optimize                — AutotunerBridge + CodingPhaseRunner
+//!   6.5 Graph Consolidation     — GraphEnrichmentHandler hook
+//!   6.5b Community Intelligence — CommunityIntelligenceHandler hook (Louvain)
+//!   6.5 ext Cross-session dedup — CodingPhaseRunner hook
+//!   7   Compact                 — trim retired data; rebuild indexes
+//!
+//! Each phase is isolated so a single failure does not abort the
+//! remaining phases. The 6 extension hook traits are all
+//! `Option<&dyn Trait>` parameters on `run_reforge` — the cycle
+//! degrades gracefully when a handler isn't installed.
+//!
+//! History: previously included Phase 6.7 (Community Summaries) and
+//! Phase 7.7 (Compression) which were env-gated under
+//! `KCA_COMMUNITY_SUMMARIES` / `KCA_REFORGE_COMPRESS`. Both were
+//! removed 2026-05-17 — features had been off in production for months.
 
 use std::collections::HashMap;
 use std::sync::Arc;

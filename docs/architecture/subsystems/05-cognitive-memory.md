@@ -9,7 +9,7 @@
 
 ## TL;DR
 
-KlyntBot's memory system. **`cognitive`** is the largest single crate in the workspace and the most intricate: it implements semantic + episodic memory, FSRS-5 spaced repetition, Louvain community detection (394-line first-party impl), Personalized PageRank retrieval (404-line first-party impl), the reforge nightly cycle (16 phase markers, 3 LLM calls at the handler level, 6 extension hook traits), and the mirror engine (8–10 signal sources feeding a self-reflection facade). **`ai-core`** is the trait system that lets feature crates declare LLM-routable events / entities / recall providers with minimal boilerplate; **`ai-core-macros`** generates the impls. **`autotuner`** runs A/B-style trials on agent parameters (prompts, weights, thresholds) with constraint-based promotion.
+KlyntBot's memory system. **`cognitive`** is the largest single crate in the workspace and the most intricate: it implements semantic + episodic memory, FSRS-5 spaced repetition, Louvain community detection (394-line first-party impl), Personalized PageRank retrieval (404-line first-party impl), the reforge nightly cycle (14 phase markers, 3 LLM calls at the handler level, 6 extension hook traits), and the mirror engine (8–10 signal sources feeding a self-reflection facade). **`ai-core`** is the trait system that lets feature crates declare LLM-routable events / entities / recall providers with minimal boilerplate; **`ai-core-macros`** generates the impls. **`autotuner`** runs A/B-style trials on agent parameters (prompts, weights, thresholds) with constraint-based promotion.
 
 This is also the subsystem with the most env-gated feature flags (`KCA_*`) and the deepest extension surface — `run_reforge` alone takes 25 parameters, many of which are `Option<&dyn Trait>` hooks.
 
@@ -41,7 +41,7 @@ flowchart TB
     FSR[FSRS-5<br/><i>pure math, 19 weights</i>]:::serv
     DEC[decay.rs<br/><i>retrieval-side retrievability<br/>12-factor RelevanceWeights</i>]:::serv
 
-    RUN[run_reforge<br/><i>16 phase markers · 3 LLM calls<br/>25-parameter signature</i>]:::refor
+    RUN[run_reforge<br/><i>14 phase markers · 3 LLM calls<br/>25-parameter signature</i>]:::refor
     RH[ReforgeHandler]:::refor
     AB1[AutotunerBridge<br/><i>reforge</i>]:::refor
     GEH[GraphEnrichmentHandler]:::refor
@@ -214,9 +214,9 @@ pub enum Aggregation { Avg, Sum, Count }
 | `#[derive(AiEntity)]` | structs | `impl AiEntity` (`entity_type`, `embed_text`). Requires `#[ai(entity_type = "...", embed_on = [...])]`. |
 | `#[derive(AiFeature)]` | structs | `impl AiFeature`, `impl RecallProvider`, plus consts: `RECALL_SPEC`, `MIRROR_SNAPSHOTS`, `PROMOTE_THRESHOLD_OVERRIDE`, `TOOL_NAME`, `ENTITY_KIND`, and a `register(reg)` method. Attrs: `recall_domain`, `skill`, `event`, `recall_boost_when(expr)`, `recall_priority_field`, `recall_recency_field`, `recall_status_filter`, `mirror_snapshots(...)`, `promotion_threshold`, `tool_name`, `entity_kind`. |
 
-### The reforge cycle — all 16 phases
+### The reforge cycle — all 14 phases
 
-(File-level doc says "8 phases" — stale. Code has grown to 16 markers.)
+(File-level doc comment in `service.rs:1` lists all 14 in order.)
 
 | # | Phase | LLM call? | Hook trait | Notes |
 |---:|---|---|---|---|
@@ -469,7 +469,6 @@ The previous `kca-bench` / `kca-e2e` validation suite was removed 2026-05-17 in 
 ## Open questions & debt
 
 - **`run_reforge`'s 25-parameter signature** is a code smell. Refactor to `ReforgeContext` builder.
-- **File-level doc comment in `service.rs:1` says "8 phases"** — actual is 16. Update.
 - **Two `AutotunerBridge` traits with the same name** (reforge vs mirror) — rename one to disambiguate.
 - **Two `retrievability` functions** (FSRS-5 power-law vs decay exponential) — rename one or co-locate with clear docstring.
 - **`MirrorEngine::start` signature was simplified** (bus removed) — document the new contract clearly; CLAUDE.md still says it takes the bus.

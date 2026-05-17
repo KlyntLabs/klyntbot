@@ -152,7 +152,6 @@ These are not bugs — they're real fallback paths kept alive during a migration
 | Sev | Location | Item | Notes |
 |---|---|---|---|
 | P2 | `AGENTS.md` | Contains only "# AGENTS.md — Phase 4 smoke test" + 4 lines of test instructions | Not authoritative; consider deleting or expanding. |
-| P1 | `cognitive/src/services/reforge/service.rs:1` (file-level doc comment) | Says "8 phases" — actual is 16+ | Update the doc comment. |
 | P1 | Bundle budget not wired into any merge-gate script | `.size-limit.json` exists (threads route ≤ 350 kB gzipped, total ≤ 2.5 MB) but no script invokes `size-limit` — only `bun run size-limit` manually. | Wire into `run_chat_perf_gates.sh` or similar so regressions fail CI. |
 | P2 | Voice/speech path docs | `voice-engine::synthesize_to_file` shells out to `/usr/bin/say` — AVSpeechSynthesizer objc2 wiring is deferred. Surface this in `crates/voice-engine.md` and `subsystems/12-plugins-platform.md` so readers don't expect AVSpeech. | Source is honest; just needs a one-line note in the relevant docs. |
 | P1 | TTFT perf gate is a no-op skeleton | `scripts/run_chat_perf_gates.sh` runs `agent/benches/ttft_e2e.rs` with `THRESHOLD_TTFT_P95_MS=25` (default — NOT 15ms as docs claim) but prints `"numeric gate deferred to PR8"` and never `exit 1`s. | Implement the numeric assertion. |
