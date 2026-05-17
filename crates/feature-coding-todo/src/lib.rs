@@ -56,9 +56,9 @@ impl FeaturePackage for CodingTodoFeature {
     }
 
     async fn health_check(&self) -> common::Result<HealthStatus> {
-        match self.repo.health_check().await {
+        match self.repo.check_health().await {
             Ok(()) => Ok(HealthStatus::Healthy),
-            Err(e) => Ok(HealthStatus::Unhealthy(e.to_string())),
+            Err(e) => Ok(HealthStatus::Unhealthy(format!("DB check failed: {e}"))),
         }
     }
 }

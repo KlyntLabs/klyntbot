@@ -90,9 +90,8 @@ impl TodoRepo {
         Ok(())
     }
 
-    /// Lightweight connection + table reachability probe for
-    /// `FeaturePackage::health_check`.
-    pub async fn health_check(&self) -> Result<(), StorageError> {
+    /// Quick liveness check — verifies the coding_todos table is accessible.
+    pub async fn check_health(&self) -> Result<(), StorageError> {
         sqlx::query("SELECT 1 FROM coding_todos LIMIT 1")
             .execute(&self.pool)
             .await?;
