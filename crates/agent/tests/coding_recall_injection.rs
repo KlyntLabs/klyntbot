@@ -8,7 +8,6 @@ fn make_ctx(channel: &str, message: Option<&str>, project_id: Option<&str>) -> S
         channel: channel.to_string(),
         chat_id: "test-chat".to_string(),
         message: message.map(|s| s.to_string()),
-        intent_summary: None,
         project_id: project_id.map(|s| s.to_string()),
         session_mode: common::SessionMode::Assistant,
     }

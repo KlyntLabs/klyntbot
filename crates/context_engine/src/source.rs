@@ -16,9 +16,6 @@ pub struct SourceContext {
     pub chat_id: String,
     /// Current user message (for relevance-filtered sources).
     pub message: Option<String>,
-    /// Condensed intent summary for relevance-filtered sources.
-    /// Falls back to `message` if not set.
-    pub intent_summary: Option<String>,
     /// Project ID for project-scoped context sources.
     pub project_id: Option<String>,
     /// Session mode discriminator (assistant vs coding).

@@ -59,7 +59,6 @@ fn registry_iterates_providers() {
         .with(FakeProvider(RecallDomain::Finance, 0.4));
     let q = RecallQuery {
         message: "deadline".into(),
-        intent_summary: None,
     };
     let ranked = reg.rank(&q);
     assert_eq!(ranked.len(), 2);
@@ -72,7 +71,6 @@ fn registry_filters_zero_scores() {
     let reg = RecallProviderRegistry::new().with(FakeProvider(RecallDomain::Tasks, 0.0));
     let q = RecallQuery {
         message: "x".into(),
-        intent_summary: None,
     };
     assert!(reg.rank(&q).is_empty());
 }

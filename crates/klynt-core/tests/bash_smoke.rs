@@ -35,6 +35,9 @@ async fn echo_hi_runs_and_emits_sandbox_event() {
                 run_in_background: None,
                 description: None,
                 silent_completion: None,
+                tty: None,
+                tty_rows: None,
+                tty_cols: None,
             },
             &ctx,
         )
@@ -86,6 +89,9 @@ async fn cwd_none_uses_registry_base() {
                 run_in_background: None,
                 description: None,
                 silent_completion: None,
+                tty: None,
+                tty_rows: None,
+                tty_cols: None,
             },
             &RoutingContext::new(ChannelName::new("coding"), ChatId::new("test")),
         )
@@ -115,6 +121,9 @@ async fn cwd_relative_joins_registry_base() {
                 run_in_background: None,
                 description: None,
                 silent_completion: None,
+                tty: None,
+                tty_rows: None,
+                tty_cols: None,
             },
             &RoutingContext::new(ChannelName::new("coding"), ChatId::new("test")),
         )
@@ -141,6 +150,9 @@ async fn cwd_absolute_wins_over_registry_base() {
                 run_in_background: None,
                 description: None,
                 silent_completion: None,
+                tty: None,
+                tty_rows: None,
+                tty_cols: None,
             },
             &RoutingContext::new(ChannelName::new("coding"), ChatId::new("test")),
         )
@@ -173,6 +185,9 @@ async fn denied_command_returns_error_and_does_not_run() {
                 run_in_background: None,
                 description: None,
                 silent_completion: None,
+                tty: None,
+                tty_rows: None,
+                tty_cols: None,
             },
             &RoutingContext::new(ChannelName::new("coding"), ChatId::new("test")),
         )

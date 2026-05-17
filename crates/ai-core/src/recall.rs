@@ -4,7 +4,6 @@ use crate::RecallDomain;
 #[derive(Debug, Clone)]
 pub struct RecallQuery {
     pub message: String,
-    pub intent_summary: Option<String>,
 }
 
 /// A candidate the retrieval layer considers for prompt injection.

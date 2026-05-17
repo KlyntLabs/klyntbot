@@ -291,7 +291,6 @@ mod tests {
             channel: String::new(),
             chat_id: String::new(),
             message: None,
-            intent_summary: None,
             project_id: None,
             session_mode: common::SessionMode::Assistant,
         };
@@ -308,7 +307,6 @@ mod tests {
             channel: String::new(),
             chat_id: String::new(),
             message: None,
-            intent_summary: None,
             project_id: None,
             session_mode: common::SessionMode::Assistant,
         };

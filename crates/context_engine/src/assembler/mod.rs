@@ -185,7 +185,6 @@ impl ContextEngine {
             channel: channel.to_string(),
             chat_id: chat_id.to_string(),
             message: message.map(|s| s.to_string()),
-            intent_summary: None,
             project_id: None,
             session_mode,
         };
@@ -1282,7 +1281,6 @@ mod tests {
             channel: "cli".into(),
             chat_id: "test".into(),
             message: None,
-            intent_summary: None,
             project_id: None,
             session_mode: common::SessionMode::Assistant,
         }

@@ -1,7 +1,7 @@
 # KlyntBot — Technical Debt Inventory
 
 > **Living document.** Categorized, not chronological. Updated as items are found, fixed, or re-evaluated.
-> **Last refreshed:** 2026-05-17 (Batch A hygiene — closed 5 more entries: Cargo `0.1.1` accepted as intentional, KCA Track 7 + Focus-session both already self-confirmed documented, two duplicate `desktop --hook` rows merged-and-removed (also documented in `crates/coding-ingest.md`). Cumulative ~38 entries closed today).
+> **Last refreshed:** 2026-05-17 (Batch B — deleted vestigial `intent_summary` field from both `context_engine::SourceContext` and `ai_core::RecallQuery`. Cumulative ~39 entries closed today).
 > **Scope:** the whole Rust workspace + `/desktop-ui` frontend. Not third-party deps.
 > **Total entries:** ~130 across 9 categories.
 
@@ -131,7 +131,6 @@ These are not bugs — they're real fallback paths kept alive during a migration
 | P3 | `crates/coding-ingest/src/adapters/codex/mod.rs:8` | "The legacy `dispatch` and `payload` modules below are retained as dead …" | Acknowledged dead code. |
 | P3 | `crates/agent/src/agent_loop/builder.rs:706` | "Notification dispatcher removed (Phase 3): legacy agent::NotificationDispatcher …" | Phase 3 cleanup remnant. |
 | P3 | `crates/feature-productivity/src/feature.rs:39` | Migration description: "Create productivity tracking tables (removed legacy focus_sessions)" | Schema cleanup. |
-| P2 | `crates/agent/src/agent_runtime/runtime.rs` (SourceContext) | `intent_summary: Option<String>` is **always `None`** in the current flat runtime — `intent_pipeline` module no longer exists | Vestigial field. Decide: delete or repurpose. |
 
 ---
 

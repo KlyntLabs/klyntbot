@@ -254,7 +254,6 @@ impl ContextSource for CognitiveContextSource {
         if let (Some(reg), Some(msg)) = (&self.recall_registry, ctx.message.as_deref()) {
             let query = ai_core::RecallQuery {
                 message: msg.to_string(),
-                intent_summary: ctx.intent_summary.clone(),
             };
             let ranked = reg.rank(&query);
             if !ranked.is_empty() {
@@ -353,7 +352,6 @@ mod tests {
             channel: "test".into(),
             chat_id: "c1".into(),
             message: None,
-            intent_summary: None,
             project_id: None,
             session_mode: common::SessionMode::Assistant,
         };
@@ -381,7 +379,6 @@ mod tests {
             channel: "test".into(),
             chat_id: "c1".into(),
             message: None,
-            intent_summary: None,
             project_id: None,
             session_mode: common::SessionMode::Assistant,
         };
@@ -412,7 +409,6 @@ mod tests {
             channel: "test".into(),
             chat_id: "c1".into(),
             message: None,
-            intent_summary: None,
             project_id: None,
             session_mode: common::SessionMode::Assistant,
         };
@@ -448,7 +444,6 @@ mod tests {
             channel: "test".into(),
             chat_id: "c1".into(),
             message: None,
-            intent_summary: None,
             project_id: None,
             session_mode: common::SessionMode::Assistant,
         };
@@ -476,7 +471,6 @@ mod tests {
             channel: "test".into(),
             chat_id: "c1".into(),
             message: Some("what are my peak hours".into()),
-            intent_summary: None,
             project_id: None,
             session_mode: common::SessionMode::Assistant,
         };
@@ -504,7 +498,6 @@ mod tests {
             channel: "test".into(),
             chat_id: "c".into(),
             message: Some("when is my deadline".into()),
-            intent_summary: None,
             project_id: None,
             session_mode: common::SessionMode::Assistant,
         };
@@ -535,7 +528,6 @@ mod tests {
             channel: "test".into(),
             chat_id: "c1".into(),
             message: None,
-            intent_summary: None,
             project_id: None,
             session_mode: common::SessionMode::Assistant,
         };
