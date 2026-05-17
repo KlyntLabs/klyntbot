@@ -90,6 +90,15 @@ impl TodoRepo {
         Ok(())
     }
 
+    /// Lightweight connection + table reachability probe for
+    /// `FeaturePackage::health_check`.
+    pub async fn health_check(&self) -> Result<(), StorageError> {
+        sqlx::query("SELECT 1 FROM coding_todos LIMIT 1")
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Clear the `proposed_in_plan_session` tag for all rows in the thread
     /// whose tag matches `plan_session_id`. Used at ratify time.
     pub async fn clear_plan_session_tag(

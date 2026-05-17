@@ -195,7 +195,7 @@ git config format.signoff true   # auto-add Signed-off-by
 Documentation lives in:
 
 - `README.md` — front door
-- `CLAUDE.md` / `AGENTS.md` — guidance for AI pair-programming sessions
+- `CLAUDE.md` — guidance for AI pair-programming sessions
 - `docs/architecture/` — system design and crate layout
 - `docs/superpowers/` — design specs and plans
 - `docs/coding-memory/` — coding-memory subsystem

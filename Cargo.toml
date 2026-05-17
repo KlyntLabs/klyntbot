@@ -178,6 +178,7 @@ feature-learning = { path = "crates/feature-learning" }
 klyntbot-server = { path = "crates/klyntbot-server" }
 klynt-execpolicy = { path = "crates/klynt-execpolicy" }
 klynt-protocol = { path = "crates/klynt-protocol" }
+klynt-pty = { path = "crates/klynt-pty" }
 klynt-sandbox = { path = "crates/klynt-sandbox" }
 klynt-hooks = { path = "crates/klynt-hooks" }
 klynt-sandbox-helper = { path = "crates/klynt-sandbox-helper" }

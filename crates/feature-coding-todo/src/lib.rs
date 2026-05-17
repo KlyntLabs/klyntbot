@@ -56,7 +56,9 @@ impl FeaturePackage for CodingTodoFeature {
     }
 
     async fn health_check(&self) -> common::Result<HealthStatus> {
-        // TODO: add a simple health check query
-        Ok(HealthStatus::Healthy)
+        match self.repo.health_check().await {
+            Ok(()) => Ok(HealthStatus::Healthy),
+            Err(e) => Ok(HealthStatus::Unhealthy(e.to_string())),
+        }
     }
 }

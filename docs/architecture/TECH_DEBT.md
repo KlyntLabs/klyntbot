@@ -1,7 +1,7 @@
 # KlyntBot — Technical Debt Inventory
 
 > **Living document.** Categorized, not chronological. Updated as items are found, fixed, or re-evaluated.
-> **Last refreshed:** 2026-05-17 (Tier 1 sweep — closed 4 P3 entries: stale init/mod.rs TODO, klynt-sandbox-helper header, llm_summary legacy fallback, feature-coaching skill-name verified live; cumulative ~24 entries closed today).
+> **Last refreshed:** 2026-05-17 (Tier 2 sweep — closed 4 more entries: feature-coding-bash workspace deps, orphan `crates/desktop-ui/` confirmed gone, root `AGENTS.md` deleted, feature-coding-todo health_check now real; cumulative ~28 entries closed today).
 > **Scope:** the whole Rust workspace + `/desktop-ui` frontend. Not third-party deps.
 > **Total entries:** ~130 across 9 categories.
 
@@ -85,7 +85,6 @@ Add entries during normal work — don't batch. Remove entries when closed; **do
 | P2 | `crates/feature-language-learning/src/practice_tool.rs:91` | `TODO: Query phoneme_mastery for low-stability phonemes` | |
 | P2 | `crates/feature-language-learning/src/pronunciation_provider.rs:35` | `TODO: Wire the full pipeline when phoneme aligner produces real data` | Depends on phoneme_aligner TODOs above. |
 | P2 | `crates/coding-ingest/src/adapters/kimi_cli/mapper.rs:265` | `TODO(distiller): attach token usage to the prior AssistantMsg row` | Token accounting incomplete for kimi-cli adapter. |
-| P3 | `crates/feature-coding-todo/src/lib.rs:59` | `TODO: add a simple health check query` | `health_check` returns `Ok(Healthy)` unconditionally. |
 | P3 | `crates/app-core/src/handlers/coding_todo.rs:268` | `TODO: cache empty CompiledRules in a static once the type supports it` | Micro-optimization. |
 | P3 | `crates/app-core/src/handlers/coding_plan.rs:203` | `TODO: Spawn untitled-rename watcher if title was empty` | UX polish. |
 | P3 | `crates/app-core/src/coding/recall_stats_handler.rs:33` | `TODO: wire up recall_invocations repo once coding-memory telemetry is …` | Telemetry surface incomplete. |
@@ -148,7 +147,6 @@ These are not bugs — they're real fallback paths kept alive during a migration
 
 | Sev | Location | Item | Notes |
 |---|---|---|---|
-| P2 | `AGENTS.md` | Contains only "# AGENTS.md — Phase 4 smoke test" + 4 lines of test instructions | Not authoritative; consider deleting or expanding. |
 | P1 | Bundle budget not wired into any merge-gate script | `.size-limit.json` exists (threads route ≤ 350 kB gzipped, total ≤ 2.5 MB) but no script invokes `size-limit` — only `bun run size-limit` manually. | Wire into `run_chat_perf_gates.sh` or similar so regressions fail CI. |
 | P2 | Voice/speech path docs | `voice-engine::synthesize_to_file` shells out to `/usr/bin/say` — AVSpeechSynthesizer objc2 wiring is deferred. Surface this in `crates/voice-engine.md` and `subsystems/12-plugins-platform.md` so readers don't expect AVSpeech. | Source is honest; just needs a one-line note in the relevant docs. |
 | P1 | TTFT perf gate is a no-op skeleton | `scripts/run_chat_perf_gates.sh` runs `agent/benches/ttft_e2e.rs` with `THRESHOLD_TTFT_P95_MS=25` (default — NOT 15ms as docs claim) but prints `"numeric gate deferred to PR8"` and never `exit 1`s. | Implement the numeric assertion. |
@@ -184,14 +182,11 @@ These are not bugs but they violate stated invariants.
 | P2 | `crates/feature-alarms` | Only `feature-*` crate with **no** `FeaturePackage` impl | Schema migrations for `scheduled_fires` come from the `scheduling` crate instead. |
 | P2 | `crates/feature-insights` | No `FeaturePackage` impl + no LLM tools at all | Pure backend service. Naming convention implies user-facing feature with tools. |
 | P2 | `crates/feature-learning/src/feature.rs:43` | `FeaturePackage::tools()` returns empty; actual `LearningTool` lives in `crates/tools/src/domain/learning_tool.rs` | Misdirection; comment partially explains. |
-| P2 | `crates/feature-coding-bash/Cargo.toml` | Uses path-based deps for `approval`, `bus`, `common`, `config`, `storage`, `klynt-pty`, `klynt-sandbox` instead of `workspace = true` | Minor inconsistency suggesting it was scaffolded separately. |
-| P2 | `crates/desktop-ui` (`crates/`) vs `/desktop-ui` (repo root) | `crates/desktop-ui/` was removed from the workspace (no `Cargo.toml` remains). Only orphaned `src/bindings.ts` persists. The actual React frontend is at the repo root `/desktop-ui/`. | Clean up orphaned `crates/desktop-ui/src/bindings.ts`. |
 | P1 | `cognitive/src/services/reforge/service.rs::run_reforge` | **26-parameter signature** (many `Option<&dyn Trait>` hooks) | Code smell. Refactor candidate: `ReforgeContext` builder. |
 | P1 | Two `AutotunerBridge` traits with the same name | `cognitive/src/services/reforge/mod.rs::AutotunerBridge` (Phase 6 orchestration) vs `cognitive/src/mirror/types.rs::AutotunerBridge` (MirrorFacade champion promotion) | Confusing for cross-file work; rename one. |
 | P1 | Two `retrievability` functions with different formulas | `cognitive/src/services/fsrs5.rs::retrievability` (power-law: `1/(1+t/9S)`) for flashcards vs `cognitive/src/services/decay.rs::retrievability` (exponential: `exp(ln(0.9)*t/s)`) for retrieval scoring | Importing the wrong one is silent and subtly wrong. Rename or co-locate. |
 | P1 | `bus::domain_events::ConcurrencyClass` enum | Defined as `{ Safe, Sequential, Exclusive }` but **not used** by `Tool::is_concurrency_safe(args) -> bool` | Decide: wire the enum to Tool (third "Exclusive" tier) or remove. |
 | P2 | `LearningTool` location | Lives at `crates/tools/src/domain/learning_tool.rs`, NOT inside `crates/feature-learning/` (which has `FeaturePackage::tools()` returning `vec![]`) | Naming mismatch confuses anyone looking for the implementation. |
-| P2 | `feature-coding-bash/Cargo.toml` | Uses path-based deps (`approval`, `bus`, `common`, `config`, `storage`, `klynt-pty`, `klynt-sandbox`) instead of `workspace = true` | Inconsistent with every other feature crate. |
 
 ---
 
