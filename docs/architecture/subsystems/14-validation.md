@@ -44,7 +44,6 @@ flowchart TB
     FIX1[(locomo10_real.json<br/>✅ present)]:::harness
     FIX2[(regression_panel.jsonl<br/>soak_10k.jsonl<br/>✅ present)]:::harness
     FIX3[(longmembench_subset.jsonl<br/>klynt_coding_bench.jsonl<br/>hallucination_planted.jsonl<br/>❌ MISSING — asserted in load test)]:::miss
-    FIX4[(kca-game-changer.md<br/>❌ MISSING — referenced as auto-generated)]:::miss
 
     FP --> KB
     PPR --> KB
@@ -258,8 +257,6 @@ Types:
 
 **Quality-gate enforcement is documentation-only.** No `exit 1` on low LoCoMo score; the script only catches runtime errors.
 
-**Game-changer report:** `mkdir -p docs/architecture` is called but **`kca-game-changer.md` is not generated** by the script. Both `kca-bench::lib.rs` and earlier subsystem docs reference it as "auto-generated every CI run" — generator missing. File doesn't exist in repo.
-
 ### `run_chat_perf_gates.sh` — 4 numeric assertions (1 is a no-op)
 
 | Gate | Source bench | Threshold | Enforced? |
@@ -440,7 +437,6 @@ When OpenAI is rate-limiting, set `KCA_LOCOMO_GRADER_URL=https://token-plan-cn.x
 ## Open questions & debt
 
 - **`cargo test -p kca-e2e` fails on a clean checkout.** Three fixture files (`longmembench_subset.jsonl`, `klynt_coding_bench.jsonl`, `hallucination_planted.jsonl`) are asserted non-empty in `lib.rs` but absent from the repo. **P0 — blocks new contributors.** Either commit the fixtures or remove the assertions.
-- **`docs/architecture/kca-game-changer.md` doesn't exist** but is referenced by `crates/kca-bench/src/lib.rs` and other subsystem docs as "auto-generated every CI run." The generator is missing. P0 doc drift — either implement the generator or remove the references.
 - **`full_pipeline` criterion bench is a stub.** Black-boxes a value; doesn't drive `AppCore`. Implement or remove the slot.
 - **TTFT perf gate is a no-op skeleton.** Threshold `25ms` (not `15ms` as earlier docs claim); check `numeric gate deferred to PR8`. Implement the numeric assertion.
 - **LoCoMo quality gate is documentation-only.** `run-locomo-real` runs but the script never `exit 1`s on a low score. Add a threshold check.

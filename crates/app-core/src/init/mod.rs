@@ -1031,7 +1031,6 @@ impl AppCore {
             }
 
             let quiet_hours = if notif_cfg.quiet_hours.enabled {
-                // TODO(phase-3.5): wire real user timezone when config has it.
                 let tz = config.timezone.as_str();
                 match QuietHoursPolicy::new(notif_cfg.quiet_hours.clone(), tz) {
                     Ok(qh) => Some(qh),

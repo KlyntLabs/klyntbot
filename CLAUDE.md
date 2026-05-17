@@ -49,7 +49,7 @@ cd desktop-ui && bun run test:watch # Vitest (watch mode)
 
 Always use these in imports, never relative `../../` paths. Note: there is **no** `@shared` or `@features` alias — those were the old UI's conventions.
 
-**Styling:** Plain CSS. No Tailwind. All styles in `src/styles/*.css`, imported through `src/styles/index.css`. Design tokens in `src/styles/ds-tokens.css`; themes in `src/styles/themes.{dark,light,dim,system}.css`. Class naming is BEM-ish (e.g. `sidebar-chat__nav-item`). When adding a new feature with its own CSS file, add an `@import` line to `src/styles/index.css`.
+**Styling:** Hybrid Tailwind + plain CSS. **New components: use Tailwind** — wired via `@tailwindcss/vite` plugin in `vite.config.ts`. **Legacy styles** live in `src/styles/*.css` (imported through `src/styles/index.css`) with BEM-ish naming (e.g. `sidebar-chat__nav-item`). Design tokens are in `src/styles/ds-tokens.css`; themes in `src/styles/themes.{dark,light,dim,system}.css`. When adding a *new* legacy/shared CSS file (rare — prefer Tailwind), add an `@import` to `src/styles/index.css`.
 
 **Typography tokens:** Never hardcode `font-size: Npx` in CSS. Use the scale in `src/styles/ds-tokens.css`: `--fs-2xs` (10.5px) / `--fs-xs` (11.5px) / `--fs-sm` (12.5px, default body — also exposed as `--fs-base`) / `--fs-md` (13.5px) / `--fs-lg` (15px) / `--fs-xl` (17px). Pick by role, not number — default text uses `var(--fs-base)`, secondary/labels step down to `--fs-xs`, headings step up to `--fs-lg`/`--fs-xl`. If no token fits (e.g. display headings ≥20px), add a new `--fs-*` to ds-tokens.css rather than hardcoding.
 

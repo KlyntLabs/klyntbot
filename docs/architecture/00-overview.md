@@ -1,7 +1,7 @@
 # KlyntBot — Architecture Overview
 
 > **Status:** Stable (overall) — see per-subsystem badges in [Subsystem inventory](#subsystem-inventory).
-> **Last verified:** 2026-05-16 (commit `575b7014c`).
+> **Last verified:** 2026-05-17 (post-sweep — Finding #1 resolved).
 > **Authoritative.** If this document disagrees with `CLAUDE.md`, `README.md`, or `AGENTS.md`, **this document wins** — those files lag and need a refresh pass. See [Document maintenance](#document-maintenance).
 
 This file is the single entry point for understanding the project. It is intentionally long. Use the table of contents to jump.
@@ -275,27 +275,11 @@ Each doc carries a `Status last verified: YYYY-MM-DD` line so readers know how s
 
 Read these even if you skip everything else. They are the things no single subsystem owns, but every reader needs to know.
 
-### 1. The "9-layer" model in CLAUDE.md doesn't match the code
+### 1. Doc drift audit (resolved)
 
-CLAUDE.md (line 79) and README.md both describe KlyntBot as a "39-crate Rust workspace organized into 9 strict layers." The workspace `Cargo.toml` lists **64 member crates** + `plugin-sdk` (excluded) + root `klyntbot` (facade) = ~66 crates. The "9 layers" description omits at least 12 crates entirely (`kca-bench`, `kca-e2e`, `klynt-execpolicy`, `klynt-process-hardening`, `klynt-pty`, `klynt-sandbox`, `klynt-sandbox-helper`, `klynt-truncation`, `lsp-client`, `mcp-bridge`, all `coding-*`, all `platform-*`). The layers also don't reflect actual dependency direction (`storage` → `ai-core` is upward in the stated model).
+The first pass of this doc system uncovered ~20 specific drift items between `CLAUDE.md` / `README.md` and the actual code: wrong crate count (`39 → 66`), stale layer model (`9 layers → 14 subsystems`), a fictional `SkillRouter` algorithm, wrong reforge phase count (`9 → 16`), wrong constant names (`INTERACTIVE_TOOL_TIMEOUT → LONG_RUNNING_TOOL_TIMEOUT`), a fictional `ANTHROPIC_CONTEXT_WINDOW` constant, wrong CSS framework (`"Plain CSS. No Tailwind"` while Tailwind was wired via `@tailwindcss/vite`), wrong bundle-budget number (`30 kB → 350 kB`), wrong perf-gate threshold (`15ms → 25ms`), wrong ingest-adapter count (`4 → 5`), references to nonexistent files (`kca-game-changer.md`, computer-use design spec), and the long-since-removed `MirrorEngine::start` `Arc<DomainEventBus>` parameter.
 
-CLAUDE.md also has several other significant drifts surfaced by this audit:
-- **"5 built-in orchestrator skills"** → actually 6 (`coding-orchestrator` added). 
-- **"`SkillRouter` selects orchestrator per-message via keyword + semantic scoring"** → no such router exists. The runtime is fully flat; all skill summaries are injected and the model loads full bodies via `skill_reference`.
-- **"9 phases with 3 LLM calls"** for reforge → actually 16 phase markers, 3 handler-level LLM calls, 6 hook traits.
-- **"Six signal sources"** for mirror → 8 unconditional + 2 conditional.
-- **"`MirrorEngine::start` takes `Arc<DomainEventBus>`"** → no longer required; removed.
-- **"4 IngestAdapter implementations"** for coding-memory → actually 5 (adds `git_post_commit`).
-- **"src/lib.rs re-exports all public types"** for the `klyntbot` facade → actually ~18 of 64 crates.
-- **`INTERACTIVE_TOOL_TIMEOUT` constant name** → actual name is `LONG_RUNNING_TOOL_TIMEOUT`.
-- **`ANTHROPIC_CONTEXT_WINDOW = 200_000` constant** → no such named constant; context window comes from `RuntimeConfig`.
-- **"Plain CSS. No Tailwind"** for the frontend → actually uses **Tailwind via `@tailwindcss/vite`** plugin (alongside legacy plain CSS in `src/styles/*.css`).
-- **4 secondary windows** → actually 5 (`coding:{repo_id}` window is full-decoration 1200×800, missed by CLAUDE.md).
-- **Voice "AVSpeech via platform-macos"** → actually shells out to the `say` CLI; AVSpeechSynthesizer objc2 wiring was deferred.
-- **TTFT perf gate "p95 ≤ 15ms"** → actual threshold default `25 ms` AND the check is a no-op skeleton ("numeric gate deferred to PR8").
-- **Bundle budget "30 kB gzipped"** → actual `.size-limit.json` cap is `350 kB` (threads route) — order-of-magnitude doc drift.
-- **"Auto-generated game-changer report at `docs/architecture/kca-game-changer.md`"** → file doesn't exist; generator missing.
-- **"Computer Use design spec at `docs/superpowers/specs/2026-04-28-computer-use-and-procedural-memory-design.md`"** → file doesn't exist either.
+**All resolved** in the doc-alignment commits on 2026-05-17 (`6223d2fd3` + the quick-win sweep). The contract going forward: **`docs/architecture/` is authoritative**; if CLAUDE.md or README.md disagree, fix them. New drift gets logged under [`TECH_DEBT.md` § Documentation drift](./TECH_DEBT.md#5-documentation-drift).
 
 **This document promotes the 14-subsystem map as the primary mental model.** Layers are kept only as a secondary "build order" annotation in [The picture](#the-picture).
 
@@ -769,13 +753,13 @@ The living debt inventory lives at [`TECH_DEBT.md`](./TECH_DEBT.md). Highlights:
 - **`feature-insights`, `feature-learning`, `feature-alarms`** don't follow the `FeaturePackage` pattern. Misleading naming convention.
 - **`ToolOutput::Structured` is defined but never produced** in production. Half-built upgrade path.
 - **`ConcurrencyClass` enum in `bus`** is not consumed by `Tool` — `Tool` uses `is_concurrency_safe(args) -> bool` instead. Decide which to keep.
-- **Computer Use platform layer is real, but not wired.** No agent tool, Tauri command, or MCP tool routes to `MacCapture` / `MacInput` / `walk_focused_app`. Design exists at `docs/superpowers/specs/2026-04-28-computer-use-and-procedural-memory-design.md`.
+- **Computer Use platform layer is real, but not wired.** No agent tool, Tauri command, or MCP tool routes to `MacCapture` / `MacInput` / `walk_focused_app`. See [`subsystems/12-plugins-platform.md`](./subsystems/12-plugins-platform.md#computer-use-wiring-status) for the full inventory of what exists vs what's missing.
 - **Two distinct `AutotunerBridge` traits** with the same name (`cognitive/services/reforge/mod.rs` vs `cognitive/mirror/types.rs`). Rename one to disambiguate.
 - **Two `retrievability` functions** with different formulas — `fsrs5::retrievability` (power-law) for flashcards, `decay::retrievability` (exponential) for retrieval scoring. Easy to import the wrong one.
 - **`run_reforge` has 26 parameters.** Refactor candidate (e.g., `ReforgeContext` builder).
 - **`intent_pipeline` is vestigial.** `SourceContext::intent_summary` is always `None`; the runtime is flat. Decide: delete or repurpose.
 - **Two `AlarmFired` `kind` strings** (`cron_job` vs `cron`) — internal dispatch vs user-facing notifications. Easy to confuse.
-- **Doc drift.** CLAUDE.md and README.md both say "39 crates / 9 layers." Actual: 64 + facade = ~66 crates; the 9-layer model omits ≥12 crates. Plus the drift items in [Finding #1](#1-the-9-layer-model-in-claudemd-doesnt-match-the-code).
+- **Doc drift.** First-pass audit fixed 2026-05-17 — see [Finding #1](#1-doc-drift-audit-resolved). Going forward: re-drift gets caught in [`TECH_DEBT.md` § Documentation drift](./TECH_DEBT.md#5-documentation-drift).
 
 ---
 

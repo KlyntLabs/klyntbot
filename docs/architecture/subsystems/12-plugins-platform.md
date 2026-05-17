@@ -309,8 +309,6 @@ pub struct AccessibilityNode {
 
 **Confirmed: no wiring exists.** Searching all crates outside `platform-macos`, `platform-capture`, and `platform-input` finds only `crates/desktop-shared/src/permissions.rs` referencing these types — for permission *checking*, not invocation.
 
-**Design spec referenced but vapor:** `docs/superpowers/specs/2026-04-28-computer-use-and-procedural-memory-design.md` is cited in `TECH_DEBT.md` and earlier docs. **The file does not exist in the repository.** Either never committed or aspirational path.
-
 **What exists:**
 - Full `ComputerUseAction` enum (16 variants) matching Anthropic's `computer_20251124` tool 1:1
 - `MacInput` with 14 of 16 actions implemented

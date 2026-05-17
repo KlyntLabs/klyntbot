@@ -421,7 +421,7 @@ The `SkillFileManager` root is passed in at construction time; not hard-coded.
 
 ### KCA validation gates
 
-`./scripts/run_kca_validation.sh` enforces quality / perf / stability gates. Soak test runs only on tagged release branches (`RUN_SOAK=1`). Auto-generated game-changer report at `docs/architecture/kca-game-changer.md`, refreshed every CI run.
+`./scripts/run_kca_validation.sh` enforces quality / perf / stability gates. Soak test runs only on tagged release branches (`RUN_SOAK=1`). See [`subsystems/14-validation.md`](./14-validation.md) for the per-gate breakdown.
 
 ---
 

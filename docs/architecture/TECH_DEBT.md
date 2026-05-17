@@ -1,7 +1,7 @@
 # KlyntBot — Technical Debt Inventory
 
 > **Living document.** Categorized, not chronological. Updated as items are found, fixed, or re-evaluated.
-> **Last refreshed:** 2026-05-16.
+> **Last refreshed:** 2026-05-17 (closed 7 entries via quick-win sweep).
 > **Scope:** the whole Rust workspace + `/desktop-ui` frontend. Not third-party deps.
 > **Total entries:** ~130 across 9 categories.
 
@@ -90,7 +90,6 @@ Add entries during normal work — don't batch. Remove entries when closed; **do
 | P3 | `crates/app-core/src/handlers/coding_plan.rs:203` | `TODO: Spawn untitled-rename watcher if title was empty` | UX polish. |
 | P3 | `crates/app-core/src/coding/recall_stats_handler.rs:33` | `TODO: wire up recall_invocations repo once coding-memory telemetry is …` | Telemetry surface incomplete. |
 | P3 | `crates/app-core/src/init/coding_subscribers.rs:51` | `TODO: wire actual success/failure once ToolCallExecuted carries it` | |
-| P3 | `crates/app-core/src/init/mod.rs:1034` | `TODO(phase-3.5): wire real user timezone when config has it` | **Stale.** Line 1035 immediately uses `config.timezone.as_str()`. Comment should be removed. |
 | P3 | `crates/app-core/src/init/temporal_scheduler.rs:19-21` | `DEFAULT_MATERIALIZE_AHEAD = 3` hardcoded; spec §3.2 references config field | See category #6. |
 | P3 | `crates/app-core/src/handlers/cron.rs:94,221` | `TODO(4.4c): wire to TemporalScheduler::is_running() once CronService is retired` | Depends on scheduler migration. |
 | P3 | `crates/common/src/notify.rs:195` | `TODO(priority-toast): consider adding <audio src="ms-winsoundevent:Notification.Looping.Alarm"/>` | UX polish. |
@@ -134,7 +133,6 @@ These are not bugs — they're real fallback paths kept alive during a migration
 | P3 | `crates/coding-ingest/src/adapters/codex/mod.rs:8` | "The legacy `dispatch` and `payload` modules below are retained as dead …" | Acknowledged dead code. |
 | P3 | `crates/agent/src/agent_loop/builder.rs:706` | "Notification dispatcher removed (Phase 3): legacy agent::NotificationDispatcher …" | Phase 3 cleanup remnant. |
 | P3 | `crates/feature-productivity/src/feature.rs:39` | Migration description: "Create productivity tracking tables (removed legacy focus_sessions)" | Schema cleanup. |
-| P2 | `crates/app-core/src/init/temporal_scheduler.rs:99` | Runtime log line `"TemporalScheduler started (side-by-side with CronService)"` — `CronService` is already removed; actual pair is `TemporalScheduler` + `CronExecutor` | Misleading text in production logs. Update to `"with CronExecutor"`. |
 | P2 | `crates/agent/src/agent_runtime/runtime.rs` (SourceContext) | `intent_summary: Option<String>` is **always `None`** in the current flat runtime — `intent_pipeline` module no longer exists | Vestigial field. Decide: delete or repurpose. |
 
 ---
@@ -143,7 +141,6 @@ These are not bugs — they're real fallback paths kept alive during a migration
 
 | Sev | Location | Item | Notes |
 |---|---|---|---|
-| P2 | `crates/desktop/src/lib.rs:16-19` | `LEGACY_COMMAND_NAMES` array is **empty**; comment says "Deleted in Phase E" | Dead code awaiting final removal. |
 | P3 | `crates/feature-learning/src/feature.rs:43` | Comment: "see Task 47 for the exposure path" | Task ID is internal/Linear-style — stale identifier; wiring exists. |
 | P3 | `crates/klynt-sandbox-helper/src/main.rs:3` | `//! Plan 1: stub; prints version and exits. Plan 3: vendored from codex-rs/linux-sandbox/ and lit up.` | Plan 3 logic is present and active; header not updated. |
 | P3 | `crates/feature-coaching/src/...` | `#[ai] skill = "automation"` attribute | Possibly stale skill name if `automation` skill was renamed/removed — verify. |
@@ -155,30 +152,11 @@ These are not bugs — they're real fallback paths kept alive during a migration
 
 | Sev | Location | Item | Notes |
 |---|---|---|---|
-| **P0** | `CLAUDE.md:79` | "39 crates, 9 layers" — actual count is **64 workspace members** + `plugin-sdk` (excluded) + root `klyntbot` (facade) ≈ **66 crates** | Misleads every reader. The 9-layer description omits ≥12 crates. |
-| **P0** | `README.md:~28` | "39-crate Rust workspace organized into 9 strict layers" | Identical drift to CLAUDE.md. |
-| P1 | `CLAUDE.md` ("Coding-memory Phase 7 — multi-CLI ingest") | Says "4 IngestAdapter implementations" — actual is **5** (adds `git_post_commit`) | Easy to miss because `git_post_commit` is a standalone `.rs` file not a subdirectory. |
-| P1 | `CLAUDE.md` (root facade) | "src/lib.rs re-exports all public types" — actual is a **partial re-export** (~18 of 64 crates) | Selective by design but doesn't match the description. |
-| P2 | `CLAUDE.md` ("Computer Use & Procedural Memory (in design — not yet implemented)") | Procedural memory's storage layer **is** implemented (`cognitive::repos::procedural_rule` is full CRUD + FTS). The unimplemented part is the higher-level UI/agent behavior. | Note worth more nuance. |
-| P2 | `CLAUDE.md` ("MCP server") | Mentions `mcp` and `mcp-bridge` as if same layer — they're **different protocols** (`mcp` = MCP wire format; `mcp-bridge` = bespoke Unix-socket IPC for desktop→stdio child events) | Splitting them in the description would prevent confusion. |
 | P2 | `AGENTS.md` | Contains only "# AGENTS.md — Phase 4 smoke test" + 4 lines of test instructions | Not authoritative; consider deleting or expanding. |
-| **P0** | `CLAUDE.md` ("5 built-in orchestrator skills") | Actual count is **6** — `coding-orchestrator` is the sixth, compiled into `SkillStore` via `DEFAULT_SKILLS` in `crates/skill-system/src/store.rs:18` | Misleads readers about scope of skill system. |
-| **P0** | `CLAUDE.md` (`SkillRouter` description) | "SkillRouter selects orchestrator per-message via keyword + semantic scoring" — **no such router exists**. The runtime is fully flat; all skill summaries are injected via `SkillListingSource` and the model loads full bodies on demand via `skill_reference` | Describes an algorithm that doesn't exist. |
-| P1 | `CLAUDE.md` (Reforge — "9 phases with 3 LLM calls") | Actual: **16 phase markers** in `cognitive/services/reforge/service.rs::run_reforge`; 3 LLM calls only at the `ReforgeHandler` level. **6 hook traits** (`ReforgeHandler`, `AutotunerBridge`, `GraphEnrichmentHandler`, `CommunityIntelligenceHandler`, `CodingPhaseRunner`, `CrossCliPhaseRunner`, `SkillDiscoveryRunner`) | Significant undercount; affects extension-point understanding. |
 | P1 | `cognitive/src/services/reforge/service.rs:1` (file-level doc comment) | Says "8 phases" — actual is 16+ | Update the doc comment. |
-| P1 | `CLAUDE.md` (Mirror — "Six signal sources") | Actual: **8 unconditional + 2 conditional + 1 stub** (`RoutingSignalSource`, `MetaRuleSignalSource`, `ConfigArchiverSource`, `TrialPreviewSource`, `TaskFocusPatternSource`, `FinanceSpendingDriftSource`, `TodoSignalSource`, `CostCeilingSource`, +`ApprovalHistorySource` and `BackgroundJobSignalSource` if optional repos present; `SkillEffectivenessSource` stubbed) | Undercount affects mirror-architecture understanding. |
-| P1 | `CLAUDE.md` (`MirrorEngine::start` signature) | Says "takes `Arc<DomainEventBus>`" — actually no longer takes the bus; removed per `crates/cognitive/src/mirror/engine.rs:101` comment | API drift. |
-| P1 | `CLAUDE.md` (`INTERACTIVE_TOOL_TIMEOUT`) | Actual name is `LONG_RUNNING_TOOL_TIMEOUT` at `crates/agent/src/execution/core.rs:54` | Constant name doesn't match. |
-| P1 | `CLAUDE.md` (`ANTHROPIC_CONTEXT_WINDOW = 200_000`) | **No such named constant exists.** Context window comes from `RuntimeConfig.context_window`, provider-supplied | Doc claims a constant that isn't there. |
-| P2 | `CLAUDE.md` (no mention of `DESKTOP_ONLY` channel mask variant) | `ChannelMask` has 4 variants: `ALL`, `NON_CODING`, `CODING_ONLY`, `DESKTOP_ONLY` | Undocumented option for new tools. |
-| P2 | `CLAUDE.md` (no mention of KCA env feature flags) | `KCA_DISABLE_COMPRESSION`, `KCA_PHASE_4`, `KCA_PHASE_4_TOOL_DRIVEN`, `KCA_PHASE_4_LEGACY_NUDGE`, `KCA_COMMUNITY_SUMMARIES`, `KCA_REFORGE_COMPRESS` — six env-only feature flags affecting agent + cognitive behavior | Discoverable only by grep; should be documented at project level. |
-| **P0** | `CLAUDE.md` ("Plain CSS. No Tailwind") | Frontend actually uses **Tailwind via `@tailwindcss/vite` plugin**. Both `@tailwindcss/vite` and explicit `tailwindcss()` plugin call are in `vite.config.ts` plugins array. New components should use Tailwind. The BEM-ish naming applies to *legacy* CSS in `src/styles/*.css` only. | Critical doc drift — guidance leads readers to skip Tailwind. |
-| **P0** | `CLAUDE.md` ("4 secondary windows") | Actually **5** — `coding:{repo_id}` per-repo coding window (1200×800, full decorations) is missed. | |
 | **P0** | `tests/fixtures/kca/{longmembench_subset,klynt_coding_bench,hallucination_planted}.jsonl` | Three files asserted non-empty in `crates/kca-e2e/src/lib.rs::loads_seed_fixtures_without_error` but **DO NOT EXIST** in repo. `cargo test -p kca-e2e` **fails on a clean checkout**. | Either commit the fixtures or remove the assertions. Blocks new contributors. |
-| **P0** | `docs/architecture/kca-game-changer.md` | Referenced by `crates/kca-bench/src/lib.rs` and earlier subsystem docs as "auto-generated every CI run." **File does not exist; generator is missing entirely.** | Either implement the generator or remove the references. |
-| **P0** | `docs/superpowers/specs/2026-04-28-computer-use-and-procedural-memory-design.md` | Cited as "design spec" for Computer Use in `TECH_DEBT.md` and earlier subsystem docs. **File does not exist in the repository.** | Either commit the spec or remove the references — my own docs point to vapor. |
-| **P0** | Bundle budget doc drift | CLAUDE.md and earlier docs claim "30 kB gzipped for `src/features/threads/**/*`." Actual `.size-limit.json`: "threads route" ≤ **350 kB gzipped** (threads + messages + coding chunks), "total app" ≤ 2.5 MB. **Off by an order of magnitude.** Plus the budget isn't wired into any merge-gate script. | Update docs + wire into `run_chat_perf_gates.sh` or similar. |
-| **P0** | Voice/speech doc drift | CLAUDE.md and earlier docs claim "AVSpeech via platform-macos." Actual: `synthesize_to_file` shells out to `/usr/bin/say`. AVSpeechSynthesizer objc2 wiring was deferred. | Doc drift; clarify in voice + platform docs. |
+| P1 | Bundle budget not wired into any merge-gate script | `.size-limit.json` exists (threads route ≤ 350 kB gzipped, total ≤ 2.5 MB) but no script invokes `size-limit` — only `bun run size-limit` manually. | Wire into `run_chat_perf_gates.sh` or similar so regressions fail CI. |
+| P2 | Voice/speech path docs | `voice-engine::synthesize_to_file` shells out to `/usr/bin/say` — AVSpeechSynthesizer objc2 wiring is deferred. Surface this in `crates/voice-engine.md` and `subsystems/12-plugins-platform.md` so readers don't expect AVSpeech. | Source is honest; just needs a one-line note in the relevant docs. |
 | P1 | TTFT perf gate is a no-op skeleton | `scripts/run_chat_perf_gates.sh` runs `agent/benches/ttft_e2e.rs` with `THRESHOLD_TTFT_P95_MS=25` (default — NOT 15ms as docs claim) but prints `"numeric gate deferred to PR8"` and never `exit 1`s. | Implement the numeric assertion. |
 | P1 | LoCoMo quality gate is documentation-only | `scripts/run_kca_validation.sh` runs `run-locomo-real` and prints results but **never `exit 1`s on a low score** — only on runtime error. | Add a threshold check (e.g., `MIN_LOCOMO_ACCURACY=0.50`). |
 | P1 | `crates/kca-bench/benches/full_pipeline.rs` | **Stub.** Black-boxes a `ConversationFixture` value without invoking `AppCore`. Exists to hold the slot + prove compilation. | Implement or remove. |
@@ -255,7 +233,7 @@ Things present in the codebase that aren't enumerated in any doc today.
 
 | Sev | What | Where | Why it matters |
 |---|---|---|---|
-| **P0** | Computer Use platform layer is real | `crates/platform-input`, `crates/platform-capture`, `crates/platform-macos/src/computer_use/{capture,input,ax_walker}.rs` | Capture, input injection, AX tree walker all implemented and tested. **Not wired** into any agent tool, Tauri command, or MCP tool. Design at `docs/superpowers/specs/2026-04-28-computer-use-and-procedural-memory-design.md`. |
+| **P0** | Computer Use platform layer is real | `crates/platform-input`, `crates/platform-capture`, `crates/platform-macos/src/computer_use/{capture,input,ax_walker}.rs` | Capture, input injection, AX tree walker all implemented and tested. **Not wired** into any agent tool, Tauri command, or MCP tool. See `subsystems/12-plugins-platform.md` for the full inventory. |
 | P1 | `kca-bench` benchmark binaries | `crates/kca-bench/src/bin/{run-locomo-real,analyze-trace,gen-soak}.rs` | Three standalone binaries usable for ad-hoc benchmarking; not mentioned in CLAUDE.md or scripts/. |
 | P1 | `kca-e2e` fixture data | `tests/fixtures/kca/{longmembench_subset,klynt_coding_bench,hallucination_planted}.jsonl` + LoCoMo real dataset | Required by `kca-e2e` (asserted non-empty at load time); not documented. |
 | P1 | `desktop --hook` short-circuit | `crates/desktop/src/main.rs` (first statement after `pre_main_hardening`) | The desktop binary doubles as the `klyntbot-hook` ingest binary at sub-10ms startup cost. Not mentioned anywhere in user-facing docs. |
