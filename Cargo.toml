@@ -59,8 +59,6 @@ members = [
     "crates/coding-memory",
     "crates/mcp-bridge",
     "crates/desktop-macros",
-    "crates/kca-e2e",
-    "crates/kca-bench",
     "crates/klynt-process-hardening",
     "crates/klynt-truncation",
     "crates/klynt-git-utils",

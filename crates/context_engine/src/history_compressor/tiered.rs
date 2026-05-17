@@ -62,12 +62,11 @@ impl TieredHistoryCompressor {
         _budget_tokens: usize,
         tier0_count: usize,
     ) -> CompressedHistory {
-        // KCA bench escape hatch: when KCA_DISABLE_COMPRESSION=1 is set,
-        // skip the entire summarization pipeline and keep every turn
-        // verbatim. Letta's 74% LoCoMo result comes from exactly this
-        // policy (no lossy compression at ingest, search verbatim at
-        // query time). Production paths see identical behavior to
-        // pre-flag when the env var is unset.
+        // Escape hatch: when KCA_DISABLE_COMPRESSION=1 is set, skip the
+        // entire summarization pipeline and keep every turn verbatim.
+        // Lossless history mode — useful for debugging context drift
+        // or comparing against verbatim baselines. Production paths
+        // see identical behavior to pre-flag when the env var is unset.
         let bench_no_compress = matches!(
             std::env::var("KCA_DISABLE_COMPRESSION").ok().as_deref(),
             Some("1") | Some("true") | Some("yes")

@@ -419,9 +419,9 @@ The `SkillFileManager` root is passed in at construction time; not hard-coded.
 
 `reforge/feedback.rs:173` reads from `strategy_records` via a raw SQL query rather than a typed repo struct. The table stores runtime signal summaries between reforge runs. **Not wired through `Repos`** — easy to miss when surveying repo coverage.
 
-### KCA validation gates
+### Validation gates
 
-`./scripts/run_kca_validation.sh` enforces quality / perf / stability gates. Soak test runs only on tagged release branches (`RUN_SOAK=1`). See [`subsystems/14-validation.md`](./14-validation.md) for the per-gate breakdown.
+The previous `kca-bench` / `kca-e2e` validation suite was removed 2026-05-17 in favor of standard external evaluations (LoCoMo + Letta — wiring pending). Until those land, only chat-runtime perf gates are enforced via `./scripts/run_chat_perf_gates.sh`. See [`subsystems/14-validation.md`](./14-validation.md) for current status + replacement plan.
 
 ---
 

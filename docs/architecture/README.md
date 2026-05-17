@@ -50,7 +50,7 @@ The navigation spine. Each doc covers a logical subsystem (which crates roll up 
 | 11 | [`subsystems/11-channels-mcp.md`](./subsystems/11-channels-mcp.md) | 🟡 In Progress | `channels`, `notifications`, `mcp`, `mcp-bridge`, `activity-log` |
 | 12 | [`subsystems/12-plugins-platform.md`](./subsystems/12-plugins-platform.md) | 🟠 Scaffolded | `plugin-runtime`, `plugin-sdk`, `platform-input`, `platform-capture`, `platform-macos` |
 | 13 | [`subsystems/13-desktop-frontend.md`](./subsystems/13-desktop-frontend.md) | 🟢 Stable | `desktop`, `desktop-shared`, `desktop-macros`, `crates/desktop-ui` *(stub)*, `/desktop-ui` *(repo root TS)*, `app-core`, `klyntbot`, `klyntbot-server` |
-| 14 | [`subsystems/14-validation.md`](./subsystems/14-validation.md) | 🟡 In Progress | `kca-bench`, `kca-e2e` |
+| 14 | [`subsystems/14-validation.md`](./subsystems/14-validation.md) | 🟠 Scaffolded | *none — chat-perf via `scripts/run_chat_perf_gates.sh`; LoCoMo + Letta wiring pending* |
 
 ### Critical-crate deep-dives (11)
 
@@ -170,7 +170,7 @@ Each of these triggers an update:
 - A new "critical crate" emerges (or a current one drops in importance).
 - The status badge for any subsystem changes.
 - A cross-cutting finding is resolved (e.g., layer-model drift gets fixed in CLAUDE.md).
-- Reforge phase count, agent execution constants, or KCA gate thresholds change.
+- Reforge phase count, agent execution constants, or validation gate thresholds change.
 - A previously-listed bug is fixed (move from TECH_DEBT to history).
 - A new "Internals" pattern emerges that future readers need.
 
@@ -213,4 +213,4 @@ This doc system was built by reading the source extensively across multiple para
 | `docs/superpowers/specs/` | Design specs for in-flight or planned features. |
 | `docs/superpowers/plans/` | Implementation plans (more detailed than specs). |
 | `docs/superpowers/notes/` | Research notes (less canonical than specs). |
-| `scripts/run_kca_validation.sh` | The merge gate. See [`subsystems/14-validation.md`](./subsystems/14-validation.md). |
+| `scripts/run_chat_perf_gates.sh` | Chat-runtime perf gates (TTFT, throughput, coalescer). Replacement memory-quality gates (LoCoMo + Letta) wiring pending — see [`subsystems/14-validation.md`](./subsystems/14-validation.md). |

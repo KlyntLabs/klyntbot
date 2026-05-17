@@ -530,7 +530,6 @@ impl UnifiedMemoryService {
         let pool = repo.pool();
         match search_episodic_memories(pool, query, None, limit).await {
             Ok(results) => {
-                crate::bench_hooks::record_hits(0, 0, results.len() as u32);
                 let mut entries = Vec::with_capacity(results.len());
                 for bm25 in &results {
                     // Load full content — prefer summary over raw content.

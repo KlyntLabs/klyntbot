@@ -684,7 +684,7 @@ Inject into `Distiller::new(.., Arc::new(MyExtractor), ..)`.
 1. Remove the `Err(NotImplemented(...))` return in `coding-memory/src/reforge/<phase>.rs`.
 2. Implement the actual logic.
 3. Update `app-core::adapters::CodingPhaseRunnerImpl` to wire it.
-4. Verify via reforge integration test in `kca-e2e`.
+4. Verify via the reforge integration tests in `coding-memory/tests/`.
 
 ### Add a tree-sitter grammar
 

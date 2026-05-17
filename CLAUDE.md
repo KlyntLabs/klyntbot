@@ -79,7 +79,7 @@ Browser-only dev: run `cd desktop-ui && bun run dev` then `cargo tauri dev` (whi
 
 > **Authoritative architecture documentation lives in [`docs/architecture/`](./docs/architecture/).** Start with [`00-overview.md`](./docs/architecture/00-overview.md) — single-file mental model with the subsystem map, three end-to-end sequence diagrams (assistant turn, coding turn, nightly reforge), the 14-subsystem inventory, 11 critical-crate deep-dives, and a glossary. **If this file disagrees with `docs/architecture/`, the docs win** — keep them in sync.
 
-Quick orientation: KlyntBot is a **66-crate Rust workspace** that ships as a single Tauri 2 desktop binary on macOS. Business logic lives in `app-core`; the `desktop` crate is a thin Tauri adapter; the root `klyntbot` crate is a *partial* re-export facade (≈18 of 64 crates). All state in SQLite (WAL) + LanceDB under `~/.klyntbot/`. Sessions are tagged `assistant` or `coding` at creation and the mode is **immutable**; tools declare `allowed_channels = "all" | "non_coding" | "coding_only"`.
+Quick orientation: KlyntBot is a **64-crate Rust workspace** that ships as a single Tauri 2 desktop binary on macOS. Business logic lives in `app-core`; the `desktop` crate is a thin Tauri adapter; the root `klyntbot` crate is a *partial* re-export facade (≈18 of 62 workspace crates). All state in SQLite (WAL) + LanceDB under `~/.klyntbot/`. Sessions are tagged `assistant` or `coding` at creation and the mode is **immutable**; tools declare `allowed_channels = "all" | "non_coding" | "coding_only"`.
 
 | When you're working on… | Open |
 |---|---|
@@ -175,11 +175,13 @@ The system prompt sent to the LLM on every chat turn is built from `ContextEngin
 - **Per-mode soul.** Assistant mode reads `~/.klyntbot/KLYNTBOT.md`; coding mode reads `~/.klyntbot/KLYNTBOT-coding.md`. Both are live-read with mtime caching. Edits to either take effect on the next message.
 - **Assistant tool gating.** `feature-tasks`, `feature-finance`, `feature-notes`, `feature-productivity`, `feature-learning`, `feature-language-learning` declare `allowed_channels = "non_coding"`. The LLM in coding mode does not see them and cannot call them.
 
+## Validation
 
-## KCA — Klynt Cognitive Architecture validation gates
+The `kca-bench` / `kca-e2e` benchmark suite was **removed 2026-05-17** in favor of standard external evaluations (LoCoMo via mem0 + Letta's eval suite — wiring pending). Until those are wired, the enforced gates are chat-runtime only:
 
-The memory system is governed by spec section 7 quality / perf / stability gates. Before any merge to main:
+```bash
+./scripts/run_chat_perf_gates.sh        # TTFT, stream throughput, relay cleanup, coalescer
+./scripts/run_chat_proptest_soak.sh     # 10,000-case property soak (release branches)
+```
 
-`./scripts/run_kca_validation.sh`
-
-Any gate failure blocks merge. Soak test runs only on tagged release branches (`RUN_SOAK=1`). For the gate-by-gate breakdown — including which gates actually fail the build vs which are no-op skeletons — see [`docs/architecture/subsystems/14-validation.md`](./docs/architecture/subsystems/14-validation.md).
+See [`docs/architecture/subsystems/14-validation.md`](./docs/architecture/subsystems/14-validation.md) for status + replacement plan.

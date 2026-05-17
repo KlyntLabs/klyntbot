@@ -1,7 +1,7 @@
 # KlyntBot — Architecture Overview
 
 > **Status:** Stable (overall) — see per-subsystem badges in [Subsystem inventory](#subsystem-inventory).
-> **Last verified:** 2026-05-17 (post-sweep — Finding #1 resolved).
+> **Last verified:** 2026-05-17 (post-KCA-bench removal — workspace now 64 crates; subsystem 14 awaiting LoCoMo + Letta replacement).
 > **Authoritative.** If this document disagrees with `CLAUDE.md`, `README.md`, or `AGENTS.md`, **this document wins** — those files lag and need a refresh pass. See [Document maintenance](#document-maintenance).
 
 This file is the single entry point for understanding the project. It is intentionally long. Use the table of contents to jump.
@@ -36,7 +36,7 @@ This file is the single entry point for understanding the project. It is intenti
 
 KlyntBot is a **local-first personal cognitive agent OS for macOS**, written in Rust and shipped as a single Tauri 2 desktop binary. It connects ~5 chat platforms (Telegram, Discord, Slack, Email, plus the desktop UI itself) to LLM providers (Anthropic, OpenAI, local MLX), with task/project/notes/finance management, persistent **cognitive memory** (FSRS5 decay, episodic/semantic extraction, Louvain community detection, personalized-pagerank retrieval), and a nightly self-improvement loop (**reforge**) that rewrites its own strategy files. All state lives in SQLite (WAL) + LanceDB under `~/.klyntbot/`.
 
-It is **not** a chat wrapper. It is a **66-crate Rust workspace** with a dedicated agent runtime, a unified memory system that meets formal quality gates (the KCA validation suite), an embedded MCP server, a WASM plugin runtime, and a coding-mode that ingests events from 5 different external CLIs (Claude Code, Codex, kimi-cli, opencode, plus git post-commit hooks).
+It is **not** a chat wrapper. It is a **64-crate Rust workspace** with a dedicated agent runtime, a unified cognitive memory system (LoCoMo + Letta external evaluations pending — see [Subsystem 14](./subsystems/14-validation.md)), an embedded MCP server, a WASM plugin runtime, and a coding-mode that ingests events from 5 different external CLIs (Claude Code, Codex, kimi-cli, opencode, plus git post-commit hooks).
 
 ---
 
@@ -87,7 +87,7 @@ flowchart TB
     EX[11 — Channels · MCP · Activity<br/><i>channels · mcp · mcp-bridge · notifications · activity-log</i>]:::ext
     PL[12 — Plugins · Platform Adapters<br/><i>plugin-runtime · plugin-sdk · platform-*</i>]:::plug
     D[13 — Desktop App + Frontend<br/><i>desktop · /desktop-ui · app-core · klyntbot facade · klyntbot-server</i>]:::desktop
-    V[14 — Validation & Benchmarks<br/><i>kca-bench · kca-e2e</i>]:::val
+    V[14 — Validation & Benchmarks<br/><i>chat-perf gates<br/>LoCoMo + Letta pending</i>]:::val
 
     F --> S
     F --> P
@@ -206,7 +206,7 @@ KlyntBot doesn't have "a memory feature." It has a **layered memory system**:
 | **Skill effectiveness** | `cognitive::mirror::sources::skill_effectiveness` | (currently stub — `TODO(T7)`) |
 | **Strategy files** | `~/.klyntbot/strategy/*.md`, archived in DB | Long-form rewriteable agent behavior, owned by `reforge` |
 
-The KCA validation suite (`./scripts/run_kca_validation.sh`) gates merges on quality/perf/stability metrics for this entire stack.
+Chat-runtime perf gates (`./scripts/run_chat_perf_gates.sh`) catch TTFT / throughput / coalescer regressions. Memory-quality gates are pending — the previous KCA bench suite was removed 2026-05-17; LoCoMo (mem0) + Letta external evaluations are planned (see [Subsystem 14](./subsystems/14-validation.md)).
 
 ---
 
@@ -229,9 +229,9 @@ Each subsystem has a dedicated deep-dive at `docs/architecture/subsystems/NN-nam
 | 11 | **Channels, MCP & Activity** | 🟡 In Progress | `channels`, `notifications`, `mcp`, `mcp-bridge`, `activity-log` |
 | 12 | **Plugin System & Platform Adapters** | 🟠 Scaffolded | `plugin-runtime`, `plugin-sdk`, `platform-input`, `platform-capture`, `platform-macos` |
 | 13 | **Desktop App & Frontend** | 🟢 Stable | `desktop`, `desktop-shared`, `desktop-macros`, `crates/desktop-ui` *(stub)*, `/desktop-ui` *(root TS)*, `app-core`, `klyntbot` *(facade)*, `klyntbot-server` |
-| 14 | **Validation & Benchmarks** | 🟢 Stable | `kca-bench`, `kca-e2e` |
+| 14 | **Validation & Benchmarks** | 🟠 Scaffolded *(replacement pending)* | *none — chat-perf via `scripts/run_chat_perf_gates.sh`; LoCoMo + Letta wiring pending* |
 
-**Status counts:** 9 Stable, 4 In Progress, 1 Scaffolded, 0 Stub-only, 0 Deprecated subsystems.
+**Status counts:** 8 Stable, 4 In Progress, 2 Scaffolded, 0 Stub-only, 0 Deprecated subsystems.
 
 ---
 
@@ -243,7 +243,7 @@ These **11 crates** each get a dedicated deep-dive at `docs/architecture/crates/
 |---|---|---|
 | **`agent`** | Subsystem 04 | Owns `AgentLoop`, `AgentRuntime`, `ExecutionCore`, `SubagentRuntime`, all handler adapters. Every message passes through. The builder (`agent_loop/builder.rs`) wires every crate together at startup. |
 | **`app-core`** | Subsystem 13 | The actual integration crate. Imports every feature, holds `AppCore`, orchestrates init. CLAUDE.md misattributes this role to the `klyntbot` facade. |
-| **`cognitive`** | Subsystem 05 | KCA gates, Louvain community detection (394-line first-party impl), PPR retrieval (404-line first-party impl), reforge nightly cycle (16 phase markers, 3 LLM calls at handler level). Most complex internal service graph in the workspace. |
+| **`cognitive`** | Subsystem 05 | Louvain community detection (394-line first-party impl), PPR retrieval (404-line first-party impl), reforge nightly cycle (16 phase markers, 3 LLM calls at handler level). Most complex internal service graph in the workspace. |
 | **`context_engine`** | Subsystem 04 | Token budgeting, `TieredHistoryCompressor`, query enhancement, `InsightForge` retrieval pipeline. Mid-loop compression interacts with this from the `agent` side — interaction is non-obvious. |
 | **`storage`** | Subsystem 02 | Every data path. Surprise: depends upward on `ai-core`. Legacy `content` column is still mirrored on every message write. |
 | **`providers`** | Subsystem 03 | `LlmProvider` trait + Anthropic native + OpenAI adapter + circuit breaker + role routing + cache breakpoint synthesis. The fan-out point for every LLM call. |
@@ -621,35 +621,25 @@ RUST_LOG=info,klyntbot=debug
 
 Environment overrides for config follow the `KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o` pattern (double underscore = nested key).
 
-### KCA environment-only feature flags
+### `KCA_*` runtime feature flags
 
-A set of `KCA_*` env flags control production behavior. They are **not** in `config.json` — they are toggles for phased rollouts, escape hatches, and bench instrumentation. All are optional; omitting them keeps default behavior.
+11 env-only flags control live agent + cognitive behavior. They are **not** in `config.json` — they are toggles for phased rollouts, escape hatches, and runtime tracing. All are optional; omitting them keeps default behavior.
+
+> **Naming note:** these all retain the `KCA_*` prefix from when they shipped alongside the now-removed `kca-bench` / `kca-e2e` benchmark suite (deleted 2026-05-17). The prefix will be renamed (or each flag hard-coded into defaults) in a separate cleanup pass once the LoCoMo + Letta external evaluations are wired.
 
 | Flag | Crate | Default | Effect |
 |---|---|---|---|
-| `KCA_DISABLE_COMPRESSION=1` | `context_engine` | off | Skips tiered history compression (escape hatch for bench reproducibility) |
+| `KCA_DISABLE_COMPRESSION=1` | `context_engine` | off | Skips tiered history compression — verbatim history mode |
 | `KCA_PHASE_4=1` | `agent` | off | Enables Phase-4 Letta-style memory-refusal recovery nudge |
 | `KCA_PHASE_4_TOOL_DRIVEN=1` | `agent` | off | Uses tool-call nudge instead of text nudge |
 | `KCA_PHASE_4_LEGACY_NUDGE=1` | `agent` | off | Falls back to legacy A/B nudge text |
-| `KCA_COMMUNITY_SUMMARIES=1` | `cognitive` | off | Enables Wave-8 community summary generation in reforge |
-| `KCA_REFORGE_COMPRESS=1` | `cognitive` | off | Enables Wave-10 LLM merge compression in reforge |
+| `KCA_COMMUNITY_SUMMARIES=1` | `cognitive` | off | Enables community summary generation in reforge |
+| `KCA_REFORGE_COMPRESS=1` | `cognitive` | off | Enables LLM merge compression in reforge |
 | `KCA_EPISODIC_THRESHOLD=<f32>` | `cognitive` | 0.3 | Overrides episodic memory importance threshold |
 | `KCA_TRACE_FSRS=1` | `cognitive` | off | Emits per-card FSRS trace logs to stderr |
-| `KCA_PER_TURN_INGEST=1` | `cognitive` | off | Persists raw turn data for distiller debugging |
-| `KCA_RAW_EPISODE_PERSIST=1` | `cognitive` | off | Persists unprocessed episode rows |
-| `KCA_VECTOR=<provider>` | `cognitive` | default | Forces a specific embedding provider |
-| `KCA_OPENAI_EMBED_MODEL=<model>` | `cognitive` | default | Overrides OpenAI embedding model |
+| `KCA_VECTOR=<provider>` | `app-core` | default | Forces a specific embedding provider |
+| `KCA_OPENAI_EMBED_MODEL=<model>` | `tools/embedding` | default | Overrides OpenAI embedding model |
 | `KCA_FACT_SEARCH_HANDLER=1` | `agent` | off | Routes fact search through handler path |
-| `KCA_PHASE_3=1` | `kca-bench` | off | Enables Phase-3 bench paths |
-| `KCA_E2E_LIMIT=<n>` | `kca-e2e` | unlimited | Caps E2E fixture count |
-| `KCA_RUN_ID=<id>` | `kca-bench` | auto | Forces a specific bench run ID |
-| `KCA_BENCH_DIRECT_DIAG=1` | `kca-bench` | off | Bypasses normal bench routing |
-| `KCA_BENCH_DIRECT_FALLBACK=1` | `kca-bench` | off | Forces fallback bench path |
-| `KCA_LOCOMO_GRADER_KEY` | `kca-bench` | — | API key for external LoCoMo grader |
-| `KCA_LOCOMO_GRADER_MODEL` | `kca-bench` | — | Model for external LoCoMo grader |
-| `KCA_LOCOMO_GRADER_URL` | `kca-bench` | — | URL for external LoCoMo grader |
-| `KCA_LOCOMO_LIMIT=<n>` | `kca-bench` | unlimited | Caps LoCoMo eval questions |
-| `KCA_LOCOMO_QA_LIMIT=<n>` | `kca-bench` | unlimited | Caps LoCoMo QA pairs |
 
 ---
 
@@ -668,30 +658,20 @@ cd desktop-ui && bun install && bun run build      # Frontend (bun, never npm)
 cargo tauri dev                                    # Full app
 ```
 
-**KCA validation** (the merge gate):
+**Validation gates.** The previous `run_kca_validation.sh` merge-gate script was removed 2026-05-17 along with the `kca-bench` and `kca-e2e` crates — replacement is LoCoMo (mem0) + Letta external evaluations, wiring pending. See [`subsystems/14-validation.md`](./subsystems/14-validation.md). Until those land, the enforced gates are chat-runtime only:
 
 ```bash
-./scripts/run_kca_validation.sh
+./scripts/run_chat_perf_gates.sh        # TTFT p95, stream throughput, relay cleanup, coalescer p95
+./scripts/run_chat_proptest_soak.sh     # 10,000-case event-sequence invariants (release branches)
 ```
 
-Gates run: lint → unit/integration → E2E (real API) → bench build check → plan-mode E2E → real LoCoMo → optional soak. **What actually fails the build** vs what's documentation-only:
-
-| Gate | Threshold | Enforced? |
+| Chat-perf gate | Threshold | Enforced? |
 |---|---|---|
 | Stream throughput | ≥ 5,000 evt/s | ✅ Yes |
 | Relay cleanup (mean) | ≤ 1 ms | ✅ Yes |
 | Coalescer p95 (10k chunks) | ≤ 16 ms | ✅ Yes |
-| **TTFT p95** | `THRESHOLD_TTFT_P95_MS=25` ms (not 15) | 🔴 **No** — "numeric gate deferred to PR8"; script runs the bench but never fails |
-| **LoCoMo quality** | Reference: Letta+gpt-4o-mini=74%, Mem0=68.5% | 🔴 **No** — `run-locomo-real` runs but script never `exit 1`s on a low score; only on runtime error |
-| **Bundle budget** | threads route ≤ 350 kB gzipped (NOT 30 kB), total ≤ 2.5 MB | 🔴 **Not in any script** — `.size-limit.json` exists but is manually invoked via `bun run size-limit` |
-
-Soak test only on release branches (`RUN_SOAK=1`). See [`subsystems/14-validation.md`](./subsystems/14-validation.md) for the full gate-by-gate breakdown.
-
-**Performance gates** specifically for the chat path:
-
-```bash
-./scripts/run_chat_perf_gates.sh
-```
+| **TTFT p95** | `THRESHOLD_TTFT_P95_MS=25` ms | 🔴 **No** — "numeric gate deferred to PR8"; script runs the bench but never fails |
+| **Bundle budget** | threads route ≤ 350 kB gzipped, total ≤ 2.5 MB | 🔴 **Not in any script** — `.size-limit.json` exists but is manually invoked via `bun run size-limit` |
 
 **Dependency hygiene** (run before releases):
 
@@ -720,7 +700,7 @@ These are deliberate non-goals — not missing features.
 
 | Term | Meaning |
 |---|---|
-| **KCA** | Klynt Cognitive Architecture — the spec for the memory system + the validation suite that gates merges. |
+| **KCA** | Klynt Cognitive Architecture — historical name for the cognitive memory subsystem + its (now-removed) custom bench suite. The bench crates were deleted 2026-05-17; LoCoMo + Letta external evaluations are pending. Some runtime feature flags retain the `KCA_*` prefix pending rename. |
 | **FSRS5** | Free Spaced Repetition Scheduler v5 — the algorithm used for memory salience decay. |
 | **Louvain** | Community-detection algorithm used on the semantic graph (first-party impl in `cognitive`). |
 | **PPR** | Personalized PageRank — graph-traversal retrieval over the semantic graph (first-party impl in `cognitive`). |
@@ -771,7 +751,7 @@ The living debt inventory lives at [`TECH_DEBT.md`](./TECH_DEBT.md). Highlights:
 - A new "critical crate" emerges (or a current one drops in importance).
 - The status badge for any subsystem changes.
 - A cross-cutting finding is resolved (e.g. the layer-model drift gets fixed in CLAUDE.md).
-- The reforge phase count, agent execution constants, or KCA gate thresholds change.
+- The reforge phase count, agent execution constants, or validation gate thresholds change.
 
 ### How to update
 

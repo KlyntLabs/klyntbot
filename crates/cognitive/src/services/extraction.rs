@@ -127,9 +127,9 @@ pub trait ConflictResolver: Send + Sync {
     ) -> ConflictDecision;
 }
 
-/// Default no-op resolver: always ADD. Used when KCA_AUDD is off or
-/// no LLM-backed resolver is wired. Preserves pre-AUDD ingestion
-/// semantics.
+/// Default no-op resolver: always ADD. Used when no LLM-backed
+/// resolver is wired (e.g., no cognitive provider configured).
+/// Preserves pre-AUDD ingestion semantics.
 pub struct NoopConflictResolver;
 
 #[async_trait]

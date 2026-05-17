@@ -8085,60 +8085,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kca-bench"
-version = "0.1.0"
-dependencies = [
- "agent",
- "app-core",
- "coding-memory",
- "cognitive",
- "common",
- "config",
- "criterion",
- "jiff",
- "kca-e2e",
- "petgraph 0.8.3",
- "providers",
- "reqwest 0.13.3",
- "serde",
- "serde_json",
- "sqlx",
- "storage",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "kca-e2e"
-version = "0.1.0"
-dependencies = [
- "agent",
- "app-core",
- "async-trait",
- "bus",
- "coding-ingest",
- "coding-memory",
- "cognitive",
- "common",
- "config",
- "desktop-shared",
- "futures",
- "jiff",
- "proptest",
- "providers",
- "serde",
- "serde_json",
- "sqlx",
- "storage",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "keyboard-types"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

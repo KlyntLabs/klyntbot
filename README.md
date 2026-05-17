@@ -27,7 +27,7 @@ KlyntBot is a personal cognitive agent OS built in Rust. It runs entirely on you
 - 🌐 **Multi-channel** — Telegram, Discord, Slack, Email, and [MCP](https://modelcontextprotocol.io) — all sharing the same memory and persona
 - 🧩 **Extensible** — feature crates, skills, WASM plugins, and an MCP server that exposes tools to other AI clients
 
-It is not a chat wrapper. It is a **66-crate Rust workspace** (see [architecture overview](./docs/architecture/00-overview.md)) organized into 14 subsystems, with a dedicated agent runtime, cognitive layer, and skill catalog as first-class primitives.
+It is not a chat wrapper. It is a **64-crate Rust workspace** (see [architecture overview](./docs/architecture/00-overview.md)) organized into 14 subsystems, with a dedicated agent runtime, cognitive layer, and skill catalog as first-class primitives.
 
 ---
 

@@ -172,7 +172,6 @@ pub async fn retrieve_relevant_facts(
             .await
         {
             Ok(hits) => {
-                crate::bench_hooks::record_hits(hits.len() as u32, 0, 0);
                 // Wave-A: hybrid RRF merge — always run both vector and
                 // fallback (FTS-anchored) paths and combine via reciprocal
                 // rank fusion. Replaces the prior one-or-other branch
@@ -236,7 +235,6 @@ pub async fn retrieve_relevant_facts(
         // identical behavior to pre-Tier 1 when no entity is in the
         // query.
         let entities = &query_entities;
-        crate::bench_hooks::record_entities(entities);
         let fts_terms: Vec<String> = if entities.is_empty() {
             vec![query.to_string()]
         } else {
@@ -285,8 +283,6 @@ pub async fn retrieve_relevant_facts(
                 }
             }
         }
-        crate::bench_hooks::record_hits(0, total_hits as u32, 0);
-
         let scored_ids: std::collections::HashSet<String> =
             scored.iter().map(|s| s.fact.id.clone()).collect();
         let now = Timestamp::now();

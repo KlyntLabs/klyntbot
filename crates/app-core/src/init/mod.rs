@@ -753,8 +753,8 @@ impl AppCore {
                 });
             // Tier 0 — AUDD on by default whenever a cognitive provider
             // is configured. Falls back to Add-only when no provider
-            // exists (e.g., offline). Removes the prior KCA_AUDD env
-            // gate; opt-out is via cognitive provider absence.
+            // exists (e.g., offline). Opt-out is via cognitive provider
+            // absence (no provider → no resolver → Add-only).
             let audd_resolver: Option<
                 Arc<dyn ::cognitive::services::extraction::ConflictResolver>,
             > = cognitive_provider.clone().map(|cp| {

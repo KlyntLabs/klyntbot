@@ -229,9 +229,9 @@ impl IngestionConsumer {
     }
 
     /// Wire an LLM-backed AUDD conflict resolver (Mem0 pattern). When
-    /// absent, ingestion uses the default Add-only behavior. Gated by
-    /// `KCA_AUDD=1` at the call site so production stays safe by
-    /// default.
+    /// absent, ingestion uses the default Add-only behavior. Opt-out
+    /// is via cognitive provider absence (no provider configured →
+    /// no resolver → Add-only).
     pub fn with_conflict_resolver(
         mut self,
         resolver: Arc<dyn crate::services::extraction::ConflictResolver>,

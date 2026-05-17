@@ -1,7 +1,7 @@
 # KlyntBot — Technical Debt Inventory
 
 > **Living document.** Categorized, not chronological. Updated as items are found, fixed, or re-evaluated.
-> **Last refreshed:** 2026-05-17 (closed 7 entries via quick-win sweep).
+> **Last refreshed:** 2026-05-17 (post-KCA-bench removal — closed 9 more entries; cumulative ~20 entries closed today).
 > **Scope:** the whole Rust workspace + `/desktop-ui` frontend. Not third-party deps.
 > **Total entries:** ~130 across 9 categories.
 
@@ -154,23 +154,17 @@ These are not bugs — they're real fallback paths kept alive during a migration
 |---|---|---|---|
 | P2 | `AGENTS.md` | Contains only "# AGENTS.md — Phase 4 smoke test" + 4 lines of test instructions | Not authoritative; consider deleting or expanding. |
 | P1 | `cognitive/src/services/reforge/service.rs:1` (file-level doc comment) | Says "8 phases" — actual is 16+ | Update the doc comment. |
-| **P0** | `tests/fixtures/kca/{longmembench_subset,klynt_coding_bench,hallucination_planted}.jsonl` | Three files asserted non-empty in `crates/kca-e2e/src/lib.rs::loads_seed_fixtures_without_error` but **DO NOT EXIST** in repo. `cargo test -p kca-e2e` **fails on a clean checkout**. | Either commit the fixtures or remove the assertions. Blocks new contributors. |
 | P1 | Bundle budget not wired into any merge-gate script | `.size-limit.json` exists (threads route ≤ 350 kB gzipped, total ≤ 2.5 MB) but no script invokes `size-limit` — only `bun run size-limit` manually. | Wire into `run_chat_perf_gates.sh` or similar so regressions fail CI. |
 | P2 | Voice/speech path docs | `voice-engine::synthesize_to_file` shells out to `/usr/bin/say` — AVSpeechSynthesizer objc2 wiring is deferred. Surface this in `crates/voice-engine.md` and `subsystems/12-plugins-platform.md` so readers don't expect AVSpeech. | Source is honest; just needs a one-line note in the relevant docs. |
 | P1 | TTFT perf gate is a no-op skeleton | `scripts/run_chat_perf_gates.sh` runs `agent/benches/ttft_e2e.rs` with `THRESHOLD_TTFT_P95_MS=25` (default — NOT 15ms as docs claim) but prints `"numeric gate deferred to PR8"` and never `exit 1`s. | Implement the numeric assertion. |
-| P1 | LoCoMo quality gate is documentation-only | `scripts/run_kca_validation.sh` runs `run-locomo-real` and prints results but **never `exit 1`s on a low score** — only on runtime error. | Add a threshold check (e.g., `MIN_LOCOMO_ACCURACY=0.50`). |
-| P1 | `crates/kca-bench/benches/full_pipeline.rs` | **Stub.** Black-boxes a `ConversationFixture` value without invoking `AppCore`. Exists to hold the slot + prove compilation. | Implement or remove. |
 | P1 | `crates/plugin-runtime/src/manifest.rs` (`PluginCronJob`) | Manifest deserializes `cronJobs: Vec<PluginCronJob>` but **no executor reads them**. Plugins can declare cron jobs and they will never fire. | Implement plugin-cron executor or remove the field. |
 | P1 | `crates/platform-macos/src/computer_use/ax_walker.rs` (`AccessibilityNode.frame`) | Frame coordinates are in **AppKit (bottom-left)** space, not Quartz (top-left) as the rest of `PlatformInput`/`PlatformCapture` API documents. Y-flip is a Phase 4 TODO. | Significant correctness gotcha for future Computer Use. Fix y-flip or document the inconsistency loudly. |
 | P2 | `crates/platform-macos/src/computer_use/input.rs` (`MacInput`) | `Screenshot` + `Zoom` variants return `NotImplemented` (14 of 16 `ComputerUseAction` work). | |
 | P2 | `crates/platform-macos/src/computer_use/capture.rs` (`MacCapture`) | `capture_window` + `get_active_window` return `NotImplemented` (3 of 5 `PlatformCapture` methods work). Plus `scale` hardcoded `2.0` instead of `NSScreen.backingScaleFactor`. | |
 | P2 | `crates/platform-macos/src/dnd.rs` (`toggle_dnd`) | Calls `shortcuts run "Toggle Do Not Disturb"` — **requires user to manually create that Shortcut**. Brittle setup dependency not surfaced anywhere. | Document loudly or auto-install the Shortcut. |
-| P2 | `crates/kca-e2e/src/replayer.rs` (`await_cognitive_idle`) | **Mandatory 14-second floor** hardcoded for Kimi K2's observed worst-case 12-second extraction tail. | Should be configurable; if cognitive pipeline changes extraction latency, this floor needs adjustment. |
-| P2 | `crates/kca-e2e/src/replayer.rs` (`chat_complete`) | Manually publishes `ChatTurnCompleted` to bus after draining stream events — bypasses production `relay_chat_stream`. | Non-obvious coupling. Add a coupling test or runtime assertion. |
 | P2 | `desktop-ui/src/features/threads/store/chatStreamStore.ts` | Legacy v1 event bridge — ~30 `agent:*` Tauri event listeners. Still active for assistant chat; coding threads migrated to v2 `ThreadEvent`. | Plan + schedule the v2 migration cut for assistant chat. |
 | P2 | OAuth callback uses fixed `CALLBACK_PORT` | `crates/desktop/src/oauth/` — no fallback if port is in use. | Add port retry or document. |
 | P2 | Embedded MCP HTTP server has no `/health` route | Status only via `get_status` MCP tool or `klyntbot://status` resource — external HTTP monitors can't probe. | Add `/health` endpoint. |
-| P3 | `crates/kca-bench/src/bin/gen_soak.rs` | Outputs `120` fixtures (5×6×4) but README says "100 base fixtures." Soak test asserts `>= 100` so passes either way. | Align README. |
 
 ---
 
@@ -213,7 +207,6 @@ These are not bugs but they violate stated invariants.
 |---|---|---|---|
 | P2 | `ToolOutput::Structured` (`crates/tools-core/src/lib.rs:165-220`) | Enum + `__STRUCTURED__` parsing convention defined and documented, but **zero production tools** emit it | Incomplete upgrade path. Decide: implement, or remove? |
 | P2 | `TasksFeature::new()` without `.with_task_tool(...)` registers zero tools silently | `crates/agent/src/agent_loop/builder.rs:1353` is the only correct wiring | Footgun for plugins/tests that construct `TasksFeature::new()` expecting tools. |
-| P3 | `kca-bench` removed synthetic fixtures (2026-05-01) — documented in the crate's `lib.rs` but **not in CLAUDE.md** | Three criterion benchmarks + three standalone binaries are undocumented at the project level | Could surface in subsystem 14 doc. |
 | P3 | Cargo `version = "0.1.1"` | Workspace version | First public release will be `0.1.0` per CHANGELOG — verify this is intentional or rewind to `0.1.0-pre`. |
 | P2 | Two `AlarmFired` `kind` strings | `"cron_job"` (TemporalScheduler → CronExecutor internal dispatch) vs `"cron"` (`app-core/init/cron.rs::publish_cron_alarm` user-facing notifications) | Confusingly similar; same enum variant, different consumers. Rename one (e.g., `cron_user_notification`). |
 | P2 | `CronHandler` is sync (`Fn`, not `AsyncFn`) | Dispatched via `tokio::task::spawn_blocking`; async work uses `tokio::task::block_in_place + rt.block_on(...)` | Footgun for new handlers; obvious only after reading existing impls. Consider `AsyncCronHandler`. |
@@ -234,8 +227,6 @@ Things present in the codebase that aren't enumerated in any doc today.
 | Sev | What | Where | Why it matters |
 |---|---|---|---|
 | **P0** | Computer Use platform layer is real | `crates/platform-input`, `crates/platform-capture`, `crates/platform-macos/src/computer_use/{capture,input,ax_walker}.rs` | Capture, input injection, AX tree walker all implemented and tested. **Not wired** into any agent tool, Tauri command, or MCP tool. See `subsystems/12-plugins-platform.md` for the full inventory. |
-| P1 | `kca-bench` benchmark binaries | `crates/kca-bench/src/bin/{run-locomo-real,analyze-trace,gen-soak}.rs` | Three standalone binaries usable for ad-hoc benchmarking; not mentioned in CLAUDE.md or scripts/. |
-| P1 | `kca-e2e` fixture data | `tests/fixtures/kca/{longmembench_subset,klynt_coding_bench,hallucination_planted}.jsonl` + LoCoMo real dataset | Required by `kca-e2e` (asserted non-empty at load time); not documented. |
 | P1 | `desktop --hook` short-circuit | `crates/desktop/src/main.rs` (first statement after `pre_main_hardening`) | The desktop binary doubles as the `klyntbot-hook` ingest binary at sub-10ms startup cost. Not mentioned anywhere in user-facing docs. |
 | P2 | Skill discovery roots (4 of them) | `klynt-skill-loader::discovery` | User / ReforgePrivate / Project / ReforgeTeam — priority order matters; not documented at the project level. |
 | P2 | OS_NATIVE + Tray notification channels | `crates/notifications/src/channel/` | Notification-only surfaces (no chat). Listed separately from chat channels but conflated in some docs. |
