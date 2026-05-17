@@ -45,25 +45,25 @@ These are runtime-behavior gates, not memory-quality gates — they catch perf r
 
 ## What was kept
 
-**Runtime feature flags prefixed `KCA_*` are still in the source.** These are independent of the benchmark — they gate live agent and cognitive behavior:
+**Chat-runtime perf scripts** (`run_chat_perf_gates.sh`, `run_chat_proptest_soak.sh`) — they test live chat behavior (TTFT, stream throughput, coalescer p95, relay cleanup, property-soaked event sequences), not memory quality, so they're orthogonal to the KCA removal.
 
-| Flag | Crate | Effect |
-|---|---|---|
-| `KCA_DISABLE_COMPRESSION=1` | `context_engine` | Skips tiered history compression — verbatim history mode |
-| `KCA_PHASE_4=1` | `agent` | Enables Letta-style memory-refusal recovery nudge |
-| `KCA_PHASE_4_TOOL_DRIVEN=1` | `agent` | Tool-call nudge instead of text nudge |
-| `KCA_PHASE_4_LEGACY_NUDGE=1` | `agent` | Falls back to legacy A/B nudge text |
-| `KCA_COMMUNITY_SUMMARIES=1` | `cognitive` | Enables community summary generation in reforge |
-| `KCA_REFORGE_COMPRESS=1` | `cognitive` | Enables LLM merge compression in reforge |
-| `KCA_EPISODIC_THRESHOLD=<f32>` | `cognitive` | Overrides episodic memory importance threshold (default 0.3) |
-| `KCA_TRACE_FSRS=1` | `cognitive` | Emits per-card FSRS trace logs to stderr |
-| `KCA_VECTOR=<provider>` | `app-core` | Forces a specific embedding provider |
-| `KCA_OPENAI_EMBED_MODEL=<model>` | `tools/embedding` | Overrides OpenAI embedding model |
-| `KCA_FACT_SEARCH_HANDLER=1` | `agent` | Routes fact search through the handler path |
+## Follow-up: all `KCA_*` env vars removed
 
-These will be renamed (drop the `KCA_` prefix) or hard-coded into defaults in a separate cleanup pass once the replacement benchmark is wired and the team picks a per-flag fate.
+The 11 runtime feature flags prefixed `KCA_*` (originally kept after the bench removal as "scope B") were also removed later on 2026-05-17. The per-flag fates:
 
-**Chat-runtime perf scripts were also kept** (`run_chat_perf_gates.sh`, `run_chat_proptest_soak.sh`) — they test live chat behavior (TTFT, stream throughput, coalescer p95, relay cleanup, property-soaked event sequences), not memory quality, so they're orthogonal to the KCA removal.
+| Flag | Fate |
+|---|---|
+| `KCA_DISABLE_COMPRESSION` | Deleted (compression always on) |
+| `KCA_PHASE_4` + `_TOOL_DRIVEN` + `_LEGACY_NUDGE` (3 flags) | Deleted (memory-refusal nudge feature dropped) |
+| `KCA_COMMUNITY_SUMMARIES` | Deleted (reforge Phase 6.7 dropped) |
+| `KCA_REFORGE_COMPRESS` | Deleted (reforge Phase 7.7 dropped) |
+| `KCA_EPISODIC_THRESHOLD` | Migrated to `config.cognitive.episodicImportanceThreshold` |
+| `KCA_TRACE_FSRS` | Deleted; `tracing::debug!` made unconditional (filter via `RUST_LOG=cognitive::services::retrieval=debug`) |
+| `KCA_VECTOR` | Hard-coded ON when `vector_store` exists |
+| `KCA_OPENAI_EMBED_MODEL` | Migrated to `config.cognitive.openaiEmbeddingModel` |
+| `KCA_FACT_SEARCH_HANDLER` | Deleted (experimental routing never enabled) |
+
+Reasoning: features that had been OFF in production for months were dead toggles — deleting them removes carrying-cost without changing observable behavior. Real tunables became proper config fields. Debug traces use standard `RUST_LOG` filtering.
 
 ---
 

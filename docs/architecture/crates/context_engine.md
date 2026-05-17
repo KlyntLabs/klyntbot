@@ -13,7 +13,7 @@ The token-budget and assembly layer for every LLM call. Owns `ContextEngine` (or
 
 The crate is **bounded and coherent**: it doesn't talk to LLMs (that's `providers`), doesn't own memory storage (that's `storage` + `cognitive`), and doesn't dispatch tools (that's `agent`). Its single responsibility is "given a request and a token budget, produce the assembled context the LLM will see."
 
-The most important constant: `LOW_BUDGET_THRESHOLD = 0.15` — emits warnings when fewer than 15% of context tokens remain. The most important env flag: `KCA_DISABLE_COMPRESSION=1` — bypasses `TieredHistoryCompressor` entirely (Letta benchmark mode).
+The most important constant: `LOW_BUDGET_THRESHOLD = 0.15` — emits warnings when fewer than 15% of context tokens remain. Compression-related tunables live in `config.cognitive.historyCompression` ([`crates/config/src/schema/cognitive.rs`](../../../crates/config/src/schema/cognitive.rs)).
 
 ---
 
@@ -534,22 +534,21 @@ Tracks sources skipped due to budget so the agent can request them via `ContextE
 ### `TieredHistoryCompressor` pipeline
 
 ```
-1. Check KCA_DISABLE_COMPRESSION → return verbatim if set
-2. Early exit if turn count ≤ tier0_count
-3. Microcompact pre-pass:
+1. Early exit if turn count ≤ tier0_count
+2. Microcompact pre-pass:
    For COMPACTABLE_TOOLS (read_file, bash, grep, glob, web_search, web_fetch),
    outside tier0_count × 2 window,
    replace results with 150-char snippet
-4. group_into_turns → split into ConversationTurn objects at tier0_start
-5. Optional cognitive scoring via MemoryScorer::score_batch (if use_cognitive_scoring enabled)
-6. Tier assignment:
+3. group_into_turns → split into ConversationTurn objects at tier0_start
+4. Optional cognitive scoring via MemoryScorer::score_batch (if use_cognitive_scoring enabled)
+5. Tier assignment:
    - Detailed: high score (≥ high_relevance_threshold) OR within recency window
    - Condensed: otherwise
-7. compress_turns:
+6. compress_turns:
    - Batch consecutive same-tier turns (sub-batches of 5)
    - Extractive-first; only call LLM when extractive output exceeds target_ratio × original_tokens
    - Skip turns < 30 tokens
-8. Return CompressedHistory { summaries, recent_messages, preamble, total_tokens }
+7. Return CompressedHistory { summaries, recent_messages, preamble, total_tokens }
 ```
 
 **Microcompact window vs tier0 window:** Microcompact uses `tier0_count × 2` (covers history about to be compressed). MidLoopCompressor in `agent` uses fixed `MIN_RECENT_MESSAGES = 8`. The two are independent.
@@ -703,14 +702,6 @@ let compressor = TieredHistoryCompressor::new(
 
 let result = compressor.compress(&history, 10_000, 8).await;
 assert_eq!(result.recent_messages.len(), 8);
-```
-
-### Test KCA escape hatch
-
-```rust
-std::env::set_var("KCA_DISABLE_COMPRESSION", "1");
-let result = compressor.compress(&long_history, 1_000, 8).await;
-// Verify history returned verbatim
 ```
 
 ---

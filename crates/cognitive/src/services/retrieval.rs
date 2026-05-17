@@ -387,17 +387,15 @@ pub async fn retrieve_relevant_facts(
                 // Use the stronger signal: direct co-activation or transitive community
                 let effective = co_score.max(community_score);
                 result.score += effective * weights.community;
-                if std::env::var("KCA_TRACE_FSRS").ok().as_deref() == Some("1") {
-                    tracing::debug!(
-                        fact_id = %result.fact.id,
-                        co_score,
-                        community_score,
-                        effective,
-                        community_weight = weights.community,
-                        stability = result.fact.stability,
-                        "W9 trace: hebbian + community"
-                    );
-                }
+                tracing::debug!(
+                    fact_id = %result.fact.id,
+                    co_score,
+                    community_score,
+                    effective,
+                    community_weight = weights.community,
+                    stability = result.fact.stability,
+                    "W9 trace: hebbian + community"
+                );
             }
         }
     }

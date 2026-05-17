@@ -66,6 +66,18 @@ pub struct CognitiveConfig {
     #[serde(default = "default_accumulate_min_days")]
     pub accumulate_min_days: usize,
 
+    /// Importance threshold (0.0–1.0) for promoting an observation to a
+    /// persistent episodic memory (default: 0.7). Below this score, the
+    /// observation is treated as transient and never written. Lower the
+    /// value (e.g. 0.0) to preserve every observation as a raw episode.
+    #[serde(default = "default_episodic_importance_threshold")]
+    pub episodic_importance_threshold: f64,
+
+    /// OpenAI embedding model name (default: "text-embedding-3-small").
+    /// Override to "text-embedding-3-large" to compare vector quality.
+    #[serde(default = "default_openai_embedding_model")]
+    pub openai_embedding_model: String,
+
     /// Maximum FSRS stability value to prevent ranking domination (default: 30.0).
     #[serde(default = "default_max_stability")]
     pub max_stability: f64,
@@ -185,6 +197,8 @@ impl Default for CognitiveConfig {
             min_similarity: default_min_similarity(),
             accumulate_promote_threshold: default_accumulate_promote_threshold(),
             accumulate_min_days: default_accumulate_min_days(),
+            episodic_importance_threshold: default_episodic_importance_threshold(),
+            openai_embedding_model: default_openai_embedding_model(),
             max_stability: default_max_stability(),
             relevance_weight_semantic: default_w_semantic(),
             relevance_weight_retrievability: default_w_retrievability(),
@@ -234,6 +248,12 @@ fn default_accumulate_promote_threshold() -> usize {
 }
 fn default_accumulate_min_days() -> usize {
     3
+}
+fn default_episodic_importance_threshold() -> f64 {
+    0.7
+}
+fn default_openai_embedding_model() -> String {
+    "text-embedding-3-small".to_string()
 }
 fn default_max_stability() -> f64 {
     30.0

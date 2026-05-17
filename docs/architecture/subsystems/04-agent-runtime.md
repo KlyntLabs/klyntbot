@@ -33,7 +33,7 @@ flowchart TB
 
     CE[ContextEngine<br/><i>build_system_prompt<br/>assemble · expand · register_source</i>]:::cx
     BA[BudgetAllocator<br/><i>8 priority levels<br/>15% low-budget warn</i>]:::cx
-    TC[TieredHistoryCompressor<br/><i>microcompact → group → score → tier → compress<br/>(KCA_DISABLE_COMPRESSION=1 disables)</i>]:::cx
+    TC[TieredHistoryCompressor<br/><i>microcompact → group → score → tier → compress</i>]:::cx
     CS[ContextSource trait<br/><i>~30 impls</i>]:::cx
     IF[InsightForge<br/><i>multi-dim retrieval orchestrator<br/>+ circuit breaker</i>]:::cx
     LCR[LiveContextRefresher<br/><i>drains ContextUpdateQueue at iteration boundary</i>]:::cx
@@ -188,15 +188,14 @@ Compiled into `SkillStore` via `DEFAULT_SKILLS` in `store.rs:18`:
 **Not constants — provider-supplied:**
 - Context window comes from `RuntimeConfig.context_window`. There is no `ANTHROPIC_CONTEXT_WINDOW` constant — CLAUDE.md and my earlier overview were wrong.
 
-### KCA env-var feature flags (runtime-only)
+### Runtime tunables (config-driven)
 
-| Flag | Effect | Location |
-|---|---|---|
-| `KCA_DISABLE_COMPRESSION=1` | Disables `TieredHistoryCompressor` — returns history verbatim (Letta benchmark mode citing 74% LoCoMo) | `context_engine/src/history_compressor/tiered.rs:68` |
-| `KCA_PHASE_4=1` + `KCA_PHASE_4_LEGACY_NUDGE=1` | Activates legacy text-nudge memory-refusal retry | `agent/src/agent_runtime/runtime.rs:575-586` |
-| `KCA_PHASE_4_TOOL_DRIVEN=1` | Activates tool-call memory-refusal retry (model nudged to call `memory` tool with entities) | `agent/src/agent_runtime/runtime.rs:573` |
-| `KCA_COMMUNITY_SUMMARIES=1` | Enables reforge Phase 6.7 community summaries (deterministic; Phase C will add LLM) | (cognitive — see [`05`](./05-cognitive-memory.md)) |
-| `KCA_REFORGE_COMPRESS=1` | Enables reforge Phase 7.7 compression (deterministic; Phase C will add LLM merge) | (cognitive — see [`05`](./05-cognitive-memory.md)) |
+Cognitive runtime values live under `config.cognitive` in `config.json` — see [`crates/config/src/schema/cognitive.rs`](../../../crates/config/src/schema/cognitive.rs). The two most commonly overridden:
+
+- `cognitive.episodicImportanceThreshold` (default `0.7`) — importance score below which observations don't become persistent episodic memories
+- `cognitive.openaiEmbeddingModel` (default `"text-embedding-3-small"`)
+
+The 11 `KCA_*` env-var feature flags that previously gated runtime behavior were removed on 2026-05-17. See [Subsystem 14 — "Follow-up: all `KCA_*` env vars removed"](./14-validation.md#follow-up-all-kca_-env-vars-removed) for the per-flag fate.
 
 ---
 
@@ -230,24 +229,10 @@ loop {
 }
 ```
 
-### KCA Phase-4 — Letta-style memory-refusal recovery
-
-```
-1. After first response, ResponseValidator::detect_memory_refusal scans for refusal phrases
-2. If detected AND (KCA_PHASE_4_TOOL_DRIVEN=1 OR KCA_PHASE_4 + LEGACY_NUDGE both =1):
-   - Tool-driven path: append user msg nudging the model to call `memory` tool with named entities
-   - Legacy path: append user msg "re-search with broader effort"
-3. Re-run execute_loop once more
-4. Accept retry result ONLY IF detect_memory_refusal does NOT fire again
-   (double-refusal keeps the original)
-5. Both retries spent → return original response
-```
-
 ### `TieredHistoryCompressor` pipeline (per-turn compression)
 
 ```
-1. Check KCA_DISABLE_COMPRESSION → return verbatim if set
-2. Early exit if turn count ≤ tier0_count (the "always-keep-recent" boundary)
+1. Early exit if turn count ≤ tier0_count (the "always-keep-recent" boundary)
 3. Microcompact pre-pass:
    - For COMPACTABLE_TOOLS (read_file, bash, grep, glob, web_search, web_fetch)
    - Outside the tier0_count × 2 window
@@ -365,9 +350,9 @@ Then domain sources (identity, active session, productivity context, recent task
 
 Cross-cutting change — every consumer that pattern-matches `AgentEvent` (frontend store, MCP relay, etc.) must handle it. Coordinate or hide behind an existing variant.
 
-### Adding a KCA env flag
+### Adding a runtime config field
 
-Use sparingly — config-driven is preferred. Existing pattern: read at startup or per-call via `std::env::var(...).is_ok_and(|v| matches!(v.as_str(), "1"|"true"|"yes"))`. Document in the [Key constants](#key-constants-with-fileline) table.
+New runtime tunables should be added to `config.cognitive` (or another existing schema section) in `crates/config/src/schema/`, not as env vars. The 11 `KCA_*` env flags that previously gated runtime behavior were removed on 2026-05-17 — see [Subsystem 14](./14-validation.md#follow-up-all-kca_-env-vars-removed) for the per-flag fate. Standard pattern: add a field with `#[serde(default = "default_xxx")]`, read from config at startup, and document in the [Key constants](#key-constants-with-fileline) table or under "Runtime tunables".
 
 ### Adding a new skill
 

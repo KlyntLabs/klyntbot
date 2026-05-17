@@ -304,32 +304,20 @@ impl AppCore {
         let appcore_embedding_engine = Some(Arc::clone(&embedding_engine));
         let appcore_vector_store = vector_store.clone();
 
-        // Wave-pre fix: cognitive fact embedder for IngestionConsumer.
-        // Without this, semantic_facts is SQLite-only and `vector_hits=0`
-        // across the entire system (the only embed path was the nightly
-        // reforge consolidation, which doesn't run during chat ingest).
-        //
-        // Gated behind KCA_VECTOR=1 because naively activating vector
-        // retrieval regressed LoCoMo dev bench -5pp (26.2% → 21.2%):
-        // `retrieval.rs::retrieve_relevant_facts` branches one-or-the-
-        // other on vector availability, demoting FTS to fallback-only.
-        // FTS-primary is more precise on date-heavy questions. Hybrid
-        // RRF-merge is on the wave plan; until that lands, default OFF.
+        // Cognitive fact embedder for IngestionConsumer. Without this,
+        // `semantic_facts` would be SQLite-only and produce zero vector
+        // hits during chat ingest (the only other embed path is nightly
+        // reforge consolidation). Always install when LanceDB is
+        // available — `retrieval.rs::retrieve_relevant_facts` runs hybrid
+        // RRF merge (vector + FTS-anchored paths combined via reciprocal
+        // rank fusion) so vector availability no longer demotes FTS.
         let cognitive_fact_embedder: Option<Arc<dyn ::cognitive::SemanticFactEmbedder>> =
-            if std::env::var("KCA_VECTOR").ok().as_deref() == Some("1") {
-                if let Some(ref vs) = vector_store {
-                    Some(Arc::new(
-                        ::agent::adapters::cognitive_embedder::SemanticFactEmbedderImpl::new(
-                            Arc::clone(&embedding_engine),
-                            vs.clone(),
-                        ),
-                    ))
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
+            vector_store.as_ref().map(|vs| {
+                Arc::new(::agent::adapters::cognitive_embedder::SemanticFactEmbedderImpl::new(
+                    Arc::clone(&embedding_engine),
+                    vs.clone(),
+                )) as Arc<dyn ::cognitive::SemanticFactEmbedder>
+            });
 
         // ── Insight embedder (reuses the same EmbeddingEngine) ──
         let insight_embedder: Arc<dyn feature_insights::InsightEmbedder> =
@@ -768,6 +756,7 @@ impl AppCore {
                 episodic_repo,
                 extraction_handler,
             )
+            .with_episodic_threshold(config.cognitive.episodic_importance_threshold)
             .with_fact_repo(::cognitive::SemanticFactRepo::new(
                 storage_pool.inner().clone(),
             ));

@@ -1,7 +1,7 @@
 # KlyntBot — Architecture Overview
 
 > **Status:** Stable (overall) — see per-subsystem badges in [Subsystem inventory](#subsystem-inventory).
-> **Last verified:** 2026-05-17 (post-KCA-bench removal — workspace now 64 crates; subsystem 14 awaiting LoCoMo + Letta replacement).
+> **Last verified:** 2026-05-17 (post-KCA-bench removal + all `KCA_*` env vars removed — workspace now 64 crates; subsystem 14 awaiting LoCoMo + Letta replacement; cognitive tunables migrated to `config.cognitive`).
 > **Authoritative.** If this document disagrees with `CLAUDE.md`, `README.md`, or `AGENTS.md`, **this document wins** — those files lag and need a refresh pass. See [Document maintenance](#document-maintenance).
 
 This file is the single entry point for understanding the project. It is intentionally long. Use the table of contents to jump.
@@ -621,25 +621,18 @@ RUST_LOG=info,klyntbot=debug
 
 Environment overrides for config follow the `KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o` pattern (double underscore = nested key).
 
-### `KCA_*` runtime feature flags
+### Cognitive tuning (`config.cognitive`)
 
-11 env-only flags control live agent + cognitive behavior. They are **not** in `config.json` — they are toggles for phased rollouts, escape hatches, and runtime tracing. All are optional; omitting them keeps default behavior.
+Two values that used to be env-only `KCA_*` flags are now real config fields under `cognitive` in `config.json`:
 
-> **Naming note:** these all retain the `KCA_*` prefix from when they shipped alongside the now-removed `kca-bench` / `kca-e2e` benchmark suite (deleted 2026-05-17). The prefix will be renamed (or each flag hard-coded into defaults) in a separate cleanup pass once the LoCoMo + Letta external evaluations are wired.
+| Config field | Default | Effect |
+|---|---|---|
+| `cognitive.episodicImportanceThreshold` | `0.7` | Importance score (0.0–1.0) below which observations are not promoted to persistent episodic memory. Lower (e.g. `0.0`) preserves every observation. |
+| `cognitive.openaiEmbeddingModel` | `"text-embedding-3-small"` | OpenAI embedding model name. `"text-embedding-3-large"` is a higher-quality alternative at the same 384 dims (Matryoshka). |
 
-| Flag | Crate | Default | Effect |
-|---|---|---|---|
-| `KCA_DISABLE_COMPRESSION=1` | `context_engine` | off | Skips tiered history compression — verbatim history mode |
-| `KCA_PHASE_4=1` | `agent` | off | Enables Phase-4 Letta-style memory-refusal recovery nudge |
-| `KCA_PHASE_4_TOOL_DRIVEN=1` | `agent` | off | Uses tool-call nudge instead of text nudge |
-| `KCA_PHASE_4_LEGACY_NUDGE=1` | `agent` | off | Falls back to legacy A/B nudge text |
-| `KCA_COMMUNITY_SUMMARIES=1` | `cognitive` | off | Enables community summary generation in reforge |
-| `KCA_REFORGE_COMPRESS=1` | `cognitive` | off | Enables LLM merge compression in reforge |
-| `KCA_EPISODIC_THRESHOLD=<f32>` | `cognitive` | 0.3 | Overrides episodic memory importance threshold |
-| `KCA_TRACE_FSRS=1` | `cognitive` | off | Emits per-card FSRS trace logs to stderr |
-| `KCA_VECTOR=<provider>` | `app-core` | default | Forces a specific embedding provider |
-| `KCA_OPENAI_EMBED_MODEL=<model>` | `tools/embedding` | default | Overrides OpenAI embedding model |
-| `KCA_FACT_SEARCH_HANDLER=1` | `agent` | off | Routes fact search through handler path |
+The full set of cognitive tunables (relevance weights, vector-search top-K, similarity thresholds, etc.) all live under `config.cognitive` — see [`crates/config/src/schema/cognitive.rs`](../../crates/config/src/schema/cognitive.rs).
+
+> **History note:** Prior to 2026-05-17 there were 11 `KCA_*` env vars gating runtime behavior (phase-4 nudges, community summaries, reforge compression, vector embedder, tracing, etc.). All were removed alongside the `kca-bench` deletion — features that had been off in production were dropped; tunables became real config fields; debug traces became unconditional `tracing::debug!` filtered via `RUST_LOG`. See the git log for the rationale per flag.
 
 ---
 
@@ -700,7 +693,7 @@ These are deliberate non-goals — not missing features.
 
 | Term | Meaning |
 |---|---|
-| **KCA** | Klynt Cognitive Architecture — historical name for the cognitive memory subsystem + its (now-removed) custom bench suite. The bench crates were deleted 2026-05-17; LoCoMo + Letta external evaluations are pending. Some runtime feature flags retain the `KCA_*` prefix pending rename. |
+| **KCA** | Klynt Cognitive Architecture — historical name for the cognitive memory subsystem + its (now-removed) custom bench suite. The bench crates were deleted 2026-05-17; all 11 `KCA_*` env-flag carryovers were removed 2026-05-17 (dead-toggle features dropped; real tunables migrated to `config.cognitive`). LoCoMo + Letta external evaluations are pending. |
 | **FSRS5** | Free Spaced Repetition Scheduler v5 — the algorithm used for memory salience decay. |
 | **Louvain** | Community-detection algorithm used on the semantic graph (first-party impl in `cognitive`). |
 | **PPR** | Personalized PageRank — graph-traversal retrieval over the semantic graph (first-party impl in `cognitive`). |

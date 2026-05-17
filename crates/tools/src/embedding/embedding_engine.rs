@@ -54,6 +54,10 @@ pub struct EmbeddingEngine {
     model: Mutex<Option<TextEmbedding>>,
     last_used: Mutex<Instant>,
     http_client: reqwest::Client,
+    /// OpenAI embedding model name (default: "text-embedding-3-small").
+    /// Override via `with_openai_model` — typically wired from
+    /// `config.cognitive.openai_embedding_model` at startup.
+    openai_model: String,
     #[cfg(not(feature = "semantic-search"))]
     _phantom: (),
 }
@@ -73,9 +77,19 @@ impl EmbeddingEngine {
             model: Mutex::new(None),
             last_used: Mutex::new(Instant::now()),
             http_client: common::shared_http_client().clone(),
+            openai_model: "text-embedding-3-small".to_string(),
             #[cfg(not(feature = "semantic-search"))]
             _phantom: (),
         }
+    }
+
+    /// Override the OpenAI embedding model name (default
+    /// "text-embedding-3-small"). Has no effect when the provider is
+    /// Local. Wire from `config.cognitive.openai_embedding_model` at
+    /// startup.
+    pub fn with_openai_model(mut self, model: String) -> Self {
+        self.openai_model = model;
+        self
     }
 
     /// Create a new engine with a specific provider.
@@ -86,6 +100,7 @@ impl EmbeddingEngine {
             model: Mutex::new(None),
             last_used: Mutex::new(Instant::now()),
             http_client: common::shared_http_client().clone(),
+            openai_model: "text-embedding-3-small".to_string(),
             #[cfg(not(feature = "semantic-search"))]
             _phantom: (),
         }
@@ -194,16 +209,13 @@ impl EmbeddingEngine {
         let base = api_base.as_deref().unwrap_or("https://api.openai.com/v1");
         let url = format!("{}/embeddings", base.trim_end_matches('/'));
 
-        // T3.1 (minimal): allow swapping the OpenAI embedding model via env
-        // without changing the dimension. text-embedding-3-large at 384 dims
-        // (Matryoshka) is a higher-quality representation than -3-small at the
-        // same dim, no LanceDB schema change required.
-        // Default: text-embedding-3-small. Set KCA_OPENAI_EMBED_MODEL=
-        // text-embedding-3-large to compare.
-        let model_name = std::env::var("KCA_OPENAI_EMBED_MODEL")
-            .unwrap_or_else(|_| "text-embedding-3-small".to_string());
+        // Configured via `config.cognitive.openai_embedding_model` →
+        // `with_openai_model` at construction. Default is
+        // "text-embedding-3-small"; "text-embedding-3-large" is a
+        // higher-quality alternative at the same 384 dims (Matryoshka),
+        // no LanceDB schema change required.
         let body = serde_json::json!({
-            "model": model_name,
+            "model": self.openai_model,
             "input": texts,
             "dimensions": EMBEDDING_DIM,
         });

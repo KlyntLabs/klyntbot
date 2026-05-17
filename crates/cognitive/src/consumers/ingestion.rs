@@ -215,17 +215,19 @@ impl IngestionConsumer {
             fact_repo: None,
             conflict_resolver: None,
             embedder: None,
-            // Wave 6 / T1.1: env-configurable episodic threshold so raw
-            // turn preservation can be turned on for benches and Letta-style
-            // setups without a code change. KCA_EPISODIC_THRESHOLD=0.0
-            // preserves every observation as a raw episode (Letta default).
-            // Production keeps the 0.7 default to avoid log-noise pollution.
-            episodic_importance_threshold: std::env::var("KCA_EPISODIC_THRESHOLD")
-                .ok()
-                .and_then(|v| v.parse::<f64>().ok())
-                .filter(|v| (0.0..=1.0).contains(v))
-                .unwrap_or(0.7),
+            // Default threshold (0.7) keeps log-noise pollution low. Override
+            // via `config.cognitive.episodicImportanceThreshold` — see
+            // `with_episodic_threshold` builder method below. Setting it to
+            // 0.0 preserves every observation as a raw episode (Letta-style).
+            episodic_importance_threshold: 0.7,
         }
+    }
+
+    /// Override the episodic-memory importance threshold (default 0.7).
+    /// Values outside `0.0..=1.0` are clamped to that range.
+    pub fn with_episodic_threshold(mut self, threshold: f64) -> Self {
+        self.episodic_importance_threshold = threshold.clamp(0.0, 1.0);
+        self
     }
 
     /// Wire an LLM-backed AUDD conflict resolver (Mem0 pattern). When

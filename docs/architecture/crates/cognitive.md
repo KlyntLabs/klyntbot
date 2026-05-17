@@ -384,9 +384,7 @@ pub trait SkillDiscoveryRunner: Send + Sync {
 | 6.5 | Graph Consolidation | (via hook) | `GraphEnrichmentHandler::enrich_graph` | |
 | 6.5b | Community Intelligence | (via hook) | `CommunityIntelligenceHandler::analyze_communities` | Calls Louvain inline |
 | 6.5-ext | Cross-session fact dedup | (via hook) | `CodingPhaseRunner::run_cross_session_dedup` | |
-| 6.7 | Community Summaries | No (deterministic) | — | Env-gated `KCA_COMMUNITY_SUMMARIES=1`. "Phase C will add LLM call." |
 | 7 | Compact | No | — | Trim retired data; rebuild indexes |
-| 7.7 | Compression | No (deterministic dedup) | — | Env-gated `KCA_REFORGE_COMPRESS=1`. "Phase C will add LLM merge." |
 
 **3 LLM calls at the `ReforgeHandler` level** (Synthesize / Review / Narrate). **Hook traits may add their own LLM calls in the agent layer** — `CodingPhaseRunner::run_synthesis` typically calls an LLM, `GraphEnrichmentHandler::enrich_graph` may, `CommunityIntelligenceHandler::analyze_communities` may, `CrossCliPhaseRunner::run_cross_cli_transfer` may, `SkillDiscoveryRunner::run_skill_discovery` may. **True total LLM-call count per nightly cycle is indeterminate from the spec alone** — it depends entirely on which hook impls are wired and what each one does internally. To know your specific deployment's count, instrument the providers and observe a real cycle.
 
@@ -635,16 +633,6 @@ Older `MirrorEngine::start` signatures required `Arc<DomainEventBus>` because so
 ### `strategy_records` table is raw-SQL accessed
 
 `reforge/feedback.rs:173` reads `strategy_records` via a raw SQL query, not through a typed `*Repo`. Easy to miss when surveying repo coverage.
-
-### KCA env-var flags
-
-| Flag | Effect |
-|---|---|
-| `KCA_DISABLE_COMPRESSION=1` | Bypasses `TieredHistoryCompressor` (Letta benchmark mode) |
-| `KCA_PHASE_4=1` + `KCA_PHASE_4_LEGACY_NUDGE=1` | Legacy text-nudge memory-refusal retry |
-| `KCA_PHASE_4_TOOL_DRIVEN=1` | Tool-call memory-refusal retry |
-| `KCA_COMMUNITY_SUMMARIES=1` | Enables Reforge Phase 6.7 (deterministic) |
-| `KCA_REFORGE_COMPRESS=1` | Enables Reforge Phase 7.7 (deterministic) |
 
 ### Reforge `service.rs:1` doc comment says "8 phases"
 
@@ -908,7 +896,6 @@ Append to `cognitive_migrations()` in `repos/mod.rs`. Pre-1.0: edit existing mig
 - **`MirrorEngine::start` no longer takes the bus** — CLAUDE.md says it does. Update CLAUDE.md.
 - **`SkillEffectivenessSource` is a stub** (`TODO(T7)`). Implement.
 - **`strategy_records` is raw-SQL accessed.** Add a typed `StrategyRecordsRepo`.
-- **`KCA_COMMUNITY_SUMMARIES` and `KCA_REFORGE_COMPRESS` are env-only.** Migrate to config once LLM versions land ("Phase C").
 - **Procedural memory storage is live but the higher-level feature isn't** — surface clearly in subsystem doc and feature roadmap.
 
 See [`TECH_DEBT.md`](../TECH_DEBT.md) categories #2 + #5 + #7 + #8.

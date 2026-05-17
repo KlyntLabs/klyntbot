@@ -411,16 +411,6 @@ pub enum AgentEvent {
 **Not constants — provider-supplied:**
 - Context window comes from `RuntimeConfig.context_window` (NOT a named `ANTHROPIC_CONTEXT_WINDOW`).
 
-### KCA env-var feature flags
-
-| Flag | Effect | Location |
-|---|---|---|
-| `KCA_DISABLE_COMPRESSION=1` | Disables `TieredHistoryCompressor` — returns history verbatim (Letta benchmark mode citing 74% LoCoMo) | `context_engine` (called from `AgentRuntime`) |
-| `KCA_PHASE_4=1` + `KCA_PHASE_4_LEGACY_NUDGE=1` | Activates legacy text-nudge memory-refusal retry | `agent_runtime/runtime.rs:575-586` |
-| `KCA_PHASE_4_TOOL_DRIVEN=1` | Activates tool-call memory-refusal retry (model nudged to call `memory` tool with entities) | `agent_runtime/runtime.rs:573` |
-
-All three default to off. See [`subsystems/04-agent-runtime.md`](../subsystems/04-agent-runtime.md) for the full KCA flag table including cognitive-side flags.
-
 ### The ReAct loop (inside `execute_loop`)
 
 ```
@@ -466,19 +456,6 @@ Fires when total message tokens exceed `COMPRESSION_THRESHOLD = 0.70` of `contex
 ### `LiveContextRefresher`
 
 Called at each iteration boundary in `execute_loop` (after mid-loop compression). Drains `ContextUpdateQueue` and calls `InjectorRegistry::collect_all(ctx)` for dynamic injectors. Injects as `Message::ContextUpdate`. High-priority updates get 10% response reserve; standard gets 20%. Drops updates that exceed token budget with a warning.
-
-### KCA Phase-4 — Letta-style memory-refusal recovery
-
-```
-1. After first response, ResponseValidator::detect_memory_refusal scans for refusal phrases
-2. If detected AND (KCA_PHASE_4_TOOL_DRIVEN OR KCA_PHASE_4 + LEGACY_NUDGE both set):
-   - Tool-driven path: append user msg nudging model to call `memory` tool with named entities
-   - Legacy path: append user msg "re-search with broader effort"
-3. Re-run execute_loop once more
-4. Accept retry result ONLY IF detect_memory_refusal does NOT fire again
-   (double-refusal → keep original)
-5. Both retries spent → return original response
-```
 
 ### Subagent `spawn` vs `spawn_detached`
 
@@ -606,11 +583,9 @@ Lives in the `approval` crate. See [`subsystems/10-sandboxing-security.md`](../s
 
 Four wiring paths exist (FeaturePackage / agent::builder / app-core::init / subagent). See [`subsystems/07-tools-framework.md`](../subsystems/07-tools-framework.md#the-four-wiring-paths).
 
-### Add a KCA env flag
+### Add a runtime config field
 
-1. Read at startup or per-call via `std::env::var(...).is_ok_and(|v| matches!(v.as_str(), "1"|"true"|"yes"))`.
-2. Document in the [Key constants](#key-constants-with-fileline) table.
-3. Use sparingly — config-driven is preferred for non-experimental flags.
+New runtime tunables go in `config.cognitive` (or the appropriate config schema section) in `crates/config/src/schema/`, **not** as env vars. The 11 `KCA_*` env flags that used to gate runtime behavior were removed on 2026-05-17 (see [Subsystem 14](../subsystems/14-validation.md#follow-up-all-kca_-env-vars-removed)). Standard pattern: add a field with `#[serde(default = "default_xxx")]`, expose via a `with_xxx` builder method if construction is layered, document in the relevant section.
 
 ### Add a subagent profile
 
@@ -623,7 +598,6 @@ Edit `agent_profile/skill_loader.rs` to add the profile definition. The runtime 
 - **`intent_pipeline` is vestigial.** `SourceContext::intent_summary` always `None`; runtime is flat. Decide: delete or repurpose.
 - **Main agent has no turn cap.** Deliberate; revisit if observed loops waste tokens.
 - **MidLoopCompressor + TieredHistoryCompressor have overlapping concerns.** Both can fire on same turn. Document the interaction more carefully (in `04-agent-runtime.md`).
-- **`KCA_*` flags are env-only.** Migrate experimental ones to config when they stabilize.
 - **Predictive cache warming is undocumented** at the user-facing level. Worth a config flag to disable for diagnostic runs.
 - **Subagent registry uses `DashMap`** — consider whether `RwLock<HashMap>` would be sufficient (it's not hot enough to need shards).
 - **`AgentEvent` is large** (~30 variants). Some are coding-specific; consider splitting into `AssistantEvent` + `CodingEvent` for type clarity.

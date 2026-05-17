@@ -233,9 +233,7 @@ pub enum Aggregation { Avg, Sum, Count }
 | 6.5 | Graph Consolidation | (via hook) | `GraphEnrichmentHandler::enrich_graph` | |
 | 6.5b | Community Intelligence | (via hook) | `CommunityIntelligenceHandler::analyze_communities` | |
 | 6.5-ext | Cross-session fact dedup | (via hook) | `CodingPhaseRunner::run_cross_session_dedup` | |
-| 6.7 | Community Summaries | No (deterministic) | — | Env-gated `KCA_COMMUNITY_SUMMARIES=1`. Comment notes "Phase C will swap this for an LLM call." |
 | 7 | Compact | No | — | Trim retired data; rebuild indexes |
-| 7.7 | Compression | No (deterministic dedup) | — | Env-gated `KCA_REFORGE_COMPRESS=1`. Comment notes "Phase C will add LLM merge." |
 
 `run_reforge` has a **25-parameter signature** — many of those parameters are `Option<&dyn Trait>` extension hooks. The cycle degrades gracefully when hooks aren't installed. See [Open questions & debt](#open-questions--debt) for the API-shape concern.
 
@@ -394,10 +392,6 @@ The cycle was originally a tight 8-phase function. As community-intelligence, gr
 
 Trade-off: very flexible (anyone can install / omit hooks), very ugly. A future refactor could pack the parameters into a `ReforgeContext` builder. **Has not been done.**
 
-### Why `KCA_COMMUNITY_SUMMARIES` / `KCA_REFORGE_COMPRESS` are env-gated
-
-Both phases are currently deterministic (rule-based dedup / summarization). Comments mark them as "Phase C will swap this for an LLM call." Until LLM versions land, env-flag is the fastest way to A/B test the deterministic versions in production without paying token cost when disabled.
-
 ### `MirrorEngine` and the bus
 
 Earlier versions of `MirrorEngine::start` required `Arc<DomainEventBus>` because some sources subscribed directly. That coupling was removed; sources now receive signals through the `SignalConsumer` path. The bus is still plumbed to `run_reforge` (Phase 6.5 community events) — but mirror itself doesn't need it.
@@ -481,7 +475,6 @@ The previous `kca-bench` / `kca-e2e` validation suite was removed 2026-05-17 in 
 - **`MirrorEngine::start` signature was simplified** (bus removed) — document the new contract clearly; CLAUDE.md still says it takes the bus.
 - **`SkillEffectivenessSource` is a stub** (`mirror/sources/skill_effectiveness.rs:77,84`) — needs T7 implementation.
 - **`strategy_records` is raw-SQL accessed** — should have a typed repo for consistency.
-- **`KCA_COMMUNITY_SUMMARIES` / `KCA_REFORGE_COMPRESS` are env-flag-gated** — should migrate to config when the LLM versions land ("Phase C").
 - **The strategy file path location** (`~/.klyntbot/skills/<skill>/`) overlaps with skill discovery — they're the same files. Two different mental models for the same data. Could be clarified.
 
 See [`TECH_DEBT.md`](../TECH_DEBT.md) categories #2, #5, #8 for specifics.
