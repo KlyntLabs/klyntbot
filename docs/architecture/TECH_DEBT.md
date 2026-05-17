@@ -1,7 +1,7 @@
 # KlyntBot — Technical Debt Inventory
 
 > **Living document.** Categorized, not chronological. Updated as items are found, fixed, or re-evaluated.
-> **Last refreshed:** 2026-05-17 (Tier 3 sweep — closed 5 more entries via doc-only edits + verification: 3 entries (voice/say, MCP 1MB cap, sandbox-helper exit 2) were already documented in subsystems but TECH_DEBT.md was stale; 1 entry (kimi/opencode poll-only) is documented in `crates/coding-ingest.md`; the `feature-learning` Task-47 comment was rewritten with a navigable file pointer. Cumulative ~33 entries closed today).
+> **Last refreshed:** 2026-05-17 (Batch A hygiene — closed 5 more entries: Cargo `0.1.1` accepted as intentional, KCA Track 7 + Focus-session both already self-confirmed documented, two duplicate `desktop --hook` rows merged-and-removed (also documented in `crates/coding-ingest.md`). Cumulative ~38 entries closed today).
 > **Scope:** the whole Rust workspace + `/desktop-ui` frontend. Not third-party deps.
 > **Total entries:** ~130 across 9 categories.
 
@@ -194,7 +194,6 @@ These are not bugs but they violate stated invariants.
 |---|---|---|---|
 | P2 | `ToolOutput::Structured` (`crates/tools-core/src/lib.rs:165-220`) | Enum + `__STRUCTURED__` parsing convention defined and documented, but **zero production tools** emit it | Incomplete upgrade path. Decide: implement, or remove? |
 | P2 | `TasksFeature::new()` without `.with_task_tool(...)` registers zero tools silently | `crates/agent/src/agent_loop/builder.rs:1353` is the only correct wiring | Footgun for plugins/tests that construct `TasksFeature::new()` expecting tools. |
-| P3 | Cargo `version = "0.1.1"` | Workspace version | First public release will be `0.1.0` per CHANGELOG — verify this is intentional or rewind to `0.1.0-pre`. |
 | P2 | Two `AlarmFired` `kind` strings | `"cron_job"` (TemporalScheduler → CronExecutor internal dispatch) vs `"cron"` (`app-core/init/cron.rs::publish_cron_alarm` user-facing notifications) | Confusingly similar; same enum variant, different consumers. Rename one (e.g., `cron_user_notification`). |
 | P2 | `CronHandler` is sync (`Fn`, not `AsyncFn`) | Dispatched via `tokio::task::spawn_blocking`; async work uses `tokio::task::block_in_place + rt.block_on(...)` | Footgun for new handlers; obvious only after reading existing impls. Consider `AsyncCronHandler`. |
 | P2 | Plural / singular tool-name footgun | Registry keys: `tasks`, `notes` (plural) but `memory`, `finance`, `alarm` (singular). MCP exposure inherits. Calling `mcp__klyntbot__task` returns `ToolNotFound` | Standardize at next MCP whitelist refresh. |
@@ -213,16 +212,12 @@ Things present in the codebase that aren't enumerated in any doc today.
 | Sev | What | Where | Why it matters |
 |---|---|---|---|
 | **P0** | Computer Use platform layer is real | `crates/platform-input`, `crates/platform-capture`, `crates/platform-macos/src/computer_use/{capture,input,ax_walker}.rs` | Capture, input injection, AX tree walker all implemented and tested. **Not wired** into any agent tool, Tauri command, or MCP tool. See `subsystems/12-plugins-platform.md` for the full inventory. |
-| P1 | `desktop --hook` short-circuit | `crates/desktop/src/main.rs` (first statement after `pre_main_hardening`) | The desktop binary doubles as the `klyntbot-hook` ingest binary at sub-10ms startup cost. Not mentioned anywhere in user-facing docs. |
 | P2 | Skill discovery roots (4 of them) | `klynt-skill-loader::discovery` | User / ReforgePrivate / Project / ReforgeTeam — priority order matters; not documented at the project level. |
 | P2 | OS_NATIVE + Tray notification channels | `crates/notifications/src/channel/` | Notification-only surfaces (no chat). Listed separately from chat channels but conflated in some docs. |
 | P2 | Voice has 5 engines | `Qwen3AsrEngine` + `CloudAsrEngine` (STT); `Qwen3TtsEngine` + `AvSpeechTtsEngine` + `CloudTtsEngine` (TTS) | `Qwen3TtsEngine` requires `--features qwen3` and isn't on by default. |
 | P3 | `klynt-protocol` + `klynt-hooks` provenance | Crate `Cargo.toml` descriptions | "Adapted from codex-rs/protocol/" and "Adapted from codex-rs/hooks/" — origin worth crediting in subsystem docs. |
 | P3 | 5 plugin host namespaces | `crates/plugin-runtime/src/host/mod.rs` | `db`, `log`, `http`, `agent`, `tool`. Three permissions: `Network`, `Storage`, `Agent`. Not enumerated outside source. |
-| P1 | KCA Track 7 — predictive cache warming | `agent::adapters::cognitive_handlers::LlmQueryPredictorHandler` + `cognitive::services::predictive_cache` | Detached `tokio::spawn` after each turn pre-fetches N follow-up queries. **Documented in `04-agent-runtime.md` and `crates/agent.md`.** |
-| P2 | Focus-session message deferral | `agent::agent_loop::run_with_rx` | When `FocusSessionStarted` fires on `DomainEventBus`, inbound messages are buffered + single auto-reply per `(channel, sender)`. Drains on `FocusSessionEnded`. **Documented in `04-agent-runtime.md` and `crates/agent.md`.** |
 | P2 | `strategy_records` table is raw-SQL accessed | `cognitive/src/services/reforge/feedback.rs:173` | No typed repo struct; reads via raw SQL. Inconsistent with every other table. |
-| P2 | `desktop --hook` short-circuit | `crates/desktop/src/main.rs` (first statement after `pre_main_hardening`) | The desktop binary doubles as the `klyntbot-hook` ingest binary; `argv[1] == "--hook"` check fires before Tauri/mimalloc init. Sub-10ms startup. Undocumented at user-facing level. |
 | P2 | `coding_approval_history` retention | Grows unboundedly; no retention policy or compaction job. | Add a 90-day retention or similar. |
 | P2 | `feature-productivity` 20 tables undocumented | Only `activity_events` and `daily_summaries` are mentioned in CLAUDE.md. 18 other tables (incl. `productivity_quality_scores`, `productivity_narratives`, `productivity_voice_journals`, `productivity_categorization_cache`, `productivity_privacy_rules`, `productivity_rule_evolution_log`, etc.) are completely undocumented. | Schema discoverability gap. |
 | P2 | Cross-feature shared tables | `practice_sessions` is defined in `feature-notes` migration 002 but also used by `feature-language-learning`. `activity_events` (in `feature-productivity`) is read by `feature-launcher::AttentionAggregator`. | No enforcement mechanism prevents schema changes from breaking the other crate. Add a runtime ownership registry or move shared tables to a dedicated crate. |
