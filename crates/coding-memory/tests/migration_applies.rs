@@ -21,8 +21,9 @@ async fn phase1_migration_applies_over_cognitive_base() {
         .await
         .expect("coding-memory migration");
 
-    // New semantic_facts columns
-    for col in ["scope_repo_id", "metadata", "actor_id"] {
+    // New semantic_facts columns (actor_id lives only on episodic_memories — see
+    // coding-memory/migrations/001_coding_memory.sql:15).
+    for col in ["scope_repo_id", "metadata"] {
         let exists: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM pragma_table_info('semantic_facts') \
              WHERE name = ?",

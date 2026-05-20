@@ -46,7 +46,6 @@ pub enum ToolSource {
     Native,
     Feature(String),
     Mcp(String),
-    Plugin(String),
     External,
 }
 

@@ -48,7 +48,7 @@ The navigation spine. Each doc covers a logical subsystem (which crates roll up 
 | 09 | [`subsystems/09-coding-mode.md`](./subsystems/09-coding-mode.md) | 🟡 In Progress | 14 crates: `klynt-*` + `coding-*` + `feature-coding-*` + `lsp-client` |
 | 10 | [`subsystems/10-sandboxing-security.md`](./subsystems/10-sandboxing-security.md) | 🟢 Stable | `approval`, `klynt-sandbox`, `klynt-sandbox-helper`, `klynt-process-hardening` |
 | 11 | [`subsystems/11-channels-mcp.md`](./subsystems/11-channels-mcp.md) | 🟡 In Progress | `channels`, `notifications`, `mcp`, `mcp-bridge`, `activity-log` |
-| 12 | [`subsystems/12-plugins-platform.md`](./subsystems/12-plugins-platform.md) | 🟠 Scaffolded | `plugin-runtime`, `plugin-sdk`, `platform-input`, `platform-capture`, `platform-macos` |
+| 12 | [`subsystems/12-plugins-platform.md`](./subsystems/12-plugins-platform.md) | 🟠 Scaffolded | `platform-input`, `platform-capture`, `platform-macos` |
 | 13 | [`subsystems/13-desktop-frontend.md`](./subsystems/13-desktop-frontend.md) | 🟢 Stable | `desktop`, `desktop-shared`, `desktop-macros`, `crates/desktop-ui` *(stub)*, `/desktop-ui` *(repo root TS)*, `app-core`, `klyntbot`, `klyntbot-server` |
 | 14 | [`subsystems/14-validation.md`](./subsystems/14-validation.md) | 🟠 Scaffolded | *none — chat-perf via `scripts/run_chat_perf_gates.sh`; LoCoMo + Letta wiring pending* |
 
@@ -74,7 +74,7 @@ Method-level references for the most-touched crates. Use these when you're about
 
 Pulled from `00-overview.md` for visibility. **Skip CLAUDE.md unless you've read these first.**
 
-1. **The workspace has 64 crates** (+`plugin-sdk` excluded + root `klyntbot` facade) ≈ **66 crates**. CLAUDE.md and root README still say "39 crates / 9 layers" — stale.
+1. **The workspace has 62 crates** + the root `klyntbot` facade ≈ **63 crates**. CLAUDE.md and root README still say "39 crates / 9 layers" — stale.
 2. **Multiple half-built features are documented as if shipped.** `lsp-client` is all-stubs. Notification channels for TG/DC/EM are unwired. MCP server-side approval always declines. Plugin `agent_ask_user` is a stub. Voice pronunciation pipeline is half-built. Computer Use platform layer is real but unwired. 4 Reforge phases in `coding-memory` are stubs.
 3. **Migration debt visible in source.** Scheduling has two parallel runners. `storage` depends upward on `ai-core`. Legacy `messages.content` column mirrored on every write. `LEGACY_COMMAND_NAMES` dead-but-not-deleted. Stale "CronService" log message.
 4. **`desktop-ui` location confusion.** `crates/desktop-ui/` is a Specta-generated bindings stub. The actual React frontend is at the repo root `/desktop-ui/`.
@@ -89,7 +89,7 @@ Used at the top of every doc.
 | 🟢 **Stable** | Implemented, tested, in production use. Bug-fix territory only. | Default for shipped features. |
 | 🟡 **In Progress** | Implemented but actively evolving. APIs may change. May have known gaps. | Features with open migration debt or phased rollouts. |
 | 🟠 **Scaffolded** | Infrastructure exists but not wired to user-visible functionality. | E.g., `platform-capture` is real but no agent tool routes to it. |
-| 🔴 **Stub** | Returns hardcoded/empty results. Marked `TODO`, `unimplemented!()`, or `NotImplementedInPhase`. | E.g., `lsp-client` methods, plugin `agent_ask_user`. |
+| 🔴 **Stub** | Returns hardcoded/empty results. Marked `TODO`, `unimplemented!()`, or `NotImplementedInPhase`. | E.g., `lsp-client` methods. |
 | ⚫ **Deprecated** | Replaced; awaiting deletion. Don't add to it. | E.g., `LEGACY_COMMAND_NAMES` const. |
 
 Each doc carries a `Status last verified: YYYY-MM-DD` line. If it's older than a few months, treat with appropriate suspicion.

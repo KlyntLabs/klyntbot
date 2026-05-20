@@ -58,12 +58,15 @@ fn icontains(haystack: &str, needle: &str) -> bool {
     if needle.is_empty() {
         return true;
     }
+    let needle_chars: Vec<char> = needle.chars().collect();
     let mut chars = haystack.chars();
     loop {
-        if chars
-            .clone()
-            .zip(needle.chars())
-            .all(|(a, b)| a.eq_ignore_ascii_case(&b))
+        let window: Vec<char> = chars.clone().take(needle_chars.len()).collect();
+        if window.len() == needle_chars.len()
+            && window
+                .iter()
+                .zip(&needle_chars)
+                .all(|(a, b)| a.eq_ignore_ascii_case(b))
         {
             return true;
         }

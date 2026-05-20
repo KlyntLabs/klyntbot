@@ -384,7 +384,6 @@ pub enum CostHint { Free, Cheap, Moderate, Expensive }
 pub enum ToolSource {
     Builtin,
     Feature(String),                 // feature crate name
-    Plugin(String),                  // plugin id
     Mcp { server: String, name: String },
 }
 ```

@@ -163,34 +163,11 @@ async fn cwd_absolute_wins_over_registry_base() {
     assert_eq!(actual, expected, "absolute cwd must override registry base");
 }
 
-#[tokio::test]
-async fn denied_command_returns_error_and_does_not_run() {
-    let policy = Arc::new(Policy::empty());
-    let privacy = Arc::new(PrivacyGuard::from_globs(&[]).unwrap());
-    let bus = Arc::new(DomainEventBus::new(64));
-    let (_tx, _rx) = mpsc::channel::<tools_core::events::ToolEvent>(32);
-    let tool = BashTool::new(
-        std::path::PathBuf::from("/tmp"),
-        policy,
-        privacy,
-        bus,
-        NonUiPolicy::Allow,
-    );
-    let r = tool
-        .execute(
-            klynt_core::tools::bash::BashArgs {
-                command: "rm -rf /tmp/k2".into(),
-                cwd: Some("/tmp".into()),
-                timeout_ms: Some(5000),
-                run_in_background: None,
-                description: None,
-                silent_completion: None,
-                tty: None,
-                tty_rows: None,
-                tty_cols: None,
-            },
-            &RoutingContext::new(ChannelName::new("coding"), ChatId::new("test")),
-        )
-        .await;
-    assert!(r.is_err());
-}
+// Removed: `denied_command_returns_error_and_does_not_run`.
+//
+// This test asserted that `BashTool` rejects commands when given an empty
+// `Policy`. That contract no longer holds at this layer — policy enforcement
+// moved to `approval::ApprovalGate`, which the agent loop invokes before
+// dispatching the tool. The other tests in this file run real commands with
+// the same `Policy::empty()`, confirming the tool itself doesn't gate.
+// Equivalent coverage lives in `crates/approval/src/gate.rs` tests.

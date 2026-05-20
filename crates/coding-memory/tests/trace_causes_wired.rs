@@ -2,9 +2,10 @@
 
 #[test]
 fn app_core_injects_causal_repo() {
-    let src = include_str!("../../app-core/src/init/mod.rs");
+    // Wiring lives in the dedicated coding_recall init module; check there.
+    let src = include_str!("../../app-core/src/init/coding_recall.rs");
     assert!(
         src.contains("with_causal_repo"),
-        "app-core init should call CodingRecallService::with_causal_repo"
+        "app-core::init::coding_recall should call CodingRecallService::with_causal_repo"
     );
 }

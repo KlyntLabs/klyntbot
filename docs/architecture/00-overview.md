@@ -36,7 +36,7 @@ This file is the single entry point for understanding the project. It is intenti
 
 KlyntBot is a **local-first personal cognitive agent OS for macOS**, written in Rust and shipped as a single Tauri 2 desktop binary. It connects ~5 chat platforms (Telegram, Discord, Slack, Email, plus the desktop UI itself) to LLM providers (Anthropic, OpenAI, local MLX), with task/project/notes/finance management, persistent **cognitive memory** (FSRS5 decay, episodic/semantic extraction, Louvain community detection, personalized-pagerank retrieval), and a nightly self-improvement loop (**reforge**) that rewrites its own strategy files. All state lives in SQLite (WAL) + LanceDB under `~/.klyntbot/`.
 
-It is **not** a chat wrapper. It is a **64-crate Rust workspace** with a dedicated agent runtime, a unified cognitive memory system (LoCoMo + Letta external evaluations pending — see [Subsystem 14](./subsystems/14-validation.md)), an embedded MCP server, a WASM plugin runtime, and a coding-mode that ingests events from 5 different external CLIs (Claude Code, Codex, kimi-cli, opencode, plus git post-commit hooks).
+It is **not** a chat wrapper. It is a **62-crate Rust workspace** with a dedicated agent runtime, a unified cognitive memory system (LoCoMo + Letta external evaluations pending — see [Subsystem 14](./subsystems/14-validation.md)), an embedded MCP server, and a coding-mode that ingests events from 5 different external CLIs (Claude Code, Codex, kimi-cli, opencode, plus git post-commit hooks).
 
 ---
 
@@ -85,7 +85,7 @@ flowchart TB
     CM[09 — Coding Mode<br/><i>coding-memory · coding-ingest · klynt-* · feature-coding-*</i>]:::coding
     SEC[10 — Sandboxing & Hardening<br/><i>approval · klynt-sandbox · process-hardening</i>]:::sec
     EX[11 — Channels · MCP · Activity<br/><i>channels · mcp · mcp-bridge · notifications · activity-log</i>]:::ext
-    PL[12 — Plugins · Platform Adapters<br/><i>plugin-runtime · plugin-sdk · platform-*</i>]:::plug
+    PL[12 — Platform Adapters<br/><i>platform-input · platform-capture · platform-macos</i>]:::plug
     D[13 — Desktop App + Frontend<br/><i>desktop · /desktop-ui · app-core · klyntbot facade · klyntbot-server</i>]:::desktop
     V[14 — Validation & Benchmarks<br/><i>chat-perf gates<br/>LoCoMo + Letta pending</i>]:::val
 
@@ -227,7 +227,7 @@ Each subsystem has a dedicated deep-dive at `docs/architecture/subsystems/NN-nam
 | 09 | **Coding Mode** | 🟡 In Progress | `klynt-core`, `coding-agents-md`, `coding-ingest`, `coding-memory`, `feature-coding-bash`, `feature-coding-todo`, `klynt-protocol`, `klynt-hooks`, `klynt-execpolicy`, `klynt-skill-loader`, `klynt-pty`, `klynt-git-utils`, `klynt-truncation`, `lsp-client` |
 | 10 | **Sandboxing & Process Hardening** | 🟢 Stable | `approval`, `klynt-sandbox`, `klynt-sandbox-helper`, `klynt-process-hardening` |
 | 11 | **Channels, MCP & Activity** | 🟡 In Progress | `channels`, `notifications`, `mcp`, `mcp-bridge`, `activity-log` |
-| 12 | **Plugin System & Platform Adapters** | 🟠 Scaffolded | `plugin-runtime`, `plugin-sdk`, `platform-input`, `platform-capture`, `platform-macos` |
+| 12 | **Platform Adapters** | 🟠 Scaffolded | `platform-input`, `platform-capture`, `platform-macos` |
 | 13 | **Desktop App & Frontend** | 🟢 Stable | `desktop`, `desktop-shared`, `desktop-macros`, `crates/desktop-ui` *(stub)*, `/desktop-ui` *(root TS)*, `app-core`, `klyntbot` *(facade)*, `klyntbot-server` |
 | 14 | **Validation & Benchmarks** | 🟠 Scaffolded *(replacement pending)* | *none — chat-perf via `scripts/run_chat_perf_gates.sh`; LoCoMo + Letta wiring pending* |
 
@@ -264,7 +264,7 @@ Used at the top of every component doc and in the [Subsystem inventory](#subsyst
 | 🟢 **Stable** | Implemented, tested, in production use. Bug-fix territory only. | Default for shipped features. |
 | 🟡 **In Progress** | Implemented but actively evolving. APIs may change. May have known gaps. | Features with open migration debt or phased rollouts. |
 | 🟠 **Scaffolded** | Infrastructure exists but not wired to user-visible functionality. | E.g. `platform-capture` is real and tested but no agent tool routes to it yet. |
-| 🔴 **Stub** | Returns hardcoded/empty results. Marked `TODO`, `unimplemented!()`, or `NotImplementedInPhase`. | E.g. `lsp-client` methods, plugin `agent_ask_user` host function. |
+| 🔴 **Stub** | Returns hardcoded/empty results. Marked `TODO`, `unimplemented!()`, or `NotImplementedInPhase`. | E.g. `lsp-client` methods. |
 | ⚫ **Deprecated** | Replaced; awaiting deletion. Don't add to it. | E.g. `LEGACY_COMMAND_NAMES` const in `desktop`. |
 
 Each doc carries a `Status last verified: YYYY-MM-DD` line so readers know how stale the badge might be.
@@ -295,7 +295,6 @@ Multiple components have honest-looking type signatures, are referenced in CLAUD
 | 2 Reforge phases in `coding-memory` (legacy trait stubs) | `crates/coding-memory/src/reforge_phase.rs` | `CodingSynthesisPhase` (2.5) and `RuleArtifactGenerationPhase` (3.5) return `NotImplementedInPhase { required_phase: 5 }`. **However**, real implementations exist in `reforge/coding_synthesis.rs` and `reforge/rule_artifacts.rs` and are wired into `app-core::CodingPhaseRunnerImpl`. `SessionEndPass` and `CrossSessionDedup` in `reforge/` are fully implemented. |
 | `InProcess` hook execution mode | `crates/klynt-protocol` + `crates/klynt-hooks` | Variant exists in `HookExecutionMode` enum but no dispatch path implements it — only `Subprocess` is wired. |
 | `Hook.fail_open` field | `crates/klynt-hooks/src/engine/dispatcher.rs` | Field in schema is ignored; fail-open is hardcoded — hook errors are silently dropped regardless. Security implication: hooks can't actually enforce. |
-| Plugin `agent_ask_user` host function | `crates/plugin-runtime/src/host/mod.rs:477` | Returns `"agent callbacks not connected"` unconditionally. Granting `Agent` permission to a plugin does nothing. |
 | Voice phoneme alignment / F0 extraction | `crates/voice-engine/src/{phoneme_aligner,tone_analyzer}.rs` | Pronunciation scoring runs without real alignment data. |
 | Computer Use (platform layer) | `crates/platform-macos/src/computer_use/` | Capture + input + AX tree walker are real, **but no agent tool, Tauri command, or MCP tool calls them.** |
 | NSWorkspace observers | `crates/platform-macos/src/lifecycle.rs:176` | Stubbed; `// TODO: wire objc2 blocks`. |
@@ -342,10 +341,6 @@ Everything KlyntBot persists lives under a single directory. Dev mode uses `~/.k
 │   └── notes_embeddings/
 ├── sessions/                            ← File-based session artefacts (not the canonical session log — that's in data.db)
 ├── workspace/                           ← Project workspace root for the agent
-├── plugins/                             ← Discovered at startup; each plugin is a directory
-│   └── <plugin-id>/
-│       ├── plugin.wasm
-│       └── klyntbot.plugin.json         ← Manifest
 ├── personas/                            ← Persona configs for the squad-chat feature
 ├── strategy/                            ← Strategy files (markdown, owned + rewritten by reforge)
 ├── skills/                              ← User-scoped skills (discovery root #1)
@@ -580,14 +575,6 @@ Skills are markdown files with YAML frontmatter (Agent Skills spec).
 3. Skills declare `mcp_tools` to whitelist MCP tool access (`["*"]` = all, `[]` = none).
 4. All skill summaries are auto-injected into the system prompt via `SkillListingSource`; the model loads full bodies on demand via the `skill_reference` tool. **No `SkillRouter` with keyword + semantic scoring exists** — the runtime is fully flat. CLAUDE.md's older description was stale.
 
-### Add a WASM plugin
-
-1. Use `crates/plugin-sdk` (re-exports `extism-pdk`) in a `cdylib`.
-2. Implement plugin functions; declare permissions in `klyntbot.plugin.json` manifest (Network / Storage / Agent).
-3. Drop `plugin.wasm` + manifest into `~/.klyntbot/plugins/<plugin-id>/`.
-4. **Restart the desktop app** — there is no hot-reload.
-5. **Caution:** the `Agent` permission grants nothing functional today (`agent_ask_user` host function is stubbed — `crates/plugin-runtime/src/host/mod.rs:477`).
-
 ### Add a Tauri command
 
 Two macros enforce the surface — direct `#[tauri::command]` is **forbidden** in `crates/desktop/src/commands/` (a test fails if present).
@@ -608,9 +595,9 @@ After adding, list the function path in `desktop_macros::klynt_collect_commands!
 
 ## Dev/prod isolation
 
-Production: `~/.klyntbot/` — config + data + plugins.
+Production: `~/.klyntbot/` — config + data.
 
-Dev: set `KLYNTBOT_HOME=~/.klyntbot-dev` (via `.env` at repo root, or env var). Everything is mirrored under the dev directory — config, data.db, sessions, workspace, lance, plugins, personas. **Nothing in dev mode touches production state.**
+Dev: set `KLYNTBOT_HOME=~/.klyntbot-dev` (via `.env` at repo root, or env var). Everything is mirrored under the dev directory — config, data.db, sessions, workspace, lance, personas. **Nothing in dev mode touches production state.**
 
 The `.env` at repo root is auto-loaded. Typical contents:
 
@@ -681,10 +668,9 @@ These are deliberate non-goals — not missing features.
 
 - **Structured observability (OpenTelemetry, Prometheus, metrics dashboards).** This is a single-user local app. Existing `tracing` logs + `PipelineEvent` SSE stream are sufficient.
 - **Windows / Linux desktop support.** macOS only. Linux has partial sandbox support via Landlock for the coding-mode sandbox helper, but the app itself is macOS.
-- **A network plugin registry.** Plugins are loaded from disk only.
+- **A third-party plugin surface.** Offline-first, no marketplace. Extensions are first-party Rust feature crates, MCP servers, or skills.
 - **Backwards-compatibility migrations pre-1.0.** Schema can be altered in-place. After 0.1.0 release, this becomes a hard rule with versioned migrations.
 - **An external `klynt-cli` binary.** The 2026-04-23 spec for this is explicitly deprecated; coding-mode runs through the desktop binary's `--hook` short-circuit instead.
-- **Hot-reload for plugins.** Restart required.
 - **Built-in AI task automations** (`plan_day`, `decompose`, `execute`, `suggest`, forecasting). Removed 2026-04-20. Compose via cron + skills + the `agent` tool instead.
 
 ---

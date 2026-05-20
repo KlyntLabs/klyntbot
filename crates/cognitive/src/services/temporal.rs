@@ -334,7 +334,11 @@ mod tests {
         let (_pool, service) = setup().await;
         let repo = service.fact_repo.clone();
 
-        let f1 = make_fact(
+        // SemanticFactRepo::upsert collapses rows that share the exact
+        // (subject, predicate, object) triple — so to model "this attribute
+        // changed value over time" the two versions must carry different
+        // objects.
+        let mut f1 = make_fact(
             "h1",
             "productivity",
             "user",
@@ -342,7 +346,8 @@ mod tests {
             "2026-01-01",
             "2026-01-01",
         );
-        let f2 = make_fact(
+        f1.object = "morning".into();
+        let mut f2 = make_fact(
             "h2",
             "productivity",
             "user",
@@ -350,6 +355,7 @@ mod tests {
             "2026-02-01",
             "2026-02-01",
         );
+        f2.object = "evening".into();
 
         repo.upsert(&f1).await.unwrap();
         repo.upsert(&f2).await.unwrap();

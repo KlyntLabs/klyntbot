@@ -1,9 +1,8 @@
 # KlyntBot — Technical Debt Inventory
 
 > **Living document.** Categorized, not chronological. Updated as items are found, fixed, or re-evaluated.
-> **Last refreshed:** 2026-05-17 (Batch B — deleted vestigial `intent_summary` field from both `context_engine::SourceContext` and `ai_core::RecallQuery`. Cumulative ~39 entries closed today).
+> **Last refreshed:** 2026-05-20
 > **Scope:** the whole Rust workspace + `/desktop-ui` frontend. Not third-party deps.
-> **Total entries:** ~130 across 9 categories.
 
 ## How to use this file
 
@@ -103,12 +102,10 @@ Add entries during normal work — don't batch. Remove entries when closed; **do
 
 | Sev | Location | Item | Notes |
 |---|---|---|---|
-| **P0** | `crates/plugin-runtime/src/host/mod.rs:477` | `agent_ask_user` host function returns `{"error":"agent callbacks not connected"}` unconditionally | **User-facing surprise:** granting plugin `Agent` permission does nothing. Tracked as "Task #8" in code. |
 | **P0** | `crates/notifications/src/channel/mod.rs:64` | `TelegramNotificationChannel`, `DiscordNotificationChannel`, `EmailNotificationChannel` exist as types but are **not wired** into `NotificationDispatcher` | **User-facing surprise:** alarms with those channel bits silently no-op. Comment defers to "4.8 / follow-up." |
 | **P0** | `crates/mcp/src/server/approval.rs:6,21` | `BlockingFallbackChannel::desktop_prompt()` always returns Decline for MCP server-side approval | **User-facing surprise:** remote MCP clients cannot get approval for sensitive tools. |
 | P1 | `crates/coding-memory/src/reforge_phase.rs:104` | Multiple Reforge phases return `NotImplementedInPhase` at runtime | Phased rollout — by design but limits production surface. |
 | P1 | `crates/coding-memory/src/reforge_phase.rs` | `CodingSynthesisPhase` (2.5) and `RuleArtifactGenerationPhase` (3.5) return `NotImplementedInPhase { required_phase: 5 }` in the legacy trait file. **However**, real implementations exist in `reforge/coding_synthesis.rs` and `reforge/rule_artifacts.rs` and are wired into `app-core::CodingPhaseRunnerImpl`. `SessionEndPass` and `CrossSessionDedup` in `reforge/` are fully implemented. | Legacy stub file shadows real implementations; should be deleted once fully migrated. |
-| P1 | `crates/plugin-sdk/src/lib.rs` (`db_query` impl) | Reads var `__db_query_not_implemented`, returns `"[]"` — SDK-side is a no-op placeholder | Real call goes through host function; this dead code is misleading. |
 | P2 | `crates/klynt-protocol::HookExecutionMode::InProcess` + `crates/klynt-hooks/src/engine/dispatcher.rs` | `InProcess` variant typed but **no dispatch path**. Only `Subprocess` mode is wired. | Decide: implement in-process hooks or remove the variant. |
 | P2 | `crates/klynt-hooks/src/engine/dispatcher.rs` | `Hook.fail_open` field defined in schema but **ignored** — fail-open is hardcoded. Hook errors silently dropped. | Security: hooks can't actually enforce blocks. Respect the field or remove it. |
 | P3 | `crates/cognitive/src/mirror/sources/skill_effectiveness.rs:77,86` | `accumulate` + `flush` are no-ops with `TODO(T7)` comments | Mirror source wired but inert. |
@@ -147,7 +144,6 @@ These are not bugs — they're real fallback paths kept alive during a migration
 |---|---|---|---|
 | P1 | Bundle budget not wired into any merge-gate script | `.size-limit.json` exists (threads route ≤ 350 kB gzipped, total ≤ 2.5 MB) but no script invokes `size-limit` — only `bun run size-limit` manually. | Wire into `run_chat_perf_gates.sh` or similar so regressions fail CI. |
 | P1 | TTFT perf gate is a no-op skeleton | `scripts/run_chat_perf_gates.sh` runs `agent/benches/ttft_e2e.rs` with `THRESHOLD_TTFT_P95_MS=25` (default — NOT 15ms as docs claim) but prints `"numeric gate deferred to PR8"` and never `exit 1`s. | Implement the numeric assertion. |
-| P1 | `crates/plugin-runtime/src/manifest.rs` (`PluginCronJob`) | Manifest deserializes `cronJobs: Vec<PluginCronJob>` but **no executor reads them**. Plugins can declare cron jobs and they will never fire. | Implement plugin-cron executor or remove the field. |
 | P1 | `crates/platform-macos/src/computer_use/ax_walker.rs` (`AccessibilityNode.frame`) | Frame coordinates are in **AppKit (bottom-left)** space, not Quartz (top-left) as the rest of `PlatformInput`/`PlatformCapture` API documents. Y-flip is a Phase 4 TODO. | Significant correctness gotcha for future Computer Use. Fix y-flip or document the inconsistency loudly. |
 | P2 | `crates/platform-macos/src/computer_use/input.rs` (`MacInput`) | `Screenshot` + `Zoom` variants return `NotImplemented` (14 of 16 `ComputerUseAction` work). | |
 | P2 | `crates/platform-macos/src/computer_use/capture.rs` (`MacCapture`) | `capture_window` + `get_active_window` return `NotImplemented` (3 of 5 `PlatformCapture` methods work). Plus `scale` hardcoded `2.0` instead of `NSScreen.backingScaleFactor`. | |
@@ -210,12 +206,11 @@ Things present in the codebase that aren't enumerated in any doc today.
 
 | Sev | What | Where | Why it matters |
 |---|---|---|---|
-| **P0** | Computer Use platform layer is real | `crates/platform-input`, `crates/platform-capture`, `crates/platform-macos/src/computer_use/{capture,input,ax_walker}.rs` | Capture, input injection, AX tree walker all implemented and tested. **Not wired** into any agent tool, Tauri command, or MCP tool. See `subsystems/12-plugins-platform.md` for the full inventory. |
+| **P0** | Computer Use platform layer is real | `crates/platform-input`, `crates/platform-capture`, `crates/platform-macos/src/computer_use/{capture,input,ax_walker}.rs` | Capture, input injection, AX tree walker all implemented and tested. **Not wired** into any agent tool, Tauri command, or MCP tool. See `subsystems/12-plugins-platform.md` for the full inventory.|
 | P2 | Skill discovery roots (4 of them) | `klynt-skill-loader::discovery` | User / ReforgePrivate / Project / ReforgeTeam — priority order matters; not documented at the project level. |
 | P2 | OS_NATIVE + Tray notification channels | `crates/notifications/src/channel/` | Notification-only surfaces (no chat). Listed separately from chat channels but conflated in some docs. |
 | P2 | Voice has 5 engines | `Qwen3AsrEngine` + `CloudAsrEngine` (STT); `Qwen3TtsEngine` + `AvSpeechTtsEngine` + `CloudTtsEngine` (TTS) | `Qwen3TtsEngine` requires `--features qwen3` and isn't on by default. |
 | P3 | `klynt-protocol` + `klynt-hooks` provenance | Crate `Cargo.toml` descriptions | "Adapted from codex-rs/protocol/" and "Adapted from codex-rs/hooks/" — origin worth crediting in subsystem docs. |
-| P3 | 5 plugin host namespaces | `crates/plugin-runtime/src/host/mod.rs` | `db`, `log`, `http`, `agent`, `tool`. Three permissions: `Network`, `Storage`, `Agent`. Not enumerated outside source. |
 | P2 | `strategy_records` table is raw-SQL accessed | `cognitive/src/services/reforge/feedback.rs:173` | No typed repo struct; reads via raw SQL. Inconsistent with every other table. |
 | P2 | `coding_approval_history` retention | Grows unboundedly; no retention policy or compaction job. | Add a 90-day retention or similar. |
 | P2 | `feature-productivity` 20 tables undocumented | Only `activity_events` and `daily_summaries` are mentioned in CLAUDE.md. 18 other tables (incl. `productivity_quality_scores`, `productivity_narratives`, `productivity_voice_journals`, `productivity_categorization_cache`, `productivity_privacy_rules`, `productivity_rule_evolution_log`, etc.) are completely undocumented. | Schema discoverability gap. |

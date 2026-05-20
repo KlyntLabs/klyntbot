@@ -43,13 +43,20 @@ pub fn compression_aware_default(
         });
     }
 
-    // 3. Pre-frontier prefix — accelerates intra-window turns
-    let frontier = compressor.frontier_index(messages);
-    if let Some(idx) = frontier.checked_sub(1) {
-        bps.push(CacheBreakpoint {
-            anchor: CacheAnchor::MessageIndex(idx),
-            ttl: CacheTtl::Ephemeral,
-        });
+    // 3. Pre-frontier prefix — accelerates intra-window turns.
+    // Skip when the conversation has no user/assistant exchange yet: the
+    // only cacheable content is the system prompt, already covered by (1).
+    let has_exchange = messages
+        .iter()
+        .any(|m| matches!(m, Message::User { .. } | Message::Assistant { .. }));
+    if has_exchange {
+        let frontier = compressor.frontier_index(messages);
+        if let Some(idx) = frontier.checked_sub(1) {
+            bps.push(CacheBreakpoint {
+                anchor: CacheAnchor::MessageIndex(idx),
+                ttl: CacheTtl::Ephemeral,
+            });
+        }
     }
 
     bps
