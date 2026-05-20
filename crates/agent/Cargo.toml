@@ -31,7 +31,6 @@ feature-coaching.workspace = true
 feature-coding-bash = { path = "../feature-coding-bash" }
 feature-language-learning.workspace = true
 feature-notes.workspace = true
-plugin-runtime.workspace = true
 mcp.workspace = true
 scheduling.workspace = true
 skill-system.workspace = true

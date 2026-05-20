@@ -694,15 +694,11 @@ impl AgentLoopBuilder {
         }
 
         // Cron tool (optional)
-        let cron_handler: Option<Arc<dyn tools::cron_tool::CronHandler>> =
-            if let Some((ref executor, ref repo)) = self.cron_executor {
-                let adapter: Arc<dyn tools::cron_tool::CronHandler> =
-                    Arc::new(CronHandlerAdapter::new(Arc::clone(executor), repo.clone()));
-                tool_registry.register(CronTool::with_handler(Arc::clone(&adapter)));
-                Some(adapter)
-            } else {
-                None
-            };
+        if let Some((ref executor, ref repo)) = self.cron_executor {
+            let adapter: Arc<dyn tools::cron_tool::CronHandler> =
+                Arc::new(CronHandlerAdapter::new(Arc::clone(executor), repo.clone()));
+            tool_registry.register(CronTool::with_handler(adapter));
+        }
 
         // Shared references — SqlitePool is Clone+Send+Sync via Arc internally
 
@@ -1589,71 +1585,6 @@ impl AgentLoopBuilder {
             let productivity_tool =
                 feature_productivity::ProductivityTool::new(prod_repos, focus_mgr, aggregator);
             tool_registry.register(productivity_tool);
-        }
-
-        // ── Plugin tools (WASM) ───────────────────────────────────────────
-        if config.plugins.enabled {
-            let plugins_dir = config.data_dir_path().join("plugins");
-            match plugin_runtime::PluginManager::load_all(
-                &plugins_dir,
-                storage_pool.inner().clone(),
-                &config.plugins,
-                Some(bus.outbound_sender()),
-                self.domain_event_bus.clone(),
-            ) {
-                Ok(plugin_manager) => {
-                    let loaded_count = plugin_manager.packages().len();
-                    for package in plugin_manager.into_packages() {
-                        // Register plugin cron jobs
-                        if let Some(ref handler) = cron_handler {
-                            for cron_job in &package.manifest().cron_jobs {
-                                let params = tools::cron_tool::AddCronJobParams {
-                                    name: format!("plugin:{}:{}", package.name(), cron_job.tool),
-                                    schedule: tools::cron_tool::CronSchedule::Cron {
-                                        expr: cron_job.schedule.clone(),
-                                        tz: None,
-                                    },
-                                    message: format!("Run plugin tool: {}", cron_job.tool),
-                                    enabled: true,
-                                    channel: None,
-                                    to: None,
-                                    internal: true,
-                                    origin: "plugin".to_string(),
-                                };
-                                match handler.add_job(params).await {
-                                    Ok(job) => {
-                                        info!(
-                                            plugin = %package.name(),
-                                            job_id = %job.id,
-                                            tool = %cron_job.tool,
-                                            "registered plugin cron job"
-                                        );
-                                    }
-                                    Err(e) => {
-                                        warn!(
-                                            plugin = %package.name(),
-                                            tool = %cron_job.tool,
-                                            error = %e,
-                                            "failed to register plugin cron job"
-                                        );
-                                    }
-                                }
-                            }
-                        }
-
-                        // Register plugin tools
-                        for tool in package.tools() {
-                            tool_registry.register_dyn(tool);
-                        }
-                    }
-                    if loaded_count > 0 {
-                        info!(count = loaded_count, "WASM plugin tools registered");
-                    }
-                }
-                Err(e) => {
-                    warn!(error = %e, "failed to load WASM plugins");
-                }
-            }
         }
 
         // ── MCP tools (Model Context Protocol) ──────────────────────────

@@ -27,7 +27,6 @@ use super::mcp::McpConfig;
 use super::notes::NotesConfig;
 use super::notifications::NotificationsConfig;
 use super::packs::PacksConfig;
-use super::plugins::PluginsConfig;
 use super::productivity::ProductivityConfig;
 use super::project::ProjectConfig;
 use super::providers::{ProviderManagerConfig, ProvidersConfig};
@@ -156,10 +155,6 @@ pub struct Config {
     /// Feature packs (controls which skills and config sections are active).
     #[serde(default)]
     pub packs: PacksConfig,
-
-    /// Plugin system configuration.
-    #[serde(default)]
-    pub plugins: PluginsConfig,
 
     /// Coding memory subsystem configuration.
     #[serde(default)]

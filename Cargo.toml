@@ -1,6 +1,5 @@
 [workspace]
 resolver = "2"
-exclude = ["crates/plugin-sdk", "tests/fixtures/hello_plugin"]
 members = [
     "crates/common",
     "crates/config",
@@ -18,7 +17,6 @@ members = [
     "crates/tools-core-macros",
     "crates/feature-finance",
     "crates/analytics",
-    "crates/plugin-runtime",
     "crates/mcp",
     "crates/notifications",
     "crates/desktop-shared",
@@ -159,7 +157,6 @@ tools-core-macros = { path = "crates/tools-core-macros" }
 feature-finance = { path = "crates/feature-finance" }
 feature-notes = { path = "crates/feature-notes" }
 feature-productivity = { path = "crates/feature-productivity" }
-plugin-runtime = { path = "crates/plugin-runtime" }
 cognitive = { path = "crates/cognitive" }
 feature-coaching = { path = "crates/feature-coaching" }
 feature-coding-bash = { path = "crates/feature-coding-bash" }
@@ -192,7 +189,6 @@ ai-core-macros = { path = "crates/ai-core-macros" }
 coding-ingest = { path = "crates/coding-ingest" }
 coding-memory = { path = "crates/coding-memory" }
 klynt-core = { path = "crates/klynt-core" }
-extism = "1"
 mcp = { path = "crates/mcp" }
 notifications = { path = "crates/notifications" }
 rmcp = { version = "0.17", default-features = false }
@@ -292,7 +288,6 @@ license.workspace = true
 default = ["email"]
 email = ["channels/email"]
 browser-integration = ["tools/browser-integration"]
-plugin-integration = ["plugin-runtime/plugin-integration"]
 soak = []
 
 [dependencies]
@@ -312,7 +307,6 @@ cognitive.workspace = true
 context_engine.workspace = true
 feature-coaching.workspace = true
 storage.workspace = true
-plugin-runtime.workspace = true
 mcp.workspace = true
 notifications.workspace = true
 
@@ -332,9 +326,7 @@ feature-finance.workspace = true
 feature-tasks.workspace = true
 feature-productivity.workspace = true
 feature-coaching.workspace = true
-plugin-runtime.workspace = true
 tools-core.workspace = true
-extism.workspace = true
 dashmap.workspace = true
 assert_cmd.workspace = true
 coding-ingest = { path = "crates/coding-ingest" }
